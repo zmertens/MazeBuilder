@@ -26,6 +26,7 @@ LevelGenerator::LevelGenerator(const std::vector<std::vector<Tile::Data>>& level
     const glm::vec3& scale)
 : Entity(config, position, rotation, scale)
 , cTileScalar(20.0f, 20.0f, 20.0f)
+, cSpriteHalfWidth((cTileScalar.x + cTileScalar.z) * 0.25f)
 , mLevel(level)
 , mWallTexId(wallTex)
 , mFloorTexId(floorTex)
@@ -104,9 +105,9 @@ void LevelGenerator::generateLevel(std::vector<Vertex>& vertices,
 {
     using namespace Tile;
 
-    for (GLuint i = 0; i != mLevel.size(); ++i)
+    for (std::size_t i = 0; i != mLevel.size(); ++i)
     {
-        for (GLuint j = 0; j != mLevel.at(0).size(); ++j)
+        for (std::size_t j = 0; j != mLevel.at(0).size(); ++j)
         {
             if (mLevel[i][j].empty == true)
             {
@@ -171,9 +172,49 @@ glm::vec3 LevelGenerator::getTileScalar() const
     return cTileScalar;
 }
 
+/**
+ * @brief LevelGenerator::getEnemyPositions
+ * @return
+ */
 std::vector<glm::vec3> LevelGenerator::getEnemyPositions() const
 {
     return mEnemyPositions;
+}
+
+/**
+ * @brief LevelGenerator::getSpriteHalfWidth
+ * @return
+ */
+float LevelGenerator::getSpriteHalfWidth() const
+{
+    return cSpriteHalfWidth;
+}
+
+/**
+ * @brief LevelGenerator::getSpeedPowerUps
+ * @return
+ */
+std::vector<glm::vec3> LevelGenerator::getSpeedPowerUps() const
+{
+    return mSpeedPowerUps;
+}
+
+/**
+ * @brief LevelGenerator::getRechargePowerUps
+ * @return
+ */
+std::vector<glm::vec3> LevelGenerator::getRechargePowerUps() const
+{
+    return mRechargePowerUps;
+}
+
+/**
+ * @brief LevelGenerator::getInvinciblePowerUps
+ * @return
+ */
+std::vector<glm::vec3> LevelGenerator::getInvinciblePowerUps() const
+{
+    return mInvinciblePowerUps;
 }
 
 /**
@@ -193,7 +234,7 @@ glm::vec2 LevelGenerator::getTexCoordsFromOffset(const glm::vec2& texCoord, cons
  * @param x
  * @param z
  */
-void LevelGenerator::addSpecial(Tile::Special special, unsigned int x, unsigned int z)
+void LevelGenerator::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
 {
     using namespace Tile;
     switch (special)
@@ -207,6 +248,15 @@ void LevelGenerator::addSpecial(Tile::Special special, unsigned int x, unsigned 
         case Special::EXIT:
             mExitPoints.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
             break;
+        case Special::INVINC_PW:
+            mInvinciblePowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
+            break;
+        case Special::RCHRG_PW:
+            mRechargePowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
+            break;
+        case Special::SPD_PW:
+            mSpeedPowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
+            break;
     } // switch
 }
 
@@ -217,7 +267,7 @@ void LevelGenerator::addSpecial(Tile::Special special, unsigned int x, unsigned 
  * @param i
  * @param j
  */
-void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j)
+void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 2);
     indices.push_back(vertices.size() + 1);
@@ -244,7 +294,7 @@ void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GL
  * @param i
  * @param j
  */
-void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j)
+void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 0);
     indices.push_back(vertices.size() + 1);
@@ -258,10 +308,10 @@ void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<
     glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 highUlowV = getTexCoordsFromOffset(glm::vec2(1.0f, 0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
 
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), low, glm::vec3(0, -1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, -1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, -1, 0)));
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, -1, 0)));
+    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
+    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 1, 0)));
+    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 1, 0)));
+    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 1, 0)));
 }
 
 /**
@@ -272,7 +322,7 @@ void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<
  * @param j
  * @param dir
  */
-void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j, char dir)
+void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j, char dir)
 {
     glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));
@@ -290,10 +340,10 @@ void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLu
             indices.push_back(vertices.size() + 2);
             indices.push_back(vertices.size() + 3);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), high, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), high, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
             break;
         }
         case 'S':
@@ -305,10 +355,10 @@ void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLu
             indices.push_back(vertices.size() + 2);
             indices.push_back(vertices.size() + 0);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), low, glm::vec3(-1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(-1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(-1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), lowUhighV, glm::vec3(-1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), low, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
             break;
         }
         case 'W':
@@ -320,10 +370,10 @@ void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLu
             indices.push_back(vertices.size() + 2);
             indices.push_back(vertices.size() + 0);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 0, -1)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 0, -1)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 0, -1)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 0, -1)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
             break;
         }
         case 'E':
@@ -335,10 +385,10 @@ void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLu
             indices.push_back(vertices.size() + 2);
             indices.push_back(vertices.size() + 3);
 
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
+            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
             break;
         }
     } // switch

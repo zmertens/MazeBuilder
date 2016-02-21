@@ -39,17 +39,20 @@ KillDashNine::KillDashNine()
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::AWESOME_FACE_INDEX, ResourceIds::Textures::TEST_ATLAS_TEX_NUM_ROWS)),
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
+        ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(2, 0, 0))
 , mLevelGen(ResourceLevels::Levels::TEST_LEVEL,
-    ResourceIds::Textures::BRICKS2_INDEX, ResourceIds::Textures::WALL_INDEX, ResourceIds::Textures::BREAKOUT_PARTICLE,
-    ResourceIds::Textures::TEST_ATLAS_TEX_NUM_ROWS,
+    ResourceIds::Textures::Atlas::BRICKS2_INDEX, ResourceIds::Textures::Atlas::WALL_INDEX,
+        ResourceIds::Textures::Atlas::METAL_INDEX,
+    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
     Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::LEVEL_ID,
     ResourceIds::Materials::PEARL_ID,
-    ResourceIds::Textures::TEST_ATLAS_TEX_ID))
+    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
+, mImGui(mSdlManager, mResources)
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
-, mPlayer(mCamera)
+, mPlayer(mCamera, mLevelGen)
 , mSkybox(Entity::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
@@ -57,14 +60,14 @@ KillDashNine::KillDashNine()
 // @note this pp needs to load after the init function to prevent issues -- if using tex factory
 , mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
     ResourceIds::Meshes::VAO_ID), sWindowDimens.x, sWindowDimens.y)
-, mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(2, 10, 0, 0))
+, mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
 , mTestSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
-    ResourceIds::Textures::TEST_ATLAS_TEX_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::BRICKWALL_INDEX,
-        ResourceIds::Textures::TEST_ATLAS_TEX_NUM_ROWS)),
-    glm::vec3(-10, -5, 0))
+    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
+        ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+    glm::vec3(0.0f))
 , mSdlMixer(mResources)
 {
     // initialize all game resources (texture, material, mesh, et cetera)
@@ -74,21 +77,59 @@ KillDashNine::KillDashNine()
 
     for (auto& enemyPos : mLevelGen.getEnemyPositions())
     {
-        // @TODO add texture atlas namespace to textures
         mEnemies.emplace_back(std::move(new Enemy(
+            mLevelGen.getTileScalar(),
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
-            ResourceIds::Textures::TEST_RPG_CHARS_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::AWESOME_FACE_INDEX,
-            ResourceIds::Textures::TEST_RPG_CHARS_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::RPG_1_WALK_1,
+            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_NUM_ROWS)),
             enemyPos
         )));
     }
 
+    for (auto& pos : mLevelGen.getInvinciblePowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CHAOS,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
+
+    for (auto& pos : mLevelGen.getSpeedPowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CONFUSE,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
+
+    for (auto& pos : mLevelGen.getRechargePowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_INCREASE,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
     // temp, get rid of this
-    mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
-}
+    //mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
+} // constructor
 
 /**
  * @brief KillDashNine::start
@@ -133,49 +174,10 @@ void KillDashNine::loop()
 void KillDashNine::handleEvents()
 {
     float mouseWheelDy = 0;
-    static bool guiOpen = true;
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
-        if (event.type == SDL_QUIT)
-        {
-            mAppIsRunning = false;
-        }
-        else if (event.type == SDL_WINDOWEVENT)
-        {
-            if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
-            {
-                unsigned int newWidth = event.window.data1;
-                unsigned int newHeight = event.window.data2;
-                glViewport(0, 0, newWidth, newHeight);
-                mSdlManager.setDimensions(glm::uvec2(newWidth, newHeight));
-                if (APP_DEBUG)
-                {
-                    std::string resizeDimens = "Resize Event -- Width: "
-                        + Utils::toString(newWidth) + ", Height: "
-                        + Utils::toString(newHeight) + "\n";
-                    SDL_Log(resizeDimens.c_str());
-                }
-            }
-        }
-        else if (event.type == SDL_MOUSEWHEEL)
-            mouseWheelDy = event.wheel.y;
-        else if (event.type == SDL_KEYDOWN)
-        {
-            if (event.key.keysym.sym == SDLK_RETURN)
-                mSdlManager.toggleFullScreen();
-            else if (event.key.keysym.sym == SDLK_ESCAPE)
-                mAppIsRunning = false;
-            else if (event.key.keysym.sym == SDLK_1)
-                guiOpen = !guiOpen;
-        }
-        else if ((mSdlManager.getWindowSettings().initFlags & SDL_INIT_JOYSTICK) &&
-            event.type == SDL_JOYBUTTONDOWN)
-        {
-            if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
-                mSdlManager.hapticRumblePlay(0.75, 500) != 0 && APP_DEBUG)
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
-        }
+        sdlEvents(event, mouseWheelDy);
     } // events
 
     // handle realtime input
@@ -191,12 +193,21 @@ void KillDashNine::update(float dt, double timeSinceInit)
 {
     //mCube.update(dt, timeSinceInit);
     mTestSprite.update(dt, timeSinceInit);
-    //mPlayer.update(dt, timeSinceInit);
-    mPlayer.update(dt, timeSinceInit, mLevelGen.getEmptySpace(), mLevelGen.getTileScalar());
+
+    //auto& transform = mTestSprite.getTransform();
+    Transform transform (mLevelGen.getExitPoints().front(), glm::vec3(0), glm::vec3(1.1f));
+    mTestSprite.setTransform(transform);
+
+    mPlayer.update(dt, timeSinceInit);
     mLevelGen.update(dt, timeSinceInit);
 
     for (auto& enemy : mEnemies)
         enemy->update(dt, timeSinceInit);
+
+    for (auto& powerup : mPowerUps)
+        powerup->update(dt, timeSinceInit);
+
+    mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevelGen.getTileScalar().y - 2.0f, mPlayer.getPosition().z, 0.0f));
 
     static int testCounter = 0;
     if (++testCounter % 50 == 0)
@@ -221,7 +232,7 @@ void KillDashNine::render()
 
     auto& shader = mResources.getShader(ResourceIds::Shaders::LEVEL_SHADER_ID);
     shader->bind();
-    auto& tex = mResources.getTexture(ResourceIds::Textures::TEST_ATLAS_TEX_ID);
+    auto& tex = mResources.getTexture(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID);
     tex->bind();
 
     shader->setUniform("uLight.ambient", mLight.getAmbient());
@@ -233,19 +244,23 @@ void KillDashNine::render()
 
     //mCube.draw(mSdlManager, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
-    //mTestSprite.draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
+    mTestSprite.draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
-    spriteShader->setUniform("uHalfSize",
-        (mLevelGen.getTileScalar().x + mLevelGen.getTileScalar().z) * 0.25f);
+    spriteShader->setUniform("uHalfSize", mLevelGen.getSpriteHalfWidth());
     mResources.putInCache(ResourceIds::Shaders::SPRITE_SHADER_ID, CachePos::Shader);
     for (auto& enemy : mEnemies)
         enemy->draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
-    //mImGuiHelper.render();
+
+
+    for (auto& powerup : mPowerUps)
+        powerup->draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
 
     mPostProcessor.activateEffect(Effects::Type::NO_EFFECT);
     mPostProcessor.release();
+
+    mImGui.render();
 
     mSdlManager.swapBuffers();
 }
@@ -352,7 +367,7 @@ void KillDashNine::init()
     // textures
     ITexture::Ptr testTex (new Tex2dImpl(mSdlManager,
         ResourcePaths::Textures::TEST_TEX_ATLAS_PATH, 0));
-    mResources.insert(ResourceIds::Textures::TEST_ATLAS_TEX_ID, std::move(testTex));
+    mResources.insert(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID, std::move(testTex));
 
     ITexture::Ptr skyboxTex (new TexSkyboxImpl(mSdlManager,
         ResourcePaths::Textures::SKYBOX_PATHS, 0));
@@ -366,7 +381,7 @@ void KillDashNine::init()
 
     ITexture::Ptr charsTex (new Tex2dImpl(mSdlManager,
         ResourcePaths::Textures::TEST_RPG_CHARS_PATH, 0));
-    mResources.insert(ResourceIds::Textures::TEST_RPG_CHARS_ID, std::move(charsTex));
+    mResources.insert(ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID, std::move(charsTex));
 
     ITexture::Ptr perlinTex (new TexPerlinNoise2dImpl(4.0f, 0.5f, 128, 128, true, 0));
     mResources.insert(ResourceIds::Textures::PERLIN_NOISE_2D_ID, std::move(perlinTex));
@@ -423,3 +438,53 @@ void KillDashNine::printFramesToConsole(const float dt)
         mTimeSinceLastUpdate -= 1.0f;
     }
 }
+
+/**
+ * @brief KillDashNine::sdlEvents
+ * @param event
+ * @param mouseWheelDy
+ */
+void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+{
+    if (event.type == SDL_QUIT)
+    {
+        mAppIsRunning = false;
+    }
+    else if (event.type == SDL_WINDOWEVENT)
+    {
+        if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
+        {
+            unsigned int newWidth = event.window.data1;
+            unsigned int newHeight = event.window.data2;
+            glViewport(0, 0, newWidth, newHeight);
+            mSdlManager.setDimensions(glm::uvec2(newWidth, newHeight));
+            if (APP_DEBUG)
+            {
+                std::string resizeDimens = "Resize Event -- Width: "
+                    + Utils::toString(newWidth) + ", Height: "
+                    + Utils::toString(newHeight) + "\n";
+                SDL_Log(resizeDimens.c_str());
+            }
+        }
+    }
+    else if (event.type == SDL_MOUSEWHEEL)
+        mouseWheelDy = event.wheel.y;
+    else if (event.type == SDL_KEYDOWN)
+    {
+        if (event.key.keysym.sym == SDLK_RETURN)
+            mSdlManager.toggleFullScreen();
+        else if (event.key.keysym.sym == SDLK_ESCAPE)
+            mAppIsRunning = false;
+        else if (event.key.keysym.sym == SDLK_1)
+        {
+
+        }
+    }
+    else if ((mSdlManager.getWindowSettings().initFlags & SDL_INIT_JOYSTICK) &&
+        event.type == SDL_JOYBUTTONDOWN)
+    {
+        if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
+            mSdlManager.hapticRumblePlay(0.75, 500) != 0 && APP_DEBUG)
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+    }
+} // sdlEvents

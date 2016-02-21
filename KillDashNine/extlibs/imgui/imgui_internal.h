@@ -1,7 +1,7 @@
-// ImGui library v1.47 WIP
-// Internals
-// You may use this file to debug, understand or extend ImGui features but we don't provide any guarantee of forward compatibility!
+// dear imgui, v1.48 WIP
+// (internals)
 
+// You may use this file to debug, understand or extend ImGui features but we don't provide any guarantee of forward compatibility!
 // Implement maths operators for ImVec2 (disabled by default to not collide with using IM_VEC2_CLASS_EXTRA along with your own math types+operators)
 //   #define IMGUI_DEFINE_MATH_OPERATORS
 
@@ -137,6 +137,15 @@ static inline float  ImLengthSqr(const ImVec4& lhs)                             
 static inline float  ImInvLength(const ImVec2& lhs, float fail_value)           { float d = lhs.x*lhs.x + lhs.y*lhs.y; if (d > 0.0f) return 1.0f / sqrtf(d); return fail_value; }
 static inline ImVec2 ImRound(ImVec2 v)                                          { return ImVec2((float)(int)v.x, (float)(int)v.y); }
 
+// We call C++ constructor on own allocated memory via the placement "new(ptr) Type()" syntax.
+// Defining a custom placement new() with a dummy parameter allows us to bypass including <new> which on some platforms complains when user has disabled exceptions.
+#ifdef IMGUI_DEFINE_PLACEMENT_NEW
+struct ImPlacementNewDummy {};
+inline void* operator new(size_t, ImPlacementNewDummy, void* ptr) { return ptr; }
+inline void operator delete(void*, ImPlacementNewDummy, void*) {}
+#define IM_PLACEMENT_NEW(_PTR)  new(ImPlacementNewDummy() ,_PTR)
+#endif
+
 //-----------------------------------------------------------------------------
 // Types
 //-----------------------------------------------------------------------------
@@ -161,7 +170,7 @@ enum ImGuiTreeNodeFlags_
 
 enum ImGuiSliderFlags_
 {
-    ImGuiSliderFlags_Vertical               = 1 << 0,
+    ImGuiSliderFlags_Vertical               = 1 << 0
 };
 
 enum ImGuiSelectableFlagsPrivate_
@@ -360,18 +369,17 @@ struct ImGuiState
     ImGuiWindow*            HoveredWindow;                      // Will catch mouse inputs
     ImGuiWindow*            HoveredRootWindow;                  // Will catch mouse inputs (for focus/move only)
     ImGuiID                 HoveredId;                          // Hovered widget
-    bool                    HoveredIdAllowHoveringOthers;
+    bool                    HoveredIdAllowOverlap;
     ImGuiID                 HoveredIdPreviousFrame;
     ImGuiID                 ActiveId;                           // Active widget
     ImGuiID                 ActiveIdPreviousFrame;
     bool                    ActiveIdIsAlive;
     bool                    ActiveIdIsJustActivated;            // Set at the time of activation for one frame
-    bool                    ActiveIdAllowHoveringOthers;        // Set only by active widget
+    bool                    ActiveIdAllowOverlap;               // Set only by active widget
     ImGuiWindow*            ActiveIdWindow;
     ImGuiWindow*            MovedWindow;                        // Track the child window we clicked on to move a window. Pointer is only valid if ActiveID is the "#MOVE" identifier of a window.
     ImVector<ImGuiIniData>  Settings;                           // .ini Settings
     float                   SettingsDirtyTimer;                 // Save .ini settinngs on disk when time reaches zero
-    int                     DisableHideTextAfterDoubleHash;
     ImVector<ImGuiColMod>   ColorModifiers;                     // Stack for PushStyleColor()/PopStyleColor()
     ImVector<ImGuiStyleMod> StyleModifiers;                     // Stack for PushStyleVar()/PopStyleVar()
     ImVector<ImFont*>       FontStack;                          // Stack for PushFont()/PopFont()
@@ -445,23 +453,23 @@ struct ImGuiState
         HoveredWindow = NULL;
         HoveredRootWindow = NULL;
         HoveredId = 0;
-        HoveredIdAllowHoveringOthers = false;
+        HoveredIdAllowOverlap = false;
         HoveredIdPreviousFrame = 0;
         ActiveId = 0;
         ActiveIdPreviousFrame = 0;
         ActiveIdIsAlive = false;
         ActiveIdIsJustActivated = false;
-        ActiveIdAllowHoveringOthers = false;
+        ActiveIdAllowOverlap = false;
         ActiveIdWindow = NULL;
         MovedWindow = NULL;
         SettingsDirtyTimer = 0.0f;
-        DisableHideTextAfterDoubleHash = 0;
 
         SetNextWindowPosVal = ImVec2(0.0f, 0.0f);
         SetNextWindowSizeVal = ImVec2(0.0f, 0.0f);
         SetNextWindowCollapsedVal = false;
         SetNextWindowPosCond = 0;
         SetNextWindowSizeCond = 0;
+        SetNextWindowContentSizeCond = 0;
         SetNextWindowCollapsedCond = 0;
         SetNextWindowFocus = false;
         SetNextTreeNodeOpenedVal = false;
@@ -482,6 +490,7 @@ struct ImGuiState
         ModalWindowDarkeningRatio = 0.0f;
         OverlayDrawList._OwnerName = "##Overlay"; // Give it a name for debugging
         MouseCursor = ImGuiMouseCursor_Arrow;
+        memset(MouseCursorData, 0, sizeof(MouseCursorData));
 
         LogEnabled = false;
         LogFile = NULL;
@@ -493,6 +502,7 @@ struct ImGuiState
         FramerateSecPerFrameIdx = 0;
         FramerateSecPerFrameAccum = 0.0f;
         CaptureMouseNextFrame = CaptureKeyboardNextFrame = false;
+        memset(TempBuffer, 0, sizeof(TempBuffer));
     }
 };
 
@@ -512,8 +522,8 @@ struct IMGUI_API ImGuiDrawContext
     int                     TreeDepth;
     ImGuiID                 LastItemID;
     ImRect                  LastItemRect;
-    bool                    LastItemHoveredAndUsable;
-    bool                    LastItemHoveredRect;
+    bool                    LastItemHoveredAndUsable;  // Item rectangle is hovered, and its window is currently interactable with (not blocked by a popup preventing access to the window)
+    bool                    LastItemHoveredRect;       // Item rectangle is hovered, but its window may or not be currently interactable with (might be blocked by a popup preventing access to the window)
     bool                    MenuBarAppending;
     float                   MenuBarOffsetX;
     ImVector<ImGuiWindow*>  ChildWindows;
@@ -597,7 +607,8 @@ struct IMGUI_API ImGuiWindow
     ImVec2                  ScrollTarget;                       // target scroll position. stored as cursor position with scrolling canceled out, so the highest point is always 0.0f. (FLT_MAX for no change)
     ImVec2                  ScrollTargetCenterRatio;            // 0.0f = scroll so that target position is at top, 0.5f = scroll so that target position is centered
     bool                    ScrollbarX, ScrollbarY;
-    ImVec2                  ScrollbarSizes;                     // 
+    ImVec2                  ScrollbarSizes;
+    float                   BorderSize;
     bool                    Active;                             // Set to true on Begin()
     bool                    WasActive;
     bool                    Accessed;                           // Set to true when any widget access the current window
@@ -648,8 +659,6 @@ public:
     ImRect      TitleBarRect() const                    { return ImRect(Pos, ImVec2(Pos.x + SizeFull.x, Pos.y + TitleBarHeight())); }
     float       MenuBarHeight() const                   { return (Flags & ImGuiWindowFlags_MenuBar) ? CalcFontSize() + GImGui->Style.FramePadding.y * 2.0f : 0.0f; }
     ImRect      MenuBarRect() const                     { float y1 = Pos.y + TitleBarHeight(); return ImRect(Pos.x, y1, Pos.x + SizeFull.x, y1 + MenuBarHeight()); }
-    ImU32       Color(ImGuiCol idx, float a=1.f) const  { ImVec4 c = GImGui->Style.Colors[idx]; c.w *= GImGui->Style.Alpha * a; return ImGui::ColorConvertFloat4ToU32(c); }
-    ImU32       Color(const ImVec4& col) const          { ImVec4 c = col; c.w *= GImGui->Style.Alpha; return ImGui::ColorConvertFloat4ToU32(c); }
 };
 
 //-----------------------------------------------------------------------------
@@ -666,13 +675,14 @@ namespace ImGui
     inline    ImGuiWindow*  GetCurrentWindowRead()      { ImGuiState& g = *GImGui; return g.CurrentWindow; }
     inline    ImGuiWindow*  GetCurrentWindow()          { ImGuiState& g = *GImGui; g.CurrentWindow->Accessed = true; return g.CurrentWindow; }
     IMGUI_API ImGuiWindow*  GetParentWindow();
+    IMGUI_API ImGuiWindow*  FindWindowByName(const char* name);
     IMGUI_API void          FocusWindow(ImGuiWindow* window);
 
     IMGUI_API void          SetActiveID(ImGuiID id, ImGuiWindow* window);
     IMGUI_API void          SetHoveredID(ImGuiID id);
     IMGUI_API void          KeepAliveID(ImGuiID id);
 
-    IMGUI_API void          EndFrame();                 // This automatically called by Render()
+    IMGUI_API void          EndFrame();                 // Automatically called by Render()
 
     IMGUI_API void          ItemSize(const ImVec2& size, float text_offset_y = 0.0f);
     IMGUI_API void          ItemSize(const ImRect& bb, float text_offset_y = 0.0f);
@@ -684,13 +694,22 @@ namespace ImGui
     IMGUI_API ImVec2        CalcItemSize(ImVec2 size, float default_x, float default_y);
     IMGUI_API float         CalcWrapWidthForPos(const ImVec2& pos, float wrap_pos_x);
 
+    IMGUI_API void          OpenPopupEx(const char* str_id, bool reopen_existing);
+
+    inline IMGUI_API ImU32  GetColorU32(ImGuiCol idx, float alpha_mul)  { ImVec4 c = GImGui->Style.Colors[idx]; c.w *= GImGui->Style.Alpha * alpha_mul; return ImGui::ColorConvertFloat4ToU32(c); }
+    inline IMGUI_API ImU32  GetColorU32(const ImVec4& col)              { ImVec4 c = col; c.w *= GImGui->Style.Alpha; return ImGui::ColorConvertFloat4ToU32(c); }
+
     // NB: All position are in absolute pixels coordinates (not window coordinates)
+    // FIXME: Refactor all RenderText* functions into one.
     IMGUI_API void          RenderText(ImVec2 pos, const char* text, const char* text_end = NULL, bool hide_text_after_hash = true);
     IMGUI_API void          RenderTextWrapped(ImVec2 pos, const char* text, const char* text_end, float wrap_width);
     IMGUI_API void          RenderTextClipped(const ImVec2& pos_min, const ImVec2& pos_max, const char* text, const char* text_end, const ImVec2* text_size_if_known, ImGuiAlign align = ImGuiAlign_Default, const ImVec2* clip_min = NULL, const ImVec2* clip_max = NULL);
     IMGUI_API void          RenderFrame(ImVec2 p_min, ImVec2 p_max, ImU32 fill_col, bool border = true, float rounding = 0.0f);
     IMGUI_API void          RenderCollapseTriangle(ImVec2 p_min, bool opened, float scale = 1.0f, bool shadow = false);
     IMGUI_API void          RenderCheckMark(ImVec2 pos, ImU32 col);
+
+    IMGUI_API void          PushClipRect(const ImVec2& clip_rect_min, const ImVec2& clip_rect_max, bool intersect_with_existing_clip_rect = true);
+    IMGUI_API void          PopClipRect();
 
     IMGUI_API bool          ButtonBehavior(const ImRect& bb, ImGuiID id, bool* out_hovered, bool* out_held, ImGuiButtonFlags flags = 0);
     IMGUI_API bool          ButtonEx(const char* label, const ImVec2& size_arg = ImVec2(0,0), ImGuiButtonFlags flags = 0);

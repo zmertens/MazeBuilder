@@ -6,10 +6,8 @@
 #include "extlibs/imgui/imgui.h"
 
 #include "engine/SdlManager.hpp"
-#include "engine/AABB.hpp"
 
 class ResourceManager;
-//class SdlManager; // use forward declare once shader / tex have been set up
 
 class ImGuiHelper final
 {
@@ -17,18 +15,11 @@ public:
     explicit ImGuiHelper(const SdlManager& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
-    float getZ_PositionSliderValue() const;
-
     void render();
-
     void cleanUp();
 
-    bool isInGUI_Window(const glm::vec3& coords) const;
-
     static void ImGui_ImplSdlGL3_RenderDrawLists(ImDrawData* draw_data);
-
     static const char* ImGui_ImplSdlGL3_GetClipboardText();
-
     static void ImGui_ImplSdlGL3_SetClipboardText(const char* text);
 
     void ImGui_ImplSdlGL3_CreateFontsTexture();
@@ -65,10 +56,9 @@ private:
     float mSliderWidgetHeight;
     float mSliderGrabMinSize;
     float mZ_PositionSliderValue;
-    AABB mComboWindow_AABB;
-    AABB mSliderWindow_AABB;
 
     ImGuiWindowFlags mImGuiWindowFlags;
+    ImGuiWindowFlags mOverlayFlags;
 
     GLuint g_FontTexture;
     double g_Time;
@@ -78,6 +68,9 @@ private:
     ImVec2 mDefaultStyle;
     ImVec2 mDefaultPadding;
     ImVec2 mDefaultItemSpacing;
+private:
+    ImGuiHelper(const ImGuiHelper& other);
+    ImGuiHelper& operator=(const ImGuiHelper& other);
 };
 
 #endif // IMGUIHELPER_HPP

@@ -23,9 +23,8 @@ const std::string SKYBOX_TEX_ID = "SKYBOX_TEX_ID";
 const std::string FULLSCREEN_TEX_ID = "FULLSCREEN_TEX_ID";
 const std::string PERLIN_NOISE_2D_ID = "PERLIN_NOISE_2D_ID";
 
-const std::string TEST_RPG_CHARS_ID = "TEST_RPG_CHARS_ID";
-const unsigned int TEST_RPG_CHARS_NUM_ROWS = 8u;
-
+namespace Atlas
+{
 // Test-Atlas data
 const std::string TEST_ATLAS_TEX_ID = "TEST_ATLAS_TEX_ID";
 const unsigned int TEST_ATLAS_TEX_NUM_ROWS = 8u;
@@ -88,6 +87,18 @@ const unsigned int BREAKOUT_POWER_UP_INCREASE = 55u;
 const unsigned int BREAKOUT_POWER_UP_PASSTHROUGH = 56u;
 const unsigned int BREAKOUT_POWER_UP_SPEED = 57u;
 const unsigned int BREAKOUT_POWER_UP_STICKY = 58u;
+
+const std::string TEST_RPG_CHARS_ID = "TEST_RPG_CHARS_ID";
+const unsigned int TEST_RPG_CHARS_NUM_ROWS = 8u;
+const unsigned int RPG_1_WALK_1 = 0u;
+const unsigned int RPG_1_WALK_2 = 1u;
+const unsigned int RPG_1_WALK_3 = 2u;
+const unsigned int RPG_1_WALK_4 = 3u;
+const unsigned int RPG_1_BACK_1 = 8u;
+const unsigned int RPG_1_BACK_2 = 9u;
+const unsigned int RPG_1_BACK_3 = 10u;
+const unsigned int RPG_1_BACK_4 = 11u;
+} // namespace Atlas
 } // namespace Textures
 
 namespace Meshes

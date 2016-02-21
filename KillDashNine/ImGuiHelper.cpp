@@ -17,6 +17,11 @@ GLuint ImGuiHelper::sVboHandle = 0;
 GLuint ImGuiHelper::sVaoHandle = 0;
 GLuint ImGuiHelper::sElementsHandle = 0;
 
+/**
+ * @brief ImGuiHelper::ImGuiHelper
+ * @param sdl
+ * @param rm
+ */
 ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
 : cSdlManager(sdl)
 , mResourceManager(rm)
@@ -33,6 +38,10 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoScrollbar
     | ImGuiWindowFlags_NoCollapse)
+, mOverlayFlags(ImGuiWindowFlags_NoTitleBar
+    | ImGuiWindowFlags_NoResize
+    | ImGuiWindowFlags_NoMove
+    | ImGuiWindowFlags_NoSavedSettings)
 , g_FontTexture(0)
 , g_Time(0.0f)
 , g_MousePressed{false, false, false}
@@ -58,92 +67,67 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
     igStyle.FramePadding = ImVec2(mDefaultStyle.x, mComboWidgetHeight);
 } // constructor
 
+/**
+ * @brief ImGuiHelper::~ImGuiHelper
+ */
 ImGuiHelper::~ImGuiHelper()
 {
     cleanUp();
 }
 
 /**
- * @brief ImGuiHelper::getZ_PositionSliderValue
- * @return
+ * @brief ImGuiHelper::render
  */
-float ImGuiHelper::getZ_PositionSliderValue() const
-{
-    return mZ_PositionSliderValue;
-}
-
 void ImGuiHelper::render()
 {
     ImGui_ImplSdlGL3_NewFrame();
 
-    ImGuiStyle& igStyle = ImGui::GetStyle();
+//    ImGuiStyle& igStyle = ImGui::GetStyle();
 
     int windowWidth = cSdlManager.getDimensions().x;
     int windowHeight = cSdlManager.getDimensions().y;
 
-    ImGui::SetNextWindowPos(ImVec2(0, 0));
+//    ImGui::SetNextWindowPos(ImVec2(0, 0));
 
-    // window title (id), show or not, size, alpha blending, settings
-    ImGui::Begin("##ComboBoxWindow", &mShowComboBoxWindow,
-        ImVec2(windowWidth, static_cast<int>(static_cast<float>(windowHeight) * 0.10f)),
-        mBackgroundAlpha, mImGuiWindowFlags);
+//    // window title (id), show or not, size, alpha blending, settings
+//    ImGui::Begin("##ComboBoxWindow", &mShowComboBoxWindow,
+//        ImVec2(windowWidth, static_cast<int>(static_cast<float>(windowHeight) * 0.10f)),
+//        mBackgroundAlpha, mImGuiWindowFlags);
 
-    ImGui::PopItemWidth();
+//    ImGui::PopItemWidth();
 
-    ImGui::End();
+//    ImGui::End();
 
-    // uncomment this to reset padding
-    //igStyle.FramePadding = mDefaultStyle;
 
-    // window at lower bottom of screen
-    ImGui::SetNextWindowPos(
-        ImVec2(0, windowHeight - static_cast<int>(static_cast<float>(windowHeight) * 0.05f)));
-    ImGui::Begin("Z Position", &mShow_Z_PositionWindow,
-    ImVec2(windowWidth, static_cast<int>(static_cast<float>(windowHeight) * 0.05f)),
-        mBackgroundAlpha, mImGuiWindowFlags);
-    ImGui::PushItemWidth(windowWidth);
-    ImGui::Text("Camera Z Position");
-    ImGui::SliderFloat("z position", &mZ_PositionSliderValue, 4.0f, 15.0f);
-    ImGui::PopItemWidth();
-
-    // create the slider box window AABB
-    mSliderWindow_AABB.minCoord = glm::vec3(0, static_cast<float>(windowHeight) - (static_cast<float>(windowHeight) * 0.05f), 0.0f);
-    mSliderWindow_AABB.maxCoord = glm::vec3(static_cast<float>(windowWidth), static_cast<float>(windowHeight), 0.0f);
-
-    ImGui::End();
-
-    // show the overlay only when the first scene and first subcene are present
-    if (1)
+    mShow_Overlay = true;
+    ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 100.0f, windowHeight * 0.5f - 100.0f));
+    if (!ImGui::Begin("OverLay Window", &mShow_Overlay, ImVec2(0, 0), 1.0f, mOverlayFlags))
     {
-        mShow_Overlay = true;
-        ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 100.0f, windowHeight * 0.5f - 100.0f));
-        if (!ImGui::Begin("OverLay Window", &mShow_Overlay, ImVec2(0, 0), 10.0f,
-            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings))
-        {
-            ImGui::End();
-            return;
-        }
-
-        ImGui::Text("mOpenGL_Vendor.c_str(", "%s");
         ImGui::End();
+        return;
     }
-    else
-        mShow_Overlay = false;
+
+    ImGui::Text("mOpenGL_Vendor.c_str(           as", "%s");
+    ImGui::TextColored(ImColor(0, 255, 0, 255), "Another thing of text", "%s");
+    ImGui::Text("Another text\n");
+    ImGui::End();
 
     ImGui::Render();
 }
 
+/**
+ * @brief ImGuiHelper::cleanUp
+ */
 void ImGuiHelper::cleanUp()
 {
     // Cleanup
     ImGui_ImplSdlGL3_Shutdown();
 }
 
-bool ImGuiHelper::isInGUI_Window(const glm::vec3& coords) const
-{
-    return mComboWindow_AABB.intersects(coords) || mSliderWindow_AABB.intersects(coords);
-}
-
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_RenderDrawLists
+ * @param draw_data
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_RenderDrawLists(ImDrawData* draw_data)
 {
     // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled
@@ -205,16 +189,29 @@ void ImGuiHelper::ImGui_ImplSdlGL3_RenderDrawLists(ImDrawData* draw_data)
     glEnable(GL_DEPTH_TEST);
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_GetClipboardText
+ * @return
+ */
 const char* ImGuiHelper::ImGui_ImplSdlGL3_GetClipboardText()
 {
     return SDL_GetClipboardText();
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_SetClipboardText
+ * @param text
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_SetClipboardText(const char* text)
 {
     SDL_SetClipboardText(text);
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_ProcessEvent
+ * @param event
+ * @return
+ */
 bool ImGuiHelper::ImGui_ImplSdlGL3_ProcessEvent(SDL_Event* event)
 {
     ImGuiIO& io = ImGui::GetIO();
@@ -255,6 +252,9 @@ bool ImGuiHelper::ImGui_ImplSdlGL3_ProcessEvent(SDL_Event* event)
     return false;
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture()
 {
     // Build texture atlas
@@ -275,6 +275,10 @@ void ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture()
     io.Fonts->TexID = reinterpret_cast<void*>(static_cast<intptr_t>(g_FontTexture));
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects
+ * @return
+ */
 bool ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects()
 {
     const GLchar *vertex_shader =
@@ -344,6 +348,9 @@ bool ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects()
     return true;
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_InvalidateDeviceObjects
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_InvalidateDeviceObjects()
 {
     if (sVaoHandle)
@@ -374,6 +381,10 @@ void ImGuiHelper::ImGui_ImplSdlGL3_InvalidateDeviceObjects()
     }
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_Init
+ * @return
+ */
 bool ImGuiHelper::ImGui_ImplSdlGL3_Init()
 {
     // Keyboard mapping.
@@ -406,12 +417,18 @@ bool ImGuiHelper::ImGui_ImplSdlGL3_Init()
     return true;
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_Shutdown
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_Shutdown()
 {
     ImGui_ImplSdlGL3_InvalidateDeviceObjects();
     ImGui::Shutdown();
 }
 
+/**
+ * @brief ImGuiHelper::ImGui_ImplSdlGL3_NewFrame
+ */
 void ImGuiHelper::ImGui_ImplSdlGL3_NewFrame()
 {
     if (!g_FontTexture)
@@ -452,5 +469,3 @@ void ImGuiHelper::ImGui_ImplSdlGL3_NewFrame()
     // Start the frame
     ImGui::NewFrame();
 } // new frame
-
-

@@ -21,7 +21,9 @@ enum class Special : Uint32 {
     PLAYER,
     ENEMY,
     DOOR,
-    POWER_UP, // @TODO - see particle todo
+    SPD_PW,
+    RCHRG_PW,
+    INVINC_PW,
     EXIT,
     PARTICLE, // @TODO - be more specific (smoke, fire... )
     POINT_LIGHT,
@@ -75,8 +77,17 @@ public:
 
     std::vector<glm::vec3> getEnemyPositions() const;
 
+    float getSpriteHalfWidth() const;
+
+    std::vector<glm::vec3> getSpeedPowerUps() const;
+
+    std::vector<glm::vec3> getRechargePowerUps() const;
+
+    std::vector<glm::vec3> getInvinciblePowerUps() const;
+
 private:
     const glm::vec3 cTileScalar;
+    const float cSpriteHalfWidth;
     std::vector<std::vector<Tile::Data>> mLevel;
     unsigned int mWallTexId;
     unsigned int mFloorTexId;
@@ -86,16 +97,19 @@ private:
     glm::vec3 mPlayerPosition;
     std::vector<glm::vec3> mExitPoints;
     std::vector<glm::vec3> mEnemyPositions;
+    std::vector<glm::vec3> mSpeedPowerUps;
+    std::vector<glm::vec3> mRechargePowerUps;
+    std::vector<glm::vec3> mInvinciblePowerUps;
     // doors
     // power ups
     // particles
     // lights
 private:
     glm::vec2 getTexCoordsFromOffset(const glm::vec2& texCoord, const glm::vec2& offset) const;
-    void addSpecial(Tile::Special special, unsigned int x, unsigned int z);
-    void generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j);
-    void generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j);
-    void generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, unsigned int i, unsigned int j, char dir);
+    void addSpecial(Tile::Special special, std::size_t x, std::size_t z);
+    void generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j);
+    void generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j);
+    void generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j, char dir);
 };
 
 #endif // LEVELGENERATOR_HPP

@@ -13,13 +13,15 @@
 #include "engine/Camera.hpp"
 #include "engine/graphics/Entity.hpp"
 #include "engine/graphics/Skybox.hpp"
-#include "Player.hpp"
 #include "engine/graphics/Light.hpp"
 #include "engine/graphics/PostProcessorImpl.hpp"
 #include "engine/graphics/Sprite.hpp"
+#include "engine/audio/SdlMixer.hpp"
+
 #include "LevelGenerator.hpp"
 #include "Enemy.hpp"
-#include "engine/audio/SdlMixer.hpp"
+#include "Player.hpp"
+#include "ImGuiHelper.hpp"
 
 class KillDashNine final : public IApplication
 {
@@ -50,19 +52,25 @@ private:
 
     Camera mCamera;
     Entity mCube;
+    LevelGenerator mLevelGen;
+    ImGuiHelper mImGui;
     Player mPlayer;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;
     Sprite mTestSprite;
     std::vector<Enemy::Ptr> mEnemies;
-    LevelGenerator mLevelGen;
+    std::vector<Sprite::Ptr> mPowerUps;
+
+    // exits
+    // power ups
 
     SdlMixer mSdlMixer;
 
 private:
     void init();
     void printFramesToConsole(const float dt);
+    void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
 #endif // KILLDASHNINE_HPP
