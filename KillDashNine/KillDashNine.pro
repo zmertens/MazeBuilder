@@ -47,7 +47,11 @@ SOURCES += \
     PowerUp.cpp \
     engine/audio/Chunk.cpp \
     engine/audio/Music.cpp \
-    Enemy.cpp
+    Enemy.cpp \
+    TitleState.cpp \
+    PlayState.cpp \
+    MenuState.cpp \
+	StateMap.cpp
 
 HEADERS += \
     engine/graphics/Fog.hpp \
@@ -104,7 +108,11 @@ HEADERS += \
     PowerUp.hpp \
     engine/audio/Chunk.hpp \
     engine/audio/Music.hpp \
-    Enemy.hpp
+    Enemy.hpp \
+    TitleState.hpp \
+    PlayState.hpp \
+    MenuState.hpp \
+	StateMap.hpp
 
 DISTFILES += \
     ../resources/shaders/level.frag.glsl \

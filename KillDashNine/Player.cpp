@@ -7,9 +7,8 @@
 
 #include "LevelGenerator.hpp"
 
-const float Player::scMovementScalar = 20.0f;
-const float Player::scMouseSensitivity = 0.65f;
-const glm::vec2 Player::scPlayerSize = glm::vec2(0.2f);
+const float Player::scMouseSensitivity = 1.0f;
+float Player::scMovementScalar = 40.0f;
 
 /**
  * @brief Player::Player
@@ -17,7 +16,8 @@ const glm::vec2 Player::scPlayerSize = glm::vec2(0.2f);
  * @param level
  */
 Player::Player(Camera& camera, LevelGenerator& level)
-: mFirstPersonCamera(camera)
+: cPlayerSize(0.2f)
+, mFirstPersonCamera(camera)
 , mLevel(level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
@@ -55,54 +55,45 @@ void Player::move(const glm::vec3& vel, float dt)
 }
 
 /**
+ * (currentMouseStates & SDL_BUTTON(SDL_BUTTON_LEFT)
  * @brief Player::input
  * @param sdlManager
  * @param mouseWheelDelta
+ * @param coords
+ * @param inputs
  */
-void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta)
+void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta,
+    const glm::vec2& coords,
+    std::unordered_map<uint8_t, bool> inputs)
 {
-    const Uint8* currentKeyStates = SDL_GetKeyboardState(nullptr);
-    int coordX;
-    int coordY;
-    const Uint32 currentMouseStates = SDL_GetMouseState(&coordX, &coordY);
-    glm::vec2 coords = glm::vec2(coordX, coordY);
-
     glm::vec2 winCenter = glm::vec2(
         static_cast<float>(sdlManager.getDimensions().x) * 0.5f,
         static_cast<float>(sdlManager.getDimensions().y) * 0.5f);
 
-    SDL_PumpEvents();
-
-    // handle input events
-    if (mMouseLocked && currentKeyStates[SDL_SCANCODE_TAB])
-    {
-        SDL_ShowCursor(SDL_ENABLE);
-        mMouseLocked = false;
-
-        if (APP_DEBUG)
-            SDL_Log("MOUSE UNLOCKED\n");
-    }
-    else if (!mMouseLocked && (currentMouseStates & SDL_BUTTON(SDL_BUTTON_LEFT)))
-    {
-        SDL_ShowCursor(SDL_DISABLE);
-        mMouseLocked = true;
-
-        if (APP_DEBUG)
-            SDL_Log("MOUSE LOCKED\n");
-    }
-
-    // reset movement direction every iteration
-    mMovementDir = glm::vec3(0);
-
     // keyboard movements
-    if (currentKeyStates[SDL_SCANCODE_W])
+    if (inputs[SDL_SCANCODE_W])
+    {
+        inputs.at(SDL_SCANCODE_W) = false;
         mMovementDir += mFirstPersonCamera.getTarget();
-    if (currentKeyStates[SDL_SCANCODE_S])
+    }
+
+    if (inputs[SDL_SCANCODE_S])
+    {
+        inputs.at(SDL_SCANCODE_S) = false;
         mMovementDir -= mFirstPersonCamera.getTarget();
-    if (currentKeyStates[SDL_SCANCODE_A])
+    }
+
+    if (inputs[SDL_SCANCODE_A])
+    {
+        inputs.at(SDL_SCANCODE_A) = false;
         mMovementDir -= mFirstPersonCamera.getRight();
-    if (currentKeyStates[SDL_SCANCODE_D])
+    }
+
+    if (inputs[SDL_SCANCODE_D])
+    {
+        inputs.at(SDL_SCANCODE_D) = false;
         mMovementDir += mFirstPersonCamera.getRight();
+    }
 
     // mouse wheel events
     if (mouseWheelDelta != 0)
@@ -113,10 +104,6 @@ void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta)
     {
         float xOffset = coords.x - winCenter.x;
         float yOffset = winCenter.y - coords.y;
-
-//        SDL_Log("winCenter.x = %f, winCenter.y = %f", winCenter.x, winCenter.y);
-//        SDL_Log("coords.x = %f, coords.y = %f", coords.x, coords.y);
-//        SDL_Log("xOffset = %f, yOffset = %f", xOffset, yOffset);
 
         if (xOffset || yOffset)
         {
@@ -135,11 +122,9 @@ void Player::update(const float dt, const double timeSinceInit)
 {
     if (glm::length(mMovementDir) > 0)
     {
-        mMovementDir = glm::normalize(mMovementDir);
-
         glm::vec3 origin (getPosition());
         // R(t) = P + Vt
-        glm::vec3 direction (origin + (mMovementDir * scMovementScalar * dt));
+        glm::vec3 direction (origin + glm::normalize(mMovementDir * scMovementScalar * dt));
         glm::vec3 collision (iterateThruSpace(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
 //        mMovementDir *= collision;
 //        // SDL_Log("collision (%f, %f, %f)\n", collision.x, collision.y, collision.z);
@@ -151,6 +136,9 @@ void Player::update(const float dt, const double timeSinceInit)
         {
 
         }
+
+        // reset movement direction every iteration
+        mMovementDir = glm::vec3(0);
     }
     // else no movement
 }
@@ -175,6 +163,33 @@ Camera& Player::getCamera() const
 }
 
 /**
+ * @brief Player::getPlayerSize
+ * @return
+ */
+glm::vec2 Player::getPlayerSize() const
+{
+    return cPlayerSize;
+}
+
+/**
+ * @brief Player::getMouseLocked
+ * @return
+ */
+bool Player::getMouseLocked() const
+{
+    return mMouseLocked;
+}
+
+/**
+ * @brief Player::setMouseLocked
+ * @param mouseLocked
+ */
+void Player::setMouseLocked(bool mouseLocked)
+{
+    mMouseLocked = mouseLocked;
+}
+
+/**
  * @brief Player::iterateThruSpace
  * @param emptySpaces
  * @param spaceScalar
@@ -191,7 +206,7 @@ glm::vec3 Player::iterateThruSpace(const std::vector<glm::vec3>& emptySpaces,
     for (auto& emptiness : emptySpaces)
     {
         collisionVec *= rectangularCollision(origin, dir,
-            glm::vec3(scPlayerSize.x, 0, scPlayerSize.y), emptiness, spaceScalar);
+            glm::vec3(cPlayerSize.x, 0, cPlayerSize.y), emptiness, spaceScalar);
     }
 
     return collisionVec;

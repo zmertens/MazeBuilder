@@ -21,6 +21,7 @@
 const float KillDashNine::sTimePerFrame = 1.0f / 60.0f;
 const glm::uvec2 KillDashNine::sWindowDimens = glm::uvec2(1080u, 720u);
 const std::string KillDashNine::sTitle = "kill -9";
+std::unordered_map<uint8_t, bool> KillDashNine::sKeyInputs;
 
 /**
  * @brief KillDashNine::KillDashNine
@@ -35,6 +36,7 @@ KillDashNine::KillDashNine()
 , mFrameCounter(0u)
 , mTimeSinceLastUpdate(0.0f)
 , mAccumulator(0.0f)
+, mStates()
 , mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
@@ -129,6 +131,9 @@ KillDashNine::KillDashNine()
     }
     // temp, get rid of this
     //mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
+
+    IState::Ptr title (new TitleState());
+    mStates.push(static_cast<int>(StateMap::Type::TITLE), std::move(title));
 } // constructor
 
 /**
@@ -180,14 +185,28 @@ void KillDashNine::handleEvents()
         sdlEvents(event, mouseWheelDy);
     } // events
 
+    const Uint8* currentKeyStates = SDL_GetKeyboardState(nullptr);
+    SDL_PumpEvents(); // don't do this on a seperate thread?
+
+    //sKeyInputs[SDL_SCANCODE_TAB] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_TAB]);
+    sKeyInputs[SDL_SCANCODE_W] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_W]);
+    sKeyInputs[SDL_SCANCODE_S] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_S]);
+    sKeyInputs[SDL_SCANCODE_A] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_A]);
+    sKeyInputs[SDL_SCANCODE_D] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_D]);
+
+    int coordX;
+    int coordY;
+    const Uint32 currentMouseStates = SDL_GetMouseState(&coordX, &coordY);
+    glm::vec2 coords = glm::vec2(coordX, coordY);
+
     // handle realtime input
-    mPlayer.input(mSdlManager, mouseWheelDy);
+    mPlayer.input(mSdlManager, mouseWheelDy, coords, sKeyInputs);
 } // update
 
 /**
  * @brief KillDashNine::update
- * @param dt
- * @param timeSinceInit
+ * @param dt = the time between frames
+ * @param timeSinceInit = the time since SDL was initialized
  */
 void KillDashNine::update(float dt, double timeSinceInit)
 {
@@ -207,7 +226,10 @@ void KillDashNine::update(float dt, double timeSinceInit)
     for (auto& powerup : mPowerUps)
         powerup->update(dt, timeSinceInit);
 
-    mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevelGen.getTileScalar().y - 2.0f, mPlayer.getPosition().z, 0.0f));
+    // keep the light above the player's head
+    mLight.setPosition(glm::vec4(mPlayer.getPosition().x,
+        mLevelGen.getTileScalar().y - mPlayer.getPlayerSize().y,
+        mPlayer.getPosition().z, 0.0f));
 
     static int testCounter = 0;
     if (++testCounter % 50 == 0)
@@ -477,6 +499,16 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             mAppIsRunning = false;
         else if (event.key.keysym.sym == SDLK_1)
         {
+
+        }
+        else if (event.key.keysym.sym == SDLK_TAB)
+        {
+            // flip mouse lock
+            mPlayer.setMouseLocked(!mPlayer.getMouseLocked());
+            if (mPlayer.getMouseLocked())
+                SDL_ShowCursor(SDL_DISABLE);
+            else
+                SDL_ShowCursor(SDL_ENABLE);
 
         }
     }

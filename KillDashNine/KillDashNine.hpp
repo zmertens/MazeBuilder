@@ -1,6 +1,8 @@
 #ifndef KILLDASHNINE_HPP
 #define KILLDASHNINE_HPP
 
+#include <unordered_map>
+
 #include <glm/glm.hpp>
 
 #include "engine/SdlManager.hpp"
@@ -22,6 +24,7 @@
 #include "Enemy.hpp"
 #include "Player.hpp"
 #include "ImGuiHelper.hpp"
+#include "StateMap.hpp"
 
 class KillDashNine final : public IApplication
 {
@@ -40,6 +43,7 @@ private:
     static const float sTimePerFrame;
     static const glm::uvec2 sWindowDimens;
     static const std::string sTitle;
+    static std::unordered_map<uint8_t, bool> sKeyInputs;
 
     SdlManager mSdlManager;
     ResourceManager mResources;
@@ -49,6 +53,8 @@ private:
     unsigned int mFrameCounter;
     float mTimeSinceLastUpdate;
     float mAccumulator;
+
+    StateMap mStates;
 
     Camera mCamera;
     Entity mCube;

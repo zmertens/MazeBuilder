@@ -2,6 +2,8 @@
 #define PLAYER_HPP
 
 #include <vector>
+#include <unordered_map>
+#include <cstdint>
 
 #include <glm/glm.hpp>
 
@@ -17,15 +19,22 @@ public:
     glm::vec3 getPosition() const;
     void setPosition(const glm::vec3& position);
     void move(const glm::vec3& vel, float dt);
-    void input(const SdlManager& sdlManager, const float mouseWheelDelta);
+    void input(const SdlManager& sdlManager, const float mouseWheelDelta,
+        const glm::vec2& coords,
+        std::unordered_map<uint8_t, bool> inputs);
     void update(const float dt, const double timeSinceInit);
     void render() const;
     Camera& getCamera() const;
 
+    glm::vec2 getPlayerSize() const;
+
+    bool getMouseLocked() const;
+    void setMouseLocked(bool mouseLocked);
+
 private:
-    static const float scMovementScalar;
     static const float scMouseSensitivity;
-    static const glm::vec2 scPlayerSize;
+    static float scMovementScalar;
+    const glm::vec2 cPlayerSize;
     Camera& mFirstPersonCamera;
     LevelGenerator& mLevel;
     glm::vec3 mStartPosition;

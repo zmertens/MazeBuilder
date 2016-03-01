@@ -267,7 +267,8 @@ void LevelGenerator::addSpecial(Tile::Special special, std::size_t x, std::size_
  * @param i
  * @param j
  */
-void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j)
+void LevelGenerator::generateFloor(std::vector<Vertex>& vertices,
+    std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 2);
     indices.push_back(vertices.size() + 1);
@@ -276,9 +277,9 @@ void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GL
     indices.push_back(vertices.size() + 2);
     indices.push_back(vertices.size() + 0);
 
-    glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
+    glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f, 0.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
-    glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
+    glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f, 1.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
     glm::vec2 highUlowV = getTexCoordsFromOffset(glm::vec2(1.0f, 0.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
 
     vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
@@ -294,7 +295,8 @@ void LevelGenerator::generateFloor(std::vector<Vertex>& vertices, std::vector<GL
  * @param i
  * @param j
  */
-void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j)
+void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices,
+    std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 0);
     indices.push_back(vertices.size() + 1);
@@ -303,9 +305,9 @@ void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<
     indices.push_back(vertices.size() + 2);
     indices.push_back(vertices.size() + 3);
 
-    glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
+    glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f, 0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
-    glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
+    glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f, 1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 highUlowV = getTexCoordsFromOffset(glm::vec2(1.0f, 0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
 
     vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
@@ -322,7 +324,9 @@ void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices, std::vector<
  * @param j
  * @param dir
  */
-void LevelGenerator::generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j, char dir)
+void LevelGenerator::generateWall(std::vector<Vertex>& vertices,
+    std::vector<GLushort>& indices,
+    std::size_t i, std::size_t j, char dir)
 {
     glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));

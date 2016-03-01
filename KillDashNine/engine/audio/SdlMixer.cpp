@@ -16,7 +16,7 @@ SdlMixer::SdlMixer(const ResourceManager& rm)
 , cChunkSize(2048)
 , mIsInitialized(true)
 {
-    init(MIX_INIT_MP3 | MIX_INIT_OGG);
+    init(MIX_INIT_OGG);
 }
 
 /**
