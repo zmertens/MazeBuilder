@@ -82,6 +82,9 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
     // if the texture isn't bound nothing is rendered to it ....
     // could use ResourceManager textures but in taht case,
     // cannot initialize PostProcessor before the ResourceManager
+    SDL_DisplayMode mode;
+    SDL_GetDesktopDisplayMode(0, &mode);
+
     Tex2dImpl fullscreen (width, height, 2);
     fullscreen.bind();
 

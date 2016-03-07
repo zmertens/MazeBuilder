@@ -19,7 +19,8 @@
 #include "engine/graphics/MeshFactory.hpp"
 
 const float KillDashNine::sTimePerFrame = 1.0f / 60.0f;
-const glm::uvec2 KillDashNine::sWindowDimens = glm::uvec2(1080u, 720u);
+const unsigned int KillDashNine::sWindowWidth = 1080u;
+const unsigned int KillDashNine::sWindowHeight = 720u;
 const std::string KillDashNine::sTitle = "kill -9";
 std::unordered_map<uint8_t, bool> KillDashNine::sKeyInputs;
 
@@ -29,14 +30,14 @@ std::unordered_map<uint8_t, bool> KillDashNine::sKeyInputs;
 KillDashNine::KillDashNine()
 : mSdlManager(SdlWindow::Settings(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
     SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false),
-    sWindowDimens, sTitle)
+    sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
 , mAppIsRunning(false)
 , mFrameCounter(0u)
 , mTimeSinceLastUpdate(0.0f)
 , mAccumulator(0.0f)
-, mStates()
+, mImGuiHelper(mSdlManager, mResources)
 , mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
@@ -44,6 +45,7 @@ KillDashNine::KillDashNine()
     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(2, 0, 0))
+, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
 , mLevelGen(ResourceLevels::Levels::TEST_LEVEL,
     ResourceIds::Textures::Atlas::BRICKS2_INDEX, ResourceIds::Textures::Atlas::WALL_INDEX,
         ResourceIds::Textures::Atlas::METAL_INDEX,
@@ -52,8 +54,6 @@ KillDashNine::KillDashNine()
     ResourceIds::Meshes::LEVEL_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
-, mImGui(mSdlManager, mResources)
-, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
 , mPlayer(mCamera, mLevelGen)
 , mSkybox(Entity::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -61,7 +61,7 @@ KillDashNine::KillDashNine()
     ResourceIds::Textures::SKYBOX_TEX_ID))
 // @note this pp needs to load after the init function to prevent issues -- if using tex factory
 , mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
-    ResourceIds::Meshes::VAO_ID), sWindowDimens.x, sWindowDimens.y)
+    ResourceIds::Meshes::VAO_ID), sWindowWidth, sWindowHeight)
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
 , mTestSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -75,65 +75,8 @@ KillDashNine::KillDashNine()
     // initialize all game resources (texture, material, mesh, et cetera)
     init();
 
-    mPlayer.move(mLevelGen.getPlayerPosition(), 1.0f);
-
-    for (auto& enemyPos : mLevelGen.getEnemyPositions())
-    {
-        mEnemies.emplace_back(std::move(new Enemy(
-            mLevelGen.getTileScalar(),
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
-            ResourceIds::Meshes::VAO_ID,
-            "",
-            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::RPG_1_WALK_1,
-            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_NUM_ROWS)),
-            enemyPos
-        )));
-    }
-
-    for (auto& pos : mLevelGen.getInvinciblePowerUps())
-    {
-        mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
-            ResourceIds::Meshes::VAO_ID,
-            "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CHAOS,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
-            pos
-        )));
-    }
-
-    for (auto& pos : mLevelGen.getSpeedPowerUps())
-    {
-        mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
-            ResourceIds::Meshes::VAO_ID,
-            "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CONFUSE,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
-            pos
-        )));
-    }
-
-    for (auto& pos : mLevelGen.getRechargePowerUps())
-    {
-        mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
-            ResourceIds::Meshes::VAO_ID,
-            "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_INCREASE,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
-            pos
-        )));
-    }
     // temp, get rid of this
     //mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
-
-    IState::Ptr title (new TitleState());
-    mStates.push(static_cast<int>(StateMap::Type::TITLE), std::move(title));
 } // constructor
 
 /**
@@ -231,11 +174,11 @@ void KillDashNine::update(float dt, double timeSinceInit)
         mLevelGen.getTileScalar().y - mPlayer.getPlayerSize().y,
         mPlayer.getPosition().z, 0.0f));
 
-    static int testCounter = 0;
-    if (++testCounter % 50 == 0)
-    {
-        //mSdlMixer.playChannel(-1, ResourceIds::Chunks::DEATH_WAV_ID, 2);
-    }
+//    static int testCounter = 0;
+//    if (++testCounter % 50 == 0)
+//    {
+//        //mSdlMixer.playChannel(-1, ResourceIds::Chunks::DEATH_WAV_ID, 2);
+//    }
 }
 
 /**
@@ -282,7 +225,7 @@ void KillDashNine::render()
     mPostProcessor.activateEffect(Effects::Type::NO_EFFECT);
     mPostProcessor.release();
 
-    mImGui.render();
+    mImGuiHelper.render();
 
     mSdlManager.swapBuffers();
 }
@@ -315,7 +258,15 @@ void KillDashNine::init()
     //glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     //glCullFace(GL_BACK);
+    initResources();
+    initPositions();
+}
 
+/**
+ * @brief KillDashNine::initResources
+ */
+void KillDashNine::initResources()
+{
     // shaders
     Shader::Ptr level (new Shader(mSdlManager));
     level->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
@@ -397,8 +348,7 @@ void KillDashNine::init()
 
     // @TODO use the fullscreen texture in the post processor (switch order of init)
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
-        mSdlManager.getDimensions().x,
-        mSdlManager.getDimensions().y, 0));
+        mSdlManager.getWindowWidth(), mSdlManager.getWindowHeight(), 0));
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
 
     ITexture::Ptr charsTex (new Tex2dImpl(mSdlManager,
@@ -433,7 +383,67 @@ void KillDashNine::init()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
+}
 
+/**
+ * @brief KillDashNine::initPositions
+ */
+void KillDashNine::initPositions()
+{
+    mPlayer.move(mLevelGen.getPlayerPosition(), 1.0f);
+
+    for (auto& enemyPos : mLevelGen.getEnemyPositions())
+    {
+        mEnemies.emplace_back(std::move(new Enemy(
+            mLevelGen.getTileScalar(),
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::RPG_1_WALK_1,
+            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_NUM_ROWS)),
+            enemyPos
+        )));
+    }
+
+    for (auto& pos : mLevelGen.getInvinciblePowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CHAOS,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
+
+    for (auto& pos : mLevelGen.getSpeedPowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CONFUSE,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
+
+    for (auto& pos : mLevelGen.getRechargePowerUps())
+    {
+        mPowerUps.emplace_back(std::move(new Sprite(
+            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID,
+            "",
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_INCREASE,
+            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            pos
+        )));
+    }
 }
 
 /**
@@ -455,6 +465,9 @@ void KillDashNine::printFramesToConsole(const float dt)
             mLogger.appendToLog("time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
             mLogger.appendToLog("\n");
         }
+
+        mImGuiHelper.updateFrames("FPS: " + Utils::toString(mFrameCounter),
+            "time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
 
         mFrameCounter = 0;
         mTimeSinceLastUpdate -= 1.0f;
@@ -479,7 +492,10 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             unsigned int newWidth = event.window.data1;
             unsigned int newHeight = event.window.data2;
             glViewport(0, 0, newWidth, newHeight);
-            mSdlManager.setDimensions(glm::uvec2(newWidth, newHeight));
+
+            mSdlManager.setWindowWidth(newWidth);
+            mSdlManager.setWindowHeight(newHeight);
+
             if (APP_DEBUG)
             {
                 std::string resizeDimens = "Resize Event -- Width: "
@@ -493,13 +509,21 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
         mouseWheelDy = event.wheel.y;
     else if (event.type == SDL_KEYDOWN)
     {
-        if (event.key.keysym.sym == SDLK_RETURN)
-            mSdlManager.toggleFullScreen();
-        else if (event.key.keysym.sym == SDLK_ESCAPE)
-            mAppIsRunning = false;
-        else if (event.key.keysym.sym == SDLK_1)
+        if (event.key.keysym.sym == SDLK_UP)
         {
-
+            mImGuiHelper.reactToUpArrow();
+        }
+        else if (event.key.keysym.sym == SDLK_DOWN)
+        {
+            mImGuiHelper.reactToDownArrow();
+        }
+        else if (event.key.keysym.sym == SDLK_RETURN)
+        {
+            handleReturnPressed();
+        }
+        else if (event.key.keysym.sym == SDLK_ESCAPE)
+        {
+            mImGuiHelper.naturalStateUpdate();
         }
         else if (event.key.keysym.sym == SDLK_TAB)
         {
@@ -509,7 +533,6 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
                 SDL_ShowCursor(SDL_DISABLE);
             else
                 SDL_ShowCursor(SDL_ENABLE);
-
         }
     }
     else if ((mSdlManager.getWindowSettings().initFlags & SDL_INIT_JOYSTICK) &&
@@ -520,3 +543,26 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
     }
 } // sdlEvents
+
+/**
+ * @brief KillDashNine::handleReturnPressed
+ */
+void KillDashNine::handleReturnPressed()
+{
+    if (mImGuiHelper.isOnExitString() &&
+        (mImGuiHelper.getState() == GuiStates::Shown::TITLE ||
+            mImGuiHelper.getState() == GuiStates::Shown::OPTIONS))
+    {
+        mAppIsRunning = false;
+    }
+    else if (mImGuiHelper.getState() == GuiStates::Shown::TITLE &&
+        !mImGuiHelper.isOnExitString())
+    {
+        mImGuiHelper.naturalStateUpdate();
+    }
+    else if (mImGuiHelper.getState() == GuiStates::Shown::OPTIONS &&
+        1 /* @todo add checks */)
+    {
+        mAppIsRunning = false;
+    }
+}

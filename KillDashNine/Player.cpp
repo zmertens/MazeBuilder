@@ -67,8 +67,8 @@ void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta,
     std::unordered_map<uint8_t, bool> inputs)
 {
     glm::vec2 winCenter = glm::vec2(
-        static_cast<float>(sdlManager.getDimensions().x) * 0.5f,
-        static_cast<float>(sdlManager.getDimensions().y) * 0.5f);
+        static_cast<float>(sdlManager.getWindowWidth()) * 0.5f,
+        static_cast<float>(sdlManager.getWindowHeight()) * 0.5f);
 
     // keyboard movements
     if (inputs[SDL_SCANCODE_W])

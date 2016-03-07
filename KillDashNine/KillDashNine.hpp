@@ -24,7 +24,6 @@
 #include "Enemy.hpp"
 #include "Player.hpp"
 #include "ImGuiHelper.hpp"
-#include "StateMap.hpp"
 
 class KillDashNine final : public IApplication
 {
@@ -41,7 +40,8 @@ protected:
 
 private:
     static const float sTimePerFrame;
-    static const glm::uvec2 sWindowDimens;
+    static const unsigned int sWindowWidth;
+    static const unsigned int sWindowHeight;
     static const std::string sTitle;
     static std::unordered_map<uint8_t, bool> sKeyInputs;
 
@@ -54,12 +54,10 @@ private:
     float mTimeSinceLastUpdate;
     float mAccumulator;
 
-    StateMap mStates;
-
-    Camera mCamera;
+    ImGuiHelper mImGuiHelper;
     Entity mCube;
+    Camera mCamera;
     LevelGenerator mLevelGen;
-    ImGuiHelper mImGui;
     Player mPlayer;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
@@ -75,8 +73,11 @@ private:
 
 private:
     void init();
+    void initResources();
+    void initPositions();
     void printFramesToConsole(const float dt);
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
+    void handleReturnPressed();
 };
 
 #endif // KILLDASHNINE_HPP

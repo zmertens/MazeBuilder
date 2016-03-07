@@ -10,15 +10,17 @@
 /**
  * @brief SdlManager::SdlManager
  * @param window
- * @param dimensions
  * @param title
+ * @param width = 0
+ * @param height = 0
  */
 SdlManager::SdlManager(const SdlWindow::Settings& window,
-    const glm::uvec2& dimensions,
-    const std::string& title)
+    const std::string& title, const unsigned int width,
+    const unsigned int height)
 : mWindowSettings(window)
-, mDimensions(dimensions)
 , mTitle(title)
+, mWinWidth(width)
+, mWinHeight(height)
 , mOpenGlContext(SDL_GL_CONTEXT_PROFILE_CORE)
 , mLogPriority(SDL_LOG_PRIORITY_VERBOSE)
 , mOpenGlMajor(4)
@@ -54,18 +56,15 @@ SdlManager::SdlManager(const SdlWindow::Settings& window,
 
     if (APP_DEBUG == 1)
     {
-        glEnable(GL_DEBUG_OUTPUT);
-        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
-        glDebugMessageControl(GL_DONT_CARE, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
-        glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
-            GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
-            GL_DEBUG_SEVERITY_NOTIFICATION, -1, "Start debugging");
+//        glEnable(GL_DEBUG_OUTPUT);
+//        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
+//        glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
+//        glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
+//            GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
+//            GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
     }
 }
 
-/**
- * @brief SdlManager::~SdlManager
- */
 SdlManager::~SdlManager()
 {
     if (mSdlWindow)
@@ -112,21 +111,21 @@ void SdlManager::initWindow(Uint32 flags)
     if (mFullscreen)
     {
         mSdlWindow = SDL_CreateWindow(mTitle.c_str(), 0, 0,
-            mDimensions.x, mDimensions.y,
+            mWinWidth, mWinHeight,
             mWindowSettings.windowFlags);
     }
     else
     {
         mSdlWindow = SDL_CreateWindow(mTitle.c_str(),
             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            mDimensions.x, mDimensions.y,
+            mWinWidth, mWinHeight,
             mWindowSettings.windowFlags);
     }
 #elif defined(APP_ANDROID)
     SDL_DisplayMode mode;
     SDL_GetDisplayMode(0, 0, &mode);
-    mDimensions.x = static_cast<float>(mode.w);
-    mDimensions.y = static_cast<float>(mode.h);
+    mWinWidth = static_cast<float>(mode.w);
+    mWinHeight = static_cast<float>(mode.h);
 
     mSdlWindow = SDL_CreateWindow(nullptr, 0, 0, mode.w, mode.h, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 #endif // defined
@@ -220,7 +219,7 @@ std::string SdlManager::getSdlInfoString() const
     ss << "\nWindow Title: " << mTitle << "\n";
     ss << "Vsync: " << mWindowSettings.vSync << "\n";
     ss << "Fullscreen: " << mFullscreen << "\n";
-    ss << "Window (width, height): " << "(" << mDimensions.x << ", " << mDimensions.y << ")\n";
+    ss << "Window (width, height): " << "(" << mWinWidth << ", " << mWinHeight << ")\n";
     ss << "The number of connected joysticks: " << SDL_NumJoysticks() << "\n";
     ss << "The GL context is : " << contextStr << "\n";
     ss << "Major, Minor versions: " << major << ", " << minor << "\n";
@@ -276,7 +275,7 @@ bool SdlManager::hapticRumblePlay(float strength, float length) const
  * @brief SdlManager::buildBufferFromFile
  * @param filename
  * @param bufferSize
- * @return
+ * @return the buffer
  */
 unsigned char* SdlManager::buildBufferFromFile(const std::string& filename, long& bufferSize) const
 {
@@ -385,18 +384,40 @@ bool SdlManager::isFullScreen() const
     return mFullscreen;
 }
 
-void SdlManager::setDimensions(const glm::uvec2& dimensions)
+/**
+ * @brief SdlManager::setWindowHeight
+ * @param height
+ */
+void SdlManager::setWindowHeight(const unsigned int height)
 {
-    mDimensions = dimensions;
+    mWinHeight = height;
 }
 
 /**
- * @brief SdlManager::getDimensions
+ * @brief SdlManager::getWindowHeight
  * @return
  */
-glm::uvec2 SdlManager::getDimensions() const
+unsigned int SdlManager::getWindowHeight() const
 {
-    return mDimensions;
+    return mWinHeight;
+}
+
+/**
+ * @brief SdlManager::setWindowWidth
+ * @param width
+ */
+void SdlManager::setWindowWidth(const unsigned int width)
+{
+    mWinWidth = width;
+}
+
+/**
+ * @brief SdlManager::getWindowWidth
+ * @return
+ */
+unsigned int SdlManager::getWindowWidth() const
+{
+    return mWinWidth;
 }
 
 /**
@@ -405,7 +426,7 @@ glm::uvec2 SdlManager::getDimensions() const
  */
 float SdlManager::getAspectRatio() const
 {
-    return static_cast<float>(mDimensions.x) / static_cast<float>(mDimensions.y);
+    return static_cast<float>(mWinWidth) / static_cast<float>(mWinHeight);
 }
 
 /**

@@ -25,46 +25,43 @@ GLuint ImGuiHelper::sElementsHandle = 0;
 ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
 : cSdlManager(sdl)
 , mResourceManager(rm)
-, mShowComboBoxWindow(true)
-, mShow_Z_PositionWindow(true)
-, mShow_Overlay(false)
-, mBackgroundAlpha(0.65f)
-, mComboWidgetHeight(8.25f)
-, mSliderWidgetHeight(5.0f)
-, mSliderGrabMinSize(30.0f)
-, mZ_PositionSliderValue(7.5f)
-, mImGuiWindowFlags(ImGuiWindowFlags_NoTitleBar
-    | ImGuiWindowFlags_NoResize
-    | ImGuiWindowFlags_NoMove
-    | ImGuiWindowFlags_NoScrollbar
-    | ImGuiWindowFlags_NoCollapse)
 , mOverlayFlags(ImGuiWindowFlags_NoTitleBar
     | ImGuiWindowFlags_NoResize
     | ImGuiWindowFlags_NoMove
     | ImGuiWindowFlags_NoSavedSettings)
+, mSelected(0, 255, 0, 255)
+, mShowFramesOverlay(true)
+, mShowPlayerStatsOverlay(true)
+, mShowTitleOverlay(true)
+, mShowOptionsOverlay(false)
+, mShowDescOverlay(false)
+, mOverlayAlpha(0.9324f)
+, mState(GuiStates::Shown::TITLE)
+, mFrames({"FPS: ", "time (us) / frame: "})
+, mTitle({"kill -9",
+    "$: You are a process;\\ \n?The System Monitor wants to kill you . \\ | \
+    \n!(There is a backdoor)  \\ \n__Do not get piped to /dev/null : &&\\ \n -xvf \
+    for (i = 0; i != 1 / 0; ++i) {} ... -o cd..\\ \n",
+    "Up, Down arrows = options up and down\n \
+    Return = select\n \
+    W, A, S, D = movement\n \
+    E = action\n \
+    Spacebar = jump\n \
+    Escape = Options\n \
+    Tab = lock mouse\n \
+    Leftmouse = laser\n \
+    Scrollmouse = zoom\n \
+    Shift = speed\n",
+    "--play", "--exit", true})
+, mOptions()
+, mDesc()
+, mStats({"Health: 100%", "Lasers: 100%", "State: Normal"})
 , g_FontTexture(0)
 , g_Time(0.0f)
 , g_MousePressed{false, false, false}
 , g_MouseWheel(0.0f)
 {
     ImGui_ImplSdlGL3_Init();
-
-    ImGuiStyle& igStyle = ImGui::GetStyle();
-
-    mDefaultStyle = igStyle.FramePadding;
-
-    igStyle.WindowRounding = 0.0f;
-
-    mDefaultPadding = igStyle.WindowPadding;
-
-    igStyle.WindowPadding = ImVec2(0.0f, 0.0f);
-
-    mDefaultItemSpacing = igStyle.ItemSpacing;
-
-    // the slider in for the z position
-    igStyle.GrabMinSize = mSliderGrabMinSize;
-
-    igStyle.FramePadding = ImVec2(mDefaultStyle.x, mComboWidgetHeight);
 } // constructor
 
 /**
@@ -82,35 +79,71 @@ void ImGuiHelper::render()
 {
     ImGui_ImplSdlGL3_NewFrame();
 
-//    ImGuiStyle& igStyle = ImGui::GetStyle();
+    int windowWidth = cSdlManager.getWindowWidth();
+    int windowHeight = cSdlManager.getWindowHeight();
 
-    int windowWidth = cSdlManager.getDimensions().x;
-    int windowHeight = cSdlManager.getDimensions().y;
-
-//    ImGui::SetNextWindowPos(ImVec2(0, 0));
-
-//    // window title (id), show or not, size, alpha blending, settings
-//    ImGui::Begin("##ComboBoxWindow", &mShowComboBoxWindow,
-//        ImVec2(windowWidth, static_cast<int>(static_cast<float>(windowHeight) * 0.10f)),
-//        mBackgroundAlpha, mImGuiWindowFlags);
-
-//    ImGui::PopItemWidth();
-
-//    ImGui::End();
-
-
-    mShow_Overlay = true;
-    ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 100.0f, windowHeight * 0.5f - 100.0f));
-    if (!ImGui::Begin("OverLay Window", &mShow_Overlay, ImVec2(0, 0), 1.0f, mOverlayFlags))
+    // set frames
+    if (mShowFramesOverlay)
     {
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::Begin("#Frame Window", &mShowFramesOverlay,
+            ImVec2(0.20f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
+        ImGui::Text(mFrames.fps.c_str(), "%s");
+        ImGui::Text(mFrames.secPerFrame.c_str(), "%s");
         ImGui::End();
-        return;
     }
 
-    ImGui::Text("mOpenGL_Vendor.c_str(           as", "%s");
-    ImGui::TextColored(ImColor(0, 255, 0, 255), "Another thing of text", "%s");
-    ImGui::Text("Another text\n");
-    ImGui::End();
+    // set title
+    if (mShowTitleOverlay)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 0.20f * static_cast<float>(windowWidth),
+            windowHeight * 0.5f - 0.20f * static_cast<float>(windowHeight)));
+        ImGui::Begin("#Title Window", &mShowTitleOverlay,
+            ImVec2(0.40f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
+        ImGui::Text(mTitle.title.c_str(), "%s");
+        ImGui::TextColored(ImColor(255, 0, 0, 255), mTitle.storyline.c_str(), "%s");
+        ImGui::Text(mTitle.controls.c_str(), "%s");
+        ImGui::TextColored(mTitle.playSelected ? mSelected : ImColor(255, 255, 255, 255),
+            mTitle.play.c_str(), "%s");
+        ImGui::TextColored(mTitle.playSelected ? ImColor(255, 255, 255, 255) : mSelected,
+            mTitle.exit.c_str(), "%s");
+        ImGui::End();
+    }
+
+    if (mShowOptionsOverlay)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 0.20f * static_cast<float>(windowWidth),
+            windowHeight * 0.5f - 0.20f * static_cast<float>(windowHeight)));
+        ImGui::Begin("#Options Window", &mShowOptionsOverlay,
+            ImVec2(0.40f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
+        ImGui::Text("Exit\n");
+        ImGui::End();
+    }
+
+    // set description
+    if (mShowDescOverlay)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth - 0.08f * static_cast<float>(windowWidth), 0));
+        ImGui::Begin("#Desc Window", &mShowDescOverlay,
+            ImVec2(0, 0), mOverlayAlpha, mOverlayFlags);
+        ImGui::Text(mDesc.desc.c_str(), "%s");
+        ImGui::End();
+    }
+
+    // set player stats
+    if (mShowPlayerStatsOverlay)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth - 0.20f * static_cast<float>(windowWidth),
+            windowHeight - 0.075f * static_cast<float>(windowHeight)));
+        ImGui::Begin("#Stats Window", &mShowPlayerStatsOverlay,
+            ImVec2(0.20f * static_cast<float>(windowWidth), 0.075f * static_cast<float>(windowHeight)),
+            mOverlayAlpha, mOverlayFlags);
+        ImGui::Text(mStats.health.c_str(), "%s");
+        ImGui::SameLine();
+        ImGui::Text(mStats.ammo.c_str(), "%s");
+        ImGui::Text(mStats.state.c_str(), "%s");
+        ImGui::End();
+    }
 
     ImGui::Render();
 }
@@ -122,6 +155,114 @@ void ImGuiHelper::cleanUp()
 {
     // Cleanup
     ImGui_ImplSdlGL3_Shutdown();
+}
+
+/**
+ * @brief ImGuiHelper::updateFrames
+ * @param fps
+ * @param secPerFrame
+ */
+void ImGuiHelper::updateFrames(const std::string& fps, const std::string secPerFrame)
+{
+    mFrames.fps = fps;
+    mFrames.secPerFrame = secPerFrame;
+}
+
+/**
+ * @brief ImGuiHelper::updateDescription
+ * @param desc
+ */
+void ImGuiHelper::updateDescription(const std::string& desc)
+{
+
+}
+
+/**
+ * @brief ImGuiHelper::getState
+ * @return
+ */
+GuiStates::Shown ImGuiHelper::getState() const
+{
+    return mState;
+}
+
+/**
+ * @brief ImGuiHelper::setState
+ * @param state
+ */
+void ImGuiHelper::setState(const GuiStates::Shown& state)
+{
+    mState = state;
+}
+
+/**
+ * A natural state update happens when the user hits SDLK_ESCAPE,
+ * and the next state follows a natural ordering:
+ * TITLE -> PLAY -> OPTIONS -> PLAY -> OPTIONS ...
+ * @brief ImGuiHelper::naturalStateUpdate
+ */
+void ImGuiHelper::naturalStateUpdate()
+{
+    if (mState == GuiStates::Shown::TITLE)
+    {
+        mState = GuiStates::Shown::PLAY;
+        mShowTitleOverlay = false;
+        mShowDescOverlay = true;
+        mDesc.desc = "Iteration# ";
+    }
+    else if (mState == GuiStates::Shown::PLAY)
+    {
+        mState = GuiStates::Shown::OPTIONS;
+        mShowOptionsOverlay = true;
+        mShowDescOverlay = true;
+        mDesc.desc = "Options";
+    }
+    else if (mState == GuiStates::Shown::OPTIONS)
+    {
+        mState = GuiStates::Shown::PLAY;
+        mShowOptionsOverlay = false;
+        mShowDescOverlay = true;
+        mDesc.desc = "Iteration# ";
+    }
+}
+
+/**
+ * @brief ImGuiHelper::reactToUpArrow
+ */
+void ImGuiHelper::reactToUpArrow()
+{
+    if (mState == GuiStates::Shown::TITLE)
+    {
+        mTitle.playSelected = !mTitle.playSelected;
+    }
+    else if (mState == GuiStates::Shown::OPTIONS)
+    {
+
+    }
+}
+
+/**
+ * @brief ImGuiHelper::reactToDownArrow
+ */
+void ImGuiHelper::reactToDownArrow()
+{
+    if (mState == GuiStates::Shown::TITLE)
+    {
+        mTitle.playSelected = !mTitle.playSelected;
+    }
+    else if (mState == GuiStates::Shown::OPTIONS)
+    {
+
+    }
+}
+
+/**
+ * @brief ImGuiHelper::isOnExitString
+ * @return
+ */
+bool ImGuiHelper::isOnExitString() const
+{
+    return !mTitle.playSelected;
 }
 
 /**
@@ -281,7 +422,7 @@ void ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture()
  */
 bool ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects()
 {
-    const GLchar *vertex_shader =
+    const GLchar* vertex_shader =
     "#version 300 es\n"
     "precision mediump float;\n"
     "uniform mat4 ProjMtx;\n"
@@ -346,6 +487,96 @@ bool ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects()
     ImGui_ImplSdlGL3_CreateFontsTexture();
 
     return true;
+}
+
+/**
+ * @brief ImGuiHelper::getShowFramesOverlay
+ * @return
+ */
+bool ImGuiHelper::getShowFramesOverlay() const
+{
+    return mShowFramesOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::setShowFramesOverlay
+ * @param showFramesOverlay
+ */
+void ImGuiHelper::setShowFramesOverlay(bool showFramesOverlay)
+{
+    mShowFramesOverlay = showFramesOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::getShowPlayerStatsOverlay
+ * @return
+ */
+bool ImGuiHelper::getShowPlayerStatsOverlay() const
+{
+    return mShowPlayerStatsOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::setShowPlayerStatsOverlay
+ * @param showPlayerStatsOverlay
+ */
+void ImGuiHelper::setShowPlayerStatsOverlay(bool showPlayerStatsOverlay)
+{
+    mShowPlayerStatsOverlay = showPlayerStatsOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::getShowTitleOverlay
+ * @return
+ */
+bool ImGuiHelper::getShowTitleOverlay() const
+{
+    return mShowTitleOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::setShowTitleOverlay
+ * @param showTitleOverlay
+ */
+void ImGuiHelper::setShowTitleOverlay(bool showTitleOverlay)
+{
+    mShowTitleOverlay = showTitleOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::getShowOptionsOverlay
+ * @return
+ */
+bool ImGuiHelper::getShowOptionsOverlay() const
+{
+    return mShowOptionsOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::setShowOptionsOverlay
+ * @param showOptionsOverlay
+ */
+void ImGuiHelper::setShowOptionsOverlay(bool showOptionsOverlay)
+{
+    mShowOptionsOverlay = showOptionsOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::getShowDescOverlay
+ * @return
+ */
+bool ImGuiHelper::getShowDescOverlay() const
+{
+    return mShowDescOverlay;
+}
+
+/**
+ * @brief ImGuiHelper::setShowDescOverlay
+ * @param showDescOverlay
+ */
+void ImGuiHelper::setShowDescOverlay(bool showDescOverlay)
+{
+    mShowDescOverlay = showDescOverlay;
 }
 
 /**
@@ -437,8 +668,9 @@ void ImGuiHelper::ImGui_ImplSdlGL3_NewFrame()
     ImGuiIO& io = ImGui::GetIO();
 
     // Setup display size (every frame to accommodate for window resizing)
-    int w = cSdlManager.getDimensions().x, h = cSdlManager.getDimensions().y;
-    io.DisplaySize = ImVec2(static_cast<float>(w), static_cast<float>(h));
+    int windowWidth = cSdlManager.getWindowWidth();
+    int windowHeight = cSdlManager.getWindowHeight();
+    io.DisplaySize = ImVec2(static_cast<float>(windowWidth), static_cast<float>(windowHeight));
     io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
 
     // Setup time step

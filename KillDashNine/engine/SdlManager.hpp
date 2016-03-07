@@ -4,8 +4,6 @@
 #include <string>
 #include <memory>
 
-#include <glm/glm.hpp>
-
 #include "Config.hpp"
 
 #if defined(APP_DESKTOP)
@@ -81,8 +79,8 @@ public:
     typedef std::unique_ptr<SdlManager> Ptr;
 public:
     explicit SdlManager(const SdlWindow::Settings& window,
-        const glm::uvec2& dimensions,
-        const std::string& title);
+        const std::string& title, const unsigned int width = 0u,
+        const unsigned int height = 0u);
     virtual ~SdlManager();
 
     void cleanUp();
@@ -98,8 +96,10 @@ public:
     void toggleFullScreen();
     bool isFullScreen() const;
 
-    void setDimensions(const glm::uvec2& dimensions);
-    glm::uvec2 getDimensions() const;
+    void setWindowHeight(const unsigned int height);
+    unsigned int getWindowHeight() const;
+    void setWindowWidth(const unsigned int width);
+    unsigned int getWindowWidth() const;
 
     float getAspectRatio() const;
 
@@ -107,8 +107,9 @@ public:
     SdlWindow::Settings getWindowSettings() const;
 private:
     SdlWindow::Settings mWindowSettings;
-    glm::uvec2 mDimensions;
     std::string mTitle;
+    unsigned int mWinWidth;
+    unsigned int mWinHeight;
     SDL_GLprofile mOpenGlContext;
     SDL_LogPriority mLogPriority;
     int mOpenGlMajor;
