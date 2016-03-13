@@ -439,7 +439,7 @@ GLuint Shader::compile(const int shaderType, const std::string& shaderCode)
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
             "%s -- Shader Compilation Failed: %s\n", mFileNames.at(shaderType).c_str(), infoLog);
     }
-    else if (APP_DEBUG && success)
+    else if (success)
     {
         SDL_Log("%s compiled successfully\n", mFileNames.at(shaderType).c_str(), infoLog);
     }
@@ -475,7 +475,7 @@ GLuint Shader::compile(const int shaderType, const GLchar* shaderCode)
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
             "%s -- Shader Compilation Failed: %s\n", mFileNames.at(shaderType).c_str(), infoLog);
     }
-    else if (APP_DEBUG && success)
+    else if (success)
     {
         SDL_Log("%s compiled successfully\n", mFileNames.at(shaderType).c_str(), infoLog);
     }
@@ -530,7 +530,7 @@ GLint Shader::getUniformLocation(const std::string& str)
     if (iter == mGlslLocations.end())
     {
         GLint loc = glGetUniformLocation(mProgram, str.c_str());
-        if (loc == -1 && APP_DEBUG)
+        if (loc == -1)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s does not exist in the shader\n", str.c_str());
         }

@@ -3,9 +3,9 @@
 #include <sstream>
 #include <cassert>
 
-#if APP_DEBUG == 1
+#if defined(APP_DEBUG)
 #include "graphics/GlUtils.hpp"
-#endif
+#endif // defined
 
 /**
  * @brief SdlManager::SdlManager
@@ -54,15 +54,14 @@ SdlManager::SdlManager(const SdlWindow::Settings& window,
         glEnable(GL_MULTISAMPLE);
     }
 
-    if (APP_DEBUG == 1)
-    {
+#if defined(APP_DEBUG)
 //        glEnable(GL_DEBUG_OUTPUT);
 //        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
 //        glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
 //        glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
 //            GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
 //            GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
-    }
+#endif // defined
 }
 
 SdlManager::~SdlManager()

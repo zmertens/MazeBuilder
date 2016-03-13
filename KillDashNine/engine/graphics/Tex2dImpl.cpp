@@ -1,11 +1,12 @@
 #include "Tex2dImpl.hpp"
 
-#if APP_DEBUG == 1
+#if defined(APP_DEBUG)
 #include "GlUtils.hpp"
-#endif
+#endif // defined
 
 #include "../Utils.hpp"
 
+// this definition of STB_IMAGE must be here
 #define STB_IMAGE_IMPLEMENTATION
 #include "../../extlibs/stb_image.h"
 

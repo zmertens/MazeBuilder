@@ -27,6 +27,8 @@
 
 class KillDashNine final : public IApplication
 {
+    friend class ImGuiHelper;
+
 public:
     KillDashNine();
     virtual void start() override;
@@ -77,7 +79,6 @@ private:
     void initPositions();
     void printFramesToConsole(const float dt);
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
-    void handleReturnPressed();
 };
 
 #endif // KILLDASHNINE_HPP

@@ -1,8 +1,8 @@
 #include "TexSkyboxImpl.hpp"
 
-#if APP_DEBUG == 1
+#if defined(APP_DEBUG)
 #include "GlUtils.hpp"
-#endif
+#endif // defined
 
 #include "../Utils.hpp"
 
@@ -119,13 +119,12 @@ void TexSkyboxImpl::init(unsigned char* str, long bufferSize)
        throw new std::runtime_error(fileError.c_str());
     }
 
-//    if (APP_DEBUG == 1)
-//    {
-//        std::string fileComp = "Texture generated from " + fileNames.at(i) + ", width = "
-//           + Utils::toString(width) + ", height = "
-//           + Utils::toString(height) + ", comp = " + Utils::toString(comp) + "\n";
-//        SDL_Log(fileComp.c_str());
-//    }
+#if defined(APP_DEBUG)
+    std::string fileComp = "Texture generated from " + Utils::toString(str) + ", width = "
+       + Utils::toString(width) + ", height = "
+       + Utils::toString(height) + ", comp = " + Utils::toString(comp) + "\n";
+    SDL_Log(fileComp.c_str());
+#endif // defined
 
     stbi_image_free(imageData);
 } // init

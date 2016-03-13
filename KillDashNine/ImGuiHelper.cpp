@@ -4,6 +4,9 @@
 #include <cstddef> // offsetof
 
 #include "engine/ResourceManager.hpp"
+#include "engine/Utils.hpp"
+
+#include "KillDashNine.hpp"
 
 GLint ImGuiHelper::sShaderHandle = 0;
 GLint ImGuiHelper::sVertHandle = 0;
@@ -34,15 +37,16 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
 , mShowPlayerStatsOverlay(true)
 , mShowTitleOverlay(true)
 , mShowOptionsOverlay(false)
-, mShowDescOverlay(false)
+, mShowDescOverlay(true)
+, mShowCrosshairOverlay(true)
 , mOverlayAlpha(0.9324f)
 , mState(GuiStates::Shown::TITLE)
 , mFrames({"FPS: ", "time (us) / frame: "})
-, mTitle({"kill -9",
-    "$: You are a process;\\ \n?The System Monitor wants to kill you . \\ | \
+, mTitle({
+    "$: kill -9 * | echo \"You are a process;\\ \n?The System Monitor wants to kill you . \\ | \
     \n!(There is a backdoor)  \\ \n__Do not get piped to /dev/null : &&\\ \n -xvf \
     for (i = 0; i != 1 / 0; ++i) {} ... -o cd..\\ \n",
-    "Up, Down arrows = options up and down\n \
+    "\tUp, Down arrows = options up and down\n \
     Return = select\n \
     W, A, S, D = movement\n \
     E = action\n \
@@ -50,17 +54,38 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
     Escape = Options\n \
     Tab = lock mouse\n \
     Leftmouse = laser\n \
-    Scrollmouse = zoom\n \
+    Scrollmouse = zoom\"\n \
     Shift = speed\n",
-    "--play", "--exit", true})
-, mOptions()
-, mDesc()
+    "--play?", "--exit?", true})
+, mOptions(0)
+, mDesc({"kill -9"})
 , mStats({"Health: 100%", "Lasers: 100%", "State: Normal"})
 , g_FontTexture(0)
 , g_Time(0.0f)
 , g_MousePressed{false, false, false}
 , g_MouseWheel(0.0f)
 {
+    // @todo : could put this in a for loop, with the
+    // strings within an array, easier to add option items
+    mOptions.tuples[0] = std::make_tuple("--music == ", true, true);
+    mOptions.tuples[1] = std::make_tuple("--sound == ", false, true);
+    mOptions.tuples[2] = std::make_tuple("--crosshair == ", false, true);
+    mOptions.tuples[3] = std::make_tuple("--fullscreen == ", false, false);
+    mOptions.tuples[4] = std::make_tuple("--difficulty == ", false, false);
+#if defined(APP_DEBUG)
+    mOptions.tuples[5] = std::make_tuple("--y-axis movement == ", false, false);
+    mOptions.tuples[6] = std::make_tuple("--collisions == ", false, true);
+    mOptions.tuples[7] = std::make_tuple("--invincible == ", false, false);
+    mOptions.tuples[8] = std::make_tuple("--speed == ", false, false);
+    mOptions.tuples[9] = std::make_tuple("--infinite ammo == ", false, false);
+    mOptions.tuples[10] = std::make_tuple("--strength == ", false, false);
+    mOptions.tuples[11] = std::make_tuple("--restart iterations?", false, false);
+    mOptions.tuples[12] = std::make_tuple("--exit?", false, false);
+#else
+    mOptions.tuples[5] = std::make_tuple("--restart iterations", false, false);
+    mOptions.tuples[6] = std::make_tuple("--exit", false, false);
+#endif // defined
+
     ImGui_ImplSdlGL3_Init();
 } // constructor
 
@@ -70,6 +95,86 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
 ImGuiHelper::~ImGuiHelper()
 {
     cleanUp();
+}
+
+/**
+ * @brief ImGuiHelper::update
+ * @param app
+ */
+void ImGuiHelper::update(KillDashNine& app)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.KeysDown[SDLK_RETURN])
+    {
+        io.KeysDown[SDLK_RETURN] = false;
+        if (mState == GuiStates::Shown::TITLE && isOnExitString())
+        {
+            app.mAppIsRunning = false;
+        }
+        else if (mState == GuiStates::Shown::TITLE && !isOnExitString())
+        {
+            // play
+            mState = GuiStates::Shown::PLAY;
+            mShowTitleOverlay = false;
+            mDesc.desc = "Iteration# "; // app.getLevelIterations
+        }
+        else if (mState == GuiStates::Shown::OPTIONS)
+        {
+            handleGuiOptions(app);
+        }
+    }
+    else if (io.KeysDown[SDLK_ESCAPE])
+    {
+        io.KeysDown[SDLK_ESCAPE] = false;
+        if (mState == GuiStates::Shown::TITLE)
+        {
+            mState = GuiStates::Shown::PLAY;
+            mShowTitleOverlay = false;
+            mDesc.desc = "Iteration# ";
+        }
+        else if (mState == GuiStates::Shown::PLAY)
+        {
+            mState = GuiStates::Shown::OPTIONS;
+            mShowOptionsOverlay = true;
+            mDesc.desc = "Options";
+        }
+        else if (mState == GuiStates::Shown::OPTIONS)
+        {
+            mState = GuiStates::Shown::PLAY;
+            mShowOptionsOverlay = false;
+            mDesc.desc = "Iteration# ";
+        }
+    }
+    else if (io.KeysDown[SDL_SCANCODE_UP])
+    {
+        io.KeysDown[SDL_SCANCODE_UP] = false;
+        if (mState == GuiStates::Shown::TITLE)
+        {
+            mTitle.playSelected = !mTitle.playSelected;
+        }
+        else if (mState == GuiStates::Shown::OPTIONS)
+        {
+            std::get<1>(mOptions.tuples[mOptions.indexer]) = false;
+            mOptions.indexer = ((mOptions.indexer - 1) < 0) ?
+                static_cast<int>(Selection::TOTAL_OPTIONS) - 1 : mOptions.indexer - 1;
+            std::get<1>(mOptions.tuples[mOptions.indexer]) = true;
+        }
+    }
+    else if (io.KeysDown[SDL_SCANCODE_DOWN])
+    {
+        io.KeysDown[SDL_SCANCODE_DOWN] = false;
+        if (mState == GuiStates::Shown::TITLE)
+        {
+            mTitle.playSelected = !mTitle.playSelected;
+        }
+        else if (mState == GuiStates::Shown::OPTIONS)
+        {
+            std::get<1>(mOptions.tuples[mOptions.indexer]) = false;
+            mOptions.indexer = ((mOptions.indexer + 1) == static_cast<int>(Selection::TOTAL_OPTIONS)) ?
+                0 : mOptions.indexer + 1;
+            std::get<1>(mOptions.tuples[mOptions.indexer]) = true;
+        }
+    }
 }
 
 /**
@@ -100,7 +205,6 @@ void ImGuiHelper::render()
             windowHeight * 0.5f - 0.20f * static_cast<float>(windowHeight)));
         ImGui::Begin("#Title Window", &mShowTitleOverlay,
             ImVec2(0.40f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
-        ImGui::Text(mTitle.title.c_str(), "%s");
         ImGui::TextColored(ImColor(255, 0, 0, 255), mTitle.storyline.c_str(), "%s");
         ImGui::Text(mTitle.controls.c_str(), "%s");
         ImGui::TextColored(mTitle.playSelected ? mSelected : ImColor(255, 255, 255, 255),
@@ -116,7 +220,13 @@ void ImGuiHelper::render()
             windowHeight * 0.5f - 0.20f * static_cast<float>(windowHeight)));
         ImGui::Begin("#Options Window", &mShowOptionsOverlay,
             ImVec2(0.40f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
-        ImGui::Text("Exit\n");
+
+        for (int i = 0; i != static_cast<int>(Selection::TOTAL_OPTIONS); ++i)
+        {
+            ImGui::TextColored(std::get<1>(mOptions.tuples[i]) ? mSelected : ImColor(255, 255, 255, 255),
+                std::string(std::get<0>(mOptions.tuples[i]) + Utils::toString(std::get<2>(mOptions.tuples[i]))).c_str(), "%s");
+        }
+
         ImGui::End();
     }
 
@@ -125,8 +235,19 @@ void ImGuiHelper::render()
     {
         ImGui::SetNextWindowPos(ImVec2(windowWidth - 0.08f * static_cast<float>(windowWidth), 0));
         ImGui::Begin("#Desc Window", &mShowDescOverlay,
-            ImVec2(0, 0), mOverlayAlpha, mOverlayFlags);
-        ImGui::Text(mDesc.desc.c_str(), "%s");
+            ImVec2(0.08f * static_cast<float>(windowWidth), 0), mOverlayAlpha, mOverlayFlags);
+        ImGui::TextColored(ImColor(255, 0, 255, 255), mDesc.desc.c_str(), "%s");
+        ImGui::End();
+    }
+
+    if (mShowCrosshairOverlay)
+    {
+        ImGui::SetNextWindowPos(ImVec2(windowWidth * 0.5f - 0.05f * static_cast<float>(windowWidth),
+            windowHeight * 0.5f - 0.05f * static_cast<float>(windowHeight)));
+        ImGui::Begin("#Cross Window", &mShowCrosshairOverlay,
+            ImVec2(0.05f * static_cast<float>(windowWidth), 0.05f * static_cast<float>(windowHeight)),
+            1.0f - mOverlayAlpha, mOverlayFlags);
+        ImGui::TextColored(ImColor(0, 0, 0, 255), "+");
         ImGui::End();
     }
 
@@ -174,7 +295,7 @@ void ImGuiHelper::updateFrames(const std::string& fps, const std::string secPerF
  */
 void ImGuiHelper::updateDescription(const std::string& desc)
 {
-
+    mDesc.desc = desc;
 }
 
 /**
@@ -193,76 +314,6 @@ GuiStates::Shown ImGuiHelper::getState() const
 void ImGuiHelper::setState(const GuiStates::Shown& state)
 {
     mState = state;
-}
-
-/**
- * A natural state update happens when the user hits SDLK_ESCAPE,
- * and the next state follows a natural ordering:
- * TITLE -> PLAY -> OPTIONS -> PLAY -> OPTIONS ...
- * @brief ImGuiHelper::naturalStateUpdate
- */
-void ImGuiHelper::naturalStateUpdate()
-{
-    if (mState == GuiStates::Shown::TITLE)
-    {
-        mState = GuiStates::Shown::PLAY;
-        mShowTitleOverlay = false;
-        mShowDescOverlay = true;
-        mDesc.desc = "Iteration# ";
-    }
-    else if (mState == GuiStates::Shown::PLAY)
-    {
-        mState = GuiStates::Shown::OPTIONS;
-        mShowOptionsOverlay = true;
-        mShowDescOverlay = true;
-        mDesc.desc = "Options";
-    }
-    else if (mState == GuiStates::Shown::OPTIONS)
-    {
-        mState = GuiStates::Shown::PLAY;
-        mShowOptionsOverlay = false;
-        mShowDescOverlay = true;
-        mDesc.desc = "Iteration# ";
-    }
-}
-
-/**
- * @brief ImGuiHelper::reactToUpArrow
- */
-void ImGuiHelper::reactToUpArrow()
-{
-    if (mState == GuiStates::Shown::TITLE)
-    {
-        mTitle.playSelected = !mTitle.playSelected;
-    }
-    else if (mState == GuiStates::Shown::OPTIONS)
-    {
-
-    }
-}
-
-/**
- * @brief ImGuiHelper::reactToDownArrow
- */
-void ImGuiHelper::reactToDownArrow()
-{
-    if (mState == GuiStates::Shown::TITLE)
-    {
-        mTitle.playSelected = !mTitle.playSelected;
-    }
-    else if (mState == GuiStates::Shown::OPTIONS)
-    {
-
-    }
-}
-
-/**
- * @brief ImGuiHelper::isOnExitString
- * @return
- */
-bool ImGuiHelper::isOnExitString() const
-{
-    return !mTitle.playSelected;
 }
 
 /**
@@ -406,6 +457,7 @@ void ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture()
     // Load as RGBA 32-bits for OpenGL3 demo because it is more likely to be compatible with user's existing shader.
 
     // Upload texture to graphics system
+    // @todo add texture class object instead
     glGenTextures(1, &g_FontTexture);
     glBindTexture(GL_TEXTURE_2D, g_FontTexture);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -422,6 +474,7 @@ void ImGuiHelper::ImGui_ImplSdlGL3_CreateFontsTexture()
  */
 bool ImGuiHelper::ImGui_ImplSdlGL3_CreateDeviceObjects()
 {
+    // @todo add these as constants along with a shader class
     const GLchar* vertex_shader =
     "#version 300 es\n"
     "precision mediump float;\n"
@@ -579,6 +632,16 @@ void ImGuiHelper::setShowDescOverlay(bool showDescOverlay)
     mShowDescOverlay = showDescOverlay;
 }
 
+bool ImGuiHelper::getShowCrosshairOverlay() const
+{
+    return mShowCrosshairOverlay;
+}
+
+void ImGuiHelper::setShowCrosshairOverlay(bool showCrosshairOverlay)
+{
+    mShowCrosshairOverlay = showCrosshairOverlay;
+}
+
 /**
  * @brief ImGuiHelper::ImGui_ImplSdlGL3_InvalidateDeviceObjects
  */
@@ -701,3 +764,72 @@ void ImGuiHelper::ImGui_ImplSdlGL3_NewFrame()
     // Start the frame
     ImGui::NewFrame();
 } // new frame
+
+
+/**
+ * @brief ImGuiHelper::isOnExitString
+ * @return
+ */
+bool ImGuiHelper::isOnExitString() const
+{
+    return !mTitle.playSelected;
+}
+
+/**
+ * @brief ImGuiHelper::handleGuiOptions
+ * @param app
+ */
+void ImGuiHelper::handleGuiOptions(KillDashNine& app)
+{
+    std::get<2>(mOptions.tuples[mOptions.indexer]) = !std::get<2>(mOptions.tuples[mOptions.indexer]);
+
+    if (mOptions.indexer == static_cast<int>(Selection::MUSIC))
+    {
+        if (std::get<2>(mOptions.tuples[mOptions.indexer]))
+            app.mSdlMixer.setVolumeMusic(app.mSdlMixer.getMaxMusicVolume());
+        else
+            app.mSdlMixer.setVolumeMusic(0);
+    }
+    if (mOptions.indexer == static_cast<int>(Selection::SOUND))
+    {
+        if (std::get<2>(mOptions.tuples[mOptions.indexer]))
+            app.mSdlMixer.setVolume(-1, app.mSdlMixer.getMaxChannelVolume());
+        else
+            app.mSdlMixer.setVolume(-1, 0);
+    }
+    if (mOptions.indexer == static_cast<int>(Selection::CROSSHAIR))
+    {
+        if (std::get<2>(mOptions.tuples[mOptions.indexer]))
+            mShowCrosshairOverlay = true;
+        else
+            mShowCrosshairOverlay = false;
+    }
+    else if (mOptions.indexer == static_cast<int>(Selection::DIFFICULTY))
+    {
+
+    }
+    else if (mOptions.indexer == static_cast<int>(Selection::FULLSCREEN))
+    {
+        app.mSdlManager.toggleFullScreen();
+    }
+#if defined(APP_DEBUG)
+    if (mOptions.indexer == static_cast<int>(Selection::COLLISIONS))
+    {
+        if (std::get<2>(mOptions.tuples[mOptions.indexer]))
+            app.mPlayer.setCollisions(true);
+        else
+            app.mPlayer.setCollisions(false);
+    }
+#endif // defined
+    if (mOptions.indexer == static_cast<int>(Selection::RESTART))
+    {
+        mState = GuiStates::Shown::TITLE;
+        mShowOptionsOverlay = false;
+        mShowTitleOverlay = true;
+        mDesc.desc = "kill -9";
+    }
+    else if (mOptions.indexer == static_cast<int>(Selection::EXIT))
+    {
+        app.mAppIsRunning = false;
+    }
+}

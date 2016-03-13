@@ -2,9 +2,9 @@
 
 #include "engine/Utils.hpp"
 
-#if APP_DEBUG == 1
+#if defined(APP_DEBUG)
 #include "engine/graphics/GlUtils.hpp"
-#endif
+#endif // defined
 
 // testing
 #include "ResourcePaths.hpp"
@@ -74,9 +74,6 @@ KillDashNine::KillDashNine()
 {
     // initialize all game resources (texture, material, mesh, et cetera)
     init();
-
-    // temp, get rid of this
-    //mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
 } // constructor
 
 /**
@@ -85,6 +82,9 @@ KillDashNine::KillDashNine()
 void KillDashNine::start()
 {
     mAppIsRunning = true;
+
+    mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
+
     loop();
 }
 
@@ -125,6 +125,7 @@ void KillDashNine::handleEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        mImGuiHelper.ImGui_ImplSdlGL3_ProcessEvent(&event);
         sdlEvents(event, mouseWheelDy);
     } // events
 
@@ -174,6 +175,7 @@ void KillDashNine::update(float dt, double timeSinceInit)
         mLevelGen.getTileScalar().y - mPlayer.getPlayerSize().y,
         mPlayer.getPosition().z, 0.0f));
 
+    mImGuiHelper.update(*this);
 //    static int testCounter = 0;
 //    if (++testCounter % 50 == 0)
 //    {
@@ -237,13 +239,12 @@ void KillDashNine::render()
  */
 void KillDashNine::finish()
 {
-    if (APP_DEBUG == 1)
-    {
-        mLogger.appendToLog(mSdlManager.getSdlInfoString());
-        mLogger.appendToLog(mSdlManager.getGlInfoString());
-        mLogger.appendToLog(mResources.getAllLogs());
-        mLogger.dumpLogToFile("data_log.txt");
-    }
+#if defined(APP_DEBUG)
+    mLogger.appendToLog(mSdlManager.getSdlInfoString());
+    mLogger.appendToLog(mSdlManager.getGlInfoString());
+    mLogger.appendToLog(mResources.getAllLogs());
+    mLogger.dumpLogToFile("data_log.txt");
+#endif // defined
 
     mAppIsRunning = false;
     mSdlManager.cleanUp();
@@ -255,9 +256,9 @@ void KillDashNine::finish()
  */
 void KillDashNine::init()
 {
-    //glEnable(GL_DEPTH_TEST);
+    glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    //glCullFace(GL_BACK);
+
     initResources();
     initPositions();
 }
@@ -346,7 +347,7 @@ void KillDashNine::initResources()
         ResourcePaths::Textures::SKYBOX_PATHS, 0));
     mResources.insert(ResourceIds::Textures::SKYBOX_TEX_ID, std::move(skyboxTex));
 
-    // @TODO use the fullscreen texture in the post processor (switch order of init)
+    // @TODO use the fullscreen texture in the post processor (switch order of init) -- add FBO to RM
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
         mSdlManager.getWindowWidth(), mSdlManager.getWindowHeight(), 0));
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
@@ -456,15 +457,14 @@ void KillDashNine::printFramesToConsole(const float dt)
     mTimeSinceLastUpdate += dt;
     if (mTimeSinceLastUpdate >= 1.0f)
     {
-        if (APP_DEBUG == 1)
-        {
-            SDL_Log("FPS: %u\n", mFrameCounter);
-            SDL_Log("time (us) / frame: %f\n", mTimeSinceLastUpdate / mFrameCounter);
-            mLogger.appendToLog("FPS: " + Utils::toString(mFrameCounter));
-            mLogger.appendToLog("\n");
-            mLogger.appendToLog("time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
-            mLogger.appendToLog("\n");
-        }
+#if defined(APP_DEBUG)
+        SDL_Log("FPS: %u\n", mFrameCounter);
+        SDL_Log("time (us) / frame: %f\n", mTimeSinceLastUpdate / mFrameCounter);
+        mLogger.appendToLog("FPS: " + Utils::toString(mFrameCounter));
+        mLogger.appendToLog("\n");
+        mLogger.appendToLog("time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
+        mLogger.appendToLog("\n");
+#endif // defined
 
         mImGuiHelper.updateFrames("FPS: " + Utils::toString(mFrameCounter),
             "time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
@@ -496,36 +496,19 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             mSdlManager.setWindowWidth(newWidth);
             mSdlManager.setWindowHeight(newHeight);
 
-            if (APP_DEBUG)
-            {
-                std::string resizeDimens = "Resize Event -- Width: "
-                    + Utils::toString(newWidth) + ", Height: "
-                    + Utils::toString(newHeight) + "\n";
-                SDL_Log(resizeDimens.c_str());
-            }
+#if defined(APP_DEBUG)
+            std::string resizeDimens = "Resize Event -- Width: "
+                + Utils::toString(newWidth) + ", Height: "
+                + Utils::toString(newHeight) + "\n";
+            SDL_Log(resizeDimens.c_str());
+#endif // defined
         }
     }
     else if (event.type == SDL_MOUSEWHEEL)
         mouseWheelDy = event.wheel.y;
     else if (event.type == SDL_KEYDOWN)
     {
-        if (event.key.keysym.sym == SDLK_UP)
-        {
-            mImGuiHelper.reactToUpArrow();
-        }
-        else if (event.key.keysym.sym == SDLK_DOWN)
-        {
-            mImGuiHelper.reactToDownArrow();
-        }
-        else if (event.key.keysym.sym == SDLK_RETURN)
-        {
-            handleReturnPressed();
-        }
-        else if (event.key.keysym.sym == SDLK_ESCAPE)
-        {
-            mImGuiHelper.naturalStateUpdate();
-        }
-        else if (event.key.keysym.sym == SDLK_TAB)
+        if (event.key.keysym.sym == SDLK_TAB)
         {
             // flip mouse lock
             mPlayer.setMouseLocked(!mPlayer.getMouseLocked());
@@ -538,31 +521,10 @@ void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
     else if ((mSdlManager.getWindowSettings().initFlags & SDL_INIT_JOYSTICK) &&
         event.type == SDL_JOYBUTTONDOWN)
     {
+#if defined(APP_DEBUG)
         if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
-            mSdlManager.hapticRumblePlay(0.75, 500) != 0 && APP_DEBUG)
+            mSdlManager.hapticRumblePlay(0.75, 500) != 0)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+#endif // defined
     }
 } // sdlEvents
-
-/**
- * @brief KillDashNine::handleReturnPressed
- */
-void KillDashNine::handleReturnPressed()
-{
-    if (mImGuiHelper.isOnExitString() &&
-        (mImGuiHelper.getState() == GuiStates::Shown::TITLE ||
-            mImGuiHelper.getState() == GuiStates::Shown::OPTIONS))
-    {
-        mAppIsRunning = false;
-    }
-    else if (mImGuiHelper.getState() == GuiStates::Shown::TITLE &&
-        !mImGuiHelper.isOnExitString())
-    {
-        mImGuiHelper.naturalStateUpdate();
-    }
-    else if (mImGuiHelper.getState() == GuiStates::Shown::OPTIONS &&
-        1 /* @todo add checks */)
-    {
-        mAppIsRunning = false;
-    }
-}

@@ -214,8 +214,7 @@ void WavefrontObjectLoader::parseFile(const std::string& filename, std::vector<V
 
     generateTangents(vertices, indices);
 
-    if (APP_DEBUG)
-    {
+#if defined(APP_DEBUG)
         std::stringstream ss;
         ss << "Loaded mesh from: " << filename << "\n";
         ss << positions.size() << " points" << "\n";
@@ -223,7 +222,7 @@ void WavefrontObjectLoader::parseFile(const std::string& filename, std::vector<V
         ss << normals.size() << " normals" << "\n";
         ss << texCoords.size() << " texture coordinates" << "\n";
         SDL_Log(ss.str().c_str());
-    }
+#endif // defined
 } // parseFile(... )
 
 /**
@@ -344,8 +343,7 @@ void WavefrontObjectLoader::parseFile(const std::string& filename, std::vector<V
 
     generateTangents(vertices, indices);
 
-    if (APP_DEBUG)
-    {
+#if defined(APP_DEBUG)
         std::stringstream ss;
         ss << "Loaded mesh from: " << filename << "\n";
         ss << positions.size() << " points" << "\n";
@@ -353,7 +351,7 @@ void WavefrontObjectLoader::parseFile(const std::string& filename, std::vector<V
         ss << normals.size() << " normals" << "\n";
         ss << texCoords.size() << " texture coordinates" << "\n";
         SDL_Log(ss.str().c_str());
-    }
+#endif // defined
 
     printVerticesAndIndicesToFile(vertices, indices, verticesFile, indicesFile);
 } // parseFile(... )

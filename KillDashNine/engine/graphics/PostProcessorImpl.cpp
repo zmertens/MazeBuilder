@@ -5,9 +5,9 @@
 // kind of a dirty hack for now...
 #include "Tex2dImpl.hpp"
 
-#if APP_DEBUG == 1
+#if defined(APP_DEBUG)
 #include "GlUtils.hpp"
-#endif
+#endif // defined
 
 PostProcessorImpl::PostProcessorImpl(const ResourceManager& resources,
     const Entity::Config& config,
@@ -96,14 +96,16 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRboHandle);
 
-    if (APP_DEBUG)
+#if defined(APP_DEBUG)
         GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
+#endif // defined
 
     if (glCheckNamedFramebufferStatus(mFboHandle, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw new std::runtime_error("FrameBuffer Error! Failed to initialize mFrameBuffer_Handle\n");
 
-    if (APP_DEBUG)
+#if defined(APP_DEBUG)
         GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
+#endif // defined
 
     glDrawBuffer(GL_COLOR_ATTACHMENT0);
 

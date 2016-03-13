@@ -2,6 +2,8 @@
 #define IMGUIHELPER_HPP
 
 #include <string>
+#include <array>
+#include <tuple>
 
 #include "extlibs/imgui/imgui.h"
 
@@ -22,6 +24,7 @@ namespace
 }
 
 class ResourceManager;
+class KillDashNine;
 
 class ImGuiHelper final
 {
@@ -29,6 +32,7 @@ public:
     explicit ImGuiHelper(const SdlManager& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
+    void update(KillDashNine& app);
     void render();
     void cleanUp();
 
@@ -37,12 +41,6 @@ public:
 
     GuiStates::Shown getState() const;
     void setState(const GuiStates::Shown& state);
-    void naturalStateUpdate();
-
-    void reactToUpArrow();
-    void reactToDownArrow();
-
-    bool isOnExitString() const;
 
     static void ImGui_ImplSdlGL3_RenderDrawLists(ImDrawData* draw_data);
     static const char* ImGui_ImplSdlGL3_GetClipboardText();
@@ -52,7 +50,7 @@ public:
 
     IMGUI_API bool ImGui_ImplSdlGL3_Init();
     IMGUI_API void ImGui_ImplSdlGL3_Shutdown();
-    IMGUI_API void ImGui_ImplSdlGL3_NewFrame();
+    IMGUI_API void ImGui_ImplSdlGL3_NewFrame(); // @todo : priv
     IMGUI_API bool ImGui_ImplSdlGL3_ProcessEvent(SDL_Event* event);
     // Use if you want to reset your rendering device without losing ImGui state.
     IMGUI_API void ImGui_ImplSdlGL3_InvalidateDeviceObjects();
@@ -73,6 +71,9 @@ public:
     bool getShowDescOverlay() const;
     void setShowDescOverlay(bool showDescOverlay);
 
+    bool getShowCrosshairOverlay() const;
+    void setShowCrosshairOverlay(bool showCrosshairOverlay);
+
 private:
     typedef struct {
         std::string fps;
@@ -80,7 +81,6 @@ private:
     } Frames;
 
     typedef struct {
-        std::string title;
         std::string storyline;
         std::string controls;
         std::string play;
@@ -88,26 +88,33 @@ private:
         bool playSelected;
     } Title;
 
-    typedef struct {
-        // will need to get crafty with this,
-        // possibly use a tuple<string, string, bool>
-        // to have 2 versions of strings depending
-        // wether or not option is off or on
-        std::string music;
-        std::string sounds;
-        std::string crosshair; // rendered using ImGui
-        std::string difficulty;
-        // debug
-        std::string yAxisMovement;
-        std::string collisions;
-        std::string invincible;
-        std::string speed;
-        std::string infAmmo;
-        std::string str;
-        // debug
-        std::string restart;
-        std::string exit;
-        // use offsetof to index the struct string?
+    enum class Selection {
+        MUSIC,
+        SOUND,
+        CROSSHAIR,
+        FULLSCREEN,
+        DIFFICULTY,
+#if defined(APP_DEBUG)
+        Y_AXIS_MV, // might not be needed
+        COLLISIONS,
+        INVINCIBLE,
+        SPEED,
+        INF_AMMO,
+        STRENGTH,
+#endif // defined
+        RESTART,
+        EXIT,
+        TOTAL_OPTIONS
+    };
+
+    typedef struct Options {
+
+        Options(const int i) : indexer(i) {}
+
+        int indexer;
+        // tuple layout is: text string, selected, on / off
+        std::array<std::tuple<std::string, bool, bool>, static_cast<int>(Selection::TOTAL_OPTIONS)> tuples;
+
     } Options;
 
     typedef struct {
@@ -144,6 +151,7 @@ private:
     bool mShowTitleOverlay;
     bool mShowOptionsOverlay;
     bool mShowDescOverlay;
+    bool mShowCrosshairOverlay;
 
     float mOverlayAlpha;
 
@@ -162,6 +170,8 @@ private:
 private:
     ImGuiHelper(const ImGuiHelper& other);
     ImGuiHelper& operator=(const ImGuiHelper& other);
+    bool isOnExitString() const;
+    void handleGuiOptions(KillDashNine& app);
 };
 
 #endif // IMGUIHELPER_HPP

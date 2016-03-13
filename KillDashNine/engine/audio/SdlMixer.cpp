@@ -60,7 +60,7 @@ void SdlMixer::setVolume(int channel, int volume)
 void SdlMixer::playChannel(int channel, const std::string& id, int loops)
 {
     auto& chunk = mResources.getChunk(id);
-    if (Mix_PlayChannel(channel, chunk->getChunk(), loops) == -1 && APP_DEBUG)
+    if (Mix_PlayChannel(channel, chunk->getChunk(), loops) == -1)
     {
         //SDL_LogError(SDL_LOG_CATEGORY_ERROR, Mix_GetError());
     }
@@ -204,7 +204,7 @@ Mix_Chunk* SdlMixer::getChunk(int channel) const
 void SdlMixer::playMusic(const std::string& id, int loops)
 {
     auto& music = mResources.getMusic(id);
-    if (Mix_PlayMusic(music->getMusic(), loops) == -1 && APP_DEBUG)
+    if (Mix_PlayMusic(music->getMusic(), loops) == -1)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, Mix_GetError());
     }
@@ -239,7 +239,10 @@ void SdlMixer::fadeInMusicPos(const std::string& id, int loops, int ms, double p
  */
 void SdlMixer::setVolumeMusic(int volume)
 {
+    if (Mix_VolumeMusic(volume))
+    {
 
+    }
 }
 
 /**
@@ -396,7 +399,7 @@ int SdlMixer::getMaxMusicVolume() const
 void SdlMixer::init(Uint32 flags)
 {
     Mix_Init(flags);
-    if (Mix_OpenAudio(cFrequency, cFormat, cChannels, cChunkSize) < 0 && APP_DEBUG)
+    if (Mix_OpenAudio(cFrequency, cFormat, cChannels, cChunkSize) < 0)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, Mix_GetError());
     }

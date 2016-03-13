@@ -31,6 +31,21 @@ public:
     bool getMouseLocked() const;
     void setMouseLocked(bool mouseLocked);
 
+    bool getCollisions() const;
+    void setCollisions(bool collisions);
+
+    bool getInvincible() const;
+    void setInvincible(bool invincible);
+
+    bool getSpeed() const;
+    void setSpeed(bool speed);
+
+    bool getInfAmmo() const;
+    void setInfAmmo(bool infAmmo);
+
+    bool getStrength() const;
+    void setStrength(bool strength);
+
 private:
     static const float scMouseSensitivity;
     static float scMovementScalar;
@@ -40,6 +55,11 @@ private:
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
     bool mMouseLocked;
+    bool mCollisions;
+    bool mInvincible;
+    bool mSpeed;
+    bool mInfAmmo;
+    bool mStrength;
 private:
     glm::vec3 iterateThruSpace(const std::vector<glm::vec3>& emptySpaces,
         const glm::vec3& spaceScalar, const glm::vec3& origin,

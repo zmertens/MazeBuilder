@@ -22,6 +22,11 @@ Player::Player(Camera& camera, LevelGenerator& level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
 , mMouseLocked(false)
+, mCollisions(true)
+, mInvincible(false)
+, mSpeed(false)
+, mInfAmmo(false)
+, mStrength(false)
 {
 
 }
@@ -122,13 +127,15 @@ void Player::update(const float dt, const double timeSinceInit)
 {
     if (glm::length(mMovementDir) > 0)
     {
-        glm::vec3 origin (getPosition());
-        // R(t) = P + Vt
-        glm::vec3 direction (origin + glm::normalize(mMovementDir * scMovementScalar * dt));
-        glm::vec3 collision (iterateThruSpace(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
-//        mMovementDir *= collision;
-//        // SDL_Log("collision (%f, %f, %f)\n", collision.x, collision.y, collision.z);
-//        mMovementDir.y = 0.0f;
+        if (mCollisions)
+        {
+            glm::vec3 origin (getPosition());
+            // R(t) = P + Vt
+            glm::vec3 direction (origin + glm::normalize(mMovementDir * scMovementScalar * dt));
+            glm::vec3 collision (iterateThruSpace(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
+            mMovementDir *= collision;
+            mMovementDir.y = 0.0f;
+        }
 
         mFirstPersonCamera.move(mMovementDir, scMovementScalar * dt);
 
@@ -189,8 +196,58 @@ void Player::setMouseLocked(bool mouseLocked)
     mMouseLocked = mouseLocked;
 }
 
+bool Player::getCollisions() const
+{
+    return mCollisions;
+}
+
+void Player::setCollisions(bool collisions)
+{
+    mCollisions = collisions;
+}
+
+bool Player::getInvincible() const
+{
+    return mInvincible;
+}
+
+void Player::setInvincible(bool invincible)
+{
+    mInvincible = invincible;
+}
+
+bool Player::getSpeed() const
+{
+    return mSpeed;
+}
+
+void Player::setSpeed(bool speed)
+{
+    mSpeed = speed;
+}
+
+bool Player::getInfAmmo() const
+{
+    return mInfAmmo;
+}
+
+void Player::setInfAmmo(bool infAmmo)
+{
+    mInfAmmo = infAmmo;
+}
+
+bool Player::getStrength() const
+{
+    return mStrength;
+}
+
+void Player::setStrength(bool strength)
+{
+    mStrength = strength;
+}
+
 /**
- * @brief Player::iterateThruSpace
+ * @brief Player::iterateThruSpace -- tiles?
  * @param emptySpaces
  * @param spaceScalar
  * @param origin

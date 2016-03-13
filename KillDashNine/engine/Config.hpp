@@ -10,7 +10,7 @@
 #define APP_OPENGL_MAJOR 4
 #define APP_OPENGL_MINOR 5
 
-#define APP_DEBUG 1
+#define APP_DEBUG
 
 #if defined(_WIN32)
 

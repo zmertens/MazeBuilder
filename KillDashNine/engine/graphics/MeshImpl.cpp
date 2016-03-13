@@ -29,10 +29,9 @@ void MeshImpl::draw(IMesh::Draw type, const unsigned int count) const
 {
     glBindVertexArray(mVaoHandle);
     glDrawArrays(getGlType(type), 0, count);
-    if (APP_DEBUG == 1)
-    {
-        glBindVertexArray(0);
-    }
+#if defined(APP_DEBUG)
+    glBindVertexArray(0);
+#endif // defined
 }
 
 /**
