@@ -14,3 +14,4 @@ The game is intended to be like a "roguelike Wolfenstein 3D".
  - jumping
  - Normal mapping on levels
  - Better sound / music / textures
+ - Command pattern for user input
