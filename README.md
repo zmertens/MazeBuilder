@@ -1,4 +1,7 @@
 # KillDashNine
+
+![](resources/demo.gif)
+
 A 2.5 dimensional video game engine using OpenGL and C++
 The game is intended to be like a "roguelike Wolfenstein 3D".
 
