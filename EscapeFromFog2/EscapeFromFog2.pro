@@ -29,7 +29,7 @@ SOURCES += \
     engine/graphics/PointLight.cpp \
     engine/graphics/SpotLight.cpp \
     ImGuiHelper.cpp \
-    KillDashNine.cpp \
+    EscapeFromFog2.cpp \
     engine/graphics/Entity.cpp \
     engine/graphics/MaterialFactory.cpp \
     engine/graphics/Tex2dImpl.cpp \
@@ -83,7 +83,7 @@ HEADERS += \
     ImGuiHelper.hpp \
     ResourcePaths.hpp \
     ResourceIds.hpp \
-    KillDashNine.hpp \
+    EscapeFromFog2.hpp \
     engine/graphics/Entity.hpp \
     engine/graphics/MaterialFactory.hpp \
     engine/graphics/Tex2dImpl.hpp \
