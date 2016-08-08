@@ -10,6 +10,9 @@
 *.dll
 *.dylib
 
+# Mac
+*.DS_Store*
+
 # Qt-es
 
 /.qmake.cache

@@ -1,5 +1,8 @@
-# KillDashNine
-A 2.5 dimensional video game engine using OpenGL and C++
+# EscapeFromFog2
+
+![](resources/demo.gif)
+
+Attempt at a 2.5 dimensional video game engine using OpenGL and C++
 The game is intended to be like a "roguelike Wolfenstein 3D".
 
 ## Stuff To Do:
@@ -11,7 +14,7 @@ The game is intended to be like a "roguelike Wolfenstein 3D".
  - Item effects and proper post-processing
  - Use OpenGL instance rendering for tiles on the level
  - Render to cube map to do cool stuff (julia fractal, scrolling terminal text)
- - jumping
+ - jumping?
  - Normal mapping on levels
  - Better sound / music / textures
  - Command pattern for user input
