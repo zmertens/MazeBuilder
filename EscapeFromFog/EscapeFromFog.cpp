@@ -1,4 +1,4 @@
-#include "KillDashNine.hpp"
+#include "EscapeFromFog.hpp"
 
 #include "engine/Utils.hpp"
 
@@ -18,16 +18,16 @@
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
 
-const float KillDashNine::sTimePerFrame = 1.0f / 60.0f;
-const unsigned int KillDashNine::sWindowWidth = 1080u;
-const unsigned int KillDashNine::sWindowHeight = 720u;
-const std::string KillDashNine::sTitle = "kill -9";
-std::unordered_map<uint8_t, bool> KillDashNine::sKeyInputs;
+const float EscapeFromFog::sTimePerFrame = 1.0f / 60.0f;
+const unsigned int EscapeFromFog::sWindowWidth = 1080u;
+const unsigned int EscapeFromFog::sWindowHeight = 720u;
+const std::string EscapeFromFog::sTitle = "kill -9";
+std::unordered_map<uint8_t, bool> EscapeFromFog::sKeyInputs;
 
 /**
- * @brief KillDashNine::KillDashNine
+ * @brief EscapeFromFog::EscapeFromFog
  */
-KillDashNine::KillDashNine()
+EscapeFromFog::EscapeFromFog()
 : mSdlManager(SdlWindow::Settings(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
     SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false),
     sTitle, sWindowWidth, sWindowHeight)
@@ -77,9 +77,9 @@ KillDashNine::KillDashNine()
 } // constructor
 
 /**
- * @brief KillDashNine::start
+ * @brief EscapeFromFog::start
  */
-void KillDashNine::start()
+void EscapeFromFog::start()
 {
     mAppIsRunning = true;
 
@@ -89,9 +89,9 @@ void KillDashNine::start()
 }
 
 /**
- * @brief KillDashNine::loop
+ * @brief EscapeFromFog::loop
  */
-void KillDashNine::loop()
+void EscapeFromFog::loop()
 {
     while (mAppIsRunning)
     {
@@ -117,9 +117,9 @@ void KillDashNine::loop()
 }
 
 /**
- * @brief KillDashNine::handleEvents
+ * @brief EscapeFromFog::handleEvents
  */
-void KillDashNine::handleEvents()
+void EscapeFromFog::handleEvents()
 {
     float mouseWheelDy = 0;
     SDL_Event event;
@@ -148,11 +148,11 @@ void KillDashNine::handleEvents()
 } // update
 
 /**
- * @brief KillDashNine::update
+ * @brief EscapeFromFog::update
  * @param dt = the time between frames
  * @param timeSinceInit = the time since SDL was initialized
  */
-void KillDashNine::update(float dt, double timeSinceInit)
+void EscapeFromFog::update(float dt, double timeSinceInit)
 {
     //mCube.update(dt, timeSinceInit);
     mTestSprite.update(dt, timeSinceInit);
@@ -184,9 +184,9 @@ void KillDashNine::update(float dt, double timeSinceInit)
 }
 
 /**
- * @brief KillDashNine::render
+ * @brief EscapeFromFog::render
  */
-void KillDashNine::render()
+void EscapeFromFog::render()
 {
     mResources.clearCache();
 
@@ -235,9 +235,9 @@ void KillDashNine::render()
 /**
  *  @note The SdlManager must clean up before Resources
  *  or else GL errors will be thrown!
- *  @brief KillDashNine::finish
+ *  @brief EscapeFromFog::finish
  */
-void KillDashNine::finish()
+void EscapeFromFog::finish()
 {
 #if defined(APP_DEBUG)
     mLogger.appendToLog(mSdlManager.getSdlInfoString());
@@ -252,9 +252,9 @@ void KillDashNine::finish()
 }
 
 /**
- * @brief KillDashNine::init
+ * @brief EscapeFromFog::init
  */
-void KillDashNine::init()
+void EscapeFromFog::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -264,9 +264,9 @@ void KillDashNine::init()
 }
 
 /**
- * @brief KillDashNine::initResources
+ * @brief EscapeFromFog::initResources
  */
-void KillDashNine::initResources()
+void EscapeFromFog::initResources()
 {
     // shaders
     Shader::Ptr level (new Shader(mSdlManager));
@@ -387,9 +387,9 @@ void KillDashNine::initResources()
 }
 
 /**
- * @brief KillDashNine::initPositions
+ * @brief EscapeFromFog::initPositions
  */
-void KillDashNine::initPositions()
+void EscapeFromFog::initPositions()
 {
     mPlayer.move(mLevelGen.getPlayerPosition(), 1.0f);
 
@@ -448,10 +448,10 @@ void KillDashNine::initPositions()
 }
 
 /**
- * @brief KillDashNine::printFramesToConsole
+ * @brief EscapeFromFog::printFramesToConsole
  * @param dt
  */
-void KillDashNine::printFramesToConsole(const float dt)
+void EscapeFromFog::printFramesToConsole(const float dt)
 {
     ++mFrameCounter;
     mTimeSinceLastUpdate += dt;
@@ -475,11 +475,11 @@ void KillDashNine::printFramesToConsole(const float dt)
 }
 
 /**
- * @brief KillDashNine::sdlEvents
+ * @brief EscapeFromFog::sdlEvents
  * @param event
  * @param mouseWheelDy
  */
-void KillDashNine::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+void EscapeFromFog::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
     {

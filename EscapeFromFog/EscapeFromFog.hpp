@@ -1,5 +1,5 @@
-#ifndef KILLDASHNINE_HPP
-#define KILLDASHNINE_HPP
+#ifndef ESCAPEFROMFOG_HPP
+#define ESCAPEFROMFOG_HPP
 
 #include <unordered_map>
 
@@ -25,12 +25,12 @@
 #include "Player.hpp"
 #include "ImGuiHelper.hpp"
 
-class KillDashNine final : public IApplication
+class EscapeFromFog final : public IApplication
 {
     friend class ImGuiHelper;
 
 public:
-    KillDashNine();
+    EscapeFromFog();
     virtual void start() override;
 
 protected:
@@ -81,4 +81,4 @@ private:
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
-#endif // KILLDASHNINE_HPP
+#endif // ESCAPEFROMFOG_HPP

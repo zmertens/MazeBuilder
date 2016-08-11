@@ -24,7 +24,7 @@ namespace
 }
 
 class ResourceManager;
-class KillDashNine;
+class EscapeFromFog;
 
 class ImGuiHelper final
 {
@@ -32,7 +32,7 @@ public:
     explicit ImGuiHelper(const SdlManager& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
-    void update(KillDashNine& app);
+    void update(EscapeFromFog& app);
     void render();
     void cleanUp();
 
@@ -171,7 +171,7 @@ private:
     ImGuiHelper(const ImGuiHelper& other);
     ImGuiHelper& operator=(const ImGuiHelper& other);
     bool isOnExitString() const;
-    void handleGuiOptions(KillDashNine& app);
+    void handleGuiOptions(EscapeFromFog& app);
 };
 
 #endif // IMGUIHELPER_HPP

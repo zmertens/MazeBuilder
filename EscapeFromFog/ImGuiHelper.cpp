@@ -6,7 +6,7 @@
 #include "engine/ResourceManager.hpp"
 #include "engine/Utils.hpp"
 
-#include "KillDashNine.hpp"
+#include "EscapeFromFog.hpp"
 
 GLint ImGuiHelper::sShaderHandle = 0;
 GLint ImGuiHelper::sVertHandle = 0;
@@ -69,7 +69,7 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
     // strings within an array, easier to add option items
     mOptions.tuples[0] = std::make_tuple("--music == ", true, true);
     mOptions.tuples[1] = std::make_tuple("--sound == ", false, true);
-    mOptions.tuples[2] = std::make_tuple("--crosshair == ", false, true);
+    mOptions.tuples[2] = std::make_tuple("--crosshair == ", false, false);
     mOptions.tuples[3] = std::make_tuple("--fullscreen == ", false, false);
     mOptions.tuples[4] = std::make_tuple("--difficulty == ", false, false);
 #if defined(APP_DEBUG)
@@ -101,7 +101,7 @@ ImGuiHelper::~ImGuiHelper()
  * @brief ImGuiHelper::update
  * @param app
  */
-void ImGuiHelper::update(KillDashNine& app)
+void ImGuiHelper::update(EscapeFromFog& app)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.KeysDown[SDLK_RETURN])
@@ -779,7 +779,7 @@ bool ImGuiHelper::isOnExitString() const
  * @brief ImGuiHelper::handleGuiOptions
  * @param app
  */
-void ImGuiHelper::handleGuiOptions(KillDashNine& app)
+void ImGuiHelper::handleGuiOptions(EscapeFromFog& app)
 {
     std::get<2>(mOptions.tuples[mOptions.indexer]) = !std::get<2>(mOptions.tuples[mOptions.indexer]);
 

@@ -5,7 +5,7 @@ CONFIG -= qt
 
 QMAKE_CXXFLAGS_DEBUG += -Wall
 
-#INCLUDEPATH += /home/lateralus/work/glm
+#INCLUDEPATH += /home/lateralus/repo/glm
 
 LIBS += -lSDL2 -lX11 -lGL -lSDL2_mixer
 
@@ -29,7 +29,7 @@ SOURCES += \
     engine/graphics/PointLight.cpp \
     engine/graphics/SpotLight.cpp \
     ImGuiHelper.cpp \
-    EscapeFromFog2.cpp \
+    EscapeFromFog.cpp \
     engine/graphics/Entity.cpp \
     engine/graphics/MaterialFactory.cpp \
     engine/graphics/Tex2dImpl.cpp \
@@ -47,7 +47,8 @@ SOURCES += \
     PowerUp.cpp \
     engine/audio/Chunk.cpp \
     engine/audio/Music.cpp \
-    Enemy.cpp
+    Enemy.cpp \
+    Bullet.cpp
 
 HEADERS += \
     engine/graphics/Fog.hpp \
@@ -83,7 +84,6 @@ HEADERS += \
     ImGuiHelper.hpp \
     ResourcePaths.hpp \
     ResourceIds.hpp \
-    EscapeFromFog2.hpp \
     engine/graphics/Entity.hpp \
     engine/graphics/MaterialFactory.hpp \
     engine/graphics/Tex2dImpl.hpp \
@@ -103,7 +103,9 @@ HEADERS += \
     PowerUp.hpp \
     engine/audio/Chunk.hpp \
     engine/audio/Music.hpp \
-    Enemy.hpp
+    Enemy.hpp \
+    EscapeFromFog.hpp \
+    Bullet.hpp
 
 DISTFILES += \
     ../resources/shaders/level.frag.glsl \

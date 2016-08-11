@@ -1,11 +1,11 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "KillDashNine.hpp"
+#include "EscapeFromFog.hpp"
 
 int main()
 {
-    KillDashNine app;
+    EscapeFromFog app;
     try
     {
         app.start();
