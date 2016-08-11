@@ -1,9 +1,10 @@
-# EscapeFromFog2
+# EscapeFromFog
 
 ![](resources/demo.gif)
 
-Attempt at a 2.5 dimensional video game engine using OpenGL and C++
-The game is intended to be like a "roguelike Wolfenstein 3D".
+Attempt at a 2.5 dimensional video game engine using mostly OpenGL and C++.
+The game is imspired by the class Wolfenstein 3D by Id Software.
+Also draws inspiration from [here](https://github.com/BennyQBD/Wolfenstein3DClone).
 
 ## Stuff To Do:
  - Add a pause state
