@@ -6,7 +6,7 @@
 #include "engine/ResourceManager.hpp"
 #include "engine/Utils.hpp"
 
-#include "EscapeFromFog.hpp"
+#include "ShooterGame.hpp"
 
 GLint ImGuiHelper::sShaderHandle = 0;
 GLint ImGuiHelper::sVertHandle = 0;
@@ -38,7 +38,7 @@ ImGuiHelper::ImGuiHelper(const SdlManager& sdl, ResourceManager& rm)
 , mShowTitleOverlay(true)
 , mShowOptionsOverlay(false)
 , mShowDescOverlay(true)
-, mShowCrosshairOverlay(true)
+, mShowCrosshairOverlay(false)
 , mOverlayAlpha(0.9324f)
 , mState(GuiStates::Shown::TITLE)
 , mFrames({"FPS: ", "time (us) / frame: "})
@@ -101,7 +101,7 @@ ImGuiHelper::~ImGuiHelper()
  * @brief ImGuiHelper::update
  * @param app
  */
-void ImGuiHelper::update(EscapeFromFog& app)
+void ImGuiHelper::update(ShooterGame& app)
 {
     ImGuiIO& io = ImGui::GetIO();
     if (io.KeysDown[SDLK_RETURN])
@@ -779,7 +779,7 @@ bool ImGuiHelper::isOnExitString() const
  * @brief ImGuiHelper::handleGuiOptions
  * @param app
  */
-void ImGuiHelper::handleGuiOptions(EscapeFromFog& app)
+void ImGuiHelper::handleGuiOptions(ShooterGame& app)
 {
     std::get<2>(mOptions.tuples[mOptions.indexer]) = !std::get<2>(mOptions.tuples[mOptions.indexer]);
 

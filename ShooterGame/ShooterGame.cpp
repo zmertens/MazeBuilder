@@ -1,4 +1,4 @@
-#include "EscapeFromFog.hpp"
+#include "ShooterGame.hpp"
 
 #include "engine/Utils.hpp"
 
@@ -18,16 +18,16 @@
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
 
-const float EscapeFromFog::sTimePerFrame = 1.0f / 60.0f;
-const unsigned int EscapeFromFog::sWindowWidth = 1080u;
-const unsigned int EscapeFromFog::sWindowHeight = 720u;
-const std::string EscapeFromFog::sTitle = "kill -9";
-std::unordered_map<uint8_t, bool> EscapeFromFog::sKeyInputs;
+const float ShooterGame::sTimePerFrame = 1.0f / 60.0f;
+const unsigned int ShooterGame::sWindowWidth = 1080u;
+const unsigned int ShooterGame::sWindowHeight = 720u;
+const std::string ShooterGame::sTitle = "ShooterGame";
+std::unordered_map<uint8_t, bool> ShooterGame::sKeyInputs;
 
 /**
- * @brief EscapeFromFog::EscapeFromFog
+ * @brief ShooterGame::ShooterGame
  */
-EscapeFromFog::EscapeFromFog()
+ShooterGame::ShooterGame()
 : mSdlManager(SdlWindow::Settings(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
     SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false),
     sTitle, sWindowWidth, sWindowHeight)
@@ -77,9 +77,9 @@ EscapeFromFog::EscapeFromFog()
 } // constructor
 
 /**
- * @brief EscapeFromFog::start
+ * @brief ShooterGame::start
  */
-void EscapeFromFog::start()
+void ShooterGame::start()
 {
     mAppIsRunning = true;
 
@@ -89,9 +89,9 @@ void EscapeFromFog::start()
 }
 
 /**
- * @brief EscapeFromFog::loop
+ * @brief ShooterGame::loop
  */
-void EscapeFromFog::loop()
+void ShooterGame::loop()
 {
     while (mAppIsRunning)
     {
@@ -117,9 +117,9 @@ void EscapeFromFog::loop()
 }
 
 /**
- * @brief EscapeFromFog::handleEvents
+ * @brief ShooterGame::handleEvents
  */
-void EscapeFromFog::handleEvents()
+void ShooterGame::handleEvents()
 {
     float mouseWheelDy = 0;
     SDL_Event event;
@@ -148,11 +148,11 @@ void EscapeFromFog::handleEvents()
 } // update
 
 /**
- * @brief EscapeFromFog::update
+ * @brief ShooterGame::update
  * @param dt = the time between frames
  * @param timeSinceInit = the time since SDL was initialized
  */
-void EscapeFromFog::update(float dt, double timeSinceInit)
+void ShooterGame::update(float dt, double timeSinceInit)
 {
     //mCube.update(dt, timeSinceInit);
     mTestSprite.update(dt, timeSinceInit);
@@ -184,9 +184,9 @@ void EscapeFromFog::update(float dt, double timeSinceInit)
 }
 
 /**
- * @brief EscapeFromFog::render
+ * @brief ShooterGame::render
  */
-void EscapeFromFog::render()
+void ShooterGame::render()
 {
     mResources.clearCache();
 
@@ -235,9 +235,9 @@ void EscapeFromFog::render()
 /**
  *  @note The SdlManager must clean up before Resources
  *  or else GL errors will be thrown!
- *  @brief EscapeFromFog::finish
+ *  @brief ShooterGame::finish
  */
-void EscapeFromFog::finish()
+void ShooterGame::finish()
 {
 #if defined(APP_DEBUG)
     mLogger.appendToLog(mSdlManager.getSdlInfoString());
@@ -252,9 +252,9 @@ void EscapeFromFog::finish()
 }
 
 /**
- * @brief EscapeFromFog::init
+ * @brief ShooterGame::init
  */
-void EscapeFromFog::init()
+void ShooterGame::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -264,9 +264,9 @@ void EscapeFromFog::init()
 }
 
 /**
- * @brief EscapeFromFog::initResources
+ * @brief ShooterGame::initResources
  */
-void EscapeFromFog::initResources()
+void ShooterGame::initResources()
 {
     // shaders
     Shader::Ptr level (new Shader(mSdlManager));
@@ -387,9 +387,9 @@ void EscapeFromFog::initResources()
 }
 
 /**
- * @brief EscapeFromFog::initPositions
+ * @brief ShooterGame::initPositions
  */
-void EscapeFromFog::initPositions()
+void ShooterGame::initPositions()
 {
     mPlayer.move(mLevelGen.getPlayerPosition(), 1.0f);
 
@@ -448,10 +448,10 @@ void EscapeFromFog::initPositions()
 }
 
 /**
- * @brief EscapeFromFog::printFramesToConsole
+ * @brief ShooterGame::printFramesToConsole
  * @param dt
  */
-void EscapeFromFog::printFramesToConsole(const float dt)
+void ShooterGame::printFramesToConsole(const float dt)
 {
     ++mFrameCounter;
     mTimeSinceLastUpdate += dt;
@@ -475,11 +475,11 @@ void EscapeFromFog::printFramesToConsole(const float dt)
 }
 
 /**
- * @brief EscapeFromFog::sdlEvents
+ * @brief ShooterGame::sdlEvents
  * @param event
  * @param mouseWheelDy
  */
-void EscapeFromFog::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+void ShooterGame::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
     {

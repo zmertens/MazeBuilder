@@ -1,11 +1,11 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "EscapeFromFog.hpp"
+#include "ShooterGame.hpp"
 
 int main()
 {
-    EscapeFromFog app;
+    ShooterGame app;
     try
     {
         app.start();

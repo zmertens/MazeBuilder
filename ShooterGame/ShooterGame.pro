@@ -29,7 +29,7 @@ SOURCES += \
     engine/graphics/PointLight.cpp \
     engine/graphics/SpotLight.cpp \
     ImGuiHelper.cpp \
-    EscapeFromFog.cpp \
+    ShooterGame.cpp \
     engine/graphics/Entity.cpp \
     engine/graphics/MaterialFactory.cpp \
     engine/graphics/Tex2dImpl.cpp \
@@ -104,7 +104,7 @@ HEADERS += \
     engine/audio/Chunk.hpp \
     engine/audio/Music.hpp \
     Enemy.hpp \
-    EscapeFromFog.hpp \
+    ShooterGame.hpp \
     Bullet.hpp
 
 DISTFILES += \

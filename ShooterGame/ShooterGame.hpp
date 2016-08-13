@@ -1,5 +1,5 @@
-#ifndef ESCAPEFROMFOG_HPP
-#define ESCAPEFROMFOG_HPP
+#ifndef ShooterGame_HPP
+#define ShooterGame_HPP
 
 #include <unordered_map>
 
@@ -25,12 +25,12 @@
 #include "Player.hpp"
 #include "ImGuiHelper.hpp"
 
-class EscapeFromFog final : public IApplication
+class ShooterGame final : public IApplication
 {
     friend class ImGuiHelper;
 
 public:
-    EscapeFromFog();
+    ShooterGame();
     virtual void start() override;
 
 protected:
@@ -81,4 +81,4 @@ private:
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
-#endif // ESCAPEFROMFOG_HPP
+#endif // ShooterGame_HPP

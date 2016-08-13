@@ -24,7 +24,7 @@ namespace
 }
 
 class ResourceManager;
-class EscapeFromFog;
+class ShooterGame;
 
 class ImGuiHelper final
 {
@@ -32,7 +32,7 @@ public:
     explicit ImGuiHelper(const SdlManager& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
-    void update(EscapeFromFog& app);
+    void update(ShooterGame& app);
     void render();
     void cleanUp();
 
@@ -171,7 +171,7 @@ private:
     ImGuiHelper(const ImGuiHelper& other);
     ImGuiHelper& operator=(const ImGuiHelper& other);
     bool isOnExitString() const;
-    void handleGuiOptions(EscapeFromFog& app);
+    void handleGuiOptions(ShooterGame& app);
 };
 
 #endif // IMGUIHELPER_HPP
