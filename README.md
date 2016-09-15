@@ -1,7 +1,7 @@
 ![](resources/demo.gif)
 
-# Kill -9
-Kill zombie processes. Pickup Memory. Find the Kernel. <br />
+# Shooter
+Shoot at sprites. Get powerups. Find the exit. <br />
 
 ## Build
  - CMake 3.0+
