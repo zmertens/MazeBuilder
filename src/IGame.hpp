@@ -1,7 +1,7 @@
-#ifndef IAPPLICATION_HPP
-#define IAPPLICATION_HPP
+#ifndef IGAME_HPP
+#define IGAME_HPP
 
-class IApplication
+class IGame
 {
 public:
     virtual void start() = 0;
@@ -14,4 +14,4 @@ protected:
     virtual void finish() = 0;
 };
 
-#endif // IAPPLICATION_HPP
+#endif // IGAME_HPP

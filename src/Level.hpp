@@ -1,5 +1,5 @@
-#ifndef LEVELGENERATOR_HPP
-#define LEVELGENERATOR_HPP
+#ifndef Level_HPP
+#define Level_HPP
 
 #include <vector>
 
@@ -48,10 +48,37 @@ typedef struct Data {
 
 } // namespace Tile
 
-class LevelGenerator final : Entity
+namespace StartLevel
+{
+
+//namespace Tx = ResourceIds::Textures;
+using namespace Tile;
+
+const std::vector<std::vector<Data>> TEST_LEVEL = {{
+    {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}},
+    {{}, {false,  Special::PLAYER}, {}, {}, {}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {}, {}, {}, {}},
+    {{}, {false,  Special::NONE}, {false,  Special::SPD_PW}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}},
+    {{}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {false,  Special::ENEMY}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false, Special::ENEMY}, {false,  Special::INVINC_PW}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::ENEMY}, {false,Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,Special::RCHRG_PW}, {}, {}, {}, {false,  Special::ENEMY}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::ENEMY}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {}, {}, {false,  Special::NONE}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}, {false,  Special::NONE}, {false,  Special::ENEMY}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}},
+    {{}, {false,  Special::EXIT}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {}, {}},
+    {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}}
+}};
+} // levels
+
+
+class Level final : Entity
 {
 public:
-    explicit LevelGenerator(const std::vector<std::vector<Tile::Data>>& level,
+    explicit Level(const std::vector<std::vector<Tile::Data>>& level,
         const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
         const float texAtlasRows,
         const Entity::Config& config,
@@ -112,4 +139,4 @@ private:
     void generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j, char dir);
 };
 
-#endif // LEVELGENERATOR_HPP
+#endif // Level_HPP

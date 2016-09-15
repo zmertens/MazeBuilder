@@ -9,7 +9,7 @@
 #include "engine/ResourceManager.hpp"
 #include "engine/DataLogger.hpp"
 
-#include "IApplication.hpp"
+#include "IGame.hpp"
 
 // temp testing
 #include "engine/Camera.hpp"
@@ -25,7 +25,7 @@
 #include "Player.hpp"
 #include "ImGuiHelper.hpp"
 
-class ShooterGame final : public IApplication
+class ShooterGame final : public IGame
 {
     friend class ImGuiHelper;
 

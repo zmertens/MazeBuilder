@@ -1,21 +1,17 @@
-# ShooterGame
-
 ![](resources/demo.gif)
 
-Attempt at a 2.5 dimensional video game engine using mostly OpenGL and C++. <br />
-The game is imspired by the classic Wolfenstein 3D first-person shooter by Id Software in the 90's. <br />
-It also draws inspiration from [BennyBox's Wolfenstein 3D clone](https://github.com/BennyQBD/Wolfenstein3DClone). <br />
+# Kill -9
+Kill zombie processes. Pickup Memory. Find the Kernel. <br />
 
-## Stuff To Do:
- - Add a pause state
- - Add combat (killing)
- - Add particle system (especially for bullets).
- - Asynchronously generate levels (the 2D array)
- - A-star pathfinding for enemies
- - Item effects (powerups)
- - Use OpenGL instance rendering for tiles on the level
- - Render to textures
- - Boss levels
- - Normal mapping on levels
- - 3D spatialization for sound
- - Command pattern for user input (add joystick inputs)
+## Build
+ - CMake 3.0+
+ - GLM 9.7.0+
+ - SDL2
+ - SDL2 Audio
+ - GPU capable of OpenGL 4.5+
+
+If all dependencies are installed and available in the system path, then create a build directory and change into it and run `cmake .. && make -j8` <br />
+
+### References
+Draws inspiration from [BennyBox's Wolfenstein 3D clone](https://github.com/BennyQBD/Wolfenstein3DClone). <br />
+

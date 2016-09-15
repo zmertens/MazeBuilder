@@ -13,6 +13,8 @@
 # Mac
 *.DS_Store*
 
+build/
+
 # Qt-es
 
 /.qmake.cache
@@ -35,3 +37,7 @@ Makefile*
 #QtCtreator Qml
 *.qmlproject.user
 *.qmlproject.user.*
+
+
+# IntelliJ
+.idea/
