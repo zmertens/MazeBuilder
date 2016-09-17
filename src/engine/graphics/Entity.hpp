@@ -13,7 +13,7 @@
 
 class ResourceManager;
 class Camera;
-class SdlManager;
+class SdlWindow;
 
 /**
  * @brief The Entity class
@@ -65,7 +65,7 @@ public:
         const glm::vec3& scale = glm::vec3(1.0f));
 
     virtual void update(float dt, double timeSinceInit);
-    virtual void draw(const SdlManager& sdlManager,
+    virtual void draw(const SdlWindow& sdlManager,
         ResourceManager& rm,
         const Camera& camera,
         const IMesh::Draw type = IMesh::Draw::TRIANGLES) const;

@@ -8,7 +8,7 @@
 #include <glm/glm.hpp>
 
 #include "engine/Transform.hpp"
-#include "engine/AABB.hpp"
+#include "engine/BoundingBox.hpp"
 
 class Bullet
 {

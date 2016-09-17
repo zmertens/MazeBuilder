@@ -4,7 +4,7 @@
 
 #include "../ResourceManager.hpp"
 #include "../Camera.hpp"
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 /**
  * @brief Entity::Entity
@@ -49,7 +49,7 @@ void Entity::update(float dt, double timeSinceInit)
  * @param camera
  * @param type = IMesh::Draw::TRIANGLES
  */
-void Entity::draw(const SdlManager& sdlManager,
+void Entity::draw(const SdlWindow& sdlManager,
     ResourceManager& rm,
     const Camera& camera,
     const IMesh::Draw type) const

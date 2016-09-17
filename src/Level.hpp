@@ -9,11 +9,11 @@
 #include "engine/graphics/Entity.hpp"
 #include "engine/Vertex.hpp"
 
-#include "ResourceIds.hpp"
+#include "ResourceConstants.hpp"
 
 class ResourceManager;
 class Camera;
-class SdlManager;
+class SdlWindow;
 
 namespace Tile
 {
@@ -87,7 +87,7 @@ public:
         const glm::vec3& scale = glm::vec3(1.0f));
 
     virtual void update(float dt, double timeSinceInit);
-    virtual void draw(const SdlManager& sdlManager,
+    virtual void draw(const SdlWindow& sdlManager,
         ResourceManager& rm,
         const Camera& camera,
         const IMesh::Draw type = IMesh::Draw::TRIANGLES) const;

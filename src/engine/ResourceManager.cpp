@@ -1,6 +1,6 @@
 #include "ResourceManager.hpp"
 
-#include "SdlManager.hpp"
+#include "SdlWindow.hpp"
 
 /**
  * @brief ResourceManager::ResourceManager
@@ -125,6 +125,25 @@ void ResourceManager::insert(const std::string& id, Chunk::Ptr chunk)
 }
 
 /**
+ * @brief ResourceManager::insert
+ * @param id
+ * @param font
+ */
+void ResourceManager::insert(const std::string& id, Font::Ptr font)
+{
+    auto itr = mFonts.find(id);
+    if (itr == mFonts.end())
+    {
+        mFonts.emplace(id, std::move(font));
+    }
+    else
+    {
+        std::string warning = id + " has already been inserted into the fonts map\n";
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, warning.c_str());
+    }
+}
+
+/**
  * @brief ResourceManager::getTexture
  * @param id
  * @return
@@ -182,6 +201,16 @@ const Music::Ptr& ResourceManager::getMusic(const std::string& id) const
 const Chunk::Ptr& ResourceManager::getChunk(const std::string& id) const
 {
     return mChunks.at(id);
+}
+
+/**
+ * @brief ResourceManager::getFont
+ * @param id
+ * @return
+ */
+const Font::Ptr& ResourceManager::getFont(const std::string& id) const
+{
+    return mFonts.at(id);
 }
 
 /**
@@ -378,6 +407,9 @@ void ResourceManager::cleanUp()
 
     for (auto& chunk : mChunks)
         chunk.second->cleanUp();
+
+    for (auto& font : mFonts)
+        font.second->cleanUp();
 
     mMeshes.clear();
     mTextures.clear();

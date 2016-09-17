@@ -4,7 +4,7 @@
 #include <string>
 #include <memory>
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 class Music
 {

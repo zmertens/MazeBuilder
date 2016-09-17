@@ -3,7 +3,7 @@
 
 #include "ITexture.hpp"
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 class TexPerlinNoise2dImpl : public ITexture
 {

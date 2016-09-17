@@ -7,7 +7,7 @@
 
 #include <glm/glm.hpp>
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 namespace ShaderTypes
 {
@@ -24,7 +24,7 @@ class Shader final
 public:
     typedef std::unique_ptr<Shader> Ptr;
 public:
-    explicit Shader(const SdlManager& sdlManager);
+    explicit Shader(const SdlWindow& sdlManager);
     virtual ~Shader();
 
     void compileAndAttachShader(const int shaderType, const std::string& filename);
@@ -59,12 +59,12 @@ public:
 
     unsigned int getProgramHandle() const;
     GLenum getShaderType(const int shaderType) const;
-    const SdlManager& getSdlManager() const;
+    const SdlWindow& getSdlManager() const;
     std::unordered_map<std::string, GLint> getGlslLocations() const;
     std::unordered_map<int, std::string> getFileNames() const;
 
 private:
-    const SdlManager& cSdlManager;
+    const SdlWindow& cSdlManager;
     GLint mProgram;
     std::unordered_map<std::string, GLint> mGlslLocations;
     std::unordered_map<int, std::string> mFileNames;

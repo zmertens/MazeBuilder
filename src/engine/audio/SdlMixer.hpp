@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 class ResourceManager;
 

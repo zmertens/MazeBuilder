@@ -1,6 +1,6 @@
 #include "Enemy.hpp"
 
-#include "ResourceIds.hpp"
+#include "ResourceConstants.hpp"
 
 #include "engine/Utils.hpp"
 

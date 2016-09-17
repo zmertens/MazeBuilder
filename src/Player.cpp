@@ -2,10 +2,10 @@
 
 #include <algorithm>
 
-#include "engine/SdlManager.hpp"
+#include "engine/SdlWindow.hpp"
 #include "engine/Camera.hpp"
 
-#include "LevelGenerator.hpp"
+#include "Level.hpp"
 
 const float Player::scMouseSensitivity = 1.0f;
 float Player::scMovementScalar = 40.0f;
@@ -15,7 +15,7 @@ float Player::scMovementScalar = 40.0f;
  * @param camera
  * @param level
  */
-Player::Player(Camera& camera, LevelGenerator& level)
+Player::Player(Camera& camera, Level& level)
 : cPlayerSize(0.2f)
 , mFirstPersonCamera(camera)
 , mLevel(level)
@@ -67,13 +67,12 @@ void Player::move(const glm::vec3& vel, float dt)
  * @param coords
  * @param inputs
  */
-void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta,
+void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
     const glm::vec2& coords,
     std::unordered_map<uint8_t, bool> inputs)
 {
-    glm::vec2 winCenter = glm::vec2(
-        static_cast<float>(sdlManager.getWindowWidth()) * 0.5f,
-        static_cast<float>(sdlManager.getWindowHeight()) * 0.5f);
+    const float winCenterX = static_cast<float>(sdlManager.getWindowWidth()) * 0.5f;
+    const float winCenterY = static_cast<float>(sdlManager.getWindowHeight()) * 0.5f;
 
     // keyboard movements
     if (inputs[SDL_SCANCODE_W])
@@ -107,13 +106,13 @@ void Player::input(const SdlManager& sdlManager, const float mouseWheelDelta,
     // rotations (mouse movements)
     if (mMouseLocked)
     {
-        float xOffset = coords.x - winCenter.x;
-        float yOffset = winCenter.y - coords.y;
+        const float xOffset = coords.x - winCenterX;
+        const float yOffset = winCenterY - coords.y;
 
         if (xOffset || yOffset)
         {
-            mFirstPersonCamera.rotate(xOffset * scMouseSensitivity, yOffset * scMouseSensitivity, false, false);
-            SDL_WarpMouseInWindow(sdlManager.getSdlWindow(), winCenter.x, winCenter.y);
+            mFirstPersonCamera.rotate(xOffset * scMouseSensitivity, 0.0f /*yOffset * scMouseSensitivity*/, false, false);
+            SDL_WarpMouseInWindow(sdlManager.getSdlWindow(), winCenterX, winCenterY);
         }
     }
 }
@@ -132,8 +131,8 @@ void Player::update(const float dt, const double timeSinceInit)
             glm::vec3 origin (getPosition());
             // R(t) = P + Vt
             glm::vec3 direction (origin + glm::normalize(mMovementDir * scMovementScalar * dt));
-            glm::vec3 collision (iterateThruSpace(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
-            mMovementDir *= collision;
+            glm::vec3 c (collision(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
+            mMovementDir *= c;
             mMovementDir.y = 0.0f;
         }
 
@@ -247,14 +246,14 @@ void Player::setStrength(bool strength)
 }
 
 /**
- * @brief Player::iterateThruSpace -- tiles?
+ * @brief Player::collision
  * @param emptySpaces
  * @param spaceScalar
  * @param origin
  * @param dir
  * @return
  */
-glm::vec3 Player::iterateThruSpace(const std::vector<glm::vec3>& emptySpaces,
+glm::vec3 Player::collision(const std::vector<glm::vec3>& emptySpaces,
     const glm::vec3& spaceScalar,
     const glm::vec3& origin,
     const glm::vec3& dir) const

@@ -1,12 +1,12 @@
-#include "LevelGenerator.hpp"
+#include "Level.hpp"
 
 #include "engine/ResourceManager.hpp"
 #include "engine/Camera.hpp"
-#include "engine/SdlManager.hpp"
+#include "engine/SdlWindow.hpp"
 #include "engine/Utils.hpp"
 
 /**
- * @brief LevelGenerator::LevelGenerator
+ * @brief Level::Level
  * @param level
  * @param wallTex
  * @param floorTex
@@ -17,7 +17,7 @@
  * @param rotation = glm::vec3(0.0f)
  * @param scale = glm::vec3(1.0f)
  */
-LevelGenerator::LevelGenerator(const std::vector<std::vector<Tile::Data>>& level,
+Level::Level(const std::vector<std::vector<Tile::Data>>& level,
     const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
     float texAtlasRows,
     const Entity::Config& config,
@@ -37,23 +37,23 @@ LevelGenerator::LevelGenerator(const std::vector<std::vector<Tile::Data>>& level
 }
 
 /**
- * @brief LevelGenerator::update
+ * @brief Level::update
  * @param dt
  * @param timeSinceInit
  */
-void LevelGenerator::update(float dt, double timeSinceInit)
+void Level::update(float dt, double timeSinceInit)
 {
 
 }
 
 /**
- * @brief LevelGenerator::draw
+ * @brief Level::draw
  * @param sdlManager
  * @param rm
  * @param camera
  * @param type = IMesh::Draw::TRIANGLES
  */
-void LevelGenerator::draw(const SdlManager& sdlManager,
+void Level::draw(const SdlWindow& sdlManager,
     ResourceManager& rm,
     const Camera& camera,
     const IMesh::Draw type) const
@@ -96,11 +96,11 @@ void LevelGenerator::draw(const SdlManager& sdlManager,
 } // draw
 
 /**
- * @brief LevelGenerator::generateLevel
+ * @brief Level::generateLevel
  * @param vertices
  * @param indices
  */
-void LevelGenerator::generateLevel(std::vector<Vertex>& vertices,
+void Level::generateLevel(std::vector<Vertex>& vertices,
     std::vector<GLushort>& indices)
 {
     using namespace Tile;
@@ -136,105 +136,105 @@ void LevelGenerator::generateLevel(std::vector<Vertex>& vertices,
 } // generateLevel
 
 /**
- * @brief LevelGenerator::getExitPoints
+ * @brief Level::getExitPoints
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getExitPoints() const
+std::vector<glm::vec3> Level::getExitPoints() const
 {
     return mExitPoints;
 }
 
 
 /**
- * @brief LevelGenerator::getEmptySpace
+ * @brief Level::getEmptySpace
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getEmptySpace() const
+std::vector<glm::vec3> Level::getEmptySpace() const
 {
     return mEmptySpace;
 }
 
 /**
- * @brief LevelGenerator::getPlayerPosition
+ * @brief Level::getPlayerPosition
  * @return
  */
-glm::vec3 LevelGenerator::getPlayerPosition() const
+glm::vec3 Level::getPlayerPosition() const
 {
     return mPlayerPosition;
 }
 
 /**
- * @brief LevelGenerator::getTileScalar
+ * @brief Level::getTileScalar
  * @return
  */
-glm::vec3 LevelGenerator::getTileScalar() const
+glm::vec3 Level::getTileScalar() const
 {
     return cTileScalar;
 }
 
 /**
- * @brief LevelGenerator::getEnemyPositions
+ * @brief Level::getEnemyPositions
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getEnemyPositions() const
+std::vector<glm::vec3> Level::getEnemyPositions() const
 {
     return mEnemyPositions;
 }
 
 /**
- * @brief LevelGenerator::getSpriteHalfWidth
+ * @brief Level::getSpriteHalfWidth
  * @return
  */
-float LevelGenerator::getSpriteHalfWidth() const
+float Level::getSpriteHalfWidth() const
 {
     return cSpriteHalfWidth;
 }
 
 /**
- * @brief LevelGenerator::getSpeedPowerUps
+ * @brief Level::getSpeedPowerUps
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getSpeedPowerUps() const
+std::vector<glm::vec3> Level::getSpeedPowerUps() const
 {
     return mSpeedPowerUps;
 }
 
 /**
- * @brief LevelGenerator::getRechargePowerUps
+ * @brief Level::getRechargePowerUps
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getRechargePowerUps() const
+std::vector<glm::vec3> Level::getRechargePowerUps() const
 {
     return mRechargePowerUps;
 }
 
 /**
- * @brief LevelGenerator::getInvinciblePowerUps
+ * @brief Level::getInvinciblePowerUps
  * @return
  */
-std::vector<glm::vec3> LevelGenerator::getInvinciblePowerUps() const
+std::vector<glm::vec3> Level::getInvinciblePowerUps() const
 {
     return mInvinciblePowerUps;
 }
 
 /**
- * @brief LevelGenerator::getTexCoordsFromOffset
+ * @brief Level::getTexCoordsFromOffset
  * @param texCoord
  * @param offset
  * @return
  */
-glm::vec2 LevelGenerator::getTexCoordsFromOffset(const glm::vec2& texCoord, const glm::vec2& offset) const
+glm::vec2 Level::getTexCoordsFromOffset(const glm::vec2& texCoord, const glm::vec2& offset) const
 {
     return (texCoord / mTexAtlasRows) + offset;
 }
 
 /**
- * @brief LevelGenerator::addSpecial
+ * @brief Level::addSpecial
  * @param special
  * @param x
  * @param z
  */
-void LevelGenerator::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
+void Level::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
 {
     using namespace Tile;
     switch (special)
@@ -261,13 +261,13 @@ void LevelGenerator::addSpecial(Tile::Special special, std::size_t x, std::size_
 }
 
 /**
- * @brief LevelGenerator::generateFloor
+ * @brief Level::generateFloor
  * @param vertices
  * @param indices
  * @param i
  * @param j
  */
-void LevelGenerator::generateFloor(std::vector<Vertex>& vertices,
+void Level::generateFloor(std::vector<Vertex>& vertices,
     std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 2);
@@ -289,13 +289,13 @@ void LevelGenerator::generateFloor(std::vector<Vertex>& vertices,
 }
 
 /**
- * @brief LevelGenerator::generateCeiling
+ * @brief Level::generateCeiling
  * @param vertices
  * @param indices
  * @param i
  * @param j
  */
-void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices,
+void Level::generateCeiling(std::vector<Vertex>& vertices,
     std::vector<GLushort>& indices, std::size_t i, std::size_t j)
 {
     indices.push_back(vertices.size() + 0);
@@ -317,14 +317,14 @@ void LevelGenerator::generateCeiling(std::vector<Vertex>& vertices,
 }
 
 /**
- * @brief LevelGenerator::generateWall
+ * @brief Level::generateWall
  * @param vertices
  * @param indices
  * @param i
  * @param j
  * @param dir
  */
-void LevelGenerator::generateWall(std::vector<Vertex>& vertices,
+void Level::generateWall(std::vector<Vertex>& vertices,
     std::vector<GLushort>& indices,
     std::size_t i, std::size_t j, char dir)
 {

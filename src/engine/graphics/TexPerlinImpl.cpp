@@ -1,10 +1,9 @@
-#include "TexPerlinNoise2dImpl.hpp"
+#include "TexPerlinImpl.hpp"
 
 #include <glm/glm.hpp>
 #include <glm/gtc/noise.hpp>
 
-//#define STB_IMAGE_IMPLEMENTATION
-#include "../../extlibs/stb_image.h"
+#include "stb_image.h"
 
 /**
  * @brief TexPerlinNoise2dImpl::TexPerlinNoise2dImpl

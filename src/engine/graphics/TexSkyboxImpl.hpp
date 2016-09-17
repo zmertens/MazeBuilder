@@ -3,12 +3,12 @@
 
 #include "ITexture.hpp"
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 class TexSkyboxImpl : public ITexture
 {
 public:
-    explicit TexSkyboxImpl(const SdlManager& sdlManager,
+    explicit TexSkyboxImpl(const SdlWindow& sdlManager,
         const std::vector<std::string>& fileNames,
         unsigned int channel = 0);
 

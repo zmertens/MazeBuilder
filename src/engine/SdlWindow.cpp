@@ -1,4 +1,4 @@
-#include "SdlManager.hpp"
+#include "SdlWindow.hpp"
 
 #include <sstream>
 #include <cassert>
@@ -8,16 +8,18 @@
 #endif // defined
 
 /**
- * @brief SdlManager::SdlManager
+ * @brief SdlWindow::SdlWindow
  * @param window
  * @param title
- * @param width = 0
- * @param height = 0
+ * @param width = 600u
+ * @param height = 600u
  */
-SdlManager::SdlManager(const SdlWindow::Settings& window,
+SdlWindow::SdlWindow(Uint32 initFlags, Uint32 winFlags, bool vsync,
     const std::string& title, const unsigned int width,
     const unsigned int height)
-: mWindowSettings(window)
+: mInitFlags(initFlags)
+, mWinFlags(winFlags)
+, mVSync(vsync)
 , mTitle(title)
 , mWinWidth(width)
 , mWinHeight(height)
@@ -33,15 +35,15 @@ SdlManager::SdlManager(const SdlWindow::Settings& window,
 , mDepthBufferSize(8)
 , mStencilBufferSize(8)
 , mSamples(4)
-, mFullscreen((window.windowFlags & SDL_WINDOW_FULLSCREEN) ||
-    (window.windowFlags & SDL_WINDOW_FULLSCREEN_DESKTOP))
+, mFullscreen((mWinFlags & SDL_WINDOW_FULLSCREEN) ||
+    (mWinFlags & SDL_WINDOW_FULLSCREEN_DESKTOP))
 {
     SDL_LogSetAllPriority(mLogPriority);
 
-    initWindow(mWindowSettings.initFlags);
-    if (mWindowSettings.initFlags & SDL_INIT_JOYSTICK)
+    initWindow(mInitFlags);
+    if (mInitFlags & SDL_INIT_JOYSTICK)
         initJoysticks();
-    if (mWindowSettings.initFlags & SDL_INIT_HAPTIC)
+    if (mInitFlags & SDL_INIT_HAPTIC)
         initHaptic();
 
     // Only load OpenGL functions after SDL window is created
@@ -55,35 +57,35 @@ SdlManager::SdlManager(const SdlWindow::Settings& window,
     }
 
 #if defined(APP_DEBUG)
-//        glEnable(GL_DEBUG_OUTPUT);
-//        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
-//        glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
-//        glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
-//            GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
-//            GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
+       glEnable(GL_DEBUG_OUTPUT);
+       glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
+       glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
+       glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
+           GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
+           GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
 #endif // defined
 }
 
-SdlManager::~SdlManager()
+SdlWindow::~SdlWindow()
 {
     if (mSdlWindow)
         cleanUp();
 }
 
 /**
- * @brief SdlManager::cleanUp
+ * @brief SdlWindow::cleanUp
  */
-void SdlManager::cleanUp()
+void SdlWindow::cleanUp()
 {
     destroyWindow();
     SDL_Quit();
 }
 
 /**
- * @brief SdlManager::initWindow
+ * @brief SdlWindow::initWindow
  * @param flags
  */
-void SdlManager::initWindow(Uint32 flags)
+void SdlWindow::initWindow(Uint32 flags)
 {
     if (SDL_Init(flags) < 0)
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
@@ -111,14 +113,14 @@ void SdlManager::initWindow(Uint32 flags)
     {
         mSdlWindow = SDL_CreateWindow(mTitle.c_str(), 0, 0,
             mWinWidth, mWinHeight,
-            mWindowSettings.windowFlags);
+            mWinFlags);
     }
     else
     {
         mSdlWindow = SDL_CreateWindow(mTitle.c_str(),
             SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
             mWinWidth, mWinHeight,
-            mWindowSettings.windowFlags);
+            mWinFlags);
     }
 #elif defined(APP_ANDROID)
     SDL_DisplayMode mode;
@@ -135,13 +137,13 @@ void SdlManager::initWindow(Uint32 flags)
     mGlContext = SDL_GL_CreateContext(mSdlWindow);
 
     // Sometimes Vsync is enabled by default
-    if (mWindowSettings.vSync && SDL_GL_SetSwapInterval(1) < 0)
+    if (mVSync && SDL_GL_SetSwapInterval(1) < 0)
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Vsync mode is not available\n");
     else
         SDL_GL_SetSwapInterval(0);
 }
 
-void SdlManager::initJoysticks()
+void SdlWindow::initJoysticks()
 {
     // setup joystick
     mSdlJoystick = SDL_JoystickOpen(0);
@@ -151,7 +153,7 @@ void SdlManager::initJoysticks()
     }
 }
 
-void SdlManager::initHaptic()
+void SdlWindow::initHaptic()
 {
     mSdlHaptic = SDL_HapticOpenFromJoystick(mSdlJoystick);
     if (!mSdlHaptic)
@@ -168,9 +170,9 @@ void SdlManager::initHaptic()
 }
 
 /**
- * @brief SdlManager::destroyWindow
+ * @brief SdlWindow::destroyWindow
  */
-void SdlManager::destroyWindow()
+void SdlWindow::destroyWindow()
 {
     SDL_GL_DeleteContext(mGlContext);
     SDL_DestroyWindow(mSdlWindow);
@@ -178,9 +180,9 @@ void SdlManager::destroyWindow()
 
 /**
  * Only loads on desktop since mobile uses OpenGL ES
- * @brief SdlManager::loadGL
+ * @brief SdlWindow::loadGL
  */
-void SdlManager::loadGL()
+void SdlWindow::loadGL()
 {
 #if defined(APP_DESKTOP)
     // Load the OpenGL functions (glLoadGen).
@@ -194,10 +196,10 @@ void SdlManager::loadGL()
 }
 
 /**
- * @brief SdlManager::getSdlInfoString
+ * @brief SdlWindow::getSdlInfoString
  * @return
  */
-std::string SdlManager::getSdlInfoString() const
+std::string SdlWindow::getSdlInfoString() const
 {
     int context, major, minor;
     SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &context);
@@ -214,9 +216,9 @@ std::string SdlManager::getSdlInfoString() const
     std::string contextStr = getContextString(context);
 
     std::stringstream ss;
-    ss << "\nPrinting SdlManager info:\n";
+    ss << "\nPrinting SdlWindow info:\n";
     ss << "\nWindow Title: " << mTitle << "\n";
-    ss << "Vsync: " << mWindowSettings.vSync << "\n";
+    ss << "Vsync: " << mVSync << "\n";
     ss << "Fullscreen: " << mFullscreen << "\n";
     ss << "Window (width, height): " << "(" << mWinWidth << ", " << mWinHeight << ")\n";
     ss << "The number of connected joysticks: " << SDL_NumJoysticks() << "\n";
@@ -226,10 +228,10 @@ std::string SdlManager::getSdlInfoString() const
 }
 
 /**
- * @brief SdlManager::getGlInfoString
+ * @brief SdlWindow::getGlInfoString
  * @return
  */
-std::string SdlManager::getGlInfoString() const
+std::string SdlWindow::getGlInfoString() const
 {
     const GLubyte* renderer = glGetString(GL_RENDERER);
     const GLubyte* vendor = glGetString(GL_VENDOR);
@@ -252,31 +254,31 @@ std::string SdlManager::getGlInfoString() const
 }
 
 /**
- * @brief SdlManager::swapBuffers
+ * @brief SdlWindow::swapBuffers
  */
-void SdlManager::swapBuffers() const
+void SdlWindow::swapBuffers() const
 {
     SDL_GL_SwapWindow(mSdlWindow);
 }
 
 /**
- * @brief SdlManager::hapticRumblePlay
+ * @brief SdlWindow::hapticRumblePlay
  * @param strength
  * @param length
  * @return
  */
-bool SdlManager::hapticRumblePlay(float strength, float length) const
+bool SdlWindow::hapticRumblePlay(float strength, float length) const
 {
     return static_cast<bool>(SDL_HapticRumblePlay(mSdlHaptic, strength, length));
 }
 
 /**
- * @brief SdlManager::buildBufferFromFile
+ * @brief SdlWindow::buildBufferFromFile
  * @param filename
  * @param bufferSize
  * @return the buffer
  */
-unsigned char* SdlManager::buildBufferFromFile(const std::string& filename, long& bufferSize) const
+unsigned char* SdlWindow::buildBufferFromFile(const std::string& filename, long& bufferSize) const
 {
     SDL_RWops* rwOps = SDL_RWFromFile(filename.c_str(), "rb");
 
@@ -317,11 +319,11 @@ unsigned char* SdlManager::buildBufferFromFile(const std::string& filename, long
 }
 
 /**
- * @brief SdlManager::buildStringFromFile
+ * @brief SdlWindow::buildStringFromFile
  * @param filename
  * @return
  */
-std::string SdlManager::buildStringFromFile(const std::string& filename) const
+std::string SdlWindow::buildStringFromFile(const std::string& filename) const
 {
     std::string returnStr;
     SDL_RWops* rwOps = SDL_RWFromFile(filename.c_str(), "r");
@@ -363,9 +365,9 @@ std::string SdlManager::buildStringFromFile(const std::string& filename) const
 }
 
 /**
- * @brief SdlManager::switchFullScreenMode
+ * @brief SdlWindow::switchFullScreenMode
  */
-void SdlManager::toggleFullScreen()
+void SdlWindow::toggleFullScreen()
 {
     mFullscreen = !mFullscreen;
     if (mFullscreen)
@@ -375,84 +377,83 @@ void SdlManager::toggleFullScreen()
 }
 
 /**
- * @brief SdlManager::isFullScreen
+ * @brief SdlWindow::isFullScreen
  * @return
  */
-bool SdlManager::isFullScreen() const
+bool SdlWindow::isFullScreen() const
 {
     return mFullscreen;
 }
 
 /**
- * @brief SdlManager::setWindowHeight
+ * @brief SdlWindow::setWindowHeight
  * @param height
  */
-void SdlManager::setWindowHeight(const unsigned int height)
+void SdlWindow::setWindowHeight(const unsigned int height)
 {
     mWinHeight = height;
 }
 
 /**
- * @brief SdlManager::getWindowHeight
+ * @brief SdlWindow::getWindowHeight
  * @return
  */
-unsigned int SdlManager::getWindowHeight() const
+unsigned int SdlWindow::getWindowHeight() const
 {
     return mWinHeight;
 }
 
 /**
- * @brief SdlManager::setWindowWidth
+ * @brief SdlWindow::setWindowWidth
  * @param width
  */
-void SdlManager::setWindowWidth(const unsigned int width)
+void SdlWindow::setWindowWidth(const unsigned int width)
 {
     mWinWidth = width;
 }
 
 /**
- * @brief SdlManager::getWindowWidth
+ * @brief SdlWindow::getWindowWidth
  * @return
  */
-unsigned int SdlManager::getWindowWidth() const
+unsigned int SdlWindow::getWindowWidth() const
 {
     return mWinWidth;
 }
 
 /**
- * @brief SdlManager::getAspectRatio
+ * @brief SdlWindow::getAspectRatio
  * @return
  */
-float SdlManager::getAspectRatio() const
+float SdlWindow::getAspectRatio() const
 {
     return static_cast<float>(mWinWidth) / static_cast<float>(mWinHeight);
 }
 
 /**
- * @brief SdlManager::getSdlWindow
+ * @brief SdlWindow::getSdlWindow
  * @return
  */
-SDL_Window* SdlManager::getSdlWindow() const
+SDL_Window* SdlWindow::getSdlWindow() const
 {
     return mSdlWindow;
 }
 
 /**
- * @brief SdlManager::getWindowSettings
  * @return
  */
-SdlWindow::Settings SdlManager::getWindowSettings() const
+Uint32 SdlWindow::getInitFlags() const
 {
-    return mWindowSettings;
+    return mInitFlags; 
 }
 
 /**
  * priv
- * @brief SdlManager::getContextString
+ * @brief SdlWindow::getContextString
  * @param context
  * @return
  */
-std::string SdlManager::getContextString(int context) const
+std::string SdlWindow::getContextString(int context) const
 {
     switch (context)
     {

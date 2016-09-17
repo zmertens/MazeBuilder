@@ -6,11 +6,13 @@
 
 #include "../Utils.hpp"
 
-// this definition of STB_IMAGE must be here
+#ifndef STB_IMAGE_IMPLEMENTATION 
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../extlibs/stb_image.h"
+#endif // STB_IMAGE_IMPLEMENTATION
 
-Tex2dImpl::Tex2dImpl(const SdlManager& sdlManager,
+#include "stb_image.h"
+
+Tex2dImpl::Tex2dImpl(const SdlWindow& sdlManager,
     const std::string& fileName,
     unsigned int channel)
 : mChannel(channel)

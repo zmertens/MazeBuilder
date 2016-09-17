@@ -1,14 +1,14 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "ShooterGame.hpp"
+#include "Shooter.hpp"
 
 int main()
 {
-    ShooterGame app;
+    Shooter game;
     try
     {
-        app.start();
+        game.start();
     }
     catch (std::exception& ex)
     {

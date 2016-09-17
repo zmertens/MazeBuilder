@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "IMesh.hpp"
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 #include "../Vertex.hpp"
 
 class IndexedMeshImpl : public IMesh

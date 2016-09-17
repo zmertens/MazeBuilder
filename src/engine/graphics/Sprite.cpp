@@ -2,7 +2,7 @@
 
 #include "../ResourceManager.hpp"
 #include "../Camera.hpp"
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 /**
  * @brief Sprite::Sprite
@@ -37,7 +37,7 @@ void Sprite::update(float dt, double timeSinceInit)
  * @param camera
  * @param type = IMesh::Draw::TRIANGLES
  */
-void Sprite::draw(const SdlManager& sdlManager,
+void Sprite::draw(const SdlWindow& sdlManager,
     ResourceManager& rm,
     const Camera& camera,
     const IMesh::Draw type) const

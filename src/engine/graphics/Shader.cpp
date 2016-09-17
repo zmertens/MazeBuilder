@@ -8,10 +8,10 @@
 
 /**
  * @brief Shader::Shader
- * @param SdlManager
+ * @param SdlWindow
  */
-Shader::Shader(const SdlManager& SdlManager)
-: cSdlManager(SdlManager)
+Shader::Shader(const SdlWindow& SdlWindow)
+: cSdlManager(SdlWindow)
 {
     createProgram();
 }
@@ -387,7 +387,7 @@ GLenum Shader::getShaderType(const int shaderType) const
  * @brief Shader::getSDL_Manager
  * @return
  */
-const SdlManager& Shader::getSdlManager() const
+const SdlWindow& Shader::getSdlManager() const
 {
     return cSdlManager;
 }

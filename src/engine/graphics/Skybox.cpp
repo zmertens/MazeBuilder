@@ -2,7 +2,7 @@
 
 #include "../ResourceManager.hpp"
 #include "../Camera.hpp"
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 /**
  * @brief Skybox::Skybox
@@ -37,7 +37,7 @@ void Skybox::update(float dt, double timeSinceInit)
  * @param camera
  * @param type
  */
-void Skybox::draw(const SdlManager& sdlManager,
+void Skybox::draw(const SdlWindow& sdlManager,
     ResourceManager& rm,
     const Camera& camera,
     const IMesh::Draw type) const

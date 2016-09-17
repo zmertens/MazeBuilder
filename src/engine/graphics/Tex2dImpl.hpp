@@ -3,12 +3,12 @@
 
 #include "ITexture.hpp"
 
-#include "../SdlManager.hpp"
+#include "../SdlWindow.hpp"
 
 class Tex2dImpl : public ITexture
 {
 public:
-    explicit Tex2dImpl(const SdlManager& sdlManager,
+    explicit Tex2dImpl(const SdlWindow& sdlManager,
         const std::string& fileName,
         unsigned int channel = 0);
     explicit Tex2dImpl(const unsigned int width, const unsigned int height,

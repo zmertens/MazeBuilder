@@ -1,12 +1,12 @@
-#ifndef DATALOGGER_HPP
-#define DATALOGGER_HPP
+#ifndef LOGGER_HPP
+#define LOGGER_HPP
 
 #include <string>
 
-class DataLogger
+class Logger
 {
 public:
-    explicit DataLogger();
+    explicit Logger();
 
     void appendToLog(const std::string& str);
     void clearLog();
@@ -16,4 +16,4 @@ private:
     std::string mLog;
 };
 
-#endif // DATALOGGER_HPP
+#endif // LOGGER_HPP

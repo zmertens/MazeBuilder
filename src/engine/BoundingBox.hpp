@@ -1,12 +1,12 @@
-#ifndef AABB_HPP
-#define AABB_HPP
+#ifndef BOUNDINGBOX_HPP
+#define BOUNDINGBOX_HPP
 
 #include <glm/glm.hpp>
 
-class AABB
+class BoundingBox
 {
 public:
-    AABB(const glm::vec3& min = glm::vec3(0), const glm::vec3& max = glm::vec3(0))
+    BoundingBox(const glm::vec3& min = glm::vec3(0), const glm::vec3& max = glm::vec3(0))
     : minCoord(min)
     , maxCoord(max)
     , center(glm::vec3((max.x + min.x) * 0.5f, (max.y + min.y) * 0.5f, (max.z + min.z) * 0.5f))
@@ -14,7 +14,7 @@ public:
 
     }
 
-    inline bool intersects(const AABB& other) const;
+    inline bool intersects(const BoundingBox& other) const;
     inline bool intersects(const glm::vec3& point) const;
 public:
     glm::vec3 minCoord;
@@ -22,7 +22,7 @@ public:
     glm::vec3 center;
 };
 
-inline bool AABB::intersects(const AABB& other) const
+inline bool BoundingBox::intersects(const BoundingBox& other) const
 {
     bool intersectX = this->maxCoord.x >= other.minCoord.x && other.maxCoord.x >= this->minCoord.x;
     bool intersectY = this->maxCoord.y >= other.minCoord.y && other.maxCoord.y >= this->minCoord.y;
@@ -31,7 +31,7 @@ inline bool AABB::intersects(const AABB& other) const
     return intersectX && intersectY && intersectZ;
 }
 
-inline bool AABB::intersects(const glm::vec3& point) const
+inline bool BoundingBox::intersects(const glm::vec3& point) const
 {
     bool intersectX = this->maxCoord.x >= point.x && point.x >= this->minCoord.x;
     bool intersectY = this->maxCoord.y >= point.y && point.y >= this->minCoord.y;
@@ -40,4 +40,4 @@ inline bool AABB::intersects(const glm::vec3& point) const
     return intersectX && intersectY && intersectZ;
 }
 
-#endif // AABB_HPP
+#endif // BOUNDINGBOX_HPP

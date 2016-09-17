@@ -1,38 +1,38 @@
-#include "DataLogger.hpp"
+#include "Logger.hpp"
 
 #include <fstream>
 
 /**
- * @brief DataLogger::DataLogger
+ * @brief Logger::Logger
  */
-DataLogger::DataLogger()
-: mLog("DataLogger Begin:\n")
+Logger::Logger()
+: mLog("Logger Begin:\n")
 {
 
 }
 
 /**
- * @brief DataLogger::appendToLog
+ * @brief Logger::appendToLog
  * @param str
  */
-void DataLogger::appendToLog(const std::string& str)
+void Logger::appendToLog(const std::string& str)
 {
     mLog += str;
 }
 
 /**
- * @brief DataLogger::clearLog
+ * @brief Logger::clearLog
  */
-void DataLogger::clearLog()
+void Logger::clearLog()
 {
     mLog.clear();
 }
 
 /**
- * @brief DataLogger::dumpLogToFile
+ * @brief Logger::dumpLogToFile
  * @param outFileName
  */
-void DataLogger::dumpLogToFile(const std::string& outFileName) const
+void Logger::dumpLogToFile(const std::string& outFileName) const
 {
     std::ofstream outStream;
     outStream.open(outFileName);

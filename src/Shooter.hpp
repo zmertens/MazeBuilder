@@ -1,18 +1,17 @@
-#ifndef ShooterGame_HPP
-#define ShooterGame_HPP
+#ifndef SHOOTER_HPP
+#define SHOOTER_HPP
 
 #include <unordered_map>
 
 #include <glm/glm.hpp>
 
-#include "engine/SdlManager.hpp"
-#include "engine/ResourceManager.hpp"
-#include "engine/DataLogger.hpp"
-
 #include "IGame.hpp"
 
-// temp testing
+#include "engine/SdlWindow.hpp"
+#include "engine/ResourceManager.hpp"
+#include "engine/Logger.hpp"
 #include "engine/Camera.hpp"
+#include "engine/RenderText.hpp"
 #include "engine/graphics/Entity.hpp"
 #include "engine/graphics/Skybox.hpp"
 #include "engine/graphics/Light.hpp"
@@ -20,17 +19,14 @@
 #include "engine/graphics/Sprite.hpp"
 #include "engine/audio/SdlMixer.hpp"
 
-#include "LevelGenerator.hpp"
+#include "Level.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
-#include "ImGuiHelper.hpp"
 
-class ShooterGame final : public IGame
+class Shooter final : public IGame
 {
-    friend class ImGuiHelper;
-
 public:
-    ShooterGame();
+    Shooter();
     virtual void start() override;
 
 protected:
@@ -47,24 +43,24 @@ private:
     static const std::string sTitle;
     static std::unordered_map<uint8_t, bool> sKeyInputs;
 
-    SdlManager mSdlManager;
+    SdlWindow mSdlWindow;
     ResourceManager mResources;
-    DataLogger mLogger;
+    Logger mLogger;
 
     bool mAppIsRunning;
     unsigned int mFrameCounter;
     float mTimeSinceLastUpdate;
     float mAccumulator;
 
-    ImGuiHelper mImGuiHelper;
     Entity mCube;
     Camera mCamera;
-    LevelGenerator mLevelGen;
+    Level mLevel;
     Player mPlayer;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;
     Sprite mTestSprite;
+    RenderText mRenderText;
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
 
@@ -77,8 +73,8 @@ private:
     void init();
     void initResources();
     void initPositions();
-    void printFramesToConsole(const float dt);
+    void calcFrameRate(const float dt);
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
-#endif // ShooterGame_HPP
+#endif // SHOOTER_HPP

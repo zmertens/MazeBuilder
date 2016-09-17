@@ -1,5 +1,5 @@
-#ifndef WINDOW_HPP
-#define WINDOW_HPP
+#ifndef SDLWINDOW_HPP
+#define SDLWINDOW_HPP
 
 #include <string>
 #include <memory>
@@ -10,15 +10,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
 #include <SDL2/SDL_mixer.h>
-#include "../extlibs/gl_core_4_5.h"
+#include "gl_core_4_5.h"
 #elif defined(APP_ANDROID)
 #include <SDL.h>
 #include <GLES3/gl3.h>
 #include <GLES3/gl3ext.h>
 #endif // defined
-
-namespace SdlWindow
-{
 
 /**
  * Possible init flag values:
@@ -50,38 +47,18 @@ namespace SdlWindow
  * SDL_WINDOW_ALLOW_HIGHDPI
  * SDL_WINDOW_MOUSE_CAPTURE
  *
- * @brief The Window struct
+ * Uber class that manages SDL2 window and OpenGL context.
+ * @brief The SdlWindow class
  */
-struct Settings {
-    Uint32 initFlags;
-    Uint32 windowFlags;
-    bool vSync;
-
-    Settings(Uint32 init_flags = SDL_INIT_EVERYTHING,
-        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN,
-        bool vsync = false)
-    : initFlags(init_flags)
-    , windowFlags(window_flags)
-    , vSync(vsync)
-    {
-
-    }
-};
-} // namespace
-
-/**
- * Uber class that manages SDL2 library and OpenGL context.
- * @brief The SdlManager class
- */
-class SdlManager final
+class SdlWindow final
 {
 public:
-    typedef std::unique_ptr<SdlManager> Ptr;
+    typedef std::unique_ptr<SdlWindow> Ptr;
 public:
-    explicit SdlManager(const SdlWindow::Settings& window,
-        const std::string& title, const unsigned int width = 0u,
-        const unsigned int height = 0u);
-    virtual ~SdlManager();
+    explicit SdlWindow(Uint32 initFlags, Uint32 winFlags, bool vsync,
+        const std::string& title, const unsigned int width = 800u,
+        const unsigned int height = 600u);
+    virtual ~SdlWindow();
 
     void cleanUp();
 
@@ -104,9 +81,12 @@ public:
     float getAspectRatio() const;
 
     SDL_Window* getSdlWindow() const;
-    SdlWindow::Settings getWindowSettings() const;
+
+    Uint32 getInitFlags() const;
 private:
-    SdlWindow::Settings mWindowSettings;
+    Uint32 mInitFlags;
+    Uint32 mWinFlags;
+    bool mVSync;
     std::string mTitle;
     unsigned int mWinWidth;
     unsigned int mWinHeight;
@@ -130,8 +110,8 @@ private:
     SDL_Joystick* mSdlJoystick;
     SDL_Haptic* mSdlHaptic;
 private:
-    SdlManager(const SdlManager& other);
-    SdlManager& operator=(const SdlManager& other);
+    SdlWindow(const SdlWindow& other);
+    SdlWindow& operator=(const SdlWindow& other);
     void initWindow(Uint32 flags);
     void initJoysticks();
     void initHaptic();
@@ -140,4 +120,4 @@ private:
     std::string getContextString(int context) const;
 };
 
-#endif // WINDOW_HPP
+#endif // SDLWINDOW_HPP

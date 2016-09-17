@@ -1,16 +1,20 @@
-#ifndef MESHIMPL_HPP
-#define MESHIMPL_HPP
+#ifndef RENDERTEXT_HPP
+#define RENDERTEXT_HPP
 
-#include "IMesh.hpp"
-#include "../SdlWindow.hpp"
+#include "graphics/IMesh.hpp"
+#include "SdlWindow.hpp"
 
-class MeshImpl : public IMesh
+class ResourceManager;
+class Text;
+
+class RenderText : public IMesh
 {
 public:
-    explicit MeshImpl();
+    explicit RenderText();
     virtual void update(float dt, double timeSinceInit) override;
     virtual void draw(IMesh::Draw type = IMesh::Draw::TRIANGLES,
         const unsigned int count = 4) const override;
+    void renderText(const ResourceManager& rm, const Text& text) const;
 
 protected:
     virtual void cleanUp() override;
@@ -18,8 +22,9 @@ protected:
     virtual void initMesh() override;
 private:
     GLuint mVaoHandle;
+    GLuint mVboHandle;
 private:
     GLenum getGlType(IMesh::Draw type) const;
 };
 
-#endif // MESHIMPL_HPP
+#endif // RENDERTEXT_HPP

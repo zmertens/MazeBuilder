@@ -1,4 +1,6 @@
-#include "ShooterGame.hpp"
+#include "Shooter.hpp"
+
+#include <glm/gtc/matrix_transform.hpp>
 
 #include "engine/Utils.hpp"
 
@@ -7,29 +9,28 @@
 #endif // defined
 
 // testing
-#include "ResourcePaths.hpp"
-#include "ResourceIds.hpp"
-#include "ResourceLevels.hpp"
+#include "ResourceConstants.hpp"
 #include "engine/graphics/MaterialFactory.hpp"
 #include "engine/graphics/Tex2dImpl.hpp"
 #include "engine/graphics/TexSkyboxImpl.hpp"
-#include "engine/graphics/TexPerlinNoise2dImpl.hpp"
+#include "engine/graphics/TexPerlinImpl.hpp"
 #include "engine/graphics/MeshImpl.hpp"
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
+#include "engine/Text.hpp"
 
-const float ShooterGame::sTimePerFrame = 1.0f / 60.0f;
-const unsigned int ShooterGame::sWindowWidth = 1080u;
-const unsigned int ShooterGame::sWindowHeight = 720u;
-const std::string ShooterGame::sTitle = "ShooterGame";
-std::unordered_map<uint8_t, bool> ShooterGame::sKeyInputs;
+const float Shooter::sTimePerFrame = 1.0f / 60.0f;
+const unsigned int Shooter::sWindowWidth = 1080u;
+const unsigned int Shooter::sWindowHeight = 720u;
+const std::string Shooter::sTitle = "Shooter";
+std::unordered_map<uint8_t, bool> Shooter::sKeyInputs;
 
 /**
- * @brief ShooterGame::ShooterGame
+ * @brief Shooter::Shooter
  */
-ShooterGame::ShooterGame()
-: mSdlManager(SdlWindow::Settings(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
-    SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false),
+Shooter::Shooter()
+: mSdlWindow(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
+    SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false,
     sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
@@ -37,7 +38,6 @@ ShooterGame::ShooterGame()
 , mFrameCounter(0u)
 , mTimeSinceLastUpdate(0.0f)
 , mAccumulator(0.0f)
-, mImGuiHelper(mSdlManager, mResources)
 , mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
@@ -46,7 +46,7 @@ ShooterGame::ShooterGame()
         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(2, 0, 0))
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
-, mLevelGen(ResourceLevels::Levels::TEST_LEVEL,
+, mLevel(StartLevel::TEST_LEVEL,
     ResourceIds::Textures::Atlas::BRICKS2_INDEX, ResourceIds::Textures::Atlas::WALL_INDEX,
         ResourceIds::Textures::Atlas::METAL_INDEX,
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
@@ -54,7 +54,7 @@ ShooterGame::ShooterGame()
     ResourceIds::Meshes::LEVEL_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
-, mPlayer(mCamera, mLevelGen)
+, mPlayer(mCamera, mLevel)
 , mSkybox(Entity::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
@@ -70,6 +70,7 @@ ShooterGame::ShooterGame()
     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(0.0f))
+, mRenderText()
 , mSdlMixer(mResources)
 {
     // initialize all game resources (texture, material, mesh, et cetera)
@@ -77,21 +78,21 @@ ShooterGame::ShooterGame()
 } // constructor
 
 /**
- * @brief ShooterGame::start
+ * @brief Shooter::start
  */
-void ShooterGame::start()
+void Shooter::start()
 {
     mAppIsRunning = true;
 
-    mSdlMixer.playMusic(ResourceIds::Music::SOBER_LULLABY_MP3_ID, -1);
+    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
 
     loop();
 }
 
 /**
- * @brief ShooterGame::loop
+ * @brief Shooter::loop
  */
-void ShooterGame::loop()
+void Shooter::loop()
 {
     while (mAppIsRunning)
     {
@@ -110,22 +111,21 @@ void ShooterGame::loop()
 
         render();
 
-        printFramesToConsole(deltaTime);
+        calcFrameRate(deltaTime);
     }
 
     finish();
 }
 
 /**
- * @brief ShooterGame::handleEvents
+ * @brief Shooter::handleEvents
  */
-void ShooterGame::handleEvents()
+void Shooter::handleEvents()
 {
     float mouseWheelDy = 0;
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
-        mImGuiHelper.ImGui_ImplSdlGL3_ProcessEvent(&event);
         sdlEvents(event, mouseWheelDy);
     } // events
 
@@ -144,25 +144,25 @@ void ShooterGame::handleEvents()
     glm::vec2 coords = glm::vec2(coordX, coordY);
 
     // handle realtime input
-    mPlayer.input(mSdlManager, mouseWheelDy, coords, sKeyInputs);
+    mPlayer.input(mSdlWindow, mouseWheelDy, coords, sKeyInputs);
 } // update
 
 /**
- * @brief ShooterGame::update
+ * @brief Shooter::update
  * @param dt = the time between frames
  * @param timeSinceInit = the time since SDL was initialized
  */
-void ShooterGame::update(float dt, double timeSinceInit)
+void Shooter::update(float dt, double timeSinceInit)
 {
     //mCube.update(dt, timeSinceInit);
     mTestSprite.update(dt, timeSinceInit);
 
     //auto& transform = mTestSprite.getTransform();
-    Transform transform (mLevelGen.getExitPoints().front(), glm::vec3(0), glm::vec3(1.1f));
+    Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(1.1f));
     mTestSprite.setTransform(transform);
 
     mPlayer.update(dt, timeSinceInit);
-    mLevelGen.update(dt, timeSinceInit);
+    mLevel.update(dt, timeSinceInit);
 
     for (auto& enemy : mEnemies)
         enemy->update(dt, timeSinceInit);
@@ -172,10 +172,9 @@ void ShooterGame::update(float dt, double timeSinceInit)
 
     // keep the light above the player's head
     mLight.setPosition(glm::vec4(mPlayer.getPosition().x,
-        mLevelGen.getTileScalar().y - mPlayer.getPlayerSize().y,
+        mLevel.getTileScalar().y - mPlayer.getPlayerSize().y,
         mPlayer.getPosition().z, 0.0f));
 
-    mImGuiHelper.update(*this);
 //    static int testCounter = 0;
 //    if (++testCounter % 50 == 0)
 //    {
@@ -184,18 +183,18 @@ void ShooterGame::update(float dt, double timeSinceInit)
 }
 
 /**
- * @brief ShooterGame::render
+ * @brief Shooter::render
  */
-void ShooterGame::render()
+void Shooter::render()
 {
     mResources.clearCache();
 
     mPostProcessor.bind();
 
-    glClearColor(1.0f, 0.0f, 0.0f, 0.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    mSkybox.draw(mSdlManager, mResources, mCamera, IMesh::Draw::TRIANGLE_STRIP);
+    mSkybox.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLE_STRIP);
 
     auto& shader = mResources.getShader(ResourceIds::Shaders::LEVEL_SHADER_ID);
     shader->bind();
@@ -207,54 +206,68 @@ void ShooterGame::render()
     shader->setUniform("uLight.specular", mLight.getSpecular());
     shader->setUniform("uLight.position", mCamera.getLookAt() * mLight.getPosition());
 
-    mLevelGen.draw(mSdlManager, mResources, mCamera);
+    mLevel.draw(mSdlWindow, mResources, mCamera);
 
-    //mCube.draw(mSdlManager, mResources, mCamera, IMesh::Draw::TRIANGLES);
+    //mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
-    mTestSprite.draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
+    mTestSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
-    spriteShader->setUniform("uHalfSize", mLevelGen.getSpriteHalfWidth());
+    spriteShader->setUniform("uHalfSize", mLevel.getSpriteHalfWidth());
     mResources.putInCache(ResourceIds::Shaders::SPRITE_SHADER_ID, CachePos::Shader);
     for (auto& enemy : mEnemies)
-        enemy->draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
+        enemy->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
 
     for (auto& powerup : mPowerUps)
-        powerup->draw(mSdlManager, mResources, mCamera, IMesh::Draw::POINTS);
+        powerup->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     mPostProcessor.activateEffect(Effects::Type::NO_EFFECT);
     mPostProcessor.release();
 
-    mImGuiHelper.render();
 
-    mSdlManager.swapBuffers();
+    // glEnable(GL_BLEND);
+    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
+    // auto& txtShader = mResources.getShader(ResourceIds::Shaders::TEXT_SHADER_ID);
+    // txtShader->bind();
+
+    // auto& font = mResources.getFont(ResourceIds::Fonts::UBUNTU_FONT_ID);
+    // font->bindTexture();
+
+    // txtShader->setUniform("uProjection", glm::ortho(0.0f, static_cast<float>(mSdlWindow.getWindowWidth()), 0.0f, static_cast<float>(mSdlWindow.getWindowHeight())));
+    // txtShader->setUniform("uColor", glm::vec3(1));
+    // BoundingBox box {glm::vec3(50, 50, 0), glm::vec3(0)};
+    // const Text sampleText {"SAMPLEasdasdasd", box, ResourceIds::Fonts::UBUNTU_FONT_ID};
+    // mRenderText.renderText(mResources, sampleText);
+    // glDisable(GL_BLEND);
+
+    mSdlWindow.swapBuffers();
 }
 
 /**
  *  @note The SdlManager must clean up before Resources
  *  or else GL errors will be thrown!
- *  @brief ShooterGame::finish
+ *  @brief Shooter::finish
  */
-void ShooterGame::finish()
+void Shooter::finish()
 {
 #if defined(APP_DEBUG)
-    mLogger.appendToLog(mSdlManager.getSdlInfoString());
-    mLogger.appendToLog(mSdlManager.getGlInfoString());
+    mLogger.appendToLog(mSdlWindow.getSdlInfoString());
+    mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
     mLogger.dumpLogToFile("data_log.txt");
 #endif // defined
 
     mAppIsRunning = false;
-    mSdlManager.cleanUp();
+    mSdlWindow.cleanUp();
     mResources.cleanUp();
 }
 
 /**
- * @brief ShooterGame::init
+ * @brief Shooter::init
  */
-void ShooterGame::init()
+void Shooter::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -264,12 +277,12 @@ void ShooterGame::init()
 }
 
 /**
- * @brief ShooterGame::initResources
+ * @brief Shooter::initResources
  */
-void ShooterGame::initResources()
+void Shooter::initResources()
 {
     // shaders
-    Shader::Ptr level (new Shader(mSdlManager));
+    Shader::Ptr level (new Shader(mSdlWindow));
     level->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::LEVEL_VERTEX_SHADER_PATH);
     level->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
@@ -279,7 +292,7 @@ void ShooterGame::initResources()
     mResources.insert(ResourceIds::Shaders::LEVEL_SHADER_ID,
         std::move(level));
 
-    Shader::Ptr skybox (new Shader(mSdlManager));
+    Shader::Ptr skybox (new Shader(mSdlWindow));
     skybox->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::SKYBOX_VERTEX_SHADER_PATH);
     skybox->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
@@ -289,7 +302,7 @@ void ShooterGame::initResources()
     mResources.insert(ResourceIds::Shaders::SKYBOX_SHADER_ID,
         std::move(skybox));
 
-    Shader::Ptr effects (new Shader(mSdlManager));
+    Shader::Ptr effects (new Shader(mSdlWindow));
     effects->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::EFFECTS_VERTEX_SHADER_PATH);
     effects->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
@@ -299,7 +312,7 @@ void ShooterGame::initResources()
     mResources.insert(ResourceIds::Shaders::EFFECTS_SHADER_ID,
         std::move(effects));
 
-    Shader::Ptr spriteShader (new Shader(mSdlManager));
+    Shader::Ptr spriteShader (new Shader(mSdlWindow));
     spriteShader->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::SPRITE_VERTEX_SHADER_PATH);
     spriteShader->compileAndAttachShader(ShaderTypes::GEOMETRY_SHADER,
@@ -310,6 +323,18 @@ void ShooterGame::initResources()
     spriteShader->bind();
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
+
+    Shader::Ptr txt (new Shader(mSdlWindow));
+    txt->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
+        ResourcePaths::Shaders::TEXT_VERTEX_SHADER_PATH);
+    txt->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
+        ResourcePaths::Shaders::TEXT_FRAGMENT_SHADER_PATH);
+    txt->linkProgram();
+    txt->bind();
+    txt->setUniform("uTexture2D", 2);
+
+    mResources.insert(ResourceIds::Shaders::TEXT_SHADER_ID,
+        std::move(txt));
 
     // materials
     mResources.insert(ResourceIds::Materials::EMERALD_ID,
@@ -334,25 +359,25 @@ void ShooterGame::initResources()
 
     std::vector<Vertex> vertices;
     std::vector<GLushort> indices;
-    mLevelGen.generateLevel(vertices, indices);
+    mLevel.generateLevel(vertices, indices);
     IMesh::Ptr levelMesh (new IndexedMeshImpl(vertices, indices));
     mResources.insert(ResourceIds::Meshes::LEVEL_ID, std::move(levelMesh));
 
     // textures
-    ITexture::Ptr testTex (new Tex2dImpl(mSdlManager,
+    ITexture::Ptr testTex (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::TEST_TEX_ATLAS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID, std::move(testTex));
 
-    ITexture::Ptr skyboxTex (new TexSkyboxImpl(mSdlManager,
+    ITexture::Ptr skyboxTex (new TexSkyboxImpl(mSdlWindow,
         ResourcePaths::Textures::SKYBOX_PATHS, 0));
     mResources.insert(ResourceIds::Textures::SKYBOX_TEX_ID, std::move(skyboxTex));
 
     // @TODO use the fullscreen texture in the post processor (switch order of init) -- add FBO to RM
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
-        mSdlManager.getWindowWidth(), mSdlManager.getWindowHeight(), 0));
+        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 0));
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
 
-    ITexture::Ptr charsTex (new Tex2dImpl(mSdlManager,
+    ITexture::Ptr charsTex (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::TEST_RPG_CHARS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID, std::move(charsTex));
 
@@ -360,8 +385,8 @@ void ShooterGame::initResources()
     mResources.insert(ResourceIds::Textures::PERLIN_NOISE_2D_ID, std::move(perlinTex));
 
     // music
-    Music::Ptr soberLullaby (new Music(ResourcePaths::Music::SOBER_LULLABY_MP3_PATH));
-    mResources.insert(ResourceIds::Music::SOBER_LULLABY_MP3_ID, std::move(soberLullaby));
+    Music::Ptr mus (new Music(ResourcePaths::Music::WRATH_OF_SIN_MP3_PATH));
+    mResources.insert(ResourceIds::Music::WRATH_OF_SIN_ID, std::move(mus));
 
     // sound
     Chunk::Ptr deathSound (new Chunk(ResourcePaths::Chunks::DEATH_WAV_PATH));
@@ -384,19 +409,23 @@ void ShooterGame::initResources()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
+
+    // fonts
+    // Font::Ptr ubuntuFont (new Font(mSdlWindow, ResourcePaths::Fonts::UBUNTU_FONT_PATH, 48l));
+    // mResources.insert(ResourceIds::Fonts::UBUNTU_FONT_ID, std::move(ubuntuFont));
 }
 
 /**
- * @brief ShooterGame::initPositions
+ * @brief Shooter::initPositions
  */
-void ShooterGame::initPositions()
+void Shooter::initPositions()
 {
-    mPlayer.move(mLevelGen.getPlayerPosition(), 1.0f);
+    mPlayer.move(mLevel.getPlayerPosition(), 1.0f);
 
-    for (auto& enemyPos : mLevelGen.getEnemyPositions())
+    for (auto& enemyPos : mLevel.getEnemyPositions())
     {
         mEnemies.emplace_back(std::move(new Enemy(
-            mLevelGen.getTileScalar(),
+            mLevel.getTileScalar(),
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
@@ -407,7 +436,7 @@ void ShooterGame::initPositions()
         )));
     }
 
-    for (auto& pos : mLevelGen.getInvinciblePowerUps())
+    for (auto& pos : mLevel.getInvinciblePowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
@@ -420,7 +449,7 @@ void ShooterGame::initPositions()
         )));
     }
 
-    for (auto& pos : mLevelGen.getSpeedPowerUps())
+    for (auto& pos : mLevel.getSpeedPowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
@@ -433,7 +462,7 @@ void ShooterGame::initPositions()
         )));
     }
 
-    for (auto& pos : mLevelGen.getRechargePowerUps())
+    for (auto& pos : mLevel.getRechargePowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
@@ -448,10 +477,10 @@ void ShooterGame::initPositions()
 }
 
 /**
- * @brief ShooterGame::printFramesToConsole
+ * @brief Shooter::calcFrameRate
  * @param dt
  */
-void ShooterGame::printFramesToConsole(const float dt)
+void Shooter::calcFrameRate(const float dt)
 {
     ++mFrameCounter;
     mTimeSinceLastUpdate += dt;
@@ -465,21 +494,17 @@ void ShooterGame::printFramesToConsole(const float dt)
         mLogger.appendToLog("time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
         mLogger.appendToLog("\n");
 #endif // defined
-
-        mImGuiHelper.updateFrames("FPS: " + Utils::toString(mFrameCounter),
-            "time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
-
         mFrameCounter = 0;
         mTimeSinceLastUpdate -= 1.0f;
     }
 }
 
 /**
- * @brief ShooterGame::sdlEvents
+ * @brief Shooter::sdlEvents
  * @param event
  * @param mouseWheelDy
  */
-void ShooterGame::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
     {
@@ -493,8 +518,8 @@ void ShooterGame::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             unsigned int newHeight = event.window.data2;
             glViewport(0, 0, newWidth, newHeight);
 
-            mSdlManager.setWindowWidth(newWidth);
-            mSdlManager.setWindowHeight(newHeight);
+            mSdlWindow.setWindowWidth(newWidth);
+            mSdlWindow.setWindowHeight(newHeight);
 
 #if defined(APP_DEBUG)
             std::string resizeDimens = "Resize Event -- Width: "
@@ -517,13 +542,15 @@ void ShooterGame::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             else
                 SDL_ShowCursor(SDL_ENABLE);
         }
+        else if (event.key.keysym.sym == SDLK_ESCAPE)
+            mAppIsRunning = false;
     }
-    else if ((mSdlManager.getWindowSettings().initFlags & SDL_INIT_JOYSTICK) &&
+    else if ((mSdlWindow.getInitFlags() & SDL_INIT_JOYSTICK) &&
         event.type == SDL_JOYBUTTONDOWN)
     {
 #if defined(APP_DEBUG)
         if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
-            mSdlManager.hapticRumblePlay(0.75, 500) != 0)
+            mSdlWindow.hapticRumblePlay(0.75, 500) != 0)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
 #endif // defined
     }

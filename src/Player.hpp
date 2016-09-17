@@ -7,19 +7,19 @@
 
 #include <glm/glm.hpp>
 
-class SdlManager;
+class SdlWindow;
 class Camera;
-class LevelGenerator;
+class Level;
 
 class Player final
 {
 public:
-    Player(Camera& camera, LevelGenerator& level);
+    Player(Camera& camera, Level& level);
 
     glm::vec3 getPosition() const;
     void setPosition(const glm::vec3& position);
     void move(const glm::vec3& vel, float dt);
-    void input(const SdlManager& sdlManager, const float mouseWheelDelta,
+    void input(const SdlWindow& sdlManager, const float mouseWheelDelta,
         const glm::vec2& coords,
         std::unordered_map<uint8_t, bool> inputs);
     void update(const float dt, const double timeSinceInit);
@@ -51,7 +51,7 @@ private:
     static float scMovementScalar;
     const glm::vec2 cPlayerSize;
     Camera& mFirstPersonCamera;
-    LevelGenerator& mLevel;
+    Level& mLevel;
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
     bool mMouseLocked;
@@ -61,7 +61,7 @@ private:
     bool mInfAmmo;
     bool mStrength;
 private:
-    glm::vec3 iterateThruSpace(const std::vector<glm::vec3>& emptySpaces,
+    glm::vec3 collision(const std::vector<glm::vec3>& emptySpaces,
         const glm::vec3& spaceScalar, const glm::vec3& origin,
         const glm::vec3& dir) const;
     glm::vec3 rectangularCollision(const glm::vec3& origin,

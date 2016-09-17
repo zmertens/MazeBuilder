@@ -6,11 +6,7 @@
 
 #include "../Utils.hpp"
 
-// @TODO : fix this define issue
-//#ifndef STB_IMAGE_IMPLEMENTATION
-//#define STB_IMAGE_IMPLEMENTATION
-//#endif
-#include "../../extlibs/stb_image.h"
+#include "stb_image.h"
 
 GLuint TexSkyboxImpl::sCubeMapIndex = 0;
 
@@ -20,7 +16,7 @@ GLuint TexSkyboxImpl::sCubeMapIndex = 0;
  * @param fileNames
  * @param channel
  */
-TexSkyboxImpl::TexSkyboxImpl(const SdlManager& sdlManager,
+TexSkyboxImpl::TexSkyboxImpl(const SdlWindow& sdlManager,
     const std::vector<std::string>& fileNames,
     unsigned int channel)
 : mChannel(channel)
