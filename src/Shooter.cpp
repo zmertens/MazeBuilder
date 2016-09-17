@@ -411,6 +411,7 @@ void Shooter::initResources()
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
 
     // fonts
+    // causes a blank screen
     // Font::Ptr ubuntuFont (new Font(mSdlWindow, ResourcePaths::Fonts::UBUNTU_FONT_PATH, 48l));
     // mResources.insert(ResourceIds::Fonts::UBUNTU_FONT_ID, std::move(ubuntuFont));
 }
