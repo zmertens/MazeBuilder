@@ -18,7 +18,8 @@ Enemy::Enemy(const glm::vec3& scalar,
     const glm::vec3& rotation,
     const glm::vec3& scale)
 : Sprite(config, position, rotation, scale)
-, mStates(States::STATIONARY)
+, mHealth(100.0f)
+, mStates(States::Sit)
 , mAnimationCounter(0.0f)
 , mAnimationIndex(0u)
 {
@@ -40,17 +41,61 @@ void Enemy::update(float dt, double timeSinceInit)
 
         updateAnimations();
     }
+
+    if (mHealth < 0.0f)
+        mStates = States::Dead;
 }
+
+float Enemy::getHealth() const
+{
+    return mHealth;
+}
+
+void Enemy::setHealth(const float health)
+{
+    mHealth = health;
+}
+
+Enemy::States Enemy::getState() const
+{
+    return mStates;
+}
+
+void Enemy::setState(Enemy::States state)
+{
+    mStates = state;
+}
+
+void Enemy::inflictDamage(const float min, const float max)
+{
+    mHealth -= Utils::getRandomFloat(min, max);
+}
+
 
 void Enemy::updateAnimations()
 {
-    if (mStates == States::STATIONARY)
+    if (mStates == States::Sit)
     {
         mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
+        if (mAnimationIndex >= 4)
+            mAnimationIndex = 0;
     }
-
-    if (mAnimationIndex >= 4)
+    else if (mStates == States::Attack)
+    {
+        mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
+        mAnimationIndex += 1;
+        if (mAnimationIndex >= 8)
+            mAnimationIndex = 4;
+    }
+    else if (mStates == States::Attack)
+    {
+        mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
+        mAnimationIndex += 1;
+        if (mAnimationIndex >= 12)
+            mAnimationIndex = 8;
+    }
+    else
         mAnimationIndex = 0;
 }
 
@@ -60,8 +105,19 @@ void Enemy::updateAnimations()
 void Enemy::genAnimations()
 {
     using namespace ResourceIds::Textures::Atlas;
+
     mAnimations[RPG_1_WALK_1] = Utils::getTexAtlasOffset(RPG_1_WALK_1, TEST_RPG_CHARS_NUM_ROWS);
     mAnimations[RPG_1_WALK_2] = Utils::getTexAtlasOffset(RPG_1_WALK_2, TEST_RPG_CHARS_NUM_ROWS);
     mAnimations[RPG_1_WALK_3] = Utils::getTexAtlasOffset(RPG_1_WALK_3, TEST_RPG_CHARS_NUM_ROWS);
     mAnimations[RPG_1_WALK_4] = Utils::getTexAtlasOffset(RPG_1_WALK_4, TEST_RPG_CHARS_NUM_ROWS);
+
+    mAnimations[RPG_1_BACK_1] = Utils::getTexAtlasOffset(RPG_1_BACK_1, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_BACK_2] = Utils::getTexAtlasOffset(RPG_1_BACK_2, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_BACK_3] = Utils::getTexAtlasOffset(RPG_1_BACK_3, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_BACK_4] = Utils::getTexAtlasOffset(RPG_1_BACK_4, TEST_RPG_CHARS_NUM_ROWS);
+
+    mAnimations[RPG_1_FRONT_1] = Utils::getTexAtlasOffset(RPG_1_FRONT_1, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_FRONT_2] = Utils::getTexAtlasOffset(RPG_1_FRONT_2, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_FRONT_3] = Utils::getTexAtlasOffset(RPG_1_FRONT_3, TEST_RPG_CHARS_NUM_ROWS);
+    mAnimations[RPG_1_FRONT_4] = Utils::getTexAtlasOffset(RPG_1_FRONT_4, TEST_RPG_CHARS_NUM_ROWS);
 }

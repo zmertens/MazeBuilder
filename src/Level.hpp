@@ -20,15 +20,11 @@ namespace Tile
 enum class Special : Uint32 {
     PLAYER,
     ENEMY,
-    DOOR,
     SPD_PW,
-    RCHRG_PW,
+    STR_PW,
     INVINC_PW,
     EXIT,
     PARTICLE, // @TODO - be more specific (smoke, fire... )
-    POINT_LIGHT,
-    SPOT_LIGHT,
-    DIR_LIGHT,
     NONE
 };
 
@@ -64,7 +60,7 @@ const std::vector<std::vector<Data>> TEST_LEVEL = {{
     {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false, Special::ENEMY}, {false,  Special::INVINC_PW}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::ENEMY}, {false,Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
-    {{}, {false,Special::RCHRG_PW}, {}, {}, {}, {false,  Special::ENEMY}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,Special::STR_PW}, {}, {}, {}, {false,  Special::ENEMY}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::ENEMY}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {false,  Special::NONE}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}},
@@ -108,7 +104,7 @@ public:
 
     std::vector<glm::vec3> getSpeedPowerUps() const;
 
-    std::vector<glm::vec3> getRechargePowerUps() const;
+    std::vector<glm::vec3> getStrengthPowerUps() const;
 
     std::vector<glm::vec3> getInvinciblePowerUps() const;
 
@@ -125,7 +121,7 @@ private:
     std::vector<glm::vec3> mExitPoints;
     std::vector<glm::vec3> mEnemyPositions;
     std::vector<glm::vec3> mSpeedPowerUps;
-    std::vector<glm::vec3> mRechargePowerUps;
+    std::vector<glm::vec3> mStrengthPowerUps;
     std::vector<glm::vec3> mInvinciblePowerUps;
     // doors
     // power ups

@@ -76,6 +76,7 @@ private:
     void initPositions();
     void calcFrameRate(const float dt);
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
+    void modifyEnemyPosition(const Enemy::Ptr& enemy, const float dt);
 };
 
 #endif // SHOOTER_HPP

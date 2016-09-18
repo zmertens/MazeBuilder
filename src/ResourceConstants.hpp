@@ -95,10 +95,14 @@ const unsigned int RPG_1_WALK_1 = 0u;
 const unsigned int RPG_1_WALK_2 = 1u;
 const unsigned int RPG_1_WALK_3 = 2u;
 const unsigned int RPG_1_WALK_4 = 3u;
-const unsigned int RPG_1_BACK_1 = 8u;
-const unsigned int RPG_1_BACK_2 = 9u;
-const unsigned int RPG_1_BACK_3 = 10u;
-const unsigned int RPG_1_BACK_4 = 11u;
+const unsigned int RPG_1_BACK_1 = 4u;
+const unsigned int RPG_1_BACK_2 = 5u;
+const unsigned int RPG_1_BACK_3 = 60u;
+const unsigned int RPG_1_BACK_4 = 7u;
+const unsigned int RPG_1_FRONT_1 = 8u;
+const unsigned int RPG_1_FRONT_2 = 9u;
+const unsigned int RPG_1_FRONT_3 = 10u;
+const unsigned int RPG_1_FRONT_4 = 11u;
 } // namespace Atlas
 } // namespace Textures
 

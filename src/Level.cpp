@@ -200,12 +200,12 @@ std::vector<glm::vec3> Level::getSpeedPowerUps() const
 }
 
 /**
- * @brief Level::getRechargePowerUps
+ * @brief Level::getStrengthPowerUps
  * @return
  */
-std::vector<glm::vec3> Level::getRechargePowerUps() const
+std::vector<glm::vec3> Level::getStrengthPowerUps() const
 {
-    return mRechargePowerUps;
+    return mStrengthPowerUps;
 }
 
 /**
@@ -251,8 +251,8 @@ void Level::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
         case Special::INVINC_PW:
             mInvinciblePowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
             break;
-        case Special::RCHRG_PW:
-            mRechargePowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
+        case Special::STR_PW:
+            mStrengthPowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
             break;
         case Special::SPD_PW:
             mSpeedPowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);

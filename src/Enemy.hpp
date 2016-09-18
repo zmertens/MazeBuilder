@@ -11,10 +11,9 @@ public:
     typedef std::unique_ptr<Enemy> Ptr;
 
     enum class States {
-        STATIONARY,
-        ATTACKING,
-        DYING,
-        DEAD
+        Sit,
+        Attack,
+        Dead
     };
 
 public:
@@ -25,8 +24,19 @@ public:
         const glm::vec3& scale = glm::vec3(1.0f));
     virtual void update(float dt, double timeSinceInit) override;
 
+    Enemy::States getState() const;
+    void setState(Enemy::States state);
+
+    float getHealth() const;
+    void setHealth(const float health);
+
+    bool isShooting() const;
+    
+    void inflictDamage(const float min, const float max);
+
 private:
-    std::array<glm::vec2, 4> mAnimations;
+    float mHealth;
+    std::array<glm::vec2, 12> mAnimations;
     States mStates;
     float mAnimationCounter;
     unsigned int mAnimationIndex;

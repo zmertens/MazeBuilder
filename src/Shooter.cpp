@@ -158,7 +158,7 @@ void Shooter::update(float dt, double timeSinceInit)
     mTestSprite.update(dt, timeSinceInit);
 
     //auto& transform = mTestSprite.getTransform();
-    Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(1.1f));
+    Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(0.9f));
     mTestSprite.setTransform(transform);
 
     mPlayer.update(dt, timeSinceInit);
@@ -166,13 +166,28 @@ void Shooter::update(float dt, double timeSinceInit)
 
     for (auto& enemy : mEnemies)
     {
+        if (enemy->getState() == Enemy::States::Dead)
+            continue;
         enemy->update(dt, timeSinceInit);
-        for (auto& bullet : mPlayer.getBullets())
-        {   
-            if (bullet.isActive() && bullet.intersects(enemy->getTransform().getTranslation(), mLevel.getSpriteHalfWidth()))
-            {
-                enemy->inflictDamage(0.1f, 1.0f);
-            }
+
+        bool inRange = glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < mLevel.getSpriteHalfWidth();
+
+        if (enemy->getState() == Enemy::States::Attack)
+        {
+            //modifyEnemyPosition(enemy, dt);
+            if (inRange)
+                mPlayer.inflictDamage(0.1f, 3.1f);
+        }
+
+        if (mPlayer.isShooting() && inRange)
+        {    
+            enemy->inflictDamage(0.1f, 3.1f);
+        }
+
+        if (enemy->getState() == Enemy::States::Sit && glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < 10.0f)
+        {    
+            enemy->setState(Enemy::States::Attack);
+            SDL_Log("Attacking");
         }
     }
 
@@ -444,7 +459,7 @@ void Shooter::initPositions()
         )));
     }
 
-    for (auto& pos : mLevel.getRechargePowerUps())
+    for (auto& pos : mLevel.getStrengthPowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
             Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
@@ -539,3 +554,17 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 #endif // defined
     }
 } // sdlEvents
+
+void Shooter::modifyEnemyPosition(const Enemy::Ptr& enemy, const float dt)
+{
+    if (glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < mLevel.getSpriteHalfWidth())
+    {
+        // SDL_Log("Enemy1 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
+        auto&& transform = enemy->getTransform();
+        glm::vec3 newPos = glm::vec3(transform.getTranslation() * (1.0f - dt) + mPlayer.getPosition() * dt);
+        transform.setTranslation(newPos);
+        enemy->setTransform(transform);
+        // SDL_Log("Enemy2 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
+        // SDL_Log("Player %f %f %f", mPlayer.getPosition().x, mPlayer.getPosition().y, mPlayer.getPosition().z);
+    }
+}

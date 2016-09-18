@@ -31,7 +31,8 @@ public:
 
     glm::vec2 getPlayerSize() const;
 
-    std::vector<Bullet> getBullets() const;
+    // std::vector<Bullet> getBullets() const;
+    bool isShooting() const;
 
     bool getMouseLocked() const;
     void setMouseLocked(bool mouseLocked);
@@ -63,7 +64,8 @@ private:
     Level& mLevel;
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
-    std::vector<Bullet> mBullets;
+    // std::vector<Bullet> mBullets;
+    bool mShooting;
     bool mMouseLocked;
     float mHealth;
     bool mCollisions;
@@ -81,7 +83,7 @@ private:
         const glm::vec3& scalar) const;
     bool isOnExitPoint(const glm::vec3& origin) const;
     bool isOnSpeedPowerUp(const glm::vec3& origin) const;
-    bool isOnRechargePowerUp(const glm::vec3& origin) const;
+    bool isOnStrengthPowerUp(const glm::vec3& origin) const;
     bool isOnInvinciblePowerUp(const glm::vec3& origin) const;
 };
 

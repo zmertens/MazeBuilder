@@ -23,7 +23,8 @@ Player::Player(Camera& camera, Level& level)
 , mLevel(level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
-, mBullets()
+// , mBullets()
+, mShooting(false)
 , mMouseLocked(false)
 , mHealth(100.0f)
 , mCollisions(true)
@@ -77,10 +78,13 @@ void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
     const glm::vec2& coords,
     std::unordered_map<uint8_t, bool> inputs)
 {
-    if (mBullets.size() < scMaxBullets && mouseStates & SDL_BUTTON(SDL_BUTTON_LEFT))
+    if (mouseStates & SDL_BUTTON(SDL_BUTTON_LEFT))
     {
-        mBullets.emplace_back(getPosition(), mFirstPersonCamera.getTarget());
+        mShooting = true;
+        // mBullets.emplace_back(getPosition(), mFirstPersonCamera.getTarget());
     }
+    else
+        mShooting = false;
 
     if (mouseStates & SDL_BUTTON(SDL_BUTTON_RIGHT))
     {
@@ -144,6 +148,9 @@ void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
  */
 void Player::update(const float dt, const double timeSinceInit)
 {
+    // if (mHealth < 0.0f)
+    //     SDL_Log("Player dead");
+
     if (glm::length(mMovementDir) > 0)
     {
         if (mCollisions)
@@ -160,6 +167,21 @@ void Player::update(const float dt, const double timeSinceInit)
 
         if (isOnExitPoint(getPosition()))
         {
+            SDL_Log("exit");
+        }
+        else if (isOnSpeedPowerUp(getPosition()))
+        {
+            SDL_Log("speed");
+
+        }
+        else if (isOnStrengthPowerUp(getPosition()))
+        {
+            SDL_Log("str");
+
+        }
+        else if (isOnInvinciblePowerUp(getPosition()))
+        {
+            SDL_Log("invic");
 
         }
 
@@ -168,15 +190,15 @@ void Player::update(const float dt, const double timeSinceInit)
     }
     // else no movement
 
-    auto&& itr = std::begin(mBullets);
-    while (itr != std::end(mBullets))
-    {        
-        itr->update();
-        if (!itr->isActive())
-            itr = mBullets.erase(itr);
-        else
-            ++itr;
-    }
+    // auto&& itr = std::begin(mBullets);
+    // while (itr != std::end(mBullets))
+    // {        
+    //     itr->update();
+    //     if (!itr->isActive())
+    //         itr = mBullets.erase(itr);
+    //     else
+    //         ++itr;
+    // }
 
 }
 
@@ -208,9 +230,14 @@ glm::vec2 Player::getPlayerSize() const
     return cPlayerSize;
 }
 
-std::vector<Bullet> Player::getBullets() const
+// std::vector<Bullet> Player::getBullets() const
+// {
+//     return mBullets;
+// }
+
+bool Player::isShooting() const
 {
-    return mBullets;
+    return mShooting;
 }
 
 /**
@@ -283,7 +310,7 @@ void Player::setStrength(bool strength)
 
 void Player::inflictDamage(const float min, const float max)
 {
-    mHealth = Utils::getRandomFloat(min, max);
+    mHealth -= Utils::getRandomFloat(min, max);
 }
 
 /**
@@ -355,14 +382,14 @@ glm::vec3 Player::rectangularCollision(const glm::vec3& origin,
  */
 bool Player::isOnExitPoint(const glm::vec3& origin) const
 {
-    const auto& exitPoints = mLevel.getExitPoints();
+    const auto& points = mLevel.getExitPoints();
 
-    auto exited = std::find_if(exitPoints.begin(), exitPoints.end(),
+    auto exited = std::find_if(points.begin(), points.end(),
         [&] (const glm::vec3& point)->bool {
             return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
     });
 
-    return (exited != exitPoints.end());
+    return (exited != points.end());
 }
 
 /**
@@ -372,17 +399,31 @@ bool Player::isOnExitPoint(const glm::vec3& origin) const
  */
 bool Player::isOnSpeedPowerUp(const glm::vec3& origin) const
 {
-    return false;
+    const auto& points = mLevel.getSpeedPowerUps();
+
+    auto exited = std::find_if(points.begin(), points.end(),
+        [&] (const glm::vec3& point)->bool {
+            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
+    });
+
+    return (exited != points.end());
 }
 
 /**
- * @brief Player::isOnRechargePowerUp
+ * @brief Player::isOnStrengthPowerUp
  * @param origin
  * @return
  */
-bool Player::isOnRechargePowerUp(const glm::vec3& origin) const
+bool Player::isOnStrengthPowerUp(const glm::vec3& origin) const
 {
-    return false;
+    const auto& points = mLevel.getStrengthPowerUps();
+
+    auto exited = std::find_if(points.begin(), points.end(),
+        [&] (const glm::vec3& point)->bool {
+            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
+    });
+
+    return (exited != points.end());
 }
 
 /**
@@ -392,5 +433,12 @@ bool Player::isOnRechargePowerUp(const glm::vec3& origin) const
  */
 bool Player::isOnInvinciblePowerUp(const glm::vec3& origin) const
 {
-    return false;
+    const auto& points = mLevel.getInvinciblePowerUps();
+
+    auto exited = std::find_if(points.begin(), points.end(),
+        [&] (const glm::vec3& point)->bool {
+            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
+    });
+
+    return (exited != points.end());
 }
