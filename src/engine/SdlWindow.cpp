@@ -111,9 +111,16 @@ void SdlWindow::initWindow(Uint32 flags)
 #if defined(APP_DESKTOP)
     if (mFullscreen)
     {
-        mSdlWindow = SDL_CreateWindow(mTitle.c_str(), 0, 0,
-            mWinWidth, mWinHeight,
+        SDL_DisplayMode mode;
+        SDL_GetDisplayMode(0, 0, &mode);
+        mSdlWindow = SDL_CreateWindow(nullptr, 0, 0,
+            mode.w, mode.h,
             mWinFlags);
+
+        int x, y;
+        SDL_GetWindowSize(mSdlWindow, &x, &y);
+        mWinWidth = static_cast<unsigned int>(x);
+        mWinHeight = static_cast<unsigned int>(y);
     }
     else
     {

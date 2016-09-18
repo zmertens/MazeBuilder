@@ -28,7 +28,7 @@ void main()
 
 	if (uEffect.type == BLUR)
 	{
-		float strength = 4.89;
+		float strength = 0.05;
 		gl_Position.x += cos(uTime * 25.0) * strength;
 		gl_Position.y += cos(uTime * 35.0) * strength;
 	}

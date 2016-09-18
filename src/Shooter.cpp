@@ -29,7 +29,7 @@ std::unordered_map<uint8_t, bool> Shooter::sKeyInputs;
  */
 Shooter::Shooter()
 : mSdlWindow(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
-    SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN, false,
+    SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN /*| SDL_WINDOW_FULLSCREEN*/, false,
     sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
@@ -61,7 +61,7 @@ Shooter::Shooter()
     ResourceIds::Textures::SKYBOX_TEX_ID))
 // @note this pp needs to load after the init function to prevent issues -- if using tex factory
 , mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
-    ResourceIds::Meshes::VAO_ID), sWindowWidth, sWindowHeight)
+    ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
 , mTestSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -170,16 +170,16 @@ void Shooter::update(float dt, double timeSinceInit)
             continue;
         enemy->update(dt, timeSinceInit);
 
-        bool inRange = glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < mLevel.getSpriteHalfWidth();
+        bool inRange = glm::length(mPlayer.getPosition() - enemy->getTransform().getTranslation()) < mLevel.getSpriteHalfWidth();
 
         if (enemy->getState() == Enemy::States::Attack)
         {
-            //modifyEnemyPosition(enemy, dt);
+            modifyEnemyPosition(enemy, dt);
             if (inRange)
                 mPlayer.inflictDamage(0.1f, 3.1f);
         }
 
-        if (mPlayer.isShooting() && inRange)
+        if (inRange && mPlayer.isShooting())
         {    
             if (mPlayer.getPower() == Power::Type::Strength)
                 enemy->inflictDamage(1.1f, 13.1f);
@@ -388,7 +388,6 @@ void Shooter::initResources()
         ResourcePaths::Textures::SKYBOX_PATHS, 0));
     mResources.insert(ResourceIds::Textures::SKYBOX_TEX_ID, std::move(skyboxTex));
 
-    // @TODO use the fullscreen texture in the post processor (switch order of init) -- add FBO to RM
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
         mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 0));
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
@@ -572,14 +571,11 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 
 void Shooter::modifyEnemyPosition(const Enemy::Ptr& enemy, const float dt)
 {
-    if (glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < mLevel.getSpriteHalfWidth())
-    {
-        // SDL_Log("Enemy1 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
-        auto&& transform = enemy->getTransform();
-        glm::vec3 newPos = glm::vec3(transform.getTranslation() * (1.0f - dt) + mPlayer.getPosition() * dt);
-        transform.setTranslation(newPos);
-        enemy->setTransform(transform);
-        // SDL_Log("Enemy2 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
-        // SDL_Log("Player %f %f %f", mPlayer.getPosition().x, mPlayer.getPosition().y, mPlayer.getPosition().z);
-    }
+    // SDL_Log("Enemy1 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
+    auto&& transform = enemy->getTransform();
+    auto currentPos = transform.getTranslation();
+    transform.setTranslation(currentPos + (glm::normalize(mPlayer.getPosition() - currentPos) * dt * 10.0f));
+    enemy->setTransform(transform);
+    // SDL_Log("Enemy2 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
+    // SDL_Log("Player %f %f %f", mPlayer.getPosition().x, mPlayer.getPosition().y, mPlayer.getPosition().z);
 }
