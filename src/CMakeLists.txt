@@ -1,3 +1,12 @@
+set(IMGUI_SOURCES
+	engine/imgui/imgui.cpp
+	engine/imgui/imgui_draw.cpp
+)
+
+set(STB_HEADER
+	engine/graphics/stb_image.h
+)
+
 set(SHOOTER_SOURCES
 	Main.cpp
 	Shooter.cpp
@@ -12,11 +21,9 @@ set(SHOOTER_SOURCES
 	engine/SdlWindow.cpp
 	engine/gl_core_4_5.c
 	engine/Transform.cpp
-	engine/Text.cpp
-	engine/RenderText.cpp
+	engine/ImGuiHelper.cpp
 	engine/graphics/Entity.cpp
 	engine/graphics/Fog.cpp
-	engine/graphics/Font.cpp
 	engine/graphics/GlUtils.cpp
 	engine/graphics/IndexedMeshImpl.cpp
 	engine/graphics/Light.cpp
@@ -38,9 +45,5 @@ set(SHOOTER_SOURCES
 	engine/audio/SdlMixer.cpp
 )
 
-set(STB_HEADER
-	engine/graphics/stb_image.h
-)
-
-add_executable(${CMAKE_PROJECT_NAME} ${SHOOTER_SOURCES} ${STB_HEADER})
+add_executable(${CMAKE_PROJECT_NAME} ${SHOOTER_SOURCES} ${IMGUI_SOURCES} ${STB_HEADER})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${SHOOTER_LIBS})

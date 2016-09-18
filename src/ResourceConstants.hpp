@@ -15,7 +15,7 @@ const std::string LEVEL_SHADER_ID = "LEVEL_SHADER_ID";
 const std::string SKYBOX_SHADER_ID = "SKYBOX_SHADER_ID";
 const std::string EFFECTS_SHADER_ID = "EFFECTS_SHADER_ID";
 const std::string SPRITE_SHADER_ID = "SPRITE_SHADER_ID";
-const std::string TEXT_SHADER_ID = "TEXT_SHADER_ID";
+// const std::string TEXT_SHADER_ID = "TEXT_SHADER_ID";
 }
 
 namespace Textures
@@ -172,8 +172,8 @@ const std::string EFFECTS_FRAGMENT_SHADER_PATH = "./resources/shaders/effects.fr
 const std::string SPRITE_VERTEX_SHADER_PATH = "./resources/shaders/sprite.vert.glsl";
 const std::string SPRITE_GEOM_SHADER_PATH = "./resources/shaders/sprite.geom.glsl";
 const std::string SPRITE_FRAGMENT_SHADER_PATH = "./resources/shaders/sprite.frag.glsl";
-const std::string TEXT_VERTEX_SHADER_PATH = "./resources/shaders/text.vert.glsl";
-const std::string TEXT_FRAGMENT_SHADER_PATH = "./resources/shaders/text.frag.glsl";
+// const std::string TEXT_VERTEX_SHADER_PATH = "./resources/shaders/text.vert.glsl";
+// const std::string TEXT_FRAGMENT_SHADER_PATH = "./resources/shaders/text.frag.glsl";
 #elif defined(APP_ANDROID)
 //const std::string SCENE_VERTEX_SHADER_PATH = "./shaders/sceneShader.vert.glsl";
 //const std::string SCENE_FRAGMENT_SHADER_PATH = "./shaders/sceneShader.frag.glsl";

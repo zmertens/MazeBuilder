@@ -11,7 +11,7 @@
 #include "engine/ResourceManager.hpp"
 #include "engine/Logger.hpp"
 #include "engine/Camera.hpp"
-#include "engine/RenderText.hpp"
+#include "engine/ImGuiHelper.hpp"
 #include "engine/graphics/Entity.hpp"
 #include "engine/graphics/Skybox.hpp"
 #include "engine/graphics/Light.hpp"
@@ -25,6 +25,7 @@
 
 class Shooter final : public IGame
 {
+    friend class ImGuiHelper;
 public:
     Shooter();
     virtual void start() override;
@@ -52,6 +53,7 @@ private:
     float mTimeSinceLastUpdate;
     float mAccumulator;
 
+    ImGuiHelper mImGui;
     Entity mCube;
     Camera mCamera;
     Level mLevel;
@@ -60,7 +62,6 @@ private:
     PostProcessorImpl mPostProcessor;
     Light mLight;
     Sprite mTestSprite;
-    RenderText mRenderText;
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
 

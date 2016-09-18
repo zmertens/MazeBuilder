@@ -1,14 +1,16 @@
 #include "Player.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 #include "engine/SdlWindow.hpp"
 #include "engine/Camera.hpp"
+#include "engine/Utils.hpp"
 
 #include "Level.hpp"
 
 const float Player::scMouseSensitivity = 1.0f;
-float Player::scMovementScalar = 40.0f;
+float Player::scMovementScalar = scOgMovementScalar;
 
 /**
  * @brief Player::Player
@@ -21,7 +23,9 @@ Player::Player(Camera& camera, Level& level)
 , mLevel(level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
+, mBullets()
 , mMouseLocked(false)
+, mHealth(100.0f)
 , mCollisions(true)
 , mInvincible(false)
 , mSpeed(false)
@@ -64,13 +68,29 @@ void Player::move(const glm::vec3& vel, float dt)
  * @brief Player::input
  * @param sdlManager
  * @param mouseWheelDelta
+ * @param mosueStates
  * @param coords
  * @param inputs
  */
 void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
+    const int32_t mouseStates,
     const glm::vec2& coords,
     std::unordered_map<uint8_t, bool> inputs)
 {
+    if (mBullets.size() < scMaxBullets && mouseStates & SDL_BUTTON(SDL_BUTTON_LEFT))
+    {
+        mBullets.emplace_back(getPosition(), mFirstPersonCamera.getTarget());
+    }
+
+    if (mouseStates & SDL_BUTTON(SDL_BUTTON_RIGHT))
+    {
+        scMovementScalar = 40.0f;
+    }
+    else
+    {
+        scMovementScalar = scOgMovementScalar;
+    }
+
     const float winCenterX = static_cast<float>(sdlManager.getWindowWidth()) * 0.5f;
     const float winCenterY = static_cast<float>(sdlManager.getWindowHeight()) * 0.5f;
 
@@ -147,6 +167,17 @@ void Player::update(const float dt, const double timeSinceInit)
         mMovementDir = glm::vec3(0);
     }
     // else no movement
+
+    auto&& itr = std::begin(mBullets);
+    while (itr != std::end(mBullets))
+    {        
+        itr->update();
+        if (!itr->isActive())
+            itr = mBullets.erase(itr);
+        else
+            ++itr;
+    }
+
 }
 
 /**
@@ -175,6 +206,11 @@ Camera& Player::getCamera() const
 glm::vec2 Player::getPlayerSize() const
 {
     return cPlayerSize;
+}
+
+std::vector<Bullet> Player::getBullets() const
+{
+    return mBullets;
 }
 
 /**
@@ -243,6 +279,11 @@ bool Player::getStrength() const
 void Player::setStrength(bool strength)
 {
     mStrength = strength;
+}
+
+void Player::inflictDamage(const float min, const float max)
+{
+    mHealth = Utils::getRandomFloat(min, max);
 }
 
 /**

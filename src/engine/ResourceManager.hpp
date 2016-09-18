@@ -12,7 +12,6 @@
 #include "graphics/IMesh.hpp"
 #include "audio/Chunk.hpp"
 #include "audio/Music.hpp"
-#include "graphics/Font.hpp"
 
 namespace CachePos
 {
@@ -35,7 +34,6 @@ public:
     void insert(const std::string& id, ITexture::Ptr texture);
     void insert(const std::string& id, Music::Ptr music);
     void insert(const std::string& id, Chunk::Ptr chunk);
-    void insert(const std::string& id, Font::Ptr font);
 
     const ITexture::Ptr& getTexture(const std::string& id) const;
     const Material::Ptr& getMaterial(const std::string& id) const;
@@ -43,7 +41,6 @@ public:
     const Shader::Ptr& getShader(const std::string& id) const;
     const Music::Ptr& getMusic(const std::string& id) const;
     const Chunk::Ptr& getChunk(const std::string& id) const;
-    const Font::Ptr& getFont(const std::string& id) const;
 
     void putInCache(const std::string& id, const unsigned int index);
     void putInCache(const glm::vec2& id, const unsigned int index);
@@ -70,7 +67,6 @@ private:
     std::unordered_map<std::string, Material::Ptr> mMaterials;
     std::unordered_map<std::string, Music::Ptr> mMusic;
     std::unordered_map<std::string, Chunk::Ptr> mChunks;
-    std::unordered_map<std::string, Font::Ptr> mFonts;
 
     std::tuple<std::string, std::string, std::string,
         glm::vec2, glm::vec2, glm::vec2> mResourceCache;

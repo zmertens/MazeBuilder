@@ -17,7 +17,6 @@
 #include "engine/graphics/MeshImpl.hpp"
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
-#include "engine/Text.hpp"
 
 const float Shooter::sTimePerFrame = 1.0f / 60.0f;
 const unsigned int Shooter::sWindowWidth = 1080u;
@@ -38,6 +37,7 @@ Shooter::Shooter()
 , mFrameCounter(0u)
 , mTimeSinceLastUpdate(0.0f)
 , mAccumulator(0.0f)
+, mImGui(mSdlWindow, mResources)
 , mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
@@ -70,7 +70,6 @@ Shooter::Shooter()
     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(0.0f))
-, mRenderText()
 , mSdlMixer(mResources)
 {
     // initialize all game resources (texture, material, mesh, et cetera)
@@ -84,7 +83,7 @@ void Shooter::start()
 {
     mAppIsRunning = true;
 
-    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    //mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
 
     loop();
 }
@@ -126,6 +125,7 @@ void Shooter::handleEvents()
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
+        mImGui.ImGui_ImplSdlGL3_ProcessEvent(&event);
         sdlEvents(event, mouseWheelDy);
     } // events
 
@@ -144,8 +144,8 @@ void Shooter::handleEvents()
     glm::vec2 coords = glm::vec2(coordX, coordY);
 
     // handle realtime input
-    mPlayer.input(mSdlWindow, mouseWheelDy, coords, sKeyInputs);
-} // update
+    mPlayer.input(mSdlWindow, mouseWheelDy, static_cast<int32_t>(currentMouseStates), coords, sKeyInputs);
+} // handleEvents
 
 /**
  * @brief Shooter::update
@@ -165,7 +165,16 @@ void Shooter::update(float dt, double timeSinceInit)
     mLevel.update(dt, timeSinceInit);
 
     for (auto& enemy : mEnemies)
+    {
         enemy->update(dt, timeSinceInit);
+        for (auto& bullet : mPlayer.getBullets())
+        {   
+            if (bullet.isActive() && bullet.intersects(enemy->getTransform().getTranslation(), mLevel.getSpriteHalfWidth()))
+            {
+                enemy->inflictDamage(0.1f, 1.0f);
+            }
+        }
+    }
 
     for (auto& powerup : mPowerUps)
         powerup->update(dt, timeSinceInit);
@@ -174,6 +183,8 @@ void Shooter::update(float dt, double timeSinceInit)
     mLight.setPosition(glm::vec4(mPlayer.getPosition().x,
         mLevel.getTileScalar().y - mPlayer.getPlayerSize().y,
         mPlayer.getPosition().z, 0.0f));
+
+    // mImGui.update(*this);
 
 //    static int testCounter = 0;
 //    if (++testCounter % 50 == 0)
@@ -226,21 +237,7 @@ void Shooter::render()
     mPostProcessor.activateEffect(Effects::Type::NO_EFFECT);
     mPostProcessor.release();
 
-
-    // glEnable(GL_BLEND);
-    // glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
-    // auto& txtShader = mResources.getShader(ResourceIds::Shaders::TEXT_SHADER_ID);
-    // txtShader->bind();
-
-    // auto& font = mResources.getFont(ResourceIds::Fonts::UBUNTU_FONT_ID);
-    // font->bindTexture();
-
-    // txtShader->setUniform("uProjection", glm::ortho(0.0f, static_cast<float>(mSdlWindow.getWindowWidth()), 0.0f, static_cast<float>(mSdlWindow.getWindowHeight())));
-    // txtShader->setUniform("uColor", glm::vec3(1));
-    // BoundingBox box {glm::vec3(50, 50, 0), glm::vec3(0)};
-    // const Text sampleText {"SAMPLEasdasdasd", box, ResourceIds::Fonts::UBUNTU_FONT_ID};
-    // mRenderText.renderText(mResources, sampleText);
-    // glDisable(GL_BLEND);
+    mImGui.render();
 
     mSdlWindow.swapBuffers();
 }
@@ -262,6 +259,7 @@ void Shooter::finish()
     mAppIsRunning = false;
     mSdlWindow.cleanUp();
     mResources.cleanUp();
+    mImGui.cleanUp();
 }
 
 /**
@@ -323,18 +321,6 @@ void Shooter::initResources()
     spriteShader->bind();
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
-
-    Shader::Ptr txt (new Shader(mSdlWindow));
-    txt->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
-        ResourcePaths::Shaders::TEXT_VERTEX_SHADER_PATH);
-    txt->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
-        ResourcePaths::Shaders::TEXT_FRAGMENT_SHADER_PATH);
-    txt->linkProgram();
-    txt->bind();
-    txt->setUniform("uTexture2D", 2);
-
-    mResources.insert(ResourceIds::Shaders::TEXT_SHADER_ID,
-        std::move(txt));
 
     // materials
     mResources.insert(ResourceIds::Materials::EMERALD_ID,
@@ -409,11 +395,6 @@ void Shooter::initResources()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
-
-    // fonts
-    // causes a blank screen
-    // Font::Ptr ubuntuFont (new Font(mSdlWindow, ResourcePaths::Fonts::UBUNTU_FONT_PATH, 48l));
-    // mResources.insert(ResourceIds::Fonts::UBUNTU_FONT_ID, std::move(ubuntuFont));
 }
 
 /**
@@ -532,6 +513,8 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
     }
     else if (event.type == SDL_MOUSEWHEEL)
         mouseWheelDy = event.wheel.y;
+    // else if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT)
+    //     mPlayer.shoot();
     else if (event.type == SDL_KEYDOWN)
     {
         if (event.key.keysym.sym == SDLK_TAB)

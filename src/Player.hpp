@@ -7,6 +7,8 @@
 
 #include <glm/glm.hpp>
 
+#include "Bullet.hpp"
+
 class SdlWindow;
 class Camera;
 class Level;
@@ -20,6 +22,7 @@ public:
     void setPosition(const glm::vec3& position);
     void move(const glm::vec3& vel, float dt);
     void input(const SdlWindow& sdlManager, const float mouseWheelDelta,
+        const int32_t mouseStates,
         const glm::vec2& coords,
         std::unordered_map<uint8_t, bool> inputs);
     void update(const float dt, const double timeSinceInit);
@@ -27,6 +30,8 @@ public:
     Camera& getCamera() const;
 
     glm::vec2 getPlayerSize() const;
+
+    std::vector<Bullet> getBullets() const;
 
     bool getMouseLocked() const;
     void setMouseLocked(bool mouseLocked);
@@ -46,15 +51,21 @@ public:
     bool getStrength() const;
     void setStrength(bool strength);
 
+    void inflictDamage(const float min, const float max);
+
 private:
     static const float scMouseSensitivity;
+    static constexpr float scOgMovementScalar = 25.0f;
+    static constexpr std::size_t scMaxBullets = 25;
     static float scMovementScalar;
     const glm::vec2 cPlayerSize;
     Camera& mFirstPersonCamera;
     Level& mLevel;
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
+    std::vector<Bullet> mBullets;
     bool mMouseLocked;
+    float mHealth;
     bool mCollisions;
     bool mInvincible;
     bool mSpeed;

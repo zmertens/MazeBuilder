@@ -1,47 +1,48 @@
 #include "Bullet.hpp"
 
+#include "engine/SdlWindow.hpp"
+
+const float Bullet::scMaxDistance = 100.0f;
+
 /**
  * @brief Bullet::Bullet
- * @param maxDistance
  * @param position
- * @param rotation
- * @param scale
+ * @param dir
  */
-Bullet::Bullet(const float maxDistance, const glm::vec3& position, const glm::vec3& rotation, const glm::vec3& scale)
-: MAX_DISTANCE(MAX_DISTANCE)
+Bullet::Bullet(const glm::vec3& position, const glm::vec3& dir)
+: mPosition(position)
+, mActive(true)
+, mStartPoint(position)
+, mEndPoint(position + (dir * scMaxDistance))
+, mFireTime(static_cast<double>(SDL_GetTicks()) / 1000.0)
 {
-
+	update();
 }
 
 void Bullet::update()
 {
-//    if(mIsActive) {
-//        const float dt = mClock.getElapsedTime().asSeconds() - mFireTime;
-//        const glm::vec3 lerp (mStartPoint * (1.0f - dt) + mEndPoint * dt);
+   if (mActive) 
+   {
+       const double dt = (static_cast<double>(SDL_GetTicks()) / 1000.0) - mFireTime;
+       //const glm::vec3 lerp (mStartPoint * (1.0f - dt) + mEndPoint * dt);
 
-//        if(glm::ceil(lerp) == glm::ceil(mEndPoint)) {
-//            mIsActive = false;
-//        }
+       glm::vec3 newPos = glm::mix(mStartPoint, mEndPoint, dt);
 
-//        mTransform->setTranslation(lerp);
-//        mBulletMesh->updateAABB(mTransform->getModelMatrix());
-//    }
-}
+       if (dt > 1.0) 
+       {
+           mActive = false;
+       }
 
-void Bullet::activate(const glm::vec3& position, const glm::vec3& direction) noexcept
-{
-//    mIsActive = true;
-//    mFireTime = mClock.getElapsedTime().asSeconds();
-//    mStartPoint = position;
-//    mEndPoint = position + (direction * MAX_DISTANCE);
-}
-
-void Bullet::deactivate() noexcept
-{
-    mIsActive = false;
+       mPosition = newPos;
+   }
 }
 
 bool Bullet::isActive() const
 {
-    return mIsActive;
+    return mActive;
+}
+
+bool Bullet::intersects(const glm::vec3& other, float size) const
+{
+	return glm::length(mPosition - other) < size;
 }
