@@ -29,16 +29,14 @@ public:
     void render() const;
     Camera& getCamera() const;
 
-    glm::vec2 getPlayerSize() const;
+    float getPlayerSize() const;
 
-    // std::vector<Bullet> getBullets() const;
     bool isShooting() const;
 
     bool getMouseLocked() const;
     void setMouseLocked(bool mouseLocked);
 
     bool getCollisions() const;
-    void setCollisions(bool collisions);
 
     Power::Type getPower() const;
     void setPower(Power::Type type);
@@ -47,34 +45,25 @@ public:
     void inflictDamage(const float min, const float max);
 
 private:
-    static const float scMouseSensitivity;
-    static constexpr float scOgMovementScalar = 25.0f;
-    static constexpr unsigned int scPowerUpLength = 100u;
-    static float scMovementScalar;
-    const glm::vec2 cPlayerSize;
+    static const float sMouseFactor;
+    static constexpr float sInitMvFactor = 25.0f;
+    static constexpr float sPowerUpLength = 20.0f;
+    static float sMvFactor;
+    static constexpr float sPlayerSize = 0.2f;
+    static constexpr bool sCollisions = false;
+    
     Camera& mFirstPersonCamera;
     Level& mLevel;
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
-    // std::vector<Bullet> mBullets;
-    double mPowerUpTimer;
+    
+    Power::Type mPower;
+    float mPowerUpTimer;
     bool mShooting;
     bool mMouseLocked;
     float mHealth;
-    bool mCollisions;
-    Power::Type mPower;
 private:
-    glm::vec3 collision(const std::vector<glm::vec3>& emptySpaces,
-        const glm::vec3& spaceScalar, const glm::vec3& origin,
-        const glm::vec3& dir) const;
-    glm::vec3 rectangularCollision(const glm::vec3& origin,
-        const glm::vec3& dir, const glm::vec3& objSize,
-        const glm::vec3& rectangle,
-        const glm::vec3& scalar) const;
-    bool isOnExitPoint(const glm::vec3& origin) const;
-    bool isOnSpeedPowerUp(const glm::vec3& origin) const;
-    bool isOnStrengthPowerUp(const glm::vec3& origin) const;
-    bool isOnInvinciblePowerUp(const glm::vec3& origin) const;
+    bool isOnPoint(const glm::vec3& origin, const std::vector<glm::vec3>& points) const;
 };
 
 #endif // PLAYER_HPP

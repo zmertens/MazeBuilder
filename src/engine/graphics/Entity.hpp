@@ -9,7 +9,6 @@
 
 #include "IndexedMeshImpl.hpp"
 #include "../Transform.hpp"
-//#include "../AABB.hpp"
 
 class ResourceManager;
 class Camera;

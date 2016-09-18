@@ -8,7 +8,6 @@
 #include "engine/graphics/GlUtils.hpp"
 #endif // defined
 
-// testing
 #include "ResourceConstants.hpp"
 #include "engine/graphics/MaterialFactory.hpp"
 #include "engine/graphics/Tex2dImpl.hpp"
@@ -18,26 +17,37 @@
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
 
-const float Shooter::sTimePerFrame = 1.0f / 60.0f;
-const unsigned int Shooter::sWindowWidth = 1080u;
-const unsigned int Shooter::sWindowHeight = 720u;
-const std::string Shooter::sTitle = "Shooter";
 std::unordered_map<uint8_t, bool> Shooter::sKeyInputs;
 
 /**
  * @brief Shooter::Shooter
  */
 Shooter::Shooter()
-: mSdlWindow(SDL_INIT_VIDEO | SDL_INIT_AUDIO,
-    SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN /*| SDL_WINDOW_FULLSCREEN*/, false,
-    sTitle, sWindowWidth, sWindowHeight)
+: mSdlWindow(sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
-, mAppIsRunning(false)
+, mPlay(false)
 , mFrameCounter(0u)
 , mTimeSinceLastUpdate(0.0f)
 , mAccumulator(0.0f)
+
 , mImGui(mSdlWindow, mResources)
+, mSdlMixer(mResources)
+
+/********* position,       yaw,  pitch, fov,  near, far  ******/
+, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
+, mLevel(StartLevel::TEST_LEVEL,
+    
+    ResourceIds::Textures::Atlas::BRICKS2_INDEX, 
+    ResourceIds::Textures::Atlas::WALL_INDEX,
+    ResourceIds::Textures::Atlas::METAL_INDEX,
+    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
+    
+    Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
+, mPlayer(mCamera, mLevel)
+
+
+// @TODO -- Initialize game entities after resource initialization (incudling post-processor)
 , mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
@@ -45,21 +55,10 @@ Shooter::Shooter()
     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(2, 0, 0))
-, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
-, mLevel(StartLevel::TEST_LEVEL,
-    ResourceIds::Textures::Atlas::BRICKS2_INDEX, ResourceIds::Textures::Atlas::WALL_INDEX,
-        ResourceIds::Textures::Atlas::METAL_INDEX,
-    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
-    Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
-    ResourceIds::Meshes::LEVEL_ID,
-    ResourceIds::Materials::PEARL_ID,
-    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
-, mPlayer(mCamera, mLevel)
 , mSkybox(Entity::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::SKYBOX_TEX_ID))
-// @note this pp needs to load after the init function to prevent issues -- if using tex factory
 , mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
     ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
@@ -67,12 +66,9 @@ Shooter::Shooter()
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
-        ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(0.0f))
-, mSdlMixer(mResources)
 {
-    // initialize all game resources (texture, material, mesh, et cetera)
     init();
 } // constructor
 
@@ -81,10 +77,8 @@ Shooter::Shooter()
  */
 void Shooter::start()
 {
-    mAppIsRunning = true;
-
-    //mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
-
+    mPlay = true;
+    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -93,7 +87,7 @@ void Shooter::start()
  */
 void Shooter::loop()
 {
-    while (mAppIsRunning)
+    while (mPlay)
     {
         static double lastTime = static_cast<double>(SDL_GetTicks()) / 1000.0;
         double currentTime = static_cast<double>(SDL_GetTicks()) / 1000.0;
@@ -109,8 +103,9 @@ void Shooter::loop()
         }
 
         render();
-
-        calcFrameRate(deltaTime);
+#if defined(APP_DEBUG)
+    calcFrameRate(deltaTime);
+#endif // defined
     }
 
     finish();
@@ -129,10 +124,10 @@ void Shooter::handleEvents()
         sdlEvents(event, mouseWheelDy);
     } // events
 
+    SDL_PumpEvents(); // don't do this on a seperate thread they said
     const Uint8* currentKeyStates = SDL_GetKeyboardState(nullptr);
-    SDL_PumpEvents(); // don't do this on a seperate thread?
 
-    //sKeyInputs[SDL_SCANCODE_TAB] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_TAB]);
+    sKeyInputs[SDL_SCANCODE_TAB] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_TAB]);
     sKeyInputs[SDL_SCANCODE_W] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_W]);
     sKeyInputs[SDL_SCANCODE_S] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_S]);
     sKeyInputs[SDL_SCANCODE_A] = static_cast<bool>(currentKeyStates[SDL_SCANCODE_A]);
@@ -141,10 +136,9 @@ void Shooter::handleEvents()
     int coordX;
     int coordY;
     const Uint32 currentMouseStates = SDL_GetMouseState(&coordX, &coordY);
-    glm::vec2 coords = glm::vec2(coordX, coordY);
 
     // handle realtime input
-    mPlayer.input(mSdlWindow, mouseWheelDy, static_cast<int32_t>(currentMouseStates), coords, sKeyInputs);
+    mPlayer.input(mSdlWindow, mouseWheelDy, static_cast<int32_t>(currentMouseStates), glm::vec2(coordX, coordY), sKeyInputs);
 } // handleEvents
 
 /**
@@ -157,7 +151,6 @@ void Shooter::update(float dt, double timeSinceInit)
     //mCube.update(dt, timeSinceInit);
     mTestSprite.update(dt, timeSinceInit);
 
-    //auto& transform = mTestSprite.getTransform();
     Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(0.9f));
     mTestSprite.setTransform(transform);
 
@@ -166,41 +159,18 @@ void Shooter::update(float dt, double timeSinceInit)
 
     for (auto& enemy : mEnemies)
     {
+        // dead bodies don't animate
         if (enemy->getState() == Enemy::States::Dead)
             continue;
         enemy->update(dt, timeSinceInit);
-
-        bool inRange = glm::length(mPlayer.getPosition() - enemy->getTransform().getTranslation()) < mLevel.getSpriteHalfWidth();
-
-        if (enemy->getState() == Enemy::States::Attack)
-        {
-            modifyEnemyPosition(enemy, dt);
-            if (inRange)
-                mPlayer.inflictDamage(0.1f, 3.1f);
-        }
-
-        if (inRange && mPlayer.isShooting())
-        {    
-            if (mPlayer.getPower() == Power::Type::Strength)
-                enemy->inflictDamage(1.1f, 13.1f);
-            else
-                enemy->inflictDamage(0.1f, 3.1f);
-        }
-
-        if (enemy->getState() == Enemy::States::Sit && glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < 10.0f)
-        {    
-            enemy->setState(Enemy::States::Attack);
-            // SDL_Log("Attacking");
-        }
+        enemy->handleMovement(dt, mPlayer, mLevel);
     }
 
     for (auto& powerup : mPowerUps)
         powerup->update(dt, timeSinceInit);
 
     // keep the light above the player's head
-    mLight.setPosition(glm::vec4(mPlayer.getPosition().x,
-        mLevel.getTileScalar().y - mPlayer.getPlayerSize().y,
-        mPlayer.getPosition().z, 0.0f));
+    mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevel.getTileScalar().y - mPlayer.getPlayerSize(), mPlayer.getPosition().z, 0.0f));
 
     mImGui.update(*this);
 
@@ -286,7 +256,7 @@ void Shooter::finish()
     mLogger.dumpLogToFile("data_log.txt");
 #endif // defined
 
-    mAppIsRunning = false;
+    mPlay = false;
     mSdlWindow.cleanUp();
     mResources.cleanUp();
     mImGui.cleanUp();
@@ -309,7 +279,7 @@ void Shooter::init()
  */
 void Shooter::initResources()
 {
-    // shaders
+    /***************** Shaders ****************************/
     Shader::Ptr level (new Shader(mSdlWindow));
     level->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::LEVEL_VERTEX_SHADER_PATH);
@@ -352,7 +322,7 @@ void Shooter::initResources()
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
 
-    // materials
+    /***************** Materials **************************************/
     mResources.insert(ResourceIds::Materials::EMERALD_ID,
         MaterialFactory::ProduceMaterial(MaterialFactory::Types::EMERALD));
     mResources.insert(ResourceIds::Materials::OBSIDIAN_ID,
@@ -366,7 +336,7 @@ void Shooter::initResources()
     mResources.insert(ResourceIds::Materials::CORAL_ORANGE_ID,
         MaterialFactory::ProduceMaterial(MaterialFactory::Types::CORAL_ORANGE));
 
-    // meshes
+    /************ Meshes ************************************************/
     mResources.insert(ResourceIds::Meshes::CUBE_ID,
         std::move(MeshFactory::ProduceMesh(MeshFactory::Types::CUBE)));
 
@@ -379,7 +349,8 @@ void Shooter::initResources()
     IMesh::Ptr levelMesh (new IndexedMeshImpl(vertices, indices));
     mResources.insert(ResourceIds::Meshes::LEVEL_ID, std::move(levelMesh));
 
-    // textures
+    /************ Textures ***********************************************/
+    // @TODO initialize the post processor impl texture in here
     ITexture::Ptr testTex (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::TEST_TEX_ATLAS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID, std::move(testTex));
@@ -396,14 +367,14 @@ void Shooter::initResources()
         ResourcePaths::Textures::TEST_RPG_CHARS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID, std::move(charsTex));
 
-    ITexture::Ptr perlinTex (new TexPerlinNoise2dImpl(4.0f, 0.5f, 128, 128, true, 0));
+    ITexture::Ptr perlinTex (new TexPerlinImpl(4.0f, 0.5f, 128, 128, true, 0));
     mResources.insert(ResourceIds::Textures::PERLIN_NOISE_2D_ID, std::move(perlinTex));
 
-    // music
+    /************** Music *************************************************/
     Music::Ptr mus (new Music(ResourcePaths::Music::WRATH_OF_SIN_MP3_PATH));
     mResources.insert(ResourceIds::Music::WRATH_OF_SIN_ID, std::move(mus));
 
-    // sound
+    /************** Sound Effects ***************************************/
     Chunk::Ptr deathSound (new Chunk(ResourcePaths::Chunks::DEATH_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::DEATH_WAV_ID, std::move(deathSound));
 
@@ -497,14 +468,12 @@ void Shooter::calcFrameRate(const float dt)
     mTimeSinceLastUpdate += dt;
     if (mTimeSinceLastUpdate >= 1.0f)
     {
-#if defined(APP_DEBUG)
         SDL_Log("FPS: %u\n", mFrameCounter);
         SDL_Log("time (us) / frame: %f\n", mTimeSinceLastUpdate / mFrameCounter);
         mLogger.appendToLog("FPS: " + Utils::toString(mFrameCounter));
         mLogger.appendToLog("\n");
         mLogger.appendToLog("time (us) / frame: " + Utils::toString(mTimeSinceLastUpdate / mFrameCounter));
         mLogger.appendToLog("\n");
-#endif // defined
         mFrameCounter = 0;
         mTimeSinceLastUpdate -= 1.0f;
     }
@@ -518,9 +487,7 @@ void Shooter::calcFrameRate(const float dt)
 void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
-    {
-        mAppIsRunning = false;
-    }
+        mPlay = false;
     else if (event.type == SDL_WINDOWEVENT)
     {
         if (event.window.event == SDL_WINDOWEVENT_SIZE_CHANGED)
@@ -529,14 +496,9 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             unsigned int newHeight = event.window.data2;
             glViewport(0, 0, newWidth, newHeight);
 
-            mSdlWindow.setWindowWidth(newWidth);
-            mSdlWindow.setWindowHeight(newHeight);
-
 #if defined(APP_DEBUG)
-            std::string resizeDimens = "Resize Event -- Width: "
-                + Utils::toString(newWidth) + ", Height: "
-                + Utils::toString(newHeight) + "\n";
-            SDL_Log(resizeDimens.c_str());
+        std::string resizeDimens = "Resize Event -- Width: " + Utils::toString(newWidth) + ", Height: " + Utils::toString(newHeight) + "\n";
+        SDL_Log(resizeDimens.c_str());
 #endif // defined
         }
     }
@@ -556,7 +518,7 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
                 SDL_ShowCursor(SDL_ENABLE);
         }
         else if (event.key.keysym.sym == SDLK_ESCAPE)
-            mAppIsRunning = false;
+            mPlay = false;
     }
     else if ((mSdlWindow.getInitFlags() & SDL_INIT_JOYSTICK) &&
         event.type == SDL_JOYBUTTONDOWN)
@@ -568,14 +530,3 @@ void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 #endif // defined
     }
 } // sdlEvents
-
-void Shooter::modifyEnemyPosition(const Enemy::Ptr& enemy, const float dt)
-{
-    // SDL_Log("Enemy1 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
-    auto&& transform = enemy->getTransform();
-    auto currentPos = transform.getTranslation();
-    transform.setTranslation(currentPos + (glm::normalize(mPlayer.getPosition() - currentPos) * dt * 10.0f));
-    enemy->setTransform(transform);
-    // SDL_Log("Enemy2 %f %f %f", enemy->getTransform().getTranslation().x, enemy->getTransform().getTranslation().y, enemy->getTransform().getTranslation().z);
-    // SDL_Log("Player %f %f %f", mPlayer.getPosition().x, mPlayer.getPosition().y, mPlayer.getPosition().z);
-}

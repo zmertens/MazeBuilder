@@ -1,6 +1,7 @@
 #ifndef UTILS_HPP
 #define UTILS_HPP
 
+#include <vector>
 #include <sstream>
 #include <random>
 
@@ -8,8 +9,6 @@
 
 namespace Utils
 {
-
-
 template <typename T>
 inline std::string toString(const T& in)
 {
@@ -57,6 +56,41 @@ inline glm::vec2 getTexAtlasOffset(const unsigned int index, const unsigned int 
     float column = glm::mod(static_cast<float>(index), static_cast<float>(numRows));
     float row = glm::floor(static_cast<float>(index) / static_cast<float>(numRows));
     return glm::vec2(column / numRows, row / numRows);
+}
+
+/**
+ * Returns zero vector if no movement whatsoever, else it returns 1 along the axis of movement (Y- axis is not checked).
+ */
+inline glm::vec3 
+tileCollision(const glm::vec3& tile, const glm::vec3& tileScale, const glm::vec3& origin, const glm::vec3& dir, const glm::vec3& pScale)
+{
+    glm::vec3 result (0.0f, 1.0f, 0.0f);
+
+    if (dir.x + pScale.x < tile.x * tileScale.x || dir.x - pScale.x > (tile.x + 1.0f) * tileScale.x  || origin.z + pScale.z < tile.z * tileScale.z || origin.z - pScale.z > (tile.z + 1.0f) * tileScale.z)
+    {
+        result.x = 1.0f;
+    }
+
+    if (origin.x + pScale.x < tile.x * tileScale.x  || origin.x - pScale.x > (tile.x + 1.0f) * tileScale.x  || dir.z + pScale.z < tile.z * tileScale.z || dir.z - pScale.z > (tile.z + 1.0f) * tileScale.z)
+    {
+        result.z = 1.0f;
+    }
+
+    return result;
+}
+
+inline glm::vec3 
+collision(const std::vector<glm::vec3>& tiles, const glm::vec3& tileScale, const glm::vec3& origin, const glm::vec3& dir, const glm::vec3& pScale)
+{
+    glm::vec3 v (1);
+    for (auto& t : tiles)
+    {
+        v *= tileCollision(t, tileScale, origin, dir, pScale);
+        if (v.x == 0.0f && v.z == 0.0f)
+            break;
+    }
+
+    return v;
 }
 
 } // namespace Utils

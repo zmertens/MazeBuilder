@@ -9,50 +9,31 @@
 
 /**
  * @brief SdlWindow::SdlWindow
- * @param window
  * @param title
- * @param width = 600u
+ * @param width = 800u
  * @param height = 600u
  */
-SdlWindow::SdlWindow(Uint32 initFlags, Uint32 winFlags, bool vsync,
-    const std::string& title, const unsigned int width,
-    const unsigned int height)
-: mInitFlags(initFlags)
-, mWinFlags(winFlags)
-, mVSync(vsync)
-, mTitle(title)
-, mWinWidth(width)
-, mWinHeight(height)
+SdlWindow::SdlWindow(const char* title, const unsigned int width, const unsigned int height)
+: mTitle(title)
 , mOpenGlContext(SDL_GL_CONTEXT_PROFILE_CORE)
 , mLogPriority(SDL_LOG_PRIORITY_VERBOSE)
-, mOpenGlMajor(4)
-, mOpenGlMinor(5)
-, mRedBufferSize(8)
-, mGreenBufferSize(8)
-, mBlueBufferSize(8)
-, mAlphaBufferSize(8)
-, mBufferSize(24)
-, mDepthBufferSize(8)
-, mStencilBufferSize(8)
-, mSamples(4)
-, mFullscreen((mWinFlags & SDL_WINDOW_FULLSCREEN) ||
-    (mWinFlags & SDL_WINDOW_FULLSCREEN_DESKTOP))
 {
     SDL_LogSetAllPriority(mLogPriority);
 
-    initWindow(mInitFlags);
-    if (mInitFlags & SDL_INIT_JOYSTICK)
+    initWindow(sInitFlags, width, height);
+
+    if (sInitFlags & SDL_INIT_JOYSTICK)
         initJoysticks();
-    if (mInitFlags & SDL_INIT_HAPTIC)
+    if (sInitFlags & SDL_INIT_HAPTIC)
         initHaptic();
 
-    // Only load OpenGL functions after SDL window is created
-    loadGL();
+    // Only load OpenGL functions after a Gl Context is created
+    loadGl();
 
-    if (mSamples > 1)
+    if (sSamples > 1)
     {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
-        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, mSamples);
+        SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, sSamples);
         glEnable(GL_MULTISAMPLE);
     }
 
@@ -85,66 +66,59 @@ void SdlWindow::cleanUp()
  * @brief SdlWindow::initWindow
  * @param flags
  */
-void SdlWindow::initWindow(Uint32 flags)
+void SdlWindow::initWindow(Uint32 flags, unsigned int width, unsigned int height)
 {
     if (SDL_Init(flags) < 0)
+    { 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        throw new std::runtime_error("Could not intialize Sdl");
+    }
 
     // Set up the GL attributes
-    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, mRedBufferSize);
-    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, mGreenBufferSize);
-    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, mBlueBufferSize);
-    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, mAlphaBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_RED_SIZE, sRedBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, sGreenBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, sBlueBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, sAlphaBufferSize);
 
-    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, mBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_BUFFER_SIZE, sBufferSize);
 
-    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, mDepthBufferSize);
-    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, mStencilBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, sDepthBufferSize);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, sStencilBufferSize);
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, mOpenGlContext);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, mOpenGlMajor);
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, mOpenGlMinor);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, sOpenGlMajor);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, sOpenGlMinor);
 
 #if defined(APP_DESKTOP)
-    if (mFullscreen)
+    if (sFullscreen)
     {
         SDL_DisplayMode mode;
         SDL_GetDisplayMode(0, 0, &mode);
-        mSdlWindow = SDL_CreateWindow(nullptr, 0, 0,
-            mode.w, mode.h,
-            mWinFlags);
-
-        int x, y;
-        SDL_GetWindowSize(mSdlWindow, &x, &y);
-        mWinWidth = static_cast<unsigned int>(x);
-        mWinHeight = static_cast<unsigned int>(y);
+        mSdlWindow = SDL_CreateWindow(nullptr, 0, 0, mode.w, mode.h, sWinFlags);
     }
     else
     {
-        mSdlWindow = SDL_CreateWindow(mTitle.c_str(),
-            SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-            mWinWidth, mWinHeight,
-            mWinFlags);
+        mSdlWindow = SDL_CreateWindow(mTitle, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, width, height, sWinFlags);
     }
 #elif defined(APP_ANDROID)
     SDL_DisplayMode mode;
     SDL_GetDisplayMode(0, 0, &mode);
-    mWinWidth = static_cast<float>(mode.w);
-    mWinHeight = static_cast<float>(mode.h);
-
     mSdlWindow = SDL_CreateWindow(nullptr, 0, 0, mode.w, mode.h, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
 #endif // defined
 
     if (mSdlWindow == 0)
+    {    
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        throw new std::runtime_error("Sdl Window did not create!\n");
+    }
 
     mGlContext = SDL_GL_CreateContext(mSdlWindow);
 
     // Sometimes Vsync is enabled by default
-    if (mVSync && SDL_GL_SetSwapInterval(1) < 0)
+    if (sVSync && SDL_GL_SetSwapInterval(1) < 0)
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Vsync mode is not available\n");
     else
         SDL_GL_SetSwapInterval(0);
@@ -187,16 +161,16 @@ void SdlWindow::destroyWindow()
 
 /**
  * Only loads on desktop since mobile uses OpenGL ES
- * @brief SdlWindow::loadGL
+ * @brief SdlWindow::loadGl
  */
-void SdlWindow::loadGL()
+void SdlWindow::loadGl()
 {
 #if defined(APP_DESKTOP)
     // Load the OpenGL functions (glLoadGen).
     if (ogl_LoadFunctions() == ogl_LOAD_FAILED)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Error loading glLoadGen");
-        destroyWindow();
+        cleanUp();
         throw new std::runtime_error("Could not load OpenGL functions\n");
     }
 #endif // defined
@@ -216,20 +190,18 @@ std::string SdlWindow::getSdlInfoString() const
     int multisamples;
     SDL_GL_GetAttribute(SDL_GL_MULTISAMPLESAMPLES, &multisamples);
 
-    assert(major == mOpenGlMajor);
-    assert(minor == mOpenGlMinor);
+    assert(major == sOpenGlMajor);
+    assert(minor == sOpenGlMinor);
     //assert(multisamples == mSamples);
-
-    std::string contextStr = getContextString(context);
 
     std::stringstream ss;
     ss << "\nPrinting SdlWindow info:\n";
     ss << "\nWindow Title: " << mTitle << "\n";
-    ss << "Vsync: " << mVSync << "\n";
-    ss << "Fullscreen: " << mFullscreen << "\n";
-    ss << "Window (width, height): " << "(" << mWinWidth << ", " << mWinHeight << ")\n";
+    ss << "Vsync: " << sVSync << "\n";
+    ss << "Fullscreen: " << sFullscreen << "\n";
+    ss << "Window (width, height): " << "(" << getWindowWidth() << ", " << getWindowHeight() << ")\n";
     ss << "The number of connected joysticks: " << SDL_NumJoysticks() << "\n";
-    ss << "The GL context is : " << contextStr << "\n";
+    ss << "The GL context is : " << getContextString(context) << "\n";
     ss << "Major, Minor versions: " << major << ", " << minor << "\n";
     return ss.str();
 }
@@ -372,60 +344,34 @@ std::string SdlWindow::buildStringFromFile(const std::string& filename) const
 }
 
 /**
- * @brief SdlWindow::switchFullScreenMode
- */
-void SdlWindow::toggleFullScreen()
-{
-    mFullscreen = !mFullscreen;
-    if (mFullscreen)
-        SDL_SetWindowFullscreen(mSdlWindow, SDL_TRUE);
-    else
-        SDL_SetWindowFullscreen(mSdlWindow, SDL_FALSE);
-}
-
-/**
  * @brief SdlWindow::isFullScreen
  * @return
  */
 bool SdlWindow::isFullScreen() const
 {
-    return mFullscreen;
-}
-
-/**
- * @brief SdlWindow::setWindowHeight
- * @param height
- */
-void SdlWindow::setWindowHeight(const unsigned int height)
-{
-    mWinHeight = height;
+    return sFullscreen;
 }
 
 /**
  * @brief SdlWindow::getWindowHeight
  * @return
  */
-unsigned int SdlWindow::getWindowHeight() const
+int SdlWindow::getWindowHeight() const
 {
-    return mWinHeight;
-}
-
-/**
- * @brief SdlWindow::setWindowWidth
- * @param width
- */
-void SdlWindow::setWindowWidth(const unsigned int width)
-{
-    mWinWidth = width;
+    int x, y;
+    SDL_GetWindowSize(mSdlWindow, &x, &y);
+    return y;
 }
 
 /**
  * @brief SdlWindow::getWindowWidth
  * @return
  */
-unsigned int SdlWindow::getWindowWidth() const
+int SdlWindow::getWindowWidth() const
 {
-    return mWinWidth;
+    int x, y;
+    SDL_GetWindowSize(mSdlWindow, &x, &y);
+    return x;
 }
 
 /**
@@ -434,7 +380,9 @@ unsigned int SdlWindow::getWindowWidth() const
  */
 float SdlWindow::getAspectRatio() const
 {
-    return static_cast<float>(mWinWidth) / static_cast<float>(mWinHeight);
+    int x, y;
+    SDL_GetWindowSize(mSdlWindow, &x, &y);
+    return static_cast<float>(x) / static_cast<float>(y);
 }
 
 /**
@@ -451,7 +399,7 @@ SDL_Window* SdlWindow::getSdlWindow() const
  */
 Uint32 SdlWindow::getInitFlags() const
 {
-    return mInitFlags; 
+    return sInitFlags; 
 }
 
 /**

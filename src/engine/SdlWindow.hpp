@@ -2,6 +2,7 @@
 #define SDLWINDOW_HPP
 
 #include <string>
+#include <cstring>
 #include <memory>
 
 #include "Config.hpp"
@@ -55,8 +56,8 @@ class SdlWindow final
 public:
     typedef std::unique_ptr<SdlWindow> Ptr;
 public:
-    explicit SdlWindow(Uint32 initFlags, Uint32 winFlags, bool vsync,
-        const std::string& title, const unsigned int width = 800u,
+    explicit SdlWindow(const char* title, 
+        const unsigned int width = 800u,
         const unsigned int height = 600u);
     virtual ~SdlWindow();
 
@@ -64,46 +65,41 @@ public:
 
     std::string getSdlInfoString() const;
     std::string getGlInfoString() const;
+    
     void swapBuffers() const;
+    
     bool hapticRumblePlay(float strength, float length) const;
 
     unsigned char* buildBufferFromFile(const std::string& filename, long& bufferSize) const;
     std::string buildStringFromFile(const std::string& filename) const;
 
-    void toggleFullScreen();
     bool isFullScreen() const;
-
-    void setWindowHeight(const unsigned int height);
-    unsigned int getWindowHeight() const;
-    void setWindowWidth(const unsigned int width);
-    unsigned int getWindowWidth() const;
-
+    int getWindowHeight() const;
+    int getWindowWidth() const;
     float getAspectRatio() const;
-
     SDL_Window* getSdlWindow() const;
-
     Uint32 getInitFlags() const;
 private:
-    Uint32 mInitFlags;
-    Uint32 mWinFlags;
-    bool mVSync;
-    std::string mTitle;
-    unsigned int mWinWidth;
-    unsigned int mWinHeight;
+    static constexpr Uint32 sInitFlags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
+    static constexpr Uint32 sWinFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN /*| SDL_WINDOW_FULLSCREEN*/;
+    static constexpr bool sVSync = false;
+    static constexpr bool sFullscreen = (sWinFlags & SDL_WINDOW_FULLSCREEN) || (sWinFlags & SDL_WINDOW_FULLSCREEN_DESKTOP);
+
+    static constexpr int sOpenGlMajor = 4;
+    static constexpr int sOpenGlMinor = 5;
+    static constexpr int sRedBufferSize = 8;
+    static constexpr int sGreenBufferSize = 8;
+    static constexpr int sBlueBufferSize = 8;
+    static constexpr int sAlphaBufferSize = 8;
+    static constexpr int sBufferSize = 24;
+    static constexpr int sDepthBufferSize = 8;
+    static constexpr int sStencilBufferSize = 8;
+    static constexpr int sSamples = 4;
+
+    const char* mTitle;
+
     SDL_GLprofile mOpenGlContext;
     SDL_LogPriority mLogPriority;
-    int mOpenGlMajor;
-    int mOpenGlMinor;
-    int mRedBufferSize;
-    int mGreenBufferSize;
-    int mBlueBufferSize;
-    int mAlphaBufferSize;
-    int mBufferSize;
-    int mDepthBufferSize;
-    int mStencilBufferSize;
-    int mSamples;
-
-    bool mFullscreen;
 
     SDL_Window* mSdlWindow;
     SDL_GLContext mGlContext;
@@ -112,11 +108,11 @@ private:
 private:
     SdlWindow(const SdlWindow& other);
     SdlWindow& operator=(const SdlWindow& other);
-    void initWindow(Uint32 flags);
+    void initWindow(Uint32 flags, unsigned int width, unsigned int height);
     void initJoysticks();
     void initHaptic();
     void destroyWindow();
-    void loadGL();
+    void loadGl();
     std::string getContextString(int context) const;
 };
 

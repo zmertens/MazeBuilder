@@ -1,6 +1,14 @@
 #ifndef IGAME_HPP
 #define IGAME_HPP
 
+namespace Game
+{
+enum class States {
+	Play,
+	Paused
+};
+} // namespace
+
 class IGame
 {
 public:

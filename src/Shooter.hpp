@@ -12,11 +12,13 @@
 #include "engine/Logger.hpp"
 #include "engine/Camera.hpp"
 #include "engine/ImGuiHelper.hpp"
+
 #include "engine/graphics/Entity.hpp"
 #include "engine/graphics/Skybox.hpp"
 #include "engine/graphics/Light.hpp"
 #include "engine/graphics/PostProcessorImpl.hpp"
 #include "engine/graphics/Sprite.hpp"
+
 #include "engine/audio/SdlMixer.hpp"
 
 #include "Level.hpp"
@@ -39,26 +41,29 @@ protected:
     virtual void finish() override;
 
 private:
-    static const float sTimePerFrame;
-    static const unsigned int sWindowWidth;
-    static const unsigned int sWindowHeight;
-    static const std::string sTitle;
+    static constexpr float sTimePerFrame = 1.0f / 60.0f;
+    static constexpr unsigned int sWindowWidth = 1080u;
+    static constexpr unsigned int sWindowHeight = 720u;
+    static constexpr auto sTitle = "Shooter";
+
     static std::unordered_map<uint8_t, bool> sKeyInputs;
 
     SdlWindow mSdlWindow;
     ResourceManager mResources;
     Logger mLogger;
 
-    bool mAppIsRunning;
+    bool mPlay;
     unsigned int mFrameCounter;
     float mTimeSinceLastUpdate;
     float mAccumulator;
 
     ImGuiHelper mImGui;
-    Entity mCube;
+    SdlMixer mSdlMixer;
     Camera mCamera;
     Level mLevel;
     Player mPlayer;
+
+    Entity mCube;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;
@@ -69,15 +74,12 @@ private:
     // exits
     // power ups
 
-    SdlMixer mSdlMixer;
-
 private:
     void init();
     void initResources();
     void initPositions();
     void calcFrameRate(const float dt);
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
-    void modifyEnemyPosition(const Enemy::Ptr& enemy, const float dt);
 };
 
 #endif // SHOOTER_HPP

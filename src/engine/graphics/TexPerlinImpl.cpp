@@ -6,7 +6,7 @@
 #include "stb_image.h"
 
 /**
- * @brief TexPerlinNoise2dImpl::TexPerlinNoise2dImpl
+ * @brief TexPerlinImpl::TexPerlinImpl
  * @param baseFrequency
  * @param persistence
  * @param width
@@ -14,7 +14,7 @@
  * @param periodic
  * @param channel = 0
  */
-TexPerlinNoise2dImpl::TexPerlinNoise2dImpl(const float baseFrequency,
+TexPerlinImpl::TexPerlinImpl(const float baseFrequency,
     const float persistence,
     const int width, const int height,
     bool periodic, unsigned int channel)
@@ -75,27 +75,27 @@ TexPerlinNoise2dImpl::TexPerlinNoise2dImpl(const float baseFrequency,
     init(width, height);
 }
 
-void TexPerlinNoise2dImpl::cleanUp()
+void TexPerlinImpl::cleanUp()
 {
     glDeleteTextures(1, &mHandle);
 }
 
-void TexPerlinNoise2dImpl::bind() const
+void TexPerlinImpl::bind() const
 {
     glBindTextureUnit(mChannel, mHandle);
 }
 
-void TexPerlinNoise2dImpl::release() const
+void TexPerlinImpl::release() const
 {
     glBindTexture(mTarget, 0);
 }
 
-unsigned int TexPerlinNoise2dImpl::getHandle() const
+unsigned int TexPerlinImpl::getHandle() const
 {
     return static_cast<unsigned int>(mHandle);
 }
 
-void TexPerlinNoise2dImpl::genTexture()
+void TexPerlinImpl::genTexture()
 {
     glGenTextures(1, &mHandle);
     glBindTexture(mTarget, mHandle);
@@ -107,12 +107,12 @@ void TexPerlinNoise2dImpl::genTexture()
     glTexParameteri(mTarget, GL_TEXTURE_MAG_FILTER, mMagFilter);
 }
 
-void TexPerlinNoise2dImpl::init(unsigned char* str, long bufferSize)
+void TexPerlinImpl::init(unsigned char* str, long bufferSize)
 {
 
 }
 
-void TexPerlinNoise2dImpl::init(const unsigned int width, const unsigned int height)
+void TexPerlinImpl::init(const unsigned int width, const unsigned int height)
 {
     glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
     glTexSubImage2D(mTarget, 0, 0, 0, width, height, mPixelFormat, GL_UNSIGNED_BYTE, mTexData);

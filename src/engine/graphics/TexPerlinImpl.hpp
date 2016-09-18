@@ -1,14 +1,14 @@
-#ifndef TEXPERLINNOISE2DIMPL_HPP
-#define TEXPERLINNOISE2DIMPL_HPP
+#ifndef TEXPERLINIMPL_HPP
+#define TEXPERLINIMPL_HPP
 
 #include "ITexture.hpp"
 
 #include "../SdlWindow.hpp"
 
-class TexPerlinNoise2dImpl : public ITexture
+class TexPerlinImpl : public ITexture
 {
 public:
-    explicit TexPerlinNoise2dImpl(const float baseFrequency,
+    explicit TexPerlinImpl(const float baseFrequency,
         const float persistence, const int width, const int height,
         bool periodic, unsigned int channel = 0);
 
@@ -35,4 +35,4 @@ private:
     GLubyte* mTexData;
 };
 
-#endif // TEXPERLINNOISE2DIMPL_HPP
+#endif // TEXPERLINIMPL_HPP

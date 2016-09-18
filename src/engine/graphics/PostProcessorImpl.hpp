@@ -7,6 +7,7 @@
 
 namespace Effects
 {
+// layout matches effects shader
 enum class Type : int {
     None = 0,
     Grayscale = 1,

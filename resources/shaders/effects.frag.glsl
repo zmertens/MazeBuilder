@@ -18,7 +18,7 @@ layout (location = 0) out vec4 FragColor;
 layout (binding = 2) uniform sampler2D uTexture2D;
 
 uniform Effect uEffect;
-
+// uniform initialization requires GL 4.3
 uniform float uEdgeKernel[9] = {
 	1.0f,  1.0f, 1.0f,
 	1.0f, -8.0f, 1.0f,

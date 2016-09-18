@@ -3,7 +3,13 @@
 
 #include <array>
 
+#include <glm/glm.hpp>
+
+#include "engine/graphics/Entity.hpp"
 #include "engine/graphics/Sprite.hpp"
+
+class Player;
+class Level;
 
 class Enemy : public Sprite
 {
@@ -29,20 +35,25 @@ public:
 
     float getHealth() const;
     void setHealth(const float health);
-
-    bool isShooting() const;
-    
+    void handleMovement(const float dt, Player& player, const Level& level);
     void inflictDamage(const float min, const float max);
 
 private:
+    static constexpr float sAnimFreq = 0.42f;
+    static constexpr float sAgroRange = 15.0f;
+
+    static const float sEnemySize;
+    static const float sMvFactor;
+
     float mHealth;
     std::array<glm::vec2, 12> mAnimations;
-    States mStates;
+    States mState;
     float mAnimationCounter;
     unsigned int mAnimationIndex;
 private:
     void updateAnimations();
     void genAnimations();
+    void moveTowardsPlayer(float dt, const Player& player, const Level& level);
 };
 
 #endif // ENEMY_HPP

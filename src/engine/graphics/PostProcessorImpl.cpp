@@ -2,7 +2,6 @@
 
 #include "../ResourceManager.hpp"
 
-// kind of a dirty hack for now...
 #include "Tex2dImpl.hpp"
 
 #if defined(APP_DEBUG)
@@ -78,13 +77,6 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
 {
     glBindFramebuffer(GL_FRAMEBUFFER, mFboHandle);
 
-    // @todo this is kind of hack because the #2 channel is not used by anything else,
-    // if the texture isn't bound nothing is rendered to it ....
-    // could use ResourceManager textures but in taht case,
-    // cannot initialize PostProcessor before the ResourceManager
-    SDL_DisplayMode mode;
-    SDL_GetDesktopDisplayMode(0, &mode);
-
     Tex2dImpl fullscreen (width, height, 2);
     fullscreen.bind();
 
@@ -97,18 +89,16 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRboHandle);
 
 #if defined(APP_DEBUG)
-        GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
+    SDL_Log("\nPostProcessorImpl using Texture channel = %i\n", 2);
+    GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
 #endif // defined
 
     if (glCheckNamedFramebufferStatus(mFboHandle, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw new std::runtime_error("FrameBuffer Error! Failed to initialize mFrameBuffer_Handle\n");
 
 #if defined(APP_DEBUG)
-        GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
-#endif // defined
-
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
-
+    GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+#endif // defined
 }
 

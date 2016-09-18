@@ -9,8 +9,8 @@
 
 #include "Level.hpp"
 
-const float Player::scMouseSensitivity = 1.0f;
-float Player::scMovementScalar = scOgMovementScalar;
+const float Player::sMouseFactor = 1.0f;
+float Player::sMvFactor = sInitMvFactor;
 
 /**
  * @brief Player::Player
@@ -18,18 +18,15 @@ float Player::scMovementScalar = scOgMovementScalar;
  * @param level
  */
 Player::Player(Camera& camera, Level& level)
-: cPlayerSize(0.2f)
-, mFirstPersonCamera(camera)
+: mFirstPersonCamera(camera)
 , mLevel(level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
-// , mBullets()
+, mPower(Power::Type::None)
 , mPowerUpTimer(0.0)
 , mShooting(false)
 , mMouseLocked(false)
 , mHealth(100.0f)
-, mCollisions(true)
-, mPower(Power::Type::None)
 {
 
 }
@@ -79,18 +76,17 @@ void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
     if (mouseStates & SDL_BUTTON(SDL_BUTTON_LEFT))
     {
         mShooting = true;
-        // mBullets.emplace_back(getPosition(), mFirstPersonCamera.getTarget());
     }
     else
         mShooting = false;
 
     if (mouseStates & SDL_BUTTON(SDL_BUTTON_RIGHT))
     {
-        scMovementScalar = 40.0f;
+        sMvFactor = 40.0f;
     }
     else
     {
-        scMovementScalar = scOgMovementScalar;
+        sMvFactor = sInitMvFactor;
     }
 
     const float winCenterX = static_cast<float>(sdlManager.getWindowWidth()) * 0.5f;
@@ -133,7 +129,7 @@ void Player::input(const SdlWindow& sdlManager, const float mouseWheelDelta,
 
         if (xOffset || yOffset)
         {
-            mFirstPersonCamera.rotate(xOffset * scMouseSensitivity, 0.0f /*yOffset * scMouseSensitivity*/, false, false);
+            mFirstPersonCamera.rotate(xOffset * sMouseFactor, 0.0f /*yOffset * sMouseFactor*/, false, false);
             SDL_WarpMouseInWindow(sdlManager.getSdlWindow(), winCenterX, winCenterY);
         }
     }
@@ -149,46 +145,42 @@ void Player::update(const float dt, const double timeSinceInit)
     // if (mHealth < 0.0f)
     //     SDL_Log("Player dead");
 
-    if (static_cast<unsigned int>(mPowerUpTimer - timeSinceInit) > scPowerUpLength)
+    if (mPowerUpTimer > sPowerUpLength)
+    {
         mPower = Power::Type::None;
+        mPowerUpTimer = 0.0f;
+    }
 
     if (mPower == Power::Type::None)
     {
-        if (isOnSpeedPowerUp(getPosition()))
-        {
+        if (isOnPoint(getPosition(), mLevel.getSpeedPowerUps()))
             mPower = Power::Type::Speed;
-            mPowerUpTimer = timeSinceInit;
-        }
-        else if (isOnStrengthPowerUp(getPosition()))
-        {
+        else if (isOnPoint(getPosition(), mLevel.getStrengthPowerUps()))
             mPower = Power::Type::Strength;
-            mPowerUpTimer = timeSinceInit;
-        }
-        else if (isOnInvinciblePowerUp(getPosition()))
-        {
+        else if (isOnPoint(getPosition(), mLevel.getInvinciblePowerUps()))
             mPower = Power::Type::Invincible;
-            mPowerUpTimer = timeSinceInit;
-        }
     }
+    else
+        mPowerUpTimer += dt;
 
     if (glm::length(mMovementDir) > 0)
     {
-        if (mCollisions)
+        if (sCollisions)
         {
             glm::vec3 origin (getPosition());
             // R(t) = P + Vt
             glm::vec3 direction (origin + glm::normalize(mMovementDir * dt));
-            glm::vec3 c (collision(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
+            glm::vec3 c (Utils::collision(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction, glm::vec3(sPlayerSize)));
             mMovementDir *= c;
             mMovementDir.y = 0.0f;
         }
 
         if (mPower == Power::Type::Speed)
-            mFirstPersonCamera.move(mMovementDir, 1.25 * scMovementScalar * dt);
+            mFirstPersonCamera.move(mMovementDir, 1.25 * sMvFactor * dt);
         else 
-            mFirstPersonCamera.move(mMovementDir, scMovementScalar * dt);
+            mFirstPersonCamera.move(mMovementDir, sMvFactor * dt);
 
-        if (isOnExitPoint(getPosition()))
+        if (isOnPoint(getPosition(), mLevel.getExitPoints()))
         {
             SDL_Log("exit");
         }
@@ -197,17 +189,6 @@ void Player::update(const float dt, const double timeSinceInit)
         mMovementDir = glm::vec3(0);
     }
     // else no movement
-
-    // auto&& itr = std::begin(mBullets);
-    // while (itr != std::end(mBullets))
-    // {        
-    //     itr->update();
-    //     if (!itr->isActive())
-    //         itr = mBullets.erase(itr);
-    //     else
-    //         ++itr;
-    // }
-
 }
 
 /**
@@ -233,9 +214,9 @@ Camera& Player::getCamera() const
  * @brief Player::getPlayerSize
  * @return
  */
-glm::vec2 Player::getPlayerSize() const
+float Player::getPlayerSize() const
 {
-    return cPlayerSize;
+    return sPlayerSize;
 }
 
 // std::vector<Bullet> Player::getBullets() const
@@ -268,12 +249,7 @@ void Player::setMouseLocked(bool mouseLocked)
 
 bool Player::getCollisions() const
 {
-    return mCollisions;
-}
-
-void Player::setCollisions(bool collisions)
-{
-    mCollisions = collisions;
+    return sCollisions;
 }
 
 Power::Type Player::getPower() const
@@ -298,127 +274,14 @@ void Player::inflictDamage(const float min, const float max)
 }
 
 /**
- * @brief Player::collision
- * @param emptySpaces
- * @param spaceScalar
- * @param origin
- * @param dir
- * @return
- */
-glm::vec3 Player::collision(const std::vector<glm::vec3>& emptySpaces,
-    const glm::vec3& spaceScalar,
-    const glm::vec3& origin,
-    const glm::vec3& dir) const
-{
-    glm::vec3 collisionVec (1);
-    for (auto& emptiness : emptySpaces)
-    {
-        collisionVec *= rectangularCollision(origin, dir,
-            glm::vec3(cPlayerSize.x, 0, cPlayerSize.y), emptiness, spaceScalar);
-    }
-
-    return collisionVec;
-}
-
-/**
- * Returns zero vector if no movement whatsoever,
- * else it returns 1 along the axis of movement.
- * @brief Player::rectangularCollision
- * @param origin
- * @param dir
- * @param objSize
- * @param rectangle
- * @param scalar
- * @return
- */
-glm::vec3 Player::rectangularCollision(const glm::vec3& origin,
-    const glm::vec3& dir, const glm::vec3& objSize,
-    const glm::vec3& rectangle,
-    const glm::vec3& scalar) const
-{
-    glm::vec3 result (0.0f, 1.0f, 0.0f);
-
-    if (dir.x + objSize.x < rectangle.x * scalar.x ||
-       dir.x - objSize.x > (rectangle.x + 1.0f) * scalar.x  ||
-       origin.z + objSize.z < rectangle.z * scalar.z ||
-       origin.z - objSize.z > (rectangle.z + 1.0f) * scalar.z)
-    {
-        result.x = 1.0f;
-    }
-
-    if (origin.x + objSize.x < rectangle.x * scalar.x  ||
-       origin.x - objSize.x > (rectangle.x + 1.0f) * scalar.x  ||
-       dir.z + objSize.z < rectangle.z * scalar.z ||
-       dir.z - objSize.z > (rectangle.z + 1.0f) * scalar.z)
-    {
-        result.z = 1.0f;
-    }
-
-    return result;
-}
-
-/**
  * Check if the length of the distance from the player
- * to the point is equal to half the size of the sprite.
- * @brief Player::isOnExitPoint
+ * to the point is equal to the distance from the center of the sprite to it's boundary.
+ * @brief Player::isOnPoint
  * @param origin
  * @return
  */
-bool Player::isOnExitPoint(const glm::vec3& origin) const
+bool Player::isOnPoint(const glm::vec3& origin, const std::vector<glm::vec3>& points) const
 {
-    const auto& points = mLevel.getExitPoints();
-
-    auto exited = std::find_if(points.begin(), points.end(),
-        [&] (const glm::vec3& point)->bool {
-            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
-    });
-
-    return (exited != points.end());
-}
-
-/**
- * @brief Player::isOnSpeedPowerUp
- * @param origin
- * @return
- */
-bool Player::isOnSpeedPowerUp(const glm::vec3& origin) const
-{
-    const auto& points = mLevel.getSpeedPowerUps();
-
-    auto exited = std::find_if(points.begin(), points.end(),
-        [&] (const glm::vec3& point)->bool {
-            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
-    });
-
-    return (exited != points.end());
-}
-
-/**
- * @brief Player::isOnStrengthPowerUp
- * @param origin
- * @return
- */
-bool Player::isOnStrengthPowerUp(const glm::vec3& origin) const
-{
-    const auto& points = mLevel.getStrengthPowerUps();
-
-    auto exited = std::find_if(points.begin(), points.end(),
-        [&] (const glm::vec3& point)->bool {
-            return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
-    });
-
-    return (exited != points.end());
-}
-
-/**
- * @brief Player::isOnInvinciblePowerUp
- * @param origin
- * @return
- */
-bool Player::isOnInvinciblePowerUp(const glm::vec3& origin) const
-{
-    const auto& points = mLevel.getInvinciblePowerUps();
-
     auto exited = std::find_if(points.begin(), points.end(),
         [&] (const glm::vec3& point)->bool {
             return glm::length(point - origin) < mLevel.getSpriteHalfWidth();
