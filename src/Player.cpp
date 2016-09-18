@@ -24,14 +24,12 @@ Player::Player(Camera& camera, Level& level)
 , mStartPosition(camera.getPosition())
 , mMovementDir(glm::vec3(0))
 // , mBullets()
+, mPowerUpTimer(0.0)
 , mShooting(false)
 , mMouseLocked(false)
 , mHealth(100.0f)
 , mCollisions(true)
-, mInvincible(false)
-, mSpeed(false)
-, mInfAmmo(false)
-, mStrength(false)
+, mPower(Power::Type::None)
 {
 
 }
@@ -151,40 +149,50 @@ void Player::update(const float dt, const double timeSinceInit)
     // if (mHealth < 0.0f)
     //     SDL_Log("Player dead");
 
+    if (static_cast<unsigned int>(mPowerUpTimer - timeSinceInit) > scPowerUpLength)
+        mPower = Power::Type::None;
+
+    if (mPower == Power::Type::None)
+    {
+        if (isOnSpeedPowerUp(getPosition()))
+        {
+            mPower = Power::Type::Speed;
+            mPowerUpTimer = timeSinceInit;
+        }
+        else if (isOnStrengthPowerUp(getPosition()))
+        {
+            mPower = Power::Type::Strength;
+            mPowerUpTimer = timeSinceInit;
+        }
+        else if (isOnInvinciblePowerUp(getPosition()))
+        {
+            mPower = Power::Type::Invincible;
+            mPowerUpTimer = timeSinceInit;
+        }
+    }
+
     if (glm::length(mMovementDir) > 0)
     {
         if (mCollisions)
         {
             glm::vec3 origin (getPosition());
             // R(t) = P + Vt
-            glm::vec3 direction (origin + glm::normalize(mMovementDir * scMovementScalar * dt));
+            glm::vec3 direction (origin + glm::normalize(mMovementDir * dt));
             glm::vec3 c (collision(mLevel.getEmptySpace(), mLevel.getTileScalar(), origin, direction));
             mMovementDir *= c;
             mMovementDir.y = 0.0f;
         }
 
-        mFirstPersonCamera.move(mMovementDir, scMovementScalar * dt);
+        if (mPower == Power::Type::Speed)
+            mFirstPersonCamera.move(mMovementDir, 1.25 * scMovementScalar * dt);
+        else 
+            mFirstPersonCamera.move(mMovementDir, scMovementScalar * dt);
 
         if (isOnExitPoint(getPosition()))
         {
             SDL_Log("exit");
         }
-        else if (isOnSpeedPowerUp(getPosition()))
-        {
-            SDL_Log("speed");
-
-        }
-        else if (isOnStrengthPowerUp(getPosition()))
-        {
-            SDL_Log("str");
-
-        }
-        else if (isOnInvinciblePowerUp(getPosition()))
-        {
-            SDL_Log("invic");
-
-        }
-
+        
         // reset movement direction every iteration
         mMovementDir = glm::vec3(0);
     }
@@ -268,49 +276,25 @@ void Player::setCollisions(bool collisions)
     mCollisions = collisions;
 }
 
-bool Player::getInvincible() const
+Power::Type Player::getPower() const
 {
-    return mInvincible;
+    return mPower;
 }
 
-void Player::setInvincible(bool invincible)
+void Player::setPower(Power::Type type)
 {
-    mInvincible = invincible;
+    mPower = type;
 }
 
-bool Player::getSpeed() const
+float Player::getHealth() const
 {
-    return mSpeed;
-}
-
-void Player::setSpeed(bool speed)
-{
-    mSpeed = speed;
-}
-
-bool Player::getInfAmmo() const
-{
-    return mInfAmmo;
-}
-
-void Player::setInfAmmo(bool infAmmo)
-{
-    mInfAmmo = infAmmo;
-}
-
-bool Player::getStrength() const
-{
-    return mStrength;
-}
-
-void Player::setStrength(bool strength)
-{
-    mStrength = strength;
+    return mHealth;
 }
 
 void Player::inflictDamage(const float min, const float max)
 {
-    mHealth -= Utils::getRandomFloat(min, max);
+    if (mPower != Power::Type::Invincible)
+        mHealth -= Utils::getRandomFloat(min, max);
 }
 
 /**

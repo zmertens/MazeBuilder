@@ -4,11 +4,14 @@
 //#include "engine/graphics/Sprite.hpp"
 //#include "engine/graphics/PostProcessorImpl.hpp"
 
-namespace PowerDurations
+namespace Power
 {
-const float SPEED = 60u;
-const float RECHARGING = 45u;
-const float INVINCIBILITY = 25u;
+enum class Type {
+	Invincible,
+	Speed,
+	Strength,
+	None
+};
 }
 
 //class PowerUp : public Sprite

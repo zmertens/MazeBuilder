@@ -14,7 +14,7 @@ PostProcessorImpl::PostProcessorImpl(const ResourceManager& resources,
     const unsigned int width, const unsigned int height)
 : mResources(resources)
 , mConfig(config)
-, mEffect(Effects::Type::NO_EFFECT)
+, mEffect(Effects::Type::None)
 , mFboHandle(0)
 , mRboHandle(0)
 {

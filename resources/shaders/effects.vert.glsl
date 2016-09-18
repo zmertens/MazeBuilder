@@ -1,6 +1,6 @@
 #version 450 core
 
-#define NO_EFFECT 0
+#define NONE 0
 #define GRAYSCALE 1
 #define INVERSION 2
 #define EDGE 3
@@ -28,8 +28,8 @@ void main()
 
 	if (uEffect.type == BLUR)
 	{
-		float strength = 0.01;
-		gl_Position.x += cos(uTime * 10.0) * strength;
-		gl_Position.y += cos(uTime * 15.0) * strength;
+		float strength = 4.89;
+		gl_Position.x += cos(uTime * 25.0) * strength;
+		gl_Position.y += cos(uTime * 35.0) * strength;
 	}
 }

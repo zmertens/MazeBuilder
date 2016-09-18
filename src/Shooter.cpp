@@ -181,13 +181,16 @@ void Shooter::update(float dt, double timeSinceInit)
 
         if (mPlayer.isShooting() && inRange)
         {    
-            enemy->inflictDamage(0.1f, 3.1f);
+            if (mPlayer.getPower() == Power::Type::Strength)
+                enemy->inflictDamage(1.1f, 13.1f);
+            else
+                enemy->inflictDamage(0.1f, 3.1f);
         }
 
         if (enemy->getState() == Enemy::States::Sit && glm::length(enemy->getTransform().getTranslation() - mPlayer.getPosition()) < 10.0f)
         {    
             enemy->setState(Enemy::States::Attack);
-            SDL_Log("Attacking");
+            // SDL_Log("Attacking");
         }
     }
 
@@ -199,7 +202,7 @@ void Shooter::update(float dt, double timeSinceInit)
         mLevel.getTileScalar().y - mPlayer.getPlayerSize().y,
         mPlayer.getPosition().z, 0.0f));
 
-    // mImGui.update(*this);
+    mImGui.update(*this);
 
 //    static int testCounter = 0;
 //    if (++testCounter % 50 == 0)
@@ -249,7 +252,19 @@ void Shooter::render()
     for (auto& powerup : mPowerUps)
         powerup->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
-    mPostProcessor.activateEffect(Effects::Type::NO_EFFECT);
+    if (mPlayer.getPower() == Power::Type::Invincible)
+    {   
+        mPostProcessor.activateEffect(Effects::Type::Blur);
+    }
+    else if (mPlayer.getPower() == Power::Type::Speed)
+    {    
+        mPostProcessor.activateEffect(Effects::Type::Edge);
+    }
+    else if (mPlayer.getPower() == Power::Type::Strength)
+        mPostProcessor.activateEffect(Effects::Type::Inversion);
+    else
+        mPostProcessor.activateEffect(Effects::Type::None);
+    
     mPostProcessor.release();
 
     mImGui.render();

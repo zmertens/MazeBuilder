@@ -6,7 +6,7 @@
 #include "ResourceManager.hpp"
 #include "Utils.hpp"
 
-// #include "../Shooter.hpp"
+#include "../Shooter.hpp"
 
 GLint ImGuiHelper::sShaderHandle = 0;
 GLint ImGuiHelper::sVertHandle = 0;
@@ -58,25 +58,26 @@ ImGuiHelper::~ImGuiHelper()
  * @brief ImGuiHelper::update
  * @param game
  */
-void ImGuiHelper::update(/*Shooter& game*/)
+void ImGuiHelper::update(const Shooter& game)
 {
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.KeysDown[SDLK_RETURN])
-    {
-        io.KeysDown[SDLK_RETURN] = false;
-    }
-    else if (io.KeysDown[SDLK_ESCAPE])
-    {
-        io.KeysDown[SDLK_ESCAPE] = false;
-    }
-    else if (io.KeysDown[SDL_SCANCODE_UP])
-    {
-        io.KeysDown[SDL_SCANCODE_UP] = false;
-    }
-    else if (io.KeysDown[SDL_SCANCODE_DOWN])
-    {
-        io.KeysDown[SDL_SCANCODE_DOWN] = false;
-    }
+    mHealth = Utils::toString(game.mPlayer.getHealth());
+    // ImGuiIO& io = ImGui::GetIO();
+    // if (io.KeysDown[SDLK_RETURN])
+    // {
+    //     io.KeysDown[SDLK_RETURN] = false;
+    // }
+    // else if (io.KeysDown[SDLK_ESCAPE])
+    // {
+    //     io.KeysDown[SDLK_ESCAPE] = false;
+    // }
+    // else if (io.KeysDown[SDL_SCANCODE_UP])
+    // {
+    //     io.KeysDown[SDL_SCANCODE_UP] = false;
+    // }
+    // else if (io.KeysDown[SDL_SCANCODE_DOWN])
+    // {
+    //     io.KeysDown[SDL_SCANCODE_DOWN] = false;
+    // }
 }
 
 /**

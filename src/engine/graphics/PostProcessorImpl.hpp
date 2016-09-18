@@ -7,13 +7,13 @@
 
 namespace Effects
 {
-enum class Type : unsigned int {
-    NO_EFFECT = 0,
-    GRAYSCALE = 1,
-    INVERSION = 2,
-    EDGE = 3,
-    BLUR = 4,
-    SHARPEN = 5,
+enum class Type : int {
+    None = 0,
+    Grayscale = 1,
+    Inversion = 2,
+    Edge = 3,
+    Blur = 4,
+    Sharpen = 5,
 };
 } // namespace
 

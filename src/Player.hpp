@@ -7,7 +7,7 @@
 
 #include <glm/glm.hpp>
 
-#include "Bullet.hpp"
+#include "PowerUp.hpp"
 
 class SdlWindow;
 class Camera;
@@ -40,24 +40,16 @@ public:
     bool getCollisions() const;
     void setCollisions(bool collisions);
 
-    bool getInvincible() const;
-    void setInvincible(bool invincible);
+    Power::Type getPower() const;
+    void setPower(Power::Type type);
 
-    bool getSpeed() const;
-    void setSpeed(bool speed);
-
-    bool getInfAmmo() const;
-    void setInfAmmo(bool infAmmo);
-
-    bool getStrength() const;
-    void setStrength(bool strength);
-
+    float getHealth() const;
     void inflictDamage(const float min, const float max);
 
 private:
     static const float scMouseSensitivity;
     static constexpr float scOgMovementScalar = 25.0f;
-    static constexpr std::size_t scMaxBullets = 25;
+    static constexpr unsigned int scPowerUpLength = 100u;
     static float scMovementScalar;
     const glm::vec2 cPlayerSize;
     Camera& mFirstPersonCamera;
@@ -65,14 +57,12 @@ private:
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
     // std::vector<Bullet> mBullets;
+    double mPowerUpTimer;
     bool mShooting;
     bool mMouseLocked;
     float mHealth;
     bool mCollisions;
-    bool mInvincible;
-    bool mSpeed;
-    bool mInfAmmo;
-    bool mStrength;
+    Power::Type mPower;
 private:
     glm::vec3 collision(const std::vector<glm::vec3>& emptySpaces,
         const glm::vec3& spaceScalar, const glm::vec3& origin,

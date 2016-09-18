@@ -22,6 +22,7 @@
 #include "Level.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
+#include "PowerUp.hpp"
 
 class Shooter final : public IGame
 {

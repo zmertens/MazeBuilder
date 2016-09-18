@@ -27,7 +27,7 @@ public:
     explicit ImGuiHelper(const SdlWindow& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
-    void update(/*Shooter& game*/);
+    void update(const Shooter& game);
     void render();
     void cleanUp();
 

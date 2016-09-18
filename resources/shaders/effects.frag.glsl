@@ -1,6 +1,6 @@
 #version 450 core
 
-#define NO_EFFECT 0
+#define NONE 0
 #define GRAYSCALE 1
 #define INVERSION 2
 #define EDGE 3
@@ -38,7 +38,7 @@ void main()
 {
     vec4 finalShade;
 
-	if (uEffect.type == NO_EFFECT)
+	if (uEffect.type == NONE)
     {
 		finalShade = texture(uTexture2D, vTexCoords);
     }
@@ -70,7 +70,6 @@ void main()
         {
             finalShade += vec4(sample_tex[i] * uBlurKernel[i], 1.0f);
         }
-		finalShade.a = 1.0;
     }
     else if (uEffect.type == EDGE)
     {
