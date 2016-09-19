@@ -85,7 +85,7 @@ void Entity::draw(const SdlWindow& sdlManager,
         shader->setUniform("uMaterial.specular", mat->getSpecular());
         shader->setUniform("uMaterial.shininess", mat->getShininess());
 
-        shader->setUniform("uTexOffset0", config.texOffset0);
+        //shader->setUniform("uTexOffset0", config.texOffset0);
 
         mesh->draw(type);
     }

@@ -179,11 +179,6 @@ void Player::update(const float dt, const double timeSinceInit)
             mFirstPersonCamera.move(mMovementDir, 1.25 * sMvFactor * dt);
         else 
             mFirstPersonCamera.move(mMovementDir, sMvFactor * dt);
-
-        if (isOnPoint(getPosition(), mLevel.getExitPoints()))
-        {
-            SDL_Log("exit");
-        }
         
         // reset movement direction every iteration
         mMovementDir = glm::vec3(0);
@@ -267,10 +262,15 @@ float Player::getHealth() const
     return mHealth;
 }
 
-void Player::inflictDamage(const float min, const float max)
+void Player::inflictDamage()
 {
     if (mPower != Power::Type::Invincible)
-        mHealth -= Utils::getRandomFloat(min, max);
+        mHealth -= Utils::getRandomFloat(sMinDamage, sMaxDamage);
+}
+
+bool Player::isOnExit() const
+{
+    return isOnPoint(getPosition(), mLevel.getExitPoints());
 }
 
 /**

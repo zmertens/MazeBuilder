@@ -70,6 +70,11 @@ Shooter::Shooter()
     glm::vec3(0.0f))
 {
     init();
+
+    // sloppppppy slut
+    auto&& t = mCube.getTransform();
+    t.setTranslation(mPlayer.getPosition());
+    mCube.setTransform(t);
 } // constructor
 
 /**
@@ -179,6 +184,12 @@ void Shooter::update(float dt, double timeSinceInit)
 //    {
 //        //mSdlMixer.playChannel(-1, ResourceIds::Chunks::DEATH_WAV_ID, 2);
 //    }
+
+    if (mPlayer.isOnExit())
+    {
+        mPlayer.move(glm::vec3(0), 1.0f);
+        mPlayer.move(mLevel.getPlayerPosition(), 1.0f);
+    }
 }
 
 /**

@@ -79,15 +79,15 @@ void Enemy::handleMovement(const float dt, Player& player, const Level& level)
     {
         moveTowardsPlayer(dt, player, level);
         if (inRange)
-            player.inflictDamage(0.1f, 3.1f);
+            player.inflictDamage();
     }
 
     if (inRange && player.isShooting())
     {    
         if (player.getPower() == Power::Type::Strength)
-            this->inflictDamage(1.1f, 13.1f);
+            this->inflictDamage(sMinDamage + 0.5f, sMaxDamage + 0.5f);
         else
-            this->inflictDamage(0.1f, 3.1f);
+            this->inflictDamage(sMinDamage, sMaxDamage);
     }
 
     if (mState == Enemy::States::Sit && glm::length(mTransform.getTranslation() - player.getPosition()) < sAgroRange)

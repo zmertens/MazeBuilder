@@ -42,7 +42,9 @@ public:
     void setPower(Power::Type type);
 
     float getHealth() const;
-    void inflictDamage(const float min, const float max);
+    void inflictDamage();
+
+    bool isOnExit() const;
 
 private:
     static const float sMouseFactor;
@@ -51,6 +53,8 @@ private:
     static float sMvFactor;
     static constexpr float sPlayerSize = 0.2f;
     static constexpr bool sCollisions = false;
+    static constexpr float sMinDamage = 0.3f;
+    static constexpr float sMaxDamage = 1.0f;
     
     Camera& mFirstPersonCamera;
     Level& mLevel;

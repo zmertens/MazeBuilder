@@ -41,6 +41,8 @@ public:
 private:
     static constexpr float sAnimFreq = 0.42f;
     static constexpr float sAgroRange = 15.0f;
+    static constexpr float sMinDamage = 0.3f;
+    static constexpr float sMaxDamage = 1.0f;
 
     static const float sEnemySize;
     static const float sMvFactor;
