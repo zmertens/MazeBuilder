@@ -38,6 +38,7 @@ if(CMAKE_BUILD_TYPE)
      AND NOT cmake_build_type_tolower STREQUAL "none")
     message(FATAL_ERROR "Unsupported build type \"${CMAKE_BUILD_TYPE}\". Allowed values are Debug, Release, RelWithDebInfo, and None (case-insensitive).")
   endif()
+  message("CMake Build Type: \"${CMAKE_BUILD_TYPE}\"")
 endif()
 
 ## RPATH -- See http://www.itk.org/Wiki/CMake_RPATH_handling

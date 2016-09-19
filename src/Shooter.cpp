@@ -1,5 +1,4 @@
 #include "Shooter.hpp"
-
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "engine/Utils.hpp"
@@ -197,6 +196,7 @@ void Shooter::update(float dt, double timeSinceInit)
  */
 void Shooter::render()
 {
+
     mResources.clearCache();
 
     mPostProcessor.bind();
