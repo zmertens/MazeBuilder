@@ -1,5 +1,5 @@
-#ifndef SHOOTER_HPP
-#define SHOOTER_HPP
+#ifndef BLOWTORCH_HPP
+#define BLOWTORCH_HPP
 
 #include <unordered_map>
 
@@ -26,11 +26,11 @@
 #include "Player.hpp"
 #include "PowerUp.hpp"
 
-class Shooter final : public IGame
+class Blowtorch final : public IGame
 {
     friend class ImGuiHelper;
 public:
-    Shooter();
+    Blowtorch();
     virtual void start() override;
 
 protected:
@@ -44,7 +44,7 @@ private:
     static constexpr float sTimePerFrame = 1.0f / 60.0f;
     static constexpr unsigned int sWindowWidth = 1080u;
     static constexpr unsigned int sWindowHeight = 720u;
-    static constexpr auto sTitle = "Shooter";
+    static constexpr auto sTitle = "Blowtorch";
 
     static std::unordered_map<uint8_t, bool> sKeyInputs;
 
@@ -82,4 +82,4 @@ private:
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
-#endif // SHOOTER_HPP
+#endif // BLOWTORCH_HPP
