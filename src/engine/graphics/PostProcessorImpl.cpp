@@ -88,7 +88,7 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRboHandle);
 
 #if defined(APP_DEBUG)
-    SDL_Log("\nPostProcessorImpl using Texture channel = %i\n", fullscreen.getChannel());
+    SDL_Log("\nPostProcessorImpl using Texture channel = %i\n", 2);
     GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
 #endif // defined
 

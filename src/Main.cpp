@@ -1,11 +1,11 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "Shooter.hpp"
+#include "Blowtorch.hpp"
 
 int main()
 {
-    Shooter game;
+    Blowtorch game;
     try
     {
         game.start();

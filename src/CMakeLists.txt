@@ -7,7 +7,7 @@ set(STB_HEADER
 	engine/graphics/stb_image.h
 )
 
-set(SHOOTER_SOURCES
+set(BLOWTORCH_SOURCES
 	Main.cpp
 	Blowtorch.cpp
 	Player.cpp
@@ -45,5 +45,5 @@ set(SHOOTER_SOURCES
 	engine/audio/SdlMixer.cpp
 )
 
-add_executable(${CMAKE_PROJECT_NAME} ${SHOOTER_SOURCES} ${IMGUI_SOURCES} ${STB_HEADER})
-target_link_libraries(${CMAKE_PROJECT_NAME} ${SHOOTER_LIBS})
+add_executable(${CMAKE_PROJECT_NAME} ${BLOWTORCH_SOURCES} ${IMGUI_SOURCES} ${STB_HEADER})
+target_link_libraries(${CMAKE_PROJECT_NAME} ${BLOWTORCH_LIBS})
