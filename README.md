@@ -1,7 +1,7 @@
 ![](resources/demo.gif)
 
-# Shooter
-Shoot at sprites. Get powerups. Find the exit. <br />
+# About
+Shoot at sprites. Don't get shot it slows you down. Get powerups. Find the exit as fast as you can. <br />
 
 ## Build
  - CMake 3.0+
