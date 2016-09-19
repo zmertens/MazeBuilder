@@ -62,7 +62,7 @@ Shooter::Shooter()
 , mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
     ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
-, mTestSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+, mExitSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
@@ -148,11 +148,11 @@ void Shooter::handleEvents()
  */
 void Shooter::update(float dt, double timeSinceInit)
 {
-    //mCube.update(dt, timeSinceInit);
-    mTestSprite.update(dt, timeSinceInit);
+    mCube.update(dt, timeSinceInit);
+    mExitSprite.update(dt, timeSinceInit);
 
     Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(0.9f));
-    mTestSprite.setTransform(transform);
+    mExitSprite.setTransform(transform);
 
     mPlayer.update(dt, timeSinceInit);
     mLevel.update(dt, timeSinceInit);
@@ -207,9 +207,9 @@ void Shooter::render()
 
     mLevel.draw(mSdlWindow, mResources, mCamera);
 
-    //mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
+    mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
-    mTestSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
+    mExitSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
@@ -223,13 +223,9 @@ void Shooter::render()
         powerup->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     if (mPlayer.getPower() == Power::Type::Invincible)
-    {   
         mPostProcessor.activateEffect(Effects::Type::Blur);
-    }
-    else if (mPlayer.getPower() == Power::Type::Speed)
-    {    
+    else if (mPlayer.getPower() == Power::Type::Speed) 
         mPostProcessor.activateEffect(Effects::Type::Edge);
-    }
     else if (mPlayer.getPower() == Power::Type::Strength)
         mPostProcessor.activateEffect(Effects::Type::Inversion);
     else
@@ -253,7 +249,7 @@ void Shooter::finish()
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
     mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
-    mLogger.dumpLogToFile("data_log.txt");
+    mLogger.dumpLogToFile("ShooterDataLog.txt");
 #endif // defined
 
     mPlay = false;
@@ -350,7 +346,7 @@ void Shooter::initResources()
     mResources.insert(ResourceIds::Meshes::LEVEL_ID, std::move(levelMesh));
 
     /************ Textures ***********************************************/
-    // @TODO initialize the post processor impl texture in here
+    // @TODO initialize the post processor impl texture in here (fullscreen quad isn't initialized before PP)
     ITexture::Ptr testTex (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::TEST_TEX_ATLAS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID, std::move(testTex));

@@ -67,7 +67,7 @@ private:
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;
-    Sprite mTestSprite;
+    Sprite mExitSprite;
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
 

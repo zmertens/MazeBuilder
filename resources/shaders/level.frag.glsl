@@ -1,4 +1,4 @@
-#version 450 core
+#version 430 core
 
 #define INV_GAMMA 0.4545454545
 

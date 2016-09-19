@@ -53,7 +53,9 @@ void TexSkyboxImpl::cleanUp()
  */
 void TexSkyboxImpl::bind() const
 {
-    glBindTextureUnit(mChannel, mHandle);
+    // glBindTextureUnit(mChannel, mHandle);
+    glActiveTexture(GL_TEXTURE0 + mChannel);
+    glBindTexture(mTarget, mHandle);
 }
 
 /**

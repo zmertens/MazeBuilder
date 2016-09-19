@@ -1,14 +1,8 @@
 // identify the operating system:
 // http://nadeausoftware.com/articles/2012/01/c_c_tip_how_use_compiler_predefined_macros_detect_operating_system
 
-#ifndef CONFIG_HPP
-#define CONFIG_HPP
-
-#define APP_VERSION_MAJOR 0
-#define APP_VERSION_MINOR 1
-
-#define APP_OPENGL_MAJOR 4
-#define APP_OPENGL_MINOR 5
+#ifndef OSCONFIG_HPP
+#define OSCONFIG_HPP
 
 #define APP_DEBUG
 
@@ -56,5 +50,5 @@
 
 #endif // defined
 
-#endif // CONFIG_HPP
+#endif // OSCONFIG_HPP
 

@@ -5,6 +5,8 @@
 
 #include "Entity.hpp"
 
+#include "Tex2dImpl.hpp"
+
 namespace Effects
 {
 // layout matches effects shader
@@ -44,6 +46,7 @@ private:
     Effects::Type mEffect;
     GLuint mFboHandle;
     GLuint mRboHandle;
+    Tex2dImpl fullscreen;
 };
 
 #endif // POSTPROCESSORIMPL_HPP

@@ -108,36 +108,34 @@ void Shader::cleanUp()
  */
 std::string Shader::getGlslUniforms() const
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-    GLint numUniforms = 0;
-    glGetProgramInterfaceiv(mProgram, GL_UNIFORM, GL_ACTIVE_RESOURCES, &numUniforms);
-    GLenum properties[] = {GL_NAME_LENGTH, GL_TYPE, GL_LOCATION, GL_BLOCK_INDEX};
+//     GLint numUniforms = 0;
+//     glGetProgramInterfaceiv(mProgram, GL_UNIFORM, GL_ACTIVE_RESOURCES, &numUniforms);
+//     GLenum properties[] = {GL_NAME_LENGTH, GL_TYPE, GL_LOCATION, GL_BLOCK_INDEX};
 
-    std::string retString = "\t(Active) GLSL Uniforms:\n";
+//     std::string retString = "\t(Active) GLSL Uniforms:\n";
 
-    for (int i = 0; i != numUniforms; ++i)
-    {
-        GLint results[4];
-        glGetProgramResourceiv(mProgram, GL_UNIFORM, i, 4, properties, 4, nullptr, results);
+//     for (int i = 0; i != numUniforms; ++i)
+//     {
+//         GLint results[4];
+//         glGetProgramResourceiv(mProgram, GL_UNIFORM, i, 4, properties, 4, nullptr, results);
 
-        if (results[3] != -1)
-            continue; // skip block uniforms here
+//         if (results[3] != -1)
+//             continue; // skip block uniforms here
 
-        GLint nameBufSize = results[0] + 1;
-        char* name = new char[nameBufSize];
+//         GLint nameBufSize = results[0] + 1;
+//         char* name = new char[nameBufSize];
 
-        glGetProgramResourceName(mProgram, GL_UNIFORM, i, nameBufSize, nullptr, name);
-//        SDL_Log("location = %d, name = %s, type = %s\n",
-//            results[2], name, getStringFromType(results[1]).c_str());
+//         glGetProgramResourceName(mProgram, GL_UNIFORM, i, nameBufSize, nullptr, name);
+// //        SDL_Log("location = %d, name = %s, type = %s\n",
+// //            results[2], name, getStringFromType(results[1]).c_str());
 
-        retString += "\tlocation = " + Utils::toString(results[2]) + ", name = "
-            + name + ", type = " + getStringFromType(results[1]) + "\n";
+//         retString += "\tlocation = " + Utils::toString(results[2]) + ", name = "
+//             + name + ", type = " + getStringFromType(results[1]) + "\n";
 
-        delete [] name;
-    }
+//         delete [] name;
+//     }
 
-    return retString;
-#endif
+//     return retString;
 }
 
 /**
@@ -146,32 +144,32 @@ std::string Shader::getGlslUniforms() const
  */
 std::string Shader::getGlslAttribs() const
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-    GLint numAttribs;
-    glGetProgramInterfaceiv(mProgram, GL_PROGRAM_INPUT, GL_ACTIVE_RESOURCES, &numAttribs);
-    GLenum properties[] = {GL_NAME_LENGTH, GL_TYPE, GL_LOCATION};
+// #if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
+//     GLint numAttribs;
+//     glGetProgramInterfaceiv(mProgram, GL_PROGRAM_INPUT, GL_ACTIVE_RESOURCES, &numAttribs);
+//     GLenum properties[] = {GL_NAME_LENGTH, GL_TYPE, GL_LOCATION};
 
-    std::string retString = "\t(Active) GLSL Attributes:\n";
+//     std::string retString = "\t(Active) GLSL Attributes:\n";
 
-    for (int i = 0; i != numAttribs; ++i)
-    {
-        GLint results[3];
-        glGetProgramResourceiv(mProgram, GL_PROGRAM_INPUT, i, 3, properties, 3, nullptr, results);
+//     for (int i = 0; i != numAttribs; ++i)
+//     {
+//         GLint results[3];
+//         glGetProgramResourceiv(mProgram, GL_PROGRAM_INPUT, i, 3, properties, 3, nullptr, results);
 
-        GLint nameBufSize = results[0] + 1;
-        char* name = new char[nameBufSize];
+//         GLint nameBufSize = results[0] + 1;
+//         char* name = new char[nameBufSize];
 
-        glGetProgramResourceName(mProgram, GL_PROGRAM_INPUT, i, nameBufSize, nullptr, name);
-//        SDL_Log("location = %d, name = %s, type = %s\n",
-//            results[2], name, getStringFromType(results[1]).c_str());
+//         glGetProgramResourceName(mProgram, GL_PROGRAM_INPUT, i, nameBufSize, nullptr, name);
+// //        SDL_Log("location = %d, name = %s, type = %s\n",
+// //            results[2], name, getStringFromType(results[1]).c_str());
 
-        retString += "\tlocation = " + Utils::toString(results[2]) + ", name = "
-            + name + ", type = " + getStringFromType(results[1]) + "\n";
+//         retString += "\tlocation = " + Utils::toString(results[2]) + ", name = "
+//             + name + ", type = " + getStringFromType(results[1]) + "\n";
 
-        delete [] name;
-    }
-    return retString;
-#endif
+//         delete [] name;
+//     }
+//     return retString;
+// #endif
 }
 
 /**
@@ -305,10 +303,8 @@ void Shader::setUniform(const std::string& str, GLuint value)
  */
 void Shader::setSubroutine(GLenum shaderType, GLuint count, const std::string& name)
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-    GLuint loc = getSubroutineLocation(shaderType, name);
-    glUniformSubroutinesuiv(shaderType, count, &loc);
-#endif
+//     GLuint loc = getSubroutineLocation(shaderType, name);
+//     glUniformSubroutinesuiv(shaderType, count, &loc);
 }
 
 /**
@@ -319,9 +315,7 @@ void Shader::setSubroutine(GLenum shaderType, GLuint count, const std::string& n
  */
 void Shader::setSubroutine(GLenum shaderType, GLuint count, GLuint index)
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-    glUniformSubroutinesuiv(shaderType, count, &index);
-#endif
+//     glUniformSubroutinesuiv(shaderType, count, &index);
 }
 
 /**
@@ -331,9 +325,7 @@ void Shader::setSubroutine(GLenum shaderType, GLuint count, GLuint index)
  */
 void Shader::bindFragDataLocation(const std::string& str, GLuint loc)
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-    glBindFragDataLocation(mProgram, loc, str.c_str());
-#endif
+//     glBindFragDataLocation(mProgram, loc, str.c_str());
 }
 
 /**
@@ -368,18 +360,14 @@ GLenum Shader::getShaderType(const int shaderType) const
             return GL_VERTEX_SHADER;
         case ShaderTypes::FRAGMENT_SHADER:
             return GL_FRAGMENT_SHADER;
-#if APP_OPENGL_MAJOR >= 3 && APP_OPENGL_MINOR >= 3
         case ShaderTypes::GEOMETRY_SHADER:
           return GL_GEOMETRY_SHADER;
-#elif APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 1
-        case ShaderTypes::TESSELATION_CONTROL_SHADER:
-            return GL_TESS_CONTROL_SHADER;
-        case ShaderTypes::TESSELATION_EVAL_SHADER:
-            return GL_TESS_EVALUATION_SHADER;
-#elif APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-        case ShaderTypes::COMPUTE_SHADER:
-          return GL_COMPUTE_SHADER;
-#endif
+        // case ShaderTypes::TESSELATION_CONTROL_SHADER: // 4.1
+        //     return GL_TESS_CONTROL_SHADER;
+        // case ShaderTypes::TESSELATION_EVAL_SHADER: // 4.1
+        //     return GL_TESS_EVALUATION_SHADER;
+        // case ShaderTypes::COMPUTE_SHADER: // 4.3
+        //   return GL_COMPUTE_SHADER;
     } // switch
 }
 
@@ -565,11 +553,7 @@ GLint Shader::getAttribLocation(const std::string& str)
  */
 GLuint Shader::getSubroutineLocation(GLenum shaderType, const std::string& name)
 {
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
     return glGetSubroutineIndex(mProgram, shaderType, name.c_str());
-#else
-    return -1;
-#endif
 }
 
 /**
@@ -585,9 +569,7 @@ std::string Shader::getStringFromType(GLenum type) const
         case GL_FLOAT_VEC2: return std::string("vec2");
         case GL_FLOAT_VEC3: return std::string("vec3");
         case GL_FLOAT_VEC4: return std::string("vec4");
-#if APP_OPENGL_MAJOR >= 4 && APP_OPENGL_MINOR >= 3
-        case GL_DOUBLE: return std::string("double");
-#endif
+        case GL_DOUBLE: return std::string("double"); // 4.3
         case GL_INT: return std::string("int");
         case GL_UNSIGNED_INT: return std::string("unsigned int");
         case GL_BOOL: return std::string("bool");

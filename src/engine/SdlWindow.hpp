@@ -5,13 +5,13 @@
 #include <cstring>
 #include <memory>
 
-#include "Config.hpp"
+#include "OsConfig.hpp"
 
 #if defined(APP_DESKTOP)
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
 #include <SDL2/SDL_mixer.h>
-#include "gl_core_4_5.h"
+#include "gl_core_4_3.h"
 #elif defined(APP_ANDROID)
 #include <SDL.h>
 #include <GLES3/gl3.h>
@@ -86,7 +86,7 @@ private:
     static constexpr bool sFullscreen = (sWinFlags & SDL_WINDOW_FULLSCREEN) || (sWinFlags & SDL_WINDOW_FULLSCREEN_DESKTOP);
 
     static constexpr int sOpenGlMajor = 4;
-    static constexpr int sOpenGlMinor = 5;
+    static constexpr int sOpenGlMinor = 3;
     static constexpr int sRedBufferSize = 8;
     static constexpr int sGreenBufferSize = 8;
     static constexpr int sBlueBufferSize = 8;

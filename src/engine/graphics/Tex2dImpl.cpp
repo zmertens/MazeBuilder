@@ -66,7 +66,9 @@ void Tex2dImpl::cleanUp()
 
 void Tex2dImpl::bind() const
 {
-    glBindTextureUnit(mChannel, mHandle);
+    // glBindTextureUnit(mChannel, mHandle); // 4.5
+    glActiveTexture(GL_TEXTURE0 + mChannel);
+    glBindTexture(mTarget, mHandle);
 }
 
 void Tex2dImpl::release() const

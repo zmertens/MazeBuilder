@@ -1,4 +1,4 @@
-#version 450 core
+#version 430 core
 
 #define NONE 0
 #define GRAYSCALE 1

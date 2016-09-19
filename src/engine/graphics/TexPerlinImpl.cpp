@@ -14,8 +14,7 @@
  * @param periodic
  * @param channel = 0
  */
-TexPerlinImpl::TexPerlinImpl(const float baseFrequency,
-    const float persistence,
+TexPerlinImpl::TexPerlinImpl(const float baseFrequency, const float persistence,
     const int width, const int height,
     bool periodic, unsigned int channel)
 : mChannel(channel)
@@ -82,7 +81,9 @@ void TexPerlinImpl::cleanUp()
 
 void TexPerlinImpl::bind() const
 {
-    glBindTextureUnit(mChannel, mHandle);
+    // glBindTextureUnit(mChannel, mHandle);
+    glActiveTexture(GL_TEXTURE0 + mChannel);
+    glBindTexture(mTarget, mHandle);
 }
 
 void TexPerlinImpl::release() const
