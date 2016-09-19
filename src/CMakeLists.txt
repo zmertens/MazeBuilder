@@ -9,7 +9,7 @@ set(STB_HEADER
 
 set(SHOOTER_SOURCES
 	Main.cpp
-	Shooter.cpp
+	Blowtorch.cpp
 	Player.cpp
 	PowerUp.cpp
 	Level.cpp
