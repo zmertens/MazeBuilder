@@ -1,4 +1,4 @@
-#include "Shooter.hpp"
+#include "Blowtorch.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "engine/Utils.hpp"
@@ -16,12 +16,12 @@
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
 
-std::unordered_map<uint8_t, bool> Shooter::sKeyInputs;
+std::unordered_map<uint8_t, bool> Blowtorch::sKeyInputs;
 
 /**
- * @brief Shooter::Shooter
+ * @brief Blowtorch::Blowtorch
  */
-Shooter::Shooter()
+Blowtorch::Blowtorch()
 : mSdlWindow(sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
@@ -77,9 +77,9 @@ Shooter::Shooter()
 } // constructor
 
 /**
- * @brief Shooter::start
+ * @brief Blowtorch::start
  */
-void Shooter::start()
+void Blowtorch::start()
 {
     mPlay = true;
     mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
@@ -87,9 +87,9 @@ void Shooter::start()
 }
 
 /**
- * @brief Shooter::loop
+ * @brief Blowtorch::loop
  */
-void Shooter::loop()
+void Blowtorch::loop()
 {
     while (mPlay)
     {
@@ -116,9 +116,9 @@ void Shooter::loop()
 }
 
 /**
- * @brief Shooter::handleEvents
+ * @brief Blowtorch::handleEvents
  */
-void Shooter::handleEvents()
+void Blowtorch::handleEvents()
 {
     float mouseWheelDy = 0;
     SDL_Event event;
@@ -146,11 +146,11 @@ void Shooter::handleEvents()
 } // handleEvents
 
 /**
- * @brief Shooter::update
+ * @brief Blowtorch::update
  * @param dt = the time between frames
  * @param timeSinceInit = the time since SDL was initialized
  */
-void Shooter::update(float dt, double timeSinceInit)
+void Blowtorch::update(float dt, double timeSinceInit)
 {
     mCube.update(dt, timeSinceInit);
     mExitSprite.update(dt, timeSinceInit);
@@ -192,9 +192,9 @@ void Shooter::update(float dt, double timeSinceInit)
 }
 
 /**
- * @brief Shooter::render
+ * @brief Blowtorch::render
  */
-void Shooter::render()
+void Blowtorch::render()
 {
 
     mResources.clearCache();
@@ -252,9 +252,9 @@ void Shooter::render()
 /**
  *  @note The SdlManager must clean up before Resources
  *  or else GL errors will be thrown!
- *  @brief Shooter::finish
+ *  @brief Blowtorch::finish
  */
-void Shooter::finish()
+void Blowtorch::finish()
 {
 #if defined(APP_DEBUG)
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
@@ -270,9 +270,9 @@ void Shooter::finish()
 }
 
 /**
- * @brief Shooter::init
+ * @brief Blowtorch::init
  */
-void Shooter::init()
+void Blowtorch::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -282,9 +282,9 @@ void Shooter::init()
 }
 
 /**
- * @brief Shooter::initResources
+ * @brief Blowtorch::initResources
  */
-void Shooter::initResources()
+void Blowtorch::initResources()
 {
     /***************** Shaders ****************************/
     Shader::Ptr level (new Shader(mSdlWindow));
@@ -405,9 +405,9 @@ void Shooter::initResources()
 }
 
 /**
- * @brief Shooter::initPositions
+ * @brief Blowtorch::initPositions
  */
-void Shooter::initPositions()
+void Blowtorch::initPositions()
 {
     mPlayer.move(mLevel.getPlayerPosition(), 1.0f);
 
@@ -466,10 +466,10 @@ void Shooter::initPositions()
 }
 
 /**
- * @brief Shooter::calcFrameRate
+ * @brief Blowtorch::calcFrameRate
  * @param dt
  */
-void Shooter::calcFrameRate(const float dt)
+void Blowtorch::calcFrameRate(const float dt)
 {
     ++mFrameCounter;
     mTimeSinceLastUpdate += dt;
@@ -487,11 +487,11 @@ void Shooter::calcFrameRate(const float dt)
 }
 
 /**
- * @brief Shooter::sdlEvents
+ * @brief Blowtorch::sdlEvents
  * @param event
  * @param mouseWheelDy
  */
-void Shooter::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
         mPlay = false;
