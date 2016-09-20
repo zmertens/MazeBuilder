@@ -5,24 +5,26 @@
 
 #include <glm/glm.hpp>
 
-#include "engine/BoundingBox.hpp"
+#include "engine/graphics/IDrawable.hpp"
+#include "engine/Transform.hpp"
 
-class Particle
+class Particle : public IDrawable
 {
 public:
-    typedef std::unique_ptr<Particle> Ptr;
-public:
-    explicit Particle(const glm::vec3& position, const glm::vec3& dir);
-    void update();
-    bool isActive() const;
-    bool intersects(const glm::vec3& other, float size) const;
-private:
-    static const float scMaxDistance;
-    glm::vec3 mPosition;
-    bool mActive;
-    glm::vec3 mStartPoint;
-    glm::vec3 mEndPoint;
-    double mFireTime;
-};
+    explicit Particle(const Draw::Config& config,
+        const glm::vec3& position = glm::vec3(0.0f),
+        const glm::vec3& rotation = glm::vec3(0.0f),
+        const glm::vec3& scale = glm::vec3(1.0f));
+    virtual void update(float dt, double timeSinceInit) override;
+    virtual void draw(const SdlWindow& sdlManager, ResourceManager& rm, const Camera& camera, const IMesh::Draw type = IMesh::Draw::TRIANGLES) const override;
+    virtual void cleanUp() override;
 
+    Transform getTransform() const;
+    void setTransform(const Transform& transform);
+
+protected:
+    Draw::Config mConfig;
+    Transform mTransform;
+    float mCounter;
+}
 #endif // PARTICLE_HPP

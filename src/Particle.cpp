@@ -1,48 +1,89 @@
 #include "Particle.hpp"
 
-#include "engine/SdlWindow.hpp"
+//#include "engine/SdlWindow.hpp"
 
-const float Particle::scMaxDistance = 100.0f;
+#include "../ResourceManager.hpp"
+#include "../Camera.hpp"
+#include "../SdlWindow.hpp"
 
 /**
  * @brief Particle::Particle
- * @param position
- * @param dir
+ * @param config
+ * @param position = glm::vec3(0.0f)
+ * @param rotation = glm::vec3(0.0f)
+ * @param scale = glm::vec3(1.0f)
  */
-Particle::Particle(const glm::vec3& position, const glm::vec3& dir)
-: mPosition(position)
-, mActive(true)
-, mStartPoint(position)
-, mEndPoint(position + (dir * scMaxDistance))
-, mFireTime(static_cast<double>(SDL_GetTicks()) / 1000.0)
+Particle::Particle(const Draw::Config& config,
+    const glm::vec3& position,
+    const glm::vec3& rotation,
+    const glm::vec3& scale)
+: mConfig(config)
+, mTransform(position, rotation, scale)
+, mCounter(0.0f)
 {
-	update();
+
 }
 
-void Particle::update()
+/**
+ * @brief Particle::update
+ * @param dt
+ * @param timeSinceInit
+ */
+void Particle::update(float dt, double timeSinceInit)
 {
-   if (mActive) 
-   {
-       const double dt = (static_cast<double>(SDL_GetTicks()) / 1000.0) - mFireTime;
-       //const glm::vec3 lerp (mStartPoint * (1.0f - dt) + mEndPoint * dt);
+    // mCounter += glm::two_pi<float>() / dt;
+    // if (mCounter > glm::two_pi<float>())
+    //     mCounter -= glm::two_pi<float>();
 
-       glm::vec3 newPos = glm::mix(mStartPoint, mEndPoint, dt);
-
-       if (dt > 1.0) 
-       {
-           mActive = false;
-       }
-
-       mPosition = newPos;
-   }
+    // mTransform.setRotation(glm::vec3(mCounter * glm::radians(0.15f),
+    //     mCounter * glm::radians(0.25f),
+    //     0));
 }
 
-bool Particle::isActive() const
+/**
+ * @brief Particle::draw
+ * @param sdlManager
+ * @param rm
+ * @param camera
+ * @param type = IMesh::Draw::TRIANGLES
+ */
+void Particle::draw(const SdlWindow& sdlManager,
+    ResourceManager& rm,
+    const Camera& camera,
+    const IMesh::Draw type) const
 {
-    return mActive;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    auto& shader = rm.getShader(mConfig.shaderId);
+    shader->bind();
+
+    auto& tex = rm.getTexture(mConfig.textureId);
+    tex->bind();
+
+    auto mv = mTransform.getModelView(camera.getLookAt());
+    auto persp = camera.getPerspective(sdlManager.getAspectRatio());
+    shader->setUniform("uProjMatrix", persp);
+    shader->setUniform("uModelViewMatrix", mv);
+    shader->setUniform("uTexOffset0", mConfig.texAtlasOffset);
+
+    auto& mesh = rm.getMesh(mConfig.meshId);
+    mesh->draw(type, 1);
+
+    glDisable(GL_BLEND);
+} // draw
+
+void Particle::cleanUp()
+{
+
 }
 
-bool Particle::intersects(const glm::vec3& other, float size) const
+Transform Particle::getTransform() const
 {
-	return glm::length(mPosition - other) < size;
+    return mTransform;
+}
+
+void Particle::setTransform(const Transform& transform)
+{
+    mTransform = transform;
 }
