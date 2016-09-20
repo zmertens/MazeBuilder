@@ -41,3 +41,7 @@ Makefile*
 
 # IntelliJ
 .idea/
+
+# kde
+*.kdev*
+*.kdev4/
