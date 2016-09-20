@@ -59,21 +59,11 @@ void Level::draw(const SdlWindow& sdlManager,
     const Camera& camera,
     const IMesh::Draw type) const
 {
-    // every config in the list has the same shader and texture
-    auto&& frontConfig = mConfig;
-    auto& shader = rm.getShader(frontConfig.shaderId);
-    if (!rm.isInCache(frontConfig.shaderId, CachePos::Shader))
-    {
-        rm.putInCache(frontConfig.shaderId, CachePos::Shader);
-        shader->bind();
-    }
+    auto& shader = rm.getShader(mConfig.shaderId);
+    shader->bind();
 
-    auto& tex = rm.getTexture(frontConfig.textureId);
-    if (!rm.isInCache(frontConfig.textureId, CachePos::Texture))
-    {
-        rm.putInCache(frontConfig.textureId, CachePos::Texture);
-        tex->bind();
-    }
+    auto& tex = rm.getTexture(mConfig.textureId);
+    tex->bind();
 
     auto mv = mTransform.getModelView(camera.getLookAt());
     auto persp = camera.getPerspective(sdlManager.getAspectRatio());
@@ -87,8 +77,6 @@ void Level::draw(const SdlWindow& sdlManager,
     shader->setUniform("uMaterial.diffuse", mat->getDiffuse());
     shader->setUniform("uMaterial.specular", mat->getSpecular());
     shader->setUniform("uMaterial.shininess", mat->getShininess());
-
-    //shader->setUniform("uTexOffset0", config.texOffset0);
 
     mesh->draw(type);
 } // draw

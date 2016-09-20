@@ -6,6 +6,7 @@
 
 #include "../Utils.hpp"
 
+// this definition has to be here or else
 #ifndef STB_IMAGE_IMPLEMENTATION 
 #define STB_IMAGE_IMPLEMENTATION
 #endif // STB_IMAGE_IMPLEMENTATION

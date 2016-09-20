@@ -39,25 +39,15 @@ void Skybox::draw(const SdlWindow& sdlManager,
     static const GLfloat gray[] = { 0.2f, 0.2f, 0.2f, 1.0f };
     static const GLfloat ones[] = { 1.0f };
 
-    // every config in the list has the same shader and texture
-    auto&& frontConfig = mConfig;
-    auto& shader = rm.getShader(frontConfig.shaderId);
-    if (!rm.isInCache(frontConfig.shaderId, CachePos::Shader))
-    {
-        rm.putInCache(frontConfig.shaderId, CachePos::Shader);
-        shader->bind();
-    }
+    auto& shader = rm.getShader(mConfig.shaderId);
+    shader->bind();
 
-    auto& tex = rm.getTexture(frontConfig.textureId);
-    if (!rm.isInCache(frontConfig.textureId, CachePos::Texture))
-    {
-        rm.putInCache(frontConfig.textureId, CachePos::Texture);
-        tex->bind();
-    }
+    auto& tex = rm.getTexture(mConfig.textureId);
+    tex->bind();
 
     shader->setUniform("uViewMatrix", camera.getLookAt());
 
-    auto& mesh = rm.getMesh(frontConfig.meshId);
+    auto& mesh = rm.getMesh(mConfig.meshId);
 
     glDepthFunc(GL_LEQUAL);
     glClearBufferfv(GL_COLOR, 0, gray);

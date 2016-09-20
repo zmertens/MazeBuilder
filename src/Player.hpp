@@ -7,7 +7,7 @@
 
 #include <glm/glm.hpp>
 
-#include "PowerUp.hpp"
+#include "Power.hpp"
 
 class SdlWindow;
 class Camera;

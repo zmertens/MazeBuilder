@@ -158,7 +158,7 @@ void Player::update(const float dt, const double timeSinceInit)
         else if (isOnPoint(getPosition(), mLevel.getStrengthPowerUps()))
             mPower = Power::Type::Strength;
         else if (isOnPoint(getPosition(), mLevel.getInvinciblePowerUps()))
-            mPower = Power::Type::Invincible;
+            mPower = Power::Type::Immunity;
     }
     else
         mPowerUpTimer += dt;
@@ -264,8 +264,9 @@ float Player::getHealth() const
 
 void Player::inflictDamage()
 {
-    if (mPower != Power::Type::Invincible)
-        mHealth -= Utils::getRandomFloat(sMinDamage, sMaxDamage);
+    mHealth -= Utils::getRandomFloat(sMinDamage, sMaxDamage);
+    if (mPower != Power::Type::Immunity && (sMvFactor - 1.0f > 2.5f))
+        sMvFactor -= 1.0f;
 }
 
 bool Player::isOnExit() const

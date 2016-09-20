@@ -24,7 +24,7 @@
 #include "Level.hpp"
 #include "Enemy.hpp"
 #include "Player.hpp"
-#include "PowerUp.hpp"
+#include "Useless.hpp"
 
 class Blowtorch final : public IGame
 {
@@ -63,16 +63,13 @@ private:
     Level mLevel;
     Player mPlayer;
 
-    //Entity mCube;
+    Useless mCube;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;
     Sprite mExitSprite;
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
-
-    // exits
-    // power ups
 
 private:
     void init();

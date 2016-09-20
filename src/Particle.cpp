@@ -1,15 +1,15 @@
-#include "Bullet.hpp"
+#include "Particle.hpp"
 
 #include "engine/SdlWindow.hpp"
 
-const float Bullet::scMaxDistance = 100.0f;
+const float Particle::scMaxDistance = 100.0f;
 
 /**
- * @brief Bullet::Bullet
+ * @brief Particle::Particle
  * @param position
  * @param dir
  */
-Bullet::Bullet(const glm::vec3& position, const glm::vec3& dir)
+Particle::Particle(const glm::vec3& position, const glm::vec3& dir)
 : mPosition(position)
 , mActive(true)
 , mStartPoint(position)
@@ -19,7 +19,7 @@ Bullet::Bullet(const glm::vec3& position, const glm::vec3& dir)
 	update();
 }
 
-void Bullet::update()
+void Particle::update()
 {
    if (mActive) 
    {
@@ -37,12 +37,12 @@ void Bullet::update()
    }
 }
 
-bool Bullet::isActive() const
+bool Particle::isActive() const
 {
     return mActive;
 }
 
-bool Bullet::intersects(const glm::vec3& other, float size) const
+bool Particle::intersects(const glm::vec3& other, float size) const
 {
 	return glm::length(mPosition - other) < size;
 }

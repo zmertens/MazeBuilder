@@ -49,8 +49,18 @@ SdlWindow::SdlWindow(const char* title, const unsigned int width, const unsigned
 
 SdlWindow::~SdlWindow()
 {
-    if (mSdlWindow)
+    if (mSdlWindow != nullptr)
         cleanUp();
+}
+
+SdlWindow::SdlWindow(const SdlWindow& other)
+{
+
+}
+
+SdlWindow& SdlWindow::operator=(const SdlWindow& other)
+{
+
 }
 
 /**

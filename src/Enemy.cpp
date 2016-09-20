@@ -3,6 +3,7 @@
 #include "ResourceConstants.hpp"
 #include "Level.hpp"
 #include "Player.hpp"
+#include "Power.hpp"
 
 #include "engine/Utils.hpp"
 
@@ -23,7 +24,7 @@ Enemy::Enemy(
     const glm::vec3& scale)
 : Sprite(config, position, rotation, scale)
 , mHealth(100.0f)
-, mState(States::Sit)
+, mState(States::Idle)
 , mAnimationCounter(0.0f)
 , mAnimationIndex(0u)
 {
@@ -94,7 +95,7 @@ void Enemy::handleMovement(const float dt, Player& player, const Level& level)
             this->inflictDamage(sMinDamage, sMaxDamage);
     }
 
-    if (mState == Enemy::States::Sit && glm::length(mTransform.getTranslation() - player.getPosition()) < sAgroRange)
+    if (mState == Enemy::States::Idle && glm::length(mTransform.getTranslation() - player.getPosition()) < sAgroRange)
     {    
         mState = Enemy::States::Attack;
     }
@@ -109,7 +110,7 @@ void Enemy::inflictDamage(const float min, const float max)
 
 void Enemy::updateAnimations()
 {
-    if (mState == States::Sit)
+    if (mState == States::Idle)
     {
         mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
@@ -123,7 +124,7 @@ void Enemy::updateAnimations()
         if (mAnimationIndex >= 8)
             mAnimationIndex = 4;
     }
-    else if (mState == States::Attack)
+    else if (mState == States::Dead)
     {
         mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;

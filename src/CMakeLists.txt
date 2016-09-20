@@ -11,10 +11,10 @@ set(BLOWTORCH_SOURCES
 	Main.cpp
 	Blowtorch.cpp
 	Player.cpp
-	PowerUp.cpp
 	Level.cpp
 	Enemy.cpp
-	Bullet.cpp
+	Particle.cpp
+	Useless.cpp
 	engine/Camera.cpp
 	engine/Logger.cpp
 	engine/ResourceManager.cpp
@@ -22,7 +22,6 @@ set(BLOWTORCH_SOURCES
 	engine/gl_core_4_3.c
 	engine/Transform.cpp
 	engine/ImGuiHelper.cpp
-	#engine/graphics/Entity.cpp
 	engine/graphics/Fog.cpp
 	engine/graphics/GlUtils.cpp
 	engine/graphics/IndexedMeshImpl.cpp

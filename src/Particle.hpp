@@ -1,5 +1,5 @@
-#ifndef BULLET_HPP
-#define BULLET_HPP
+#ifndef PARTICLE_HPP
+#define PARTICLE_HPP
 
 #include <memory>
 
@@ -7,12 +7,12 @@
 
 #include "engine/BoundingBox.hpp"
 
-class Bullet
+class Particle
 {
 public:
-    typedef std::unique_ptr<Bullet> Ptr;
+    typedef std::unique_ptr<Particle> Ptr;
 public:
-    explicit Bullet(const glm::vec3& position, const glm::vec3& dir);
+    explicit Particle(const glm::vec3& position, const glm::vec3& dir);
     void update();
     bool isActive() const;
     bool intersects(const glm::vec3& other, float size) const;
@@ -25,4 +25,4 @@ private:
     double mFireTime;
 };
 
-#endif // BULLET_HPP
+#endif // PARTICLE_HPP

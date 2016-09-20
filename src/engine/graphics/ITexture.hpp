@@ -5,9 +5,6 @@
 #include <vector>
 #include <memory>
 
-//#define STB_IMAGE_IMPLEMENTATION
-//#include "../../extlibs/stb_image.h"
-
 class ITexture
 {
 public:

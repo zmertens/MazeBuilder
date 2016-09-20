@@ -13,16 +13,6 @@
 #include "audio/Chunk.hpp"
 #include "audio/Music.hpp"
 
-namespace CachePos
-{
-const unsigned int Shader = 0;
-const unsigned int Material = 1;
-const unsigned int Texture = 2;
-const unsigned int Offset0 = 3;
-const unsigned int Offset1 = 4;
-const unsigned int Offset2 = 5;
-}
-
 class ResourceManager final
 {
 public:
@@ -41,12 +31,6 @@ public:
     const Shader::Ptr& getShader(const std::string& id) const;
     const Music::Ptr& getMusic(const std::string& id) const;
     const Chunk::Ptr& getChunk(const std::string& id) const;
-
-    void putInCache(const std::string& id, const unsigned int index);
-    void putInCache(const glm::vec2& id, const unsigned int index);
-    bool isInCache(const std::string& id, const unsigned int index) const;
-    bool isInCache(const glm::vec2& id, const unsigned int index) const;
-    void clearCache();
 
     std::string getAllLogs() const;
     std::string getShaderLogs() const;
@@ -70,9 +54,6 @@ private:
 
     std::tuple<std::string, std::string, std::string,
         glm::vec2, glm::vec2, glm::vec2> mResourceCache;
-private:
-    ResourceManager(const ResourceManager& other);
-    ResourceManager& operator=(const ResourceManager& other);
 };
 
 #endif // RESOURCEMANAGER_HPP

@@ -17,8 +17,10 @@ public:
     typedef std::unique_ptr<Enemy> Ptr;
 
     enum class States {
-        Sit,
+        Idle,
         Attack,
+        Hurt,
+        Follow,
         Dead
     };
 

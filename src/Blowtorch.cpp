@@ -47,13 +47,11 @@ Blowtorch::Blowtorch()
 
 
 // @TODO -- Initialize game entities after resource initialization (incudling post-processor)
-// , mCube(Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
-//     ResourceIds::Meshes::CUBE_ID,
-//     ResourceIds::Materials::PEARL_ID,
-//     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-//     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
-//         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
-//     glm::vec3(2, 0, 0))
+, mCube(Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
+    ResourceIds::Meshes::CUBE_ID,
+    ResourceIds::Materials::PEARL_ID,
+    ResourceIds::Textures::PERLIN_NOISE_2D_ID,
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)))
 , mSkybox(Draw::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
@@ -70,10 +68,9 @@ Blowtorch::Blowtorch()
 {
     init();
 
-    // sloppppppy slut
-    // auto&& t = mCube.getTransform();
-    // t.setTranslation(mPlayer.getPosition());
-    // mCube.setTransform(t);
+    auto&& t = mCube.getTransform();
+    t.setTranslation(mPlayer.getPosition());
+    mCube.setTransform(t);
 } // constructor
 
 /**
@@ -152,7 +149,7 @@ void Blowtorch::handleEvents()
  */
 void Blowtorch::update(float dt, double timeSinceInit)
 {
-    // mCube.update(dt, timeSinceInit);
+    mCube.update(dt, timeSinceInit);
     mExitSprite.update(dt, timeSinceInit);
 
     Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(0.9f));
@@ -196,9 +193,6 @@ void Blowtorch::update(float dt, double timeSinceInit)
  */
 void Blowtorch::render()
 {
-
-    mResources.clearCache();
-
     mPostProcessor.bind();
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -208,32 +202,30 @@ void Blowtorch::render()
 
     auto& shader = mResources.getShader(ResourceIds::Shaders::LEVEL_SHADER_ID);
     shader->bind();
-    auto& tex = mResources.getTexture(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID);
-    tex->bind();
-
+    // auto& tex = mResources.getTexture(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID);
+    // tex->bind();
     shader->setUniform("uLight.ambient", mLight.getAmbient());
     shader->setUniform("uLight.diffuse", mLight.getDiffuse());
     shader->setUniform("uLight.specular", mLight.getSpecular());
     shader->setUniform("uLight.position", mCamera.getLookAt() * mLight.getPosition());
 
     mLevel.draw(mSdlWindow, mResources, mCamera);
+    mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
-    // mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
-
-    mExitSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
     spriteShader->setUniform("uHalfSize", mLevel.getSpriteHalfWidth());
-    mResources.putInCache(ResourceIds::Shaders::SPRITE_SHADER_ID, CachePos::Shader);
+
+    mExitSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
+
     for (auto& enemy : mEnemies)
         enemy->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
-
 
     for (auto& powerup : mPowerUps)
         powerup->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
-    if (mPlayer.getPower() == Power::Type::Invincible)
+    if (mPlayer.getPower() == Power::Type::Immunity)
         mPostProcessor.activateEffect(Effects::Type::Blur);
     else if (mPlayer.getPower() == Power::Type::Speed) 
         mPostProcessor.activateEffect(Effects::Type::Edge);
@@ -260,7 +252,7 @@ void Blowtorch::finish()
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
     mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
-    mLogger.dumpLogToFile("ShooterDataLog.txt");
+    mLogger.dumpLogToFile(Utils::toString(sTitle) + "DataLog.txt");
 #endif // defined
 
     mPlay = false;

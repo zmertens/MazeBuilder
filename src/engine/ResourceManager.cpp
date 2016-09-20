@@ -185,89 +185,6 @@ const Chunk::Ptr& ResourceManager::getChunk(const std::string& id) const
 }
 
 /**
- * @brief ResourceManager::putInCache
- * @param id
- * @param index
- */
-void ResourceManager::putInCache(const std::string& id, const unsigned int index)
-{
-    switch (index)
-    {
-        case CachePos::Shader: std::get<CachePos::Shader>(mResourceCache) = id; break;
-        case CachePos::Material: std::get<CachePos::Material>(mResourceCache) = id; break;
-        case CachePos::Texture: std::get<CachePos::Texture>(mResourceCache) = id; break;
-    }
-}
-
-/**
- * @brief ResourceManager::putInCache
- * @param id
- * @param index
- */
-void ResourceManager::putInCache(const glm::vec2& id, const unsigned int index)
-{
-    switch (index)
-    {
-        case CachePos::Offset0: std::get<CachePos::Offset0>(mResourceCache) = id; break;
-        case CachePos::Offset1: std::get<CachePos::Offset1>(mResourceCache) = id; break;
-        case CachePos::Offset2: std::get<CachePos::Offset2>(mResourceCache) = id; break;
-    }
-}
-
-/**
- * @brief ResourceManager::isInCache
- * @param id
- * @param index
- * @return
- */
-bool ResourceManager::isInCache(const std::string& id, const unsigned int index) const
-{
-    switch (index)
-    {
-        case CachePos::Shader: return std::get<CachePos::Shader>(mResourceCache) == id;
-        case CachePos::Material: return std::get<CachePos::Material>(mResourceCache) == id;
-        case CachePos::Texture: return std::get<CachePos::Texture>(mResourceCache) == id;
-    }
-}
-
-/**
- * @brief ResourceManager::isInCache
- * @param id
- * @param index
- * @return
- */
-bool ResourceManager::isInCache(const glm::vec2& id, const unsigned int index) const
-{
-    switch (index)
-    {
-        case CachePos::Offset0:
-            return (std::get<CachePos::Offset0>(mResourceCache).x == id.x &&
-                std::get<CachePos::Offset0>(mResourceCache).y == id.y);
-        case CachePos::Offset1:
-            return (std::get<CachePos::Offset1>(mResourceCache).x == id.x &&
-                std::get<CachePos::Offset1>(mResourceCache).y == id.y);
-        case CachePos::Offset2:
-            return (std::get<CachePos::Offset2>(mResourceCache).x == id.x &&
-                std::get<CachePos::Offset2>(mResourceCache).y == id.y);
-    }
-}
-
-
-/**
- * Resets cache.
- * @brief ResourceManager::clearCache
- */
-void ResourceManager::clearCache()
-{
-    std::get<CachePos::Shader>(mResourceCache) = "";
-    std::get<CachePos::Material>(mResourceCache) = "";
-    std::get<CachePos::Texture>(mResourceCache) = "";
-    std::get<CachePos::Offset0>(mResourceCache) = glm::vec2(-1);
-    std::get<CachePos::Offset1>(mResourceCache) = glm::vec2(-1);
-    std::get<CachePos::Offset2>(mResourceCache) = glm::vec2(-1);
-}
-
-/**
  * @brief ResourceManager::getAllLogs
  * @return
  */
@@ -293,8 +210,8 @@ std::string ResourceManager::getShaderLogs() const
     for (auto& itr : mShaders)
     {
         ret += "Shader id: " + itr.first + "\n";
-        ret += itr.second->getGlslAttribs();
-        ret += itr.second->getGlslUniforms();
+        // ret += itr.second->getGlslAttribs();
+        // ret += itr.second->getGlslUniforms();
     }
     return ret;
 }

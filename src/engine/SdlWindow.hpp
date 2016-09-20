@@ -61,6 +61,9 @@ public:
         const unsigned int height = 600u);
     virtual ~SdlWindow();
 
+    SdlWindow(const SdlWindow& other);
+    SdlWindow& operator=(const SdlWindow& other);
+
     void cleanUp();
 
     std::string getSdlInfoString() const;
@@ -106,8 +109,6 @@ private:
     SDL_Joystick* mSdlJoystick;
     SDL_Haptic* mSdlHaptic;
 private:
-    SdlWindow(const SdlWindow& other);
-    SdlWindow& operator=(const SdlWindow& other);
     void initWindow(Uint32 flags, unsigned int width, unsigned int height);
     void initJoysticks();
     void initHaptic();
