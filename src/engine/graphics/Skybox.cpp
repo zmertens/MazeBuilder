@@ -7,15 +7,9 @@
 /**
  * @brief Skybox::Skybox
  * @param config
- * @param position = glm::vec3(0.0f)
- * @param rotation = glm::vec3(0.0f)
- * @param scale = glm::vec3(1.0f)
  */
-Skybox::Skybox(const Entity::Config& config,
-    const glm::vec3& position,
-    const glm::vec3& rotation,
-    const glm::vec3& scale)
-: Entity(config, position, rotation, scale)
+Skybox::Skybox(const Draw::Config& config)
+: mConfig(config)
 {
 
 }
@@ -46,7 +40,7 @@ void Skybox::draw(const SdlWindow& sdlManager,
     static const GLfloat ones[] = { 1.0f };
 
     // every config in the list has the same shader and texture
-    auto& frontConfig = mConfig.front();
+    auto&& frontConfig = mConfig;
     auto& shader = rm.getShader(frontConfig.shaderId);
     if (!rm.isInCache(frontConfig.shaderId, CachePos::Shader))
     {
@@ -74,4 +68,9 @@ void Skybox::draw(const SdlWindow& sdlManager,
 
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
+}
+
+void Skybox::cleanUp()
+{
+
 }

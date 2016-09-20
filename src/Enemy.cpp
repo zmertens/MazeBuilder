@@ -11,14 +11,13 @@ const float Enemy::sMvFactor = 17.5f;
 
 /**
  * @brief Enemy::Enemy
- * @param scalar
  * @param config
  * @param position = glm::vec3(0.0f)
  * @param rotation = glm::vec3(0.0f)
  * @param scale = glm::vec3(1.0f)
  */
-Enemy::Enemy(const glm::vec3& scalar,
-    const Entity::Config& config,
+Enemy::Enemy(
+    const Draw::Config& config,
     const glm::vec3& position,
     const glm::vec3& rotation,
     const glm::vec3& scale)
@@ -49,6 +48,11 @@ void Enemy::update(float dt, double timeSinceInit)
 
     if (mHealth < 0.0f)
         mState = States::Dead;
+}
+
+void Enemy::cleanUp()
+{
+
 }
 
 float Enemy::getHealth() const
@@ -107,21 +111,21 @@ void Enemy::updateAnimations()
 {
     if (mState == States::Sit)
     {
-        mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
+        mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
         if (mAnimationIndex >= 4)
             mAnimationIndex = 0;
     }
     else if (mState == States::Attack)
     {
-        mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
+        mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
         if (mAnimationIndex >= 8)
             mAnimationIndex = 4;
     }
     else if (mState == States::Attack)
     {
-        mConfig.front().texOffset0 = mAnimations[mAnimationIndex];
+        mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
         if (mAnimationIndex >= 12)
             mAnimationIndex = 8;

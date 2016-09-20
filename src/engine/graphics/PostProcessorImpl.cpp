@@ -7,7 +7,7 @@
 #endif // defined
 
 PostProcessorImpl::PostProcessorImpl(const ResourceManager& resources,
-    const Entity::Config& config,
+    const Draw::Config& config,
     const unsigned int width, const unsigned int height)
 : mResources(resources)
 , mConfig(config)

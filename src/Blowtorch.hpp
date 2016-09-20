@@ -13,7 +13,7 @@
 #include "engine/Camera.hpp"
 #include "engine/ImGuiHelper.hpp"
 
-#include "engine/graphics/Entity.hpp"
+#include "engine/graphics/IDrawable.hpp"
 #include "engine/graphics/Skybox.hpp"
 #include "engine/graphics/Light.hpp"
 #include "engine/graphics/PostProcessorImpl.hpp"
@@ -63,7 +63,7 @@ private:
     Level mLevel;
     Player mPlayer;
 
-    Entity mCube;
+    //Entity mCube;
     Skybox mSkybox;
     PostProcessorImpl mPostProcessor;
     Light mLight;

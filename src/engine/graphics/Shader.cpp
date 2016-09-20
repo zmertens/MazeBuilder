@@ -21,7 +21,19 @@ Shader::Shader(const SdlWindow& SdlWindow)
  */
 Shader::~Shader()
 {
-    cleanUp();
+    if (mProgram)
+        cleanUp();
+}
+
+Shader::Shader(const Shader& other)
+: cSdlManager(other.getSdlManager())
+{
+    // dangerous and unimplemented
+}
+
+Shader& Shader::operator=(const Shader& other)
+{
+    // dangerous and unmiplemented
 }
 
 /**

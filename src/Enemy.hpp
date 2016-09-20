@@ -5,7 +5,7 @@
 
 #include <glm/glm.hpp>
 
-#include "engine/graphics/Entity.hpp"
+#include "engine/graphics/IDrawable.hpp"
 #include "engine/graphics/Sprite.hpp"
 
 class Player;
@@ -23,12 +23,13 @@ public:
     };
 
 public:
-    explicit Enemy(const glm::vec3& scalar,
-        const Entity::Config& config,
+    explicit Enemy(
+        const Draw::Config& config,
         const glm::vec3& position = glm::vec3(0.0f),
         const glm::vec3& rotation = glm::vec3(0.0f),
         const glm::vec3& scale = glm::vec3(1.0f));
     virtual void update(float dt, double timeSinceInit) override;
+    virtual void cleanUp() override;
 
     Enemy::States getState() const;
     void setState(Enemy::States state);

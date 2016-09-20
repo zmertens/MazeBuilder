@@ -3,7 +3,7 @@
 
 #include "IFramebuffer.hpp"
 
-#include "Entity.hpp"
+#include "IDrawable.hpp"
 
 #include "Tex2dImpl.hpp"
 
@@ -26,7 +26,7 @@ class PostProcessorImpl : public IFramebuffer
 {
 public:
     explicit PostProcessorImpl(const ResourceManager& resources,
-        const Entity::Config& config,
+        const Draw::Config& config,
         const unsigned int width, const unsigned int height);
 
     virtual void cleanUp() override;
@@ -42,7 +42,7 @@ protected:
 
 private:
     const ResourceManager& mResources;
-    Entity::Config mConfig;
+    Draw::Config mConfig;
     Effects::Type mEffect;
     GLuint mFboHandle;
     GLuint mRboHandle;

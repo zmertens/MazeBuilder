@@ -11,11 +11,13 @@
  * @param rotation = glm::vec3(0.0f)
  * @param scale = glm::vec3(1.0f)
  */
-Sprite::Sprite(const Entity::Config& config,
+Sprite::Sprite(const Draw::Config& config,
     const glm::vec3& position,
     const glm::vec3& rotation,
     const glm::vec3& scale)
-: Entity(config, position, rotation, scale)
+: mConfig(config)
+, mTransform(position, rotation, scale)
+, mCounter(0.0f)
 {
 
 }
@@ -27,7 +29,13 @@ Sprite::Sprite(const Entity::Config& config,
  */
 void Sprite::update(float dt, double timeSinceInit)
 {
+    // mCounter += glm::two_pi<float>() / dt;
+    // if (mCounter > glm::two_pi<float>())
+    //     mCounter -= glm::two_pi<float>();
 
+    // mTransform.setRotation(glm::vec3(mCounter * glm::radians(0.15f),
+    //     mCounter * glm::radians(0.25f),
+    //     0));
 }
 
 /**
@@ -46,7 +54,7 @@ void Sprite::draw(const SdlWindow& sdlManager,
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // every config in the list has the same shader and texture
-    auto& frontConfig = mConfig.front();
+    auto&& frontConfig = mConfig;
     auto& shader = rm.getShader(frontConfig.shaderId);
     if (!rm.isInCache(frontConfig.shaderId, CachePos::Shader))
     {
@@ -66,18 +74,30 @@ void Sprite::draw(const SdlWindow& sdlManager,
     shader->setUniform("uProjMatrix", persp);
     shader->setUniform("uModelViewMatrix", mv);
 
-    for (auto& config : mConfig)
+    auto& mesh = rm.getMesh(mConfig.meshId);
+
+    if (!rm.isInCache(mConfig.texAtlasOffset, CachePos::Offset0))
     {
-        auto& mesh = rm.getMesh(config.meshId);
-
-        if (!rm.isInCache(config.texOffset0, CachePos::Offset0))
-        {
-            rm.putInCache(config.texOffset0, CachePos::Offset0);
-            shader->setUniform("uTexOffset0", config.texOffset0);
-        }
-
-        mesh->draw(type, 1);
+        rm.putInCache(mConfig.texAtlasOffset, CachePos::Offset0);
+        shader->setUniform("uTexOffset0", mConfig.texAtlasOffset);
     }
+
+    mesh->draw(type, 1);
 
     glDisable(GL_BLEND);
 } // draw
+
+void Sprite::cleanUp()
+{
+
+}
+
+Transform Sprite::getTransform() const
+{
+    return mTransform;
+}
+
+void Sprite::setTransform(const Transform& transform)
+{
+    mTransform = transform;
+}

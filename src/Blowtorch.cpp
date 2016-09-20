@@ -42,26 +42,26 @@ Blowtorch::Blowtorch()
     ResourceIds::Textures::Atlas::METAL_INDEX,
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
     
-    Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
+    Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
 , mPlayer(mCamera, mLevel)
 
 
 // @TODO -- Initialize game entities after resource initialization (incudling post-processor)
-, mCube(Entity::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
-    ResourceIds::Meshes::CUBE_ID,
-    ResourceIds::Materials::PEARL_ID,
-    ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
-        ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
-    glm::vec3(2, 0, 0))
-, mSkybox(Entity::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
+// , mCube(Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID,
+//     ResourceIds::Meshes::CUBE_ID,
+//     ResourceIds::Materials::PEARL_ID,
+//     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
+//     Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX,
+//         ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+//     glm::vec3(2, 0, 0))
+, mSkybox(Draw::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::SKYBOX_TEX_ID))
-, mPostProcessor(mResources, Entity::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
+, mPostProcessor(mResources, Draw::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
     ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
-, mExitSprite(Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+, mExitSprite(Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
@@ -71,9 +71,9 @@ Blowtorch::Blowtorch()
     init();
 
     // sloppppppy slut
-    auto&& t = mCube.getTransform();
-    t.setTranslation(mPlayer.getPosition());
-    mCube.setTransform(t);
+    // auto&& t = mCube.getTransform();
+    // t.setTranslation(mPlayer.getPosition());
+    // mCube.setTransform(t);
 } // constructor
 
 /**
@@ -82,7 +82,7 @@ Blowtorch::Blowtorch()
 void Blowtorch::start()
 {
     mPlay = true;
-    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    // mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -152,7 +152,7 @@ void Blowtorch::handleEvents()
  */
 void Blowtorch::update(float dt, double timeSinceInit)
 {
-    mCube.update(dt, timeSinceInit);
+    // mCube.update(dt, timeSinceInit);
     mExitSprite.update(dt, timeSinceInit);
 
     Transform transform (mLevel.getExitPoints().front(), glm::vec3(0), glm::vec3(0.9f));
@@ -218,7 +218,7 @@ void Blowtorch::render()
 
     mLevel.draw(mSdlWindow, mResources, mCamera);
 
-    mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
+    // mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
     mExitSprite.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
@@ -414,8 +414,7 @@ void Blowtorch::initPositions()
     for (auto& enemyPos : mLevel.getEnemyPositions())
     {
         mEnemies.emplace_back(std::move(new Enemy(
-            mLevel.getTileScalar(),
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
             ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID,
@@ -428,7 +427,7 @@ void Blowtorch::initPositions()
     for (auto& pos : mLevel.getInvinciblePowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
             ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
@@ -441,7 +440,7 @@ void Blowtorch::initPositions()
     for (auto& pos : mLevel.getSpeedPowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
             ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
@@ -454,7 +453,7 @@ void Blowtorch::initPositions()
     for (auto& pos : mLevel.getStrengthPowerUps())
     {
         mPowerUps.emplace_back(std::move(new Sprite(
-            Entity::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
+            Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
             ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,

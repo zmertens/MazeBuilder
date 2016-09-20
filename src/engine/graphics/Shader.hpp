@@ -26,7 +26,9 @@ public:
 public:
     explicit Shader(const SdlWindow& sdlManager);
     virtual ~Shader();
-
+    Shader(const Shader& other);
+    Shader& operator=(const Shader& other);
+    
     void compileAndAttachShader(const int shaderType, const std::string& filename);
     void compileAndAttachShader(const int shaderType, const std::string& codeId, const GLchar* code);
     void linkProgram();
@@ -69,8 +71,6 @@ private:
     std::unordered_map<std::string, GLint> mGlslLocations;
     std::unordered_map<int, std::string> mFileNames;
 private:
-    Shader(const Shader& other);
-    Shader& operator=(const Shader& other);
     GLuint compile(const int shaderType, const std::string& shaderCode);
     GLuint compile(const int shaderType, const GLchar* shaderCode);
     void attach(GLuint shaderId);

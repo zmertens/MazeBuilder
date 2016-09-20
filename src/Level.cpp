@@ -20,11 +20,12 @@
 Level::Level(const std::vector<std::vector<Tile::Data>>& level,
     const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
     float texAtlasRows,
-    const Entity::Config& config,
+    const Draw::Config& config,
     const glm::vec3& position,
     const glm::vec3& rotation,
     const glm::vec3& scale)
-: Entity(config, position, rotation, scale)
+: mConfig(config)
+, mTransform(position, rotation, scale)
 , cTileScalar(20.0f, 20.0f, 20.0f)
 , cSpriteHalfWidth((cTileScalar.x + cTileScalar.z) * 0.25f)
 , mLevel(level)
@@ -59,7 +60,7 @@ void Level::draw(const SdlWindow& sdlManager,
     const IMesh::Draw type) const
 {
     // every config in the list has the same shader and texture
-    auto& frontConfig = mConfig.front();
+    auto&& frontConfig = mConfig;
     auto& shader = rm.getShader(frontConfig.shaderId);
     if (!rm.isInCache(frontConfig.shaderId, CachePos::Shader))
     {
@@ -79,21 +80,23 @@ void Level::draw(const SdlWindow& sdlManager,
     shader->setUniform("uProjMatrix", persp);
     shader->setUniform("uModelViewMatrix", mv);
 
-    for (auto& config : mConfig)
-    {
-        auto& mat = rm.getMaterial(config.materialId);
-        auto& mesh = rm.getMesh(config.meshId);
+    auto& mat = rm.getMaterial(mConfig.materialId);
+    auto& mesh = rm.getMesh(mConfig.meshId);
 
-        shader->setUniform("uMaterial.ambient", mat->getAmbient());
-        shader->setUniform("uMaterial.diffuse", mat->getDiffuse());
-        shader->setUniform("uMaterial.specular", mat->getSpecular());
-        shader->setUniform("uMaterial.shininess", mat->getShininess());
+    shader->setUniform("uMaterial.ambient", mat->getAmbient());
+    shader->setUniform("uMaterial.diffuse", mat->getDiffuse());
+    shader->setUniform("uMaterial.specular", mat->getSpecular());
+    shader->setUniform("uMaterial.shininess", mat->getShininess());
 
-        //shader->setUniform("uTexOffset0", config.texOffset0);
+    //shader->setUniform("uTexOffset0", config.texOffset0);
 
-        mesh->draw(type);
-    }
+    mesh->draw(type);
 } // draw
+
+void Level::cleanUp()
+{
+
+}
 
 /**
  * @brief Level::generateLevel

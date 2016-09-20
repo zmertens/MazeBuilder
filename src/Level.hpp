@@ -6,18 +6,19 @@
 #include <glm/glm.hpp>
 
 #include "engine/graphics/MeshFactory.hpp"
-#include "engine/graphics/Entity.hpp"
+#include "engine/graphics/IDrawable.hpp"
+#include "engine/Transform.hpp"
 #include "engine/Vertex.hpp"
+#include "engine/SdlWindow.hpp"
 
 #include "ResourceConstants.hpp"
 
 class ResourceManager;
 class Camera;
-class SdlWindow;
 
 namespace Tile
 {
-enum class Special : Uint32 {
+enum class Special {
     PLAYER,
     ENEMY,
     SPD_PW,
@@ -71,13 +72,13 @@ const std::vector<std::vector<Data>> TEST_LEVEL = {{
 } // levels
 
 
-class Level final : Entity
+class Level final : IDrawable
 {
 public:
     explicit Level(const std::vector<std::vector<Tile::Data>>& level,
         const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
         const float texAtlasRows,
-        const Entity::Config& config,
+        const Draw::Config& config,
         const glm::vec3& position = glm::vec3(0.0f),
         const glm::vec3& rotation = glm::vec3(0.0f),
         const glm::vec3& scale = glm::vec3(1.0f));
@@ -87,6 +88,7 @@ public:
         ResourceManager& rm,
         const Camera& camera,
         const IMesh::Draw type = IMesh::Draw::TRIANGLES) const;
+    virtual void cleanUp() override;
 
     void generateLevel(std::vector<Vertex>& vertices, std::vector<GLushort>& indices);
 
@@ -112,6 +114,8 @@ private:
     const glm::vec3 cTileScalar;
     const float cSpriteHalfWidth;
     std::vector<std::vector<Tile::Data>> mLevel;
+    Draw::Config mConfig;
+    Transform mTransform;
     unsigned int mWallTexId;
     unsigned int mFloorTexId;
     unsigned int mCeilTexId;

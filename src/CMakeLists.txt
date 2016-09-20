@@ -22,7 +22,7 @@ set(BLOWTORCH_SOURCES
 	engine/gl_core_4_3.c
 	engine/Transform.cpp
 	engine/ImGuiHelper.cpp
-	engine/graphics/Entity.cpp
+	#engine/graphics/Entity.cpp
 	engine/graphics/Fog.cpp
 	engine/graphics/GlUtils.cpp
 	engine/graphics/IndexedMeshImpl.cpp
@@ -44,6 +44,10 @@ set(BLOWTORCH_SOURCES
 	engine/audio/Music.cpp
 	engine/audio/SdlMixer.cpp
 )
+
+#set(BLOWTORCH_HEADERS
+
+#)
 
 add_executable(${CMAKE_PROJECT_NAME} ${BLOWTORCH_SOURCES} ${IMGUI_SOURCES} ${STB_HEADER})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${BLOWTORCH_LIBS})
