@@ -213,7 +213,8 @@ void Blowtorch::render()
     mLevel.draw(mSdlWindow, mResources, mCamera);
     mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
-    mParticles->draw(mSdlWindow, mResources, mCamera);
+    if (mPlayer.isShooting())
+        mParticles->draw(mSdlWindow, mResources, mCamera);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
@@ -325,7 +326,7 @@ void Blowtorch::initResources()
     particles->bind();
     particles->setUniform("uRender", GL_FALSE);
     particles->setUniform("uParticleTex", 0);
-    particles->setUniform("ParticleLifetime", 0.5f);
+    particles->setUniform("ParticleLifetime", 3.5f);
     particles->setUniform("Accel", glm::vec3(0.0f, 0.0f, -1.4f));
     mResources.insert(ResourceIds::Shaders::PARTICLES_SHADER_ID,
         std::move(particles));
@@ -417,7 +418,7 @@ void Blowtorch::initResources()
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
 
     /****************** Particles ****************************************/
-    mParticles = std::move(Particle::Ptr(new Particle(
+    mParticles = std::move(Particle::Ptr(new Particle(mPlayer,
         Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))));
 
 }
