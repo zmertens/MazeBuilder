@@ -15,7 +15,7 @@ in vec2 vTexCoords;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 2) uniform sampler2D uTexture2D;
+layout (binding = 1) uniform sampler2D uTexture2D;
 
 uniform Effect uEffect;
 // uniform initialization requires GL 4.3

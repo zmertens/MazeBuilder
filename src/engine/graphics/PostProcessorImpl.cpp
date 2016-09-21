@@ -2,7 +2,7 @@
 
 #include "../ResourceManager.hpp"
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
 #include "GlUtils.hpp"
 #endif // defined
 
@@ -14,7 +14,7 @@ PostProcessorImpl::PostProcessorImpl(const ResourceManager& resources,
 , mEffect(Effects::Type::None)
 , mFboHandle(0)
 , mRboHandle(0)
-, fullscreen(width, height, 2)
+, fullscreen(width, height, 1)
 {
     genFrameBuffer();
     init(width, height);
@@ -87,8 +87,8 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
 
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, mRboHandle);
 
-#if defined(APP_DEBUG)
-    SDL_Log("\nPostProcessorImpl using Texture channel = %i\n", 2);
+#if defined(BLOWTORCH_DEBUG_MODE)
+    SDL_Log("\nPostProcessorImpl using Texture channel = %i\n", 1);
     GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
 #endif // defined
 
@@ -98,7 +98,7 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
     // if (glCheckNamedFramebufferStatus(mFboHandle, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) // 4.5
     //     throw new std::runtime_error("FrameBuffer Error! Failed to initialize mFrameBuffer_Handle\n");
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
     GlUtils::CheckForOpenGLError(__FILE__, __LINE__);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 #endif // defined

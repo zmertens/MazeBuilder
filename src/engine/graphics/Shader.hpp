@@ -14,9 +14,9 @@ namespace ShaderTypes
 const int VERTEX_SHADER = 0;
 const int FRAGMENT_SHADER = 1;
 const int GEOMETRY_SHADER = 2;
-const int TESSELATION_EVAL_SHADER = 3;
-const int TESSELATION_CONTROL_SHADER = 4;
-const int COMPUTE_SHADER = 5;
+// const int TESSELATION_EVAL_SHADER = 3;
+// const int TESSELATION_CONTROL_SHADER = 4;
+// const int COMPUTE_SHADER = 5;
 }
 
 class Shader final
@@ -58,6 +58,8 @@ public:
 
     void bindFragDataLocation(const std::string& str, GLuint loc);
     void bindAttribLocation(const std::string& str, GLuint loc);
+
+    void initTransformFeedback(GLsizei size, const GLchar* const* names, GLint type);
 
     unsigned int getProgramHandle() const;
     GLenum getShaderType(const int shaderType) const;

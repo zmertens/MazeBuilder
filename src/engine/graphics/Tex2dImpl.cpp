@@ -1,6 +1,6 @@
 #include "Tex2dImpl.hpp"
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
 #include "GlUtils.hpp"
 #endif // defined
 

@@ -351,6 +351,14 @@ void Shader::bindAttribLocation(const std::string& str, GLuint loc)
 }
 
 /**
+ *
+ */
+void Shader::initTransformFeedback(GLsizei size, const GLchar* const* names, GLint type)
+{
+    glTransformFeedbackVaryings(mProgram, size, names, type);
+}
+
+/**
  * @brief Shader::getProgramHandle
  * @return
  */

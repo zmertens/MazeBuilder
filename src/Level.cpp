@@ -7,7 +7,6 @@
 
 /**
  * @brief Level::Level
- * @param level
  * @param wallTex
  * @param floorTex
  * @param ceilTex
@@ -17,7 +16,7 @@
  * @param rotation = glm::vec3(0.0f)
  * @param scale = glm::vec3(1.0f)
  */
-Level::Level(const std::vector<std::vector<Tile::Data>>& level,
+Level::Level(
     const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
     float texAtlasRows,
     const Draw::Config& config,
@@ -28,7 +27,7 @@ Level::Level(const std::vector<std::vector<Tile::Data>>& level,
 , mTransform(position, rotation, scale)
 , cTileScalar(20.0f, 20.0f, 20.0f)
 , cSpriteHalfWidth((cTileScalar.x + cTileScalar.z) * 0.25f)
-, mLevel(level)
+, mLevel(::LEVEL_ONE)
 , mWallTexId(wallTex)
 , mFloorTexId(floorTex)
 , mCeilTexId(ceilTex)
@@ -239,7 +238,7 @@ void Level::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
         case Special::EXIT:
             mExitPoints.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
             break;
-        case Special::INVINC_PW:
+        case Special::IMMUN_PW:
             mInvinciblePowerUps.emplace_back((x + 0.5f) * cTileScalar.x, cTileScalar.y * 0.5f, (z + 0.5f) * cTileScalar.z);
             break;
         case Special::STR_PW:

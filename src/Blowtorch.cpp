@@ -3,7 +3,7 @@
 
 #include "engine/Utils.hpp"
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
 #include "engine/graphics/GlUtils.hpp"
 #endif // defined
 
@@ -35,8 +35,7 @@ Blowtorch::Blowtorch()
 
 /********* position,       yaw,  pitch, fov,  near, far  ******/
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
-, mLevel(StartLevel::TEST_LEVEL,
-    
+, mLevel(
     ResourceIds::Textures::Atlas::BRICKS2_INDEX, 
     ResourceIds::Textures::Atlas::WALL_INDEX,
     ResourceIds::Textures::Atlas::METAL_INDEX,
@@ -104,7 +103,7 @@ void Blowtorch::loop()
         }
 
         render();
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
     calcFrameRate(deltaTime);
 #endif // defined
     }
@@ -173,6 +172,8 @@ void Blowtorch::update(float dt, double timeSinceInit)
     // keep the light above the player's head
     mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevel.getTileScalar().y - mPlayer.getPlayerSize(), mPlayer.getPosition().z, 0.0f));
 
+    mParticles->update(dt, timeSinceInit);
+
     mImGui.update(*this);
 
 //    static int testCounter = 0;
@@ -212,6 +213,7 @@ void Blowtorch::render()
     mLevel.draw(mSdlWindow, mResources, mCamera);
     mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
+    mParticles->draw(mSdlWindow, mResources, mCamera);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
@@ -242,23 +244,22 @@ void Blowtorch::render()
 }
 
 /**
- *  @note The SdlManager must clean up before Resources
- *  or else GL errors will be thrown!
  *  @brief Blowtorch::finish
  */
 void Blowtorch::finish()
 {
-#if defined(APP_DEBUG)
+    mPlay = false;
+#if defined(BLOWTORCH_DEBUG_MODE)
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
     mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
     mLogger.dumpLogToFile(Utils::toString(sTitle) + "DataLog.txt");
 #endif // defined
 
-    mPlay = false;
-    mSdlWindow.cleanUp();
+    mParticles->cleanUp();
     mResources.cleanUp();
     mImGui.cleanUp();
+    mSdlWindow.cleanUp(); // call this guy last
 }
 
 /**
@@ -268,6 +269,9 @@ void Blowtorch::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+
+    glEnable(GL_PROGRAM_POINT_SIZE);
+    glPointSize(10.0f);
 
     initResources();
     initPositions();
@@ -308,6 +312,23 @@ void Blowtorch::initResources()
     effects->bind();
     mResources.insert(ResourceIds::Shaders::EFFECTS_SHADER_ID,
         std::move(effects));
+
+    Shader::Ptr particles (new Shader(mSdlWindow));
+    particles->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
+        ResourcePaths::Shaders::PARTICLES_VERTEX_SHADER_PATH);
+    particles->compileAndAttachShader(ShaderTypes::FRAGMENT_SHADER,
+        ResourcePaths::Shaders::PARTICLES_FRAGMENT_SHADER_PATH);
+    // setup xform feedback before linkage
+    const char* names[] = {"Position", "Velocity", "StartTime"};
+    particles->initTransformFeedback(3, names, GL_SEPARATE_ATTRIBS);
+    particles->linkProgram();
+    particles->bind();
+    particles->setUniform("uRender", GL_FALSE);
+    particles->setUniform("uParticleTex", 0);
+    particles->setUniform("ParticleLifetime", 0.5f);
+    particles->setUniform("Accel", glm::vec3(0.0f, 0.0f, -1.4f));
+    mResources.insert(ResourceIds::Shaders::PARTICLES_SHADER_ID,
+        std::move(particles));
 
     Shader::Ptr spriteShader (new Shader(mSdlWindow));
     spriteShader->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
@@ -359,7 +380,7 @@ void Blowtorch::initResources()
     mResources.insert(ResourceIds::Textures::SKYBOX_TEX_ID, std::move(skyboxTex));
 
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
-        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 0));
+        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 0)); // use as 1 due to Post Processor
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
 
     ITexture::Ptr charsTex (new Tex2dImpl(mSdlWindow,
@@ -394,6 +415,11 @@ void Blowtorch::initResources()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
+
+    /****************** Particles ****************************************/
+    mParticles = std::move(Particle::Ptr(new Particle(
+        Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))));
+
 }
 
 /**
@@ -494,7 +520,7 @@ void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             unsigned int newHeight = event.window.data2;
             glViewport(0, 0, newWidth, newHeight);
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
         std::string resizeDimens = "Resize Event -- Width: " + Utils::toString(newWidth) + ", Height: " + Utils::toString(newHeight) + "\n";
         SDL_Log(resizeDimens.c_str());
 #endif // defined
@@ -521,7 +547,7 @@ void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
     else if ((mSdlWindow.getInitFlags() & SDL_INIT_JOYSTICK) &&
         event.type == SDL_JOYBUTTONDOWN)
     {
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
         if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
             mSdlWindow.hapticRumblePlay(0.75, 500) != 0)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());

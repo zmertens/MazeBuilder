@@ -15,6 +15,7 @@ static const std::string LEVEL_SHADER_ID = "LEVEL_SHADER_ID";
 static const std::string SKYBOX_SHADER_ID = "SKYBOX_SHADER_ID";
 static const std::string EFFECTS_SHADER_ID = "EFFECTS_SHADER_ID";
 static const std::string SPRITE_SHADER_ID = "SPRITE_SHADER_ID";
+static const std::string PARTICLES_SHADER_ID = "PARTICLES_SHADER_ID";
 // const std::string TEXT_SHADER_ID = "TEXT_SHADER_ID";
 }
 
@@ -176,6 +177,8 @@ const std::string EFFECTS_FRAGMENT_SHADER_PATH = "./resources/shaders/effects.fr
 const std::string SPRITE_VERTEX_SHADER_PATH = "./resources/shaders/sprite.vert.glsl";
 const std::string SPRITE_GEOM_SHADER_PATH = "./resources/shaders/sprite.geom.glsl";
 const std::string SPRITE_FRAGMENT_SHADER_PATH = "./resources/shaders/sprite.frag.glsl";
+const std::string PARTICLES_VERTEX_SHADER_PATH = "./resources/shaders/particles.vert.glsl";
+const std::string PARTICLES_FRAGMENT_SHADER_PATH = "./resources/shaders/particles.frag.glsl";
 // const std::string TEXT_VERTEX_SHADER_PATH = "./resources/shaders/text.vert.glsl";
 // const std::string TEXT_FRAGMENT_SHADER_PATH = "./resources/shaders/text.frag.glsl";
 #elif defined(APP_ANDROID)

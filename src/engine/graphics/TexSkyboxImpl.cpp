@@ -1,6 +1,6 @@
 #include "TexSkyboxImpl.hpp"
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
 #include "GlUtils.hpp"
 #endif // defined
 
@@ -117,7 +117,7 @@ void TexSkyboxImpl::init(unsigned char* str, long bufferSize)
        throw new std::runtime_error(fileError.c_str());
     }
 
-#if defined(APP_DEBUG)
+#if defined(BLOWTORCH_DEBUG_MODE)
     std::string fileComp = "Texture generated from " + Utils::toString(str) + ", width = "
        + Utils::toString(width) + ", height = "
        + Utils::toString(height) + ", comp = " + Utils::toString(comp) + "\n";

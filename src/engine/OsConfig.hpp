@@ -4,8 +4,6 @@
 #ifndef OSCONFIG_HPP
 #define OSCONFIG_HPP
 
-#define APP_DEBUG
-
 #if defined(_WIN32)
 
     #define APP_MS_WINDOWS

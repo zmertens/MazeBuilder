@@ -2,6 +2,7 @@
 #define BLOWTORCH_HPP
 
 #include <unordered_map>
+#include <memory>
 
 #include <glm/glm.hpp>
 
@@ -25,6 +26,7 @@
 #include "Enemy.hpp"
 #include "Player.hpp"
 #include "Useless.hpp"
+#include "Particle.hpp"
 
 class Blowtorch final : public IGame
 {
@@ -70,6 +72,8 @@ private:
     Sprite mExitSprite;
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
+
+    Particle::Ptr mParticles;
 
 private:
     void init();

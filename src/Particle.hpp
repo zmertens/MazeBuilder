@@ -8,8 +8,12 @@
 #include "engine/graphics/IDrawable.hpp"
 #include "engine/Transform.hpp"
 
+#include "engine/SdlWindow.hpp"
+
 class Particle : public IDrawable
 {
+public:
+    using Ptr = std::unique_ptr<Particle>;
 public:
     explicit Particle(const Draw::Config& config,
         const glm::vec3& position = glm::vec3(0.0f),
@@ -25,6 +29,25 @@ public:
 protected:
     Draw::Config mConfig;
     Transform mTransform;
-    float mCounter;
-}
+    float mTimePassed;
+    float mDelta;
+
+private:
+    static constexpr GLuint nParticles = 10000;
+
+    GLuint particleArray[2];
+    GLuint feedback[2];
+
+    GLuint posBuf[2];
+    GLuint velBuf[2];
+    GLuint startTime[2];
+    GLuint initVel;
+
+    bool drawBuf;
+    GLuint query;
+
+private:
+    void initBuffers();
+};
+
 #endif // PARTICLE_HPP

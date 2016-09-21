@@ -23,9 +23,8 @@ enum class Special {
     ENEMY,
     SPD_PW,
     STR_PW,
-    INVINC_PW,
+    IMMUN_PW,
     EXIT,
-    PARTICLE, // @TODO - be more specific (smoke, fire... )
     NONE
 };
 
@@ -45,20 +44,19 @@ typedef struct Data {
 
 } // namespace Tile
 
-namespace StartLevel
+namespace 
 {
-
-//namespace Tx = ResourceIds::Textures;
+    //namespace Tx = ResourceIds::Textures;
 using namespace Tile;
 
-const std::vector<std::vector<Data>> TEST_LEVEL = {{
+const std::vector<std::vector<Data>> LEVEL_ONE = {{
     {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}},
     {{}, {false,  Special::PLAYER}, {}, {}, {}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {}, {}, {}, {}},
     {{}, {false,  Special::NONE}, {false,  Special::SPD_PW}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}},
     {{}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {false,  Special::ENEMY}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
-    {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false, Special::ENEMY}, {false,  Special::INVINC_PW}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
+    {{}, {false,  Special::NONE}, {false,  Special::NONE}, {false, Special::ENEMY}, {false,  Special::IMMUN_PW}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::NONE}, {}, {}, {}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {}, {}, {}, {}, {false,Special::NONE}, {}, {}, {false,Special::ENEMY}, {false,Special::NONE}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
     {{}, {false,Special::STR_PW}, {}, {}, {}, {false,  Special::ENEMY}, {}, {}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {false,  Special::NONE}, {}, {}},
@@ -69,13 +67,12 @@ const std::vector<std::vector<Data>> TEST_LEVEL = {{
     {{}, {false,  Special::EXIT}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {false,  Special::NONE}, {false,  Special::NONE}, {}, {}, {}, {}, {}, {}, {}, {}},
     {{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}}
 }};
-} // levels
-
+} // namespace
 
 class Level final : IDrawable
 {
 public:
-    explicit Level(const std::vector<std::vector<Tile::Data>>& level,
+    explicit Level(
         const unsigned int wallTex, const unsigned int floorTex, const unsigned int ceilTex,
         const float texAtlasRows,
         const Draw::Config& config,

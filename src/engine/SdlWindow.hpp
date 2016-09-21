@@ -7,6 +7,10 @@
 
 #include "OsConfig.hpp"
 
+#ifndef BLOWTORCH_DEBUG_MODE
+#define BLOWTORCH_DEBUG_MODE
+#endif //
+
 #if defined(APP_DESKTOP)
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
