@@ -180,7 +180,7 @@ void SdlWindow::loadGl()
     if (ogl_LoadFunctions() == ogl_LOAD_FAILED)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Error loading glLoadGen");
-        cleanUp();
+        SDL_Quit();
         throw new std::runtime_error("Could not load OpenGL functions\n");
     }
 #endif // defined
