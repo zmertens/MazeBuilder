@@ -12,7 +12,7 @@ int main()
     }
     catch (std::exception& ex)
     {
-        SDL_Log(ex.what());
+        SDL_Log("%s", ex.what());
     }
 
     return EXIT_SUCCESS;

@@ -81,7 +81,7 @@ void SdlWindow::initWindow(Uint32 flags, unsigned int width, unsigned int height
 {
     if (SDL_Init(flags) < 0)
     { 
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s", SDL_GetError());
         throw new std::runtime_error("Could not intialize Sdl");
     }
 
@@ -122,7 +122,7 @@ void SdlWindow::initWindow(Uint32 flags, unsigned int width, unsigned int height
 
     if (mSdlWindow == 0)
     {    
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s", SDL_GetError());
         throw new std::runtime_error("Sdl Window did not create!\n");
     }
 
@@ -303,7 +303,7 @@ unsigned char* SdlWindow::buildBufferFromFile(const std::string& filename, long&
     }
     else
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s", SDL_GetError());
         return nullptr;
     }
 }
@@ -348,7 +348,7 @@ std::string SdlWindow::buildStringFromFile(const std::string& filename) const
     }
     else
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "%s", SDL_GetError());
     }
 
     return returnStr;

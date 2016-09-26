@@ -50,7 +50,8 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)))
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+    mLevel.getPlayerPosition())
 , mSkybox(Draw::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
@@ -66,11 +67,6 @@ GameImpl::GameImpl()
     glm::vec3(0.0f))
 {
     init();
-
-    // @TODO Update the Useless to accept transform params
-    auto&& t = mCube.getTransform();
-    t.setTranslation(mPlayer.getPosition());
-    mCube.setTransform(t);
 } // constructor
 
 /**
