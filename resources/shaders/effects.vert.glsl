@@ -1,4 +1,4 @@
-#version 430 core
+#version 330 core
 
 #define NONE 0
 #define GRAYSCALE 1
@@ -12,7 +12,7 @@ struct Effect {
 };
 
 uniform Effect uEffect;
-uniform float uTime = 0.0f;
+uniform float uTime;
 
 out vec2 vTexCoords;
 

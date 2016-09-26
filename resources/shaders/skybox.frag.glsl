@@ -1,10 +1,10 @@
-#version 430 core
+#version 330 core
 
 in vec3 vTexSkyboxCoord;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 0) uniform samplerCube uSkybox;
+uniform samplerCube uSkybox;
 
 void main(void)
 {

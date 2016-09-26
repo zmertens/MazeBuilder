@@ -1,4 +1,4 @@
-#version 430 core
+#version 330 core
 
 struct Light {
 	vec3 ambient;
@@ -20,15 +20,13 @@ out VS_OUT
 	vec3 vLightDir;
 } vs_out;
 
-//uniform float uAtlasRows = 8.0f;
-//uniform vec2 uTexOffset0;
 uniform Light uLight;
 uniform mat4 uModelViewMatrix;
 uniform mat4 uProjMatrix;
 
 void main(void)
 {
-	vs_out.vTexCoord0 = aVertexTexCoord;//(aVertexTexCoord / uAtlasRows) + uTexOffset0;
+	vs_out.vTexCoord0 = aVertexTexCoord;
 
 	vec4 mvPosition = uModelViewMatrix * vec4(aVertexPosition, 1.0);
 

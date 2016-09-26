@@ -37,14 +37,15 @@ SdlWindow::SdlWindow(const char* title, const unsigned int width, const unsigned
         glEnable(GL_MULTISAMPLE);
     }
 
-#if defined(BLOWTORCH_DEBUG_MODE)
-       glEnable(GL_DEBUG_OUTPUT);
-       glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
-       glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
-       glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
-           GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
-           GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
-#endif // defined
+// Requires OpenGL 4.3
+// #if defined(BLOWTORCH_DEBUG_MODE)
+//        glEnable(GL_DEBUG_OUTPUT);
+//        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
+//        glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);
+//        glDebugMessageInsert(GL_DEBUG_SOURCE_APPLICATION,
+//            GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM,
+//            GL_DEBUG_SEVERITY_MEDIUM, -1, "Start debugging");
+// #endif // defined
 }
 
 SdlWindow::~SdlWindow()

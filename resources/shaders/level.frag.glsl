@@ -1,4 +1,4 @@
-#version 430 core
+#version 330 core
 
 #define INV_GAMMA 0.4545454545
 
@@ -26,7 +26,7 @@ in VS_OUT
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 0) uniform sampler2D uTexture2D;
+uniform sampler2D uTexture2D;
 
 uniform Material uMaterial;
 uniform Light uLight;

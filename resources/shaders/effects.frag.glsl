@@ -1,4 +1,4 @@
-#version 430 core
+#version 330 core
 
 #define NONE 0
 #define GRAYSCALE 1
@@ -15,24 +15,13 @@ in vec2 vTexCoords;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (binding = 1) uniform sampler2D uTexture2D;
+uniform sampler2D uTexture2D;
 
 uniform Effect uEffect;
-// uniform initialization requires GL 4.3
-uniform float uEdgeKernel[9] = {
-	1.0f,  1.0f, 1.0f,
-	1.0f, -8.0f, 1.0f,
-	1.0f,  1.0f, 1.0f};
 
-uniform float uBlurKernel[9] = {
-	0.0625f, 0.125f, 0.0625f,
-	0.125f, 0.25f, 0.125f,
-	0.0625f, 0.125f, 0.0625f};
-
-uniform float uSharpenKernel[9] = {
-	-1.0f, -1.0f, -1.0f,
-	-1.0f,  9.0f, -1.0f,
-	-1.0f, -1.0f, -1.0f};
+uniform float uEdgeKernel[9];
+uniform float uBlurKernel[9];
+uniform float uSharpenKernel[9];
 
 void main()
 {

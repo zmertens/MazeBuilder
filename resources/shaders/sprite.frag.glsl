@@ -2,7 +2,7 @@
 
 in vec2 vTexCoord;
 
-layout (binding = 0) uniform sampler2D uTexture2D;
+uniform sampler2D uTexture2D;
 
 layout (location = 0) out vec4 FragColor;
 

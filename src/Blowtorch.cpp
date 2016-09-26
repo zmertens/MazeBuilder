@@ -78,7 +78,7 @@ Blowtorch::Blowtorch()
 void Blowtorch::start()
 {
     mPlay = true;
-    // mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -184,8 +184,7 @@ void Blowtorch::update(float dt, double timeSinceInit)
 
     if (mPlayer.isOnExit())
     {
-        mPlayer.move(glm::vec3(0), 1.0f);
-        mPlayer.move(mLevel.getPlayerPosition(), 1.0f);
+        mPlayer.setPosition(mLevel.getPlayerPosition());
     }
 }
 
@@ -254,7 +253,7 @@ void Blowtorch::finish()
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
     mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
-    mLogger.dumpLogToFile(Utils::toString(sTitle) + "DataLog.txt");
+    mLogger.dumpLogToFile("log.txt");
 #endif // defined
 
     mParticles->cleanUp();
@@ -291,6 +290,7 @@ void Blowtorch::initResources()
         ResourcePaths::Shaders::LEVEL_FRAGMENT_SHADER_PATH);
     level->linkProgram();
     level->bind();
+    level->setUniform("uTexture2D", 0);
     mResources.insert(ResourceIds::Shaders::LEVEL_SHADER_ID,
         std::move(level));
 
@@ -301,6 +301,7 @@ void Blowtorch::initResources()
         ResourcePaths::Shaders::SKYBOX_FRAGMENT_SHADER_PATH);
     skybox->linkProgram();
     skybox->bind();
+    skybox->setUniform("uSkybox", 0);
     mResources.insert(ResourceIds::Shaders::SKYBOX_SHADER_ID,
         std::move(skybox));
 
@@ -311,6 +312,28 @@ void Blowtorch::initResources()
         ResourcePaths::Shaders::EFFECTS_FRAGMENT_SHADER_PATH);
     effects->linkProgram();
     effects->bind();
+    effects->setUniform("uTexture2D", 1);
+    effects->setUniform("uTime", 0.0f);
+
+    GLfloat edge_kernel[9] = {
+        1.0f,  1.0f, 1.0f,
+        1.0f, -8.0f, 1.0f,
+        1.0f,  1.0f, 1.0f};
+    
+    GLfloat blur_kernel[9] = {
+        0.0625f, 0.125f, 0.0625f,
+        0.125f, 0.25f, 0.125f,
+        0.0625f, 0.125f, 0.0625f};
+
+    GLfloat sharpen_kernel[9] = {
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  9.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f};
+
+    effects->setUniform("uEdgeKernel", edge_kernel, 9);
+    effects->setUniform("uBlurKernel", blur_kernel, 9);
+    effects->setUniform("uSharpenKernel", sharpen_kernel, 9);
+
     mResources.insert(ResourceIds::Shaders::EFFECTS_SHADER_ID,
         std::move(effects));
 
@@ -340,6 +363,9 @@ void Blowtorch::initResources()
         ResourcePaths::Shaders::SPRITE_FRAGMENT_SHADER_PATH);
     spriteShader->linkProgram();
     spriteShader->bind();
+    spriteShader->setUniform("uHalfSize", 0.5f);
+    spriteShader->setUniform("uAtlasRows", 8.0f);
+    spriteShader->setUniform("uTexture2D", 0);
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
 

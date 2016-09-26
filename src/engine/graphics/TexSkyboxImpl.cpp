@@ -104,12 +104,15 @@ void TexSkyboxImpl::init(unsigned char* str, long bufferSize)
 
     if (imageData && width && height)
     {
-        // glTexStorage2D only needs to be set once since every cubemap texture has same dimensions
-        if (sCubeMapIndex == 0)
-            glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
+        // Requires OpenGL 4.2
+        // // glTexStorage2D only needs to be set once since every cubemap texture has same dimensions
+        // if (sCubeMapIndex == 0)
+        //     glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
 
-        glTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + sCubeMapIndex, 0, 0, 0, width, height,
-            mPixelFormat, GL_UNSIGNED_BYTE, imageData);
+        // glTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + sCubeMapIndex, 0, 0, 0, width, height,
+        //     mPixelFormat, GL_UNSIGNED_BYTE, imageData);
+
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + sCubeMapIndex, 0, mInternalFormat, width, height, 0, mPixelFormat, GL_UNSIGNED_BYTE, imageData);
     }
     else
     {

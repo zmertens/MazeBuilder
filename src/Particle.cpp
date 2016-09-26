@@ -109,7 +109,12 @@ void Particle::draw(const SdlWindow& sdlManager,
 
 void Particle::cleanUp()
 {
-
+    glDeleteBuffers(2, posBuf); 
+    glDeleteBuffers(2, velBuf); 
+    glDeleteBuffers(2, startTime); 
+    glDeleteBuffers(1, &initVel); 
+    glDeleteVertexArrays(2, particleArray);
+    glDeleteTransformFeedbacks(2, feedback);
 }
 
 Transform Particle::getTransform() const

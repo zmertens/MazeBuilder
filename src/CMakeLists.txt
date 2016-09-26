@@ -19,7 +19,7 @@ set(BLOWTORCH_SOURCES
 	engine/Logger.cpp
 	engine/ResourceManager.cpp
 	engine/SdlWindow.cpp
-	engine/gl_core_4_3.c
+	engine/gl_core_4_0.c
 	engine/Transform.cpp
 	engine/ImGuiHelper.cpp
 	engine/graphics/Fog.cpp

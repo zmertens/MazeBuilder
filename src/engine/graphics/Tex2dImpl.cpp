@@ -102,8 +102,10 @@ void Tex2dImpl::init(unsigned char* str, long bufferSize)
 
    if (imageData && width && height)
    {
-        glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
-        glTexSubImage2D(mTarget, 0, 0, 0, width, height, mPixelFormat, GL_UNSIGNED_BYTE, imageData);
+        // Requires OpenGL 4.2
+        // glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
+        // glTexSubImage2D(mTarget, 0, 0, 0, width, height, mPixelFormat, GL_UNSIGNED_BYTE, imageData);
+        glTexImage2D(mTarget, 0, mInternalFormat, width, height, 0, mPixelFormat, GL_UNSIGNED_BYTE, imageData);
 
         glGenerateMipmap(mTarget);
    }
@@ -123,5 +125,6 @@ void Tex2dImpl::init(unsigned char* str, long bufferSize)
  */
 void Tex2dImpl::init(const unsigned int width, const unsigned int height)
 {
-    glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
+    // glTexStorage2D(mTarget, 1, mInternalFormat, width, height);
+    glTexImage2D(mTarget, 0, mInternalFormat, width, height, 0, mPixelFormat, GL_UNSIGNED_BYTE, nullptr);
 }

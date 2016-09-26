@@ -1,13 +1,13 @@
-#version 430 core
+#version 330 core
 
 layout (points) in;
 layout (triangle_strip, max_vertices = 4) out;
 
 out vec2 vTexCoord;
 
-uniform float uHalfSize = 0.5f;   // Half the width of the quad
+uniform float uHalfSize;   // Half the width of the quad
 uniform mat4 uProjMatrix;
-uniform float uAtlasRows = 8.0f;
+uniform float uAtlasRows;
 uniform vec2 uTexOffset0;
 
 void main()
