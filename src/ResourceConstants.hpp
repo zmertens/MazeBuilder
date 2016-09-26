@@ -2,6 +2,7 @@
 #define RESOURCECONSTANTS
 
 #include <string>
+#include <vector>
 
 /**
  * All ID values are equal to the variable
@@ -24,6 +25,7 @@ namespace Textures
 static const std::string SKYBOX_TEX_ID = "SKYBOX_TEX_ID";
 static const std::string FULLSCREEN_TEX_ID = "FULLSCREEN_TEX_ID";
 static const std::string PERLIN_NOISE_2D_ID = "PERLIN_NOISE_2D_ID";
+static const std::string BLUEWATER_ID = "BLUEWATER_ID";
 
 namespace Atlas
 {
@@ -193,7 +195,6 @@ const std::string PARTICLES_FRAGMENT_SHADER_PATH = "./resources/shaders/particle
 
 namespace Textures
 {
-#if defined(APP_DESKTOP)
 const std::string TEST_TEX_ATLAS_PATH = "./resources/textures/test-atlas.png";
 const std::string SKYBOX_TEX_TOP = "./resources/textures/skybox/top.png";
 const std::string SKYBOX_TEX_BOTTOM = "./resources/textures/skybox/bottom.png";
@@ -212,10 +213,7 @@ const std::vector<std::string> SKYBOX_PATHS = {
 };
 
 const std::string TEST_RPG_CHARS_PATH = "./resources/textures/Putt-Putt-Chars.png";
-
-#elif defined(APP_ANDROID)
-
-#endif // defined
+const std::string BLUEWATER_PATH = "./resources/textures/bluewater.png";
 }
 
 namespace Music

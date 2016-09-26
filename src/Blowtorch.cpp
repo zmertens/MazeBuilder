@@ -34,7 +34,7 @@ Blowtorch::Blowtorch()
 , mSdlMixer(mResources)
 
 /********* position,       yaw,  pitch, fov,  near, far  ******/
-, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.1f, 1000.0f)
+, mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.01f, 1000.0f)
 , mLevel(
     ResourceIds::Textures::Atlas::BRICKS2_INDEX, 
     ResourceIds::Textures::Atlas::WALL_INDEX,
@@ -349,8 +349,6 @@ void Blowtorch::initResources()
     particles->bind();
     particles->setUniform("uRender", GL_FALSE);
     particles->setUniform("uParticleTex", 0);
-    particles->setUniform("ParticleLifetime", 3.5f);
-    particles->setUniform("Accel", glm::vec3(0.0f, 0.0f, -1.4f));
     mResources.insert(ResourceIds::Shaders::PARTICLES_SHADER_ID,
         std::move(particles));
 
@@ -414,6 +412,10 @@ void Blowtorch::initResources()
         ResourcePaths::Textures::TEST_RPG_CHARS_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID, std::move(charsTex));
 
+    ITexture::Ptr bluewater (new Tex2dImpl(mSdlWindow,
+        ResourcePaths::Textures::BLUEWATER_PATH, 0));
+    mResources.insert(ResourceIds::Textures::BLUEWATER_ID, std::move(bluewater));
+
     ITexture::Ptr perlinTex (new TexPerlinImpl(4.0f, 0.5f, 128, 128, true, 0));
     mResources.insert(ResourceIds::Textures::PERLIN_NOISE_2D_ID, std::move(perlinTex));
 
@@ -445,7 +447,7 @@ void Blowtorch::initResources()
 
     /****************** Particles ****************************************/
     mParticles = std::move(Particle::Ptr(new Particle(mPlayer,
-        Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))));
+        Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::BLUEWATER_ID))));
 
 }
 

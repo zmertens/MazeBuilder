@@ -41,14 +41,14 @@ void Particle::update(float dt, double timeSinceInit)
     // if (mCounter > glm::two_pi<float>())
     //     mCounter -= glm::two_pi<float>();
 
-    mTransform.setTranslation(mPlayer.getPosition() + (mPlayer.getCamera().getTarget() * 0.5f));
+    mTransform.setTranslation(mPlayer.getPosition() + (mPlayer.getCamera().getTarget() * 3.01f));
 
     // mTransform.setRotation(glm::glm::vec3(mCounter * glm::radians(0.15f),
     //     mCounter * glm::radians(0.25f),
     //     0));
 
-    mDelta = dt;
-    mTimePassed = timeSinceInit;
+    mDelta = timeSinceInit - mTimePassed;
+    mTimePassed = static_cast<float>(timeSinceInit);
 
     // Swap buffers
     drawBuf = !drawBuf;
@@ -78,6 +78,8 @@ void Particle::draw(const SdlWindow& sdlManager,
     shader->setUniform("uRender", 0);
     shader->setUniform("Time", mTimePassed);
     shader->setUniform("H", mDelta);
+    shader->setUniform("Accel", glm::vec3(0.0f, 10.0f, -0.6f));
+    shader->setUniform("ParticleLifetime", 3.5f);
 
     // if (static_cast<int>(mTimePassed) % 2 == 0)
     glEnable(GL_RASTERIZER_DISCARD);
@@ -166,16 +168,16 @@ void Particle::initBuffers()
       theta = glm::mix(0.0f, glm::pi<float>() / 6.0f, Utils::getRandomFloat(0.0f, 1000.0f));
       phi = glm::mix(0.0f, glm::two_pi<float>(), Utils::getRandomFloat(0.0f, 1000.0f));
 
-          v.x = glm::sin(theta) * glm::cos(phi);
-          v.y = glm::cos(theta);
-          v.z = glm::sin(theta) * glm::sin(phi);
+      v.x = glm::sin(theta) * glm::cos(phi);
+      v.y = glm::cos(theta);
+      v.z = glm::sin(theta) * glm::sin(phi);
 
-          velocity = glm::mix(1.25f,1.5f, Utils::getRandomFloat(0.0f, 1000.0f));
-          v = glm::normalize(v) * velocity;
+      velocity = glm::mix(1.25f,1.5f, Utils::getRandomFloat(0.0f, 1000.0f));
+      v = glm::normalize(v) * velocity;
 
-          data[3*i]   = v.x;
-          data[3*i+1] = v.y;
-          data[3*i+2] = v.z;
+      data[3*i]   = v.x;
+      data[3*i+1] = v.y;
+      data[3*i+2] = v.z;
     }
     glBindBuffer(GL_ARRAY_BUFFER,velBuf[0]);
     glBufferSubData(GL_ARRAY_BUFFER, 0, size, data);
