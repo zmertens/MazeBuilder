@@ -51,9 +51,6 @@ private:
     std::unordered_map<std::string, Material::Ptr> mMaterials;
     std::unordered_map<std::string, Music::Ptr> mMusic;
     std::unordered_map<std::string, Chunk::Ptr> mChunks;
-
-    std::tuple<std::string, std::string, std::string,
-        glm::vec2, glm::vec2, glm::vec2> mResourceCache;
 };
 
 #endif // RESOURCEMANAGER_HPP
