@@ -6,7 +6,7 @@
 #include "ResourceManager.hpp"
 #include "Utils.hpp"
 
-#include "../Blowtorch.hpp"
+#include "../GameImpl.hpp"
 
 GLint ImGuiHelper::sShaderHandle = 0;
 GLint ImGuiHelper::sVertHandle = 0;
@@ -58,7 +58,7 @@ ImGuiHelper::~ImGuiHelper()
  * @brief ImGuiHelper::update
  * @param game
  */
-void ImGuiHelper::update(const Blowtorch& game)
+void ImGuiHelper::update(const GameImpl& game)
 {
     mHealth = Utils::toString(game.mPlayer.getHealth());
     // ImGuiIO& io = ImGui::GetIO();

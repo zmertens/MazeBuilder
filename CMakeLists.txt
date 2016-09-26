@@ -53,7 +53,7 @@ endif("${is_system_dir}" STREQUAL "-1")
 
 # System libraries automatically found by CMake 
 find_package(Threads REQUIRED)
-find_package(OpenGL 4.5 REQUIRED)
+find_package(OpenGL 4.0 REQUIRED)
 find_package(X11 REQUIRED)
 find_package(Freetype 2.0.0 REQUIRED)
 

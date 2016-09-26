@@ -1,9 +1,9 @@
-#include "Blowtorch.hpp"
+#include "GameImpl.hpp"
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "engine/Utils.hpp"
 
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
 #include "engine/graphics/GlUtils.hpp"
 #endif // defined
 
@@ -16,12 +16,12 @@
 #include "engine/graphics/IndexedMeshImpl.hpp"
 #include "engine/graphics/MeshFactory.hpp"
 
-std::unordered_map<uint8_t, bool> Blowtorch::sKeyInputs;
+std::unordered_map<uint8_t, bool> GameImpl::sKeyInputs;
 
 /**
- * @brief Blowtorch::Blowtorch
+ * @brief GameImpl::GameImpl
  */
-Blowtorch::Blowtorch()
+GameImpl::GameImpl()
 : mSdlWindow(sTitle, sWindowWidth, sWindowHeight)
 , mResources()
 , mLogger()
@@ -67,15 +67,16 @@ Blowtorch::Blowtorch()
 {
     init();
 
+    // @TODO Update the Useless to accept transform params
     auto&& t = mCube.getTransform();
     t.setTranslation(mPlayer.getPosition());
     mCube.setTransform(t);
 } // constructor
 
 /**
- * @brief Blowtorch::start
+ * @brief GameImpl::start
  */
-void Blowtorch::start()
+void GameImpl::start()
 {
     mPlay = true;
     mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
@@ -83,9 +84,9 @@ void Blowtorch::start()
 }
 
 /**
- * @brief Blowtorch::loop
+ * @brief GameImpl::loop
  */
-void Blowtorch::loop()
+void GameImpl::loop()
 {
     while (mPlay)
     {
@@ -103,7 +104,7 @@ void Blowtorch::loop()
         }
 
         render();
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
     calcFrameRate(deltaTime);
 #endif // defined
     }
@@ -112,9 +113,9 @@ void Blowtorch::loop()
 }
 
 /**
- * @brief Blowtorch::handleEvents
+ * @brief GameImpl::handleEvents
  */
-void Blowtorch::handleEvents()
+void GameImpl::handleEvents()
 {
     float mouseWheelDy = 0;
     SDL_Event event;
@@ -142,11 +143,11 @@ void Blowtorch::handleEvents()
 } // handleEvents
 
 /**
- * @brief Blowtorch::update
+ * @brief GameImpl::update
  * @param dt = the time between frames
  * @param timeSinceInit = the time since SDL was initialized
  */
-void Blowtorch::update(float dt, double timeSinceInit)
+void GameImpl::update(float dt, double timeSinceInit)
 {
     mCube.update(dt, timeSinceInit);
     mExitSprite.update(dt, timeSinceInit);
@@ -172,7 +173,7 @@ void Blowtorch::update(float dt, double timeSinceInit)
     // keep the light above the player's head
     mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevel.getTileScalar().y - mPlayer.getPlayerSize(), mPlayer.getPosition().z, 0.0f));
 
-    mParticles->update(dt, timeSinceInit);
+    mBlowtorch->update(dt, timeSinceInit);
 
     mImGui.update(*this);
 
@@ -189,9 +190,9 @@ void Blowtorch::update(float dt, double timeSinceInit)
 }
 
 /**
- * @brief Blowtorch::render
+ * @brief GameImpl::render
  */
-void Blowtorch::render()
+void GameImpl::render()
 {
     mPostProcessor.bind();
 
@@ -213,7 +214,7 @@ void Blowtorch::render()
     mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
 
     if (mPlayer.isShooting())
-        mParticles->draw(mSdlWindow, mResources, mCamera);
+        mBlowtorch->draw(mSdlWindow, mResources, mCamera);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
@@ -244,28 +245,28 @@ void Blowtorch::render()
 }
 
 /**
- *  @brief Blowtorch::finish
+ *  @brief GameImpl::finish
  */
-void Blowtorch::finish()
+void GameImpl::finish()
 {
     mPlay = false;
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
     mLogger.appendToLog(mSdlWindow.getSdlInfoString());
     mLogger.appendToLog(mSdlWindow.getGlInfoString());
     mLogger.appendToLog(mResources.getAllLogs());
     mLogger.dumpLogToFile("log.txt");
 #endif // defined
 
-    mParticles->cleanUp();
+    mBlowtorch->cleanUp();
     mResources.cleanUp();
     mImGui.cleanUp();
     mSdlWindow.cleanUp(); // call this guy last
 }
 
 /**
- * @brief Blowtorch::init
+ * @brief GameImpl::init
  */
-void Blowtorch::init()
+void GameImpl::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -278,9 +279,9 @@ void Blowtorch::init()
 }
 
 /**
- * @brief Blowtorch::initResources
+ * @brief GameImpl::initResources
  */
-void Blowtorch::initResources()
+void GameImpl::initResources()
 {
     /***************** Shaders ****************************/
     Shader::Ptr level (new Shader(mSdlWindow));
@@ -446,15 +447,15 @@ void Blowtorch::initResources()
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
 
     /****************** Particles ****************************************/
-    mParticles = std::move(Particle::Ptr(new Particle(mPlayer,
+    mBlowtorch = std::move(Particle::Ptr(new Particle(mPlayer,
         Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::BLUEWATER_ID))));
 
 }
 
 /**
- * @brief Blowtorch::initPositions
+ * @brief GameImpl::initPositions
  */
-void Blowtorch::initPositions()
+void GameImpl::initPositions()
 {
     mPlayer.move(mLevel.getPlayerPosition(), 1.0f);
 
@@ -512,10 +513,10 @@ void Blowtorch::initPositions()
 }
 
 /**
- * @brief Blowtorch::calcFrameRate
+ * @brief GameImpl::calcFrameRate
  * @param dt
  */
-void Blowtorch::calcFrameRate(const float dt)
+void GameImpl::calcFrameRate(const float dt)
 {
     ++mFrameCounter;
     mTimeSinceLastUpdate += dt;
@@ -533,11 +534,11 @@ void Blowtorch::calcFrameRate(const float dt)
 }
 
 /**
- * @brief Blowtorch::sdlEvents
+ * @brief GameImpl::sdlEvents
  * @param event
  * @param mouseWheelDy
  */
-void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
+void GameImpl::sdlEvents(SDL_Event& event, float& mouseWheelDy)
 {
     if (event.type == SDL_QUIT)
         mPlay = false;
@@ -549,7 +550,7 @@ void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
             unsigned int newHeight = event.window.data2;
             glViewport(0, 0, newWidth, newHeight);
 
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
         std::string resizeDimens = "Resize Event -- Width: " + Utils::toString(newWidth) + ", Height: " + Utils::toString(newHeight) + "\n";
         SDL_Log(resizeDimens.c_str());
 #endif // defined
@@ -576,7 +577,7 @@ void Blowtorch::sdlEvents(SDL_Event& event, float& mouseWheelDy)
     else if ((mSdlWindow.getInitFlags() & SDL_INIT_JOYSTICK) &&
         event.type == SDL_JOYBUTTONDOWN)
     {
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
         if (event.jbutton.button == SDL_CONTROLLER_BUTTON_X &&
             mSdlWindow.hapticRumblePlay(0.75, 500) != 0)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, SDL_GetError());

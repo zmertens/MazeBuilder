@@ -3,7 +3,7 @@
 #include <sstream>
 #include <cassert>
 
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
 #include "graphics/GlUtils.hpp"
 #endif // defined
 
@@ -38,7 +38,7 @@ SdlWindow::SdlWindow(const char* title, const unsigned int width, const unsigned
     }
 
 // Requires OpenGL 4.3
-// #if defined(BLOWTORCH_DEBUG_MODE)
+// #if defined(GAME_DEBUG_MODE)
 //        glEnable(GL_DEBUG_OUTPUT);
 //        glDebugMessageCallback(GlUtils::GlDebugCallback, nullptr);
 //        glDebugMessageControl(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_ERROR, GL_DEBUG_SEVERITY_MEDIUM, 0, nullptr, GL_TRUE);

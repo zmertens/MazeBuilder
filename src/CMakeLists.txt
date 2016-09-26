@@ -9,7 +9,7 @@ set(STB_HEADER
 
 set(BLOWTORCH_SOURCES
 	Main.cpp
-	Blowtorch.cpp
+	GameImpl.cpp
 	Player.cpp
 	Level.cpp
 	Enemy.cpp

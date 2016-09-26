@@ -1,14 +1,14 @@
 #include <stdexcept>
 #include <cstdlib>
 
-#include "Blowtorch.hpp"
+#include "GameImpl.hpp"
 
 int main()
 {
-    Blowtorch game;
+    GameImpl blowtorch;
     try
     {
-        game.start();
+        blowtorch.start();
     }
     catch (std::exception& ex)
     {

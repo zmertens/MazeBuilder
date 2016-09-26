@@ -1,5 +1,5 @@
-#ifndef BLOWTORCH_HPP
-#define BLOWTORCH_HPP
+#ifndef GAMEIMPL_HPP
+#define GAMEIMPL_HPP
 
 #include <unordered_map>
 #include <memory>
@@ -28,11 +28,11 @@
 #include "Useless.hpp"
 #include "Particle.hpp"
 
-class Blowtorch final : public IGame
+class GameImpl final : public IGame
 {
     friend class ImGuiHelper;
 public:
-    Blowtorch();
+    GameImpl();
     virtual void start() override;
 
 protected:
@@ -73,7 +73,7 @@ private:
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
 
-    Particle::Ptr mParticles;
+    Particle::Ptr mBlowtorch;
 
 private:
     void init();
@@ -83,4 +83,4 @@ private:
     void sdlEvents(SDL_Event& event, float& mouseWheelDy);
 };
 
-#endif // BLOWTORCH_HPP
+#endif // GAMEIMPL_HPP

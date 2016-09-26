@@ -7,8 +7,8 @@
 
 #include "OsConfig.hpp"
 
-#ifndef BLOWTORCH_DEBUG_MODE
-#define BLOWTORCH_DEBUG_MODE
+#ifndef GAME_DEBUG_MODE
+#define GAME_DEBUG_MODE
 #endif //
 
 #if defined(APP_DESKTOP)
@@ -40,7 +40,7 @@
  * SDL_WINDOW_SHOWN
  * SDL_WINDOW_RESIZABLE
  * SDL_WINDOW_FULLSCREEN
- * SDL_FULLSCREEN_DESKTOP
+ * SDL_FULLSCREEN_DESKTOP -- SDL_WINDOW_FULLSCREEN_DESKTOP ?
  * SDL_WINDOW_HIDDEN
  * SDL_WINDOW_BORDERLESS
  * SDL_WINDOW_MINIMIZED
@@ -90,7 +90,7 @@ private:
     static constexpr Uint32 sInitFlags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
     static constexpr Uint32 sWinFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN /*| SDL_WINDOW_FULLSCREEN*/;
     static constexpr bool sVSync = false;
-    static constexpr bool sFullscreen = (sWinFlags & SDL_WINDOW_FULLSCREEN) || (sWinFlags & SDL_WINDOW_FULLSCREEN_DESKTOP);
+    static constexpr bool sFullscreen = false;
 
     static constexpr int sOpenGlMajor = 4;
     static constexpr int sOpenGlMinor = 3;

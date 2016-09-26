@@ -19,7 +19,7 @@ namespace Gui
 }
 
 class ResourceManager;
-class Blowtorch;
+class GameImpl;
 
 class ImGuiHelper final
 {
@@ -27,7 +27,7 @@ public:
     explicit ImGuiHelper(const SdlWindow& sdl, ResourceManager& rm);
     virtual ~ImGuiHelper();
 
-    void update(const Blowtorch& game);
+    void update(const GameImpl& game);
     void render();
     void cleanUp();
 

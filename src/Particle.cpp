@@ -257,7 +257,7 @@ void Particle::initBuffers()
 
     glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, 0);
 
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
     GLint value;
     glGetIntegerv(GL_MAX_TRANSFORM_FEEDBACK_BUFFERS, &value);
     printf("MAX_TRANSFORM_FEEDBACK_BUFFERS = %d\n", value);

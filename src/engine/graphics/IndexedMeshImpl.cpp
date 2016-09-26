@@ -40,7 +40,7 @@ void IndexedMeshImpl::draw(IMesh::Draw type,
 {
     glBindVertexArray(mVaoHandle);
     glDrawElements(getGlType(type), mNumIndices, GL_UNSIGNED_SHORT, 0);
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
     glBindVertexArray(0);
 #endif // defined
 }
@@ -89,7 +89,7 @@ void IndexedMeshImpl::initMesh()
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIboHandle);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, mNumIndices * sizeof(GLushort), cIndices.data(), GL_STATIC_DRAW);
 
-#if defined(BLOWTORCH_DEBUG_MODE)
+#if defined(GAME_DEBUG_MODE)
     glBindVertexArray(0);
 #endif // defined
 }
