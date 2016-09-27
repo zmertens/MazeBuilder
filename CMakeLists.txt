@@ -55,7 +55,7 @@ endif("${is_system_dir}" STREQUAL "-1")
 find_package(Threads REQUIRED)
 find_package(OpenGL 4.0 REQUIRED)
 find_package(X11 REQUIRED)
-find_package(Freetype 2.0.0 REQUIRED)
+#find_package(Freetype 2.0.0 REQUIRED)
 
 # User-installed libraries
 find_package(GLM 0.9.7 REQUIRED)
