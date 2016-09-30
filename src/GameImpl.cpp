@@ -56,8 +56,8 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::SKYBOX_TEX_ID))
-, mPostProcessor(mResources, Draw::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
-    ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
+//, mPostProcessor(mResources, Draw::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
+//    ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
 , mExitSprite(Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -190,7 +190,7 @@ void GameImpl::update(float dt, double timeSinceInit)
  */
 void GameImpl::render()
 {
-    mPostProcessor.bind();
+    mPostProcessor->bind();
 
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -225,15 +225,15 @@ void GameImpl::render()
         powerup->draw(mSdlWindow, mResources, mCamera, IMesh::Draw::POINTS);
 
     if (mPlayer.getPower() == Power::Type::Immunity)
-        mPostProcessor.activateEffect(Effects::Type::Blur);
+        mPostProcessor->activateEffect(Effects::Type::Blur);
     else if (mPlayer.getPower() == Power::Type::Speed)
-        mPostProcessor.activateEffect(Effects::Type::Edge);
+        mPostProcessor->activateEffect(Effects::Type::Edge);
     else if (mPlayer.getPower() == Power::Type::Strength)
-        mPostProcessor.activateEffect(Effects::Type::Inversion);
+        mPostProcessor->activateEffect(Effects::Type::Inversion);
     else
-        mPostProcessor.activateEffect(Effects::Type::None);
+        mPostProcessor->activateEffect(Effects::Type::None);
 
-    mPostProcessor.release();
+    mPostProcessor->release();
 
     mImGui.render();
 
@@ -252,7 +252,7 @@ void GameImpl::finish()
     mLogger.appendToLog(mResources.getAllLogs());
     mLogger.dumpLogToFile("log.txt");
 #endif // defined
-
+    mPostProcessor->cleanUp();
     mBlowtorch->cleanUp();
     mResources.cleanUp();
     mImGui.cleanUp();
@@ -359,7 +359,8 @@ void GameImpl::initResources()
     spriteShader->linkProgram();
     spriteShader->bind();
     spriteShader->setUniform("uHalfSize", 0.5f);
-    spriteShader->setUniform("uAtlasRows", 8.0f);
+    spriteShader->setUniform("uAtlasRows",
+        static_cast<GLfloat>(ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_NUM_ROWS));
     spriteShader->setUniform("uTexture2D", 0);
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
@@ -399,7 +400,7 @@ void GameImpl::initResources()
     mResources.insert(ResourceIds::Textures::SKYBOX_TEX_ID, std::move(skyboxTex));
 
     ITexture::Ptr fullScreenTex (new Tex2dImpl(
-        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 0)); // use as 1 due to Post Processor
+        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight(), 1)); // use as 1 due to Post Processor
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
 
     ITexture::Ptr charsTex (new Tex2dImpl(mSdlWindow,
@@ -443,6 +444,13 @@ void GameImpl::initResources()
     mBlowtorch = std::move(Particle::Ptr(new Particle(mPlayer,
         Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::BLUEWATER_ID))));
 
+    /***************** Post-Processor ************************************/
+    mPostProcessor = std::move(std::unique_ptr<PostProcessorImpl>(new PostProcessorImpl(
+        mResources, Draw::Config(
+            ResourceIds::Shaders::EFFECTS_SHADER_ID,
+            ResourceIds::Meshes::VAO_ID, "", // no material
+            ResourceIds::Textures::FULLSCREEN_TEX_ID),
+        mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())));
 }
 
 /**

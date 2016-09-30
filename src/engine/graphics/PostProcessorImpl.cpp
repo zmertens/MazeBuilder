@@ -14,7 +14,6 @@ PostProcessorImpl::PostProcessorImpl(const ResourceManager& resources,
 , mEffect(Effects::Type::None)
 , mFboHandle(0)
 , mRboHandle(0)
-, fullscreen(width, height, 1)
 {
     genFrameBuffer();
     init(width, height);
@@ -30,7 +29,8 @@ void PostProcessorImpl::cleanUp()
 
 void PostProcessorImpl::bind() const
 {
-    fullscreen.bind();
+    auto& tex = mResources.getTexture(mConfig.textureId);
+    tex->bind();
     glBindFramebuffer(GL_FRAMEBUFFER, mFboHandle);
 }
 
@@ -77,9 +77,10 @@ void PostProcessorImpl::genFrameBuffer()
 
 void PostProcessorImpl::init(const unsigned int width, const unsigned int height)
 {
-    fullscreen.bind();
+    auto& tex = mResources.getTexture(mConfig.textureId);
+    tex->bind();
 
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fullscreen.getHandle(), 0);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex->getHandle(), 0);
 
     glBindRenderbuffer(GL_RENDERBUFFER, mRboHandle);
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
@@ -95,6 +96,7 @@ void PostProcessorImpl::init(const unsigned int width, const unsigned int height
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         throw new std::runtime_error("FrameBuffer Error! Failed to initialize mFrameBuffer_Handle\n");
 
+    // OpenGL 4.5
     // if (glCheckNamedFramebufferStatus(mFboHandle, GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) // 4.5
     //     throw new std::runtime_error("FrameBuffer Error! Failed to initialize mFrameBuffer_Handle\n");
 

@@ -5,7 +5,7 @@
 
 #include "IDrawable.hpp"
 
-#include "Tex2dImpl.hpp"
+#include "Tex2dImpl.hpp" // to declare gl stuff
 
 namespace Effects
 {
@@ -24,6 +24,8 @@ class ResourceManager;
 
 class PostProcessorImpl : public IFramebuffer
 {
+public:
+    using Ptr = std::unique_ptr<PostProcessorImpl>;
 public:
     explicit PostProcessorImpl(const ResourceManager& resources,
         const Draw::Config& config,
@@ -46,7 +48,6 @@ private:
     Effects::Type mEffect;
     GLuint mFboHandle;
     GLuint mRboHandle;
-    Tex2dImpl fullscreen;
 };
 
 #endif // POSTPROCESSORIMPL_HPP

@@ -67,13 +67,13 @@ private:
 
     Useless mCube;
     Skybox mSkybox;
-    PostProcessorImpl mPostProcessor;
     Light mLight;
     Sprite mExitSprite;
+
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
-
     Particle::Ptr mBlowtorch;
+    PostProcessorImpl::Ptr mPostProcessor;
 
 private:
     void init();
