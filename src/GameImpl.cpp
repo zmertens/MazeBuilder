@@ -36,11 +36,11 @@ GameImpl::GameImpl()
 /********* position,       yaw,  pitch, fov,  near, far  ******/
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.01f, 1000.0f)
 , mLevel(
-    ResourceIds::Textures::Atlas::BRICKS2_INDEX, 
+    ResourceIds::Textures::Atlas::BRICKS2_INDEX,
     ResourceIds::Textures::Atlas::WALL_INDEX,
     ResourceIds::Textures::Atlas::METAL_INDEX,
     ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
-    
+
     Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
 , mPlayer(mCamera, mLevel)
 
@@ -226,13 +226,13 @@ void GameImpl::render()
 
     if (mPlayer.getPower() == Power::Type::Immunity)
         mPostProcessor.activateEffect(Effects::Type::Blur);
-    else if (mPlayer.getPower() == Power::Type::Speed) 
+    else if (mPlayer.getPower() == Power::Type::Speed)
         mPostProcessor.activateEffect(Effects::Type::Edge);
     else if (mPlayer.getPower() == Power::Type::Strength)
         mPostProcessor.activateEffect(Effects::Type::Inversion);
     else
         mPostProcessor.activateEffect(Effects::Type::None);
-    
+
     mPostProcessor.release();
 
     mImGui.render();
@@ -316,7 +316,7 @@ void GameImpl::initResources()
         1.0f,  1.0f, 1.0f,
         1.0f, -8.0f, 1.0f,
         1.0f,  1.0f, 1.0f};
-    
+
     GLfloat blur_kernel[9] = {
         0.0625f, 0.125f, 0.0625f,
         0.125f, 0.25f, 0.125f,
@@ -385,10 +385,7 @@ void GameImpl::initResources()
     IMesh::Ptr vaoMesh (new MeshImpl());
     mResources.insert(ResourceIds::Meshes::VAO_ID, std::move(vaoMesh));
 
-    std::vector<Vertex> vertices;
-    std::vector<GLushort> indices;
-    mLevel.generateLevel(vertices, indices);
-    IMesh::Ptr levelMesh (new IndexedMeshImpl(vertices, indices));
+    IMesh::Ptr levelMesh (new IndexedMeshImpl(mLevel.getVertices(), mLevel.getIndices()));
     mResources.insert(ResourceIds::Meshes::LEVEL_ID, std::move(levelMesh));
 
     /************ Textures ***********************************************/

@@ -44,7 +44,7 @@ typedef struct Data {
 
 } // namespace Tile
 
-namespace 
+namespace
 {
     //namespace Tx = ResourceIds::Textures;
 using namespace Tile;
@@ -87,7 +87,8 @@ public:
         const IMesh::Draw type = IMesh::Draw::TRIANGLES) const override;
     virtual void cleanUp() override;
 
-    void generateLevel(std::vector<Vertex>& vertices, std::vector<GLushort>& indices);
+    std::vector<Vertex> getVertices() const;
+    std::vector<GLushort> getIndices() const;
 
     std::vector<glm::vec3> getExitPoints() const;
 
@@ -111,6 +112,8 @@ private:
     const glm::vec3 cTileScalar;
     const float cSpriteHalfWidth;
     std::vector<std::vector<Tile::Data>> mLevel;
+    std::vector<Vertex> mVertices;
+    std::vector<GLushort> mIndices;
     Draw::Config mConfig;
     Transform mTransform;
     unsigned int mWallTexId;
@@ -131,9 +134,10 @@ private:
 private:
     glm::vec2 getTexCoordsFromOffset(const glm::vec2& texCoord, const glm::vec2& offset) const;
     void addSpecial(Tile::Special special, std::size_t x, std::size_t z);
-    void generateFloor(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j);
-    void generateCeiling(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j);
-    void generateWall(std::vector<Vertex>& vertices, std::vector<GLushort>& indices, std::size_t i, std::size_t j, char dir);
+    void generateLevel() noexcept;
+    void generateFloor(std::size_t i, std::size_t j);
+    void generateCeiling(std::size_t i, std::size_t j);
+    void generateWall(std::size_t i, std::size_t j, char dir);
 };
 
 #endif // Level_HPP

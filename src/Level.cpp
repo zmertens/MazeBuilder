@@ -28,12 +28,14 @@ Level::Level(
 , cTileScalar(20.0f, 20.0f, 20.0f)
 , cSpriteHalfWidth((cTileScalar.x + cTileScalar.z) * 0.25f)
 , mLevel(::LEVEL_ONE)
+, mVertices()
+, mIndices()
 , mWallTexId(wallTex)
 , mFloorTexId(floorTex)
 , mCeilTexId(ceilTex)
 , mTexAtlasRows(texAtlasRows)
 {
-
+    generateLevel();
 }
 
 /**
@@ -87,11 +89,8 @@ void Level::cleanUp()
 
 /**
  * @brief Level::generateLevel
- * @param vertices
- * @param indices
  */
-void Level::generateLevel(std::vector<Vertex>& vertices,
-    std::vector<GLushort>& indices)
+void Level::generateLevel() noexcept
 {
     using namespace Tile;
 
@@ -108,22 +107,33 @@ void Level::generateLevel(std::vector<Vertex>& vertices,
             {
                 addSpecial(mLevel[i][j].special, i, j);
 
-                generateFloor(vertices, indices, i, j);
+                generateFloor(i, j);
 
-                generateCeiling(vertices, indices, i, j);
+                generateCeiling(i, j);
 
                 if (mLevel[i][j - 1].empty == true)
-                    generateWall(vertices, indices, i, j, 'N');
+                    generateWall(i, j, 'N');
                 if (mLevel[i][j + 1].empty == true)
-                    generateWall(vertices, indices, i, j, 'S');
+                    generateWall(i, j, 'S');
                 if (mLevel[i - 1][j].empty == true)
-                    generateWall(vertices, indices, i, j, 'W');
+                    generateWall(i, j, 'W');
                 if (mLevel[i + 1][j].empty == true)
-                    generateWall(vertices, indices, i, j, 'E');
+                    generateWall(i, j, 'E');
             }
         }
     }
 } // generateLevel
+
+
+std::vector<Vertex> Level::getVertices() const
+{
+    return mVertices;
+}
+
+std::vector<GLushort> Level::getIndices() const
+{
+    return mIndices;
+}
 
 /**
  * @brief Level::getExitPoints
@@ -252,71 +262,61 @@ void Level::addSpecial(Tile::Special special, std::size_t x, std::size_t z)
 
 /**
  * @brief Level::generateFloor
- * @param vertices
- * @param indices
  * @param i
  * @param j
  */
-void Level::generateFloor(std::vector<Vertex>& vertices,
-    std::vector<GLushort>& indices, std::size_t i, std::size_t j)
+void Level::generateFloor(std::size_t i, std::size_t j)
 {
-    indices.push_back(vertices.size() + 2);
-    indices.push_back(vertices.size() + 1);
-    indices.push_back(vertices.size() + 0);
-    indices.push_back(vertices.size() + 3);
-    indices.push_back(vertices.size() + 2);
-    indices.push_back(vertices.size() + 0);
+    mIndices.push_back(mVertices.size() + 2);
+    mIndices.push_back(mVertices.size() + 1);
+    mIndices.push_back(mVertices.size() + 0);
+    mIndices.push_back(mVertices.size() + 3);
+    mIndices.push_back(mVertices.size() + 2);
+    mIndices.push_back(mVertices.size() + 0);
 
     glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f, 0.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
     glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f, 1.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
     glm::vec2 highUlowV = getTexCoordsFromOffset(glm::vec2(1.0f, 0.0f), Utils::getTexAtlasOffset(mFloorTexId, mTexAtlasRows));
 
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), lowUhighV, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), high, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), lowUhighV, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), high, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 1, 0)));
 }
 
 /**
  * @brief Level::generateCeiling
- * @param vertices
- * @param indices
  * @param i
  * @param j
  */
-void Level::generateCeiling(std::vector<Vertex>& vertices,
-    std::vector<GLushort>& indices, std::size_t i, std::size_t j)
+void Level::generateCeiling(std::size_t i, std::size_t j)
 {
-    indices.push_back(vertices.size() + 0);
-    indices.push_back(vertices.size() + 1);
-    indices.push_back(vertices.size() + 2);
-    indices.push_back(vertices.size() + 0);
-    indices.push_back(vertices.size() + 2);
-    indices.push_back(vertices.size() + 3);
+    mIndices.push_back(mVertices.size() + 0);
+    mIndices.push_back(mVertices.size() + 1);
+    mIndices.push_back(mVertices.size() + 2);
+    mIndices.push_back(mVertices.size() + 0);
+    mIndices.push_back(mVertices.size() + 2);
+    mIndices.push_back(mVertices.size() + 3);
 
     glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f, 0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 high = getTexCoordsFromOffset(glm::vec2(1.0f, 1.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
     glm::vec2 highUlowV = getTexCoordsFromOffset(glm::vec2(1.0f, 0.0f), Utils::getTexAtlasOffset(mCeilTexId, mTexAtlasRows));
 
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 1, 0)));
-    vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), low, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 1, 0)));
+    mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 1, 0)));
 }
 
 /**
  * @brief Level::generateWall
- * @param vertices
- * @param indices
  * @param i
  * @param j
  * @param dir
  */
-void Level::generateWall(std::vector<Vertex>& vertices,
-    std::vector<GLushort>& indices,
-    std::size_t i, std::size_t j, char dir)
+void Level::generateWall(std::size_t i, std::size_t j, char dir)
 {
     glm::vec2 low = getTexCoordsFromOffset(glm::vec2(0.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));
     glm::vec2 lowUhighV = getTexCoordsFromOffset(glm::vec2(0.0f, 1.0f), Utils::getTexAtlasOffset(mWallTexId, mTexAtlasRows));
@@ -327,62 +327,62 @@ void Level::generateWall(std::vector<Vertex>& vertices,
     {
         case 'N':
         {
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 1);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 3);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 1);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 3);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), high, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), high, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
             break;
         }
         case 'S':
         {
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 1);
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 3);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 1);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 3);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 0);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), low, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 0, 1)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), low, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(0, 0, 1)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), lowUhighV, glm::vec3(0, 0, 1)));
             break;
         }
         case 'W':
         {
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 1);
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 3);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 1);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 3);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 0);
 
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3(i * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
             break;
         }
         case 'E':
         {
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 1);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 0);
-            indices.push_back(vertices.size() + 2);
-            indices.push_back(vertices.size() + 3);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 1);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 0);
+            mIndices.push_back(mVertices.size() + 2);
+            mIndices.push_back(mVertices.size() + 3);
 
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
-            vertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, j * cTileScalar.z), low, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, 0, (j + 1) * cTileScalar.z), highUlowV, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, (j + 1) * cTileScalar.z), high, glm::vec3(1, 0, 0)));
+            mVertices.push_back(Vertex(glm::vec3((i + 1) * cTileScalar.x, cTileScalar.y, j * cTileScalar.z), lowUhighV, glm::vec3(1, 0, 0)));
             break;
         }
     } // switch
