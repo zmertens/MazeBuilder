@@ -55,12 +55,12 @@ private:
     static constexpr bool sCollisions = false;
     static constexpr float sMinDamage = 0.3f;
     static constexpr float sMaxDamage = 1.0f;
-    
+
     Camera& mFirstPersonCamera;
     Level& mLevel;
     glm::vec3 mStartPosition;
     glm::vec3 mMovementDir;
-    
+
     Power::Type mPower;
     float mPowerUpTimer;
     bool mShooting;

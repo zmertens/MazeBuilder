@@ -88,7 +88,7 @@ void Enemy::handleMovement(const float dt, Player& player, const Level& level)
     }
 
     if (inRange && player.isShooting())
-    {    
+    {
         if (player.getPower() == Power::Type::Strength)
             this->inflictDamage(sMinDamage + 0.5f, sMaxDamage + 0.5f);
         else
@@ -96,7 +96,7 @@ void Enemy::handleMovement(const float dt, Player& player, const Level& level)
     }
 
     if (mState == Enemy::States::Idle && glm::length(mTransform.getTranslation() - player.getPosition()) < sAgroRange)
-    {    
+    {
         mState = Enemy::States::Attack;
     }
 
@@ -114,22 +114,29 @@ void Enemy::updateAnimations()
     {
         mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
-        if (mAnimationIndex >= 4)
+        if (mAnimationIndex > 2)
             mAnimationIndex = 0;
     }
     else if (mState == States::Attack)
     {
         mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
-        if (mAnimationIndex >= 8)
-            mAnimationIndex = 4;
+        if (mAnimationIndex > 5)
+            mAnimationIndex = 3;
+    }
+    else if (mState == States::Hurt)
+    {
+        mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
+        mAnimationIndex += 1;
+        if (mAnimationIndex > 8)
+            mAnimationIndex = 6;
     }
     else if (mState == States::Dead)
     {
         mConfig.texAtlasOffset = mAnimations[mAnimationIndex];
         mAnimationIndex += 1;
-        if (mAnimationIndex >= 12)
-            mAnimationIndex = 8;
+        if (mAnimationIndex > 11)
+            mAnimationIndex = 9;
     }
     else
         mAnimationIndex = 0;
@@ -142,20 +149,22 @@ void Enemy::genAnimations()
 {
     using namespace ResourceIds::Textures::Atlas;
 
-    mAnimations[RPG_1_WALK_1] = Utils::getTexAtlasOffset(RPG_1_WALK_1, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_WALK_2] = Utils::getTexAtlasOffset(RPG_1_WALK_2, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_WALK_3] = Utils::getTexAtlasOffset(RPG_1_WALK_3, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_WALK_4] = Utils::getTexAtlasOffset(RPG_1_WALK_4, TEST_RPG_CHARS_NUM_ROWS);
-
-    mAnimations[RPG_1_BACK_1] = Utils::getTexAtlasOffset(RPG_1_BACK_1, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_BACK_2] = Utils::getTexAtlasOffset(RPG_1_BACK_2, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_BACK_3] = Utils::getTexAtlasOffset(RPG_1_BACK_3, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_BACK_4] = Utils::getTexAtlasOffset(RPG_1_BACK_4, TEST_RPG_CHARS_NUM_ROWS);
-
-    mAnimations[RPG_1_FRONT_1] = Utils::getTexAtlasOffset(RPG_1_FRONT_1, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_FRONT_2] = Utils::getTexAtlasOffset(RPG_1_FRONT_2, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_FRONT_3] = Utils::getTexAtlasOffset(RPG_1_FRONT_3, TEST_RPG_CHARS_NUM_ROWS);
-    mAnimations[RPG_1_FRONT_4] = Utils::getTexAtlasOffset(RPG_1_FRONT_4, TEST_RPG_CHARS_NUM_ROWS);
+    // idle
+    mAnimations[IDLE_0] = Utils::getTexAtlasOffset(IDLE_0, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[IDLE_1] = Utils::getTexAtlasOffset(IDLE_1, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[IDLE_2] = Utils::getTexAtlasOffset(IDLE_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    // attack
+    mAnimations[ATTACK_0] = Utils::getTexAtlasOffset(ATTACK_0, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[ATTACK_1] = Utils::getTexAtlasOffset(ATTACK_1, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[ATTACK_2] = Utils::getTexAtlasOffset(ATTACK_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    // hurt
+    mAnimations[HURT_0] = Utils::getTexAtlasOffset(HURT_0, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[HURT_1] = Utils::getTexAtlasOffset(HURT_1, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[HURT_2] = Utils::getTexAtlasOffset(HURT_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    // dead
+    mAnimations[DEAD_0] = Utils::getTexAtlasOffset(DEAD_0, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[DEAD_1] = Utils::getTexAtlasOffset(DEAD_1, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[DEAD_2] = Utils::getTexAtlasOffset(DEAD_2, ENEMY_ATLAS_TEX_NUM_ROWS);
 }
 
 void Enemy::moveTowardsPlayer(float dt, const Player& player, const Level& level)

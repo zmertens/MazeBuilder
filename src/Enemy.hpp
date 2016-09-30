@@ -20,7 +20,6 @@ public:
         Idle,
         Attack,
         Hurt,
-        Follow,
         Dead
     };
 

@@ -7,7 +7,8 @@ enum class Type {
 	None,
 	Strength,
 	Speed,
-	Immunity
+	Immunity,
+	ReverseTime
 };
 
 } // namespace

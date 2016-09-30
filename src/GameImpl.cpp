@@ -39,9 +39,9 @@ GameImpl::GameImpl()
     ResourceIds::Textures::Atlas::BRICKS2_INDEX,
     ResourceIds::Textures::Atlas::WALL_INDEX,
     ResourceIds::Textures::Atlas::METAL_INDEX,
-    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS,
+    ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS,
 
-    Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID))
+    Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID))
 , mPlayer(mCamera, mLevel)
 
 
@@ -50,7 +50,7 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
     mLevel.getPlayerPosition())
 , mSkybox(Draw::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -62,8 +62,8 @@ GameImpl::GameImpl()
 , mExitSprite(Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
     "",
-    ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+    ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
     glm::vec3(0.0f))
 {
     init();
@@ -75,7 +75,7 @@ GameImpl::GameImpl()
 void GameImpl::start()
 {
     mPlay = true;
-    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    //mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -390,9 +390,9 @@ void GameImpl::initResources()
 
     /************ Textures ***********************************************/
     // @TODO initialize the post processor impl texture in here (fullscreen quad isn't initialized before PP)
-    ITexture::Ptr testTex (new Tex2dImpl(mSdlWindow,
-        ResourcePaths::Textures::TEST_TEX_ATLAS_PATH, 0));
-    mResources.insert(ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID, std::move(testTex));
+    ITexture::Ptr levelTex (new Tex2dImpl(mSdlWindow,
+        ResourcePaths::Textures::LEVEL_ATLAS_TEX_PATH, 0));
+    mResources.insert(ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID, std::move(levelTex));
 
     ITexture::Ptr skyboxTex (new TexSkyboxImpl(mSdlWindow,
         ResourcePaths::Textures::SKYBOX_PATHS, 0));
@@ -403,8 +403,8 @@ void GameImpl::initResources()
     mResources.insert(ResourceIds::Textures::FULLSCREEN_TEX_ID, std::move(fullScreenTex));
 
     ITexture::Ptr charsTex (new Tex2dImpl(mSdlWindow,
-        ResourcePaths::Textures::TEST_RPG_CHARS_PATH, 0));
-    mResources.insert(ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID, std::move(charsTex));
+        ResourcePaths::Textures::ENEMY_ATLAS_TEX_PATH, 0));
+    mResources.insert(ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_ID, std::move(charsTex));
 
     ITexture::Ptr bluewater (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::BLUEWATER_PATH, 0));
@@ -458,9 +458,9 @@ void GameImpl::initPositions()
             Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
-            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_ID,
-            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::RPG_1_WALK_1,
-            ResourceIds::Textures::Atlas::TEST_RPG_CHARS_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_ID,
+            Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::IDLE_0,
+            ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_NUM_ROWS)),
             enemyPos
         )));
     }
@@ -471,9 +471,9 @@ void GameImpl::initPositions()
             Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CHAOS,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }
@@ -484,9 +484,9 @@ void GameImpl::initPositions()
             Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CONFUSE,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }
@@ -497,9 +497,9 @@ void GameImpl::initPositions()
             Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
             ResourceIds::Meshes::VAO_ID,
             "",
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_ID,
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_INCREASE,
-            ResourceIds::Textures::Atlas::TEST_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }

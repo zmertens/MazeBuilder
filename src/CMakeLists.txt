@@ -44,9 +44,52 @@ set(BLOWTORCH_SOURCES
 	engine/audio/SdlMixer.cpp
 )
 
-#set(BLOWTORCH_HEADERS
+set(BLOWTORCH_HEADERS
+	GameImpl.hpp
+	IGame.hpp
+	ResourceConstants.hpp
+	Player.hpp
+	Level.hpp
+	Enemy.hpp
+	Particle.hpp
+    Power.hpp
+	Useless.hpp
+	engine/Utils.hpp
+	engine/Vertex.hpp
+	engine/OsConfig.hpp
+	engine/BoundingBox.hpp
+	engine/Camera.hpp
+	engine/Logger.hpp
+	engine/ResourceManager.hpp
+	engine/SdlWindow.hpp
+	engine/gl_core_4_0.h
+	engine/ImGuiHelper.hpp
+	engine/Transform.hpp
+	engine/graphics/ITexture.hpp
+	engine/graphics/IFramebuffer.hpp
+	engine/graphics/IDrawable.hpp
+	engine/graphics/Attenuation.hpp
+	engine/graphics/Fog.hpp
+	engine/graphics/GlUtils.hpp
+	engine/graphics/IndexedMeshImpl.hpp
+	engine/graphics/Light.hpp
+	engine/graphics/Material.hpp
+	engine/graphics/MaterialFactory.hpp
+	engine/graphics/MeshFactory.hpp
+	engine/graphics/MeshImpl.hpp
+	engine/graphics/PointLight.hpp
+	engine/graphics/PostProcessorImpl.hpp
+	engine/graphics/Shader.hpp
+	engine/graphics/Skybox.hpp
+	engine/graphics/SpotLight.hpp
+	engine/graphics/Sprite.hpp
+	engine/graphics/Tex2dImpl.hpp
+	engine/graphics/TexPerlinImpl.hpp
+	engine/graphics/TexSkyboxImpl.hpp
+	engine/audio/Chunk.hpp
+	engine/audio/Music.hpp
+	engine/audio/SdlMixer.hpp
+)
 
-#)
-
-add_executable(${CMAKE_PROJECT_NAME} ${BLOWTORCH_SOURCES} ${IMGUI_SOURCES} ${STB_HEADER})
+add_executable(${CMAKE_PROJECT_NAME} ${BLOWTORCH_SOURCES} ${BLOWTORCH_HEADERS} ${IMGUI_SOURCES} ${STB_HEADER})
 target_link_libraries(${CMAKE_PROJECT_NAME} ${BLOWTORCH_LIBS})

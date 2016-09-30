@@ -29,9 +29,8 @@ static const std::string BLUEWATER_ID = "BLUEWATER_ID";
 
 namespace Atlas
 {
-// Test-Atlas data
-static const std::string TEST_ATLAS_TEX_ID = "TEST_ATLAS_TEX_ID";
-static constexpr unsigned int TEST_ATLAS_TEX_NUM_ROWS = 8u;
+static const std::string LEVEL_ATLAS_TEX_ID = "LEVEL_ATLAS_TEX_ID";
+static constexpr unsigned int LEVEL_ATLAS_TEX_NUM_ROWS = 8u;
 static constexpr unsigned int MONTY_PYTHON_INDEX = 0u;
 static constexpr unsigned int UP_ARROW_INDEX = 1u;
 static constexpr unsigned int AWESOME_FACE_INDEX = 2u;
@@ -92,20 +91,20 @@ static constexpr unsigned int BREAKOUT_POWER_UP_PASSTHROUGH = 56u;
 static constexpr unsigned int BREAKOUT_POWER_UP_SPEED = 57u;
 static constexpr unsigned int BREAKOUT_POWER_UP_STICKY = 58u;
 
-const std::string TEST_RPG_CHARS_ID = "TEST_RPG_CHARS_ID";
-static constexpr unsigned int TEST_RPG_CHARS_NUM_ROWS = 8u;
-static constexpr unsigned int RPG_1_WALK_1 = 0u;
-static constexpr unsigned int RPG_1_WALK_2 = 1u;
-static constexpr unsigned int RPG_1_WALK_3 = 2u;
-static constexpr unsigned int RPG_1_WALK_4 = 3u;
-static constexpr unsigned int RPG_1_BACK_1 = 4u;
-static constexpr unsigned int RPG_1_BACK_2 = 5u;
-static constexpr unsigned int RPG_1_BACK_3 = 60u;
-static constexpr unsigned int RPG_1_BACK_4 = 7u;
-static constexpr unsigned int RPG_1_FRONT_1 = 8u;
-static constexpr unsigned int RPG_1_FRONT_2 = 9u;
-static constexpr unsigned int RPG_1_FRONT_3 = 10u;
-static constexpr unsigned int RPG_1_FRONT_4 = 11u;
+const std::string ENEMY_ATLAS_TEX_ID = "ENEMY_ATLAS_TEX_ID";
+static constexpr unsigned int ENEMY_ATLAS_TEX_NUM_ROWS = 4u;
+static constexpr unsigned int IDLE_0 = 0u;
+static constexpr unsigned int IDLE_1 = 1u;
+static constexpr unsigned int IDLE_2 = 2u;
+static constexpr unsigned int ATTACK_0 = 3u;
+static constexpr unsigned int ATTACK_1 = 4u;
+static constexpr unsigned int ATTACK_2 = 5u;
+static constexpr unsigned int HURT_0 = 6u;
+static constexpr unsigned int HURT_1 = 7u;
+static constexpr unsigned int HURT_2 = 8u;
+static constexpr unsigned int DEAD_0 = 9u;
+static constexpr unsigned int DEAD_1 = 10u;
+static constexpr unsigned int DEAD_2 = 11u;
 } // namespace Atlas
 } // namespace Textures
 
@@ -169,7 +168,6 @@ namespace ResourcePaths
 {
 namespace Shaders
 {
-#if defined(APP_DESKTOP)
 const std::string LEVEL_VERTEX_SHADER_PATH = "./resources/shaders/level.vert.glsl";
 const std::string LEVEL_FRAGMENT_SHADER_PATH = "./resources/shaders/level.frag.glsl";
 const std::string SKYBOX_VERTEX_SHADER_PATH = "./resources/shaders/skybox.vert.glsl";
@@ -181,21 +179,11 @@ const std::string SPRITE_GEOM_SHADER_PATH = "./resources/shaders/sprite.geom.gls
 const std::string SPRITE_FRAGMENT_SHADER_PATH = "./resources/shaders/sprite.frag.glsl";
 const std::string PARTICLES_VERTEX_SHADER_PATH = "./resources/shaders/particles.vert.glsl";
 const std::string PARTICLES_FRAGMENT_SHADER_PATH = "./resources/shaders/particles.frag.glsl";
-// const std::string TEXT_VERTEX_SHADER_PATH = "./resources/shaders/text.vert.glsl";
-// const std::string TEXT_FRAGMENT_SHADER_PATH = "./resources/shaders/text.frag.glsl";
-#elif defined(APP_ANDROID)
-//const std::string SCENE_VERTEX_SHADER_PATH = "./shaders/sceneShader.vert.glsl";
-//const std::string SCENE_FRAGMENT_SHADER_PATH = "./shaders/sceneShader.frag.glsl";
-//const std::string SKYBOX_VERTEX_SHADER_PATH = "./shaders/skybox.vert.glsl";
-//const std::string SKYBOX_FRAGMENT_SHADER_PATH = "./shaders/skybox.frag.glsl";
-//const std::string EFFECTS_VERTEX_SHADER_PATH = "./shaders/effectsShader.vert.glsl";
-//const std::string EFFECTS_FRAGMENT_SHADER_PATH = "./shaders/effectsShader.frag.glsl";
-#endif // defined
 }
 
 namespace Textures
 {
-const std::string TEST_TEX_ATLAS_PATH = "./resources/textures/test-atlas.png";
+const std::string LEVEL_ATLAS_TEX_PATH = "./resources/textures/level.png";
 const std::string SKYBOX_TEX_TOP = "./resources/textures/skybox/top.png";
 const std::string SKYBOX_TEX_BOTTOM = "./resources/textures/skybox/bottom.png";
 const std::string SKYBOX_TEX_LEFT = "./resources/textures/skybox/left.png";
@@ -212,20 +200,17 @@ const std::vector<std::string> SKYBOX_PATHS = {
     ResourcePaths::Textures::SKYBOX_TEX_FRONT, // -z
 };
 
-const std::string TEST_RPG_CHARS_PATH = "./resources/textures/Putt-Putt-Chars.png";
+const std::string ENEMY_ATLAS_TEX_PATH = "./resources/textures/enemy.png";
 const std::string BLUEWATER_PATH = "./resources/textures/bluewater.png";
 }
 
 namespace Music
 {
-#if defined(APP_DESKTOP)
 const std::string WRATH_OF_SIN_MP3_PATH = "./resources/audio/Wrath_Of_Sin.mp3";
-#endif
 }
 
 namespace Chunks
 {
-#if defined(APP_DESKTOP)
 const std::string DEATH_WAV_PATH = "./resources/audio/death.wav";
 const std::string EXIT_WAV_PATH = "./resources/audio/exit.wav";
 const std::string GENERAL_POWERUP_WAV_PATH = "./resources/audio/general_powerup.wav";
@@ -233,7 +218,6 @@ const std::string HIT_HURT_WAV_PATH = "./resources/audio/hit-hurt.wav";
 const std::string LASER_WAV_PATH = "./resources/audio/laser.wav";
 const std::string PLAYER_JUMP_WAV_PATH = "./resources/audio/player_jump.wav";
 const std::string SELECT_WAV_PATH = "./resources/audio/select.wav";
-#endif
 }
 
 namespace Fonts
