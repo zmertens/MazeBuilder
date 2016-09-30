@@ -461,7 +461,7 @@ void GameImpl::initPositions()
             ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::IDLE_0,
             ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_NUM_ROWS)),
-            enemyPos
+            enemyPos, glm::vec3(0), glm::vec3(0.5f)
         )));
     }
 

@@ -5,10 +5,10 @@ namespace Power
 {
 enum class Type {
 	None,
-	Strength,
-	Speed,
-	Immunity,
-	ReverseTime
+	Strength, // edge
+	Speed, // speed
+	Immunity, // sharpen
+	ReverseTime // grayscale
 };
 
 } // namespace
