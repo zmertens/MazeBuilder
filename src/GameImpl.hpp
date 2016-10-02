@@ -26,7 +26,6 @@
 #include "Enemy.hpp"
 #include "Player.hpp"
 #include "Useless.hpp"
-#include "Particle.hpp"
 
 class GameImpl final : public IGame
 {
@@ -46,7 +45,7 @@ private:
     static constexpr float sTimePerFrame = 1.0f / 60.0f;
     static constexpr unsigned int sWindowWidth = 1080u;
     static constexpr unsigned int sWindowHeight = 720u;
-    static constexpr auto sTitle = "Blowtorch";
+    static constexpr auto sTitle = "Maze";
 
     static std::unordered_map<uint8_t, bool> sKeyInputs;
 
@@ -72,7 +71,6 @@ private:
 
     std::vector<Enemy::Ptr> mEnemies;
     std::vector<Sprite::Ptr> mPowerUps;
-    Particle::Ptr mBlowtorch;
     PostProcessorImpl::Ptr mPostProcessor;
 
 private:

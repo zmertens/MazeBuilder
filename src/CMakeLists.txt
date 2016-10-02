@@ -7,19 +7,18 @@ set(STB_HEADER
 	engine/graphics/stb_image.h
 )
 
-set(BLOWTORCH_SOURCES
+set(PROJECT_SOURCES
 	Main.cpp
 	GameImpl.cpp
 	Player.cpp
 	Level.cpp
 	Enemy.cpp
-	Particle.cpp
 	Useless.cpp
 	engine/Camera.cpp
 	engine/Logger.cpp
 	engine/ResourceManager.cpp
 	engine/SdlWindow.cpp
-	engine/gl_core_4_0.c
+	engine/gl_core_3_3.c
 	engine/Transform.cpp
 	engine/ImGuiHelper.cpp
 	engine/graphics/Fog.cpp
@@ -44,14 +43,13 @@ set(BLOWTORCH_SOURCES
 	engine/audio/SdlMixer.cpp
 )
 
-set(BLOWTORCH_HEADERS
+set(PROJECT_HEADERS
 	GameImpl.hpp
 	IGame.hpp
 	ResourceConstants.hpp
 	Player.hpp
 	Level.hpp
 	Enemy.hpp
-	Particle.hpp
     Power.hpp
 	Useless.hpp
 	engine/Utils.hpp
@@ -62,7 +60,7 @@ set(BLOWTORCH_HEADERS
 	engine/Logger.hpp
 	engine/ResourceManager.hpp
 	engine/SdlWindow.hpp
-	engine/gl_core_4_0.h
+	engine/gl_core_3_3.h
 	engine/ImGuiHelper.hpp
 	engine/Transform.hpp
 	engine/graphics/ITexture.hpp
@@ -91,5 +89,5 @@ set(BLOWTORCH_HEADERS
 	engine/audio/SdlMixer.hpp
 )
 
-add_executable(${CMAKE_PROJECT_NAME} ${BLOWTORCH_SOURCES} ${BLOWTORCH_HEADERS} ${IMGUI_SOURCES} ${STB_HEADER})
-target_link_libraries(${CMAKE_PROJECT_NAME} ${BLOWTORCH_LIBS})
+add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${IMGUI_SOURCES} ${STB_HEADER})
+target_link_libraries(${CMAKE_PROJECT_NAME} ${PROJECT_LIBS})

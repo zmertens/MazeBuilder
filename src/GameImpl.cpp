@@ -36,6 +36,7 @@ GameImpl::GameImpl()
 /********* position,       yaw,  pitch, fov,  near, far  ******/
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.01f, 1000.0f)
 , mLevel(
+    // @TODO init these in the level class
     ResourceIds::Textures::Atlas::BRICKS2_INDEX,
     ResourceIds::Textures::Atlas::WALL_INDEX,
     ResourceIds::Textures::Atlas::METAL_INDEX,
@@ -56,8 +57,6 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::SKYBOX_TEX_ID))
-//, mPostProcessor(mResources, Draw::Config(ResourceIds::Shaders::EFFECTS_SHADER_ID,
-//    ResourceIds::Meshes::VAO_ID), mSdlWindow.getWindowWidth(), mSdlWindow.getWindowHeight())
 , mLight(glm::vec3(1), glm::vec3(1), glm::vec3(1), glm::vec4(0, 10.0f, 0, 0))
 , mExitSprite(Draw::Config(ResourceIds::Shaders::SPRITE_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -169,8 +168,6 @@ void GameImpl::update(float dt, double timeSinceInit)
     // keep the light above the player's head
     mLight.setPosition(glm::vec4(mPlayer.getPosition().x, mLevel.getTileScalar().y - mPlayer.getPlayerSize(), mPlayer.getPosition().z, 0.0f));
 
-    mBlowtorch->update(dt, timeSinceInit);
-
     mImGui.update(*this);
 
 //    static int testCounter = 0;
@@ -208,9 +205,6 @@ void GameImpl::render()
 
     mLevel.draw(mSdlWindow, mResources, mCamera);
     mCube.draw(mSdlWindow, mResources, mCamera, IMesh::Draw::TRIANGLES);
-
-    if (mPlayer.isShooting())
-        mBlowtorch->draw(mSdlWindow, mResources, mCamera);
 
     auto& spriteShader = mResources.getShader(ResourceIds::Shaders::SPRITE_SHADER_ID);
     spriteShader->bind();
@@ -253,7 +247,6 @@ void GameImpl::finish()
     mLogger.dumpLogToFile("log.txt");
 #endif // defined
     mPostProcessor->cleanUp();
-    mBlowtorch->cleanUp();
     mResources.cleanUp();
     mImGui.cleanUp();
     mSdlWindow.cleanUp(); // call this guy last
@@ -266,9 +259,6 @@ void GameImpl::init()
 {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-
-    glEnable(GL_PROGRAM_POINT_SIZE);
-    glPointSize(10.0f);
 
     initResources();
     initPositions();
@@ -390,7 +380,6 @@ void GameImpl::initResources()
     mResources.insert(ResourceIds::Meshes::LEVEL_ID, std::move(levelMesh));
 
     /************ Textures ***********************************************/
-    // @TODO initialize the post processor impl texture in here (fullscreen quad isn't initialized before PP)
     ITexture::Ptr levelTex (new Tex2dImpl(mSdlWindow,
         ResourcePaths::Textures::LEVEL_ATLAS_TEX_PATH, 0));
     mResources.insert(ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID, std::move(levelTex));
@@ -439,10 +428,6 @@ void GameImpl::initResources()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
-
-    /****************** Particles ****************************************/
-    mBlowtorch = std::move(Particle::Ptr(new Particle(mPlayer,
-        Draw::Config(ResourceIds::Shaders::PARTICLES_SHADER_ID, "", "", ResourceIds::Textures::BLUEWATER_ID))));
 
     /***************** Post-Processor ************************************/
     mPostProcessor = std::move(std::unique_ptr<PostProcessorImpl>(new PostProcessorImpl(

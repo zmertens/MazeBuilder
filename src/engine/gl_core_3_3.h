@@ -275,7 +275,6 @@ extern "C" {
 #define GL_POLYGON_SMOOTH_HINT 0x0C53
 #define GL_PROXY_TEXTURE_1D 0x8063
 #define GL_PROXY_TEXTURE_2D 0x8064
-#define GL_QUADS 0x0007
 #define GL_R3_G3_B2 0x2A10
 #define GL_READ_BUFFER 0x0C02
 #define GL_RED 0x1903
@@ -982,84 +981,6 @@ extern "C" {
 #define GL_TIME_ELAPSED 0x88BF
 #define GL_VERTEX_ATTRIB_ARRAY_DIVISOR 0x88FE
 
-#define GL_ACTIVE_SUBROUTINES 0x8DE5
-#define GL_ACTIVE_SUBROUTINE_MAX_LENGTH 0x8E48
-#define GL_ACTIVE_SUBROUTINE_UNIFORMS 0x8DE6
-#define GL_ACTIVE_SUBROUTINE_UNIFORM_LOCATIONS 0x8E47
-#define GL_ACTIVE_SUBROUTINE_UNIFORM_MAX_LENGTH 0x8E49
-#define GL_COMPATIBLE_SUBROUTINES 0x8E4B
-#define GL_DOUBLE_MAT2 0x8F46
-#define GL_DOUBLE_MAT2x3 0x8F49
-#define GL_DOUBLE_MAT2x4 0x8F4A
-#define GL_DOUBLE_MAT3 0x8F47
-#define GL_DOUBLE_MAT3x2 0x8F4B
-#define GL_DOUBLE_MAT3x4 0x8F4C
-#define GL_DOUBLE_MAT4 0x8F48
-#define GL_DOUBLE_MAT4x2 0x8F4D
-#define GL_DOUBLE_MAT4x3 0x8F4E
-#define GL_DOUBLE_VEC2 0x8FFC
-#define GL_DOUBLE_VEC3 0x8FFD
-#define GL_DOUBLE_VEC4 0x8FFE
-#define GL_DRAW_INDIRECT_BUFFER 0x8F3F
-#define GL_DRAW_INDIRECT_BUFFER_BINDING 0x8F43
-#define GL_FRACTIONAL_EVEN 0x8E7C
-#define GL_FRACTIONAL_ODD 0x8E7B
-#define GL_FRAGMENT_INTERPOLATION_OFFSET_BITS 0x8E5D
-#define GL_GEOMETRY_SHADER_INVOCATIONS 0x887F
-#define GL_INT_SAMPLER_CUBE_MAP_ARRAY 0x900E
-#define GL_ISOLINES 0x8E7A
-#define GL_MAX_COMBINED_TESS_CONTROL_UNIFORM_COMPONENTS 0x8E1E
-#define GL_MAX_COMBINED_TESS_EVALUATION_UNIFORM_COMPONENTS 0x8E1F
-#define GL_MAX_FRAGMENT_INTERPOLATION_OFFSET 0x8E5C
-#define GL_MAX_GEOMETRY_SHADER_INVOCATIONS 0x8E5A
-#define GL_MAX_PATCH_VERTICES 0x8E7D
-#define GL_MAX_PROGRAM_TEXTURE_GATHER_OFFSET 0x8E5F
-#define GL_MAX_SUBROUTINES 0x8DE7
-#define GL_MAX_SUBROUTINE_UNIFORM_LOCATIONS 0x8DE8
-#define GL_MAX_TESS_CONTROL_INPUT_COMPONENTS 0x886C
-#define GL_MAX_TESS_CONTROL_OUTPUT_COMPONENTS 0x8E83
-#define GL_MAX_TESS_CONTROL_TEXTURE_IMAGE_UNITS 0x8E81
-#define GL_MAX_TESS_CONTROL_TOTAL_OUTPUT_COMPONENTS 0x8E85
-#define GL_MAX_TESS_CONTROL_UNIFORM_BLOCKS 0x8E89
-#define GL_MAX_TESS_CONTROL_UNIFORM_COMPONENTS 0x8E7F
-#define GL_MAX_TESS_EVALUATION_INPUT_COMPONENTS 0x886D
-#define GL_MAX_TESS_EVALUATION_OUTPUT_COMPONENTS 0x8E86
-#define GL_MAX_TESS_EVALUATION_TEXTURE_IMAGE_UNITS 0x8E82
-#define GL_MAX_TESS_EVALUATION_UNIFORM_BLOCKS 0x8E8A
-#define GL_MAX_TESS_EVALUATION_UNIFORM_COMPONENTS 0x8E80
-#define GL_MAX_TESS_GEN_LEVEL 0x8E7E
-#define GL_MAX_TESS_PATCH_COMPONENTS 0x8E84
-#define GL_MAX_TRANSFORM_FEEDBACK_BUFFERS 0x8E70
-#define GL_MAX_VERTEX_STREAMS 0x8E71
-#define GL_MIN_FRAGMENT_INTERPOLATION_OFFSET 0x8E5B
-#define GL_MIN_PROGRAM_TEXTURE_GATHER_OFFSET 0x8E5E
-#define GL_MIN_SAMPLE_SHADING_VALUE 0x8C37
-#define GL_NUM_COMPATIBLE_SUBROUTINES 0x8E4A
-#define GL_PATCHES 0x000E
-#define GL_PATCH_DEFAULT_INNER_LEVEL 0x8E73
-#define GL_PATCH_DEFAULT_OUTER_LEVEL 0x8E74
-#define GL_PATCH_VERTICES 0x8E72
-#define GL_PROXY_TEXTURE_CUBE_MAP_ARRAY 0x900B
-#define GL_SAMPLER_CUBE_MAP_ARRAY 0x900C
-#define GL_SAMPLER_CUBE_MAP_ARRAY_SHADOW 0x900D
-#define GL_SAMPLE_SHADING 0x8C36
-#define GL_TESS_CONTROL_OUTPUT_VERTICES 0x8E75
-#define GL_TESS_CONTROL_SHADER 0x8E88
-#define GL_TESS_EVALUATION_SHADER 0x8E87
-#define GL_TESS_GEN_MODE 0x8E76
-#define GL_TESS_GEN_POINT_MODE 0x8E79
-#define GL_TESS_GEN_SPACING 0x8E77
-#define GL_TESS_GEN_VERTEX_ORDER 0x8E78
-#define GL_TEXTURE_BINDING_CUBE_MAP_ARRAY 0x900A
-#define GL_TEXTURE_CUBE_MAP_ARRAY 0x9009
-#define GL_TRANSFORM_FEEDBACK 0x8E22
-#define GL_TRANSFORM_FEEDBACK_BINDING 0x8E25
-#define GL_TRANSFORM_FEEDBACK_BUFFER_ACTIVE 0x8E24
-#define GL_TRANSFORM_FEEDBACK_BUFFER_PAUSED 0x8E23
-#define GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_CONTROL_SHADER 0x84F0
-#define GL_UNIFORM_BLOCK_REFERENCED_BY_TESS_EVALUATION_SHADER 0x84F1
-#define GL_UNSIGNED_INT_SAMPLER_CUBE_MAP_ARRAY 0x900F
-
 extern void (CODEGEN_FUNCPTR *_ptrc_glBlendFunc)(GLenum sfactor, GLenum dfactor);
 #define glBlendFunc _ptrc_glBlendFunc
 extern void (CODEGEN_FUNCPTR *_ptrc_glClear)(GLbitfield mask);
@@ -1759,99 +1680,6 @@ extern void (CODEGEN_FUNCPTR *_ptrc_glVertexAttribP4ui)(GLuint index, GLenum typ
 #define glVertexAttribP4ui _ptrc_glVertexAttribP4ui
 extern void (CODEGEN_FUNCPTR *_ptrc_glVertexAttribP4uiv)(GLuint index, GLenum type, GLboolean normalized, const GLuint * value);
 #define glVertexAttribP4uiv _ptrc_glVertexAttribP4uiv
-
-extern void (CODEGEN_FUNCPTR *_ptrc_glBeginQueryIndexed)(GLenum target, GLuint index, GLuint id);
-#define glBeginQueryIndexed _ptrc_glBeginQueryIndexed
-extern void (CODEGEN_FUNCPTR *_ptrc_glBindTransformFeedback)(GLenum target, GLuint id);
-#define glBindTransformFeedback _ptrc_glBindTransformFeedback
-extern void (CODEGEN_FUNCPTR *_ptrc_glBlendEquationSeparatei)(GLuint buf, GLenum modeRGB, GLenum modeAlpha);
-#define glBlendEquationSeparatei _ptrc_glBlendEquationSeparatei
-extern void (CODEGEN_FUNCPTR *_ptrc_glBlendEquationi)(GLuint buf, GLenum mode);
-#define glBlendEquationi _ptrc_glBlendEquationi
-extern void (CODEGEN_FUNCPTR *_ptrc_glBlendFuncSeparatei)(GLuint buf, GLenum srcRGB, GLenum dstRGB, GLenum srcAlpha, GLenum dstAlpha);
-#define glBlendFuncSeparatei _ptrc_glBlendFuncSeparatei
-extern void (CODEGEN_FUNCPTR *_ptrc_glBlendFunci)(GLuint buf, GLenum src, GLenum dst);
-#define glBlendFunci _ptrc_glBlendFunci
-extern void (CODEGEN_FUNCPTR *_ptrc_glDeleteTransformFeedbacks)(GLsizei n, const GLuint * ids);
-#define glDeleteTransformFeedbacks _ptrc_glDeleteTransformFeedbacks
-extern void (CODEGEN_FUNCPTR *_ptrc_glDrawArraysIndirect)(GLenum mode, const void * indirect);
-#define glDrawArraysIndirect _ptrc_glDrawArraysIndirect
-extern void (CODEGEN_FUNCPTR *_ptrc_glDrawElementsIndirect)(GLenum mode, GLenum type, const void * indirect);
-#define glDrawElementsIndirect _ptrc_glDrawElementsIndirect
-extern void (CODEGEN_FUNCPTR *_ptrc_glDrawTransformFeedback)(GLenum mode, GLuint id);
-#define glDrawTransformFeedback _ptrc_glDrawTransformFeedback
-extern void (CODEGEN_FUNCPTR *_ptrc_glDrawTransformFeedbackStream)(GLenum mode, GLuint id, GLuint stream);
-#define glDrawTransformFeedbackStream _ptrc_glDrawTransformFeedbackStream
-extern void (CODEGEN_FUNCPTR *_ptrc_glEndQueryIndexed)(GLenum target, GLuint index);
-#define glEndQueryIndexed _ptrc_glEndQueryIndexed
-extern void (CODEGEN_FUNCPTR *_ptrc_glGenTransformFeedbacks)(GLsizei n, GLuint * ids);
-#define glGenTransformFeedbacks _ptrc_glGenTransformFeedbacks
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetActiveSubroutineName)(GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei * length, GLchar * name);
-#define glGetActiveSubroutineName _ptrc_glGetActiveSubroutineName
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetActiveSubroutineUniformName)(GLuint program, GLenum shadertype, GLuint index, GLsizei bufsize, GLsizei * length, GLchar * name);
-#define glGetActiveSubroutineUniformName _ptrc_glGetActiveSubroutineUniformName
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetActiveSubroutineUniformiv)(GLuint program, GLenum shadertype, GLuint index, GLenum pname, GLint * values);
-#define glGetActiveSubroutineUniformiv _ptrc_glGetActiveSubroutineUniformiv
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetProgramStageiv)(GLuint program, GLenum shadertype, GLenum pname, GLint * values);
-#define glGetProgramStageiv _ptrc_glGetProgramStageiv
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetQueryIndexediv)(GLenum target, GLuint index, GLenum pname, GLint * params);
-#define glGetQueryIndexediv _ptrc_glGetQueryIndexediv
-extern GLuint (CODEGEN_FUNCPTR *_ptrc_glGetSubroutineIndex)(GLuint program, GLenum shadertype, const GLchar * name);
-#define glGetSubroutineIndex _ptrc_glGetSubroutineIndex
-extern GLint (CODEGEN_FUNCPTR *_ptrc_glGetSubroutineUniformLocation)(GLuint program, GLenum shadertype, const GLchar * name);
-#define glGetSubroutineUniformLocation _ptrc_glGetSubroutineUniformLocation
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetUniformSubroutineuiv)(GLenum shadertype, GLint location, GLuint * params);
-#define glGetUniformSubroutineuiv _ptrc_glGetUniformSubroutineuiv
-extern void (CODEGEN_FUNCPTR *_ptrc_glGetUniformdv)(GLuint program, GLint location, GLdouble * params);
-#define glGetUniformdv _ptrc_glGetUniformdv
-extern GLboolean (CODEGEN_FUNCPTR *_ptrc_glIsTransformFeedback)(GLuint id);
-#define glIsTransformFeedback _ptrc_glIsTransformFeedback
-extern void (CODEGEN_FUNCPTR *_ptrc_glMinSampleShading)(GLfloat value);
-#define glMinSampleShading _ptrc_glMinSampleShading
-extern void (CODEGEN_FUNCPTR *_ptrc_glPatchParameterfv)(GLenum pname, const GLfloat * values);
-#define glPatchParameterfv _ptrc_glPatchParameterfv
-extern void (CODEGEN_FUNCPTR *_ptrc_glPatchParameteri)(GLenum pname, GLint value);
-#define glPatchParameteri _ptrc_glPatchParameteri
-extern void (CODEGEN_FUNCPTR *_ptrc_glPauseTransformFeedback)(void);
-#define glPauseTransformFeedback _ptrc_glPauseTransformFeedback
-extern void (CODEGEN_FUNCPTR *_ptrc_glResumeTransformFeedback)(void);
-#define glResumeTransformFeedback _ptrc_glResumeTransformFeedback
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform1d)(GLint location, GLdouble x);
-#define glUniform1d _ptrc_glUniform1d
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform1dv)(GLint location, GLsizei count, const GLdouble * value);
-#define glUniform1dv _ptrc_glUniform1dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform2d)(GLint location, GLdouble x, GLdouble y);
-#define glUniform2d _ptrc_glUniform2d
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform2dv)(GLint location, GLsizei count, const GLdouble * value);
-#define glUniform2dv _ptrc_glUniform2dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform3d)(GLint location, GLdouble x, GLdouble y, GLdouble z);
-#define glUniform3d _ptrc_glUniform3d
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform3dv)(GLint location, GLsizei count, const GLdouble * value);
-#define glUniform3dv _ptrc_glUniform3dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform4d)(GLint location, GLdouble x, GLdouble y, GLdouble z, GLdouble w);
-#define glUniform4d _ptrc_glUniform4d
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniform4dv)(GLint location, GLsizei count, const GLdouble * value);
-#define glUniform4dv _ptrc_glUniform4dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix2dv _ptrc_glUniformMatrix2dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix2x3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix2x3dv _ptrc_glUniformMatrix2x3dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix2x4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix2x4dv _ptrc_glUniformMatrix2x4dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix3dv _ptrc_glUniformMatrix3dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix3x2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix3x2dv _ptrc_glUniformMatrix3x2dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix3x4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix3x4dv _ptrc_glUniformMatrix3x4dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix4dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix4dv _ptrc_glUniformMatrix4dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix4x2dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix4x2dv _ptrc_glUniformMatrix4x2dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformMatrix4x3dv)(GLint location, GLsizei count, GLboolean transpose, const GLdouble * value);
-#define glUniformMatrix4x3dv _ptrc_glUniformMatrix4x3dv
-extern void (CODEGEN_FUNCPTR *_ptrc_glUniformSubroutinesuiv)(GLenum shadertype, GLsizei count, const GLuint * indices);
-#define glUniformSubroutinesuiv _ptrc_glUniformSubroutinesuiv
 
 enum ogl_LoadStatus
 {

@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.0.0 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.1.0 FATAL_ERROR)
 
 ## Project info
-project(Blowtorch CXX C)
+project(Maze CXX C)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -53,7 +53,7 @@ endif("${is_system_dir}" STREQUAL "-1")
 
 # System libraries automatically found by CMake 
 find_package(Threads REQUIRED)
-find_package(OpenGL 4.0 REQUIRED)
+find_package(OpenGL 3.3 REQUIRED)
 find_package(X11 REQUIRED)
 #find_package(Freetype 2.0.0 REQUIRED)
 
@@ -67,10 +67,10 @@ message(STATUS "SDL2 found = ${SDL2_FOUND} , at ${SDL2_INCLUDE_DIR}")
 find_package(SDL2Mixer REQUIRED)
 message(STATUS "SDL2 Mixer found = ${SDL2_MIXER_FOUND}, at ${SDL2_MIXER_INCLUDE_DIR}")
 
-set(BLOWTORCH_INCLUDES ${GLM_INCLUDE_DIR} ${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIR} ${FREETYPE_INCLUDE_DIRS})
-include_directories(${BLOWTORCH_INCLUDES})
+set(PROJECT_INCLUDES ${GLM_INCLUDE_DIR} ${SDL2_INCLUDE_DIR} ${SDL2_MIXER_INCLUDE_DIR} ${FREETYPE_INCLUDE_DIRS})
+include_directories(${PROJECT_INCLUDES})
 
-set(BLOWTORCH_LIBS ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${X11_X11_LIB} ${OPENGL_gl_LIBRARY} ${FREETYPE_LIBRARIES})
+set(PROJECT_LIBS ${SDL2_LIBRARY} ${SDL2_MIXER_LIBRARY} ${X11_X11_LIB} ${OPENGL_gl_LIBRARY} ${FREETYPE_LIBRARIES})
 
 add_subdirectory(src)
 

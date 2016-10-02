@@ -284,7 +284,8 @@ void Shader::setUniform(const std::string& str, GLfloat value)
  */
 void Shader::setUniform(const std::string& str, GLdouble value)
 {
-    glUniform1d(getUniformLocation(str), value);
+    // OpenGL 4.0
+    // glUniform1d(getUniformLocation(str), value);
 }
 
 /**
@@ -355,7 +356,8 @@ void Shader::bindAttribLocation(const std::string& str, GLuint loc)
  */
 void Shader::initTransformFeedback(GLsizei size, const GLchar* const* names, GLint type)
 {
-    glTransformFeedbackVaryings(mProgram, size, names, type);
+    // Opengl 4.0
+    // glTransformFeedbackVaryings(mProgram, size, names, type);
 }
 
 /**
@@ -449,7 +451,9 @@ GLuint Shader::compile(const int shaderType, const std::string& shaderCode)
     }
     else if (success)
     {
+#if defined(GAME_DEBUG_MODE)
         SDL_Log("%s compiled successfully\n", mFileNames.at(shaderType).c_str(), infoLog);
+#endif // defined
     }
 
     return shaderId;
@@ -485,7 +489,9 @@ GLuint Shader::compile(const int shaderType, const GLchar* shaderCode)
     }
     else if (success)
     {
+#if defined(GAME_DEBUG_MODE)
         SDL_Log("%s compiled successfully\n", mFileNames.at(shaderType).c_str(), infoLog);
+#endif // defined
     }
 
     return shaderId;
@@ -573,7 +579,9 @@ GLint Shader::getAttribLocation(const std::string& str)
  */
 GLuint Shader::getSubroutineLocation(GLenum shaderType, const std::string& name)
 {
-    return glGetSubroutineIndex(mProgram, shaderType, name.c_str());
+    return -1;
+    // OpenGL 4.0
+    // return glGetSubroutineIndex(mProgram, shaderType, name.c_str());
 }
 
 /**
@@ -589,7 +597,7 @@ std::string Shader::getStringFromType(GLenum type) const
         case GL_FLOAT_VEC2: return std::string("vec2");
         case GL_FLOAT_VEC3: return std::string("vec3");
         case GL_FLOAT_VEC4: return std::string("vec4");
-        case GL_DOUBLE: return std::string("double"); // 4.3
+        // case GL_DOUBLE: return std::string("double"); // 4.0
         case GL_INT: return std::string("int");
         case GL_UNSIGNED_INT: return std::string("unsigned int");
         case GL_BOOL: return std::string("bool");
