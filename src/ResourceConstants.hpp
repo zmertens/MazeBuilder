@@ -29,8 +29,8 @@ static const std::string BLUEWATER_ID = "BLUEWATER_ID";
 
 namespace Atlas
 {
+static constexpr unsigned int ATLAS_TEX_NUM_ROWS = 8u;
 static const std::string LEVEL_ATLAS_TEX_ID = "LEVEL_ATLAS_TEX_ID";
-static constexpr unsigned int LEVEL_ATLAS_TEX_NUM_ROWS = 8u;
 static constexpr unsigned int MONTY_PYTHON_INDEX = 0u;
 static constexpr unsigned int UP_ARROW_INDEX = 1u;
 static constexpr unsigned int AWESOME_FACE_INDEX = 2u;
@@ -92,7 +92,6 @@ static constexpr unsigned int BREAKOUT_POWER_UP_SPEED = 57u;
 static constexpr unsigned int BREAKOUT_POWER_UP_STICKY = 58u;
 
 const std::string ENEMY_ATLAS_TEX_ID = "ENEMY_ATLAS_TEX_ID";
-static constexpr unsigned int ENEMY_ATLAS_TEX_NUM_ROWS = 4u;
 static constexpr unsigned int IDLE_0 = 0u;
 static constexpr unsigned int IDLE_1 = 1u;
 static constexpr unsigned int IDLE_2 = 2u;

@@ -150,21 +150,21 @@ void Enemy::genAnimations()
     using namespace ResourceIds::Textures::Atlas;
 
     // idle
-    mAnimations[IDLE_0] = Utils::getTexAtlasOffset(IDLE_0, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[IDLE_1] = Utils::getTexAtlasOffset(IDLE_1, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[IDLE_2] = Utils::getTexAtlasOffset(IDLE_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[IDLE_0] = Utils::getTexAtlasOffset(IDLE_0, ATLAS_TEX_NUM_ROWS);
+    mAnimations[IDLE_1] = Utils::getTexAtlasOffset(IDLE_1, ATLAS_TEX_NUM_ROWS);
+    mAnimations[IDLE_2] = Utils::getTexAtlasOffset(IDLE_2, ATLAS_TEX_NUM_ROWS);
     // attack
-    mAnimations[ATTACK_0] = Utils::getTexAtlasOffset(ATTACK_0, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[ATTACK_1] = Utils::getTexAtlasOffset(ATTACK_1, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[ATTACK_2] = Utils::getTexAtlasOffset(ATTACK_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[ATTACK_0] = Utils::getTexAtlasOffset(ATTACK_0, ATLAS_TEX_NUM_ROWS);
+    mAnimations[ATTACK_1] = Utils::getTexAtlasOffset(ATTACK_1, ATLAS_TEX_NUM_ROWS);
+    mAnimations[ATTACK_2] = Utils::getTexAtlasOffset(ATTACK_2, ATLAS_TEX_NUM_ROWS);
     // hurt
-    mAnimations[HURT_0] = Utils::getTexAtlasOffset(HURT_0, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[HURT_1] = Utils::getTexAtlasOffset(HURT_1, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[HURT_2] = Utils::getTexAtlasOffset(HURT_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[HURT_0] = Utils::getTexAtlasOffset(HURT_0, ATLAS_TEX_NUM_ROWS);
+    mAnimations[HURT_1] = Utils::getTexAtlasOffset(HURT_1, ATLAS_TEX_NUM_ROWS);
+    mAnimations[HURT_2] = Utils::getTexAtlasOffset(HURT_2, ATLAS_TEX_NUM_ROWS);
     // dead
-    mAnimations[DEAD_0] = Utils::getTexAtlasOffset(DEAD_0, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[DEAD_1] = Utils::getTexAtlasOffset(DEAD_1, ENEMY_ATLAS_TEX_NUM_ROWS);
-    mAnimations[DEAD_2] = Utils::getTexAtlasOffset(DEAD_2, ENEMY_ATLAS_TEX_NUM_ROWS);
+    mAnimations[DEAD_0] = Utils::getTexAtlasOffset(DEAD_0, ATLAS_TEX_NUM_ROWS);
+    mAnimations[DEAD_1] = Utils::getTexAtlasOffset(DEAD_1, ATLAS_TEX_NUM_ROWS);
+    mAnimations[DEAD_2] = Utils::getTexAtlasOffset(DEAD_2, ATLAS_TEX_NUM_ROWS);
 }
 
 void Enemy::moveTowardsPlayer(float dt, const Player& player, const Level& level)

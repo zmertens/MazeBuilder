@@ -7,9 +7,9 @@
 
 #include "OsConfig.hpp"
 
-#ifndef GAME_DEBUG_MODE
-#define GAME_DEBUG_MODE
-#endif //
+//#ifndef GAME_DEBUG_MODE
+//#define GAME_DEBUG_MODE
+//#endif // GAME_DEBUG_MODE
 
 #if defined(APP_DESKTOP)
 #include <SDL2/SDL.h>
@@ -60,7 +60,7 @@ class SdlWindow final
 public:
     typedef std::unique_ptr<SdlWindow> Ptr;
 public:
-    explicit SdlWindow(const char* title, 
+    explicit SdlWindow(const char* title,
         const unsigned int width = 800u,
         const unsigned int height = 600u);
     virtual ~SdlWindow();
@@ -72,9 +72,9 @@ public:
 
     std::string getSdlInfoString() const;
     std::string getGlInfoString() const;
-    
+
     void swapBuffers() const;
-    
+
     bool hapticRumblePlay(float strength, float length) const;
 
     unsigned char* buildBufferFromFile(const std::string& filename, long& bufferSize) const;
@@ -88,9 +88,9 @@ public:
     Uint32 getInitFlags() const;
 private:
     static constexpr Uint32 sInitFlags = SDL_INIT_VIDEO | SDL_INIT_AUDIO;
-    static constexpr Uint32 sWinFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN /*| SDL_WINDOW_FULLSCREEN*/;
+    static constexpr Uint32 sWinFlags = SDL_WINDOW_OPENGL | SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN;
     static constexpr bool sVSync = false;
-    static constexpr bool sFullscreen = false;
+    static constexpr bool sFullscreen = true;
 
     static constexpr int sOpenGlMajor = 4;
     static constexpr int sOpenGlMinor = 3;

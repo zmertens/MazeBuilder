@@ -52,7 +52,7 @@ private:
     static constexpr float sPowerUpLength = 20.0f;
     static float sMvFactor;
     static constexpr float sPlayerSize = 0.2f;
-    static constexpr bool sCollisions = false;
+    static constexpr bool sCollisions = true;
     static constexpr float sMinDamage = 0.3f;
     static constexpr float sMaxDamage = 1.0f;
 

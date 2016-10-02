@@ -39,7 +39,7 @@ GameImpl::GameImpl()
     ResourceIds::Textures::Atlas::BRICKS2_INDEX,
     ResourceIds::Textures::Atlas::WALL_INDEX,
     ResourceIds::Textures::Atlas::METAL_INDEX,
-    ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS,
+    ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS,
 
     Draw::Config(ResourceIds::Shaders::LEVEL_SHADER_ID, ResourceIds::Meshes::LEVEL_ID, ResourceIds::Materials::PEARL_ID, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID))
 , mPlayer(mCamera, mLevel)
@@ -50,7 +50,7 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::CUBE_ID,
     ResourceIds::Materials::PEARL_ID,
     ResourceIds::Textures::PERLIN_NOISE_2D_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
     mLevel.getPlayerPosition())
 , mSkybox(Draw::Config(ResourceIds::Shaders::SKYBOX_SHADER_ID,
     ResourceIds::Meshes::VAO_ID,
@@ -63,7 +63,7 @@ GameImpl::GameImpl()
     ResourceIds::Meshes::VAO_ID,
     "",
     ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
-    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
+    Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::AWESOME_FACE_INDEX, ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
     glm::vec3(0.0f))
 {
     init();
@@ -75,7 +75,7 @@ GameImpl::GameImpl()
 void GameImpl::start()
 {
     mPlay = true;
-    //mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -360,7 +360,7 @@ void GameImpl::initResources()
     spriteShader->bind();
     spriteShader->setUniform("uHalfSize", 0.5f);
     spriteShader->setUniform("uAtlasRows",
-        static_cast<GLfloat>(ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_NUM_ROWS));
+        static_cast<GLfloat>(ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS));
     spriteShader->setUniform("uTexture2D", 0);
     mResources.insert(ResourceIds::Shaders::SPRITE_SHADER_ID,
         std::move(spriteShader));
@@ -468,8 +468,8 @@ void GameImpl::initPositions()
             "",
             ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::IDLE_0,
-            ResourceIds::Textures::Atlas::ENEMY_ATLAS_TEX_NUM_ROWS)),
-            enemyPos, glm::vec3(0), glm::vec3(0.5f)
+            ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
+            enemyPos, glm::vec3(0), glm::vec3(1.0f)
         )));
     }
 
@@ -481,7 +481,7 @@ void GameImpl::initPositions()
             "",
             ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CHAOS,
-            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }
@@ -494,7 +494,7 @@ void GameImpl::initPositions()
             "",
             ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_CONFUSE,
-            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }
@@ -507,7 +507,7 @@ void GameImpl::initPositions()
             "",
             ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_ID,
             Utils::getTexAtlasOffset(ResourceIds::Textures::Atlas::BREAKOUT_POWER_UP_INCREASE,
-            ResourceIds::Textures::Atlas::LEVEL_ATLAS_TEX_NUM_ROWS)),
+            ResourceIds::Textures::Atlas::ATLAS_TEX_NUM_ROWS)),
             pos
         )));
     }
