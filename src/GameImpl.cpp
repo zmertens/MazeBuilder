@@ -31,7 +31,7 @@ GameImpl::GameImpl()
 , mAccumulator(0.0f)
 
 , mImGui(mSdlWindow, mResources)
-, mSdlMixer(mResources)
+//, mSdlMixer(mResources)
 
 /********* position,       yaw,  pitch, fov,  near, far  ******/
 , mCamera(glm::vec3(0.0f), 0.0f, 0.0f, 75.0f, 0.01f, 1000.0f)
@@ -74,7 +74,7 @@ GameImpl::GameImpl()
 void GameImpl::start()
 {
     mPlay = true;
-    mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
+    //mSdlMixer.playMusic(ResourceIds::Music::WRATH_OF_SIN_ID, -1);
     loop();
 }
 
@@ -403,11 +403,12 @@ void GameImpl::initResources()
     ITexture::Ptr perlinTex (new TexPerlinImpl(4.0f, 0.5f, 128, 128, true, 0));
     mResources.insert(ResourceIds::Textures::PERLIN_NOISE_2D_ID, std::move(perlinTex));
 
-    /************** Music *************************************************/
+/*
+    ************** Music *************************************************
     Music::Ptr mus (new Music(ResourcePaths::Music::WRATH_OF_SIN_MP3_PATH));
     mResources.insert(ResourceIds::Music::WRATH_OF_SIN_ID, std::move(mus));
 
-    /************** Sound Effects ***************************************/
+    ************** Sound Effects ***************************************
     Chunk::Ptr deathSound (new Chunk(ResourcePaths::Chunks::DEATH_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::DEATH_WAV_ID, std::move(deathSound));
 
@@ -428,7 +429,7 @@ void GameImpl::initResources()
 
     Chunk::Ptr selectSound (new Chunk(ResourcePaths::Chunks::SELECT_WAV_PATH));
     mResources.insert(ResourceIds::Chunks::SELECT_WAV_ID, std::move(selectSound));
-
+*/
     /***************** Post-Processor ************************************/
     mPostProcessor = std::move(std::unique_ptr<PostProcessorImpl>(new PostProcessorImpl(
         mResources, Draw::Config(

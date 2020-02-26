@@ -90,7 +90,7 @@ void ResourceManager::insert(const std::string& id, ITexture::Ptr texture)
  * @brief ResourceManager::insert
  * @param id
  * @param music
- */
+ *
 void ResourceManager::insert(const std::string& id, Music::Ptr music)
 {
     auto itr = mMusic.find(id);
@@ -105,11 +105,11 @@ void ResourceManager::insert(const std::string& id, Music::Ptr music)
     }
 }
 
-/**
+**
  * @brief ResourceManager::insert
  * @param id
  * @param chunk
- */
+ *
 void ResourceManager::insert(const std::string& id, Chunk::Ptr chunk)
 {
     auto itr = mChunks.find(id);
@@ -122,7 +122,7 @@ void ResourceManager::insert(const std::string& id, Chunk::Ptr chunk)
         std::string warning = id + " has already been inserted into the chunks map\n";
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, warning.c_str());
     }
-}
+}*/
 
 /**
  * @brief ResourceManager::getTexture
@@ -168,21 +168,21 @@ const Shader::Ptr& ResourceManager::getShader(const std::string& id) const
  * @brief ResourceManager::getMusic
  * @param id
  * @return
- */
+ *
 const Music::Ptr& ResourceManager::getMusic(const std::string& id) const
 {
     return mMusic.at(id);
 }
 
-/**
+**
  * @brief ResourceManager::getChunk
  * @param id
  * @return
- */
+ *
 const Chunk::Ptr& ResourceManager::getChunk(const std::string& id) const
 {
     return mChunks.at(id);
-}
+} */
 
 /**
  * @brief ResourceManager::getAllLogs
@@ -255,7 +255,7 @@ std::string ResourceManager::getMeshLogs() const
 /**
  * @brief ResourceManager::getMusicLogs
  * @return
- */
+ *
 std::string ResourceManager::getMusicLogs() const
 {
     std::string ret = "Printing Music Logs:\n";
@@ -264,17 +264,17 @@ std::string ResourceManager::getMusicLogs() const
     return ret;
 }
 
-/**
+**
  * @brief ResourceManager::getChunkLogs
  * @return
- */
+ *
 std::string ResourceManager::getChunkLogs() const
 {
     std::string ret = "Printing Chunk Logs:\n";
     for (auto& itr : mChunks)
         ret += "Chunk id: " + itr.first + "\n";
     return ret;
-}
+} */
 
 /**
  * @brief ResourceManager::cleanUp
@@ -290,11 +290,13 @@ void ResourceManager::cleanUp()
     for (auto& shader : mShaders)
         shader.second->cleanUp();
 
+/*
     for (auto& music : mMusic)
         music.second->cleanUp();
 
     for (auto& chunk : mChunks)
         chunk.second->cleanUp();
+*/
 
     mMeshes.clear();
     mTextures.clear();

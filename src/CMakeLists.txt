@@ -38,9 +38,9 @@ set(PROJECT_SOURCES
 	engine/graphics/Tex2dImpl.cpp
 	engine/graphics/TexPerlinImpl.cpp
 	engine/graphics/TexSkyboxImpl.cpp
-	engine/audio/Chunk.cpp
-	engine/audio/Music.cpp
-	engine/audio/SdlMixer.cpp
+	#engine/audio/Chunk.cpp
+	#engine/audio/Music.cpp
+	#engine/audio/SdlMixer.cpp
 )
 
 set(PROJECT_HEADERS
@@ -84,9 +84,9 @@ set(PROJECT_HEADERS
 	engine/graphics/Tex2dImpl.hpp
 	engine/graphics/TexPerlinImpl.hpp
 	engine/graphics/TexSkyboxImpl.hpp
-	engine/audio/Chunk.hpp
-	engine/audio/Music.hpp
-	engine/audio/SdlMixer.hpp
+	#engine/audio/Chunk.hpp
+	#engine/audio/Music.hpp
+	#engine/audio/SdlMixer.hpp
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${IMGUI_SOURCES} ${STB_HEADER})

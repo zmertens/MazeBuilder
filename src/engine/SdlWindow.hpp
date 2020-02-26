@@ -14,7 +14,7 @@
 #if defined(APP_DESKTOP)
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_log.h>
-#include <SDL2/SDL_mixer.h>
+//#include <SDL2/SDL_mixer.h>
 #include "gl_core_3_3.h"
 #elif defined(APP_ANDROID)
 #include <SDL.h>

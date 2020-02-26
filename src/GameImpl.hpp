@@ -20,7 +20,7 @@
 #include "engine/graphics/PostProcessorImpl.hpp"
 #include "engine/graphics/Sprite.hpp"
 
-#include "engine/audio/SdlMixer.hpp"
+//#include "engine/audio/SdlMixer.hpp"
 
 #include "Level.hpp"
 #include "Enemy.hpp"
@@ -59,7 +59,7 @@ private:
     float mAccumulator;
 
     ImGuiHelper mImGui;
-    SdlMixer mSdlMixer;
+    //SdlMixer mSdlMixer;
     Camera mCamera;
     Level mLevel;
     Player mPlayer;
