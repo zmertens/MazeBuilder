@@ -324,6 +324,7 @@ void GameImpl::initResources()
     mResources.insert(ResourceIds::Shaders::EFFECTS_SHADER_ID,
         std::move(effects));
 
+/*
     Shader::Ptr particles (new Shader(mSdlWindow));
     particles->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,
         ResourcePaths::Shaders::PARTICLES_VERTEX_SHADER_PATH);
@@ -338,6 +339,7 @@ void GameImpl::initResources()
     particles->setUniform("uParticleTex", 0);
     mResources.insert(ResourceIds::Shaders::PARTICLES_SHADER_ID,
         std::move(particles));
+*/
 
     Shader::Ptr spriteShader (new Shader(mSdlWindow));
     spriteShader->compileAndAttachShader(ShaderTypes::VERTEX_SHADER,

@@ -195,8 +195,8 @@ std::string ResourceManager::getAllLogs() const
     ret += getTextureLogs();
     ret += getMaterialLogs();
     ret += getMeshLogs();
-    ret += getMusicLogs();
-    ret += getChunkLogs();
+//    ret += getMusicLogs();
+//    ret += getChunkLogs();
     return ret;
 }
 
