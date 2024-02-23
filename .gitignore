@@ -1,2 +1,12 @@
 # Blender Cache Files
 *.blend1
+
+build/
+
+scripts/*.txt
+scripts/*.png
+scripts/*.PNG
+scripts/*.jpg
+scripts/*.jpeg
+scripts/*.JPG
+scripts/*.JPEG
