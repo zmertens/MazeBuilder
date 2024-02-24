@@ -47,6 +47,10 @@ freely, subject to the following restrictions:
 * tinycthread.h.
 */
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 /* Which platform are we on? */
 #if !defined(_TTHREAD_PLATFORM_DEFINED_)
   #if defined(_WIN32) || defined(__WIN32__) || defined(__WINDOWS__)
@@ -108,10 +112,6 @@ freely, subject to the following restrictions:
 #define _TTHREAD_EMULATE_CLOCK_GETTIME_
 /* Emulate struct timespec */
 #if defined(_TTHREAD_WIN32_)
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
 
 struct _ttherad_timespec {
   time_t tv_sec;
@@ -440,7 +440,7 @@ void *tss_get(tss_t key);
 int tss_set(tss_t key, void *val);
 
 #if defined(__cplusplus)
-} // extern "C" {
+}
 #endif
 
 #endif /* _TINYTHREAD_H_ */
