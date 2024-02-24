@@ -2,7 +2,7 @@
 #define _util_h_
 
 #include <glad/glad.h>
-
+#include <cstring>
 #include "config.h"
 
 #define PI 3.14159265359
@@ -12,12 +12,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SIGN(x) (((x) > 0) - ((x) < 0))
-
-#if defined(DEBUGGING)
-    #define LOG(...) printf(__VA_ARGS__)
-#else
-    #define LOG(...)
-#endif
 
 typedef struct {
     unsigned int fps;
@@ -42,5 +36,9 @@ char *tokenize(char *str, const char *delim, char **key);
 int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
+void dump_opengl_info(bool dumpExtensions);
+
+#define gl_check_for_error() glCheckError_(__FILE__, __LINE__)
+GLenum glCheckError_(const char *file, int line);
 
 #endif

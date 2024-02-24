@@ -2,6 +2,19 @@
 
 Build mazes in 3D and save, export to file.
 
+## CMake
+
+This project uses `cmake` to build and test. It uses `FetchContent...` to pull in SDL and CURL libraries if necessary. Modern hardware supporting OpenGL 3.0 is required.
+
+```sh
+cmake -S "source directory here" -B build
+```
+
+| CMake Option | Default | 
+|--------------|---------|
+| BUILD_FOR_ANDROID | OFF |
+| BUILD_SHARED_LIBS | TRUE |
+
 ## Commands
 
 Generate a simple maze using `default` algorithms, and print the result to stdout:
