@@ -1,2 +1,27 @@
+# C/C++ files and Craft-specific files
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
+env
+log.txt
+*.o
+*.db
+*.exe
+*.dll
+*.pyc
+
 # Blender Cache Files
 *.blend1
+
+build/
+.vscode
+.github
+
+# Script output files
+scripts/*.txt
+scripts/*.png
+scripts/*.PNG
+scripts/*.jpg
+scripts/*.jpeg
+scripts/*.JPG
+scripts/*.JPEG
