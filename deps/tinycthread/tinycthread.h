@@ -440,7 +440,7 @@ void *tss_get(tss_t key);
 int tss_set(tss_t key, void *val);
 
 #if defined(__cplusplus)
-} // extern "C" {
+}
 #endif
 
 #endif /* _TINYTHREAD_H_ */
