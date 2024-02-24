@@ -19,7 +19,13 @@ Make Maze Builder interactive with a seed:
 ./maze_builder -i -s 1337
 ```
 
+## Scripts
+
+The `scripts` directory contains Ruby and Python scripts to build mazes quickly.
+Outputs to `.png` files or `stdout`.
+
 ## Resources
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
  - [Craft](https://github.com/fogleman/Craft)
  - [Dear ImGui](https://github.com/ocornut/imgui)
+ - [SDL](https://github.com/libsdl-org/SDL)
