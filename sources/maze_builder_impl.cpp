@@ -1,7 +1,7 @@
 #include "maze_builder_impl.h"
 
 #include <memory>
-#include <exception>
+#include <stdexcept>
 
 #include "ibuilder.h"
 #include "bst_maze.h"

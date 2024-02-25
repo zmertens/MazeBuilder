@@ -109,10 +109,8 @@ void args_handler::gather_args(int argc, char* argv[]) {
             }
         } else if (regex_match(current, help_regex)) {
             throw runtime_error(this->get_help());
-            break;
         } else if (regex_match(current, version_regex)) {
             throw runtime_error(this->get_version());
-            break;
         } else if (regex_match(current, algo_regex)) {
             args_map.emplace("algo", "bst");
         } else if (regex_match(current, output_regex)) {
