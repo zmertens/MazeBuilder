@@ -1080,7 +1080,7 @@ void craft::gen_chunk_buffer(Chunk *chunk) {
     chunk->dirty = 0;
 }
 
-void craft::map_set_func(int x, int y, int z, int w, void *arg) {
+void map_set_func(int x, int y, int z, int w, void *arg) {
     Map *map = (Map *)arg;
     map_set(map, x, y, z, w);
 }
@@ -1090,7 +1090,7 @@ void craft::load_chunk(WorkerItem *item) {
     int q = item->q;
     Map *block_map = item->block_maps[1][1];
     Map *light_map = item->light_maps[1][1];
-    create_world(p, q, (world_func) &map_set_func, block_map);
+    create_world(p, q, map_set_func, block_map);
     db_load_blocks(block_map, p, q);
     db_load_lights(light_map, p, q);
 }
@@ -1343,6 +1343,7 @@ void craft::ensure_chunks(Player *player) {
 int craft::worker_run(void *arg) {
     Worker *worker = (Worker *)arg;
     int running = 1;
+    craft caller ("dummy");
     while (running) {
         mtx_lock(&worker->mtx);
         while (worker->state != WORKER_BUSY) {
@@ -1351,9 +1352,9 @@ int craft::worker_run(void *arg) {
         mtx_unlock(&worker->mtx);
         WorkerItem *item = &worker->item;
         if (item->load) {
-            load_chunk(item);
+            caller.load_chunk(item);
         }
-        compute_chunk(item);
+        caller.compute_chunk(item);
         mtx_lock(&worker->mtx);
         worker->state = WORKER_DONE;
         mtx_unlock(&worker->mtx);
@@ -2716,7 +2717,7 @@ bool craft::run() {
         worker->state = WORKER_IDLE;
         mtx_init(&worker->mtx, mtx_plain);
         cnd_init(&worker->cnd);
-        thrd_create(&worker->thrd, (thrd_start_t) &worker_run, worker);
+        thrd_create(&worker->thrd, this->worker_run, worker);
     }
 
     // DEAR IMGUI INIT //

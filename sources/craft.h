@@ -202,7 +202,7 @@ private:
     void compute_chunk(WorkerItem *item);
     void generate_chunk(Chunk *chunk, WorkerItem *item);
     void gen_chunk_buffer(Chunk *chunk);
-    void map_set_func(int x, int y, int z, int w, void *arg);
+    // void map_set_func(int x, int y, int z, int w, void *arg);
     void load_chunk(WorkerItem *item);
     void request_chunk(int p, int q);
     void init_chunk(Chunk *chunk, int p, int q);
@@ -213,7 +213,7 @@ private:
     void force_chunks(Player *player);
     void ensure_chunks_worker(Player *player, Worker *worker);
     void ensure_chunks(Player *player);
-    int worker_run(void *arg);
+    static int worker_run(void *arg);
     void unset_sign(int x, int y, int z);
     void unset_sign_face(int x, int y, int z, int face);
     void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty);
