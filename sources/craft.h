@@ -13,6 +13,8 @@
 #include "map.h"
 #include "config.h"
 
+#include "imaze.h"
+
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 128
 #define WORKERS 4
@@ -21,10 +23,10 @@
 #define MAX_PATH_LENGTH 256
 #define MAX_ADDR_LENGTH 256
 
-class craft {
+class craft : public imaze {
 public:
     craft(const std::string& window_name, unsigned int seed = 0);
-    bool run();
+    bool run() override;
 private:
     typedef struct {
         Map map;

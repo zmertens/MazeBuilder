@@ -1,23 +1,42 @@
 #include "maze_builder_impl.h"
 
+#include <memory>
+#include <exception>
+
+#include "ibuilder.h"
 #include "craft.h"
 
-maze_builder_impl::maze_builder_impl(const args_handler& args)
-: args(args) {
+maze_builder_impl::maze_builder_impl(const std::string& description)
+: m_description(description) {
 
+}
+
+void maze_builder_impl::seed(unsigned int s) {
+    this->s = s;
+}
+
+void maze_builder_impl::interactive(bool i) {
+    this->is_interactive = i;
+}
+
+void maze_builder_impl::algo(const std::string& algo) {
+    this->algorithm = algo;
+}
+
+void maze_builder_impl::output(const std::string& filename) {
+    this->filename = filename;
 }
 
 /**
  * @param seed defaults to zero
 */
-bool maze_builder_impl::build(unsigned int seed) {
-    bool success = false;
-    success = true;
+ibuilder::imaze_ptr maze_builder_impl::build() {
+    using namespace std;
 
-    if (this->args.interactive) {
-        craft craft_engine ("craft-sdl3", seed);
-        craft_engine.run();
+    if (this->is_interactive) {
+        imaze_ptr my_maze (new craft(m_description, this->s));
+        return my_maze;
+    } else {
+        // throw std::runtime_error("failed to build maze");
     }
-
-    return success;
 }

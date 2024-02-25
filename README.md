@@ -24,7 +24,7 @@ Generate a simple maze using `default` algorithms, and print the result to stdou
 
 Specify a seed and a `binary search tree` algorithm:
 ```sh
-./maze_builder --seed=1337 --algo=bst > bst.txt
+./maze_builder --seed=1337 --algo=bst -o bst.txt
 ```
 
 Make Maze Builder interactive with a seed:
