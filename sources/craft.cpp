@@ -235,20 +235,21 @@ void craft::draw_triangles_3d_text(Attrib *attrib, GLuint buffer, int count) {
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
+// Sky Attrib doesn't use normals, so quickly check for that
 void craft::draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
-    
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
     glEnableVertexAttribArray(attrib->position);
+
     glEnableVertexAttribArray(attrib->normal);
     glEnableVertexAttribArray(attrib->uv);
-    
-    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
-        sizeof(GLfloat) * 8, 0);
-    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE,
-        sizeof(GLfloat) * 8, (GLvoid *)(sizeof(GLfloat) * 3));
-    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE,
-        sizeof(GLfloat) * 8, (GLvoid *)(sizeof(GLfloat) * 6));
+
+    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8, 0);
+    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8, (GLvoid *)(sizeof(GLfloat) * 3));
+    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8, (GLvoid *)(sizeof(GLfloat) * 6));
+     
     glDrawArrays(GL_TRIANGLES, 0, count);
+
     glDisableVertexAttribArray(attrib->position);
     glDisableVertexAttribArray(attrib->normal);
     glDisableVertexAttribArray(attrib->uv);
@@ -1640,7 +1641,7 @@ void craft::render_sky(Attrib *attrib, Player *player, GLuint buffer) {
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     glUniform1i(attrib->sampler, 2);
     glUniform1f(attrib->timer, time_of_day());
-    
+
     draw_triangles_3d(attrib, buffer, 512 * 3);
 }
 
@@ -2686,7 +2687,9 @@ bool craft::run() {
         "shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
     sky_attrib.program = program;
     sky_attrib.position = glGetAttribLocation(program, "position");
-    sky_attrib.normal = glGetAttribLocation(program, "normal");
+    // @TODO: use GLSL layout attribs!
+    //  currently sky normal vec3 is optimized out by GLSL compiler
+    sky_attrib.normal = 1; //glGetAttribLocation(program, "normal");
     sky_attrib.uv = glGetAttribLocation(program, "uv");
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
@@ -2914,7 +2917,7 @@ bool craft::run() {
             ImGui::Render();
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            
+
             render_sky(&sky_attrib, player, sky_buffer);
             glClear(GL_DEPTH_BUFFER_BIT);
             int face_count = render_chunks(&block_attrib, player);
@@ -2924,7 +2927,7 @@ bool craft::run() {
             if (SHOW_WIREFRAME) {
                 render_wireframe(&line_attrib, player);
             }
-            
+
             // RENDER HUD //
             glClear(GL_DEPTH_BUFFER_BIT);
             if (SHOW_CROSSHAIRS) {
