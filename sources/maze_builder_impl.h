@@ -8,10 +8,10 @@ class maze_builder_impl : public ibuilder {
 public:
     maze_builder_impl(const std::string& description);
 
-    void seed(unsigned int s);
-    void interactive(bool i);
-    void algo(const std::string& algo);
-    void output(const std::string& filename);
+    maze_builder_impl& seed(unsigned int s);
+    maze_builder_impl& interactive(bool i);
+    maze_builder_impl& algo(const std::string& algo);
+    maze_builder_impl& output(const std::string& filename);
     imaze_ptr build() override;
 private:
     std::string m_description;

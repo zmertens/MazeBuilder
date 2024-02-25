@@ -2,12 +2,17 @@
 
 #include <regex>
 #include <exception>
+#include <functional>
 
 #include <SDL3/SDL.h>
 
 args_handler::args_handler(const std::string& v, const std::string& h, int argc, char* argv[]) {
     args_map.emplace("version", v);
     args_map.emplace("help", h);
+    args_map.emplace("algo", "bst");
+    args_map.emplace("seed", "0");
+    args_map.emplace("output", "stdout");
+    args_map.emplace("interactive", "0");
 
     gather_args(argc, argv);
 }
@@ -26,6 +31,7 @@ std::string args_handler::get_version() const {
     if (check) {
         return itr->second;
     }
+    throw std::runtime_error("Version info not provided.");
 }
 
 std::string args_handler::get_help() const {
@@ -34,6 +40,7 @@ std::string args_handler::get_help() const {
     if (check) {
         return itr->second;
     }
+    throw std::runtime_error("Help info not provided.");
 }
 
 std::string args_handler::get_algo() const {
@@ -42,6 +49,7 @@ std::string args_handler::get_algo() const {
     if (check) {
         return itr->second;
     }
+    throw std::runtime_error("Algorithm info not provided.");
 }
 
 std::string args_handler::get_output() const {
@@ -50,6 +58,7 @@ std::string args_handler::get_output() const {
     if (check) {
         return itr->second;
     }
+    throw std::runtime_error("Output info not provided.");
 }
 
 // Populate the vector of strings with char-strings
@@ -70,9 +79,34 @@ void args_handler::gather_args(int argc, char* argv[]) {
 #endif
         string current (argv[i]);
         if (regex_match(current, interactive_regex)) {
-            args_map.emplace("interactive", "1");
+#if defined(DEBUGGING)
+            SDL_Log("Matching interactive: true");
+#endif
+            args_map["interactive"] = "1";
         } else if (regex_match(current, seed_regex)) {
-            
+            // seed follows an '=' or some spaces (or just one space...)
+            std::string seed_val = "";
+            if (current.compare("-s") == 0) { 
+                if (i + 1 < argc) {
+                    seed_val = argv[i + 1];
+                }
+                args_map["seed"] = seed_val;
+            } else {
+                // start at -1 because increment in while loop
+                int counter = -1;
+                std::string temp = "";
+                while (++counter < current.size()) {
+                    static bool start_counting_digits = false;
+                    if (current[counter] == '=') {
+                        start_counting_digits = true;
+                        continue;
+                    }
+                    if (start_counting_digits) {
+                        temp += current[counter];
+                    }
+                }
+                args_map["seed"] = temp;
+            }
         } else if (regex_match(current, help_regex)) {
             throw runtime_error(this->get_help());
             break;
@@ -80,37 +114,28 @@ void args_handler::gather_args(int argc, char* argv[]) {
             throw runtime_error(this->get_version());
             break;
         } else if (regex_match(current, algo_regex)) {
-            
+            args_map.emplace("algo", "bst");
         } else if (regex_match(current, output_regex)) {
-            
+            args_map.emplace("output", "stdout");
         } else {
             throw runtime_error("Could not handle arguments: " + current);
         }
     }
 
+    function<bool(const std::string&)> check_args = [this](const std::string& s) {
+        auto itr = this->args_map.find(s);
+        return itr == this->args_map.end();
+    };
+
     // check if interactive was set, else set it to '0'
-    auto itr = args_map.find("interactive");
-    bool not_interactive = itr == args_map.end();
-    if (not_interactive) {
+    bool has_arg = check_args("interactive");
+    if (!has_arg) {
         args_map.emplace("interactive", "0");
     }
 
     // Do the same check for seed, algo, output and set defaults
-    itr = args_map.find("seed");
-    bool no_seed = itr == args_map.end();
-    if (no_seed) {
+    has_arg = check_args("seed");
+    if (!has_arg) {
         args_map.emplace("seed", "0");
-    }
-
-    itr = args_map.find("algo");
-    bool no_algo = itr == args_map.end();
-    if (no_algo) {
-        args_map.emplace("algo", "bst");
-    }
-
-    itr = args_map.find("output");
-    bool no_output = itr == args_map.end();
-    if (no_output) {
-        args_map.emplace("output", "stdout");
     }
 } // gather_args

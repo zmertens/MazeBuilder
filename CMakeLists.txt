@@ -50,7 +50,7 @@ endif()
 
 # Quick and dirty Android build using SDL3 android-build script
 if(BUILD_FOR_ANDROID)
-    message(STATUS "Building SDL3 app for Android...")
+    message(INFO ": Building SDL app for Android!")
 
     if(NOT DEFINED ENV{ANDROID_HOME})
         message(FATAL_ERROR "Set ANDROID_HOME to path of Android Sdk.")
@@ -76,10 +76,10 @@ if(BUILD_FOR_ANDROID)
     list(GET DOWNLOAD_STATUS 1 ERROR_MESSAGE)
     # Check if download was successful.
     if(${STATUS_CODE} EQUAL 0)
-        message(STATUS "Download completed successfully!")
+        message(INFO ": SDL download completed successfully!")
     else()
         # Exit CMake if the download failed, printing the error message.
-        message(FATAL_ERROR "Error occurred during download: ${ERROR_MESSAGE}")
+        message(FATAL_ERROR ": Error occurred during download: ${ERROR_MESSAGE}")
     endif()
 
     if(NOT EXISTS ${ANDROID_BUILD_SCRIPT})
@@ -94,7 +94,7 @@ if(BUILD_FOR_ANDROID)
         execute_process(COMMAND sed -i -e "s|\"SDLActivity\"|\"CraftActivity\"|g" ${ANDROID_APP_PREFIX}/app/src/main/AndroidManifest.xml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
     endif()
 else()
-    message(STATUS "Building SDL3 app for Desktop...")
+    message(INFO ": Building SDL app for Desktop!")
 
     add_executable(${EXE_NAME} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${CRAFT_CPP_FILES})
 
@@ -107,7 +107,7 @@ else()
     # Find/Configure SDL3
     find_package(SDL3 QUIET)
     if(SDL3_FOUND)
-        message(STATUS "Using SDL3 via find_package")
+        message(INFO ": Using SDL3 via find_package")
     endif()
 
     # If all else fails, download SDL3
@@ -122,10 +122,12 @@ else()
             GIT_SHALLOW TRUE
             GIT_PROGRESS TRUE
         )
-        message(STATUS "Using SDL3 via FetchContent")
+        message(INFO ": Using SDL3 via FetchContent")
         FetchContent_MakeAvailable(SDL)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
+
+    # include_directories(${SDL3_DIR}/include)
 
     if(MINGW)
         set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
@@ -143,7 +145,7 @@ else()
             GIT_TAG master
             GIT_SHALLOW TRUE
             GIT_PROGRESS TRUE)
-        message(STATUS "Using CURL via FetchContent")
+        message(INFO ": Getting CURL via FetchContent")
         FetchContent_MakeAvailable(CURL)
     endif()
 

@@ -4,32 +4,38 @@
 #include <exception>
 
 #include "ibuilder.h"
+#include "bst_maze.h"
 #include "craft.h"
 
 maze_builder_impl::maze_builder_impl(const std::string& description)
-: m_description(description) {
+: m_description(description)
+, s(0)
+, is_interactive(false)
+, algorithm("bst")
+, filename("stdout") {
 
 }
 
-void maze_builder_impl::seed(unsigned int s) {
+maze_builder_impl& maze_builder_impl::seed(unsigned int s) {
     this->s = s;
+    return *this;
 }
 
-void maze_builder_impl::interactive(bool i) {
+maze_builder_impl& maze_builder_impl::interactive(bool i) {
     this->is_interactive = i;
+    return *this;
 }
 
-void maze_builder_impl::algo(const std::string& algo) {
+maze_builder_impl& maze_builder_impl::algo(const std::string& algo) {
     this->algorithm = algo;
+    return *this;
 }
 
-void maze_builder_impl::output(const std::string& filename) {
+maze_builder_impl& maze_builder_impl::output(const std::string& filename) {
     this->filename = filename;
+    return *this;
 }
 
-/**
- * @param seed defaults to zero
-*/
 ibuilder::imaze_ptr maze_builder_impl::build() {
     using namespace std;
 
@@ -37,6 +43,11 @@ ibuilder::imaze_ptr maze_builder_impl::build() {
         imaze_ptr my_maze (new craft(m_description, this->s));
         return my_maze;
     } else {
-        // throw std::runtime_error("failed to build maze");
+        if (this->algorithm.compare("bst") == 0) {
+            imaze_ptr my_maze (new bst_maze(m_description, this->s, this->filename));
+            return my_maze;
+        } else {
+            throw runtime_error("Invalid algorithm: " + this->algorithm);
+        }
     }
 }
