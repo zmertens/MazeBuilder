@@ -4,9 +4,11 @@
 #ifndef IMAZE_H
 #define IMAZE_H
 
+#include <memory>
+
 class imaze {
 public:
-
+    using imaze_ptr = std::unique_ptr<imaze>;
     virtual bool run() = 0;
 };
 

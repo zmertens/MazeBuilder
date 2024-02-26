@@ -1,6 +1,6 @@
 # Represents a cell in a maze
 
-require 'distances'
+require 'Distances'
 
 class Cell
     attr_reader :row, :column

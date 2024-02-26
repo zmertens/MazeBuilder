@@ -1,6 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "../sources/maze_builder_impl.h"
+#include <memory>
+
+#include "../sources/imaze.h"
+#include "../sources/bst_maze.h"
 
 unsigned int Factorial( unsigned int number ) {
     return number <= 1 ? number : Factorial(number-1)*number;
@@ -14,8 +17,7 @@ TEST_CASE( "Factorials are computed", "[factorial]" ) {
 }
 
 TEST_CASE("BST Algo returns success", "[bst_algo]") {
-    maze_builder_impl bst_builder {"bst_algo_maze"};
-    auto bst_maze = bst_builder.seed(1337).build();
-    bool success = bst_maze->run();
+    imaze::imaze_ptr my_maze (new bst_maze("bst algo", 1337, "stdout"));
+    bool success = my_maze->run();
     REQUIRE(success == true);
 }

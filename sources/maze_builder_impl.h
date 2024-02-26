@@ -2,6 +2,7 @@
 #define MAZE_BUILDER_H
 
 #include <string>
+#include "imaze.h"
 #include "ibuilder.h"
 
 class maze_builder_impl : public ibuilder {
@@ -12,7 +13,7 @@ public:
     maze_builder_impl& interactive(bool i);
     maze_builder_impl& algo(const std::string& algo);
     maze_builder_impl& output(const std::string& filename);
-    imaze_ptr build() override;
+    imaze::imaze_ptr build() override;
 private:
     std::string m_description;
     unsigned int s;

@@ -13,7 +13,8 @@ cmake --build build/
 
 | CMake Option | Default | 
 |--------------|---------|
-| BUILD_FOR_ANDROID | OFF |
+| BUILD_MAZE_FOR_ANDROID | OFF |
+| BUILD_MAZE_TESTS | OFF |
 | BUILD_SHARED_LIBS | TRUE |
 | BUILD_STATIC_LIBS | FALSE |
 | CMAKE_BUILD_TYPE | RelWithDebInfo |

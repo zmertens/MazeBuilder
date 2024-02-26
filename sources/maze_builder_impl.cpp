@@ -36,15 +36,15 @@ maze_builder_impl& maze_builder_impl::output(const std::string& filename) {
     return *this;
 }
 
-ibuilder::imaze_ptr maze_builder_impl::build() {
+imaze::imaze_ptr maze_builder_impl::build() {
     using namespace std;
 
     if (this->is_interactive) {
-        imaze_ptr my_maze (new craft(m_description, this->s));
+        imaze::imaze_ptr my_maze (new craft(m_description, this->s));
         return my_maze;
     } else {
         if (this->algorithm.compare("bst") == 0) {
-            imaze_ptr my_maze (new bst_maze(m_description, this->s, this->filename));
+            imaze::imaze_ptr my_maze (new bst_maze(m_description, this->s, this->filename));
             return my_maze;
         } else {
             throw runtime_error("Invalid algorithm: " + this->algorithm);

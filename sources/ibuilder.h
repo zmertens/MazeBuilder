@@ -7,9 +7,7 @@
 
 class ibuilder {
 public:
-    using imaze_ptr = std::unique_ptr<imaze>;
-
-    virtual imaze_ptr build() = 0;
+    virtual imaze::imaze_ptr build() = 0;
 };
 
 #endif // IBUILDER_H

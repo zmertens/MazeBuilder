@@ -4,9 +4,9 @@ cmake_policy(SET CMP0058 NEW)
 
 project(maze_builder)
 
-set(EXE_NAME "maze_builder")
+set(MAZE_BUILDER_EXE "maze_builder")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -38,13 +38,11 @@ set(DEP_C_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinycthread/tinycthread.c)
 
-set(EXE_NAME_WITH_TESTS "${EXE_NAME}_tests")
-set(TEST_CPP_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test1.cpp)
+option(BUILD_MAZE_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
 file(GLOB PROJECT_CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sources/*.cpp)
 
-option(BUILD_FOR_ANDROID "Building for Android using SDL3" OFF)
+option(BUILD_MAZE_FOR_ANDROID "Building for Android using SDL3" OFF)
 
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "RelWithDebInfo" ENABLE_DEBUGGING)
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "Debug" ENABLE_DEBUGGING2)
@@ -55,7 +53,7 @@ if(ENABLE_DEBUGGING OR ENABLE_DEBUGGING2)
 endif()
 
 # Quick and dirty Android build using SDL3 android-build script
-if(BUILD_FOR_ANDROID)
+if(BUILD_MAZE_FOR_ANDROID)
     message(INFO ": Building SDL app for Android!")
 
     if(NOT DEFINED ENV{ANDROID_HOME})
@@ -102,7 +100,9 @@ if(BUILD_FOR_ANDROID)
 else()
     message(INFO ": Building SDL app for Desktop!")
 
-    add_executable(${EXE_NAME} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${PROJECT_CPP_FILES})
+    add_executable(${MAZE_BUILDER_EXE} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${PROJECT_CPP_FILES})
+
+    target_compile_features(${MAZE_BUILDER_EXE} PUBLIC cxx_std_17)
 
     include_directories(deps/glad/include)
     include_directories(deps)
@@ -159,6 +159,23 @@ else()
 
     include_directories(${CURL_SOURCE_DIR}/include)
 
+    if(APPLE)
+        target_link_libraries(${MAZE_BUILDER_EXE} OpenGL::GL SDL3::SDL3 CURL::libcurl)
+    endif()
+
+    if(UNIX)
+        target_link_libraries(${MAZE_BUILDER_EXE} dl OpenGL::GL SDL3::SDL3 CURL::libcurl)
+    endif()
+
+    if(MINGW)
+        target_link_libraries(${MAZE_BUILDER_EXE} ws2_32.lib OpenGL::GL SDL3::SDL3 CURL::libcurl)
+    endif()
+
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
+endif()
+
+if(BUILD_MAZE_TESTS)
     find_package(Catch2 3 QUIET)
     if(CATCH2_FOUND)
         message(INFO ": Using Catch2 via find_package")
@@ -176,25 +193,22 @@ else()
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
+    set(MAZE_BUILDER_ALGO_FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/args_handler.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/output_writer.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_builder_impl.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sources/bst_maze.cpp)
+    set(MAZE_BUILDER_ALGO_LIB "MAZE_BUILDER")
+    set(MAZE_BUILDER_TEST_EXE "${MAZE_BUILDER_EXE}_tests")
+    file(GLOB MAZE_BUILDER_TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
+
+    add_library(${MAZE_BUILDER_ALGO_LIB} STATIC ${MAZE_BUILDER_ALGO_FILES})
+
     # These tests can use the Catch2-provided main
-    add_executable(${EXE_NAME_WITH_TESTS} ${TEST_CPP_FILES} ${DEP_C_FILES} ${DEAR_IMGUI_SRCS} ${PROJECT_CPP_FILES})
-    target_link_libraries(${EXE_NAME_WITH_TESTS} PRIVATE OpenGL::GL SDL3::SDL3 CURL::libcurl Catch2::Catch2WithMain)
+    add_executable(${MAZE_BUILDER_TEST_EXE} ${MAZE_BUILDER_TEST_FILES})
+    target_link_libraries(${MAZE_BUILDER_TEST_EXE} PRIVATE ${MAZE_BUILDER_ALGO_LIB} Catch2::Catch2WithMain)
+    target_include_directories(${MAZE_BUILDER_TEST_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tests")
     include(CTest)
     include(Catch)
-    catch_discover_tests(${EXE_NAME_WITH_TESTS})
-
-    if(APPLE)
-        target_link_libraries(${EXE_NAME} OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    if(UNIX)
-        target_link_libraries(${EXE_NAME} dl OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    if(MINGW)
-        target_link_libraries(${EXE_NAME} ws2_32.lib OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
+    catch_discover_tests(${MAZE_BUILDER_TEST_EXE})
 endif()
