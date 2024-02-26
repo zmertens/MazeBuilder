@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
+
 set(DEAR_IMGUI_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_demo.cpp
@@ -36,7 +38,11 @@ set(DEP_C_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinycthread/tinycthread.c)
 
-file(GLOB CRAFT_CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sources/*.cpp)
+set(EXE_NAME_WITH_TESTS "${EXE_NAME}_tests")
+set(TEST_CPP_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/test1.cpp)
+
+file(GLOB PROJECT_CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sources/*.cpp)
 
 option(BUILD_FOR_ANDROID "Building for Android using SDL3" OFF)
 
@@ -44,7 +50,7 @@ string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "RelWithDebInfo" ENABLE_DEBUGGING)
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "Debug" ENABLE_DEBUGGING2)
 
 if(ENABLE_DEBUGGING OR ENABLE_DEBUGGING2)
-    message(INFO ": Debugging enabled for ${PROJECT_NAME}")
+    message(INFO ": -DDEBUGGING enabled for ${PROJECT_NAME}")
     add_compile_definitions("DEBUGGING")
 endif()
 
@@ -96,7 +102,7 @@ if(BUILD_FOR_ANDROID)
 else()
     message(INFO ": Building SDL app for Desktop!")
 
-    add_executable(${EXE_NAME} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${CRAFT_CPP_FILES})
+    add_executable(${EXE_NAME} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${PROJECT_CPP_FILES})
 
     include_directories(deps/glad/include)
     include_directories(deps)
@@ -127,8 +133,7 @@ else()
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
-    # include_directories(${SDL3_DIR}/include)
-
+    # Help find CURL for this platform
     if(MINGW)
         set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
             "C:/Program Files/CURL/lib" "C:/Program Files (x86)/CURL/lib")
@@ -137,6 +142,9 @@ else()
     endif()
 
     find_package(CURL QUIET)
+    if(CURL_FOUND)
+        message(INFO ": Using CURL via find_package")
+    endif()
     if(NOT CURL_FOUND)
         include(FetchContent)
         FetchContent_Declare(
@@ -150,6 +158,30 @@ else()
     endif()
 
     include_directories(${CURL_SOURCE_DIR}/include)
+
+    find_package(Catch2 3 QUIET)
+    if(CATCH2_FOUND)
+        message(INFO ": Using Catch2 via find_package")
+    endif()
+    if(NOT CATCH2_FOUND)
+        include(FetchContent)
+        FetchContent_Declare(
+            Catch2
+            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+            GIT_TAG v3.4.0
+            GIT_SHALLOW TRUE
+            GIT_PROGRESS TRUE)
+        message(INFO ": Getting Catch2 via FetchContent")
+        FetchContent_MakeAvailable(Catch2)
+        list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
+    endif()
+
+    # These tests can use the Catch2-provided main
+    add_executable(${EXE_NAME_WITH_TESTS} ${TEST_CPP_FILES} ${DEP_C_FILES} ${DEAR_IMGUI_SRCS} ${PROJECT_CPP_FILES})
+    target_link_libraries(${EXE_NAME_WITH_TESTS} PRIVATE OpenGL::GL SDL3::SDL3 CURL::libcurl Catch2::Catch2WithMain)
+    include(CTest)
+    include(Catch)
+    catch_discover_tests(${EXE_NAME_WITH_TESTS})
 
     if(APPLE)
         target_link_libraries(${EXE_NAME} OpenGL::GL SDL3::SDL3 CURL::libcurl)

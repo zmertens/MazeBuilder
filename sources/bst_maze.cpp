@@ -13,7 +13,7 @@ bool bst_maze::run() {
 #if defined(DEBUGGING)
     double start = SDL_GetTicks() / 1000.0;
     double elapsed = SDL_GetTicks() / 1000.0 - start;
-    SDL_Log("Running bst algo, elapsed %d\n", elapsed);
+    SDL_Log("Running bst algo, elapsed %f\n", elapsed);
 #endif
     return true;
 }
