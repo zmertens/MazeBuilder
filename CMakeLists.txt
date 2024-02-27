@@ -104,16 +104,21 @@ else()
 
     target_compile_features(${MAZE_BUILDER_EXE} PUBLIC cxx_std_17)
 
-    include_directories(deps/glad/include)
-    include_directories(deps)
-    include_directories(deps/dearimgui)
+    if (WIN32)
+        target_include_directories(${MAZE_BUILDER_EXE} PRIVATE "C:\\Program Files (x86)\\SDL3\\include")
+        include_directories("C:\\Program Files (x86)\\SDL3\\include")
+    endif()
+
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps)
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
 
     find_package(OpenGL REQUIRED)
 
     # Find/Configure SDL3
     find_package(SDL3 QUIET)
     if(SDL3_FOUND)
-        message(INFO ": Using SDL3 via find_package")
+        message(INFO ": Getting SDL3 via find_package")
     endif()
 
     # If all else fails, download SDL3
@@ -128,13 +133,13 @@ else()
             GIT_SHALLOW TRUE
             GIT_PROGRESS TRUE
         )
-        message(INFO ": Using SDL3 via FetchContent")
+        message(INFO ": Getting SDL3 via FetchContent")
         FetchContent_MakeAvailable(SDL)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
     # Help find CURL for this platform
-    if(MINGW)
+    if(MINGW OR WIN32)
         set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
             "C:/Program Files/CURL/lib" "C:/Program Files (x86)/CURL/lib")
         set(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH}
@@ -143,7 +148,7 @@ else()
 
     find_package(CURL QUIET)
     if(CURL_FOUND)
-        message(INFO ": Using CURL via find_package")
+        message(INFO ": Getting CURL via find_package")
     endif()
     if(NOT CURL_FOUND)
         include(FetchContent)
@@ -167,7 +172,7 @@ else()
         target_link_libraries(${MAZE_BUILDER_EXE} dl OpenGL::GL SDL3::SDL3 CURL::libcurl)
     endif()
 
-    if(MINGW)
+    if(MINGW OR WIN32)
         target_link_libraries(${MAZE_BUILDER_EXE} ws2_32.lib OpenGL::GL SDL3::SDL3 CURL::libcurl)
     endif()
 
@@ -178,7 +183,7 @@ endif()
 if(BUILD_MAZE_TESTS)
     find_package(Catch2 3 QUIET)
     if(CATCH2_FOUND)
-        message(INFO ": Using Catch2 via find_package")
+        message(INFO ": Getting Catch2 via find_package")
     endif()
     if(NOT CATCH2_FOUND)
         include(FetchContent)

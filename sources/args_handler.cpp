@@ -3,8 +3,8 @@
 #include <regex>
 #include <exception>
 #include <functional>
-
-#include <SDL3/SDL.h>
+#include <iostream>
+#include <cstdlib>
 
 args_handler::args_handler(const std::string& v, const std::string& h, int argc, char* argv[]) {
     args_map.emplace("version", v);
@@ -18,11 +18,11 @@ args_handler::args_handler(const std::string& v, const std::string& h, int argc,
 }
 
 unsigned int args_handler::get_seed() const {
-    return SDL_atoi(args_map.at("seed").c_str());
+    return atoi(args_map.at("seed").c_str());
 }
 
 bool args_handler::is_interactive() const {
-    return static_cast<bool>(SDL_atoi(args_map.at("interactive").c_str()));
+    return static_cast<bool>(atoi(args_map.at("interactive").c_str()));
 }
 
 std::string args_handler::get_version() const {
@@ -75,12 +75,12 @@ void args_handler::gather_args(int argc, char* argv[]) {
     // skip program name
     for (unsigned int i = 1; i < argc; i++) {
 #if defined(DEBUGGING)
-        SDL_Log("parsing args: %s\n", argv[i]);
+        cout << "parsing arg: " << argv[i] << endl;
 #endif
         string current (argv[i]);
         if (regex_match(current, interactive_regex)) {
 #if defined(DEBUGGING)
-            SDL_Log("Matching interactive: true");
+            cout << "Matching interactive: true" << endl;
 #endif
             args_map["interactive"] = "1";
         } else if (regex_match(current, seed_regex)) {
