@@ -1,16 +1,20 @@
-#ifndef BST_HPP
-#define BST_HPP
+#ifndef BINARY_TREE_H
+#define BINARY_TREE_H
+
+#include <functional>
 
 #include "maze_algo_interface.h"
 
+namespace mazes {
+
 class grid;
 
-class bst : public maze_algo_interface {
+class binary_tree : public maze_algo_interface {
 public:
 
     bool run(grid& g, std::function<int(int, int)> const& get_int) const noexcept override;
 private:
 
 };
-
-#endif // BST_HPP
+}
+#endif // BINARY_TREE_H

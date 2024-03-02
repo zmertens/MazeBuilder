@@ -9,7 +9,7 @@
 /*
 maze_builder_impl maze_builder;
 maze my_maze = maze_builder.seed(seed).interactive(i).build();
-maze my_maze2 = maze_builder.seed(seed).algo(bst).output(filename).build();
+maze my_maze2 = maze_builder.seed(seed).algo(algo_name).output(filename).build();
 */
 
 int main(int argc, char* argv[]) {
@@ -20,12 +20,12 @@ int main(int argc, char* argv[]) {
     static const std::string HELP_MSG = R"help(
         Maze Builder Usages:
           1. ./maze_builder > default_maze.txt
-          2. ./maze_builder --seed=1337 --algo=bst -o bst.txt
+          2. ./maze_builder --seed=1337 --algo=binary_tree -o bt.txt
           3. ./maze_builder -i -s 1337
     )help";
 
     try {
-        args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
+        mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
 
 #if defined(DEBUGGING)
         cout << "INFO: Interactive: " << args.is_interactive() << endl;
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
             auto my_maze = maze_builder.interactive(args.is_interactive()).seed(args.get_seed()).algo(args.get_algo()).output(args.get_output()).build();
             bool success = my_maze->run();        
         } else {
-            maze_builder_impl bst_builder {"bst_algo_maze"};
+            maze_builder_impl bst_builder {"binary_tree_maze"};
             auto bst_maze = bst_builder.seed(args.get_seed()).build();
             bool success = bst_maze->run();
         }

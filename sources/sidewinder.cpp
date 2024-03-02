@@ -7,6 +7,7 @@
 #include "cell.h"
 #include "grid.h"
 
+using namespace mazes;
 using namespace std;
 
 bool sidewinder::run(grid& g, std::function<int(int, int)> const& get_int) const noexcept {

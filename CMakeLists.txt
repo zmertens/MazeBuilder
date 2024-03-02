@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.2...3.5)
 
 cmake_policy(SET CMP0058 NEW)
 
@@ -44,7 +44,7 @@ option(BUILD_MAZE_TESTS "Build ${PROJECT_NAME} tests" OFF)
 set(MAZE_ALGO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/args_builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/bst.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/binary_tree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp)
@@ -61,8 +61,6 @@ set(CRAFT_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp)
-
-option(BUILD_MAZE_FOR_ANDROID "Building for Android using SDL3" OFF)
 
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "RelWithDebInfo" ENABLE_DEBUGGING)
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "Debug" ENABLE_DEBUGGING2)

@@ -6,6 +6,8 @@
 #include <iostream>
 #include <cstdlib>
 
+using namespace mazes;
+
 args_builder::args_builder(const std::string& v, const std::string& h, int argc, char* argv[]) {
     args_map.emplace("version", v);
     args_map.emplace("help", h);
@@ -117,7 +119,7 @@ void args_builder::gather_args(int argc, char* argv[]) {
         } else if (regex_match(current, version_regex)) {
             throw runtime_error(this->get_version());
         } else if (regex_match(current, algo_regex)) {
-            args_map.emplace("algo", "bst");
+            args_map.emplace("algo", "binary_tree");
         } else if (regex_match(current, output_regex)) {
             args_map.emplace("output", "stdout");
         } else {

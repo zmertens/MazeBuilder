@@ -1,7 +1,11 @@
 #ifndef SIDEWINDER_HPP
 #define SIDEWINDER_HPP
 
+#include <functional>
+
 #include "maze_algo_interface.h"
+
+namespace mazes {
 
 class grid;
 
@@ -12,5 +16,7 @@ public:
 private:
 
 };
+
+}
 
 #endif // SIDEWINDER_HPP

@@ -2,6 +2,7 @@
 
 #include <iomanip>
 
+using namespace mazes;
 using namespace std;
 
 cell::cell(unsigned int row, unsigned int column) 

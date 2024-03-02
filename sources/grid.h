@@ -1,5 +1,5 @@
-#ifndef GRID_HPP
-#define GRID_HPP
+#ifndef GRID_H
+#define GRID_H
 
 #include <vector>
 #include <memory>
@@ -7,6 +7,8 @@
 #include <string>
 
 #include "cell.h"
+
+namespace mazes {
 
 class grid {
 public:
@@ -51,5 +53,5 @@ private:
     const unsigned int m_rows, m_columns;
     std::vector<std::vector<std::shared_ptr<cell>>> m_grid;
 };
-
-#endif // GRID_HPP
+} // namespace mazes
+#endif // GRID_H

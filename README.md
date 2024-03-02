@@ -4,7 +4,7 @@ Build mazes in console or 3D, and save, export to file.
 
 ## CMake
 
-This project uses `cmake` to build and test. It uses `find_package` or `FetchContent` to get SDL, Catch2 and CURL libraries if necessary. Modern hardware supporting OpenGL 3.0 is required.
+This project uses `cmake` to build and test. It uses `find_package` or `FetchContent` to get SDL and Catch2 if necessary. Modern hardware supporting OpenGL 3.0 is required.
 
 ```sh
 cmake -S "source directory here" -B build

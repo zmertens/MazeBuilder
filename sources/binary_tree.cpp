@@ -1,4 +1,4 @@
-#include "bst.h"
+#include "binary_tree.h"
 
 #include <vector>
 #include <random>
@@ -7,13 +7,11 @@
 #include "cell.h"
 #include "grid.h"
 
-using namespace std;
-
-bool bst::run(grid& g, std::function<int(int, int)> const& get_int) const noexcept {
-
+bool mazes::binary_tree::run(grid& g, std::function<int(int, int)> const& get_int) const noexcept {
+    using namespace std;
     for (auto&& row : g.get_grid()) {
         for (auto&& c : row) {
-            vector<shared_ptr<cell>> neighbors {};
+            vector<shared_ptr<mazes::cell>> neighbors {};
             if (c->get_north() != nullptr)
                 neighbors.emplace_back(c->get_north());
             if (c->get_east() != nullptr)

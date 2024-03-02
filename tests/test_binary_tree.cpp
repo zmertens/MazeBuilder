@@ -6,7 +6,7 @@
 #include <random>
 
 #include "grid.h"
-#include "bst.h"
+#include "binary_tree.h"
 
 using namespace std;
 
@@ -20,9 +20,9 @@ static auto get_int = [](int low, int high) ->int {
 
 TEST_CASE("Binary Search Tree maze algo computed", "[bst]") {
     grid g {5, 5};
-    bst my_bst_maze;
+    binary_tree my_binary_tree_maze;
     SECTION("Run BST and check for success", "![benchmark]") {
-        bool success = my_bst_maze.run(g, get_int);
+        bool success = my_binary_tree_maze.run(g, get_int);
         REQUIRE(success == true);
         stringstream ss;
         ss << g;

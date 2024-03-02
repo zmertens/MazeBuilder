@@ -4,6 +4,8 @@
 #include <string>
 #include <unordered_map>
 
+namespace mazes {
+
 class args_builder {
 public:
     args_builder(const std::string& v, const std::string& h, int argc, char* argv[]);
@@ -21,4 +23,5 @@ private:
     std::unordered_map<std::string, std::string> args_map;
 };
 
+}
 #endif // ARGS_HANDLER_H

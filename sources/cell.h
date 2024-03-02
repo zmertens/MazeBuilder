@@ -1,10 +1,12 @@
-#ifndef CELL_HPP
-#define CELL_HPP
+#ifndef CELL_H
+#define CELL_H
 
 #include <iostream>
 #include <memory>
 #include <vector>
 #include <unordered_map>
+
+namespace mazes {
 
 class cell {
 public:
@@ -45,4 +47,6 @@ private:
     std::shared_ptr<cell> m_west;
 };
 
-#endif // CELL_HPP
+} // namespace
+
+#endif // CELL_H

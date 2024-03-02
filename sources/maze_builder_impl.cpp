@@ -5,16 +5,19 @@
 #include <random>
 
 #include "imaze_builder.h"
-#include "bst.h"
+#include "binary_tree.h"
+#include "sidewinder.h"
 #include "grid.h"
 #include "cell.h"
 #include "craft.h"
+
+using namespace std;
 
 maze_builder_impl::maze_builder_impl(const std::string& description)
 : m_description(description)
 , s(0)
 , is_interactive(false)
-, algorithm("bst")
+, algorithm("binary_tree")
 , filename("stdout") {
 
 }
@@ -40,7 +43,6 @@ maze_builder_impl& maze_builder_impl::output(const std::string& filename) {
 }
 
 imaze::imaze_ptr maze_builder_impl::build() {
-    using namespace std;
 
     if (this->is_interactive) {
         imaze::imaze_ptr my_maze (new craft(m_description, this->s));
@@ -53,8 +55,8 @@ imaze::imaze_ptr maze_builder_impl::build() {
             uniform_int_distribution<int> dist {low, high};
             return dist(rng_engine);
         };
-        if (this->algorithm.compare("bst") == 0) {
-            grid g {5, 5};
+        if (this->algorithm.compare("binary_tree") == 0) {
+            mazes::grid g {5, 5};
             // imaze::imaze_ptr my_maze {make_unique<bst>()};
             // return my_maze;
             return nullptr;

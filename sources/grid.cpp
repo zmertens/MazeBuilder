@@ -4,6 +4,7 @@
 #include <string>
 #include <stdexcept>
 
+using namespace mazes;
 using namespace std;
 
 grid::grid(unsigned int rows, unsigned int columns)
