@@ -3,7 +3,6 @@
 #include <regex>
 #include <stdexcept>
 #include <functional>
-#include <iostream>
 #include <cstdlib>
 
 using namespace mazes;
@@ -11,16 +10,16 @@ using namespace mazes;
 args_builder::args_builder(const std::string& v, const std::string& h, int argc, char* argv[]) {
     args_map.emplace("version", v);
     args_map.emplace("help", h);
-    args_map.emplace("algo", "bst");
+    args_map.emplace("algo", "binary_tree");
     args_map.emplace("seed", "0");
     args_map.emplace("output", "stdout");
     args_map.emplace("interactive", "0");
 
-    gather_args(argc, argv);
+    this->state = gather_args(argc, argv);
 }
 
 args_builder::args_builder(const std::unordered_map<std::string, std::string>& args) 
-: args_map(args) {
+: args_map{args} {
 
 }
 
@@ -68,9 +67,19 @@ std::string args_builder::get_output() const {
     throw std::runtime_error("Output info not provided.");
 }
 
+args_state args_builder::get_state() const noexcept {
+    return this->state;
+}
+
+std::unordered_map<std::string, std::string> args_builder::get_args_map() const noexcept {
+    return this->args_map;
+}
+
 // Populate the vector of strings with char-strings
-void args_builder::gather_args(int argc, char* argv[]) {
+args_state args_builder::gather_args(int argc, char* argv[]) {
     using namespace std;
+
+    args_state state {args_state::READY_TO_ROCK};
 
     regex interactive_regex ("(^--interactive$|^\\-i$)", regex_constants::ECMAScript);
     regex seed_regex ("(^--seed=[\\d]+$|^\\-s\\s+\\d+$)", regex_constants::ECMAScript);
@@ -81,14 +90,8 @@ void args_builder::gather_args(int argc, char* argv[]) {
 
     // skip program name
     for (unsigned int i = 1; i < argc; i++) {
-#if defined(DEBUGGING)
-        cout << "INFO: parsing arg: " << argv[i] << endl;
-#endif
         string current (argv[i]);
         if (regex_match(current, interactive_regex)) {
-#if defined(DEBUGGING)
-            cout << "INFO: Matching interactive: true" << endl;
-#endif
             args_map["interactive"] = "1";
         } else if (regex_match(current, seed_regex)) {
             // seed follows an '=' or some spaces (or just one space...)
@@ -115,9 +118,9 @@ void args_builder::gather_args(int argc, char* argv[]) {
                 args_map["seed"] = temp;
             }
         } else if (regex_match(current, help_regex)) {
-            throw runtime_error(this->get_help());
+            state = args_state::JUST_NEEDS_HELP;
         } else if (regex_match(current, version_regex)) {
-            throw runtime_error(this->get_version());
+            state = args_state::JUST_NEEDS_VERSION;
         } else if (regex_match(current, algo_regex)) {
             args_map.emplace("algo", "binary_tree");
         } else if (regex_match(current, output_regex)) {
@@ -143,4 +146,6 @@ void args_builder::gather_args(int argc, char* argv[]) {
     if (!has_arg) {
         args_map.emplace("seed", "0");
     }
+
+    return state;
 } // gather_args

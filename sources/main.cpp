@@ -26,10 +26,19 @@ int main(int argc, char* argv[]) {
 
     try {
         mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
+        mazes::args_state state_of_args {args.get_state()};
 
 #if defined(DEBUGGING)
-        cout << "INFO: Interactive: " << args.is_interactive() << endl;
+        std::cout << args << std::endl;
 #endif
+
+        if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
+            cout << HELP_MSG << endl;
+            return EXIT_SUCCESS;
+        } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
+            cout << MAZE_BUILDER_VERSION << endl;
+            return EXIT_SUCCESS;
+        }
 
         if (args.is_interactive()) {
             maze_builder_impl maze_builder {"craft-sdl3"};

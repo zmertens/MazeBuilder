@@ -2,9 +2,15 @@
 #define ARGS_HANDLER_H
 
 #include <string>
+#include <sstream>
 #include <unordered_map>
+#include <ostream>
 
 namespace mazes {
+
+enum class args_state {
+    JUST_NEEDS_HELP, JUST_NEEDS_VERSION, READY_TO_ROCK
+};
 
 class args_builder {
 public:
@@ -17,10 +23,22 @@ public:
     std::string get_help() const;
     std::string get_algo() const;
     std::string get_output() const;
+    std::unordered_map<std::string, std::string> get_args_map() const noexcept;
+    args_state get_state() const noexcept;
+
+    friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
+        std::stringstream ss;
+        for (auto&& k : args.get_args_map()) {
+            ss << "INFO: " << k.first << ", " << k.second << "\n";
+        }
+
+        return os << ss.str() << "\n";
+    }
 
 private:
-    void gather_args(int argc, char* argv[]);
+    args_state gather_args(int argc, char* argv[]);
     std::unordered_map<std::string, std::string> args_map;
+    args_state state;
 };
 
 }
