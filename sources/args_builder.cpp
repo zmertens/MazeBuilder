@@ -1,12 +1,12 @@
-#include "args_handler.h"
+#include "args_builder.h"
 
 #include <regex>
-#include <exception>
+#include <stdexcept>
 #include <functional>
 #include <iostream>
 #include <cstdlib>
 
-args_handler::args_handler(const std::string& v, const std::string& h, int argc, char* argv[]) {
+args_builder::args_builder(const std::string& v, const std::string& h, int argc, char* argv[]) {
     args_map.emplace("version", v);
     args_map.emplace("help", h);
     args_map.emplace("algo", "bst");
@@ -17,15 +17,20 @@ args_handler::args_handler(const std::string& v, const std::string& h, int argc,
     gather_args(argc, argv);
 }
 
-unsigned int args_handler::get_seed() const {
+args_builder::args_builder(const std::unordered_map<std::string, std::string>& args) 
+: args_map(args) {
+
+}
+
+unsigned int args_builder::get_seed() const {
     return atoi(args_map.at("seed").c_str());
 }
 
-bool args_handler::is_interactive() const {
+bool args_builder::is_interactive() const {
     return static_cast<bool>(atoi(args_map.at("interactive").c_str()));
 }
 
-std::string args_handler::get_version() const {
+std::string args_builder::get_version() const {
     auto itr = args_map.find("version");
     bool check = itr != args_map.end();
     if (check) {
@@ -34,7 +39,7 @@ std::string args_handler::get_version() const {
     throw std::runtime_error("Version info not provided.");
 }
 
-std::string args_handler::get_help() const {
+std::string args_builder::get_help() const {
     auto itr = args_map.find("help");
     bool check = itr != args_map.end();
     if (check) {
@@ -43,7 +48,7 @@ std::string args_handler::get_help() const {
     throw std::runtime_error("Help info not provided.");
 }
 
-std::string args_handler::get_algo() const {
+std::string args_builder::get_algo() const {
     auto itr = args_map.find("algo");
     bool check = itr != args_map.end();
     if (check) {
@@ -52,7 +57,7 @@ std::string args_handler::get_algo() const {
     throw std::runtime_error("Algorithm info not provided.");
 }
 
-std::string args_handler::get_output() const {
+std::string args_builder::get_output() const {
     auto itr = args_map.find("output");
     bool check = itr != args_map.end();
     if (check) {
@@ -62,7 +67,7 @@ std::string args_handler::get_output() const {
 }
 
 // Populate the vector of strings with char-strings
-void args_handler::gather_args(int argc, char* argv[]) {
+void args_builder::gather_args(int argc, char* argv[]) {
     using namespace std;
 
     regex interactive_regex ("(^--interactive$|^\\-i$)", regex_constants::ECMAScript);
@@ -75,12 +80,12 @@ void args_handler::gather_args(int argc, char* argv[]) {
     // skip program name
     for (unsigned int i = 1; i < argc; i++) {
 #if defined(DEBUGGING)
-        cout << "parsing arg: " << argv[i] << endl;
+        cout << "INFO: parsing arg: " << argv[i] << endl;
 #endif
         string current (argv[i]);
         if (regex_match(current, interactive_regex)) {
 #if defined(DEBUGGING)
-            cout << "Matching interactive: true" << endl;
+            cout << "INFO: Matching interactive: true" << endl;
 #endif
             args_map["interactive"] = "1";
         } else if (regex_match(current, seed_regex)) {

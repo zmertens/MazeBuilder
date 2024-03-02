@@ -206,7 +206,6 @@ private:
     void gen_chunk_buffer(Chunk *chunk);
     // void map_set_func(int x, int y, int z, int w, void *arg);
     void load_chunk(WorkerItem *item);
-    void request_chunk(int p, int q);
     void init_chunk(Chunk *chunk, int p, int q);
     void create_chunk(Chunk *chunk, int p, int q);
     void delete_chunks();
@@ -237,7 +236,6 @@ private:
     void render_item(Attrib *attrib);
     void render_text(Attrib *attrib, int justify, float x, float y, float n, char *text);
     void add_message(const char *text);
-    void login();
     void copy();
     void paste();
     void array(Block *b1, Block *b2, int xc, int yc, int zc);

@@ -1,5 +1,5 @@
 #include "craft.h"
-#include "args_handler.h"
+#include "args_builder.h"
 #include "maze_builder_impl.h"
 
 #include <exception>
@@ -25,10 +25,10 @@ int main(int argc, char* argv[]) {
     )help";
 
     try {
-        args_handler args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
+        args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
 
 #if defined(DEBUGGING)
-        cout << "Interactive: " << args.is_interactive() << endl;
+        cout << "INFO: Interactive: " << args.is_interactive() << endl;
 #endif
 
         if (args.is_interactive()) {
@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
         }
     
     } catch (std::exception& ex) {
-        cerr << ex.what() << endl; 
+        cerr << "ERROR: " << ex.what() << endl; 
     }
 
     return EXIT_SUCCESS;

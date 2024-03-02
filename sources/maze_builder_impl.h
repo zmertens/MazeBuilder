@@ -3,9 +3,9 @@
 
 #include <string>
 #include "imaze.h"
-#include "ibuilder.h"
+#include "imaze_builder.h"
 
-class maze_builder_impl : public ibuilder {
+class maze_builder_impl : public imaze_builder {
 public:
     maze_builder_impl(const std::string& description);
 

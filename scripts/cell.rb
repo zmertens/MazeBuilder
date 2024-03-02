@@ -41,9 +41,9 @@ class Cell
         list
     end
 
-    # def to_s
-    #     "row: #{@row} , column: #{@column}"
-    # end
+    def to_s
+        "row: #{@row} , column: #{@column}"
+    end
 
     # Compute distances between cell starting points
     # using Dijkstra's algo

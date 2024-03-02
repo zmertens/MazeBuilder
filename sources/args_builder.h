@@ -4,9 +4,10 @@
 #include <string>
 #include <unordered_map>
 
-class args_handler {
+class args_builder {
 public:
-    args_handler(const std::string& v, const std::string& h, int argc, char* argv[]);
+    args_builder(const std::string& v, const std::string& h, int argc, char* argv[]);
+    args_builder(const std::unordered_map<std::string, std::string>& args);
 
     unsigned int get_seed() const;
     bool is_interactive() const;

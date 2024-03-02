@@ -5,7 +5,7 @@
 
 #include "imaze.h"
 
-class ibuilder {
+class imaze_builder {
 public:
     virtual imaze::imaze_ptr build() = 0;
 };

@@ -6,7 +6,7 @@
 require 'grid'
 require 'binary_tree'
 
-grid = Grid.new(100, 100)
+grid = Grid.new(5, 5)
 
 BinaryTree.on(grid)
 

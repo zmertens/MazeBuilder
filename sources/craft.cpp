@@ -18,16 +18,13 @@ Ported to C++11
 #endif
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <curl/curl.h>
-
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <string>
-#include "auth.h"
-#include "client.h"
+
 #include "config.h"
 #include "cube.h"
 #include "db.h"
@@ -1096,11 +1093,6 @@ void craft::load_chunk(WorkerItem *item) {
     db_load_lights(light_map, p, q);
 }
 
-void craft::request_chunk(int p, int q) {
-    int key = db_get_key(p, q);
-    client_chunk(p, q, key);
-}
-
 void craft::init_chunk(Chunk *chunk, int p, int q) {
     chunk->p = p;
     chunk->q = q;
@@ -1131,8 +1123,6 @@ void craft::create_chunk(Chunk *chunk, int p, int q) {
     item->block_maps[1][1] = &chunk->map;
     item->light_maps[1][1] = &chunk->lights;
     load_chunk(item);
-
-    request_chunk(p, q);
 }
 
 void craft::delete_chunks() {
@@ -1193,7 +1183,6 @@ void craft::check_workers() {
                     map_free(&chunk->lights);
                     map_copy(&chunk->map, block_map);
                     map_copy(&chunk->lights, light_map);
-                    request_chunk(item->p, item->q);
                 }
                 generate_chunk(chunk, item);
             }
@@ -1415,7 +1404,6 @@ void craft::set_sign(int x, int y, int z, int face, const char *text) {
     int p = chunked(x);
     int q = chunked(z);
     _set_sign(p, q, x, y, z, face, text, 1);
-    client_sign(x, y, z, face, text);
 }
 
 void craft::toggle_light(int x, int y, int z) {
@@ -1427,7 +1415,6 @@ void craft::toggle_light(int x, int y, int z) {
         int w = map_get(map, x, y, z) ? 0 : 15;
         map_set(map, x, y, z, w);
         db_insert_light(p, q, x, y, z, w);
-        client_light(x, y, z, w);
         dirty_chunk(chunk);
     }
 }
@@ -1484,7 +1471,6 @@ void craft::set_block(int x, int y, int z, int w) {
             _set_block(p + dx, q + dz, x, y, z, -w, 1);
         }
     }
-    client_block(x, y, z, w);
 }
 
 void craft::record_block(int x, int y, int z, int w) {
@@ -1720,29 +1706,6 @@ void craft::add_message(const char *text) {
     g->message_index = (g->message_index + 1) % MAX_MESSAGES;
 }
 
-void craft::login() {
-    char username[128] = {0};
-    char identity_token[128] = {0};
-    char access_token[128] = {0};
-    if (db_auth_get_selected(username, 128, identity_token, 128)) {
-        printf("Contacting login server for username: %s\n", username);
-        if (get_access_token(
-            access_token, 128, username, identity_token))
-        {
-            printf("Successfully authenticated with the login server\n");
-            client_login(username, access_token);
-        }
-        else {
-            printf("Failed to authenticate with the login server\n");
-            client_login("", "");
-        }
-    }
-    else {
-        printf("Logging in anonymously\n");
-        client_login("", "");
-    }
-}
-
 void craft::copy() {
     memcpy(&g->copy0, &g->block0, sizeof(Block));
     memcpy(&g->copy1, &g->block1, sizeof(Block));
@@ -1933,46 +1896,11 @@ void craft::tree(Block *block) {
 void craft::parse_command(const char *buffer, int forward) {
     char username[128] = {0};
     char token[128] = {0};
-    char server_addr[MAX_ADDR_LENGTH];
-    int server_port = DEFAULT_PORT;
     char filename[MAX_PATH_LENGTH];
     int radius, count, xc, yc, zc;
     if (sscanf(buffer, "/identity %128s %128s", username, token) == 2) {
         db_auth_set(username, token);
         add_message("Successfully imported identity token!");
-        login();
-    }
-    else if (strcmp(buffer, "/logout") == 0) {
-        db_auth_select_none();
-        login();
-    }
-    else if (sscanf(buffer, "/login %128s", username) == 1) {
-        if (db_auth_select(username)) {
-            login();
-        }
-        else {
-            add_message("Unknown username.");
-        }
-    }
-    else if (sscanf(buffer,
-        "/online %128s %d", server_addr, &server_port) >= 1)
-    {
-        g->mode_changed = 1;
-        g->mode = MODE_ONLINE;
-        strncpy(g->server_addr, server_addr, MAX_ADDR_LENGTH);
-        g->server_port = server_port;
-        snprintf(g->db_path, MAX_PATH_LENGTH,
-            "cache.%s.%d.db", g->server_addr, g->server_port);
-    }
-    else if (sscanf(buffer, "/offline %128s", filename) == 1) {
-        g->mode_changed = 1;
-        g->mode = MODE_OFFLINE;
-        snprintf(g->db_path, MAX_PATH_LENGTH, "%s.db", filename);
-    }
-    else if (strcmp(buffer, "/offline") == 0) {
-        g->mode_changed = 1;
-        g->mode = MODE_OFFLINE;
-        snprintf(g->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
     }
     else if (sscanf(buffer, "/view %d", &radius) == 1) {
         if (radius >= 1 && radius <= 24) {
@@ -2034,9 +1962,6 @@ void craft::parse_command(const char *buffer, int forward) {
     }
     else if (sscanf(buffer, "/cylinder %d", &radius) == 1) {
         cylinder(&g->block0, &g->block1, radius, 0);
-    }
-    else if (forward) {
-        client_talk(buffer);
     }
 }
 
@@ -2154,8 +2079,6 @@ int craft::handle_events(double dt) {
 							}
 						} else if (g->typing_buffer[0] == '/') {
 							parse_command(g->typing_buffer, 1);
-						} else {
-							client_talk(g->typing_buffer);
 						}
 					}
 				} else {
@@ -2778,15 +2701,6 @@ bool craft::run() {
             }
         }
 
-        // CLIENT INITIALIZATION //
-        if (g->mode == MODE_ONLINE) {
-            client_enable();
-            client_connect(g->server_addr, g->server_port);
-            client_start();
-            client_version(1);
-            login();
-        }
-
         // LOCAL VARIABLES //
         reset_model();
         FPS fps = {0, 0, 0};
@@ -2881,23 +2795,10 @@ bool craft::run() {
             ImGui::End();
         }
 
-            // HANDLE DATA FROM SERVER //
-            char *buffer = client_recv();
-            if (buffer) {
-                parse_buffer(buffer);
-                free(buffer);
-            }
-
             // FLUSH DATABASE //
             if (now - last_commit > COMMIT_INTERVAL) {
                 last_commit = now;
                 db_commit();
-            }
-
-            // SEND POSITION TO SERVER //
-            if (now - last_update > 0.1) {
-                last_update = now;
-                client_position(s->x, s->y, s->z, s->rx, s->ry);
             }
 
             // PREPARE TO RENDER //
@@ -3039,8 +2940,6 @@ bool craft::run() {
         db_save_state(s->x, s->y, s->z, s->rx, s->ry);
         db_close();
         db_disable();
-        client_stop();
-        client_disable();
         del_buffer(sky_buffer);
         delete_all_chunks();
         delete_all_players();

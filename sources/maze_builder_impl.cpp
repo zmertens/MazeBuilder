@@ -2,9 +2,12 @@
 
 #include <memory>
 #include <stdexcept>
+#include <random>
 
-#include "ibuilder.h"
-#include "bst_maze.h"
+#include "imaze_builder.h"
+#include "bst.h"
+#include "grid.h"
+#include "cell.h"
 #include "craft.h"
 
 maze_builder_impl::maze_builder_impl(const std::string& description)
@@ -43,9 +46,18 @@ imaze::imaze_ptr maze_builder_impl::build() {
         imaze::imaze_ptr my_maze (new craft(m_description, this->s));
         return my_maze;
     } else {
+        auto get_int = [=](int low, int high) -> int {
+            random_device rd;
+            seed_seq seed {rd()};
+            mt19937 rng_engine {seed};
+            uniform_int_distribution<int> dist {low, high};
+            return dist(rng_engine);
+        };
         if (this->algorithm.compare("bst") == 0) {
-            imaze::imaze_ptr my_maze (new bst_maze(m_description, this->s, this->filename));
-            return my_maze;
+            grid g {5, 5};
+            // imaze::imaze_ptr my_maze {make_unique<bst>()};
+            // return my_maze;
+            return nullptr;
         } else {
             throw runtime_error("Invalid algorithm: " + this->algorithm);
         }
