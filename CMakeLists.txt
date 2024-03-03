@@ -50,7 +50,6 @@ set(MAZE_ALGO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp)
 
 set(CRAFT_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_builder_impl.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/db.cpp

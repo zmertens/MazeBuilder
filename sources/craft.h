@@ -2,18 +2,22 @@
 #define CRAFT_H
 
 #include <string>
+#include <functional>
 #include <memory>
+#include <list>
 
 #include <glad/glad.h>
 
 #include <SDL3/SDL.h>
 
 #include <tinycthread/tinycthread.h>
+
 #include "sign.h"
 #include "map.h"
 #include "config.h"
 
-#include "imaze.h"
+#include "maze_algo_interface.h"
+#include "maze_factory_enum.h"
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 128
@@ -23,10 +27,13 @@
 #define MAX_PATH_LENGTH 256
 #define MAX_ADDR_LENGTH 256
 
-class craft : public imaze {
+class grid;
+
+class craft : public mazes::maze_algo_interface {
 public:
-    craft(const std::string& window_name, unsigned int seed = 0);
-    bool run() override;
+    craft(const std::string& window_name, std::function<std::unique_ptr<maze_algo_interface>(mazes::maze_factory_types)> const& factory);
+    bool run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
+    // std::list<std::unique_ptr<mazes::grid>> get_grids() const noexcept;
 private:
     typedef struct {
         Map map;
@@ -148,8 +155,10 @@ private:
 
     static std::unique_ptr<Model> g;
 
-    const std::string& window_name;
-    const unsigned int seed;
+    const std::string& m_window_name;
+    std::unique_ptr<mazes::maze_algo_interface> m_bt_ptr;
+    std::unique_ptr<mazes::maze_algo_interface> m_sidewinder_ptr;
+    // std::list<std::unique_ptr<mazes::grid>> m_grids;
 
     int chunked(float x) const;
     double get_time() const;

@@ -1,5 +1,6 @@
 #include "args_builder.h"
 
+#include <string>
 #include <regex>
 #include <stdexcept>
 #include <functional>
@@ -23,11 +24,11 @@ args_builder::args_builder(const std::unordered_map<std::string, std::string>& a
 
 }
 
-unsigned int args_builder::get_seed() const {
+unsigned int args_builder::get_seed() const noexcept {
     return atoi(args_map.at("seed").c_str());
 }
 
-bool args_builder::is_interactive() const {
+bool args_builder::is_interactive() const noexcept {
     return static_cast<bool>(atoi(args_map.at("interactive").c_str()));
 }
 
@@ -71,7 +72,24 @@ args_state args_builder::get_state() const noexcept {
     return this->state;
 }
 
-std::unordered_map<std::string, std::string> args_builder::get_args_map() const noexcept {
+args_builder_interface& args_builder::set_seed(unsigned int s) noexcept {
+    this->args_map.insert_or_assign("seed", std::to_string(s));
+}
+
+args_builder_interface& args_builder::set_interactive(bool i) noexcept {
+    this->args_map.insert_or_assign("interactive", std::to_string(i));
+}
+
+args_builder_interface& args_builder::set_algo(const std::string& algo) noexcept {
+    this->args_map.insert_or_assign("algo", algo);
+}
+
+// Output can be stdout
+args_builder_interface& args_builder::set_output(const std::string& filename) noexcept {
+    this->args_map.insert_or_assign("output", filename);
+}
+
+const std::unordered_map<std::string, std::string>& args_builder::build() const noexcept {
     return this->args_map;
 }
 

@@ -7,7 +7,10 @@
 #include "cell.h"
 #include "grid.h"
 
-bool mazes::binary_tree::run(grid& g, std::function<int(int, int)> const& get_int) const noexcept {
+/**
+ * @param interactive = false
+*/
+bool mazes::binary_tree::run(grid& g, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
     using namespace std;
     for (auto&& row : g.get_grid()) {
         for (auto&& c : row) {

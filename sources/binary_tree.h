@@ -12,7 +12,7 @@ class grid;
 class binary_tree : public maze_algo_interface {
 public:
 
-    bool run(grid& g, std::function<int(int, int)> const& get_int) const noexcept override;
+    bool run(grid& g, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
 private:
 
 };

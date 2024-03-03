@@ -10,7 +10,10 @@
 using namespace mazes;
 using namespace std;
 
-bool sidewinder::run(grid& g, std::function<int(int, int)> const& get_int) const noexcept {
+/**
+ * @param interactive = false
+*/
+bool sidewinder::run(grid& g, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
     
     for (auto&& row : g.get_grid()) {
         vector<shared_ptr<cell>> run;

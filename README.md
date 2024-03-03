@@ -20,7 +20,7 @@ cmake --build build/
 
 ## Commands
 
-Generate a simple maze using `default` algorithms, and print the result to stdout:
+Generate a simple maze using `default` settings (width=10, height=10, `binary_tree` algo), and print the result to stdout:
 ```sh
 ./maze_builder > default_maze.txt
 ```

@@ -9,7 +9,7 @@ class grid;
 
 class maze_algo_interface {
 public:
-    virtual bool run(grid& g, std::function<int(int, int)> const& get_int) const noexcept = 0;
+    virtual bool run(grid& g, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept = 0;
 };
 }
 #endif // MAZE_ALGO_INTERFACE_HPP

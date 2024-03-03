@@ -64,3 +64,11 @@ void grid::print_grid_cells(vector<vector<shared_ptr<cell>>> const& grid) const 
 std::vector<std::vector<std::shared_ptr<cell>>> grid::get_grid() const {
     return this->m_grid;
 }
+
+unsigned int grid::get_rows() const noexcept {
+    return this->m_rows;
+}
+
+unsigned int grid::get_columns() const noexcept {
+    return this->m_columns;
+}

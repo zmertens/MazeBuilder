@@ -48,15 +48,17 @@ Ported to C++11
 #define WORKER_BUSY 1
 #define WORKER_DONE 2
 
+using namespace mazes;
+using namespace std;
+
 std::unique_ptr<craft::Model> craft::g (new craft::Model());
 
-/**
- * @param seed defaults to zero
-*/
-craft::craft(const std::string& window_name, unsigned int seed)
-: window_name(window_name)
-, seed(seed) {
-
+craft::craft(const std::string& window_name, std::function<std::unique_ptr<maze_algo_interface>(mazes::maze_factory_types)> const& factory)
+: m_window_name(window_name)
+, m_bt_ptr{factory(maze_factory_types::BINARY_TREE)}
+, m_sidewinder_ptr{factory(maze_factory_types::SIDEWINDER)}
+// , m_grids{} {
+{
 }
 
 int craft::chunked(float x) const {
@@ -1333,7 +1335,7 @@ void craft::ensure_chunks(Player *player) {
 int craft::worker_run(void *arg) {
     Worker *worker = (Worker *)arg;
     int running = 1;
-    craft caller ("dummy");
+    craft caller {"dummy", nullptr};
     while (running) {
         mtx_lock(&worker->mtx);
         while (worker->state != WORKER_BUSY) {
@@ -2373,7 +2375,7 @@ void craft::create_window_and_context() {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-    g->window = SDL_CreateWindow(this->window_name.c_str(), window_width, window_height, window_flags);
+    g->window = SDL_CreateWindow(this->m_window_name.c_str(), window_width, window_height, window_flags);
     g->context = (SDL_GLContext*) SDL_GL_CreateContext(g->window);
 
     SDL_GL_MakeCurrent(g->window, g->context);
@@ -2498,23 +2500,33 @@ void craft::reset_model() {
     g->time_changed = 1;
 }
 
-bool craft::run() {
-    // INITIALIZATION //
-    // curl_global_init(CURL_GLOBAL_DEFAULT);
+/**
+ * Run the craft-engine in a loop with SDL window open
+ * @param interactive = false
+*/
+bool craft::run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+    
+    // Generate just 1 maze, 1 grid
+    if (!interactive) {
+        this->m_bt_ptr->run(gr, get_int);
+        // this->m_grids.emplace_back(make_unique<mazes::grid>(grid.get_rows(), grid.get_columns()));
+        return true;
+    }
+
     srand(time(NULL));
     rand();
 
     // SDL INITIALIZATION //
     if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed (%s)\n", SDL_GetError());
-        return -1;
+        return false;
     }
 
     create_window_and_context();
     if (!g->window) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Window failed (%s)\n", SDL_GetError());
         SDL_Quit();
-        return -1;
+        return false;
     }
 
     SDL_ShowWindow(g->window);
@@ -2524,7 +2536,7 @@ bool craft::run() {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, 
             "OpenGL loader failed (%s)\n", SDL_GetError());
         SDL_Quit();
-        return -1;
+        return false;
     }
 
     dump_opengl_info(DUMP_GL_EXTENSIONS);
@@ -2972,3 +2984,7 @@ bool craft::run() {
 
     return true;
 } // run
+
+// std::list<unique_ptr<mazes::grid>> craft::get_grids() const noexcept {
+//     return move(m_grids);
+// }

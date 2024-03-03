@@ -14,6 +14,8 @@ class grid {
 public:
     grid(unsigned int rows, unsigned int columns);
     std::vector<std::vector<std::shared_ptr<cell>>> get_grid() const;
+    unsigned int get_rows() const noexcept;
+    unsigned int get_columns() const noexcept;
 private:
     void prepare_grid(std::vector<std::vector<std::shared_ptr<cell>>>& grid) noexcept;
     void configure_cells(std::vector<std::vector<std::shared_ptr<cell>>>& grid) noexcept;

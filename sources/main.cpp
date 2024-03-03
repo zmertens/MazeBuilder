@@ -1,16 +1,14 @@
-#include "craft.h"
-#include "args_builder.h"
-#include "maze_builder_impl.h"
-
+#include <random>
 #include <exception>
 #include <cstdio>
 #include <iostream>
 
-/*
-maze_builder_impl maze_builder;
-maze my_maze = maze_builder.seed(seed).interactive(i).build();
-maze my_maze2 = maze_builder.seed(seed).algo(algo_name).output(filename).build();
-*/
+#include "craft.h"
+#include "grid.h"
+#include "binary_tree.h"
+#include "sidewinder.h"
+#include "args_builder.h"
+#include "maze_factory_enum.h"
 
 int main(int argc, char* argv[]) {
     using namespace std;
@@ -27,6 +25,7 @@ int main(int argc, char* argv[]) {
     try {
         mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
         mazes::args_state state_of_args {args.get_state()};
+        auto&& args_map {args.build()};
 
 #if defined(DEBUGGING)
         std::cout << args << std::endl;
@@ -40,14 +39,32 @@ int main(int argc, char* argv[]) {
             return EXIT_SUCCESS;
         }
 
-        if (args.is_interactive()) {
-            maze_builder_impl maze_builder {"craft-sdl3"};
-            auto my_maze = maze_builder.interactive(args.is_interactive()).seed(args.get_seed()).algo(args.get_algo()).output(args.get_output()).build();
-            bool success = my_maze->run();        
+        auto use_this_for_seed = args_map.at("seed");
+        auto get_int = [](int low, int high) -> int {
+            using namespace std;
+            random_device rd;
+            seed_seq seed {rd()};
+            mt19937 rng_engine {seed};
+            uniform_int_distribution<int> dist {low, high};
+            return dist(rng_engine);
+        };
+
+        auto maze_factory = [](mazes::maze_factory_types maze_type) -> std::unique_ptr<mazes::maze_algo_interface> {
+            switch (maze_type) {
+                case mazes::maze_factory_types::BINARY_TREE: 
+                    return std::make_unique<mazes::binary_tree>();
+                case mazes::maze_factory_types::SIDEWINDER:
+                    return std::make_unique<mazes::sidewinder>();
+            }
+        };
+        
+        craft maze_builder {"craft-sdl3", maze_factory};
+        mazes::grid empty_grid {10, 10};
+        bool success = maze_builder.run(empty_grid, get_int, args.is_interactive());
+        if (success) {
+            cout << empty_grid << endl;
         } else {
-            maze_builder_impl bst_builder {"binary_tree_maze"};
-            auto bst_maze = bst_builder.seed(args.get_seed()).build();
-            bool success = bst_maze->run();
+            cerr << "ERROR: " << args.get_algo() << " failed!!" << endl;
         }
     
     } catch (std::exception& ex) {
