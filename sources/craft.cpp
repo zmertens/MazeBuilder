@@ -181,7 +181,7 @@ struct craft::craft_impl {
     unique_ptr<State> m_state;
     unique_ptr<Chunk> m_chunk;
 
-    craft_impl::craft_impl(const std::string& window_name, mazes::maze_types maze_type)
+    craft_impl(const std::string& window_name, mazes::maze_types maze_type)
     : m_window_name{window_name}
     , m_maze_type{maze_type}
     , m_model{make_unique<Model>()}
@@ -193,7 +193,7 @@ struct craft::craft_impl {
 
     }
 
-    static int craft_impl::worker_run(void *arg) {
+    static int worker_run(void *arg) {
         Worker *worker = (Worker *)arg;
         int running = 1;
         // never call the factory with this caller
@@ -217,9 +217,9 @@ struct craft::craft_impl {
     } // worker_run
 
 
-    void craft_impl::init_worker_threads() {
+    void init_worker_threads() {
         for (int i = 0; i < WORKERS; i++) {
-            craft_impl::Worker *worker = this->m_model->workers + i;
+            Worker *worker = this->m_model->workers + i;
             worker->index = i;
             worker->state = WORKER_IDLE;
             mtx_init(&worker->mtx, mtx_plain);
@@ -228,11 +228,11 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::del_buffer(GLuint buffer) {
+    void del_buffer(GLuint buffer) {
         glDeleteBuffers(1, &buffer);
     }
 
-    GLuint craft_impl::gen_buffer(GLsizei size, GLfloat *data) {
+    GLuint gen_buffer(GLsizei size, GLfloat *data) {
         GLuint buffer;
         glGenBuffers(1, &buffer);
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -251,13 +251,13 @@ struct craft::craft_impl {
         return buffer;
     }
 
-    int craft_impl::chunked(float x) const {
+    int chunked(float x) const {
         return SDL_floorf(SDL_roundf(x) / CHUNK_SIZE);
     }
-    double craft_impl::get_time() const {
+    double get_time() const {
     	return (SDL_GetTicks() + (double) this->m_model->start_time - (double) this->m_model->start_ticks) / 1000.0;
     }
-    float craft_impl::time_of_day() const {
+    float time_of_day() const {
         if (this->m_model->day_length <= 0) {
             return 0.5;
         }
@@ -268,7 +268,7 @@ struct craft::craft_impl {
         return t;
     }
 
-    float craft_impl::get_daylight() const {
+    float get_daylight() const {
         float timer = time_of_day();
         if (timer < 0.5) {
             float t = (timer - 0.25) * 100;
@@ -280,7 +280,7 @@ struct craft::craft_impl {
         }
     }
 
-    int craft_impl::get_scale_factor() const {
+    int get_scale_factor() const {
         int window_width, window_height;
         int buffer_width, buffer_height;
         SDL_GetWindowSize(this->m_model->window, &window_width, &window_height);
@@ -291,14 +291,14 @@ struct craft::craft_impl {
         return result;
     }
 
-    void craft_impl::get_sight_vector(float rx, float ry, float *vx, float *vy, float *vz) const {
+    void get_sight_vector(float rx, float ry, float *vx, float *vy, float *vz) const {
         float m = SDL_cosf(ry);
         *vx = SDL_cosf(rx - RADIANS(90)) * m;
         *vy = SDL_sinf(ry);
         *vz = SDL_sinf(rx - RADIANS(90)) * m;
     }
 
-    void craft_impl::get_motion_vector(int flying, int sz, int sx, float rx, float ry,
+    void get_motion_vector(int flying, int sz, int sx, float rx, float ry,
         float *vx, float *vy, float *vz) const {
         *vx = 0; *vy = 0; *vz = 0;
         if (!sz && !sx) {
@@ -328,7 +328,7 @@ struct craft::craft_impl {
         }
     }
 
-    GLuint craft_impl::gen_crosshair_buffer() {
+    GLuint gen_crosshair_buffer() {
         float x = static_cast<float>(this->m_model->width) / 2.0f;
         float y = static_cast<float>(this->m_model->height) / 2.0f;
         float p = 10.f * static_cast<float>(this->m_model->scale);
@@ -339,21 +339,21 @@ struct craft::craft_impl {
         return this->gen_buffer(sizeof(data), data);
     }
 
-    GLuint craft_impl::gen_wireframe_buffer(float x, float y, float z, float n) {
+    GLuint gen_wireframe_buffer(float x, float y, float z, float n) {
         float data[72];
         // cube.h -> make_cube_wireframe
         make_cube_wireframe(data, x, y, z, n);
         return this->gen_buffer(sizeof(data), data);
     }
 
-    GLuint craft_impl::gen_sky_buffer() {
+    GLuint gen_sky_buffer() {
         float data[12288];
         // cube.h -> make_sphere
         make_sphere(data, 1, 3);
         return this->gen_buffer(sizeof(data), data);
     }
 
-    GLuint craft_impl::gen_cube_buffer(float x, float y, float z, float n, int w) {
+    GLuint gen_cube_buffer(float x, float y, float z, float n, int w) {
         GLfloat *data = malloc_faces(10, 6);
         float ao[6][4] = {0};
         float light[6][4] = {
@@ -368,7 +368,7 @@ struct craft::craft_impl {
         return gen_faces(10, 6, data);
     }
 
-    GLuint craft_impl::gen_plant_buffer(float x, float y, float z, float n, int w) {
+    GLuint gen_plant_buffer(float x, float y, float z, float n, int w) {
         GLfloat *data = malloc_faces(10, 4);
         float ao = 0;
         float light = 1;
@@ -376,13 +376,13 @@ struct craft::craft_impl {
         return gen_faces(10, 4, data);
     }
 
-    GLuint craft_impl::gen_player_buffer(float x, float y, float z, float rx, float ry) {
+    GLuint gen_player_buffer(float x, float y, float z, float rx, float ry) {
         GLfloat *data = malloc_faces(10, 6);
         make_player(data, x, y, z, rx, ry);
         return gen_faces(10, 6, data);
     }
 
-    GLuint craft_impl::gen_text_buffer(float x, float y, float n, char *text) {
+    GLuint gen_text_buffer(float x, float y, float n, char *text) {
         int length = strlen(text);
         GLfloat *data = malloc_faces(4, length);
         for (int i = 0; i < length; i++) {
@@ -392,7 +392,7 @@ struct craft::craft_impl {
         return gen_faces(4, length, data);
     }
 
-    void craft_impl::draw_triangles_3d_ao(Attrib *attrib, GLuint buffer, int count) {
+    void draw_triangles_3d_ao(Attrib *attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glEnableVertexAttribArray(attrib->position);
         glEnableVertexAttribArray(attrib->normal);
@@ -410,7 +410,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void craft_impl::draw_triangles_3d_text(Attrib *attrib, GLuint buffer, int count) {
+    void draw_triangles_3d_text(Attrib *attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glEnableVertexAttribArray(attrib->position);
         glEnableVertexAttribArray(attrib->uv);
@@ -425,7 +425,7 @@ struct craft::craft_impl {
     }
 
     // Sky Attrib doesn't use normals, so quickly check for that
-    void craft_impl::draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
+    void draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
         glEnableVertexAttribArray(attrib->position);
@@ -445,7 +445,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void craft_impl::draw_triangles_2d(Attrib *attrib, GLuint buffer, int count) {
+    void draw_triangles_2d(Attrib *attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glEnableVertexAttribArray(attrib->position);
         glEnableVertexAttribArray(attrib->uv);
@@ -459,7 +459,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void craft_impl::draw_lines(Attrib *attrib, GLuint buffer, int components, int count) {
+    void draw_lines(Attrib *attrib, GLuint buffer, int components, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glEnableVertexAttribArray(attrib->position);
         glVertexAttribPointer(
@@ -469,48 +469,48 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void craft_impl::draw_chunk(Attrib *attrib, Chunk *chunk) {
+    void draw_chunk(Attrib *attrib, Chunk *chunk) {
         draw_triangles_3d_ao(attrib, chunk->buffer, chunk->faces * 6);
     }
 
-    void craft_impl::draw_item(Attrib *attrib, GLuint buffer, int count) {
+    void draw_item(Attrib *attrib, GLuint buffer, int count) {
         draw_triangles_3d_ao(attrib, buffer, count);
     }
 
-    void craft_impl::draw_text(Attrib *attrib, GLuint buffer, int length) {
+    void draw_text(Attrib *attrib, GLuint buffer, int length) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         draw_triangles_2d(attrib, buffer, length * 6);
         glDisable(GL_BLEND);
     }
 
-    void craft_impl::draw_signs(Attrib *attrib, Chunk *chunk) {
+    void draw_signs(Attrib *attrib, Chunk *chunk) {
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-8, -1024);
         draw_triangles_3d_text(attrib, chunk->sign_buffer, chunk->sign_faces * 6);
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
-    void craft_impl::draw_sign(Attrib *attrib, GLuint buffer, int length) {
+    void draw_sign(Attrib *attrib, GLuint buffer, int length) {
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-8, -1024);
         draw_triangles_3d_text(attrib, buffer, length * 6);
         glDisable(GL_POLYGON_OFFSET_FILL);
     }
 
-    void craft_impl::draw_cube(Attrib *attrib, GLuint buffer) {
+    void draw_cube(Attrib *attrib, GLuint buffer) {
         draw_item(attrib, buffer, 36);
     }
 
-    void craft_impl::draw_plant(Attrib *attrib, GLuint buffer) {
+    void draw_plant(Attrib *attrib, GLuint buffer) {
         draw_item(attrib, buffer, 24);
     }
 
-    void craft_impl::draw_player(Attrib *attrib, Player *player) {
+    void draw_player(Attrib *attrib, Player *player) {
         draw_cube(attrib, player->buffer);
     }
 
-    craft_impl::Player *craft_impl::find_player(int id) {
+    Player *find_player(int id) {
         for (int i = 0; i < this->m_model->player_count; i++) {
             Player *player = this->m_model->players + i;
             if (player->id == id) {
@@ -520,7 +520,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void craft_impl::update_player(Player *player, float x, float y, float z, float rx, float ry, int interpolate)
+    void update_player(Player *player, float x, float y, float z, float rx, float ry, int interpolate)
     {
         if (interpolate) {
             State *s1 = &player->state1;
@@ -543,7 +543,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::interpolate_player(Player *player) {
+    void interpolate_player(Player *player) {
         State *s1 = &player->state1;
         State *s2 = &player->state2;
         float t1 = s2->t - s1->t;
@@ -561,7 +561,7 @@ struct craft::craft_impl {
             0);
     }
 
-    void craft_impl::delete_player(int id) {
+    void delete_player(int id) {
         Player *player = this->find_player(id);
         if (!player) {
             return;
@@ -573,7 +573,7 @@ struct craft::craft_impl {
         this->m_model->player_count = count;
     }
 
-    void craft_impl::delete_all_players() {
+    void delete_all_players() {
         for (int i = 0; i < this->m_model->player_count; i++) {
             Player *player = this->m_model->players + i;
             this->del_buffer(player->buffer);
@@ -581,7 +581,7 @@ struct craft::craft_impl {
         this->m_model->player_count = 0;
     }
 
-    float craft_impl::player_player_distance(Player *p1, Player *p2) {
+    float player_player_distance(Player *p1, Player *p2) {
         State *s1 = &p1->state;
         State *s2 = &p2->state;
         float x = s2->x - s1->x;
@@ -590,7 +590,7 @@ struct craft::craft_impl {
         return SDL_sqrt(x * x + y * y + z * z);
     }
 
-    float craft_impl::player_crosshair_distance(Player *p1, Player *p2) {
+    float player_crosshair_distance(Player *p1, Player *p2) {
         State *s1 = &p1->state;
         State *s2 = &p2->state;
         float d = this->player_player_distance(p1, p2);
@@ -605,7 +605,7 @@ struct craft::craft_impl {
         return SDL_sqrt(x * x + y * y + z * z);
     }
 
-    craft_impl::Player *craft_impl::player_crosshair(Player *player) {
+    Player *player_crosshair(Player *player) {
         Player *result = 0;
         float threshold = RADIANS(5);
         float best = 0;
@@ -626,7 +626,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    Chunk *craft_impl::find_chunk(int p, int q) {
+    Chunk *find_chunk(int p, int q) {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             if (chunk->p == p && chunk->q == q) {
@@ -636,13 +636,13 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int craft_impl::chunk_distance(Chunk *chunk, int p, int q) {
+    int chunk_distance(Chunk *chunk, int p, int q) {
         int dp = ABS(chunk->p - p);
         int dq = ABS(chunk->q - q);
         return MAX(dp, dq);
     }
 
-    int craft_impl::chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
+    int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
         float miny_f = static_cast<float>(miny);
         float maxy_f = static_cast<float>(maxy);
         float x = static_cast<float>(p * CHUNK_SIZE - 1);
@@ -685,7 +685,7 @@ struct craft::craft_impl {
         return 1;
     } // chunk_visible
 
-    int craft_impl::highest_block(float x, float z) {
+    int highest_block(float x, float z) {
         int result = -1;
         int nx = SDL_roundf(x);
         int nz = SDL_roundf(z);
@@ -704,7 +704,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    int craft_impl::_hit_test (Map *map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int *hx, int *hy, int *hz) {
+    int _hit_test (Map *map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int *hx, int *hy, int *hz) {
         static constexpr int m = 32;
         int px = 0;
         int py = 0;
@@ -731,7 +731,7 @@ struct craft::craft_impl {
         return 0;
     } // _hit_test
 
-    int craft_impl::hit_test(int previous, float x, float y, float z, float rx, float ry, int *bx, int *by, int *bz) {
+    int hit_test(int previous, float x, float y, float z, float rx, float ry, int *bx, int *by, int *bz) {
         int result = 0;
         float best = 0;
         int p = this->chunked(x);
@@ -758,7 +758,7 @@ struct craft::craft_impl {
         return result;
     } // hit_test
 
-    int craft_impl::hit_test_face(Player *player, int *x, int *y, int *z, int *face) {
+    int hit_test_face(Player *player, int *x, int *y, int *z, int *face) {
         State *s = &player->state;
         int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
         // item.h -> is_obstacle
@@ -792,7 +792,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int craft_impl::collide(int height, float *x, float *y, float *z) {
+    int collide(int height, float *x, float *y, float *z) {
         int result = 0;
         int p = this->chunked(*x);
         int q = this->chunked(*z);
@@ -834,7 +834,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    int craft_impl::player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) {
+    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) {
         int nx = SDL_roundf(x);
         int ny = SDL_roundf(y);
         int nz = SDL_roundf(z);
@@ -846,7 +846,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int craft_impl::_gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) {
+    int _gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) {
         static constexpr int glyph_dx[8] = {0, 0, -1, 1, 1, 0, -1, 0};
         static constexpr int glyph_dz[8] = {1, -1, 0, 0, 0, -1, 0, 1};
         static constexpr int line_dx[8] = {0, 0, 0, 0, 0, 1, 0, -1};
@@ -908,7 +908,7 @@ struct craft::craft_impl {
         return count;
     }
 
-    void craft_impl::gen_sign_buffer(Chunk *chunk) {
+    void gen_sign_buffer(Chunk *chunk) {
         SignList *signs = &chunk->signs;
 
         // first pass - count characters
@@ -931,7 +931,7 @@ struct craft::craft_impl {
         chunk->sign_faces = faces;
     }
 
-    int craft_impl::has_lights(Chunk *chunk) {
+    int has_lights(Chunk *chunk) {
         if (!SHOW_LIGHTS) {
             return 0;
         }
@@ -953,7 +953,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void craft_impl::dirty_chunk(Chunk *chunk) {
+    void dirty_chunk(Chunk *chunk) {
         chunk->dirty = 1;
         if (has_lights(chunk)) {
             for (int dp = -1; dp <= 1; dp++) {
@@ -967,7 +967,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::occlusion(
+    void occlusion(
         char neighbors[27], char lights[27], float shades[27],
         float ao[6][4], float light[6][4])
     {
@@ -1018,7 +1018,7 @@ struct craft::craft_impl {
     #define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
     #define XZ(x, z) ((x) * XZ_SIZE + (z))
 
-    void craft_impl::light_fill(
+    void light_fill(
         char *opaque, char *light,
         int x, int y, int z, int w, int force)
     {
@@ -1046,7 +1046,7 @@ struct craft::craft_impl {
         light_fill(opaque, light, x, y, z + 1, w, 0);
     }
 
-    void craft_impl::compute_chunk(WorkerItem *item) {
+    void compute_chunk(WorkerItem *item) {
         char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
@@ -1224,7 +1224,7 @@ struct craft::craft_impl {
         item->data = data;
     } // compute_chunk
 
-    void craft_impl::generate_chunk(Chunk *chunk, WorkerItem *item) {
+    void generate_chunk(Chunk *chunk, WorkerItem *item) {
         chunk->miny = item->miny;
         chunk->maxy = item->maxy;
         chunk->faces = item->faces;
@@ -1233,7 +1233,7 @@ struct craft::craft_impl {
         this->gen_sign_buffer(chunk);
     }
 
-    void craft_impl::gen_chunk_buffer(Chunk *chunk) {
+    void gen_chunk_buffer(Chunk *chunk) {
         WorkerItem _item;
         WorkerItem *item = &_item;
         item->p = chunk->p;
@@ -1265,7 +1265,7 @@ struct craft::craft_impl {
         map_set(map, x, y, z, w);
     }
 
-    void craft_impl::load_chunk(craft_impl::WorkerItem *item) {
+    void load_chunk(WorkerItem *item) {
         int p = item->p;
         int q = item->q;
         Map *block_map = item->block_maps[1][1];
@@ -1275,9 +1275,9 @@ struct craft::craft_impl {
         db_load_lights(light_map, p, q);
     }
 
-    void craft_impl::init_chunk(Chunk *chunk, int p, int q) {
+    void init_chunk(Chunk *chunk, int p, int q) {
 #if defined(DEBUGGING)
-        SDL_Log("init_chunk(%f, %d, %d): ", chunk, p, q);
+        SDL_Log("init_chunk(%p, %d, %d): ", chunk, p, q);
 #endif 
         chunk->p = p;
         chunk->q = q;
@@ -1298,7 +1298,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void craft_impl::create_chunk(Chunk *chunk, int p, int q) {
+    void create_chunk(Chunk *chunk, int p, int q) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1310,7 +1310,7 @@ struct craft::craft_impl {
         load_chunk(item);
     }
 
-    void craft_impl::delete_chunks() {
+    void delete_chunks() {
         int count = this->m_model->chunk_count;
         State *s1 = &this->m_model->players->state;
         State *s2 = &(this->m_model->players + this->m_model->observe1)->state;
@@ -1341,7 +1341,7 @@ struct craft::craft_impl {
         this->m_model->chunk_count = count;
     }
 
-    void craft_impl::delete_all_chunks() {
+    void delete_all_chunks() {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             map_free(&chunk->map);
@@ -1353,7 +1353,7 @@ struct craft::craft_impl {
         this->m_model->chunk_count = 0;
     }
 
-    void craft_impl::check_workers() {
+    void check_workers() {
         for (int i = 0; i < WORKERS; i++) {
             Worker *worker = this->m_model->workers + i;
             mtx_lock(&worker->mtx);
@@ -1391,7 +1391,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::force_chunks(Player *player) {
+    void force_chunks(Player *player) {
         State *s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1415,9 +1415,9 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::ensure_chunks_worker(craft_impl::Player *player, craft_impl::Worker *worker) {
+    void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
-        // craft_impl::State *s {this->m_state.get()};
+        // State *s {this->m_state.get()};
         float matrix[16];
         set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
         float planes[6][4];
@@ -1438,7 +1438,7 @@ struct craft::craft_impl {
                 if (index != worker->index) {
                     continue;
                 }
-                craft_impl::Chunk *chunk = find_chunk(a, b);
+                Chunk *chunk = find_chunk(a, b);
                 if (chunk && !chunk->dirty) {
                     continue;
                 }
@@ -1502,7 +1502,7 @@ struct craft::craft_impl {
         cnd_signal(&worker->cnd);
     }
 
-    void craft_impl::ensure_chunks(Player *player) {
+    void ensure_chunks(Player *player) {
         check_workers();
         force_chunks(player);
         for (int i = 0; i < WORKERS; i++) {
@@ -1515,7 +1515,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::unset_sign(int x, int y, int z) {
+    void unset_sign(int x, int y, int z) {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1531,7 +1531,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::unset_sign_face(int x, int y, int z, int face) {
+    void unset_sign_face(int x, int y, int z, int face) {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1547,7 +1547,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::_set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) {
+    void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) {
         if (strlen(text) == 0) {
             unset_sign_face(x, y, z, face);
             return;
@@ -1563,13 +1563,13 @@ struct craft::craft_impl {
         db_insert_sign(p, q, x, y, z, face, text);
     }
 
-    void craft_impl::set_sign(int x, int y, int z, int face, const char *text) {
+    void set_sign(int x, int y, int z, int face, const char *text) {
         int p = chunked(x);
         int q = chunked(z);
         _set_sign(p, q, x, y, z, face, text, 1);
     }
 
-    void craft_impl::toggle_light(int x, int y, int z) {
+    void toggle_light(int x, int y, int z) {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1582,7 +1582,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::set_light(int p, int q, int x, int y, int z, int w) {
+    void set_light(int p, int q, int x, int y, int z, int w) {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->lights;
@@ -1596,7 +1596,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::_set_block(int p, int q, int x, int y, int z, int w, int dirty) {
+    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->map;
@@ -1616,7 +1616,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::set_block(int x, int y, int z, int w) {
+    void set_block(int x, int y, int z, int w) {
         int p = chunked(x);
         int q = chunked(z);
         _set_block(p, q, x, y, z, w, 1);
@@ -1636,7 +1636,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::record_block(int x, int y, int z, int w) {
+    void record_block(int x, int y, int z, int w) {
         memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
         this->m_model->block0.x = x;
         this->m_model->block0.y = y;
@@ -1644,7 +1644,7 @@ struct craft::craft_impl {
         this->m_model->block0.w = w;
     }
 
-    int craft_impl::get_block(int x, int y, int z) {
+    int get_block(int x, int y, int z) {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1655,7 +1655,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void craft_impl::builder_block(int x, int y, int z, int w) {
+    void builder_block(int x, int y, int z, int w) {
         if (y <= 0 || y >= 256) {
             return;
         }
@@ -1667,7 +1667,7 @@ struct craft::craft_impl {
         }
     }
 
-    int craft_impl::render_chunks(Attrib *attrib, Player *player) {
+    int render_chunks(Attrib *attrib, Player *player) {
         int result = 0;
         State *s = &player->state;
         this->ensure_chunks(player);
@@ -1707,7 +1707,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    void craft_impl::render_signs(Attrib *attrib, Player *player) {
+    void render_signs(Attrib *attrib, Player *player) {
         State *s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1735,7 +1735,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::render_sign(Attrib *attrib, Player *player) {
+    void render_sign(Attrib *attrib, Player *player) {
         if (!this->m_model->typing || this->m_model->typing_buffer[0] != CRAFT_KEY_SIGN) {
             return;
         }
@@ -1753,16 +1753,16 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 1);
         char text[MAX_SIGN_LENGTH];
-        strncpy(text, this->m_model->typing_buffer + 1, MAX_SIGN_LENGTH);
+        SDL_strlcpy(text, this->m_model->typing_buffer + 1, MAX_SIGN_LENGTH);
         text[MAX_SIGN_LENGTH - 1] = '\0';
-        GLfloat *data = malloc_faces(5, strlen(text));
+        GLfloat *data = malloc_faces(5, SDL_strlen(text));
         int length = _gen_sign_buffer(data, x, y, z, face, text);
         GLuint buffer = gen_faces(5, length, data);
         draw_sign(attrib, buffer, length);
         del_buffer(buffer);
     }
 
-    void craft_impl::render_players(Attrib *attrib, Player *player) {
+    void render_players(Attrib *attrib, Player *player) {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1781,7 +1781,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::render_sky(Attrib *attrib, Player *player, GLuint buffer) {
+    void render_sky(Attrib *attrib, Player *player, GLuint buffer) {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1796,7 +1796,7 @@ struct craft::craft_impl {
         draw_triangles_3d(attrib, buffer, 512 * 3);
     }
 
-    void craft_impl::render_wireframe(Attrib *attrib, Player *player) {
+    void render_wireframe(Attrib *attrib, Player *player) {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1816,7 +1816,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::render_crosshairs(Attrib *attrib) {
+    void render_crosshairs(Attrib *attrib) {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
         glUseProgram(attrib->program);
@@ -1829,7 +1829,7 @@ struct craft::craft_impl {
         glDisable(GL_COLOR_LOGIC_OP);
     }
 
-    void craft_impl::render_item(Attrib *attrib) {
+    void render_item(Attrib *attrib) {
         float matrix[16];
         set_matrix_item(matrix, this->m_model->width, this->m_model->height, this->m_model->scale);
         glUseProgram(attrib->program);
@@ -1850,7 +1850,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::render_text(Attrib *attrib, int justify, float x, float y, float n, char *text) {
+    void render_text(Attrib *attrib, int justify, float x, float y, float n, char *text) {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
         glUseProgram(attrib->program);
@@ -1864,19 +1864,19 @@ struct craft::craft_impl {
         del_buffer(buffer);
     }
 
-    void craft_impl::add_message(const char *text) {
+    void add_message(const char *text) {
         printf("%s\n", text);
         snprintf(
             this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
         this->m_model->message_index = (this->m_model->message_index + 1) % MAX_MESSAGES;
     }
 
-    void craft_impl::copy() {
+    void copy() {
         memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
         memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
     }
 
-    void craft_impl::paste() {
+    void paste() {
         Block *c1 = &this->m_model->copy1;
         Block *c2 = &this->m_model->copy0;
         Block *p1 = &this->m_model->block1;
@@ -1898,7 +1898,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::array(Block *b1, Block *b2, int xc, int yc, int zc) {
+    void array(Block *b1, Block *b2, int xc, int yc, int zc) {
         if (b1->w != b2->w) {
             return;
         }
@@ -1921,7 +1921,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::cube(Block *b1, Block *b2, int fill) {
+    void cube(Block *b1, Block *b2, int fill) {
         if (b1->w != b2->w) {
             return;
         }
@@ -1951,7 +1951,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::sphere(Block *center, int radius, int fill, int fx, int fy, int fz) {
+    void sphere(Block *center, int radius, int fill, int fx, int fy, int fz) {
         static const float offsets[8][3] = {
             {-0.5, -0.5, -0.5},
             {-0.5, -0.5, 0.5},
@@ -2000,7 +2000,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::cylinder(Block *b1, Block *b2, int radius, int fill) {
+    void cylinder(Block *b1, Block *b2, int radius, int fill) {
         if (b1->w != b2->w) {
             return;
         }
@@ -2038,7 +2038,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::tree(Block *block) {
+    void tree(Block *block) {
         int bx = block->x;
         int by = block->y;
         int bz = block->z;
@@ -2058,7 +2058,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::parse_command(const char *buffer, int forward) {
+    void parse_command(const char *buffer, int forward) {
         char username[128] = {0};
         char token[128] = {0};
         char filename[MAX_PATH_LENGTH];
@@ -2130,7 +2130,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::on_light() {
+    void on_light() {
         State *s = &this->m_model->players->state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
@@ -2139,7 +2139,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::on_left_click() {
+    void on_left_click() {
         State *s = &this->m_model->players->state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
@@ -2152,7 +2152,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::on_right_click() {
+    void on_right_click() {
         State *s = &this->m_model->players->state;
         int hx, hy, hz;
         int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
@@ -2164,7 +2164,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::on_middle_click() {
+    void on_middle_click() {
         State *s = &this->m_model->players->state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
@@ -2177,7 +2177,7 @@ struct craft::craft_impl {
     }
 
     // https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    int craft_impl::handle_events(double dt) {
+    int handle_events(double dt) {
         // Handle window init and force a scale
         static SDL_bool first_event = 1;
         static float dy = 0;
@@ -2243,14 +2243,14 @@ struct craft::craft_impl {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
                             } else if (this->m_model->typing_buffer[0] == '/') {
-                                parse_command(this->m_model->typing_buffer, 1);
+                                this->parse_command(this->m_model->typing_buffer, 1);
                             }
                         }
                     } else {
                         if (control) {
-                            on_right_click();
+                            this->on_right_click();
                         } else {
-                            on_left_click();
+                            this->on_left_click();
                         }
                     }
                     break;
@@ -2260,7 +2260,7 @@ struct craft::craft_impl {
                         char* clip_buffer = SDL_GetClipboardText();
                         if (this->m_model->typing) {
                             this->m_model->suppress_char = 1;
-                            strncat(this->m_model->typing_buffer, clip_buffer,
+                            SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                 MAX_TEXT_LENGTH - this->m_model->text_len - 1);
                         } else {
                             parse_command(clip_buffer, 0);
@@ -2357,8 +2357,8 @@ struct craft::craft_impl {
                 // could probably just do text[text_len++] = e.text.text[0]
                 // since I only handle ascii
                 if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH -1) {
-                    strcat(this->m_model->typing_buffer, e.text.text);
-                    this->m_model->text_len += strlen(e.text.text);
+                    strcat_s(this->m_model->typing_buffer, e.text.text);
+                    this->m_model->text_len += SDL_strlen(e.text.text);
                     //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
                     //SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                 }
@@ -2497,7 +2497,7 @@ struct craft::craft_impl {
 
     } // handle_events
 
-    void craft_impl::create_window_and_context() {
+    void create_window_and_context() {
         this->m_model->start_ticks = (int) SDL_GetTicks(); 
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
         int window_width = WINDOW_WIDTH;
@@ -2546,7 +2546,7 @@ struct craft::craft_impl {
         SDL_GL_SetSwapInterval(1);
     } // create_window_and_context
 
-    void craft_impl::parse_buffer(char *buffer) {
+    void parse_buffer(char *buffer) {
         Player *me = this->m_model->players;
         State *s = &this->m_model->players->state;
         char *key;
@@ -2644,7 +2644,7 @@ struct craft::craft_impl {
         }
     }
 
-    void craft_impl::reset_model() {
+    void reset_model() {
         memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
         this->m_model->chunk_count = 0;
         memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
@@ -2670,6 +2670,25 @@ craft::craft(const std::string& window_name, mazes::maze_types maze_type)
 }
 
 craft::~craft() = default;
+
+// craft::craft(const craft& rhs)
+// : m_pimpl{nullptr} {
+//     if (rhs.m_pimpl) {
+//         this->m_pimpl = make_unique<craft_impl>(*rhs.m_pimpl);
+//     }
+// }
+
+// craft& craft::operator=(const craft& rhs) {
+//     if (!rhs.m_pimpl) {
+//         this->m_pimpl.reset();
+//     } else if (!this->m_pimpl) {
+//         this->m_pimpl = make_unique<craft_impl>(*rhs.m_pimpl);
+//     } else {
+//         *this->m_pimpl = *rhs.m_pimpl;
+//     }
+
+//     return *this;
+// }
 
 /**
  * Run the craft-engine in a loop with SDL window open
