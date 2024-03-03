@@ -59,10 +59,10 @@ int main(int argc, char* argv[]) {
         };
         
         craft maze_builder {"craft-sdl3", mazes::maze_types::BINARY_TREE};
-        mazes::grid empty_grid {10, 10};
-        bool success = maze_builder.run(empty_grid, get_int, args.is_interactive());
+        mazes::grid init_grid {10, 10};
+        bool success = maze_builder.run(init_grid, get_int, args.is_interactive());
         if (success) {
-            cout << empty_grid << endl;
+            cout << init_grid << endl;
         } else {
             cerr << "ERROR: " << args.get_algo() << " failed!!" << endl;
         }

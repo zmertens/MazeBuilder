@@ -2357,7 +2357,7 @@ struct craft::craft_impl {
                 // could probably just do text[text_len++] = e.text.text[0]
                 // since I only handle ascii
                 if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH -1) {
-                    strcat_s(this->m_model->typing_buffer, e.text.text);
+                    strcat(this->m_model->typing_buffer, e.text.text);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                     //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
                     //SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);

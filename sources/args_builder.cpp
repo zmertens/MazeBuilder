@@ -74,19 +74,23 @@ args_state args_builder::get_state() const noexcept {
 
 args_builder_interface& args_builder::set_seed(unsigned int s) noexcept {
     this->args_map.insert_or_assign("seed", std::to_string(s));
+    return *this;
 }
 
 args_builder_interface& args_builder::set_interactive(bool i) noexcept {
     this->args_map.insert_or_assign("interactive", std::to_string(i));
+    return *this;
 }
 
 args_builder_interface& args_builder::set_algo(const std::string& algo) noexcept {
     this->args_map.insert_or_assign("algo", algo);
+    return *this;
 }
 
 // Output can be stdout
 args_builder_interface& args_builder::set_output(const std::string& filename) noexcept {
     this->args_map.insert_or_assign("output", filename);
+    return *this;
 }
 
 const std::unordered_map<std::string, std::string>& args_builder::build() const noexcept {
