@@ -9,6 +9,7 @@
 #include "binary_tree.h"
 
 using namespace std;
+using namespace mazes;
 
 static auto get_int = [](int low, int high) ->int {
     random_device rd;
@@ -18,10 +19,10 @@ static auto get_int = [](int low, int high) ->int {
     return dist(mt);
 };
 
-TEST_CASE("Binary Search Tree maze algo computed", "[bst]") {
+TEST_CASE("Binary Tree maze algo computed", "[binary_tree]") {
     grid g {5, 5};
     binary_tree my_binary_tree_maze;
-    SECTION("Run BST and check for success", "![benchmark]") {
+    SECTION("Run binary tree and check for success", "[bt_section]]") {
         bool success = my_binary_tree_maze.run(g, get_int);
         REQUIRE(success == true);
         stringstream ss;
@@ -45,18 +46,14 @@ TEST_CASE("Cells have neighbors", "[cells]") {
     SECTION("Cell has neighbor to south") {
         cell1->set_south(cell2);
         REQUIRE(is_equal(cell1->get_south(), cell2));
+        auto&& neighbors = cell1->get_neighbors();
+        REQUIRE(!neighbors.empty());
     }
 
     SECTION("Cells are linked") {
         // links are bi-directional by default
         cell1->link(cell1, cell2);
         REQUIRE(cell1->is_linked(cell2));
-    }
-
-    SECTION("Cell1 has neighbors") {
-        cell1->set_south(cell2);
-        auto&& neighbors = cell1->get_neighbors();
-        REQUIRE(!neighbors.empty());
     }
 }
 
