@@ -2,6 +2,37 @@
 #include <noise/noise.h>
 #include "world.h"
 
+#include <memory>
+#include <random>
+
+#include "grid.h"
+#include "binary_tree.h"
+
+void create_maze(int p, int q, world_func func, void *arg) {
+    mazes::grid grid {5, 5};
+    auto get_int = [](int low, int high) -> int {
+        using namespace std;
+        random_device rd;
+        seed_seq seed {rd()};
+        mt19937 rng_engine {seed};
+        uniform_int_distribution<int> dist {low, high};
+        return dist(rng_engine);
+    };
+    auto bt_ptr {std::make_unique<mazes::binary_tree>()};
+    bt_ptr->run(grid, get_int);
+    int pad = 1;
+    for (auto dx {0}; dx < grid.get_rows() + pad; dx++) {
+        for (auto dz{-pad}; dz < grid.get_columns() + pad; dz++) {
+            int x = p * grid.get_grid().at(dx).at(dz)->get_row() + dx;
+            int z = q * grid.get_grid().at(dx).at(dz)->get_column() + dz;
+            int h {10};
+            for (int y = 0; y < h; y++) {
+                func(x, y, z, 1, arg);
+            }
+        }
+    }
+}
+
 void create_world(int p, int q, world_func func, void *arg) {
     int pad = 1;
     for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
@@ -65,13 +96,11 @@ void create_world(int p, int q, world_func func, void *arg) {
             // clouds
             if (SHOW_CLOUDS) {
                 for (int y = 64; y < 72; y++) {
-                    if (simplex3(
-                        x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75)
-                    {
+                    if (simplex3(x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75) {
                         func(x, y, z, 16 * flag, arg);
                     }
                 }
             }
         }
     }
-}
+} // create_world

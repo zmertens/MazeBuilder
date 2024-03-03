@@ -33,7 +33,8 @@ set(DEAR_IMGUI_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.h
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
-set(DEP_C_FILES
+set(DEPENDENCY_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinyobjloader/tiny_obj_loader.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c
@@ -72,7 +73,7 @@ endif()
 message(INFO ": Building SDL app for Desktop!")
 set(MAZE_BUILDER_LIB "maze_builder_lib")
 add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_ALGO_FILES})
-add_executable(${MAZE_BUILDER_EXE} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${CRAFT_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
+add_executable(${MAZE_BUILDER_EXE} ${DEAR_IMGUI_SRCS} ${DEPENDENCY_FILES} ${CRAFT_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
 
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 

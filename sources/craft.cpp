@@ -78,6 +78,7 @@ struct craft::craft_impl {
         int maxy;
         int faces;
         GLfloat *data;
+        mazes::grid *grid;
     } WorkerItem;
 
     typedef struct {
@@ -175,21 +176,11 @@ struct craft::craft_impl {
     const std::string& m_window_name;
     mazes::maze_types m_maze_type;
     unique_ptr<Model> m_model;
-    unique_ptr<WorkerItem> m_worker_item;
-    unique_ptr<Worker> m_worker;
-    unique_ptr<Attrib> m_attrib;
-    unique_ptr<State> m_state;
-    unique_ptr<Chunk> m_chunk;
 
     craft_impl(const std::string& window_name, mazes::maze_types maze_type)
     : m_window_name{window_name}
     , m_maze_type{maze_type}
-    , m_model{make_unique<Model>()}
-    , m_worker_item{make_unique<WorkerItem>()}
-    , m_worker{}
-    , m_attrib{}
-    , m_state{}
-    , m_chunk{} {
+    , m_model{make_unique<Model>()} {
 
     }
 
@@ -704,7 +695,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    int _hit_test (Map *map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int *hx, int *hy, int *hz) {
+    int _hit_test(Map *map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int *hx, int *hy, int *hz) {
         static constexpr int m = 32;
         int px = 0;
         int py = 0;
@@ -967,11 +958,8 @@ struct craft::craft_impl {
         }
     }
 
-    void occlusion(
-        char neighbors[27], char lights[27], float shades[27],
-        float ao[6][4], float light[6][4])
-    {
-        static const int lookup3[6][4][3] = {
+    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) {
+        static constexpr int lookup3[6][4][3] = {
             {{0, 1, 3}, {2, 1, 5}, {6, 3, 7}, {8, 5, 7}},
             {{18, 19, 21}, {20, 19, 23}, {24, 21, 25}, {26, 23, 25}},
             {{6, 7, 15}, {8, 7, 17}, {24, 15, 25}, {26, 17, 25}},
@@ -979,7 +967,7 @@ struct craft::craft_impl {
             {{0, 3, 9}, {6, 3, 15}, {18, 9, 21}, {24, 15, 21}},
             {{2, 5, 11}, {8, 5, 17}, {20, 11, 23}, {26, 17, 23}}
         };
-    static const int lookup4[6][4][4] = {
+        static constexpr int lookup4[6][4][4] = {
             {{0, 1, 3, 4}, {1, 2, 4, 5}, {3, 4, 6, 7}, {4, 5, 7, 8}},
             {{18, 19, 21, 22}, {19, 20, 22, 23}, {21, 22, 24, 25}, {22, 23, 25, 26}},
             {{6, 7, 15, 16}, {7, 8, 16, 17}, {15, 16, 24, 25}, {16, 17, 25, 26}},
@@ -987,7 +975,7 @@ struct craft::craft_impl {
             {{0, 3, 9, 12}, {3, 6, 12, 15}, {9, 12, 18, 21}, {12, 15, 21, 24}},
             {{2, 5, 11, 14}, {5, 8, 14, 17}, {11, 14, 20, 23}, {14, 17, 23, 26}}
         };
-        static const float curve[4] = {0.0, 0.25, 0.5, 0.75};
+        static constexpr float curve[4] = {0.0, 0.25, 0.5, 0.75};
         for (int i = 0; i < 6; i++) {
             for (int j = 0; j < 4; j++) {
                 int corner = neighbors[lookup3[i][j][0]];
@@ -1018,10 +1006,7 @@ struct craft::craft_impl {
     #define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
     #define XZ(x, z) ((x) * XZ_SIZE + (z))
 
-    void light_fill(
-        char *opaque, char *light,
-        int x, int y, int z, int w, int force)
-    {
+    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
         if (x + w < XZ_LO || z + w < XZ_LO) {
             return;
         }
@@ -1254,8 +1239,8 @@ struct craft::craft_impl {
                 }
             }
         }
-        compute_chunk(item);
-        generate_chunk(chunk, item);
+        this->compute_chunk(item);
+        this->generate_chunk(chunk, item);
         chunk->dirty = 0;
     }
 
@@ -1270,6 +1255,7 @@ struct craft::craft_impl {
         int q = item->q;
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
+        // create_maze(p, q, map_set_func, block_map);
         create_world(p, q, map_set_func, block_map);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
@@ -1417,7 +1403,6 @@ struct craft::craft_impl {
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
-        // State *s {this->m_state.get()};
         float matrix[16];
         set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
         float planes[6][4];
@@ -1693,15 +1678,13 @@ struct craft::craft_impl {
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
-            if (chunk_distance(chunk, p, q) > this->m_model->render_radius) {
+            if (this->chunk_distance(chunk, p, q) > this->m_model->render_radius) {
                 continue;
             }
-            if (!chunk_visible(
-                planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
-            {
+            if (!this->chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy)) {
                 continue;
             }
-            draw_chunk(attrib, chunk);
+            this->draw_chunk(attrib, chunk);
             result += chunk->faces;
         }
         return result;
@@ -2694,12 +2677,12 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open
  * @param interactive = false
 */
-bool craft::run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
     
     // Generate just 1 maze, 1 grid
+    auto bt_ptr {make_unique<mazes::binary_tree>()};
+    bt_ptr->run(grid, get_int);
     if (!interactive) {
-        auto bt_ptr {make_unique<mazes::binary_tree>()};
-        bt_ptr->run(gr, get_int);
         // this->m_grids.emplace_back(make_unique<mazes::grid>(grid.get_rows(), grid.get_columns()));
         return true;
     }
@@ -2879,10 +2862,6 @@ bool craft::run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bo
             db_enable();
             if (db_init(m_pimpl->m_model->db_path)) {
                 return -1;
-            }
-            if (m_pimpl->m_model->mode == MODE_ONLINE) {
-                // TODO: support proper caching of signs (handle deletions)
-                db_delete_all_signs();
             }
         }
 
@@ -3143,11 +3122,13 @@ bool craft::run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bo
     SDL_GL_DeleteContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
-    
-    // curl_global_cleanup();
 
     return true;
 } // run
+
+void craft::convert_grid_to_voxels(const mazes::grid& grid) noexcept {
+
+}
 
 // std::list<unique_ptr<mazes::grid>> craft::get_grids() const noexcept {
 //     return move(m_grids);

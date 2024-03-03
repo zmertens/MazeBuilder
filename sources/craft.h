@@ -43,13 +43,12 @@ public:
     // craft& operator=(const craft& rhs);
     
     bool run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
-    // std::list<std::unique_ptr<mazes::grid>> get_grids() const noexcept;
+    std::list<std::unique_ptr<mazes::grid>> get_grids() const noexcept;
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
 
-    void init();
-    bool cleanup() const;
+    void convert_grid_to_voxels(const mazes::grid& grid) noexcept;
 };
 
 #endif // CRAFT_H
