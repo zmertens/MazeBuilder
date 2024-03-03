@@ -49,29 +49,18 @@ char *load_file(const char *path) {
     return data;
 }
 
-GLuint gen_buffer(GLsizei size, GLfloat *data) {
-    GLuint buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    return buffer;
-}
+// GLuint gen_buffer(GLsizei size, GLfloat *data) {
+//     GLuint buffer;
+//     glGenBuffers(1, &buffer);
+//     glBindBuffer(GL_ARRAY_BUFFER, buffer);
+//     glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
+//     glBindBuffer(GL_ARRAY_BUFFER, 0);
+//     return buffer;
+// }
 
-void del_buffer(GLuint buffer) {
-    glDeleteBuffers(1, &buffer);
-}
-
-GLfloat *malloc_faces(int components, int faces) {
-    return (GLfloat*) malloc(sizeof(GLfloat) * 6 * components * faces);
-}
-
-GLuint gen_faces(int components, int faces, GLfloat *data) {
-    GLuint buffer = gen_buffer(
-        sizeof(GLfloat) * 6 * components * faces, data);
-    free(data);
-    return buffer;
-}
+// void del_buffer(GLuint buffer) {
+//     glDeleteBuffers(1, &buffer);
+// }
 
 GLuint make_shader(GLenum type, const char *source) {
     GLuint shader = glCreateShader(type);
