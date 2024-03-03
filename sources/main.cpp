@@ -8,7 +8,7 @@
 #include "binary_tree.h"
 #include "sidewinder.h"
 #include "args_builder.h"
-#include "maze_factory_enum.h"
+#include "maze_types_enum.h"
 
 int main(int argc, char* argv[]) {
     using namespace std;
@@ -49,16 +49,16 @@ int main(int argc, char* argv[]) {
             return dist(rng_engine);
         };
 
-        auto maze_factory = [](mazes::maze_factory_types maze_type) -> std::unique_ptr<mazes::maze_algo_interface> {
+        auto maze_factory = [](mazes::maze_types maze_type) {
             switch (maze_type) {
-                case mazes::maze_factory_types::BINARY_TREE: 
+                case mazes::maze_types::BINARY_TREE: 
                     return std::make_unique<mazes::binary_tree>();
-                case mazes::maze_factory_types::SIDEWINDER:
-                    return std::make_unique<mazes::sidewinder>();
+                // case mazes::maze_factory_types::SIDEWINDER:
+                //     return std::make_unique<mazes::sidewinder>();
             }
         };
         
-        craft maze_builder {"craft-sdl3", maze_factory};
+        craft maze_builder {"craft-sdl3", mazes::maze_types::BINARY_TREE};
         mazes::grid empty_grid {10, 10};
         bool success = maze_builder.run(empty_grid, get_int, args.is_interactive());
         if (success) {

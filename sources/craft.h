@@ -17,7 +17,7 @@
 #include "config.h"
 
 #include "maze_algo_interface.h"
-#include "maze_factory_enum.h"
+#include "maze_types_enum.h"
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 128
@@ -31,7 +31,7 @@ class grid;
 
 class craft : public mazes::maze_algo_interface {
 public:
-    craft(const std::string& window_name, std::function<std::unique_ptr<maze_algo_interface>(mazes::maze_factory_types)> const& factory);
+    craft(const std::string& window_name, mazes::maze_types maze_type);
     bool run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
     // std::list<std::unique_ptr<mazes::grid>> get_grids() const noexcept;
 private:
@@ -156,8 +156,7 @@ private:
     static std::unique_ptr<Model> g;
 
     const std::string& m_window_name;
-    std::unique_ptr<mazes::maze_algo_interface> m_bt_ptr;
-    std::unique_ptr<mazes::maze_algo_interface> m_sidewinder_ptr;
+    mazes::maze_types m_maze_type;
     // std::list<std::unique_ptr<mazes::grid>> m_grids;
 
     int chunked(float x) const;

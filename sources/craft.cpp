@@ -35,6 +35,8 @@ Ported to C++11
 #include "util.h"
 #include "world.h"
 
+#include "binary_tree.h"
+
 #define DUMP_GL_EXTENSIONS 0
 
 #define ALIGN_LEFT 0
@@ -53,12 +55,9 @@ using namespace std;
 
 std::unique_ptr<craft::Model> craft::g (new craft::Model());
 
-craft::craft(const std::string& window_name, std::function<std::unique_ptr<maze_algo_interface>(mazes::maze_factory_types)> const& factory)
-: m_window_name(window_name)
-, m_bt_ptr{factory(maze_factory_types::BINARY_TREE)}
-, m_sidewinder_ptr{factory(maze_factory_types::SIDEWINDER)}
-// , m_grids{} {
-{
+craft::craft(const std::string& window_name, mazes::maze_types maze_type)
+: m_window_name{window_name}
+, m_maze_type{maze_type} {
 }
 
 int craft::chunked(float x) const {
@@ -1335,7 +1334,8 @@ void craft::ensure_chunks(Player *player) {
 int craft::worker_run(void *arg) {
     Worker *worker = (Worker *)arg;
     int running = 1;
-    craft caller {"dummy", nullptr};
+    // never call the factory with this caller
+    craft caller {"dummy", maze_types::BINARY_TREE};
     while (running) {
         mtx_lock(&worker->mtx);
         while (worker->state != WORKER_BUSY) {
@@ -2508,7 +2508,8 @@ bool craft::run(mazes::grid& gr, std::function<int(int, int)> const& get_int, bo
     
     // Generate just 1 maze, 1 grid
     if (!interactive) {
-        this->m_bt_ptr->run(gr, get_int);
+        auto bt_ptr {make_unique<mazes::binary_tree>()};
+        bt_ptr->run(gr, get_int);
         // this->m_grids.emplace_back(make_unique<mazes::grid>(grid.get_rows(), grid.get_columns()));
         return true;
     }

@@ -2,7 +2,7 @@
 #define MAZE_FACTORY_ENUM_H
 
 namespace mazes {
-    enum class maze_factory_types {
+    enum class maze_types {
         BINARY_TREE,
         SIDEWINDER,
         WILSONS,
