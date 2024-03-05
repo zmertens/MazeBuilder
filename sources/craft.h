@@ -1,7 +1,7 @@
 #ifndef CRAFT_H
 #define CRAFT_H
 
-#include <string>
+#include <string_view>
 #include <functional>
 #include <memory>
 #include <list>
@@ -37,7 +37,7 @@ struct Worker;
 
 class craft : public mazes::maze_algo_interface {
 public:
-    craft(const std::string& window_name, mazes::maze_types maze_type);
+    craft(const std::string_view& window_name, mazes::maze_types maze_type);
     ~craft();
     // craft(const craft& rhs);
     // craft& operator=(const craft& rhs);

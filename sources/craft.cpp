@@ -24,6 +24,8 @@ Originally written in C99, ported to C++17
 #include <cstring>
 #include <ctime>
 #include <string>
+#include <sstream>
+#include <string_view>
 
 #include "config.h"
 #include "cube.h"
@@ -78,7 +80,6 @@ struct craft::craft_impl {
         int maxy;
         int faces;
         GLfloat *data;
-        mazes::grid *grid;
     } WorkerItem;
 
     typedef struct {
@@ -173,11 +174,11 @@ struct craft::craft_impl {
     } Model;
 
     // Public member so the pimpl can access and manipulate
-    const std::string& m_window_name;
+    const std::string_view& m_window_name;
     mazes::maze_types m_maze_type;
     unique_ptr<Model> m_model;
 
-    craft_impl(const std::string& window_name, mazes::maze_types maze_type)
+    craft_impl(const std::string_view& window_name, mazes::maze_types maze_type)
     : m_window_name{window_name}
     , m_maze_type{maze_type}
     , m_model{make_unique<Model>()} {
@@ -1245,9 +1246,8 @@ struct craft::craft_impl {
     }
 
     // @TODO : figure out how to not make this static
-    static void map_set_func(int x, int y, int z, int w, void *arg) {
-        Map *map = (Map *)arg;
-        map_set(map, x, y, z, w);
+    static void map_set_func(int x, int y, int z, int w, Map *m) {
+        map_set(m, x, y, z, w);
     }
 
     void load_chunk(WorkerItem *item) {
@@ -1255,16 +1255,13 @@ struct craft::craft_impl {
         int q = item->q;
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
-        // create_maze(p, q, map_set_func, block_map);
-        create_world(p, q, map_set_func, block_map);
+        // world.h 
+        world::create_world(p, q, map_set_func, block_map);        
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
 
     void init_chunk(Chunk *chunk, int p, int q) {
-#if defined(DEBUGGING)
-        SDL_Log("init_chunk(%p, %d, %d): ", chunk, p, q);
-#endif 
         chunk->p = p;
         chunk->q = q;
         chunk->faces = 0;
@@ -2046,11 +2043,11 @@ struct craft::craft_impl {
         char token[128] = {0};
         char filename[MAX_PATH_LENGTH];
         int radius, count, xc, yc, zc;
-        if (sscanf(buffer, "/identity %128s %128s", username, token) == 2) {
+        if (SDL_sscanf(buffer, "/identity %128s %128s", username, token) == 2) {
             db_auth_set(username, token);
             add_message("Successfully imported identity token!");
         }
-        else if (sscanf(buffer, "/view %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
                 this->m_model->create_radius = radius;
                 this->m_model->render_radius = radius;
@@ -2060,55 +2057,55 @@ struct craft::craft_impl {
                 add_message("Viewing distance must be between 1 and 24.");
             }
         }
-        else if (strcmp(buffer, "/copy") == 0) {
+        else if (SDL_strcmp(buffer, "/copy") == 0) {
             copy();
         }
-        else if (strcmp(buffer, "/paste") == 0) {
+        else if (SDL_strcmp(buffer, "/paste") == 0) {
             paste();
         }
-        else if (strcmp(buffer, "/tree") == 0) {
+        else if (SDL_strcmp(buffer, "/tree") == 0) {
             tree(&this->m_model->block0);
         }
-        else if (sscanf(buffer, "/array %d %d %d", &xc, &yc, &zc) == 3) {
+        else if (SDL_sscanf(buffer, "/array %d %d %d", &xc, &yc, &zc) == 3) {
             array(&this->m_model->block1, &this->m_model->block0, xc, yc, zc);
         }
-        else if (sscanf(buffer, "/array %d", &count) == 1) {
+        else if (SDL_sscanf(buffer, "/array %d", &count) == 1) {
             array(&this->m_model->block1, &this->m_model->block0, count, count, count);
         }
-        else if (strcmp(buffer, "/fcube") == 0) {
+        else if (SDL_strcmp(buffer, "/fcube") == 0) {
             cube(&this->m_model->block0, &this->m_model->block1, 1);
         }
-        else if (strcmp(buffer, "/cube") == 0) {
+        else if (SDL_strcmp(buffer, "/cube") == 0) {
             cube(&this->m_model->block0, &this->m_model->block1, 0);
         }
-        else if (sscanf(buffer, "/fsphere %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/fsphere %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 1, 0, 0, 0);
         }
-        else if (sscanf(buffer, "/sphere %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/sphere %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 0, 0, 0, 0);
         }
-        else if (sscanf(buffer, "/fcirclex %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/fcirclex %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 1, 1, 0, 0);
         }
-        else if (sscanf(buffer, "/circlex %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/circlex %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 0, 1, 0, 0);
         }
-        else if (sscanf(buffer, "/fcircley %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/fcircley %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 1, 0, 1, 0);
         }
-        else if (sscanf(buffer, "/circley %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/circley %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 0, 0, 1, 0);
         }
-        else if (sscanf(buffer, "/fcirclez %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/fcirclez %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 1, 0, 0, 1);
         }
-        else if (sscanf(buffer, "/circlez %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/circlez %d", &radius) == 1) {
             sphere(&this->m_model->block0, radius, 0, 0, 0, 1);
         }
-        else if (sscanf(buffer, "/fcylinder %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/fcylinder %d", &radius) == 1) {
             cylinder(&this->m_model->block0, &this->m_model->block1, radius, 1);
         }
-        else if (sscanf(buffer, "/cylinder %d", &radius) == 1) {
+        else if (SDL_sscanf(buffer, "/cylinder %d", &radius) == 1) {
             cylinder(&this->m_model->block0, &this->m_model->block1, radius, 0);
         }
     }
@@ -2143,6 +2140,9 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
+#if defined(DEBUGGING)
+                SDL_Log("set_block(%d, %d, %d, %d): ", hx, hy, hz, items[this->m_model->item_index]);
+#endif
             }
         }
     }
@@ -2520,112 +2520,14 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-
-        this->m_model->window = SDL_CreateWindow(this->m_window_name.c_str(), window_width, window_height, window_flags);
+        
+        this->m_model->window = SDL_CreateWindow(m_window_name.data(), window_width, window_height, window_flags);
         this->m_model->context = (SDL_GLContext*) SDL_GL_CreateContext(this->m_model->window);
 
         SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
 
         SDL_GL_SetSwapInterval(1);
     } // create_window_and_context
-
-    void parse_buffer(char *buffer) {
-        Player *me = this->m_model->players;
-        State *s = &this->m_model->players->state;
-        char *key;
-        char *line = tokenize(buffer, "\n", &key);
-        while (line) {
-            int pid;
-            float ux, uy, uz, urx, ury;
-            if (sscanf(line, "U,%d,%f,%f,%f,%f,%f",
-                &pid, &ux, &uy, &uz, &urx, &ury) == 6)
-            {
-                me->id = pid;
-                s->x = ux; s->y = uy; s->z = uz; s->rx = urx; s->ry = ury;
-                force_chunks(me);
-                if (uy == 0) {
-                    s->y = highest_block(s->x, s->z) + 2;
-                }
-            }
-            int bp, bq, bx, by, bz, bw;
-            if (sscanf(line, "B,%d,%d,%d,%d,%d,%d",
-                &bp, &bq, &bx, &by, &bz, &bw) == 6)
-            {
-                _set_block(bp, bq, bx, by, bz, bw, 0);
-                if (player_intersects_block(2, s->x, s->y, s->z, bx, by, bz)) {
-                    s->y = highest_block(s->x, s->z) + 2;
-                }
-            }
-            if (sscanf(line, "L,%d,%d,%d,%d,%d,%d",
-                &bp, &bq, &bx, &by, &bz, &bw) == 6)
-            {
-                set_light(bp, bq, bx, by, bz, bw);
-            }
-            float px, py, pz, prx, pry;
-            if (sscanf(line, "P,%d,%f,%f,%f,%f,%f",
-                &pid, &px, &py, &pz, &prx, &pry) == 6)
-            {
-                Player *player = find_player(pid);
-                if (!player && this->m_model->player_count < MAX_PLAYERS) {
-                    player = this->m_model->players + this->m_model->player_count;
-                    this->m_model->player_count++;
-                    player->id = pid;
-                    player->buffer = 0;
-                    snprintf(player->name, MAX_NAME_LENGTH, "player%d", pid);
-                    update_player(player, px, py, pz, prx, pry, 1); // twice
-                }
-                if (player) {
-                    update_player(player, px, py, pz, prx, pry, 1);
-                }
-            }
-            if (sscanf(line, "D,%d", &pid) == 1) {
-                delete_player(pid);
-            }
-            int kp, kq, kk;
-            if (sscanf(line, "K,%d,%d,%d", &kp, &kq, &kk) == 3) {
-                db_set_key(kp, kq, kk);
-            }
-            if (sscanf(line, "R,%d,%d", &kp, &kq) == 2) {
-                Chunk *chunk = find_chunk(kp, kq);
-                if (chunk) {
-                    dirty_chunk(chunk);
-                }
-            }
-            double elapsed;
-            int day_length;
-            if (sscanf(line, "E,%lf,%d", &elapsed, &day_length) == 2) {
-                // glfwSetTime(fmod(elapsed, day_length));
-                this->m_model->start_time = SDL_fmod(elapsed, day_length) / 1000.0;
-                this->m_model->day_length = day_length;
-                this->m_model->time_changed = 1;
-            }
-            if (line[0] == 'T' && line[1] == ',') {
-                char *text = line + 2;
-                add_message(text);
-            }
-            char format[64];
-            snprintf(
-                format, sizeof(format), "N,%%d,%%%ds", MAX_NAME_LENGTH - 1);
-            char name[MAX_NAME_LENGTH];
-            if (sscanf(line, format, &pid, name) == 2) {
-                Player *player = find_player(pid);
-                if (player) {
-                    strncpy(player->name, name, MAX_NAME_LENGTH);
-                }
-            }
-            snprintf(
-                format, sizeof(format),
-                "S,%%d,%%d,%%d,%%d,%%d,%%d,%%%d[^\n]", MAX_SIGN_LENGTH - 1);
-            int face;
-            char text[MAX_SIGN_LENGTH] = {0};
-            if (sscanf(line, format,
-                &bp, &bq, &bx, &by, &bz, &face, text) >= 6)
-            {
-                _set_sign(bp, bq, bx, by, bz, face, text, 0);
-            }
-            line = tokenize(NULL, "\n", &key);
-        }
-    }
 
     void reset_model() {
         memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
@@ -2648,7 +2550,7 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string& window_name, mazes::maze_types maze_type)
+craft::craft(const std::string_view& window_name, mazes::maze_types maze_type)
 : m_pimpl{make_unique<craft_impl>(window_name, maze_type)} {
 }
 
@@ -2707,7 +2609,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "OpenGL loader failed (%s)\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL loader failed (%s)\n", SDL_GetError());
         SDL_Quit();
         return false;
     }
@@ -2853,7 +2755,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-    // RENDER LOOP //
+    // MAIN LOOP //
     int running = 1;
     while (running) {
 
@@ -2886,6 +2788,43 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
         if (!loaded) {
             s->y = m_pimpl->highest_block(s->x, s->z) + 2;
         }
+        
+        stringstream ss;
+        ss << grid;
+        std::string_view grid_sv {ss.str().data()};
+        // All columns are the same length, but not necessarily the same length as the number of rows
+        auto col_length {0}, col_counter {0};
+        auto row_counter {0};
+        for (auto row_itr {grid_sv.cbegin()}; row_itr != grid_sv.cend(); row_itr++) {
+            if (row_counter != grid_sv.npos && *row_itr == '\n') {
+                // calc the column length before resetting (all columns should be the same length!)
+                col_length = (col_length < col_counter) ? col_counter : col_length;
+                col_counter = 0;
+                row_counter = (row_itr + 1 == grid_sv.end()) ? row_counter : row_counter + 1;
+            }
+            else {
+                col_counter += 1;
+            }
+        } // row_itr
+
+#if defined(DEBUGGING)
+        SDL_Log("col_length %d, row_counter %d\n", col_length, row_counter);
+#endif
+
+       for (auto row {0}; row < grid.get_grid().size(); row++) {
+            for (auto col {0}; col < grid.get_grid().at(row).size(); col++) {
+                auto&& temp_cell = grid.get_grid().at(row).at(col);
+                if (temp_cell == nullptr) {
+                    temp_cell = make_shared<cell>(-1, -1);
+                }
+                if (!temp_cell->is_linked(temp_cell->get_east())) {
+                    this->m_pimpl->set_block(row, 15, col, items[this->m_pimpl->m_model->item_index]);
+                    this->m_pimpl->record_block(row, 15, col, items[this->m_pimpl->m_model->item_index]);
+                }                
+
+            }
+       }
+                
 
         // BEGIN EVENT LOOP //
         int previous = SDL_GetTicks();
@@ -2904,9 +2843,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
             dt = MIN(dt, 0.2);
             dt = MAX(dt, 0.0);
             previous = now;
-#if defined(DEBUGGING)
-            SDL_Log("fps: %d\n", fps.fps);
-#endif
+
             if (m_pimpl->handle_events(dt)) {
                 running = 0;
                 break;
@@ -3089,7 +3026,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
 #if defined(DEBUGGING)
             gl_check_for_error();
 #endif
-        } // MAIN LOOP
+        } // EVENT LOOP
 
         // SHUTDOWN //
         db_save_state(s->x, s->y, s->z, s->rx, s->ry);
@@ -3098,7 +3035,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
         m_pimpl->del_buffer(sky_buffer);
         m_pimpl->delete_all_chunks();
         m_pimpl->delete_all_players();
-    } // RENDER LOOP
+    } // MAIN LOOP
 
     SDL_Log("Cleaning up ImGui objects. . .");
     ImGui_ImplOpenGL3_Shutdown();

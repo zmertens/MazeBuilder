@@ -2,6 +2,7 @@
 #include <exception>
 #include <cstdio>
 #include <iostream>
+#include <string_view>
 
 #include "craft.h"
 #include "grid.h"
@@ -57,8 +58,8 @@ int main(int argc, char* argv[]) {
                 //     return std::make_unique<mazes::sidewinder>();
             }
         };
-        
-        craft maze_builder {"craft-sdl3", mazes::maze_types::BINARY_TREE};
+        string_view sv = "craft-sdl3";
+        craft maze_builder {sv, mazes::maze_types::BINARY_TREE};
         mazes::grid init_grid {10, 10};
         bool success = maze_builder.run(init_grid, get_int, args.is_interactive());
         if (success) {

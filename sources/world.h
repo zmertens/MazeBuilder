@@ -1,11 +1,18 @@
 #ifndef _world_h_
 #define _world_h_
 
+#include <functional>
+
 #include "grid.h"
+#include "map.h"
 
-typedef void (*world_func)(int, int, int, int, void *);
+using world_func = std::function<void(int, int, int, int, Map*)>;
 
-void create_maze(int p, int q, world_func func, void *arg);
-void create_world(int p, int q, world_func func, void *arg);
+class world {
+public:
+    static void create_world(int p, int q, world_func func, Map *m);
+private:
+
+};
 
 #endif
