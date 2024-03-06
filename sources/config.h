@@ -4,7 +4,7 @@
 #include <SDL3/SDL.h>
 
 // app parameters
-#define FULLSCREEN 1
+#define FULLSCREEN 0
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 #define VSYNC 1
