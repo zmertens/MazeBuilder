@@ -13,9 +13,8 @@ using namespace std;
 /**
  * @param interactive = false
 */
-bool sidewinder::run(grid& g, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
-    
-    for (auto&& row : g.get_grid()) {
+bool sidewinder::run(mazes::grid_ptr& _grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+    for (auto&& row : _grid->get_grid()) {
         vector<shared_ptr<cell>> run;
         for (auto&& c : row) {
             run.emplace_back(c);

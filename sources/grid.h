@@ -13,14 +13,17 @@ namespace mazes {
 class grid {
 public:
     grid(unsigned int rows, unsigned int columns);
+
     std::vector<std::vector<std::shared_ptr<cell>>> get_grid() const;
     unsigned int get_rows() const noexcept;
     unsigned int get_columns() const noexcept;
+    void print_grid_cells() const noexcept;
+    std::vector<shared_cell_ptr> operator[](std::size_t i);
+    std::vector<shared_cell_ptr> const& operator[](std::size_t i) const;
 private:
     void prepare_grid(std::vector<std::vector<std::shared_ptr<cell>>>& grid) noexcept;
     void configure_cells(std::vector<std::vector<std::shared_ptr<cell>>>& grid) noexcept;
-    void print_grid_cells(std::vector<std::vector<std::shared_ptr<cell>>> const& grid) const noexcept;
-
+    
     friend std::ostream& operator<<(std::ostream& os, grid& g) {
         std::stringstream output;
         output << "+";
@@ -55,5 +58,8 @@ private:
     const unsigned int m_rows, m_columns;
     std::vector<std::vector<std::shared_ptr<cell>>> m_grid;
 };
+
+using grid_ptr = std::unique_ptr<grid>;
+
 } // namespace mazes
 #endif // GRID_H

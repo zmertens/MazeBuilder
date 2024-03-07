@@ -1,6 +1,6 @@
 #include "cell.h"
 
-#include <iomanip>
+#include <iostream>
 
 using namespace mazes;
 using namespace std;

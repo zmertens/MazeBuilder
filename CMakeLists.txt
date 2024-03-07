@@ -87,6 +87,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
 
 find_package(OpenGL REQUIRED)
+find_package(Threads REQUIRED)
 
 # Find/Configure SDL3
 find_package(SDL3 QUIET)
@@ -112,15 +113,15 @@ if(NOT SDL3_FOUND)
 endif()
 
 if(APPLE)
-    target_link_libraries(${MAZE_BUILDER_EXE} OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_EXE} OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 if(UNIX)
-    target_link_libraries(${MAZE_BUILDER_EXE} dl OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_EXE} dl OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 if(MINGW OR WIN32)
-    target_link_libraries(${MAZE_BUILDER_EXE} ws2_32.lib OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_EXE} ws2_32.lib OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
@@ -149,7 +150,7 @@ if(BUILD_MAZE_TESTS)
     # These tests can use the Catch2-provided main
     add_executable(${MAZE_BUILDER_TEST_EXE} ${TEST_FILES})
     target_compile_features(${MAZE_BUILDER_TEST_EXE} PUBLIC cxx_std_17)
-    target_link_libraries(${MAZE_BUILDER_TEST_EXE} PRIVATE ${MAZE_BUILDER_LIB} Catch2::Catch2WithMain)
+    target_link_libraries(${MAZE_BUILDER_TEST_EXE} PRIVATE ${MAZE_BUILDER_LIB} Threads::Threads Catch2::Catch2WithMain)
     target_include_directories(${MAZE_BUILDER_TEST_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources")
     include(CTest)
     include(Catch)

@@ -47,6 +47,8 @@ private:
     std::shared_ptr<cell> m_west;
 };
 
+using shared_cell_ptr = std::shared_ptr<cell>;
+
 } // namespace
 
 #endif // CELL_H

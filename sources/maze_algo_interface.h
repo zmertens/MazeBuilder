@@ -1,15 +1,17 @@
 #ifndef MAZE_ALGO_INTERFACE_HPP
 #define MAZE_ALGO_INTERFACE_HPP
 
-namespace mazes {
-
+#include <memory>
 #include <functional>
+#include <future>
 
-class grid;
+#include "grid.h"
+
+namespace mazes {
 
 class maze_algo_interface {
 public:
-    virtual bool run(grid& g, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept = 0;
+    virtual bool run(grid_ptr& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept = 0;
 };
 }
 #endif // MAZE_ALGO_INTERFACE_HPP

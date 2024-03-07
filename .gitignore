@@ -15,6 +15,7 @@ log.txt
 
 build/
 .vscode
+.vs
 .github
 
 # Script output files

@@ -41,6 +41,14 @@ Originally written in C99, ported to C++17
 
 #define DUMP_GL_EXTENSIONS 0
 
+#define MAX_CHUNKS 8192
+#define MAX_PLAYERS 128
+#define WORKERS 4
+#define MAX_TEXT_LENGTH 256
+#define MAX_NAME_LENGTH 32
+#define MAX_PATH_LENGTH 256
+#define MAX_ADDR_LENGTH 256
+
 #define ALIGN_LEFT 0
 #define ALIGN_CENTER 1
 #define ALIGN_RIGHT 2
@@ -175,12 +183,12 @@ struct craft::craft_impl {
 
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
-    mazes::maze_types m_maze_type;
+    std::future<bool> m_maze_future;
     unique_ptr<Model> m_model;
 
-    craft_impl(const std::string_view& window_name, mazes::maze_types maze_type)
+    craft_impl(const std::string_view& window_name, std::future<bool> maze_future)
     : m_window_name{window_name}
-    , m_maze_type{maze_type}
+    , m_maze_future{std::move(maze_future)}
     , m_model{make_unique<Model>()} {
 
     }
@@ -189,7 +197,8 @@ struct craft::craft_impl {
         Worker *worker = (Worker *)arg;
         int running = 1;
         // never call the factory with this caller
-        craft caller {"dummy", maze_types::BINARY_TREE};
+        string_view sv {"dummy"};
+        craft caller {sv, {}};
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -1255,8 +1264,9 @@ struct craft::craft_impl {
         int q = item->q;
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
-        // world.h 
-        world::create_world(p, q, map_set_func, block_map);        
+        // world.h
+        static world _world;
+        _world.create_world(p, q, map_set_func, block_map);        
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -2481,7 +2491,7 @@ struct craft::craft_impl {
     } // handle_events
 
     void create_window_and_context() {
-        this->m_model->start_ticks = (int) SDL_GetTicks(); 
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
         int window_width = WINDOW_WIDTH;
         int window_height = WINDOW_HEIGHT;
@@ -2492,9 +2502,9 @@ struct craft::craft_impl {
             if (modes) {
                 for (int i = 0; i < num_modes; ++i) {
                     const SDL_DisplayMode *mode = modes[i];
-    #if defined(DEBUGGING)
+#if defined(DEBUGGING)
                     SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n", display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
-    #endif
+#endif
                 }
             }
             
@@ -2550,8 +2560,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, mazes::maze_types maze_type)
-: m_pimpl{make_unique<craft_impl>(window_name, maze_type)} {
+craft::craft(const std::string_view& window_name, std::future<bool> maze_future)
+: m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future))} {
 }
 
 craft::~craft() = default;
@@ -2579,14 +2589,10 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open
  * @param interactive = false
 */
-bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+bool craft::run(mazes::grid_ptr& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
     
-    // Generate just 1 maze, 1 grid
-    auto bt_ptr {make_unique<mazes::binary_tree>()};
-    bt_ptr->run(grid, get_int);
     if (!interactive) {
-        // this->m_grids.emplace_back(make_unique<mazes::grid>(grid.get_rows(), grid.get_columns()));
-        return true;
+        return this->m_pimpl->m_maze_future.get();
     }
 
     srand(time(NULL));
@@ -2787,44 +2793,7 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
         m_pimpl->force_chunks(me);
         if (!loaded) {
             s->y = m_pimpl->highest_block(s->x, s->z) + 2;
-        }
-        
-        stringstream ss;
-        ss << grid;
-        std::string_view grid_sv {ss.str().data()};
-        // All columns are the same length, but not necessarily the same length as the number of rows
-        auto col_length {0}, col_counter {0};
-        auto row_counter {0};
-        for (auto row_itr {grid_sv.cbegin()}; row_itr != grid_sv.cend(); row_itr++) {
-            if (row_counter != grid_sv.npos && *row_itr == '\n') {
-                // calc the column length before resetting (all columns should be the same length!)
-                col_length = (col_length < col_counter) ? col_counter : col_length;
-                col_counter = 0;
-                row_counter = (row_itr + 1 == grid_sv.end()) ? row_counter : row_counter + 1;
-            }
-            else {
-                col_counter += 1;
-            }
-        } // row_itr
-
-#if defined(DEBUGGING)
-        SDL_Log("col_length %d, row_counter %d\n", col_length, row_counter);
-#endif
-
-       for (auto row {0}; row < grid.get_grid().size(); row++) {
-            for (auto col {0}; col < grid.get_grid().at(row).size(); col++) {
-                auto&& temp_cell = grid.get_grid().at(row).at(col);
-                if (temp_cell == nullptr) {
-                    temp_cell = make_shared<cell>(-1, -1);
-                }
-                if (!temp_cell->is_linked(temp_cell->get_east())) {
-                    this->m_pimpl->set_block(row, 15, col, items[this->m_pimpl->m_model->item_index]);
-                    this->m_pimpl->record_block(row, 15, col, items[this->m_pimpl->m_model->item_index]);
-                }                
-
-            }
-       }
-                
+        }                
 
         // BEGIN EVENT LOOP //
         int previous = SDL_GetTicks();
@@ -3062,11 +3031,3 @@ bool craft::run(mazes::grid& grid, std::function<int(int, int)> const& get_int, 
 
     return true;
 } // run
-
-void craft::convert_grid_to_voxels(const mazes::grid& grid) noexcept {
-
-}
-
-// std::list<unique_ptr<mazes::grid>> craft::get_grids() const noexcept {
-//     return move(m_grids);
-// }

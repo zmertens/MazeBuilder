@@ -14,14 +14,14 @@ TEST_CASE( "Factorials are computed", "[factorial]" ) {
     REQUIRE( Factorial(10) == 3628800 );
 }
 
-TEST_CASE("Benchmarking Factorials") {
-    BENCHMARK("Factorial(20)") {
-        return Factorial(20);
-    };
-    BENCHMARK("Factorial(25)") {
-        return Factorial(25);
-    };
-    BENCHMARK("Factorial(42)") {
-        return Factorial(42);
-    };    
-}
+// TEST_CASE("Benchmarking Factorials") {
+//     BENCHMARK("Factorial(20)") {
+//         return Factorial(20);
+//     };
+//     BENCHMARK("Factorial(25)") {
+//         return Factorial(25);
+//     };
+//     BENCHMARK("Factorial(42)") {
+//         return Factorial(42);
+//     };    
+// }

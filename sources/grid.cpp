@@ -20,12 +20,9 @@ void grid::prepare_grid(vector<vector<shared_ptr<cell>>>& grid) noexcept {
     for (auto row {0}; row < this->m_rows; row++) {
         vector<shared_ptr<cell>> new_row {};
         for (auto col {0}; col < this->m_columns; col++) {
-            auto temp {make_shared<cell>(row, col)};
-            // cout << temp << endl;
-            new_row.emplace_back(temp);
+            new_row.emplace_back(make_shared<cell>(row, col));
         }
         grid.emplace_back(new_row);
-        // cout << grid.at(row).back() << endl;
     }
 }
 
@@ -52,13 +49,21 @@ void grid::configure_cells(vector<vector<shared_ptr<cell>>>& grid) noexcept {
     }
 }
 
-void grid::print_grid_cells(vector<vector<shared_ptr<cell>>> const& grid) const noexcept {
+void grid::print_grid_cells() const noexcept {
     cout << "INFO: " << "Printing grid cells" << endl;
-    for (auto row {0}; row < grid.size(); row++) {
-        for (auto col {0}; col < grid.at(row).size(); col++) {
-            cout << "INFO: Cell[" << row << "][" << col << "]:" << grid.at(row).at(col) << endl;
+    for (auto row {0}; row < m_grid.size(); row++) {
+        for (auto col {0}; col < m_grid.at(row).size(); col++) {
+            cout << "INFO: Cell[" << row << "][" << col << "]:" << m_grid[row][col] << endl;
         }
     }
+}
+
+std::vector<shared_cell_ptr> grid::operator[](std::size_t i) {
+    return this->m_grid.at(i);
+}
+
+std::vector<shared_cell_ptr> const& grid::operator[](std::size_t i) const {
+    return this->m_grid.at(i);
 }
 
 std::vector<std::vector<std::shared_ptr<cell>>> grid::get_grid() const {

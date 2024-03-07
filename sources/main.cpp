@@ -1,8 +1,11 @@
 #include <random>
+#include <memory>
 #include <exception>
 #include <cstdio>
 #include <iostream>
 #include <string_view>
+#include <future>
+#include <thread>
 
 #include "craft.h"
 #include "grid.h"
@@ -12,11 +15,10 @@
 #include "maze_types_enum.h"
 
 int main(int argc, char* argv[]) {
-    using namespace std;
 
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.0.1]";
 
-    static const std::string HELP_MSG = R"help(
+    static constexpr auto HELP_MSG = R"help(
         Maze Builder Usages:
           1. ./maze_builder > default_maze.txt
           2. ./maze_builder --seed=1337 --algo=binary_tree -o bt.txt
@@ -33,10 +35,10 @@ int main(int argc, char* argv[]) {
 #endif
 
         if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
-            cout << HELP_MSG << endl;
+            std::cout << HELP_MSG << std::endl;
             return EXIT_SUCCESS;
         } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
-            cout << MAZE_BUILDER_VERSION << endl;
+            std::cout << MAZE_BUILDER_VERSION << std::endl;
             return EXIT_SUCCESS;
         }
 
@@ -49,27 +51,41 @@ int main(int argc, char* argv[]) {
             uniform_int_distribution<int> dist {low, high};
             return dist(rng_engine);
         };
-
-        auto maze_factory = [](mazes::maze_types maze_type) {
+        
+        auto maze_factory = [&](mazes::maze_types maze_type, mazes::grid_ptr& _grid) {
             switch (maze_type) {
-                case mazes::maze_types::BINARY_TREE: 
-                    return std::make_unique<mazes::binary_tree>();
-                // case mazes::maze_factory_types::SIDEWINDER:
-                //     return std::make_unique<mazes::sidewinder>();
+                case mazes::maze_types::BINARY_TREE: {
+                    static mazes::binary_tree bt;
+                    return std::async([&] {
+                        return bt.run(std::ref(_grid), get_int);
+                    });
+                }
+                case mazes::maze_types::SIDEWINDER: {
+                    static mazes::sidewinder sw;
+                    return std::async([&] {
+                        return sw.run(std::ref(_grid), get_int, false);
+                    });
+                }
             }
         };
-        string_view sv = "craft-sdl3";
-        craft maze_builder {sv, mazes::maze_types::BINARY_TREE};
-        mazes::grid init_grid {10, 10};
-        bool success = maze_builder.run(init_grid, get_int, args.is_interactive());
+        std::string_view sv {"craft-sdl3"};
+        mazes::maze_types maze_algo = (args.get_algo().compare("binary_tree") == 0) ? mazes::maze_types::BINARY_TREE : mazes::maze_types::SIDEWINDER;
+        auto _grid {std::make_unique<mazes::grid>(25, 25)};
+        craft maze_builder {sv, std::move(maze_factory(mazes::maze_types::SIDEWINDER, std::ref(_grid)))};
+        auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
+        // auto&& success = maze_factory(maze_algo, std::ref(_grid)).get();
+        // _grid->print_grid_cells();
         if (success) {
-            cout << init_grid << endl;
+            // Check grid size because terminal output can get smushed
+            if (_grid->get_columns() < 50 && _grid->get_rows() < 50) {
+                std::cout << *_grid.get() << std::endl;
+            }
         } else {
-            cerr << "ERROR: " << args.get_algo() << " failed!!" << endl;
+            std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
         }
     
     } catch (std::exception& ex) {
-        cerr << "ERROR: " << ex.what() << endl; 
+        std::cerr << "ERROR: " << ex.what() << std::endl; 
     }
 
     return EXIT_SUCCESS;
