@@ -28,10 +28,10 @@ public:
     
     args_state get_state() const noexcept;
 
-    args_builder_interface& set_seed(unsigned int s) noexcept override;
-    args_builder_interface& set_interactive(bool i) noexcept override;
-    args_builder_interface& set_algo(const std::string& algo) noexcept override;
-    args_builder_interface& set_output(const std::string& filename) noexcept override;
+    virtual args_builder_interface& set_seed(unsigned int s) noexcept;
+    virtual args_builder_interface& set_interactive(bool i) noexcept;
+    virtual args_builder_interface& set_algo(const std::string& algo) noexcept;
+    virtual args_builder_interface& set_output(const std::string& filename) noexcept;
     const std::unordered_map<std::string, std::string>& build() const noexcept override;
 
     friend std::ostream& operator<<(std::ostream& os, args_builder& args) {

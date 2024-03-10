@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = (args.get_algo().compare("binary_tree") == 0) ? mazes::maze_types::BINARY_TREE : mazes::maze_types::SIDEWINDER;
         auto _grid {std::make_unique<mazes::grid>(25, 25)};
-        craft maze_builder {sv, std::move(maze_factory(mazes::maze_types::SIDEWINDER, std::ref(_grid)))};
+        craft maze_builder {sv, std::move(maze_factory(maze_algo, std::ref(_grid)))};
         auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
         // auto&& success = maze_factory(maze_algo, std::ref(_grid)).get();
         // _grid->print_grid_cells();
