@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <ostream>
+#include <functional>
 
 #include "args_builder_interface.h"
 
@@ -19,19 +20,18 @@ public:
     args_builder(const std::string& v, const std::string& h, int argc, char* argv[]);
     args_builder(const std::unordered_map<std::string, std::string>& args);
 
-    unsigned int get_seed() const noexcept;
-    bool is_interactive() const noexcept;
+    unsigned int get_seed() const;
+    bool is_interactive() const;
     std::string get_version() const;
     std::string get_help() const;
     std::string get_algo() const;
     std::string get_output() const;
+    unsigned int get_width() const;
+    unsigned int get_length() const;
+    unsigned int get_height() const;
     
     args_state get_state() const noexcept;
 
-    virtual args_builder_interface& set_seed(unsigned int s) noexcept;
-    virtual args_builder_interface& set_interactive(bool i) noexcept;
-    virtual args_builder_interface& set_algo(const std::string& algo) noexcept;
-    virtual args_builder_interface& set_output(const std::string& filename) noexcept;
     const std::unordered_map<std::string, std::string>& build() const noexcept override;
 
     friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
@@ -44,9 +44,11 @@ public:
     }
 
 private:
-    args_state gather_args(int argc, char* argv[]);
+    void gather_args(int argc, char* argv[]);
     std::unordered_map<std::string, std::string> args_map;
     args_state state;
+
+    std::function<bool(const std::string&)> has_args;
 };
 
 }

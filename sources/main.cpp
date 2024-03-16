@@ -19,10 +19,19 @@ int main(int argc, char* argv[]) {
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.0.1]";
 
     static constexpr auto HELP_MSG = R"help(
-        Maze Builder Usages:
-          1. ./maze_builder > default_maze.txt
-          2. ./maze_builder --seed=1337 --algo=binary_tree -o bt.txt
-          3. ./maze_builder -i -s 1337
+        Usages: maze_builder [OPTION]... [OUT_FILE]
+        Run the builder to generate mazes from optional algorithms
+        Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt\n
+        Options specify how to generate the maze and file output:
+          -a, --algorithm    binary_tree [default], sidewinder
+          -s, --seed         seed for the random number generator (mt19937)
+          -w, --width        maze width
+          -h, --height       maze height
+          -l, --length       maze length
+          -i, --interactive  run program in interactive mode with a GUI
+          -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
+          -h, --help         display this help message
+          -v, --version      display program version
     )help";
 
     try {
@@ -51,6 +60,20 @@ int main(int argc, char* argv[]) {
             uniform_int_distribution<int> dist {low, high};
             return dist(rng_engine);
         };
+
+        auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
+            using namespace std;
+            if (algo.compare("binary_tree") == 0) {
+                return mazes::maze_types::BINARY_TREE;
+            } else if (algo.compare("sidewinder") == 0) {
+                return mazes::maze_types::SIDEWINDER;
+            } else {
+#if defined(DEBUGGING)
+                cout << "INFO: Using default maze algorithm, \"binary_tree\"\n";
+#endif
+                return mazes::maze_types::BINARY_TREE;
+            }
+        };
         
         auto maze_factory = [&](mazes::maze_types maze_type, mazes::grid_ptr& _grid) {
             switch (maze_type) {
@@ -68,8 +91,9 @@ int main(int argc, char* argv[]) {
                 }
             }
         };
+
         std::string_view sv {"craft-sdl3"};
-        mazes::maze_types maze_algo = (args.get_algo().compare("binary_tree") == 0) ? mazes::maze_types::BINARY_TREE : mazes::maze_types::SIDEWINDER;
+        mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
         auto _grid {std::make_unique<mazes::grid>(25, 25)};
         craft maze_builder {sv, std::move(maze_factory(maze_algo, std::ref(_grid)))};
         auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
@@ -77,7 +101,7 @@ int main(int argc, char* argv[]) {
         // _grid->print_grid_cells();
         if (success) {
             // Check grid size because terminal output can get smushed
-            if (_grid->get_columns() < 50 && _grid->get_rows() < 50) {
+            if (_grid->get_columns() < 10000 && _grid->get_rows() < 10000) {
                 std::cout << *_grid.get() << std::endl;
             }
         } else {
