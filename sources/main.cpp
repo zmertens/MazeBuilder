@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
           -a, --algorithm    binary_tree [default], sidewinder
           -s, --seed         seed for the random number generator [mt19937]
           -w, --width        maze width [default=100]
-          -h, --height       maze height [default=10]
+          -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
@@ -99,7 +99,7 @@ int main(int argc, char* argv[]) {
 
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
-        auto _grid {std::make_unique<mazes::grid>(25, 25)};
+        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length())};
         craft maze_builder {sv, std::move(maze_factory(maze_algo, std::ref(_grid)))};
         auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
         // auto&& success = maze_factory(maze_algo, std::ref(_grid)).get();

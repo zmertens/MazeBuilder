@@ -74,7 +74,7 @@ TEST_CASE("Just needs help", "[help]" ) {
 }
 
 TEST_CASE("Args can be parsed", "[parsing args]" ) {
-    vector<string> args_vec {"maze_builder", "--algorithm=sidewinder", "-s", "42", "-w", "101", "-l", "50", "--height=100", "--output=maze.obj"};
+    vector<string> args_vec {"maze_builder", "--algorithm=sidewinder", "-s", "42", "-w", "101", "-l", "50", "-y", "8", "--output=maze.obj"};
     static constexpr auto version {"1.0.0"};
     static constexpr auto help {"TESTING HELP MESSAGE!!"};
 
@@ -86,7 +86,7 @@ TEST_CASE("Args can be parsed", "[parsing args]" ) {
         REQUIRE(args_builder.get_seed() == 42);
         REQUIRE(args_builder.get_width() == 101);
         REQUIRE(args_builder.get_length() == 50);
-        REQUIRE(args_builder.get_height() == 100);
+        REQUIRE(args_builder.get_height() == 8);
         REQUIRE(args_builder.get_algo().compare("sidewinder") == 0);
         REQUIRE(args_builder.get_output().compare("maze.obj") == 0);
     }

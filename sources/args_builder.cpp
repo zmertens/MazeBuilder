@@ -104,8 +104,8 @@ void args_builder::gather_args() {
         return temp;
     };
 
-    // for short options like "-s 42", there are two passes that need to happen
-    // state is when "-s" is found is stored in a bool value, and when the digits are found
+    // For short options like "-s 42", there are two passes that need to happen
+    // When "-s" is found is stored in a bool value, and when the digits are found
     // in the next pass they are passed into the short val function and state is updated
     bool needs_short_val = false;
     auto set_val_from_short_option = [this, &needs_short_val](const string& option, const string& value) {
@@ -118,12 +118,13 @@ void args_builder::gather_args() {
     regex interactive_regex ("^--interactive$|^-i$", regex_constants::ECMAScript);
     regex seed_regex ("--seed=[\\d+]+|^-s$", regex_constants::ECMAScript);
     regex width_regex ("--width=[\\d+]+|^-w$", regex_constants::ECMAScript);
-    regex length_regex ("--length=[\\d+]+|^-l$", regex_constants::ECMAScript);
-    regex height_regex ("--height=[\\d+]+|^-h$", regex_constants::ECMAScript);
+    regex length_regex ("--length=[\\d]+|^-l$", regex_constants::ECMAScript);
+    // short option -h is changed because of the --help short option
+    regex height_regex ("--height=[\\d]+|^-y$", regex_constants::ECMAScript);
     regex help_regex ("(^--help$|^\\-h$)", regex_constants::ECMAScript);
     regex version_regex ("(^--version$|^\\-v$)", regex_constants::ECMAScript);
     regex algo_regex ("--algorithm=[\\w]+|^-a$", regex_constants::ECMAScript);
-    regex output_regex ("(^--output=[\\w\\\\.]+|\\-o)", regex_constants::ECMAScript);
+    regex output_regex ("(^--output=[\\w\\\\.]+|^\\-o$)", regex_constants::ECMAScript);
 
     string short_val_option {""};
     // skip program name with +1
@@ -174,19 +175,19 @@ void args_builder::gather_args() {
                     short_val_option = "length";
                     needs_short_val = true;
                 } else {
-                    throw runtime_error("no value provided for -l: " + current);
+                    throw runtime_error("ERROR: no value provided for -l: " + current);
                 }
             } else {
                 args_map["length"] = get_val_from_long_option(current);
             }
         } else if (regex_match(current, height_regex)) {
             // height follows an '=' or some spaces (or just one space...)
-            if (current.compare("-h") == 0) { 
+            if (current.compare("-y") == 0) { 
                 if (itr + 1 != args_vec.cend()) {
                     short_val_option = "height";
                     needs_short_val = true;
                 } else {
-                    throw runtime_error("no value provided for -h: " + current);
+                    throw runtime_error("ERROR: no value provided for -y: " + current);
                 }
             } else {
                 args_map["height"] = get_val_from_long_option(current);
@@ -197,7 +198,7 @@ void args_builder::gather_args() {
                     short_val_option = "algorithm";
                     needs_short_val = true;
                 } else {
-                    throw runtime_error("no value provided for -a: " + current);
+                    throw runtime_error("ERROR: no value provided for -a: " + current);
                 }
             } else {
                 args_map["algorithm"] = get_val_from_long_option(current);
@@ -208,13 +209,13 @@ void args_builder::gather_args() {
                     short_val_option = "output";
                     needs_short_val = true;
                 } else {
-                    throw runtime_error("no value provided for -o: " + current);
+                    throw runtime_error("ERROR: no value provided for -o: " + current);
                 }
             } else {
                 args_map["output"] = get_val_from_long_option(current);
             }
         } else {
-            throw runtime_error("Could not handle arguments: " + current);
+            throw runtime_error("ERROR: Could not handle arguments: " + current);
         }
     } // loop
 
