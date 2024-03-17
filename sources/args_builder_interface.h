@@ -6,7 +6,7 @@
 
 class args_builder_interface {
 public:
-    virtual const std::unordered_map<std::string, std::string>& build() const noexcept = 0;
+    virtual const std::unordered_map<std::string, std::string>& build() = 0;
 };
 
 #endif // ARGS_BUILDER_INTERFACE

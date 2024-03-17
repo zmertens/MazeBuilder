@@ -5,6 +5,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <ostream>
+#include <vector>
 #include <functional>
 
 #include "args_builder_interface.h"
@@ -17,22 +18,22 @@ enum class args_state {
 
 class args_builder : public args_builder_interface {
 public:
-    args_builder(const std::string& v, const std::string& h, int argc, char* argv[]);
+    args_builder(const std::string& v, const std::string& h, const std::vector<std::string>& args_vec);
     args_builder(const std::unordered_map<std::string, std::string>& args);
 
-    unsigned int get_seed() const;
-    bool is_interactive() const;
-    std::string get_version() const;
-    std::string get_help() const;
-    std::string get_algo() const;
-    std::string get_output() const;
-    unsigned int get_width() const;
-    unsigned int get_length() const;
-    unsigned int get_height() const;
+    unsigned int get_seed() const noexcept;
+    bool is_interactive() const noexcept;
+    std::string get_version() const noexcept;
+    std::string get_help() const noexcept;
+    std::string get_algo() const noexcept;
+    std::string get_output() const noexcept;
+    unsigned int get_width() const noexcept;
+    unsigned int get_length() const noexcept;
+    unsigned int get_height() const noexcept;
     
     args_state get_state() const noexcept;
 
-    const std::unordered_map<std::string, std::string>& build() const noexcept override;
+    const std::unordered_map<std::string, std::string>& build() override;
 
     friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
         std::stringstream ss;
@@ -44,11 +45,10 @@ public:
     }
 
 private:
-    void gather_args(int argc, char* argv[]);
+    void gather_args();
     std::unordered_map<std::string, std::string> args_map;
+    std::vector<std::string> args_vec;
     args_state state;
-
-    std::function<bool(const std::string&)> has_args;
 };
 
 }

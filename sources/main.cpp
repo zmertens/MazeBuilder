@@ -24,18 +24,23 @@ int main(int argc, char* argv[]) {
         Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt\n
         Options specify how to generate the maze and file output:
           -a, --algorithm    binary_tree [default], sidewinder
-          -s, --seed         seed for the random number generator (mt19937)
-          -w, --width        maze width
-          -h, --height       maze height
-          -l, --length       maze length
+          -s, --seed         seed for the random number generator [mt19937]
+          -w, --width        maze width [default=100]
+          -h, --height       maze height [default=10]
+          -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
           -h, --help         display this help message
           -v, --version      display program version
     )help";
 
+    std::vector<std::string> args_vec;
+    for (int i = 0; i < argc; i++) {
+        args_vec.emplace_back(argv[i]);
+    }
+
     try {
-        mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, argc, argv);
+        mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
         mazes::args_state state_of_args {args.get_state()};
         auto&& args_map {args.build()};
 

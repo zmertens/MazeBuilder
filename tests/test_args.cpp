@@ -13,6 +13,7 @@ using namespace std;
 using namespace mazes;
 
 TEST_CASE( "Args are computed", "[args]" ) {
+    // it is up to the caller to provide a full list of args
     std::unordered_map<std::string, std::string> args = {
         {"algorithm", "sidewinder"},
         {"seed", "0"},
@@ -47,31 +48,53 @@ TEST_CASE( "Args are computed", "[args]" ) {
 }
 
 TEST_CASE("Just needs help", "[help]" ) {
-    static char* argv[] = {"maze_builder", "-h"};
-    static constexpr auto argc {2};
+    // it is up to the caller to provide program name with arguments
+    vector<string> args_vec {"maze_builder"};
     static constexpr auto version {"1.0.0"};
     static constexpr auto help {"TESTING HELP MESSAGE!!"};
-    args_builder args_builder {version, help, argc, argv};
 
-    auto&& state = args_builder.get_state();
-    REQUIRE(state == args_state::JUST_NEEDS_HELP);
+    SECTION("Testing short args") {
+        args_vec.emplace_back("-h");
+        args_builder args_builder {version, help, args_vec};
+        // build with parse the arguments
+        auto&& args = args_builder.build();
+        auto&& state = args_builder.get_state();
+        REQUIRE(state == args_state::JUST_NEEDS_HELP);
+        REQUIRE(!args.empty());
+    }
+    SECTION("Testing long args") {
+        args_vec.emplace_back("--help");
+        args_builder args_builder {version, help, args_vec};
+        // build with parse the arguments
+        auto&& args = args_builder.build();
+        auto&& state = args_builder.get_state();
+        REQUIRE(state == args_state::JUST_NEEDS_HELP);
+        REQUIRE(!args.empty());
+    }
 }
 
 TEST_CASE("Args can be parsed", "[parsing args]" ) {
-    static char* argv[] = {"maze_builder", "--algorithm=sidewinder", "-s", "42", "-w", "101", "-l", "50", "--output=maze.obj"};
-    static constexpr auto argc {9};
+    vector<string> args_vec {"maze_builder", "--algorithm=sidewinder", "-s", "42", "-w", "101", "-l", "50", "--height=100", "--output=maze.obj"};
     static constexpr auto version {"1.0.0"};
     static constexpr auto help {"TESTING HELP MESSAGE!!"};
-    args_builder args_builder {version, help, argc, argv};
 
-    REQUIRE(args_builder.get_seed() == 42);
-    REQUIRE(args_builder.get_width() == 101);
-    REQUIRE(args_builder.get_length() == 50);
-    REQUIRE(args_builder.get_algo().compare("sidewinder") == 0);
+    // build will parse the arguments
+    SECTION("Business as usual args") {
+        args_builder args_builder {version, help, args_vec};
+        auto&& args = args_builder.build();
+        REQUIRE(!args.empty());
+        REQUIRE(args_builder.get_seed() == 42);
+        REQUIRE(args_builder.get_width() == 101);
+        REQUIRE(args_builder.get_length() == 50);
+        REQUIRE(args_builder.get_height() == 100);
+        REQUIRE(args_builder.get_algo().compare("sidewinder") == 0);
+        REQUIRE(args_builder.get_output().compare("maze.obj") == 0);
+    }
     // SECTION("Throwing exception") {
-    //     auto&& args = args_builder.build();
-    //     args["width"] = "";
-    //     REQUIRE_THROWS(args_builder.get_width());
+    //     args_vec.clear();
+    //     args_vec.emplace_back("maze_builder2", "--blah=binary_blah");
+    //     args_builder args_builder {version, help, args_vec};
+    //     REQUIRE_THROWS(args_builder.build());
     // }
 }
 
