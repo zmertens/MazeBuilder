@@ -10,36 +10,6 @@
 
 using namespace std;
 
-void world::create_maze(int p, int q, world_func func, Map *m, mazes::grid_ptr const& _grid) {
-    using namespace std;
-    
-    auto&& _g = _grid->get_grid();
-    int pad = 1;
-    for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
-        for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {
-            int flag = 1;
-            if (dx < 0 || dz < 0 || dx >= CHUNK_SIZE || dz >= CHUNK_SIZE) {
-                flag = -1;
-            }
-            int x = p * CHUNK_SIZE + dx;
-            int z = q * CHUNK_SIZE + dz;
-
-            for (auto row {0}; row < _g.size(); row++) {
-                auto&& num_columns = _g.at(row).size();
-                for (auto col {0}; col < num_columns; col++) {
-                    auto index = row * num_columns + col;
-                    // if (index) {
-                    //     auto cell_val {grid_sv[index]};
-                    //     if (cell_val != ' ') {
-                    func(x, 65, z, 1, m);
-                        // }
-                    // }
-                }
-            }
-        }
-    }
-} // create_maze
-
 void world::create_world(int p, int q, world_func func, Map *m) {
     int pad = 1;
     for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {

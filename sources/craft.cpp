@@ -1,5 +1,5 @@
 /*
-Craft engine builds voxels
+Craft engine builds voxels and has maze-generating algorithms
 Originally written in C99, ported to C++17
 */
 
@@ -8,6 +8,8 @@ Originally written in C99, ported to C++17
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
+
+#include <glad/glad.h>
 
 #include <SDL3/SDL.h>
 
@@ -34,6 +36,7 @@ Originally written in C99, ported to C++17
 
 #include "matrix.h"
 #include <noise/noise.h>
+#include <tinycthread/tinycthread.h>
 #include "util.h"
 #include "world.h"
 
@@ -42,7 +45,7 @@ Originally written in C99, ported to C++17
 #define DUMP_GL_EXTENSIONS 0
 
 #define MAX_CHUNKS 8192
-#define MAX_PLAYERS 128
+#define MAX_PLAYERS 1
 #define WORKERS 4
 #define MAX_TEXT_LENGTH 256
 #define MAX_NAME_LENGTH 32
@@ -52,9 +55,6 @@ Originally written in C99, ported to C++17
 #define ALIGN_LEFT 0
 #define ALIGN_CENTER 1
 #define ALIGN_RIGHT 2
-
-#define MODE_OFFLINE 0
-#define MODE_ONLINE 1
 
 #define WORKER_IDLE 0
 #define WORKER_BUSY 1
@@ -166,7 +166,6 @@ struct craft::craft_impl {
         int ortho;
         float fov;
         int suppress_char;
-        int mode;
         int mode_changed;
         char db_path[MAX_PATH_LENGTH];
         char server_addr[MAX_ADDR_LENGTH];
@@ -205,11 +204,11 @@ struct craft::craft_impl {
                 cnd_wait(&worker->cnd, &worker->mtx);
             }
             mtx_unlock(&worker->mtx);
-            WorkerItem *item = &worker->item;
-            if (item->load) {
-                caller.m_pimpl->load_chunk(item);
+            WorkerItem *worker_item = &worker->item;
+            if (worker_item->load) {
+                caller.m_pimpl->load_chunk(worker_item);
             }
-            caller.m_pimpl->compute_chunk(item);
+            caller.m_pimpl->compute_chunk(worker_item);
             mtx_lock(&worker->mtx);
             worker->state = WORKER_DONE;
             mtx_unlock(&worker->mtx);
@@ -1009,12 +1008,12 @@ struct craft::craft_impl {
         }
     }
 
-    #define XZ_SIZE (CHUNK_SIZE * 3 + 2)
-    #define XZ_LO (CHUNK_SIZE)
-    #define XZ_HI (CHUNK_SIZE * 2 + 1)
-    #define Y_SIZE 258
-    #define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
-    #define XZ(x, z) ((x) * XZ_SIZE + (z))
+#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
+#define XZ_LO (CHUNK_SIZE)
+#define XZ_HI (CHUNK_SIZE * 2 + 1)
+#define Y_SIZE 258
+#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
+#define XZ(x, z) ((x) * XZ_SIZE + (z))
 
     void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
         if (x + w < XZ_LO || z + w < XZ_LO) {
@@ -1254,11 +1253,12 @@ struct craft::craft_impl {
         chunk->dirty = 0;
     }
 
-    // @TODO : figure out how to not make this static
     static void map_set_func(int x, int y, int z, int w, Map *m) {
         map_set(m, x, y, z, w);
     }
 
+    // Create a chunk that represents a unique portion of the world
+    // p, q represents the chunk key
     void load_chunk(WorkerItem *item) {
         int p = item->p;
         int q = item->q;
@@ -2589,7 +2589,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open
  * @param interactive = false
 */
-bool craft::run(mazes::grid_ptr& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+bool craft::run(unique_ptr<mazes::grid>& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
     
     if (!interactive) {
         return this->m_pimpl->m_maze_future.get();
@@ -2711,7 +2711,6 @@ bool craft::run(mazes::grid_ptr& grid, std::function<int(int, int)> const& get_i
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
     
-    m_pimpl->m_model->mode = MODE_OFFLINE;
     snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
@@ -2766,7 +2765,7 @@ bool craft::run(mazes::grid_ptr& grid, std::function<int(int, int)> const& get_i
     while (running) {
 
         // DATABASE INITIALIZATION //
-        if (m_pimpl->m_model->mode == MODE_OFFLINE || USE_CACHE) {
+        if (USE_CACHE) {
             db_enable();
             if (db_init(m_pimpl->m_model->db_path)) {
                 return -1;

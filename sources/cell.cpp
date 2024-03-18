@@ -5,9 +5,10 @@
 using namespace mazes;
 using namespace std;
 
-cell::cell(unsigned int row, unsigned int column) 
+cell::cell(unsigned int row, unsigned int column, unsigned int index) 
 : m_row{row}
 , m_column{column}
+, m_index{index}
 , m_links{}
 , m_north{nullptr}
 , m_south{nullptr}
@@ -17,8 +18,7 @@ cell::cell(unsigned int row, unsigned int column)
 }
 
 bool cell::has_key(const shared_ptr<cell>& c) const {
-    auto itr = m_links.find(c);
-    return itr != m_links.end();
+    return m_links.find(c) != m_links.end();
 }
 
 /**
@@ -71,6 +71,10 @@ unsigned int cell::get_column() const {
     return this->m_column;
 }
 
+unsigned int cell::get_index() const {
+    return this->m_index;
+}
+
 shared_ptr<cell> cell::get_north() const {
     return this->m_north;
 }
@@ -101,4 +105,20 @@ void cell::set_east(shared_ptr<cell> const& other) {
 
 void cell::set_west(shared_ptr<cell> const& other) {
     this->m_west = other;
+}
+
+std::shared_ptr<cell> cell::get_left() const {
+    return this->m_left;
+}
+
+std::shared_ptr<cell> cell::get_right() const {
+    return this->m_right;
+}
+
+void cell::set_left(std::shared_ptr<cell>& other_left) {
+    this->m_left = move(other_left);
+}
+
+void cell::set_right(std::shared_ptr<cell>& other_right) {
+    this->m_right = move(other_right);
 }

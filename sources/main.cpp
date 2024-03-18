@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
         Run the builder to generate mazes from optional algorithms
-        Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt\n
+        Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
         Options specify how to generate the maze and file output:
           -a, --algorithm    binary_tree [default], sidewinder
           -s, --seed         seed for the random number generator [mt19937]
@@ -79,8 +79,10 @@ int main(int argc, char* argv[]) {
                 return mazes::maze_types::BINARY_TREE;
             }
         };
-        
-        auto maze_factory = [&](mazes::maze_types maze_type, mazes::grid_ptr& _grid) {
+
+        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length())};
+
+        auto maze_factory = [&_grid, &get_int](mazes::maze_types maze_type) {
             switch (maze_type) {
                 case mazes::maze_types::BINARY_TREE: {
                     static mazes::binary_tree bt;
@@ -91,7 +93,7 @@ int main(int argc, char* argv[]) {
                 case mazes::maze_types::SIDEWINDER: {
                     static mazes::sidewinder sw;
                     return std::async([&] {
-                        return sw.run(std::ref(_grid), get_int, false);
+                        return sw.run(std::ref(_grid), get_int);
                     });
                 }
             }
@@ -99,11 +101,10 @@ int main(int argc, char* argv[]) {
 
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
-        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length())};
-        craft maze_builder {sv, std::move(maze_factory(maze_algo, std::ref(_grid)))};
-        auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
-        // auto&& success = maze_factory(maze_algo, std::ref(_grid)).get();
-        // _grid->print_grid_cells();
+        //craft maze_builder {sv, std::move(maze_factory(maze_algo))};
+        //auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
+        static mazes::binary_tree bt;
+        auto&& success = bt.run(std::ref(_grid), get_int);
         if (success) {
             // Check grid size because terminal output can get smushed
             if (_grid->get_columns() < 10000 && _grid->get_rows() < 10000) {

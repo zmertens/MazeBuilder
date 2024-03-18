@@ -5,13 +5,13 @@
 #include <functional>
 #include <future>
 
-#include "grid.h"
-
 namespace mazes {
+
+class grid;
 
 class maze_algo_interface {
 public:
-    virtual bool run(grid_ptr& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept = 0;
+    virtual bool run(std::unique_ptr<mazes::grid>& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept = 0;
 };
 }
 #endif // MAZE_ALGO_INTERFACE_HPP

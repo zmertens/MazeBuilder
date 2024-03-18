@@ -1,14 +1,18 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
+#include <vector>
 #include <sstream>
 #include <algorithm>
 #include <functional>
 #include <random>
 #include <future>
+#include <chrono>
 #include <thread>
+#include <mutex>
 
 #include "maze_algo_interface.h"
+#include "cell.h"
 #include "grid.h"
 #include "binary_tree.h"
 #include "sidewinder.h"
@@ -24,14 +28,39 @@ static auto get_int = [](int low, int high) ->int {
     return dist(mt);
 };
 
-// static auto append_grids = [](grid_ptr& g1, grid_ptr& g2, grid_ptr& g12) -> void {
-    // g12.reset();
-    // g12 = {make_unique<grid>(g1->get_rows() * g2->get_rows(), g1->get_columns() * g2->get_columns())};
-// };
+//static auto append_grids = [](const unique_ptr<grid>& g1, const unique_ptr<grid>& g2, unique_ptr<grid>& g12) -> void {
+    //g12.reset();
+    //g12 = {make_unique<grid>(g1->get_rows() * g2->get_rows(), g1->get_columns() * g2->get_columns())};
+    // start appending a grid to a grid, take care that the indices can collide causing duplicates
+    // in the grow function there should be a counter to grab the largest index and append to the leaves
+    // g12->grow(g1);
+    // g12->grow(g2);
+//};
 
-TEST_CASE("Compare maze algos", "[maze_algos_race]") {
-    grid_ptr _grid_from_bt {make_unique<grid>(500, 500)};
-    grid_ptr _grid_from_sw {make_unique<grid>(500, 500)};
+TEST_CASE("Searching the grid yields positive results", "[search]") {
+    unsigned int rows {25}, columns {20};
+    vector<unsigned int> shuffled_ints {rows * columns};
+    shuffled_ints.reserve(rows * columns);
+    int next_index {0};
+    for (auto itr {shuffled_ints.begin()}; itr != shuffled_ints.end(); itr++) {
+        *itr = next_index++;
+    }
+
+    auto rd = std::random_device{};
+    auto rng = std::default_random_engine{ rd() };
+    shuffle(begin(shuffled_ints), end(shuffled_ints), rng);
+
+    unique_ptr<grid> _grid {make_unique<grid>(rows, columns)};
+    
+    for (auto&& i : shuffled_ints) {
+        auto&& found = _grid->search(_grid->get_root(), i);
+        REQUIRE(found != nullptr);
+    }
+}
+
+TEST_CASE("Compare maze algos", "[compare successes]") {
+    unique_ptr<grid> _grid_from_bt {make_unique<grid>(500, 500)};
+    unique_ptr<grid> _grid_from_sw {make_unique<grid>(500, 500)};
 
     auto&& future_grid_from_bt = std::async(std::launch::async, [&] {
         mazes::binary_tree bt;
@@ -42,43 +71,39 @@ TEST_CASE("Compare maze algos", "[maze_algos_race]") {
         return sw.run(_grid_from_sw, get_int, false);
     });
 
-    // BENCHMARK("benchmark binary_tree algo") {
-    //     return future_grid_from_bt.get();
-    // };
-
-    // BENCHMARK("benchmark sidewinder algo") {
-    //     return future_grid_from_sw.get();
-    // };
-
-    SECTION("Check for success", "[assert_section]]") {
+    SECTION("Check for success", "[assert_section]") {
+        auto start = chrono::system_clock::now();
         auto&& success = future_grid_from_bt.get();
+        auto elapsed1 = chrono::system_clock::now() - start;
         REQUIRE(success == true);
+        // program should not take zero seconds to run
+        auto elapsed1ms {chrono::duration_cast<chrono::milliseconds>(elapsed1).count()};
+        REQUIRE(elapsed1ms != 0);
         stringstream ss;
         ss << *_grid_from_bt.get();
         REQUIRE(ss.str().length() != 0);
+        start = chrono::system_clock::now();
         success = future_grid_from_sw.get();
+        auto elapsed2 = chrono::system_clock::now() - start;
         REQUIRE(success == true);
+        auto elapsed2ms {chrono::duration_cast<chrono::milliseconds>(elapsed2).count()};
         ss.clear();
         ss << *_grid_from_sw.get();
         REQUIRE(ss.str().length() != 0);
+        // curious if either algo runs in identical time
+        REQUIRE(elapsed1ms != elapsed2ms);
     }
 }
 
 TEST_CASE("Cells have neighbors", "[cells]") {
 
-    using namespace std;
-
-    auto is_equal = [&](shared_ptr<cell> cell1, shared_ptr<cell> cell2) -> bool {
-        return cell1 == cell2;
-    };
-
     // cell1 has cell2 neighbor to the south
-    shared_ptr<cell> cell1 {make_shared<cell>(0, 0)};
-    shared_ptr<cell> cell2 {make_shared<cell>(0, 1)};
+    shared_ptr<cell> cell1 {make_shared<cell>(0, 0, 0)};
+    shared_ptr<cell> cell2 {make_shared<cell>(0, 1, 1)};
 
     SECTION("Cell has neighbor to south") {
         cell1->set_south(cell2);
-        REQUIRE(is_equal(cell1->get_south(), cell2));
+        REQUIRE(cell1->get_south() == cell2);
         auto&& neighbors = cell1->get_neighbors();
         REQUIRE(!neighbors.empty());
     }
@@ -87,39 +112,81 @@ TEST_CASE("Cells have neighbors", "[cells]") {
         // links are bi-directional by default
         cell1->link(cell1, cell2);
         REQUIRE(cell1->is_linked(cell2));
+        REQUIRE(cell2->is_linked(cell1));
     }
 }
 
-TEST_CASE("Threading grids", "[threading]") {
-    grid_ptr _grid1 {make_unique<grid>(250, 250)};
-    grid_ptr _grid2 {make_unique<grid>(250, 250)};
-    grid_ptr _grid3 {make_unique<grid>(250, 250)};
-    grid_ptr _grid4 {make_unique<grid>(250, 250)};
+TEST_CASE("Grids are sortable", "[sort]") {
+    unique_ptr<grid> g1 {make_unique<grid>(100, 100)};
+    vector<shared_ptr<cell>> sorted_cells;
+    g1->sort(g1->get_root(), sorted_cells);
+    // each sorted cell should increase in index value up until the max in the grid
+    unsigned int max {0};
+    for (auto&& cell : sorted_cells) {
+        REQUIRE(cell->get_index() >= max);
+        max = cell->get_index();
+    }
+}
+
+TEST_CASE("Packaged task grids", "[packaged tasks]") {
+    unique_ptr<grid> _grid1 {make_unique<grid>(250, 250)};
+    unique_ptr<grid> _grid2 {make_unique<grid>(250, 250)};
+    unique_ptr<grid> _grid3 {make_unique<grid>(250, 250)};
+    unique_ptr<grid> _grid4 {make_unique<grid>(250, 250)};
     
-    auto run_bt = [&](grid_ptr& g)->bool {
+    auto run_bt = [&](unique_ptr<grid>& g)->bool {
         binary_tree bt;
         return bt.run(ref(g), get_int, false);
     };
     
-    // thread t1 (run_bt, _grid1);
-    // thread t2 (run_bt, _grid2);
-    // thread t3 (run_bt, _grid3);
-    // thread t4 (run_bt, _grid4);
-    // t1.join();
-    // t2.join();
-    // t3.join();
-    // t4.join();
+    packaged_task<bool(unique_ptr<grid>&)> task1 (run_bt);
+    packaged_task<bool(unique_ptr<grid>&)> task2 (run_bt);
+    packaged_task<bool(unique_ptr<grid>&)> task3 (run_bt);
+    packaged_task<bool(unique_ptr<grid>&)> task4 (run_bt);
 
-    // grid_ptr _grid12;
-    // append_grids(_grid1, _grid2, _grid12);
-    // grid_ptr _grid34; = move(append_grids(_grid3, _grid4));
-    // grid_ptr _grid_final = move(append_grids(_grid12, _grid34));
+    auto fut1 = task1.get_future();
+    auto fut2 = task2.get_future();
+    auto fut3 = task3.get_future();
+    auto fut4 = task4.get_future();
 
-    // stringstream ss;
-    // ss << *_grid12.get();
-    // REQUIRE(ss.str().empty() == false);
-    // REQUIRE(_grid12->get_rows() >= _grid1->get_rows());
-    // REQUIRE(_grid12->get_rows() >= _grid2->get_rows());
-    // REQUIRE(_grid12->get_columns() >= _grid1->get_columns());
-    // REQUIRE(_grid12->get_columns() >= _grid2->get_columns());
+    // execute the packaged tasks
+    task1(ref(_grid1));
+    task2(ref(_grid2));
+    task3(ref(_grid3));
+    task4(ref(_grid4));
+
+    // check results
+    REQUIRE(fut1.get() == true);
+    REQUIRE(fut2.get() == true);
+    REQUIRE(fut3.get() == true);
+    REQUIRE(fut4.get() == true);
+} // packaged tasks
+
+TEST_CASE("Threading mazes and appending together", "[threading mazes]") {
+    auto a1 = {0, 1, 2, 3, 4, 5};
+    auto a2 = {6, 7, 8, 9, 10};
+
+    vector<unsigned int> increments;
+
+    mutex mtx;
+
+    // count asynchrously
+    auto increments_by_1 = std::thread([&]()->void {
+        lock_guard<mutex> lock {mtx};
+        for (auto&& i : a1) {
+            increments.emplace_back(i + 1);
+        }
+    });
+    auto increments_by_2 = std::thread([&]()->void {
+        lock_guard<mutex> lock {mtx};
+        for (auto&& i : a2) {
+            increments.emplace_back(i + 2);
+        }
+    });
+
+    increments_by_1.join();
+    increments_by_2.join();
+
+    for (auto&& i : increments)
+        REQUIRE(i);
 }

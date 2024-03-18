@@ -14,7 +14,6 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_maze(int p, int q, world_func func, Map *m, mazes::grid_ptr const& _grid);
     void create_world(int p, int q, world_func func, Map *m);
 private:
 };

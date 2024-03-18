@@ -12,9 +12,8 @@ namespace mazes {
 class grid;
 class sidewinder : public maze_algo_interface {
 public:
-    bool run(mazes::grid_ptr& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
-private:
-    mazes::grid_ptr m_grid;
+    bool run(std::unique_ptr<grid>& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
+
 };
 
 }

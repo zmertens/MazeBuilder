@@ -31,6 +31,9 @@ args_builder::args_builder(const std::string& v, const std::string& h, const std
 
 }
 
+/*
+It's up to the caller to prepare an args map with all the defaults
+*/
 args_builder::args_builder(const std::unordered_map<std::string, std::string>& args) 
 : state {args_state::READY_TO_ROCK}
 , args_map{args}
