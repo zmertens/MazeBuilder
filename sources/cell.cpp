@@ -115,10 +115,10 @@ std::shared_ptr<cell> cell::get_right() const {
     return this->m_right;
 }
 
-void cell::set_left(std::shared_ptr<cell>& other_left) {
-    this->m_left = move(other_left);
+void cell::set_left(std::shared_ptr<cell> const& other_left) {
+    this->m_left = other_left;
 }
 
-void cell::set_right(std::shared_ptr<cell>& other_right) {
-    this->m_right = move(other_right);
+void cell::set_right(std::shared_ptr<cell> const& other_right) {
+    this->m_right = other_right;
 }

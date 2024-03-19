@@ -75,7 +75,7 @@ bool grid::create_binary_search_tree(const std::vector<unsigned int>& shuffled_i
         if (this->m_binary_search_tree_root == nullptr) {
             this->m_binary_search_tree_root = {make_shared<cell>(row, column, index)};
         } else {
-            this->insert(this->m_binary_search_tree_root, row, column, index);
+            this->insert(ref(this->m_binary_search_tree_root), row, column, index);
         }
 
         column = ++column % this->m_columns;
@@ -176,7 +176,7 @@ void grid::grow(std::unique_ptr<grid> const& other_grid) noexcept {
 /**
  * Keep calling insert recursively until we hit null (a leaf)
 */
-void grid::insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index) {
+void grid::insert(std::shared_ptr<cell>& parent, unsigned int row, unsigned int col, unsigned int index) {
     if (parent->get_index() > index) {
         if (parent->get_left() == nullptr) {
             parent->set_left({make_shared<cell>(row, col, index)});

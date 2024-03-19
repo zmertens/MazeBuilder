@@ -35,8 +35,8 @@ public:
     std::shared_ptr<cell> get_left() const;
     std::shared_ptr<cell> get_right() const;
 
-    void set_left(std::shared_ptr<cell>& other_left);
-    void set_right(std::shared_ptr<cell>& other_right);
+    void set_left(std::shared_ptr<cell> const& other_left);
+    void set_right(std::shared_ptr<cell> const& other_right);
 
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
