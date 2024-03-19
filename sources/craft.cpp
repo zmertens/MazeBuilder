@@ -1629,7 +1629,7 @@ struct craft::craft_impl {
     }
 
     void record_block(int x, int y, int z, int w) {
-        memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
+        SDL_memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
         this->m_model->block0.x = x;
         this->m_model->block0.y = y;
         this->m_model->block0.z = z;

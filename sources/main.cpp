@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string_view>
 #include <future>
-#include <thread>
+#include <sstream>
 
 #include "craft.h"
 #include "grid.h"
@@ -13,6 +13,7 @@
 #include "sidewinder.h"
 #include "args_builder.h"
 #include "maze_types_enum.h"
+#include "writer.h"
 
 int main(int argc, char* argv[]) {
 
@@ -98,15 +99,22 @@ int main(int argc, char* argv[]) {
                 }
             }
         };
-
+        // string views don't own the data, they have less copying overhead
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
         craft maze_builder {sv, std::move(maze_factory(maze_algo))};
         auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
         if (success) {
             // Check grid size because terminal output can get smushed
-            if (_grid->get_columns() < 10000 && _grid->get_rows() < 10000) {
+            if (args.get_output().compare("stdout") == 0) {
                 std::cout << *_grid.get() << std::endl;
+            } else {
+                mazes::writer my_writer;
+            
+                std::stringstream ss;
+                ss << *_grid.get();
+            
+                my_writer.write(args.get_output(), ss.str());
             }
         } else {
             std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
