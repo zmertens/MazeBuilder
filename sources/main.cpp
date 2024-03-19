@@ -101,10 +101,8 @@ int main(int argc, char* argv[]) {
 
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
-        //craft maze_builder {sv, std::move(maze_factory(maze_algo))};
-        //auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
-        static mazes::binary_tree bt;
-        auto&& success = bt.run(std::ref(_grid), get_int);
+        craft maze_builder {sv, std::move(maze_factory(maze_algo))};
+        auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
         if (success) {
             // Check grid size because terminal output can get smushed
             if (_grid->get_columns() < 10000 && _grid->get_rows() < 10000) {

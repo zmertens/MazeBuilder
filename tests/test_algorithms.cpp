@@ -28,11 +28,11 @@ static auto get_int = [](int low, int high) ->int {
     return dist(mt);
 };
 
-//TEST_CASE("Make a very large grid", "[large grid]") {
-//    unique_ptr<grid> very_large_grid{ make_unique<grid>(1'000, 2) };
-//    binary_tree bt_algo;
-//    REQUIRE(bt_algo.run(ref(very_large_grid), get_int, false));
-//}
+TEST_CASE("Make a very large grid", "[large grid]") {
+    unique_ptr<grid> very_large_grid{ make_unique<grid>(1'000, 2) };
+    binary_tree bt_algo;
+    REQUIRE(bt_algo.run(ref(very_large_grid), get_int, false));
+}
 
 TEST_CASE("Searching the grid yields positive results", "[search]") {
     unsigned int rows {25}, columns {20};

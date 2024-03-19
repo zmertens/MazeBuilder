@@ -49,18 +49,31 @@ char *load_file(const char *path) {
     return data;
 }
 
-// GLuint gen_buffer(GLsizei size, GLfloat *data) {
-//     GLuint buffer;
-//     glGenBuffers(1, &buffer);
-//     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-//     glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-//     glBindBuffer(GL_ARRAY_BUFFER, 0);
-//     return buffer;
-// }
-
-// void del_buffer(GLuint buffer) {
-//     glDeleteBuffers(1, &buffer);
-// }
+/*
+Private function to load file using SDL-specific functions
+*/
+//char* load_file_using_sdl(const char* path) {
+//    
+//    char* data;
+//
+//    // Open binary file
+//    SDL_RWops* io = SDL_RWFromFile(path, "r");
+//    if (io != nullptr) {
+//        Sint64 data_size = SDL_RWsize(io);
+//        data = (char*) SDL_malloc(data_size + 1);
+//        if (SDL_RWread(io, data, data_size) != data_size) {
+//            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RWread failed: %s\n", SDL_GetError());
+//        }
+//#if defined(DEBUGGING)
+//        SDL_Log("Reading file % s\n", path);
+//#endif
+//        SDL_RWclose(io);
+//    } else {
+//        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: SDL_RWops failed: %s", SDL_GetError());
+//    }
+//
+//    return data;
+//}
 
 GLuint make_shader(GLenum type, const char *source) {
     GLuint shader = glCreateShader(type);
