@@ -12,11 +12,11 @@
 /**
  * @param interactive = false
 */
-bool mazes::binary_tree::run(std::unique_ptr<grid>& _grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+bool mazes::binary_tree::run(std::unique_ptr<grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 	return this->run_on_cell(_grid->get_root(), get_int);
 }
 
-bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell>& _cell, std::function<int(int, int)> const& get_int) noexcept {
+bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, std::function<int(int, int)> const& get_int) const noexcept {
     using namespace std;
     using namespace mazes;
     if (_cell != nullptr) {

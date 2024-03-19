@@ -2589,7 +2589,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open
  * @param interactive = false
 */
-bool craft::run(unique_ptr<mazes::grid>& grid, std::function<int(int, int)> const& get_int, bool interactive) noexcept {
+bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
     
     if (!interactive) {
         return this->m_pimpl->m_maze_future.get();

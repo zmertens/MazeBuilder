@@ -16,7 +16,7 @@ public:
     // craft(const craft& rhs);
     // craft& operator=(const craft& rhs);
     
-    bool run(std::unique_ptr<mazes::grid>& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) noexcept override;
+    bool run(std::unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) const noexcept override;
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
