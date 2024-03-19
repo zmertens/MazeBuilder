@@ -48,7 +48,8 @@ set(MAZE_ALGO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/binary_tree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp)
 
 set(CRAFT_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
@@ -145,7 +146,7 @@ if(BUILD_MAZE_TESTS)
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
-    file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.cpp)
+    file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
 
     # These tests can use the Catch2-provided main
     add_executable(${MAZE_BUILDER_TEST_EXE} ${TEST_FILES})

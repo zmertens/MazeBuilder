@@ -1,16 +1,23 @@
 #ifndef WRITER_H
 #define WRITER_H
 
+#include <string_view>
 #include <string>
-#include <future>
 
-#include <tinyobjloader/tiny_obj_loader.h>
+#include "file_types_enum.h"
+
+namespace mazes {
 
 class writer {
 public:
-    bool write(const std::string& filename);
+	writer();
+	file_types get_filetype(const std::string& filename) const noexcept;
+	bool write(const std::string& filename, const std::string_view& data) const;
 private:
+	void write_wavefront_obj(const std::string_view& data) const;
+	void write_plain_text(const std::string_view& data) const;
+}; // writer
 
-};
+}
 
 #endif // WRITER_H

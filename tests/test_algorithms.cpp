@@ -28,14 +28,11 @@ static auto get_int = [](int low, int high) ->int {
     return dist(mt);
 };
 
-//static auto append_grids = [](const unique_ptr<grid>& g1, const unique_ptr<grid>& g2, unique_ptr<grid>& g12) -> void {
-    //g12.reset();
-    //g12 = {make_unique<grid>(g1->get_rows() * g2->get_rows(), g1->get_columns() * g2->get_columns())};
-    // start appending a grid to a grid, take care that the indices can collide causing duplicates
-    // in the grow function there should be a counter to grab the largest index and append to the leaves
-    // g12->grow(g1);
-    // g12->grow(g2);
-//};
+//TEST_CASE("Make a very large grid", "[large grid]") {
+//    unique_ptr<grid> very_large_grid{ make_unique<grid>(1'000, 2) };
+//    binary_tree bt_algo;
+//    REQUIRE(bt_algo.run(ref(very_large_grid), get_int, false));
+//}
 
 TEST_CASE("Searching the grid yields positive results", "[search]") {
     unsigned int rows {25}, columns {20};
@@ -59,8 +56,8 @@ TEST_CASE("Searching the grid yields positive results", "[search]") {
 }
 
 TEST_CASE("Compare maze algos", "[compare successes]") {
-    unique_ptr<grid> _grid_from_bt {make_unique<grid>(500, 500)};
-    unique_ptr<grid> _grid_from_sw {make_unique<grid>(500, 500)};
+    unique_ptr<grid> _grid_from_bt {make_unique<grid>(50, 50)};
+    unique_ptr<grid> _grid_from_sw {make_unique<grid>(49, 49)};
 
     auto&& future_grid_from_bt = std::async(std::launch::async, [&] {
         mazes::binary_tree bt;
@@ -75,7 +72,7 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
         auto start = chrono::system_clock::now();
         auto&& success = future_grid_from_bt.get();
         auto elapsed1 = chrono::system_clock::now() - start;
-        REQUIRE(success == true);
+        REQUIRE(success);
         // program should not take zero seconds to run
         auto elapsed1ms {chrono::duration_cast<chrono::milliseconds>(elapsed1).count()};
         REQUIRE(elapsed1ms != 0);

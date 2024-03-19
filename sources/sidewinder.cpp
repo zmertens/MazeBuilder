@@ -35,7 +35,7 @@ bool mazes::sidewinder::run_on_cell(std::shared_ptr<cell> const& _cell, std::fun
             if (random_cell->get_north() != nullptr) {
                 random_cell->link(random_cell, random_cell->get_north(), true);
                 store.clear();
-            } else {
+            } else if (random_cell->get_east() != nullptr) {
                 _cell->link(_cell, _cell->get_east(), true);
             }
         }
