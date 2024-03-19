@@ -21,7 +21,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3 
-    - using: 'node20'
 
     - name: Install Dependencies
       run: |
