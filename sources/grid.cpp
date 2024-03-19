@@ -146,8 +146,9 @@ unsigned int grid::max_index(shared_ptr<mazes::cell> const& parent, unsigned int
     if (parent != nullptr) {
         max_index(parent->get_left(), max);
         max_index(parent->get_right(), max);
-        return parent->get_index() > max ? max : parent->get_index();
+        max = parent->get_index() > max ? max : parent->get_index();
     }
+    return max;
 }
 
 /**
@@ -155,10 +156,11 @@ unsigned int grid::max_index(shared_ptr<mazes::cell> const& parent, unsigned int
 */
 unsigned int grid::min_index(std::shared_ptr<cell> const& parent, unsigned int min) const noexcept {
     if (parent != nullptr) {
-        return parent->get_index() < min ? min : parent->get_index();
+        min = parent->get_index() < min ? min : parent->get_index();
         max_index(parent->get_left(), min);
         max_index(parent->get_right(), min);
     }
+    return min;
 }
 
 shared_ptr<cell> grid::get_root() const noexcept {
@@ -176,7 +178,7 @@ void grid::grow(std::unique_ptr<grid> const& other_grid) noexcept {
 /**
  * Keep calling insert recursively until we hit null (a leaf)
 */
-void grid::insert(std::shared_ptr<cell>& parent, unsigned int row, unsigned int col, unsigned int index) {
+void grid::insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index) {
     if (parent->get_index() > index) {
         if (parent->get_left() == nullptr) {
             parent->set_left({make_shared<cell>(row, col, index)});
