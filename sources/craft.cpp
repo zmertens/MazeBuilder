@@ -1,5 +1,5 @@
 /*
-Craft engine builds voxels and has maze-generating algorithms
+Craft engine builds voxels as chunks and can apply maze-generating algorithms
 Originally written in C99, ported to C++17
 */
 
@@ -20,13 +20,11 @@ Originally written in C99, ported to C++17
 #endif
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <string>
-#include <sstream>
 #include <string_view>
 
 #include "config.h"
@@ -39,8 +37,6 @@ Originally written in C99, ported to C++17
 #include <tinycthread/tinycthread.h>
 #include "util.h"
 #include "world.h"
-
-#include "binary_tree.h"
 
 #define DUMP_GL_EXTENSIONS 0
 
@@ -62,6 +58,7 @@ Originally written in C99, ported to C++17
 
 using namespace mazes;
 using namespace std;
+
 struct craft::craft_impl {
     typedef struct {
         Map map;
@@ -183,11 +180,13 @@ struct craft::craft_impl {
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
     std::future<bool> m_maze_future;
+    std::packaged_task<bool(const std::string& data)> m_task_writer;
     unique_ptr<Model> m_model;
 
-    craft_impl(const std::string_view& window_name, std::future<bool> maze_future)
+    craft_impl(const std::string_view& window_name, std::future<bool> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
     : m_window_name{window_name}
     , m_maze_future{std::move(maze_future)}
+    , m_task_writer(std::move(task_writes))
     , m_model{make_unique<Model>()} {
 
     }
@@ -197,7 +196,7 @@ struct craft::craft_impl {
         int running = 1;
         // never call the factory with this caller
         string_view sv {"dummy"};
-        craft caller {sv, {}};
+        craft caller {sv, {}, {}};
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -1216,6 +1215,12 @@ struct craft::craft_impl {
         item->maxy = maxy;
         item->faces = faces;
         item->data = data;
+
+        // only print out data for this chunk
+        if (item->p == 0 && item->q == 0) {
+            convert_data_to_str(faces, data);
+        }
+
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1492,7 +1497,7 @@ struct craft::craft_impl {
         chunk->dirty = 0;
         worker->state = WORKER_BUSY;
         cnd_signal(&worker->cnd);
-    }
+    } // ensure chunks worker
 
     void ensure_chunks(Player *player) {
         check_workers();
@@ -2560,8 +2565,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, std::future<bool> maze_future)
-: m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future))} {
+craft::craft(const std::string_view& window_name, std::future<bool> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
+    : m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future), std::move(task_writes))} {
 }
 
 craft::~craft() = default;
@@ -2589,10 +2594,16 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open
  * @param interactive = false
 */
-bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
-    
+bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
+    auto fut_writer = this->m_pimpl->m_task_writer.get_future();
     if (!interactive) {
-        return this->m_pimpl->m_maze_future.get();
+        bool success = this->m_pimpl->m_maze_future.get();
+        if (success) {
+            // call util functions to get data
+            // auto _grid_data = get_data_from_grid_or_mesh
+            // this->m_pimpl->m_task_writer(_grid_data);
+            return fut_writer.get();
+        }
     }
 
     srand(time(NULL));
@@ -2776,7 +2787,6 @@ bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)
         m_pimpl->reset_model();
         FPS fps = {0, 0, 0};
         double last_commit = SDL_GetTicks();
-        double last_update = SDL_GetTicks();
         
         GLuint sky_buffer = m_pimpl->gen_sky_buffer();
         
@@ -2802,7 +2812,6 @@ bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)
             if (m_pimpl->m_model->time_changed) {
                 m_pimpl->m_model->time_changed = 0;
                 last_commit = SDL_GetTicks();
-                last_update = SDL_GetTicks();
                 memset(&fps, 0, sizeof(fps));
             }
             update_fps(&fps);
@@ -2938,7 +2947,6 @@ bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)
             if (m_pimpl->m_model->typing) {
                 snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
                 m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-                ty -= ts * 2;
             }
             if (SHOW_PLAYER_NAMES) {
                 if (player != me) {
@@ -3005,12 +3013,16 @@ bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)
         m_pimpl->delete_all_players();
     } // MAIN LOOP
 
+#if defined(DEBUGGING)
     SDL_Log("Cleaning up ImGui objects. . .");
+    SDL_Log("Cleaning up OpenGL objects. . .");
+    SDL_Log("Cleaning up SDL objects. . .");
+#endif
+
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    SDL_Log("Cleaning up OpenGL objects. . .");
     glDeleteTextures(1, &texture);
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
@@ -3023,7 +3035,7 @@ bool craft::run(unique_ptr<mazes::grid> const& grid, std::function<int(int, int)
     gl_check_for_error();
 #endif
 
-    SDL_Log("Cleaning up SDL objects. . .");
+
     SDL_GL_DeleteContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();

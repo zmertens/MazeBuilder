@@ -99,23 +99,20 @@ int main(int argc, char* argv[]) {
                 }
             }
         };
+        mazes::writer my_writer;
+        auto write_func = [&my_writer, &args](auto data)->bool {
+            return my_writer.write(args.get_output(), data);
+        };
+        std::packaged_task<bool(const std::string& data)> task_writes (write_func);
+
         // string views don't own the data, they have less copying overhead
         std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
-        craft maze_builder {sv, std::move(maze_factory(maze_algo))};
+        craft maze_builder {sv, std::move(maze_factory(maze_algo)), std::move(task_writes)};
         auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
         if (success) {
-            // Check grid size because terminal output can get smushed
-            if (args.get_output().compare("stdout") == 0) {
-                std::cout << *_grid.get() << std::endl;
-            } else {
-                mazes::writer my_writer;
-            
-                std::stringstream ss;
-                ss << *_grid.get();
-            
-                my_writer.write(args.get_output(), ss.str());
-            }
+            // std::stringstream ss;
+            // ss << *_grid.get();
         } else {
             std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
         }

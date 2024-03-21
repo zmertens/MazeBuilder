@@ -18,11 +18,22 @@ cmake --build build/
 | BUILD_STATIC_LIBS | FALSE |
 | CMAKE_BUILD_TYPE | RelWithDebInfo |
 
-## Commands
+## Commands and Help Message
 
-Generate a simple maze using `default` settings (width=10, height=10, `binary_tree` algo), and print the result to stdout:
 ```sh
-./maze_builder > default_maze.txt
+Usages: maze_builder [OPTION]... [OUT_FILE]
+Run the builder to generate mazes from optional algorithms
+Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
+Options specify how to generate the maze and file output:
+  -a, --algorithm    binary_tree [default], sidewinder
+  -s, --seed         seed for the random number generator [mt19937]
+  -w, --width        maze width [default=100]
+  -y, --height       maze height [default=10]
+  -l, --length       maze length [default=100]
+  -i, --interactive  run program in interactive mode with a GUI
+  -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
+  -h, --help         display this help message
+  -v, --version      display program version
 ```
 
 Specify a seed and a `binary search tree` algorithm:

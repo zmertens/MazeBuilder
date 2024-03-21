@@ -34,7 +34,6 @@ set(DEAR_IMGUI_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
 set(DEPENDENCY_FILES
-    ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinyobjloader/tiny_obj_loader.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c

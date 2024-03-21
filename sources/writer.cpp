@@ -1,9 +1,14 @@
+/**
+ * Writer class handles stdout, and basic file writing to text or Wavefront obj file
+ */
+
 #include "writer.h"
 
-#include <string_view>
+#include <iostream>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <cassert>
 
 #include "file_types_enum.h"
 
@@ -33,36 +38,44 @@ file_types writer::get_filetype(const std::string& filename) const noexcept {
 	}
 }
 
+/**
+ * @brief writer::write
+ * @param filename can be stdout, .txt, or .obj
+ * @param data represents a grid in plain text (ASCII) or Wavefront object file (mesh)
+ * @return
+ */
 bool writer::write(const std::string& filename, const std::string& data) const {
-	bool success = false;
-	file_types ftype = file_types::PLAIN_TEXT;
+
+    if (filename.compare("stdout") == 0) {
+        cout << data << endl;
+        return true;
+    }
+
+    auto ftype = file_types::PLAIN_TEXT;
 	if (!filename.empty()) {
 		ftype = get_filetype(filename);
 	} else {
-		// indeterminable file type or stdout
+		// indeterminable file type
 		throw new runtime_error("Unknown file type for filename: " + filename);
 	}
 
 	// open file stream and start writing the data as per the file type
 	if (ftype == file_types::PLAIN_TEXT) {
 		this->write_plain_text(filename, data);
-	} else {
+	} else if (ftype == file_types::WAVEFRONT_OBJ_FILE) {
 		this->write_wavefront_obj(filename, data);
+	} else {
+		throw new runtime_error("Unknown file type for filename: " + filename);
 	}
-	return success;
+    return true;
 }
 
+/**
+ * Borrowing from: https://github.com/thinks/obj-io/blob/master/examples/simple_example.cc
+*/
 void writer::write_wavefront_obj(const std::string& filename, const std::string& data) const {
-	string_view data_view{ data };
-	filesystem::path data_path{ filename };
-	ofstream out_writer{ data_path };
-	
-	for (auto&& obj_data : data_view) {
-#if defined(DEBUGGING)
-		out_writer << obj_data;
-#endif
-	}
-	out_writer.close();
+    filesystem::path data_path {filename};
+    ofstream out_writer {data_path};
 }
 
 void writer::write_plain_text(const std::string& filename, const std::string& data) const {
