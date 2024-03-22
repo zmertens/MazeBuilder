@@ -31,8 +31,9 @@ public:
     void grow(std::unique_ptr<grid> const& other_grid) noexcept;
     void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
     std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
+    // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
-
+    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
 private:
 
     bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
@@ -43,15 +44,8 @@ private:
         std::vector<std::shared_ptr<cell>> cells;
         cells.reserve(g.get_rows() * g.get_columns());
         // populate the cells with the BST
-        g.sort(g.get_root(), cells);
-        std::sort(cells.begin(), cells.end(), [](auto c1, auto c2)->bool {
-            if (c1->get_row() == c2->get_row()) {
-                if (c1->get_column() == c2->get_column()) {
-                    return false;
-                }
-                return (c1->get_column() < c2->get_column()) ? true : false;
-            }
-            return (c1->get_row() < c2->get_row()) ? true : false; });
+        g.sort(g.get_root(), ref(cells));
+        g.sort_by_row_then_col(ref(cells));
 
         std::stringstream output;
         output << "+";

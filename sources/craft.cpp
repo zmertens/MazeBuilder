@@ -26,6 +26,7 @@ Originally written in C99, ported to C++17
 #include <ctime>
 #include <string>
 #include <string_view>
+#include <algorithm>
 
 #include "config.h"
 #include "cube.h"
@@ -39,6 +40,7 @@ Originally written in C99, ported to C++17
 #include "world.h"
 
 #include "grid.h"
+#include "cell.h"
 
 #define DUMP_GL_EXTENSIONS 0
 
@@ -1410,25 +1412,32 @@ struct craft::craft_impl {
     }
 
     /**
-     * @brief compute_grid gets player coords, and builds a 3D grid using grid row, column, height
-     * It forces a chunk w.r.t to the player, and installs a Worker to collect the grid data, faces
-     * The grid is built by "simulating" left-clicks and setting the blocks that way
+     * @brief compute_grid takes player coords, and builds a 3D grid using grid row, column, height
+     * It string parses the grid.
      * @param _grid
      * @param p
      * @return The worker item with the grid data, faces
      */
-    WorkerItem *compute_grid(unique_ptr<mazes::grid> const& _grid, Player *p) {
-        for (auto block_x {0}; block_x < _grid->get_rows(); block_x++) {
-            for (auto block_z {0}; block_z < _grid->get_columns(); block_z++) {
-                for (auto block_y {0}; block_y < _grid->get_height(); block_y++) {
-                    set_block(block_x, block_y, block_z, 0);
-                    record_block(block_x, block_y, block_z, 0);
-                }
+    void compute_grid(unique_ptr<mazes::grid> const& _grid, Player *p) {
+        stringstream ss;
+        ss << *_grid.get();
+        string sv{ ss.str() };
+#if defined(DEBUGGING)
+        SDL_Log("Computing grid str: %s\n", sv);
+#endif
+        auto&& itr = sv.cbegin();
+        auto row_x{ 0u }, col_z{ 0u };
+        while (itr != sv.end() && row_x < _grid->get_rows() && col_z < _grid->get_columns()) {
+            switch (*itr) {
+            case '\n': row_x++; col_z = 0; break;
+            case ' ': col_z++; break;
+            case '+': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
+            case '-': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
+            case '|': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
             }
-        }
-        // ensure_chunks(p);
-        return nullptr;
-    }
+            itr++;
+        } // while
+    } // compute_grid
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
@@ -2806,7 +2815,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
         m_pimpl->force_chunks(me);
         if (!loaded) {
             s->y = m_pimpl->highest_block(s->x, s->z) + 2;
-        }                
+        }
 
         // BEGIN EVENT LOOP //
         int previous = SDL_GetTicks();
@@ -3008,8 +3017,14 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                 // maze_future.get() is a blocking call, but we're almost done here anyway
                 // the _grid function parameter is updated from the future.get() call
                 if (success_from_maze_fut) {
-                    // call util functions to get grid data (c++ string)
-                    // auto&& my_grid_worker_item = this->m_pimpl->compute_grid(_grid, me);
+#if defined(DEBUGGING)
+                    SDL_Log("Computing grid: %p\n", _grid.get());
+#endif
+                    
+
+                    // set blocks and call util functions to get grid data (c++ string)
+                    this->m_pimpl->compute_grid(_grid, me);
+                    
                     // auto&& _grid_str = convert_grid_to_str(my_grid_worker_item->faces, my_grid_worker_item->data);
                     // call the task writer with string data, to write the file
                     // this->m_pimpl->m_task_writer(_grid_str);

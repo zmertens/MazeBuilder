@@ -25,14 +25,14 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 , m_columns{columns}
 , m_height{height}
 , m_binary_search_tree_root{nullptr}
-, m_sort_by_row_column{[](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->int {
-    if (c1->get_row() == c2->get_row()) {
-        if (c1->get_column() == c2->get_column()) {
-            return 0;
+, m_sort_by_row_column{[](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
+        if (c1->get_row() == c2->get_row()) {
+            if (c1->get_column() == c2->get_column()) {
+                return false;
+            }
+            return (c1->get_column() < c2->get_column()) ? true : false;
         }
-        return (c1->get_column() < c2->get_column()) ? -1 : 1;
-    }
-    return (c1->get_row() < c2->get_row()) ? -1 : 1;}}
+        return (c1->get_row() < c2->get_row()) ? true : false; }}
 , m_calc_index{[this](unsigned int row, unsigned int col)->unsigned int 
     {return row * this->m_columns + col;}} {
     
@@ -54,17 +54,9 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
         // First sort cells by row then column
         vector<shared_ptr<cell>> sorted_cells;
         sorted_cells.reserve(this->m_rows * this->m_columns);
-        // generate a linear list of cells (doesn't matter if it's sorted here, just need a linear list)
+        // populate a vector of cells from the grid (doesn't matter if it's sorted here, just need it filled)
         this->sort(this->m_binary_search_tree_root, ref(sorted_cells));
-        // now use STL sort by row, column with custom lambda function
-        std::sort(sorted_cells.begin(), sorted_cells.end(), [](auto c1, auto c2)->bool {
-            if (c1->get_row() == c2->get_row()) {
-                if (c1->get_column() == c2->get_column()) {
-                    return false;
-                }
-                return (c1->get_column() < c2->get_column()) ? true : false;
-            }
-            return (c1->get_row() < c2->get_row()) ? true : false; });
+        this->sort_by_row_then_col(ref(sorted_cells));
         configure_cells(ref(sorted_cells));
     }
 }
@@ -94,7 +86,10 @@ bool grid::create_binary_search_tree(const std::vector<unsigned int>& shuffled_i
 }
 
 /*
-* @param cells is sorted by row and then column
+* Configure by nearest row, column pairing
+* A cell at (0, 0) will have a southern neighbor at (0, 1)
+* Counting is down top-left to right and then down (like an SQL table)
+* @param cells are sorted by row and then column
 */
 void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
     unsigned int rowCounter = 0, columnCounter = 0;
@@ -221,3 +216,11 @@ void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr
     }
 }
 
+/**
+* Sort the grid as if it were 2-dimensional grid and not hidden by a BST
+* Compare rows, then if equal, compare columns
+*/
+void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
+    // now use STL sort by row, column with custom lambda function
+    std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
+}

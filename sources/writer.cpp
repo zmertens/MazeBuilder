@@ -70,9 +70,6 @@ bool writer::write(const std::string& filename, const std::string& data) const {
     return true;
 }
 
-/**
- * Borrowing from: https://github.com/thinks/obj-io/blob/master/examples/simple_example.cc
-*/
 void writer::write_wavefront_obj(const std::string& filename, const std::string& data) const {
     filesystem::path data_path {filename};
     ofstream out_writer {data_path};

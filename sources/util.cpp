@@ -283,7 +283,7 @@ std::string convert_grid_to_str(int faces, GLfloat *data) {
     using namespace std;
 
 #if defined(DEBUGGING)
-    SDL_Log("faces: %d, data: %f\n", faces, data);
+    SDL_Log("faces: %d, data: %p\n", faces, data);
 #endif
 
     using MeshType = TriangleMesh<>;
