@@ -1,3 +1,7 @@
+import bpy
+import bmesh
+from bpy_extras.object_utils import AddObjectHelper
+
 import random
 
 class Cell:
@@ -40,16 +44,16 @@ class Grid:
         
     def prepare_grid(self):
         self._grid = []
-        for row in range(0, self._rows):
+        for row in range(0, len(self._rows)):
             self._grid.append([])
-            for col in range(0, self._columns):
+            for col in range(0, len(self._columns)):
                 self._grid[row].append(Cell(row, col))
         self.configure_cells()
         
     def configure_cells(self):
         pass
         
-    def __getitem__(self, row, column):
+    def __index__(self, row, column):
         if row < 0 or row >= self._rows:
             return None
         elif column < 0 or column >= len(self._grid[row]):
@@ -65,12 +69,12 @@ class Grid:
         return self._rows * self._columns
     
     def each_row(self):
-        for row in range(0, len(self._grid)):
+        for row in xrange(len(self._grid)):
             yield row
     
     def each_cell(self):
-        for cell_list in self.each_row():
-            for cell in range(0, cell_list):
+        for cell_list in self.each_row:
+            for cell in cell_list:
                 if cell:
                     yield cell   
 
@@ -78,7 +82,7 @@ class BinaryTree:
     
     # Count left-right, bottom-top
     def on(self, grid):
-        for cell in grid.each_cell():
+        for cell in grid.each_cell:
             neighbors = []
             if cell._north != None:
                 neighbors.append(cell._north)
@@ -95,10 +99,11 @@ if __name__ == '__main__':
     CELL_SIZE = 4
     
     grid = Grid(20, 20)
-    bst = BinaryTree()
-    bst.on(grid)
     
-    for cell in grid.each_cell():
-        print(cell)
+    BinaryTree.on(grid)
+    
+    for cell in grid.each_cell:
+        bpy.ops.mesh.primitive_plane_add(size=CELL_SIZE, enter_editmode=False, align='WORLD', location=(0, 0, 0))
+        bpy.ops.transform.translate(value=(0, 2.66474, 0), orient_type='GLOBAL', orient_matrix=((1, 0, 0), (0, 1, 0), (0, 0, 1)), orient_matrix_type='GLOBAL', constraint_axis=(False, True, False), mirror=True, use_proportional_edit=False, proportional_edit_falloff='SMOOTH', proportional_size=1, use_proportional_connected=False, use_proportional_projected=False)
 
     
