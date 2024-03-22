@@ -2,9 +2,7 @@
 
 #include <memory>
 #include <vector>
-#include <random>
 #include <functional>
-#include <iostream>
 
 #include "cell.h"
 #include "grid.h"

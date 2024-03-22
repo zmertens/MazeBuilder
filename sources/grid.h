@@ -1,12 +1,12 @@
-/*
-The grid class implements a Binary Search Tree for performance and API reasons
+/**
+ * The grid class implements a Binary Search Tree for performance and API reasons
+ * Grid represents an ASCII-format maze in 2D, or Wavefront object file in 3D
 */
 
 #ifndef GRID_H
 #define GRID_H
 
 #include <vector>
-#include <list>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -20,10 +20,11 @@ namespace mazes {
 
 class grid {
 public:
-    grid(unsigned int rows, unsigned int columns);
+    grid(unsigned int rows, unsigned int columns, unsigned int height = 0);
 
     unsigned int get_rows() const noexcept;
     unsigned int get_columns() const noexcept;
+    unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
     std::shared_ptr<cell> get_root() const noexcept;
@@ -89,7 +90,7 @@ private:
     std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
     std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
-    const unsigned int m_rows, m_columns;
+    const unsigned int m_rows, m_columns, m_height;
 }; // class
 
 } // namespace mazes

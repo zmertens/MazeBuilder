@@ -1,5 +1,5 @@
 /*
-Craft engine builds voxels as chunks and can apply maze-generating algorithms
+Craft engine builds voxels as chunks and can run maze-generating algorithms
 Originally written in C99, ported to C++17
 */
 
@@ -38,7 +38,16 @@ Originally written in C99, ported to C++17
 #include "util.h"
 #include "world.h"
 
+#include "grid.h"
+
 #define DUMP_GL_EXTENSIONS 0
+
+#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
+#define XZ_LO (CHUNK_SIZE)
+#define XZ_HI (CHUNK_SIZE * 2 + 1)
+#define Y_SIZE 258
+#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
+#define XZ(x, z) ((x) * XZ_SIZE + (z))
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
@@ -1005,14 +1014,7 @@ struct craft::craft_impl {
                 light[i][j] = light_sum / 15.0 / 4.0;
             }
         }
-    }
-
-#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
-#define XZ_LO (CHUNK_SIZE)
-#define XZ_HI (CHUNK_SIZE * 2 + 1)
-#define Y_SIZE 258
-#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
-#define XZ(x, z) ((x) * XZ_SIZE + (z))
+    } // occlusion
 
     void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
         if (x + w < XZ_LO || z + w < XZ_LO) {
@@ -1215,12 +1217,6 @@ struct craft::craft_impl {
         item->maxy = maxy;
         item->faces = faces;
         item->data = data;
-
-        // only print out data for this chunk
-        if (item->p == 0 && item->q == 0) {
-            convert_data_to_str(faces, data);
-        }
-
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1411,6 +1407,30 @@ struct craft::craft_impl {
                 }
             }
         }
+    }
+
+    /**
+     * @brief compute_grid gets player coords, and builds a 3D grid using grid row, column, height
+     * It forces a chunk w.r.t to the player, and installs a Worker to collect the grid data, faces
+     * The grid is built by "simulating" left-clicks and setting the blocks that way
+     * @param _grid
+     * @param p
+     * @return The worker item with the grid data, faces
+     */
+    WorkerItem *compute_grid(unique_ptr<mazes::grid> const& _grid, Player *p) {
+#if defined(DEBUGGING)
+        SDL_Log("player(%f, %f, %f): ", p->state.x, p->state.y, p->state.z);
+#endif
+        for (auto block_x {static_cast<int>(p->state.x)}; block_x < _grid->get_rows(); block_x++) {
+            for (auto block_z {static_cast<int>(p->state.z)}; block_z < _grid->get_columns(); block_z++) {
+                for (auto block_y {static_cast<int>(p->state.y)}; block_y < _grid->get_height(); block_y++) {
+                    set_block(block_x, block_y, block_z, 0);
+                    record_block(block_x, block_y, block_z, 0);
+                }
+            }
+        }
+        // ensure_chunks(p);
+        return nullptr;
     }
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
@@ -1631,6 +1651,9 @@ struct craft::craft_impl {
                 _set_block(p + dx, q + dz, x, y, z, -w, 1);
             }
         }
+#if defined(DEBUGGING)
+        SDL_Log("set_block(%d, %d, %d, block_type: %d): ", x, y, z, items[this->m_model->item_index]);
+#endif
     }
 
     void record_block(int x, int y, int z, int w) {
@@ -2155,9 +2178,6 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
-#if defined(DEBUGGING)
-                SDL_Log("set_block(%d, %d, %d, %d): ", hx, hy, hz, items[this->m_model->item_index]);
-#endif
             }
         }
     }
@@ -2595,16 +2615,8 @@ craft::~craft() = default;
  * @param interactive = false
 */
 bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
+
     auto fut_writer = this->m_pimpl->m_task_writer.get_future();
-    if (!interactive) {
-        bool success = this->m_pimpl->m_maze_future.get();
-        if (success) {
-            // call util functions to get data
-            // auto _grid_data = get_data_from_grid_or_mesh
-            // this->m_pimpl->m_task_writer(_grid_data);
-            return fut_writer.get();
-        }
-    }
 
     srand(time(NULL));
     rand();
@@ -2772,7 +2784,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // MAIN LOOP //
-    int running = 1;
+    bool running = true;
     while (running) {
 
         // DATABASE INITIALIZATION //
@@ -2822,7 +2834,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             previous = now;
 
             if (m_pimpl->handle_events(dt)) {
-                running = 0;
+                running = false;
                 break;
             }
             if (m_pimpl->m_model->mode_changed) {
@@ -3002,6 +3014,26 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 #if defined(DEBUGGING)
             gl_check_for_error();
 #endif
+
+            // interactive should always be true in craft::run, but just check it
+            static bool lets_write = true;
+            if (interactive && lets_write) {
+                lets_write = false;
+                // maze_future.get() is a blocking call, but we're almost done here anyway
+                // the _grid function parameter is updated from the future.get() call
+                bool success = this->m_pimpl->m_maze_future.get();
+                if (success) {
+                    SDL_Log("Maze ran successfully, now compute grid\n");
+                    // call util functions to get grid data (c++ string)
+                    auto&& my_grid_worker_item = this->m_pimpl->compute_grid(_grid, me);
+                    // auto&& _grid_str = convert_grid_to_str(my_grid_worker_item->faces, my_grid_worker_item->data);
+                    // call the task writer with string data, to write the file
+                    // this->m_pimpl->m_task_writer(_grid_str);
+                }
+                // running = false exits the main loop, break exits the event loop
+                // running = false;
+                // break;
+            }
         } // EVENT LOOP
 
         // SHUTDOWN //
@@ -3040,5 +3072,6 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
-    return true;
+    // get the result of the last task write operation (blocking)
+    return fut_writer.get();
 } // run

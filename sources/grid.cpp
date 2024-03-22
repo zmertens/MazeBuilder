@@ -15,10 +15,15 @@ using namespace std;
  * The grid constructor does several things: init members, create shuffled indices
  * so the binary search tree can be "more balanced" than a BST with nodes inserted in sorted order
  * and, sorts the created grid by row, column. Finally, it configures the N,S,E,W neighboring cells
-*/
-grid::grid(unsigned int rows, unsigned int columns)
+ * @brief grid::grid
+ * @param rows
+ * @param columns
+ * @param height = 0
+ */
+grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 : m_rows{rows}
 , m_columns{columns}
+, m_height{height}
 , m_binary_search_tree_root{nullptr}
 , m_sort_by_row_column{[](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->int {
     if (c1->get_row() == c2->get_row()) {
@@ -137,6 +142,10 @@ unsigned int grid::get_rows() const noexcept {
 
 unsigned int grid::get_columns() const noexcept {
     return this->m_columns;
+}
+
+unsigned int grid::get_height() const noexcept {
+    return this->m_height;
 }
 
 /**

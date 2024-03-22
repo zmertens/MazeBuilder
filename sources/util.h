@@ -37,7 +37,7 @@ int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
 void dump_opengl_info(bool dumpExtensions);
 
-std::string convert_data_to_str(int faces, GLfloat *data);
+std::string convert_grid_to_str(int faces, GLfloat *data);
 
 #define gl_check_for_error() glCheckError_(__FILE__, __LINE__)
 GLenum glCheckError_(const char *file, int line);

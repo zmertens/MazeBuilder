@@ -1,11 +1,10 @@
 #include <random>
 #include <memory>
 #include <exception>
-#include <cstdio>
 #include <iostream>
 #include <string_view>
-#include <future>
 #include <sstream>
+#include <future>
 
 #include "craft.h"
 #include "grid.h"
@@ -21,7 +20,7 @@ int main(int argc, char* argv[]) {
 
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
-        Run the builder to generate mazes from optional algorithms
+        Generates mazes in ASCII-format or Wavefront object format
         Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
         Options specify how to generate the maze and file output:
           -a, --algorithm    binary_tree [default], sidewinder
@@ -81,7 +80,7 @@ int main(int argc, char* argv[]) {
             }
         };
 
-        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length())};
+        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height())};
 
         auto maze_factory = [&_grid, &get_int](mazes::maze_types maze_type) {
             switch (maze_type) {
@@ -105,14 +104,29 @@ int main(int argc, char* argv[]) {
         };
         std::packaged_task<bool(const std::string& data)> task_writes (write_func);
 
-        // string views don't own the data, they have less copying overhead
-        std::string_view sv {"craft-sdl3"};
         mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
-        craft maze_builder {sv, std::move(maze_factory(maze_algo)), std::move(task_writes)};
-        auto&& success = maze_builder.run(_grid, get_int, args.is_interactive());
-        if (success) {
-            // std::stringstream ss;
-            // ss << *_grid.get();
+        bool success = false;
+        if (args.is_interactive()) {
+            // string views don't own the data, they have less copying overhead
+            std::string_view sv {"craft-sdl3"};
+            craft maze_builder_3D {sv, std::move(maze_factory(maze_algo)), std::move(task_writes)};
+            success = maze_builder_3D.run(_grid, get_int, args.is_interactive());
+        } else {
+            success = maze_factory(maze_algo).get();
+        }
+
+        if (success && !args.is_interactive()) {
+            auto&& fut_writer = task_writes.get_future();
+            std::stringstream ss;
+            ss << *_grid.get();
+            task_writes(ss.str());
+            if (fut_writer.get()) {
+#if defined(DEBUGGING)
+                std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
+#endif
+            } else {
+                std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+            }
         } else {
             std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
         }
