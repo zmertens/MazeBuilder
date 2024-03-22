@@ -1,12 +1,7 @@
+#include "world.h"
 #include "config.h"
 
 #include <noise/noise.h>
-#include <random>
-#include <memory>
-
-#include "world.h"
-#include "binary_tree.h"
-#include "grid.h"
 
 using namespace std;
 

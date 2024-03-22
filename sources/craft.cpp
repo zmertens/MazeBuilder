@@ -188,13 +188,13 @@ struct craft::craft_impl {
 
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
-    std::future<bool> m_maze_future;
+    std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     std::packaged_task<bool(const std::string& data)> m_task_writer;
     unique_ptr<Model> m_model;
 
-    craft_impl(const std::string_view& window_name, std::future<bool> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
+    craft_impl(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func, std::packaged_task<bool(const std::string& data)> task_writes)
     : m_window_name{window_name}
-    , m_maze_future{std::move(maze_future)}
+    , m_maze_func{maze_func}
     , m_task_writer(std::move(task_writes))
     , m_model{make_unique<Model>()} {
 
@@ -1418,12 +1418,9 @@ struct craft::craft_impl {
      * @return The worker item with the grid data, faces
      */
     WorkerItem *compute_grid(unique_ptr<mazes::grid> const& _grid, Player *p) {
-#if defined(DEBUGGING)
-        SDL_Log("player(%f, %f, %f): ", p->state.x, p->state.y, p->state.z);
-#endif
-        for (auto block_x {static_cast<int>(p->state.x)}; block_x < _grid->get_rows(); block_x++) {
-            for (auto block_z {static_cast<int>(p->state.z)}; block_z < _grid->get_columns(); block_z++) {
-                for (auto block_y {static_cast<int>(p->state.y)}; block_y < _grid->get_height(); block_y++) {
+        for (auto block_x {0}; block_x < _grid->get_rows(); block_x++) {
+            for (auto block_z {0}; block_z < _grid->get_columns(); block_z++) {
+                for (auto block_y {0}; block_y < _grid->get_height(); block_y++) {
                     set_block(block_x, block_y, block_z, 0);
                     record_block(block_x, block_y, block_z, 0);
                 }
@@ -1651,9 +1648,6 @@ struct craft::craft_impl {
                 _set_block(p + dx, q + dz, x, y, z, -w, 1);
             }
         }
-#if defined(DEBUGGING)
-        SDL_Log("set_block(%d, %d, %d, block_type: %d): ", x, y, z, items[this->m_model->item_index]);
-#endif
     }
 
     void record_block(int x, int y, int z, int w) {
@@ -2164,6 +2158,9 @@ struct craft::craft_impl {
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
             set_block(hx, hy, hz, 0);
             record_block(hx, hy, hz, 0);
+#if defined(DEBUGGING)
+            SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             if (is_plant(get_block(hx, hy + 1, hz))) {
                 set_block(hx, hy + 1, hz, 0);
             }
@@ -2178,6 +2175,9 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
+#if defined(DEBUGGING)
+                SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             }
         }
     }
@@ -2196,8 +2196,6 @@ struct craft::craft_impl {
 
     // https://github.com/rswinkle/Craft/blob/sdl/src/main.c
     int handle_events(double dt) {
-        // Handle window init and force a scale
-        static SDL_bool first_event = 1;
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2238,7 +2236,6 @@ struct craft::craft_impl {
                     } else {
                         return 1;
                     }
-                    break;
                 }
                 break;
 
@@ -2445,12 +2442,8 @@ struct craft::craft_impl {
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
             }
             case SDL_EVENT_WINDOW_SHOWN: {
-                // trigger scale calculation when app loads
-                if (first_event) {
-                    this->m_model->scale = get_scale_factor();
-                    SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
-                    first_event = 0;
-                }
+                this->m_model->scale = get_scale_factor();
+                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
             }
             } // switch
         }
@@ -2543,8 +2536,6 @@ struct craft::craft_impl {
             window_flags |= SDL_WINDOW_RESIZABLE;
         }
 
-        // GL 3.0 + GLSL 130
-        const char* glsl_version = "#version 130";
     #if defined(DEBUGGING)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
     #else
@@ -2565,17 +2556,17 @@ struct craft::craft_impl {
     } // create_window_and_context
 
     void reset_model() {
-        memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
+        SDL_memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
         this->m_model->chunk_count = 0;
-        memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
+        SDL_memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
         this->m_model->player_count = 0;
         this->m_model->observe1 = 0;
         this->m_model->observe2 = 0;
         this->m_model->flying = 0;
         this->m_model->item_index = 0;
-        memset(this->m_model->typing_buffer, 0, sizeof(char) * MAX_TEXT_LENGTH);
+        SDL_memset(this->m_model->typing_buffer, 0, sizeof(char) * MAX_TEXT_LENGTH);
         this->m_model->typing = 0;
-        memset(this->m_model->messages, 0, sizeof(char) * MAX_MESSAGES * MAX_TEXT_LENGTH);
+        SDL_memset(this->m_model->messages, 0, sizeof(char) * MAX_MESSAGES * MAX_TEXT_LENGTH);
         this->m_model->message_index = 0;
         this->m_model->day_length = DAY_LENGTH;
         this->m_model->start_time = (this->m_model->day_length / 3)*1000;
@@ -2585,7 +2576,7 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, std::future<bool> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
+craft::craft(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
     : m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future), std::move(task_writes))} {
 }
 
@@ -2611,12 +2602,13 @@ craft::~craft() = default;
 // }
 
 /**
- * Run the craft-engine in a loop with SDL window open
+ * Run the craft-engine in a loop with SDL window open, compute the maze first
  * @param interactive = false
 */
 bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 
-    auto fut_writer = this->m_pimpl->m_task_writer.get_future();
+    // run a default maze to flex muscle memories (computers have muscles?)
+    bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
 
     srand(time(NULL));
     rand();
@@ -2824,7 +2816,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             if (m_pimpl->m_model->time_changed) {
                 m_pimpl->m_model->time_changed = 0;
                 last_commit = SDL_GetTicks();
-                memset(&fps, 0, sizeof(fps));
+                SDL_memset(&fps, 0, sizeof(fps));
             }
             update_fps(&fps);
             double now = SDL_GetTicks();
@@ -3008,12 +3000,6 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);     
                 }
             }
-            
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-            SDL_GL_SwapWindow(m_pimpl->m_model->window);
-#if defined(DEBUGGING)
-            gl_check_for_error();
-#endif
 
             // interactive should always be true in craft::run, but just check it
             static bool lets_write = true;
@@ -3021,11 +3007,9 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                 lets_write = false;
                 // maze_future.get() is a blocking call, but we're almost done here anyway
                 // the _grid function parameter is updated from the future.get() call
-                bool success = this->m_pimpl->m_maze_future.get();
-                if (success) {
-                    SDL_Log("Maze ran successfully, now compute grid\n");
+                if (success_from_maze_fut) {
                     // call util functions to get grid data (c++ string)
-                    auto&& my_grid_worker_item = this->m_pimpl->compute_grid(_grid, me);
+                    // auto&& my_grid_worker_item = this->m_pimpl->compute_grid(_grid, me);
                     // auto&& _grid_str = convert_grid_to_str(my_grid_worker_item->faces, my_grid_worker_item->data);
                     // call the task writer with string data, to write the file
                     // this->m_pimpl->m_task_writer(_grid_str);
@@ -3034,6 +3018,12 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                 // running = false;
                 // break;
             }
+
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            SDL_GL_SwapWindow(m_pimpl->m_model->window);
+#if defined(DEBUGGING)
+            gl_check_for_error();
+#endif
         } // EVENT LOOP
 
         // SHUTDOWN //
@@ -3067,11 +3057,10 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     gl_check_for_error();
 #endif
 
-
     SDL_GL_DeleteContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
-    // get the result of the last task write operation (blocking)
-    return fut_writer.get();
+    // get the result of the maze generation
+    return success_from_maze_fut;
 } // run

@@ -109,7 +109,7 @@ int main(int argc, char* argv[]) {
         if (args.is_interactive()) {
             // string views don't own the data, they have less copying overhead
             std::string_view sv {"craft-sdl3"};
-            craft maze_builder_3D {sv, std::move(maze_factory(maze_algo)), std::move(task_writes)};
+            craft maze_builder_3D {sv, maze_factory, std::move(task_writes)};
             success = maze_builder_3D.run(_grid, get_int, args.is_interactive());
         } else {
             success = maze_factory(maze_algo).get();
@@ -127,7 +127,7 @@ int main(int argc, char* argv[]) {
             } else {
                 std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
             }
-        } else {
+        } else if (!success){
             std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
         }
     
