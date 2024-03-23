@@ -20,6 +20,11 @@ Originally written in C99, ported to C++17
 #endif
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
+// Struggling with CMake build config and so I added this for Release builds
+#if defined(DEBUGGING)
+#undef DEBUGGING
+#endif
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -2653,7 +2658,9 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
         return false;
     }
 
+#if defined(DEBUGGING)
     dump_opengl_info(DUMP_GL_EXTENSIONS);
+#endif
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);

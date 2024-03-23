@@ -14,6 +14,11 @@
 #include "maze_types_enum.h"
 #include "writer.h"
 
+// Struggling with CMake build config and so I added this for Release builds
+#if defined(DEBUGGING)
+#undef DEBUGGING
+#endif
+
 int main(int argc, char* argv[]) {
 
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.0.1]";
