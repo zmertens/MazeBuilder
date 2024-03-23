@@ -2,6 +2,8 @@
 
 Build mazes in console or 3D, and save, export to file.
 
+![](scripts/blender_binary_tree_demo_33x33.PNG)
+
 ## CMake
 
 This project uses `cmake` to build and test. It uses `find_package` or `FetchContent` to get SDL and Catch2 if necessary. Modern hardware supporting OpenGL 3.0 is required.
@@ -36,9 +38,9 @@ Options specify how to generate the maze and file output:
   -v, --version      display program version
 ```
 
-Specify a seed and a `binary search tree` algorithm:
+Specify a seed and a `binary tree` algorithm:
 ```sh
-./maze_builder --seed=1337 --algo=bst -o bst.txt
+./maze_builder --seed=1337 --algorithm=binary_tree -o bt.txt
 ```
 
 Make Maze Builder run as `interactive` with a `seed`:
@@ -49,7 +51,8 @@ Make Maze Builder run as `interactive` with a `seed`:
 ## Scripts
 
 The `scripts` directory contains Ruby and Python scripts to build mazes quickly.
-These programs can output to `.png` files or `stdout`.
+These programs can output to `.png` files or `stdout`. There is a Python script
+using the Blender API to generate a maze in that interface.
 
 ## Resources
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)

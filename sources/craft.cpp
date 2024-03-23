@@ -2562,6 +2562,15 @@ struct craft::craft_impl {
         SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
 
         SDL_GL_SetSwapInterval(1);
+
+        auto icon_path{ "textures/maze_in_green_32x32.bmp" };
+        SDL_Surface* icon_surface = SDL_LoadBMP(icon_path);
+        if (icon_surface) {
+            SDL_SetWindowIcon(this->m_model->window, icon_surface);
+            SDL_DestroySurface(icon_surface);
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Couldn't load icon at %s\n", icon_path);
+        }
     } // create_window_and_context
 
     void reset_model() {
