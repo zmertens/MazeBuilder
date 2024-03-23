@@ -1,6 +1,6 @@
 # Represents a cell in a maze
 
-require 'distances'
+require 'Distances'
 
 class Cell
     attr_reader :row, :column
@@ -41,9 +41,9 @@ class Cell
         list
     end
 
-    # def to_s
-    #     "row: #{@row} , column: #{@column}"
-    # end
+    def to_s
+        "row: #{@row} , column: #{@column}"
+    end
 
     # Compute distances between cell starting points
     # using Dijkstra's algo

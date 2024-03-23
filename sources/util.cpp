@@ -1,15 +1,26 @@
-#include <cmath>
+/**
+ * Utility functions for handling opengl operations, RNG, and meshes
+ *
+*/
+
+#include "util.h"
+
 #include <cstdio>
 #include <cstdlib>
 #include <cerrno>
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <fstream>
 
 #include <SDL3/SDL.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-#include "matrix.h"
-#include "util.h"
+#include <thinks/obj_io/obj_io.h>
+#include <thinks/obj_io/mesh_types.h>
+#include <thinks/obj_io/read_write_utils.h>
 
 int rand_int(int n) {
     int result;
@@ -48,29 +59,31 @@ char *load_file(const char *path) {
     return data;
 }
 
-GLuint gen_buffer(GLsizei size, GLfloat *data) {
-    GLuint buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    return buffer;
-}
-
-void del_buffer(GLuint buffer) {
-    glDeleteBuffers(1, &buffer);
-}
-
-GLfloat *malloc_faces(int components, int faces) {
-    return (GLfloat*) malloc(sizeof(GLfloat) * 6 * components * faces);
-}
-
-GLuint gen_faces(int components, int faces, GLfloat *data) {
-    GLuint buffer = gen_buffer(
-        sizeof(GLfloat) * 6 * components * faces, data);
-    free(data);
-    return buffer;
-}
+/*
+Private function to load file using SDL-specific functions
+*/
+//char* load_file_using_sdl(const char* path) {
+//    
+//    char* data;
+//
+//    // Open binary file
+//    SDL_RWops* io = SDL_RWFromFile(path, "rb");
+//    if (io != nullptr) {
+//        Sint64 data_size = SDL_RWsize(io);
+//        data = (char*) SDL_malloc(data_size + 1);
+//        if (SDL_RWread(io, data, data_size) != data_size) {
+//            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RWread failed: %s\n", SDL_GetError());
+//        }
+//#if defined(DEBUGGING)
+//        SDL_Log("Reading file % s\n", path);
+//#endif
+//        SDL_RWclose(io);
+//    } else {
+//        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: SDL_RWops failed: %s", SDL_GetError());
+//    }
+//
+//    return data;
+//}
 
 GLuint make_shader(GLenum type, const char *source) {
     GLuint shader = glCreateShader(type);
@@ -231,3 +244,106 @@ int wrap(const char *input, int max_width, char *output, int max_length) {
     free(text);
     return line_number;
 }
+
+void dump_opengl_info(bool dumpExtensions) {
+    const GLubyte *renderer = glGetString(GL_RENDERER);
+    const GLubyte *vendor = glGetString(GL_VENDOR);
+    const GLubyte *version = glGetString(GL_VERSION);
+    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+    GLint major, minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+	
+	SDL_Log("-------------------------------------------------------------\n");
+    SDL_Log("GL Vendor    : %s\n", vendor);
+    SDL_Log("GL Renderer  : %s\n", renderer);
+    SDL_Log("GL Version   : %s\n", version);
+    SDL_Log("GL Version   : %d.%d\n", major, minor);
+    SDL_Log("GLSL Version : %s\n", glslVersion);
+    SDL_Log("-------------------------------------------------------------\n");
+
+    if (dumpExtensions) {
+        GLint nExtensions;
+        glGetIntegerv(GL_NUM_EXTENSIONS, &nExtensions);
+        for (int i = 0; i < nExtensions; i++) {
+            SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
+        }
+    }
+}
+
+/**
+ * @brief convert_grid_to_str take the grid vertex data and transform into C++ string data
+ * From the data, a task writer in Craft will call C++ fstream functions with the string data
+ * @param faces
+ * @param data
+ * @return
+ */
+std::string convert_grid_to_str(int faces, GLfloat *data) {
+    using namespace std;
+
+#if defined(DEBUGGING)
+    SDL_Log("faces: %d, data: %p\n", faces, data);
+#endif
+
+    using MeshType = TriangleMesh<>;
+    using IndexType = MeshType::IndexType;
+    using VertexType = MeshType::VertexType;
+    using PositionType = VertexType::PositionType;
+    using TexCoordType = VertexType::TexCoordType;
+    using NormalType = VertexType::NormalType;
+
+    auto my_mesh = MeshType{};
+    // for each visible cube face or plant face
+    for (int i = 0; i < faces; i++) {
+        // each face has 6 points (2 triangles, 3 vertices each)
+        my_mesh.indices.emplace_back(static_cast<std::uint16_t>(faces - i));
+        for (int j = 0; j < 6; j++) {
+            // each vertex has 10 values (x, y, z, nx, ny, nz, u, v, ao, light)
+            int k = i * 60 + j * 10;
+            GLfloat x = data[k+0];
+            GLfloat y = data[k+1];
+            GLfloat z = data[k+2];
+            GLfloat nx = data[k+3];
+            GLfloat ny = data[k+4];
+            GLfloat nz = data[k+5];
+            GLfloat u = data[k+6];
+            GLfloat v = data[k+7];
+            my_mesh.vertices.emplace_back(VertexType{PositionType{x, y, z}, TexCoordType{u, v}, NormalType{nx, ny, nz}});
+        }
+    }
+
+    struct WriteResult {
+        thinks::ObjWriteResult write_result;
+        std::string mesh_str;
+    };
+
+    // write normals and tex coords too
+    auto&& mesh_result = WriteMesh(my_mesh, true, true);
+
+
+    return mesh_result.mesh_str;
+}
+
+GLenum glCheckError_(const char *file, int line)
+{
+    GLenum errorCode;
+    while ((errorCode = glGetError()) != GL_NO_ERROR)
+    {
+        std::string error = "";
+        switch (errorCode)
+        {
+            case GL_INVALID_ENUM: error = "INVALID_ENUM"; break;
+            case GL_INVALID_VALUE: error = "INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION: error = "INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW: error = "STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW: error = "STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY: error = "OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
+        }
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, 
+            "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error.c_str(), file, line);
+    }
+    return errorCode;
+}
+

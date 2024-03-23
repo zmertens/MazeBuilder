@@ -35,7 +35,7 @@ class Grid
             cell.west = self[row, col - 1]
             cell.east = self[row, col + 1]
 
-            # puts "Cell: #{cell}"
+            puts "Cell: #{cell}"
         end
     end
 

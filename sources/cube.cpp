@@ -1,6 +1,7 @@
-#include <math.h>
-
 #include "cube.h"
+
+#include <SDL3/SDL.h>
+
 #include "item.h"
 #include "matrix.h"
 #include "util.h"

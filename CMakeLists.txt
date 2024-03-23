@@ -1,14 +1,17 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.2...3.5)
 
 cmake_policy(SET CMP0058 NEW)
 
 project(maze_builder)
 
-set(EXE_NAME "maze_builder")
+set(MAZE_BUILDER_EXE "maze_builder")
+set(MAZE_BUILDER_TEST_EXE "maze_builder_tests")
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 set(DEAR_IMGUI_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui.cpp
@@ -30,137 +33,126 @@ set(DEAR_IMGUI_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.h
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
-set(DEP_C_FILES
+set(DEPENDENCY_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c
     ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinycthread/tinycthread.c)
 
-file(GLOB CRAFT_CPP_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sources/*.cpp)
+option(BUILD_MAZE_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
-option(BUILD_FOR_ANDROID "Building for Android using SDL3" OFF)
+set(MAZE_ALGO_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/args_builder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/binary_tree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp)
+
+set(CRAFT_FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/cube.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/db.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/item.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/map.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/matrix.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp)
 
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "RelWithDebInfo" ENABLE_DEBUGGING)
 string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "Debug" ENABLE_DEBUGGING2)
 
 if(ENABLE_DEBUGGING OR ENABLE_DEBUGGING2)
-    message(INFO ": Debugging enabled for ${PROJECT_NAME}")
+    message(INFO ": -DDEBUGGING enabled for ${PROJECT_NAME}")
     add_compile_definitions("DEBUGGING")
 endif()
 
-# Quick and dirty Android build using SDL3 android-build script
-if(BUILD_FOR_ANDROID)
-    message(STATUS "Building SDL3 app for Android...")
+message(INFO ": Building SDL app for Desktop!")
+set(MAZE_BUILDER_LIB "maze_builder_lib")
+add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_ALGO_FILES})
+add_executable(${MAZE_BUILDER_EXE} ${DEAR_IMGUI_SRCS} ${DEPENDENCY_FILES} ${CRAFT_FILES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
 
-    if(NOT DEFINED ENV{ANDROID_HOME})
-        message(FATAL_ERROR "Set ANDROID_HOME to path of Android Sdk.")
+target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
+
+if (WIN32)
+    target_include_directories(${MAZE_BUILDER_EXE} PRIVATE "C:\\Program Files (x86)\\SDL3\\include")
+    include_directories("C:\\Program Files (x86)\\SDL3\\include")
+endif()
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
+
+find_package(OpenGL REQUIRED)
+find_package(Threads REQUIRED)
+
+# Find/Configure SDL3
+find_package(SDL3 QUIET)
+if(SDL3_FOUND)
+    message(INFO ": Getting SDL3 via find_package")
+endif()
+
+# If all else fails, download SDL3
+if(NOT SDL3_FOUND)
+    include(FetchContent)
+    set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
+    set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
+    FetchContent_Declare(
+        SDL
+        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
+    message(INFO ": Getting SDL3 via FetchContent")
+    FetchContent_MakeAvailable(SDL)
+    set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+endif()
+
+if(APPLE)
+    target_link_libraries(${MAZE_BUILDER_EXE} OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+endif()
+
+if(UNIX)
+    target_link_libraries(${MAZE_BUILDER_EXE} dl OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+endif()
+
+if(MINGW OR WIN32)
+    target_link_libraries(${MAZE_BUILDER_EXE} ws2_32.lib OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+endif()
+
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
+
+if(BUILD_MAZE_TESTS)
+    find_package(Catch2 3 QUIET)
+    if(CATCH2_FOUND)
+        message(INFO ": Getting Catch2 via find_package")
     endif()
-
-    if(NOT DEFINED ENV{ANDROID_NDK_HOME})
-        message(FATAL_ERROR "Set ANDROID_NDK_HOME to path of Android Ndk.")
-    endif()
-
-    set(ANDROID_JNI_FILES
-        ${DEP_C_FILES}
-        ${DEAR_IMGUI_SRCS}
-        ${DEAR_IMGUI_HEADERS}
-        ${CRAFT_SOURCE_FILES})
-    set(JAVA_PKG_NAME "com.example.craft")
-    set(SDL_DIR_NAME SDL-main)
-    set(ANDROID_BUILD_SCRIPT "${CMAKE_BINARY_DIR}/${SDL_DIR_NAME}/build-scripts/androidbuild.sh")
-
-    file(DOWNLOAD https://github.com/libsdl-org/SDL/archive/main.zip SHOW_PROGRESS ${CMAKE_BINARY_DIR}/${SDL_DIR_NAME}.zip STATUS DOWNLOAD_STATUS)
-    file(ARCHIVE_EXTRACT INPUT ${SDL_DIR_NAME}.zip)
-    # Separate the returned status code, and error message.
-    list(GET DOWNLOAD_STATUS 0 STATUS_CODE)
-    list(GET DOWNLOAD_STATUS 1 ERROR_MESSAGE)
-    # Check if download was successful.
-    if(${STATUS_CODE} EQUAL 0)
-        message(STATUS "Download completed successfully!")
-    else()
-        # Exit CMake if the download failed, printing the error message.
-        message(FATAL_ERROR "Error occurred during download: ${ERROR_MESSAGE}")
-    endif()
-
-    if(NOT EXISTS ${ANDROID_BUILD_SCRIPT})
-        message(FATAL_ERROR ": ${ANDROID_BUILD_SCRIPT} is not valid.")
-    endif()
-
-    set(ANDROID_APP_PREFIX ${CMAKE_BINARY_DIR}/${SDL_DIR_NAME}/build/${JAVA_PKG_NAME})
-    execute_process(COMMAND bash ${ANDROID_BUILD_SCRIPT} ${JAVA_PKG_NAME} ${ANDROID_JNI_FILES} WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    if(EXISTS ${ANDROID_APP_PREFIX}/app)
-        execute_process(COMMAND sed -i -e "s|-lGLESv2|-lGLESv3|" ${ANDROID_APP_PREFIX}/app/jni/src/Android.mk WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-        execute_process(COMMAND sed -i -e "s|Game|${PROJECT_NAME}|g" ${ANDROID_APP_PREFIX}/app/src/main/res/values/strings.xml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-        execute_process(COMMAND sed -i -e "s|\"SDLActivity\"|\"CraftActivity\"|g" ${ANDROID_APP_PREFIX}/app/src/main/AndroidManifest.xml WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-    endif()
-else()
-    message(STATUS "Building SDL3 app for Desktop...")
-
-    add_executable(${EXE_NAME} ${DEAR_IMGUI_SRCS} ${DEP_C_FILES} ${CRAFT_CPP_FILES})
-
-    include_directories(deps/glad/include)
-    include_directories(deps)
-    include_directories(deps/dearimgui)
-
-    find_package(OpenGL REQUIRED)
-
-    # Find/Configure SDL3
-    find_package(SDL3 QUIET)
-    if(SDL3_FOUND)
-        message(STATUS "Using SDL3 via find_package")
-    endif()
-
-    # If all else fails, download SDL3
-    if(NOT SDL3_FOUND)
-        include(FetchContent)
-        set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
-        set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-        FetchContent_Declare(
-            SDL
-            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-            GIT_TAG main
-            GIT_SHALLOW TRUE
-            GIT_PROGRESS TRUE
-        )
-        message(STATUS "Using SDL3 via FetchContent")
-        FetchContent_MakeAvailable(SDL)
-        set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-    endif()
-
-    if(MINGW)
-        set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH}
-            "C:/Program Files/CURL/lib" "C:/Program Files (x86)/CURL/lib")
-        set(CMAKE_INCLUDE_PATH ${CMAKE_INCLUDE_PATH}
-            "C:/Program Files/CURL/include" "C:/Program Files (x86)/CURL/include")
-    endif()
-
-    find_package(CURL QUIET)
-    if(NOT CURL_FOUND)
+    if(NOT CATCH2_FOUND)
         include(FetchContent)
         FetchContent_Declare(
-            CURL
-            GIT_REPOSITORY https://github.com/curl/curl.git
-            GIT_TAG master
+            Catch2
+            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+            GIT_TAG v3.4.0
             GIT_SHALLOW TRUE
             GIT_PROGRESS TRUE)
-        message(STATUS "Using CURL via FetchContent")
-        FetchContent_MakeAvailable(CURL)
+        message(INFO ": Getting Catch2 via FetchContent")
+        FetchContent_MakeAvailable(Catch2)
+        list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
-    include_directories(${CURL_SOURCE_DIR}/include)
+    file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
 
-    if(APPLE)
-        target_link_libraries(${EXE_NAME} OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    if(UNIX)
-        target_link_libraries(${EXE_NAME} dl OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    if(MINGW)
-        target_link_libraries(${EXE_NAME} ws2_32.lib OpenGL::GL SDL3::SDL3 CURL::libcurl)
-    endif()
-
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
+    # These tests can use the Catch2-provided main
+    add_executable(${MAZE_BUILDER_TEST_EXE} ${TEST_FILES})
+    target_compile_features(${MAZE_BUILDER_TEST_EXE} PUBLIC cxx_std_17)
+    target_link_libraries(${MAZE_BUILDER_TEST_EXE} PRIVATE ${MAZE_BUILDER_LIB} Threads::Threads Catch2::Catch2WithMain)
+    target_include_directories(${MAZE_BUILDER_TEST_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources")
+    include(CTest)
+    include(Catch)
+    catch_discover_tests(${MAZE_BUILDER_TEST_EXE})
 endif()

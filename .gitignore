@@ -1,6 +1,7 @@
 # C/C++ files and Craft-specific files
 CMakeCache.txt
 CMakeFiles
+CMakeLists.txt.user
 cmake_install.cmake
 env
 log.txt
@@ -15,6 +16,7 @@ log.txt
 
 build/
 .vscode
+.vs
 .github
 
 # Script output files

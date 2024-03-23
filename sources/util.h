@@ -3,7 +3,8 @@
 
 #include <glad/glad.h>
 
-#include "config.h"
+#include <string>
+#include <vector>
 
 #define PI 3.14159265359
 #define DEGREES(radians) ((radians) * 180 / PI)
@@ -12,12 +13,6 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SIGN(x) (((x) > 0) - ((x) < 0))
-
-#if defined(DEBUGGING)
-    #define LOG(...) printf(__VA_ARGS__)
-#else
-    #define LOG(...)
-#endif
 
 typedef struct {
     unsigned int fps;
@@ -29,8 +24,6 @@ int rand_int(int n);
 double rand_double();
 void update_fps(FPS *fps);
 
-GLuint gen_buffer(GLsizei size, GLfloat *data);
-void del_buffer(GLuint buffer);
 GLfloat *malloc_faces(int components, int faces);
 GLuint gen_faces(int components, int faces, GLfloat *data);
 GLuint make_shader(GLenum type, const char *source);
@@ -42,5 +35,11 @@ char *tokenize(char *str, const char *delim, char **key);
 int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
+void dump_opengl_info(bool dumpExtensions);
+
+std::string convert_grid_to_str(int faces, GLfloat *data);
+
+#define gl_check_for_error() glCheckError_(__FILE__, __LINE__)
+GLenum glCheckError_(const char *file, int line);
 
 #endif
