@@ -28,9 +28,11 @@ public:
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
     std::shared_ptr<cell> get_root() const noexcept;
+    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
     void grow(std::unique_ptr<grid> const& other_grid) noexcept;
     void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
     std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
+    bool is_solveable() const noexcept;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
