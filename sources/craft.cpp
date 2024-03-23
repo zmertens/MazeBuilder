@@ -21,9 +21,9 @@ Originally written in C99, ported to C++17
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
 // Struggling with CMake build config and so I added this for Release builds
-#if defined(DEBUGGING)
-#undef DEBUGGING
-#endif
+//#if defined(DEBUGGING)
+//#undef DEBUGGING
+//#endif
 
 #include <cstdio>
 #include <cstdlib>
