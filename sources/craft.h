@@ -21,6 +21,7 @@ public:
     // craft& operator=(const craft& rhs);
     bool run(std::unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) const noexcept override;
 private:
+    struct dear_imgui_helper;
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
 

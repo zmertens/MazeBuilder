@@ -110,34 +110,7 @@ Originally written in C99, ported to C++17
 #define RENDER_CHUNK_RADIUS 10
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
-#define CHUNK_SIZE 32
 #define COMMIT_INTERVAL 5
-
-enum {
-    FORWARD,
-    BACKWARD,
-    LEFT,
-    RIGHT,
-    JUMP,
-    FLY,
-    OBSERVE,
-    OBSERVE_INSET,
-    ITEM_NEXT,
-    ITEM_PREV,
-    ZOOM,
-    ORTHO,
-    CHAT,
-    COMMAND,
-    SIGN,
-    NUM_CONTROLS
-};
-
-#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
-#define XZ_LO (CHUNK_SIZE)
-#define XZ_HI (CHUNK_SIZE * 2 + 1)
-#define Y_SIZE 258
-#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
-#define XZ(x, z) ((x) * XZ_SIZE + (z))
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
@@ -159,6 +132,13 @@ using namespace mazes;
 using namespace std;
 
 struct craft::craft_impl {
+    typedef struct {
+        int chunk_size;
+        bool show_trees;
+        bool show_plants;
+        bool show_clouds;
+    } dear_imgui_helper;
+
     typedef struct {
         Map map;
         Map lights;
@@ -236,13 +216,6 @@ struct craft::craft_impl {
     } Attrib;
 
     typedef struct {
-        unsigned int chunk_size;
-        bool show_clouds;
-        bool show_plants;
-        bool show_trees;
-    } dear_imgui_helper;
-
-    typedef struct {
         SDL_Window *window;
         SDL_GLContext *context;
         Worker workers[WORKERS];
@@ -281,7 +254,6 @@ struct craft::craft_impl {
         Block block1;
         Block copy0;
         Block copy1;
-        dear_imgui_helper gui_helper;
     } Model;
 
     // Public member so the pimpl can access and manipulate
@@ -289,17 +261,15 @@ struct craft::craft_impl {
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     std::packaged_task<bool(const std::string& data)> m_task_writer;
     unique_ptr<Model> m_model;
+    dear_imgui_helper gui;
 
     craft_impl(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func, std::packaged_task<bool(const std::string& data)> task_writes)
     : m_window_name{window_name}
     , m_maze_func{maze_func}
     , m_task_writer(std::move(task_writes))
-    , m_model{make_unique<Model>()} {
-        // default settings for the world
-        m_model->gui_helper.show_clouds = true;
-        m_model->gui_helper.show_plants = true;
-        m_model->gui_helper.show_trees = true;
-        m_model->gui_helper.chunk_size = 32u;
+    , m_model{make_unique<Model>()}
+    , gui{ 32, true, true, true} {
+
     }
 
     static int worker_run(void *arg) {
@@ -362,7 +332,7 @@ struct craft::craft_impl {
     }
 
     int chunked(float x) const {
-        return SDL_floorf(SDL_roundf(x) / CHUNK_SIZE);
+        return SDL_floorf(SDL_roundf(x) / this->gui.chunk_size);
     }
     double get_time() const {
     	return (SDL_GetTicks() + (double) this->m_model->start_time - (double) this->m_model->start_ticks) / 1000.0;
@@ -755,9 +725,9 @@ struct craft::craft_impl {
     int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
         float miny_f = static_cast<float>(miny);
         float maxy_f = static_cast<float>(maxy);
-        float x = static_cast<float>(p * CHUNK_SIZE - 1);
-        float z = static_cast<float>(q * CHUNK_SIZE - 1);
-        float d = static_cast<float>(CHUNK_SIZE + 1);
+        float x = static_cast<float>(p * this->gui.chunk_size - 1);
+        float z = static_cast<float>(q * this->gui.chunk_size - 1);
+        float d = static_cast<float>(this->gui.chunk_size + 1);
         float points[8][3] = {
             {x + 0.f, miny_f, z + 0.f},
             {x + d, miny_f, z + 0.f},
@@ -1119,6 +1089,12 @@ struct craft::craft_impl {
     } // occlusion
 
     void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
+#define XZ_SIZE (this->gui.chunk_size * 3 + 2)
+#define XZ_LO (this->gui.chunk_size)
+#define XZ_HI (this->gui.chunk_size * 2 + 1)
+#define Y_SIZE 258
+#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
+#define XZ(x, z) ((x) * XZ_SIZE + (z))
         if (x + w < XZ_LO || z + w < XZ_LO) {
             return;
         }
@@ -1148,9 +1124,9 @@ struct craft::craft_impl {
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
-        int ox = item->p * CHUNK_SIZE - CHUNK_SIZE - 1;
+        int ox = item->p * this->gui.chunk_size - this->gui.chunk_size - 1;
         int oy = -1;
-        int oz = item->q * CHUNK_SIZE - CHUNK_SIZE - 1;
+        int oz = item->q * this->gui.chunk_size - this->gui.chunk_size - 1;
 
         // check for lights
         int has_light = 0;
@@ -1369,9 +1345,8 @@ struct craft::craft_impl {
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
-        auto&& gui_options = this->m_model->gui_helper;
-        
-        _world.create_world(p, q, map_set_func, block_map);        
+        auto&& gui_options = this->gui;
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1389,9 +1364,9 @@ struct craft::craft_impl {
         db_load_signs(signs, p, q);
         Map *block_map = &chunk->map;
         Map *light_map = &chunk->lights;
-        int dx = p * CHUNK_SIZE - 1;
+        int dx = p * this->gui.chunk_size - 1;
         int dy = 0;
-        int dz = q * CHUNK_SIZE - 1;
+        int dz = q * this->gui.chunk_size - 1;
         map_alloc(block_map, dx, dy, dz, 0x7fff);
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
@@ -1813,7 +1788,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 0);
         glUniform1i(attrib->extra1, 2);
         glUniform1f(attrib->extra2, light);
-        glUniform1f(attrib->extra3, this->m_model->render_radius * CHUNK_SIZE);
+        glUniform1f(attrib->extra3, this->m_model->render_radius * this->gui.chunk_size);
         glUniform1i(attrib->extra4, this->m_model->ortho);
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
@@ -2307,6 +2282,7 @@ struct craft::craft_impl {
 
     /**
     * https://github.com/rswinkle/Craft/blob/sdl/src/main.c
+    * This function also checks if user is interacting with gui to prevent mouse hiding
     * @param dt
     * @param running reference to running loop in game loop
     * @return bool return true when event handle successfully
@@ -2327,9 +2303,11 @@ struct craft::craft_impl {
         SDL_Keymod mod_state = SDL_GetModState();
 
         int control = mod_state ;//& (KMOD_LCTRL | KMOD_RCTRL | KMOD_LGUI | KMOD_RGUI);
-        int exclusive = SDL_GetRelativeMouseMode();
+        //int exclusive = SDL_GetRelativeMouseMode();
+        bool mouse_focusing_gui = ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) || ImGui::IsWindowHovered();
 
         while (SDL_PollEvent(&e)) {
+            ImGui_ImplSDL3_ProcessEvent(&e);
             switch (e.type) {
             case SDL_EVENT_QUIT: {
                 running = false;
@@ -2341,10 +2319,9 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_ESCAPE:
                     if (this->m_model->typing) {
                         this->m_model->typing = 0;
-                    } else if (exclusive) {
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
                     } else {
-                        return 1;
+                        // show mouse
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
                     }
                 }
                 break;
@@ -2476,7 +2453,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_MOTION: {
-                if (exclusive) {
+                if (!mouse_focusing_gui) {
                     s->rx += e.motion.xrel * m;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * m;
@@ -2497,7 +2474,8 @@ struct craft::craft_impl {
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                 if (e.button.button == SDL_BUTTON_LEFT) {
-                    if (exclusive) {
+                    if (!mouse_focusing_gui) {
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
                         if (control) {
                             on_right_click();
                         }
@@ -2505,12 +2483,9 @@ struct craft::craft_impl {
                             on_left_click();
                         }
                     }
-                    else {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                    }
                 }
                 else if (e.button.button == SDL_BUTTON_RIGHT) {
-                    if (exclusive) {
+                    if (!mouse_focusing_gui) {
                         if (control) {
                             on_light();
                         }
@@ -2520,7 +2495,7 @@ struct craft::craft_impl {
                     }
                 }
                 else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (exclusive) {
+                    if (!mouse_focusing_gui) {
                         on_middle_click();
                     }
                 }
@@ -2742,7 +2717,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     }
 
     SDL_ShowWindow(m_pimpl->m_model->window);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_FALSE);
 
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL loader failed (%s)\n", SDL_GetError());
@@ -2955,6 +2930,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                 m_pimpl->m_model->mode_changed = 0;
                 break;
             }
+            
 
             // Start the Dear ImGui frame
             ImGui_ImplOpenGL3_NewFrame();
