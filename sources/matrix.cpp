@@ -2,7 +2,6 @@
 
 #include <SDL3/SDL.h>
 
-#include "config.h"
 #include "matrix.h"
 #include "util.h"
 

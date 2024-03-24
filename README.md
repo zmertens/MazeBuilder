@@ -2,7 +2,7 @@
 
 Build mazes in console or 3D, and save, export to file.
 
-![](scripts/blender_binary_tree_demo_33x33.PNG)
+![Textured maze with solution in white](textures/maze_in_green_32x32.bmp)
 
 ## CMake
 

@@ -33,21 +33,104 @@ Originally written in C99, ported to C++17
 #include <string_view>
 #include <algorithm>
 
-#include "config.h"
+#include <noise/noise.h>
+#include <tinycthread/tinycthread.h>
+
+#include "util.h"
+#include "world.h"
 #include "cube.h"
 #include "db.h"
 #include "item.h"
-
 #include "matrix.h"
-#include <noise/noise.h>
-#include <tinycthread/tinycthread.h>
-#include "util.h"
-#include "world.h"
 
 #include "grid.h"
 #include "cell.h"
 
 #define DUMP_GL_EXTENSIONS 0
+
+// basic configurations
+#define KEY_FORWARD SDL_SCANCODE_W
+#define KEY_BACKWARD SDL_SCANCODE_S
+#define KEY_LEFT SDL_SCANCODE_A
+#define KEY_RIGHT SDL_SCANCODE_D
+#define KEY_JUMP SDL_SCANCODE_SPACE
+#define KEY_FLY SDL_SCANCODE_TAB
+#define KEY_OBSERVE SDL_SCANCODE_O
+#define KEY_OBSERVE_INSET SDL_SCANCODE_P
+#define KEY_ITEM_NEXT SDL_SCANCODE_E
+#define KEY_ITEM_PREV SDL_SCANCODE_R
+#define KEY_ZOOM SDL_SCANCODE_LSHIFT
+#define KEY_ORTHO SDL_SCANCODE_F
+#define KEY_CHAT SDL_SCANCODE_T
+#define KEY_COMMAND SDL_SCANCODE_SLASH
+#define KEY_SIGN SDL_SCANCODE_GRAVE
+
+#define FULLSCREEN 0
+#define WINDOW_WIDTH 1024
+#define WINDOW_HEIGHT 768
+#define VSYNC 1
+#define SCROLL_THRESHOLD 0.1
+#define MAX_MESSAGES 4
+#define DB_PATH "craft.db"
+#define USE_CACHE 1
+#define DAY_LENGTH 600
+#define INVERT_MOUSE 0
+
+// rendering options
+#define SHOW_LIGHTS 1
+#define SHOW_PLANTS 1
+#define SHOW_CLOUDS 1
+#define SHOW_TREES 1
+#define SHOW_ITEM 1
+#define SHOW_CROSSHAIRS 1
+#define SHOW_WIREFRAME 1
+#define SHOW_INFO_TEXT 1
+#define SHOW_CHAT_TEXT 1
+#define SHOW_PLAYER_NAMES 1
+
+// key bindings
+#define CRAFT_KEY_FORWARD 'W'
+#define CRAFT_KEY_BACKWARD 'S'
+#define CRAFT_KEY_LEFT 'A'
+#define CRAFT_KEY_RIGHT 'D'
+#define CRAFT_KEY_JUMP GLFW_KEY_SPACE
+#define CRAFT_KEY_FLY GLFW_KEY_TAB
+#define CRAFT_KEY_OBSERVE 'O'
+#define CRAFT_KEY_OBSERVE_INSET 'P'
+#define CRAFT_KEY_ITEM_NEXT 'E'
+#define CRAFT_KEY_ITEM_PREV 'R'
+#define CRAFT_KEY_ZOOM GLFW_KEY_LEFT_SHIFT
+#define CRAFT_KEY_ORTHO 'F'
+#define CRAFT_KEY_CHAT 't'
+#define CRAFT_KEY_COMMAND '/'
+#define CRAFT_KEY_SIGN '`'
+
+// advanced parameters
+#define CREATE_CHUNK_RADIUS 10
+#define RENDER_CHUNK_RADIUS 10
+#define RENDER_SIGN_RADIUS 4
+#define DELETE_CHUNK_RADIUS 14
+#define CHUNK_SIZE 32
+#define COMMIT_INTERVAL 5
+
+enum {
+    FORWARD,
+    BACKWARD,
+    LEFT,
+    RIGHT,
+    JUMP,
+    FLY,
+    OBSERVE,
+    OBSERVE_INSET,
+    ITEM_NEXT,
+    ITEM_PREV,
+    ZOOM,
+    ORTHO,
+    CHAT,
+    COMMAND,
+    SIGN,
+    NUM_CONTROLS
+};
 
 #define XZ_SIZE (CHUNK_SIZE * 3 + 2)
 #define XZ_LO (CHUNK_SIZE)
@@ -153,6 +236,13 @@ struct craft::craft_impl {
     } Attrib;
 
     typedef struct {
+        unsigned int chunk_size;
+        bool show_clouds;
+        bool show_plants;
+        bool show_trees;
+    } dear_imgui_helper;
+
+    typedef struct {
         SDL_Window *window;
         SDL_GLContext *context;
         Worker workers[WORKERS];
@@ -191,6 +281,7 @@ struct craft::craft_impl {
         Block block1;
         Block copy0;
         Block copy1;
+        dear_imgui_helper gui_helper;
     } Model;
 
     // Public member so the pimpl can access and manipulate
@@ -204,7 +295,11 @@ struct craft::craft_impl {
     , m_maze_func{maze_func}
     , m_task_writer(std::move(task_writes))
     , m_model{make_unique<Model>()} {
-
+        // default settings for the world
+        m_model->gui_helper.show_clouds = true;
+        m_model->gui_helper.show_plants = true;
+        m_model->gui_helper.show_trees = true;
+        m_model->gui_helper.chunk_size = 32u;
     }
 
     static int worker_run(void *arg) {
@@ -1274,6 +1369,8 @@ struct craft::craft_impl {
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
+        auto&& gui_options = this->m_model->gui_helper;
+        
         _world.create_world(p, q, map_set_func, block_map);        
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
@@ -2208,8 +2305,13 @@ struct craft::craft_impl {
         }
     }
 
-    // https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    int handle_events(double dt) {
+    /**
+    * https://github.com/rswinkle/Craft/blob/sdl/src/main.c
+    * @param dt
+    * @param running reference to running loop in game loop
+    * @return bool return true when event handle successfully
+    */
+    bool handle_events(double dt, bool& running) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2228,18 +2330,12 @@ struct craft::craft_impl {
         int exclusive = SDL_GetRelativeMouseMode();
 
         while (SDL_PollEvent(&e)) {
-            /*
-            if (e.type == this->m_model->userevent) {
-
-                code = e.user.code;
-                switch (code) {
-                }
-            }
-            */
             switch (e.type) {
-            case SDL_EVENT_QUIT:
-                return 1;
-            case SDL_EVENT_KEY_UP:
+            case SDL_EVENT_QUIT: {
+                running = false;
+                return true;
+            }
+            case SDL_EVENT_KEY_UP: {
                 sc = e.key.keysym.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE:
@@ -2252,33 +2348,37 @@ struct craft::craft_impl {
                     }
                 }
                 break;
-
-            case SDL_EVENT_KEY_DOWN:
+            }
+            case SDL_EVENT_KEY_DOWN: {
                 sc = e.key.keysym.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_RETURN:
                     if (this->m_model->typing) {
                         if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
                             if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                                this->m_model->typing_buffer[this->m_model->text_len] = '\r'; // TODO? \n?
-                                this->m_model->typing_buffer[this->m_model->text_len+1] = '\0';
+                                this->m_model->typing_buffer[this->m_model->text_len] = '\n';
+                                this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
                             }
-                        } else {
+                        }
+                        else {
                             this->m_model->typing = 0;
                             if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-                                Player *player = this->m_model->players;
+                                Player* player = this->m_model->players;
                                 int x, y, z, face;
                                 if (hit_test_face(player, &x, &y, &z, &face)) {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
-                            } else if (this->m_model->typing_buffer[0] == '/') {
+                            }
+                            else if (this->m_model->typing_buffer[0] == '/') {
                                 this->parse_command(this->m_model->typing_buffer, 1);
                             }
                         }
-                    } else {
+                    }
+                    else {
                         if (control) {
                             this->on_right_click();
-                        } else {
+                        }
+                        else {
                             this->on_left_click();
                         }
                     }
@@ -2291,7 +2391,8 @@ struct craft::craft_impl {
                             this->m_model->suppress_char = 1;
                             SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                 MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                        } else {
+                        }
+                        else {
                             parse_command(clip_buffer, 0);
                         }
                     }
@@ -2316,7 +2417,7 @@ struct craft::craft_impl {
 
                 case KEY_FLY:
                     if (!this->m_model->typing)
-                        this->m_model->flying = !this->m_model->flying;
+                        this->m_model->flying = ~this->m_model->flying;
                     break;
 
                 case KEY_ITEM_NEXT:
@@ -2340,25 +2441,6 @@ struct craft::craft_impl {
                         this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
 
-                    /*
-                case KEY_ORTHO:
-                    break;
-                case KEY_ZOOM:
-                    break;
-                case KEY_FORWARD:
-                    break;
-                case KEY_BACKWARD:
-                    break;
-                case KEY_LEFT:
-                    break;
-                case KEY_RIGHT:
-                    break;
-                case KEY_UP:
-                    break;
-                case KEY_DOWN:
-                    break;
-                    */
-
                 case KEY_CHAT:
                     this->m_model->typing = 1;
                     this->m_model->typing_buffer[0] = '\0';
@@ -2381,86 +2463,96 @@ struct craft::craft_impl {
                 }
 
                 break;
-
-            case SDL_EVENT_TEXT_INPUT:
+            } // SDL_EVENT_KEY_DOWN
+            case SDL_EVENT_TEXT_INPUT: {
                 // could probably just do text[text_len++] = e.text.text[0]
                 // since I only handle ascii
-                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH -1) {
+                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                     strcat(this->m_model->typing_buffer, e.text.text);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                     //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
                     //SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                 }
                 break;
-
-            case SDL_EVENT_MOUSE_MOTION:
+            }
+            case SDL_EVENT_MOUSE_MOTION: {
                 if (exclusive) {
                     s->rx += e.motion.xrel * m;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * m;
-                    } else {
+                    }
+                    else {
                         s->ry -= e.motion.yrel * m;
                     }
                     if (s->rx < 0) {
                         s->rx += RADIANS(360);
                     }
-                    if (s->rx >= RADIANS(360)){
+                    if (s->rx >= RADIANS(360)) {
                         s->rx -= RADIANS(360);
                     }
                     s->ry = MAX(s->ry, -RADIANS(90));
                     s->ry = MIN(s->ry, RADIANS(90));
                 }
                 break;
-
-            case SDL_EVENT_MOUSE_BUTTON_DOWN:
+            }
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
                 if (e.button.button == SDL_BUTTON_LEFT) {
                     if (exclusive) {
                         if (control) {
                             on_right_click();
-                        } else {
+                        }
+                        else {
                             on_left_click();
                         }
-                    } else {
+                    }
+                    else {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                     }
-                } else if (e.button.button == SDL_BUTTON_RIGHT) {
+                }
+                else if (e.button.button == SDL_BUTTON_RIGHT) {
                     if (exclusive) {
                         if (control) {
                             on_light();
-                        } else {
+                        }
+                        else {
                             on_right_click();
                         }
                     }
-                } else if (e.button.button == SDL_BUTTON_MIDDLE) {
+                }
+                else if (e.button.button == SDL_BUTTON_MIDDLE) {
                     if (exclusive) {
                         on_middle_click();
                     }
                 }
 
                 break;
-
-            case SDL_EVENT_MOUSE_WHEEL:
+            }
+            case SDL_EVENT_MOUSE_WHEEL: {
                 // TODO might have to change this to force 1 step
                 if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                     this->m_model->item_index += e.wheel.y;
-                } else {
+                }
+                else {
                     this->m_model->item_index -= e.wheel.y;
                 }
                 if (this->m_model->item_index < 0)
-                    this->m_model->item_index = item_count -1;
+                    this->m_model->item_index = item_count - 1;
                 else
                     this->m_model->item_index %= item_count;
                 break;
+            }
             case SDL_EVENT_WINDOW_RESIZED: {
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
             }
             case SDL_EVENT_WINDOW_SHOWN: {
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
             }
             } // switch
-        }
+        } // SDL_Event
 
         const Uint8 *state = SDL_GetKeyboardState(NULL);
 
@@ -2518,7 +2610,7 @@ struct craft::craft_impl {
             s->y = highest_block(s->x, s->z) + 2;
         }
 
-        return 0;
+        return true;
 
     } // handle_events
 
@@ -2770,8 +2862,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
+    //ImGui::StyleColorsDark();
+    ImGui::StyleColorsLight();
 
     // Setup Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
@@ -2779,23 +2871,28 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+    // - If no fonts are loaded, dear imgui will use the default font. 
+    // You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+    // - If the file cannot be loaded, the function will return a nullptr. 
+    //  Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
+    // - The fonts will be rasterized at a given size (w/ oversampling) 
+    // and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
     // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
+    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. 
+    //  See Makefile.emscripten for details.
     //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+    io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+    //io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
 
     // Our state
+    bool dear_imgui_main_window = true;
     bool show_demo_window = true;
     bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
@@ -2850,9 +2947,9 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             dt = MAX(dt, 0.0);
             previous = now;
 
-            if (m_pimpl->handle_events(dt)) {
-                running = false;
-                break;
+            if (m_pimpl->handle_events(dt, running)) {
+                if (!running)
+                    break;
             }
             if (m_pimpl->m_model->mode_changed) {
                 m_pimpl->m_model->mode_changed = 0;
@@ -2873,16 +2970,16 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                 static float f = 0.0f;
                 static int counter = 0;
 
-                ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+                ImGui::Begin("Hello, world!");
 
-                ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-                ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+                ImGui::Text("This is some useful text.");
+                ImGui::Checkbox("Demo Window", &show_demo_window);
                 ImGui::Checkbox("Another Window", &show_another_window);
 
-                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-                ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+                ImGui::ColorEdit3("clear color", (float*)&clear_color);
 
-                if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+                if (ImGui::Button("Button"))
                     counter++;
                 ImGui::SameLine();
                 ImGui::Text("counter = %d", counter);

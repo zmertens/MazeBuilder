@@ -1,11 +1,18 @@
 #include "world.h"
-#include "config.h"
 
 #include <noise/noise.h>
 
+#include "util.h"
+
+// CHUNK_SIZE cannot be unsigned int!!
+#define CHUNK_SIZE 32
+#define SHOW_TREES 1
+#define SHOW_CLOUDS 1
+#define SHOW_PLANTS 1
+
 using namespace std;
 
-void world::create_world(int p, int q, world_func func, Map *m) {
+void world::create_world(int p, int q, world_func func, Map *m) const noexcept {
     int pad = 1;
     for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
         for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {

@@ -146,9 +146,9 @@ void flip_image_vertical(
     unsigned char *new_data = (unsigned char*) malloc(sizeof(unsigned char) * size);
     for (unsigned int i = 0; i < height; i++) {
         unsigned int j = height - i - 1;
-        memcpy(new_data + j * stride, data + i * stride, stride);
+        SDL_memcpy(new_data + j * stride, data + i * stride, stride);
     }
-    memcpy(data, new_data, size);
+    SDL_memcpy(data, new_data, size);
     free(new_data);
 }
 
