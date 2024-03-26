@@ -45,6 +45,7 @@ Originally written in C99, ported to C++17
 
 #include "grid.h"
 #include "cell.h"
+#include "writer.h"
 
 #define DUMP_GL_EXTENSIONS 0
 
@@ -65,7 +66,6 @@ Originally written in C99, ported to C++17
 #define KEY_COMMAND SDL_SCANCODE_SLASH
 #define KEY_SIGN SDL_SCANCODE_GRAVE
 
-#define FULLSCREEN 0
 #define WINDOW_WIDTH 1024
 #define WINDOW_HEIGHT 768
 #define VSYNC 1
@@ -78,9 +78,6 @@ Originally written in C99, ported to C++17
 
 // rendering options
 #define SHOW_LIGHTS 1
-#define SHOW_PLANTS 1
-#define SHOW_CLOUDS 1
-#define SHOW_TREES 1
 #define SHOW_ITEM 1
 #define SHOW_CROSSHAIRS 1
 #define SHOW_WIREFRAME 1
@@ -88,21 +85,6 @@ Originally written in C99, ported to C++17
 #define SHOW_CHAT_TEXT 1
 #define SHOW_PLAYER_NAMES 1
 
-// key bindings
-#define CRAFT_KEY_FORWARD 'W'
-#define CRAFT_KEY_BACKWARD 'S'
-#define CRAFT_KEY_LEFT 'A'
-#define CRAFT_KEY_RIGHT 'D'
-#define CRAFT_KEY_JUMP GLFW_KEY_SPACE
-#define CRAFT_KEY_FLY GLFW_KEY_TAB
-#define CRAFT_KEY_OBSERVE 'O'
-#define CRAFT_KEY_OBSERVE_INSET 'P'
-#define CRAFT_KEY_ITEM_NEXT 'E'
-#define CRAFT_KEY_ITEM_PREV 'R'
-#define CRAFT_KEY_ZOOM GLFW_KEY_LEFT_SHIFT
-#define CRAFT_KEY_ORTHO 'F'
-#define CRAFT_KEY_CHAT 't'
-#define CRAFT_KEY_COMMAND '/'
 #define CRAFT_KEY_SIGN '`'
 
 // advanced parameters
@@ -137,6 +119,7 @@ struct craft::craft_impl {
         bool show_trees;
         bool show_plants;
         bool show_clouds;
+        bool fullscreen;
     } dear_imgui_helper;
 
     typedef struct {
@@ -258,17 +241,21 @@ struct craft::craft_impl {
 
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
+    const std::string_view& m_version;
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
-    std::packaged_task<bool(const std::string& data)> m_task_writer;
+    mazes::writer m_writer;
+    std::packaged_task<bool(const std::string& out, const std::string& data)> m_task_writer;
     unique_ptr<Model> m_model;
     dear_imgui_helper gui;
 
-    craft_impl(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func, std::packaged_task<bool(const std::string& data)> task_writes)
+    craft_impl(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
     : m_window_name{window_name}
+    , m_version{version}
     , m_maze_func{maze_func}
-    , m_task_writer(std::move(task_writes))
+    , m_writer{}
+    , m_task_writer{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
     , m_model{make_unique<Model>()}
-    , gui{ 32, true, true, true} {
+    , gui{32, true, true, true, false} {
 
     }
 
@@ -277,7 +264,7 @@ struct craft::craft_impl {
         int running = 1;
         // never call the factory with this caller
         string_view sv {"dummy"};
-        craft caller {sv, {}, {}};
+        craft caller{ sv, {}, {} };
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -1500,7 +1487,7 @@ struct craft::craft_impl {
         ss << *_grid.get();
         string sv{ ss.str() };
 #if defined(DEBUGGING)
-        SDL_Log("Computing grid str: %s\n", sv);
+        SDL_Log("Computing grid str: %s\n", sv.c_str());
 #endif
         auto&& itr = sv.cbegin();
         auto row_x{ 0u }, col_z{ 0u };
@@ -2304,7 +2291,7 @@ struct craft::craft_impl {
 
         int control = mod_state ;//& (KMOD_LCTRL | KMOD_RCTRL | KMOD_LGUI | KMOD_RGUI);
         //int exclusive = SDL_GetRelativeMouseMode();
-        bool mouse_focusing_gui = ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) || ImGui::IsWindowHovered();
+        bool mouse_focusing_gui = (ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) || ImGui::IsWindowHovered()) && !SDL_GetRelativeMouseMode();
 
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -2503,17 +2490,19 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                // TODO might have to change this to force 1 step
-                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                    this->m_model->item_index += e.wheel.y;
+                if (!mouse_focusing_gui) {
+                    // TODO might have to change this to force 1 step
+                    if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
+                        this->m_model->item_index += e.wheel.y;
+                    }
+                    else {
+                        this->m_model->item_index -= e.wheel.y;
+                    }
+                    if (this->m_model->item_index < 0)
+                        this->m_model->item_index = item_count - 1;
+                    else
+                        this->m_model->item_index %= item_count;
                 }
-                else {
-                    this->m_model->item_index -= e.wheel.y;
-                }
-                if (this->m_model->item_index < 0)
-                    this->m_model->item_index = item_count - 1;
-                else
-                    this->m_model->item_index %= item_count;
                 break;
             }
             case SDL_EVENT_WINDOW_RESIZED: {
@@ -2594,7 +2583,7 @@ struct craft::craft_impl {
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
         int window_width = WINDOW_WIDTH;
         int window_height = WINDOW_HEIGHT;
-        if (FULLSCREEN) {
+        if (this->gui.fullscreen) {
             SDL_DisplayID display = SDL_GetPrimaryDisplay();
             int num_modes = 0;
             const SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
@@ -2633,7 +2622,7 @@ struct craft::craft_impl {
 
         SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
 
-        SDL_GL_SetSwapInterval(1);
+        SDL_GL_SetSwapInterval(VSYNC);
 
         auto icon_path{ "textures/maze_in_green_32x32.bmp" };
         SDL_Surface* icon_surface = SDL_LoadBMP(icon_path);
@@ -2666,8 +2655,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future), std::move(task_writes))} {
+craft::craft(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future)
+    : m_pimpl{std::make_unique<craft_impl>(window_name, version, std::move(maze_future))} {
 }
 
 craft::~craft() = default;
@@ -2697,7 +2686,7 @@ craft::~craft() = default;
 */
 bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 
-    // run a default maze to flex muscle memories (computers have muscles?)
+    // run a default maze to get things going
     bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
 
     srand(time(NULL));
@@ -2867,9 +2856,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     //IM_ASSERT(font != nullptr);
 
     // Our state
-    bool dear_imgui_main_window = true;
     bool show_demo_window = true;
-    bool show_another_window = false;
+    bool show_craft_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // MAIN LOOP //
@@ -2918,8 +2906,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             update_fps(&fps);
             double now = SDL_GetTicks();
             double dt = (now - previous) / 1000.0;
-            dt = MIN(dt, 0.2);
-            dt = MAX(dt, 0.0);
+            dt = SDL_min(dt, 0.2);
+            dt = SDL_max(dt, 0.0);
             previous = now;
 
             if (m_pimpl->handle_events(dt, running)) {
@@ -2941,40 +2929,55 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             if (show_demo_window)
                 ImGui::ShowDemoWindow(&show_demo_window);
 
-            // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-            {
-                static float f = 0.0f;
-                static int counter = 0;
+            ImGui::Begin(this->m_pimpl->m_version.data());
 
-                ImGui::Begin("Hello, world!");
+            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+                if (ImGui::BeginTabItem("Builder")) {
+                    ImGui::Text("Builder settings");
+                    ImGui::Text("Output");
+                    ImGui::Text("Width");
+                    ImGui::Text("Length");
+                    ImGui::Text("Height");
+                    ImGui::Text("Seed");
+                    if (ImGui::TreeNode("Algorithms")) {
+                        static const char* algos[2] = {"binary_tree", "sidewinder"};
+                        static int algos_current_idx{ 0 };
+                        auto preview{ algos[algos_current_idx] };
 
-                ImGui::Text("This is some useful text.");
-                ImGui::Checkbox("Demo Window", &show_demo_window);
-                ImGui::Checkbox("Another Window", &show_another_window);
+                        if (ImGui::BeginCombo("algorithm", preview)) {
+                            for (int n = 0; n < 2; n++) {
+                                const bool is_selected = (algos_current_idx == n);
+                                if (ImGui::Selectable(algos[n], is_selected))
+                                    algos_current_idx = n;
 
-                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-                ImGui::ColorEdit3("clear color", (float*)&clear_color);
-
-                if (ImGui::Button("Button"))
-                    counter++;
-                ImGui::SameLine();
-                ImGui::Text("counter = %d", counter);
-
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-                ImGui::End();
+                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        ImGui::TreePop();
+                    }
+                    
+                    ImGui::Button("Build!");
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Graphics")) {
+                    ImGui::Text("Graphic settings");
+                    auto last_fullscreen_mode = this->m_pimpl->gui.fullscreen;
+                    ImGui::Checkbox("Fullscreen", &this->m_pimpl->gui.fullscreen);
+                    if (last_fullscreen_mode != this->m_pimpl->gui.fullscreen);
+                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->gui.fullscreen);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
 
-            // 3. Show another simple window.
-            if (show_another_window)
-            {
-                ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-                ImGui::Text("Hello from another window!");
-                if (ImGui::Button("Close Me"))
-                    show_another_window = false;
-                ImGui::End();
-            }
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
 
-                // FLUSH DATABASE //
+            // FLUSH DATABASE //
             if (now - last_commit > COMMIT_INTERVAL) {
                 last_commit = now;
                 db_commit();
