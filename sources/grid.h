@@ -64,6 +64,7 @@ private:
                 auto next_index {rowCounter * g.get_columns() + columnCounter};
                 if (next_index < cells.size()) {
                     auto&& temp = cells.at(next_index);
+                    // bottom left cell needs boundaries
                     if (temp == nullptr)
                         temp = { std::make_shared<cell>(-1, -1, next_index) };
                     // 3 spaces in body
