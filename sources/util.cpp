@@ -273,12 +273,13 @@ void dump_opengl_info(bool dumpExtensions) {
 }
 
 /**
- * @brief convert_grid_to_str take the opengl faces and vertex data and maps to Wavefront Obj file format
+ * @brief convert_data_to_mesh_str takes the OpenGL data and maps it to Wavefront Obj file format
  * @param faces
  * @param data
+ * @param mesh_str the string which will contain the mesh data
  * @return
  */
-std::string convert_grid_to_str(int faces, GLfloat* data) {
+void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     using namespace std;
 
     struct Vec2 {
@@ -303,41 +304,41 @@ std::string convert_grid_to_str(int faces, GLfloat* data) {
         std::vector<std::uint16_t> indices;
     };
 
-    //Mesh temp_mesh;
-    auto temp_mesh = Mesh{
-        std::vector<Vertex>{
-          Vertex{
-              Vec3{1.f, 0.f, 0.f},  // position
-              Vec2{1.f, 0.f},       // tex_coord
-              Vec3{0.f, 0.f, 1.f}}, // normal
-          Vertex{
-              Vec3{0.f, 1.f, 0.f},
-              Vec2{0.f, 1.f},
-              Vec3{0.f, 0.f, 1.f}},
-          Vertex{
-              Vec3{1.f, 1.f, 0.f},
-              Vec2{1.f, 1.f},
-              Vec3{0.f, 0.f, 1.f}}},
-        std::vector<std::uint16_t>{0, 1, 2} };
+    Mesh temp_mesh;
+    //auto temp_mesh = Mesh{
+    //    std::vector<Vertex>{
+    //      Vertex{
+    //          Vec3{1.f, 0.f, 0.f},  // position
+    //          Vec2{1.f, 0.f},       // tex_coord
+    //          Vec3{0.f, 0.f, 1.f}}, // normal
+    //      Vertex{
+    //          Vec3{0.f, 1.f, 0.f},
+    //          Vec2{0.f, 1.f},
+    //          Vec3{0.f, 0.f, 1.f}},
+    //      Vertex{
+    //          Vec3{1.f, 1.f, 0.f},
+    //          Vec2{1.f, 1.f},
+    //          Vec3{0.f, 0.f, 1.f}}},
+    //    std::vector<std::uint16_t>{0, 1, 2} };
 
     // for each visible cube face or plant face
-    //for (int i = 0; i < faces; i++) {
-    //    // each face has 6 points (2 triangles, 3 vertices each)
-    //    temp_mesh.indices.emplace_back(static_cast<std::uint16_t>(faces - i));
-    //    for (int j = 0; j < 6; j++) {
-    //        // each vertex has 10 values (x, y, z, nx, ny, nz, u, v, ao, light)
-    //        int k = i * 60 + j * 10;
-    //        GLfloat x = data[k + 0];
-    //        GLfloat y = data[k + 1];
-    //        GLfloat z = data[k + 2];
-    //        GLfloat nx = data[k + 3];
-    //        GLfloat ny = data[k + 4];
-    //        GLfloat nz = data[k + 5];
-    //        GLfloat u = data[k + 6];
-    //        GLfloat v = data[k + 7];
-    //        temp_mesh.vertices.emplace_back(Vertex{ Vec3{x, y, z}, Vec2{u, v}, Vec3{nx, ny, nz} });
-    //    }
-    //}
+    for (int i = 0; i < faces; i++) {
+        // each face has 6 points (2 triangles, 3 vertices each)
+        temp_mesh.indices.emplace_back(static_cast<std::uint16_t>(faces - i));
+        for (int j = 0; j < 6; j++) {
+            // each vertex has 10 values (x, y, z, nx, ny, nz, u, v, ao, light)
+            int k = i * 60 + j * 10;
+            GLfloat x = data[k + 0];
+            GLfloat y = data[k + 1];
+            GLfloat z = data[k + 2];
+            GLfloat nx = data[k + 3];
+            GLfloat ny = data[k + 4];
+            GLfloat nz = data[k + 5];
+            GLfloat u = data[k + 6];
+            GLfloat v = data[k + 7];
+            temp_mesh.vertices.emplace_back(Vertex{ Vec3{x, y, z}, Vec2{u, v}, Vec3{nx, ny, nz} });
+        }
+    }
 
     const auto vtx_iend = std::end(temp_mesh.vertices);
 
@@ -410,14 +411,11 @@ std::string convert_grid_to_str(int faces, GLfloat* data) {
 
     // Open the OBJ file and pass in the mappers, which will be called
     // internally to write the contents of the mesh to the file.
-    auto ofs = std::ofstream("out.obj");
+    auto ofs = std::ofstream("out2.obj");
     assert(ofs);
     const auto result = thinks::WriteObj(ofs, pos_mapper, face_mapper, tex_mapper, nml_mapper);
     ofs.close();
-
-    return "bnlah";
-    //return mesh_result.mesh_str;
-}
+} // convert_data_to_mesh_str
 
 GLenum glCheckError_(const char *file, int line)
 {

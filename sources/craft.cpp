@@ -32,6 +32,7 @@ Originally written in C99, ported to C++17
 #include <string>
 #include <string_view>
 #include <algorithm>
+#include <unordered_map>
 
 #include <noise/noise.h>
 #include <tinycthread/tinycthread.h>
@@ -120,7 +121,7 @@ struct craft::craft_impl {
         bool show_plants;
         bool show_clouds;
         bool fullscreen;
-        string view_to_grid;
+        bool color_mode_dark;
     } dear_imgui_helper;
 
     typedef struct {
@@ -250,27 +251,22 @@ struct craft::craft_impl {
     const std::string_view& m_version;
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     mazes::writer m_writer;
-    std::packaged_task<string(const chunk_to_write_to&)> m_setup_writer;
+    std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
     std::packaged_task<bool(const std::string& out, const std::string& data)> m_task_writer;
     unique_ptr<Model> m_model;
     dear_imgui_helper m_gui;
-    future<string> m_grid_future;
-    future<bool> m_writer_is_done;
-    bool m_compute_grid_done;
+    //std::unordered_map<std::pair<int, int>, std::string>
 
     craft_impl(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
         : m_window_name{ window_name }
         , m_version{ version }
         , m_maze_func{ maze_func }
         , m_writer{}
-        , m_setup_writer{ [](const chunk_to_write_to& c)->string {
-            return convert_grid_to_str(c.faces, c.data); } }
+        , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
+            convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
         , m_task_writer{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
-        , m_gui{32, true, true, true, false}
-        , m_grid_future{ m_setup_writer.get_future() }
-        , m_writer_is_done{ m_task_writer.get_future() }
-        , m_compute_grid_done{ false } {
+        , m_gui{32, true, true, true, false, false} {
 
     }
 
@@ -1300,9 +1296,15 @@ struct craft::craft_impl {
 
         // check if the grid has been computed (blocks set), if so, setup the writer
         // setting up the writer calls util.cpp::convert_grid_to_mesh_str
-        if (this->m_compute_grid_done && item->p == 0 && item->q == 0) {
+        if (item->p == 0 && item->q == 0) {
             //this->m_setup_writer({ faces, data });
+            string mesh_str{ "" };
+            convert_data_to_mesh_str(item->faces, item->data, ref(mesh_str));
+            SDL_Log(mesh_str.c_str());
         }
+#if defined(DEBUGGING)
+        SDL_Log("In compute chunk: p: %d, q: %d\n", item->p, item->q);
+#endif
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1359,6 +1361,10 @@ struct craft::craft_impl {
         db_load_lights(light_map, p, q);
     }
 
+    /**
+    * @brief called by ensure_chunk_workers, create_chunk
+    * @return
+    */
     void init_chunk(Chunk *chunk, int p, int q) {
         chunk->p = p;
         chunk->q = q;
@@ -1497,18 +1503,19 @@ struct craft::craft_impl {
     }
 
     /**
-     * @brief compute_grid parses the grid, and builds a 3D grid using grid row, column, height
+     * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
+     * Calling set_grid, set_block will trigger compute_chunk
      * @param _grid
      * @param p
      * @return
      */
-    void compute_grid(shared_ptr<mazes::cell> const& _cell, unique_ptr<mazes::grid> const& _grid, Player *p) {
+    void set_grid(shared_ptr<mazes::cell> const& _cell, unique_ptr<mazes::grid> const& _grid, Player *p) {
 
         if (_cell != nullptr) {
-            compute_grid(_cell->get_left(), _grid, p);
+            set_grid(_cell->get_left(), _grid, p);
             set_block(_cell->get_row(), _grid->get_height(), _cell->get_column(), 5);
             record_block(_cell->get_row(), _grid->get_height(), _cell->get_column(), 5);
-            compute_grid(_cell->get_right(), _grid, p);
+            set_grid(_cell->get_right(), _grid, p);
         }
 
         //auto&& itr = sv.cbegin();
@@ -1523,7 +1530,7 @@ struct craft::craft_impl {
         //    }
         //    itr++;
         //} // while
-    } // compute_grid
+    } // set_grid
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
@@ -1552,10 +1559,10 @@ struct craft::craft_impl {
                     continue;
                 }
                 int distance = MAX(ABS(dp), ABS(dq));
-                int invisible = !chunk_visible(planes, a, b, 0, 256);
+                int invisible = ~chunk_visible(planes, a, b, 0, 256);
                 int priority = 0;
                 if (chunk) {
-                    priority = chunk->buffer && chunk->dirty;
+                    priority = chunk->buffer & chunk->dirty;
                 }
                 int score = (invisible << 24) | (priority << 16) | distance;
                 if (score < best_score) {
@@ -2878,8 +2885,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     //IM_ASSERT(font != nullptr);
 
     // Our state
-    bool show_demo_window = true;
-    bool show_craft_gui = true;
+    bool show_demo_window = false;
+    bool show_builder_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
     // hang onto writer fut, get the result as part of GUI progress bar
@@ -3129,8 +3136,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             static bool ready_to_compute = true;
             if (success_from_maze_fut && ready_to_compute) {
                 // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
-                // now that the _grid is calculated, set the blocks in the 3D world by compute_grid
-                this->m_pimpl->compute_grid(_grid->get_root(), _grid, me);
+                // now that the _grid is calculated, set the blocks in the 3D world by set_grid
+                this->m_pimpl->set_grid(_grid->get_root(), _grid, me);
                 ready_to_compute = false;
             }
 
