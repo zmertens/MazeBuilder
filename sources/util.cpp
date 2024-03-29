@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cerrno>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <cstdint>
 #include <fstream>
@@ -188,7 +189,7 @@ char *tokenize(char *str, const char *delim, char **key) {
 }
 
 int char_width(char input) {
-    static const int lookup[128] = {
+    static constexpr int lookup[128] = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         4, 2, 4, 7, 6, 9, 7, 2, 3, 3, 4, 6, 3, 5, 2, 7,
@@ -305,6 +306,8 @@ void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     };
 
     Mesh temp_mesh;
+    
+    // Simple triangle mesh for testing purposes
     //auto temp_mesh = Mesh{
     //    std::vector<Vertex>{
     //      Vertex{
@@ -321,10 +324,10 @@ void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     //          Vec3{0.f, 0.f, 1.f}}},
     //    std::vector<std::uint16_t>{0, 1, 2} };
 
-    // for each visible cube face or plant face
+    // for each **VISIBLE** cube face or plant face
     for (int i = 0; i < faces; i++) {
         // each face has 6 points (2 triangles, 3 vertices each)
-        temp_mesh.indices.emplace_back(static_cast<std::uint16_t>(faces - i));
+        temp_mesh.indices.emplace_back(static_cast<std::uint16_t>(i));
         for (int j = 0; j < 6; j++) {
             // each vertex has 10 values (x, y, z, nx, ny, nz, u, v, ao, light)
             int k = i * 60 + j * 10;
@@ -410,11 +413,13 @@ void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     };
 
     // Open the OBJ file and pass in the mappers, which will be called
-    // internally to write the contents of the mesh to the file.
-    auto ofs = std::ofstream("out2.obj");
-    assert(ofs);
+    // internally to write the contents of the mesh to the stream
+    std::ostringstream oss;
+    auto&& ofs = oss;
     const auto result = thinks::WriteObj(ofs, pos_mapper, face_mapper, tex_mapper, nml_mapper);
-    ofs.close();
+    // update the mesh_str parameter
+    mesh_str = oss.str();
+    oss.clear();
 } // convert_data_to_mesh_str
 
 GLenum glCheckError_(const char *file, int line)

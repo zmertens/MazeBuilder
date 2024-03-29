@@ -252,10 +252,10 @@ struct craft::craft_impl {
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     mazes::writer m_writer;
     std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
-    std::packaged_task<bool(const std::string& out, const std::string& data)> m_task_writer;
+    std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
     unique_ptr<Model> m_model;
     dear_imgui_helper m_gui;
-    //std::unordered_map<std::pair<int, int>, std::string>
+    std::string m_current_mesh_str;
 
     craft_impl(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
         : m_window_name{ window_name }
@@ -264,9 +264,10 @@ struct craft::craft_impl {
         , m_writer{}
         , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
             convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
-        , m_task_writer{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
+        , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
-        , m_gui{32, true, true, true, false, false} {
+        , m_gui{32, true, true, true, false, false}
+        , m_current_mesh_str{} {
 
     }
 
@@ -1296,15 +1297,14 @@ struct craft::craft_impl {
 
         // check if the grid has been computed (blocks set), if so, setup the writer
         // setting up the writer calls util.cpp::convert_grid_to_mesh_str
-        if (item->p == 0 && item->q == 0) {
+        static bool already_written = false;
+        if (item->p == 0 && item->q == 0 && !already_written) {
             //this->m_setup_writer({ faces, data });
-            string mesh_str{ "" };
-            convert_data_to_mesh_str(item->faces, item->data, ref(mesh_str));
-            SDL_Log(mesh_str.c_str());
+            convert_data_to_mesh_str(item->faces, item->data, ref(this->m_current_mesh_str));
+            this->m_writer_task("out3.obj", ref(this->m_current_mesh_str));
+            //SDL_Log("In compute chunk: mesh_str: %s\n", this->m_current_mesh_str.c_str());
+            already_written = true;
         }
-#if defined(DEBUGGING)
-        SDL_Log("In compute chunk: p: %d, q: %d\n", item->p, item->q);
-#endif
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -2717,7 +2717,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 
     // run a default maze to get things going
     bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
-    
+
     srand(time(NULL));
     rand();
 
@@ -2888,9 +2888,6 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     bool show_demo_window = false;
     bool show_builder_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    
-    // hang onto writer fut, get the result as part of GUI progress bar
-    auto&& writer_fut = this->m_pimpl->m_task_writer.get_future();
     
     // MAIN LOOP //
     bool running = true;
@@ -3143,10 +3140,21 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 
             // interactive should always be true in craft::run, but just check it
             // get() is a blocking call, but we need to check that there is mesh str rdy
-            if (interactive) {
+            static bool mesh_write_now = false;
+            if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
                 //auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
                 // call the task writer to asynchronously write the file (should flip the future)
-                //this->m_pimpl->m_task_writer("out.obj", ref(grid_str));
+                
+                /*auto&& writer_fut = this->m_pimpl->m_writer_task.get_future();
+                SDL_Log("mesh writing success= %d\n", writer_fut.get());*/
+                mesh_write_now = true;
+            }
+
+            if (mesh_write_now) {
+                // check success
+                //bool success_writing = writing_task_fut.get();
+                //SDL_Log("mesh writing success= %d\n", success_writing);
+                //mesh_write_now = false;
             }
 
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

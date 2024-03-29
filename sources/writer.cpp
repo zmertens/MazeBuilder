@@ -51,9 +51,9 @@ bool writer::write(const std::string& filename, const std::string& data) const {
         return true;
     }
 
-    auto ftype = file_types::PLAIN_TEXT;
+    auto ftype = get_filetype(filename);
 	if (!filename.empty()) {
-		ftype = get_filetype(filename);
+		// keep writing
 	} else {
 		// indeterminable file type
 		throw new runtime_error("Unknown file type for filename: " + filename);
@@ -73,6 +73,8 @@ bool writer::write(const std::string& filename, const std::string& data) const {
 void writer::write_wavefront_obj(const std::string& filename, const std::string& data) const {
     filesystem::path data_path {filename};
     ofstream out_writer {data_path};
+	out_writer << data;
+	out_writer.close();
 }
 
 void writer::write_plain_text(const std::string& filename, const std::string& data) const {
