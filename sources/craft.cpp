@@ -122,6 +122,7 @@ struct craft::craft_impl {
         bool show_clouds;
         bool fullscreen;
         bool color_mode_dark;
+        bool capture_mouse;
     } dear_imgui_helper;
 
     typedef struct {
@@ -266,7 +267,7 @@ struct craft::craft_impl {
             convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
         , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
-        , m_gui{32, true, true, true, false, false}
+        , m_gui{32, true, true, true, false, true, false}
         , m_current_mesh_str{} {
 
     }
@@ -1301,7 +1302,6 @@ struct craft::craft_impl {
         if (item->p == 0 && item->q == 0 && !already_written) {
             //this->m_setup_writer({ faces, data });
             convert_data_to_mesh_str(item->faces, item->data, ref(this->m_current_mesh_str));
-            this->m_writer_task("out3.obj", ref(this->m_current_mesh_str));
             //SDL_Log("In compute chunk: mesh_str: %s\n", this->m_current_mesh_str.c_str());
             already_written = true;
         }
@@ -2297,7 +2297,7 @@ struct craft::craft_impl {
     }
 
     /**
-    * https://github.com/rswinkle/Craft/blob/sdl/src/main.c
+    * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
     * This function also checks if user is interacting with gui to prevent mouse hiding
     * @param dt
     * @param running reference to running loop in game loop
@@ -2318,9 +2318,9 @@ struct craft::craft_impl {
 
         SDL_Keymod mod_state = SDL_GetModState();
 
-        int control = mod_state ;//& (KMOD_LCTRL | KMOD_RCTRL | KMOD_LGUI | KMOD_RGUI);
-        //int exclusive = SDL_GetRelativeMouseMode();
-        bool mouse_focusing_gui = (ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow) || ImGui::IsWindowHovered()) && !SDL_GetRelativeMouseMode();
+        int control = mod_state;
+        
+        bool capture_mouse = this->m_gui.capture_mouse;
 
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -2338,6 +2338,8 @@ struct craft::craft_impl {
                     } else {
                         // show mouse
                         SDL_SetRelativeMouseMode(SDL_FALSE);
+                        this->m_gui.capture_mouse = !this->m_gui.capture_mouse;
+                        capture_mouse = !capture_mouse;
                     }
                 }
                 break;
@@ -2469,7 +2471,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_MOTION: {
-                if (!mouse_focusing_gui) {
+                if (capture_mouse) {
                     s->rx += e.motion.xrel * m;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * m;
@@ -2489,29 +2491,25 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (e.button.button == SDL_BUTTON_LEFT) {
-                    if (!mouse_focusing_gui) {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                        if (control) {
-                            on_right_click();
-                        }
-                        else {
-                            on_left_click();
-                        }
+                if (capture_mouse && e.button.button == SDL_BUTTON_LEFT) {
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    if (control) {
+                        on_right_click();
+                    }
+                    else {
+                        on_left_click();
                     }
                 }
-                else if (e.button.button == SDL_BUTTON_RIGHT) {
-                    if (!mouse_focusing_gui) {
-                        if (control) {
-                            on_light();
-                        }
-                        else {
-                            on_right_click();
-                        }
+                else if (capture_mouse && e.button.button == SDL_BUTTON_RIGHT) {
+                    if (control) {
+                        on_light();
+                    }
+                    else {
+                        on_right_click();
                     }
                 }
                 else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (!mouse_focusing_gui) {
+                    if (capture_mouse) {
                         on_middle_click();
                     }
                 }
@@ -2519,7 +2517,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (!mouse_focusing_gui) {
+                if (capture_mouse) {
                     // TODO might have to change this to force 1 step
                     if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                         this->m_model->item_index += e.wheel.y;
@@ -2854,11 +2852,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
-    // Setup Dear ImGui style
-    //ImGui::StyleColorsDark();
-    ImGui::StyleColorsLight();
-
-    // Setup Platform/Renderer backends
+    // Setup ImGui Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
     const char* glsl_version = "#version 130";
     ImGui_ImplOpenGL3_Init(glsl_version);
@@ -2889,6 +2883,8 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     bool show_builder_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
+    auto&& writer_fut{ this->m_pimpl->m_writer_task.get_future() };
+
     // MAIN LOOP //
     bool running = true;
     while (running) {
@@ -2954,12 +2950,12 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+            // Show the big demo window?
             if (show_demo_window)
                 ImGui::ShowDemoWindow(&show_demo_window);
-
+            // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.data());
-
+            // GUI Tabs
             ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
             if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
                 if (ImGui::BeginTabItem("Builder")) {
@@ -2998,6 +2994,14 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                     ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
                     if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen);
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
+                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
+                    if (this->m_pimpl->m_gui.color_mode_dark)
+                        ImGui::StyleColorsDark();
+                    else
+                        ImGui::StyleColorsLight();
+                    ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
+                    if (this->m_pimpl->m_gui.capture_mouse)
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
@@ -3144,17 +3148,16 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
                 //auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
                 // call the task writer to asynchronously write the file (should flip the future)
-                
-                /*auto&& writer_fut = this->m_pimpl->m_writer_task.get_future();
-                SDL_Log("mesh writing success= %d\n", writer_fut.get());*/
+                this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
+                this->m_pimpl->m_current_mesh_str.clear();
                 mesh_write_now = true;
             }
 
             if (mesh_write_now) {
                 // check success
-                //bool success_writing = writing_task_fut.get();
-                //SDL_Log("mesh writing success= %d\n", success_writing);
-                //mesh_write_now = false;
+                bool success_writing = writer_fut.get();
+                SDL_Log("mesh writing success= %d\n", success_writing);
+                mesh_write_now = false;
             }
 
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
