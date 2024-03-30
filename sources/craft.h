@@ -15,7 +15,7 @@ class writer;
 
 class craft : public mazes::maze_algo_interface {
 public:
-    craft(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types)> maze_func);
+    craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types)> maze_func);
     ~craft();
     // craft(const craft& rhs);
     // craft& operator=(const craft& rhs);

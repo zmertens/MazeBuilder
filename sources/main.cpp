@@ -106,16 +106,17 @@ int main(int argc, char* argv[]) {
         };
         std::packaged_task<bool(const std::string& data)> task_writes (write_func);
 
-        mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algorithm());
+        mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
         bool success = false;
         if (args.is_interactive()) {
             // string views don't own the data, they have less copying overhead
             std::string_view sv {"craft-sdl3"};
             std::string_view version_view{ MAZE_BUILDER_VERSION };
-            craft maze_builder_3D {sv, version_view, maze_factory};
+            std::string_view help_view{ HELP_MSG };
+            craft maze_builder_3D {sv, version_view, help_view, maze_factory};
             success = maze_builder_3D.run(_grid, get_int, args.is_interactive());
         } else {
-            success = maze_factory(maze_algo).get();
+            success = maze_factory(my_maze_type).get();
         }
 
         if (success && !args.is_interactive()) {

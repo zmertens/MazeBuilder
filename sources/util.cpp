@@ -9,6 +9,7 @@
 #include <cstdlib>
 #include <cerrno>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <cstdint>
 #include <fstream>
@@ -188,7 +189,7 @@ char *tokenize(char *str, const char *delim, char **key) {
 }
 
 int char_width(char input) {
-    static const int lookup[128] = {
+    static constexpr int lookup[128] = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         4, 2, 4, 7, 6, 9, 7, 2, 3, 3, 4, 6, 3, 5, 2, 7,
@@ -273,57 +274,153 @@ void dump_opengl_info(bool dumpExtensions) {
 }
 
 /**
- * @brief convert_grid_to_str take the grid vertex data and transform into C++ string data
- * From the data, a task writer in Craft will call C++ fstream functions with the string data
+ * @brief convert_data_to_mesh_str takes the OpenGL data and maps it to Wavefront Obj file format
  * @param faces
  * @param data
+ * @param mesh_str the string which will contain the mesh data
  * @return
  */
-std::string convert_grid_to_str(int faces, GLfloat *data) {
+void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     using namespace std;
 
-#if defined(DEBUGGING)
-    SDL_Log("faces: %d, data: %p\n", faces, data);
-#endif
+    struct Vec2 {
+        float x;
+        float y;
+    };
 
-    using MeshType = TriangleMesh<>;
-    using IndexType = MeshType::IndexType;
-    using VertexType = MeshType::VertexType;
-    using PositionType = VertexType::PositionType;
-    using TexCoordType = VertexType::TexCoordType;
-    using NormalType = VertexType::NormalType;
+    struct Vec3 {
+        float x;
+        float y;
+        float z;
+    };
 
-    auto my_mesh = MeshType{};
-    // for each visible cube face or plant face
+    struct Vertex {
+        Vec3 position;
+        Vec2 tex_coord;
+        Vec3 normal;
+    };
+
+    struct Mesh {
+        std::vector<Vertex> vertices;
+        std::vector<std::uint16_t> indices;
+    };
+
+    Mesh temp_mesh;
+    
+    // Simple triangle mesh for testing purposes
+    //auto temp_mesh = Mesh{
+    //    std::vector<Vertex>{
+    //      Vertex{
+    //          Vec3{1.f, 0.f, 0.f},  // position
+    //          Vec2{1.f, 0.f},       // tex_coord
+    //          Vec3{0.f, 0.f, 1.f}}, // normal
+    //      Vertex{
+    //          Vec3{0.f, 1.f, 0.f},
+    //          Vec2{0.f, 1.f},
+    //          Vec3{0.f, 0.f, 1.f}},
+    //      Vertex{
+    //          Vec3{1.f, 1.f, 0.f},
+    //          Vec2{1.f, 1.f},
+    //          Vec3{0.f, 0.f, 1.f}}},
+    //    std::vector<std::uint16_t>{0, 1, 2} };
+
+    // for each **VISIBLE** cube face or plant face
     for (int i = 0; i < faces; i++) {
         // each face has 6 points (2 triangles, 3 vertices each)
-        my_mesh.indices.emplace_back(static_cast<std::uint16_t>(faces - i));
+        temp_mesh.indices.emplace_back(static_cast<std::uint16_t>(i));
         for (int j = 0; j < 6; j++) {
             // each vertex has 10 values (x, y, z, nx, ny, nz, u, v, ao, light)
             int k = i * 60 + j * 10;
-            GLfloat x = data[k+0];
-            GLfloat y = data[k+1];
-            GLfloat z = data[k+2];
-            GLfloat nx = data[k+3];
-            GLfloat ny = data[k+4];
-            GLfloat nz = data[k+5];
-            GLfloat u = data[k+6];
-            GLfloat v = data[k+7];
-            my_mesh.vertices.emplace_back(VertexType{PositionType{x, y, z}, TexCoordType{u, v}, NormalType{nx, ny, nz}});
+            GLfloat x = data[k + 0];
+            GLfloat y = data[k + 1];
+            GLfloat z = data[k + 2];
+            GLfloat nx = data[k + 3];
+            GLfloat ny = data[k + 4];
+            GLfloat nz = data[k + 5];
+            GLfloat u = data[k + 6];
+            GLfloat v = data[k + 7];
+            temp_mesh.vertices.emplace_back(Vertex{ Vec3{x, y, z}, Vec2{u, v}, Vec3{nx, ny, nz} });
         }
     }
 
-    struct WriteResult {
-        thinks::ObjWriteResult write_result;
-        std::string mesh_str;
+    const auto vtx_iend = std::end(temp_mesh.vertices);
+
+    // Mappers have two responsibilities:
+    // (1) - Iterating over a certain attribute of the mesh (e.g. positions).
+    // (2) - Translating from users types to OBJ types (e.g. Vec3 ->
+    //       Position<float, 3>)
+
+    // Positions.
+    auto pos_vtx_iter = std::begin(temp_mesh.vertices);
+    auto pos_mapper = [&pos_vtx_iter, vtx_iend]() {
+        using ObjPositionType = thinks::ObjPosition<float, 3>;
+
+        if (pos_vtx_iter == vtx_iend) {
+            // End indicates that no further calls should be made to this mapper,
+            // in this case because the captured iterator has reached the end
+            // of the vector.
+            return thinks::ObjEnd<ObjPositionType>();
+        }
+
+        // Map indicates that additional positions may be available after this one.
+        const auto pos = (*pos_vtx_iter++).position;
+        return thinks::ObjMap(ObjPositionType(pos.x, pos.y, pos.z));
     };
 
-    // write normals and tex coords too
-    auto&& mesh_result = WriteMesh(my_mesh, true, true);
+    // Faces.
+    auto idx_iter = std::begin(temp_mesh.indices);
+    const auto idx_iend = std::end(temp_mesh.indices);
+    auto face_mapper = [&idx_iter, idx_iend]() {
+        using ObjIndexType = thinks::ObjIndex<uint16_t>;
+        using ObjFaceType = thinks::ObjTriangleFace<ObjIndexType>;
 
+        // Check that there are 3 more indices (trailing indices handled below).
+        if (std::distance(idx_iter, idx_iend) < 3) {
+            return thinks::ObjEnd<ObjFaceType>();
+        }
 
-    return mesh_result.mesh_str;
-}
+        // Create a face from the mesh indices.
+        const auto idx0 = ObjIndexType(*idx_iter++);
+        const auto idx1 = ObjIndexType(*idx_iter++);
+        const auto idx2 = ObjIndexType(*idx_iter++);
+        return thinks::ObjMap(ObjFaceType(idx0, idx1, idx2));
+    };
+
+    // Texture coordinates [optional].
+    auto tex_vtx_iter = std::begin(temp_mesh.vertices);
+    auto tex_mapper = [&tex_vtx_iter, vtx_iend]() {
+        using ObjTexCoordType = thinks::ObjTexCoord<float, 2>;
+
+        if (tex_vtx_iter == vtx_iend) {
+            return thinks::ObjEnd<ObjTexCoordType>();
+        }
+
+        const auto tex = (*tex_vtx_iter++).tex_coord;
+        return thinks::ObjMap(ObjTexCoordType(tex.x, tex.y));
+    };
+
+    // Normals [optional].
+    auto nml_vtx_iter = std::begin(temp_mesh.vertices);
+    auto nml_mapper = [&nml_vtx_iter, vtx_iend]() {
+        using ObjNormalType = thinks::ObjNormal<float>;
+
+        if (nml_vtx_iter == vtx_iend) {
+            return thinks::ObjEnd<ObjNormalType>();
+        }
+
+        const auto nml = (*nml_vtx_iter++).normal;
+        return thinks::ObjMap(ObjNormalType(nml.x, nml.y, nml.z));
+    };
+
+    // Open the OBJ file and pass in the mappers, which will be called
+    // internally to write the contents of the mesh to the stream
+    std::ostringstream oss;
+    auto&& ofs = oss;
+    const auto result = thinks::WriteObj(ofs, pos_mapper, face_mapper, tex_mapper, nml_mapper);
+    // update the mesh_str parameter
+    mesh_str = oss.str();
+    oss.clear();
+} // convert_data_to_mesh_str
 
 GLenum glCheckError_(const char *file, int line)
 {
