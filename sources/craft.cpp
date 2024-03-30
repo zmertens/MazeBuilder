@@ -250,6 +250,7 @@ struct craft::craft_impl {
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
     const std::string_view& m_version;
+    const std::string_view& m_help;
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     mazes::writer m_writer;
     std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
@@ -258,9 +259,10 @@ struct craft::craft_impl {
     dear_imgui_helper m_gui;
     std::string m_current_mesh_str;
 
-    craft_impl(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
+    craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
         : m_window_name{ window_name }
         , m_version{ version }
+        , m_help{help}
         , m_maze_func{ maze_func }
         , m_writer{}
         , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
@@ -277,7 +279,7 @@ struct craft::craft_impl {
         int running = 1;
         // never call the factory with this caller
         string_view sv {"dummy"};
-        craft caller{ sv, {}, {} };
+        craft caller{ sv, {}, {}, {} };
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -2682,8 +2684,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, const std::string_view& version, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, version, std::move(maze_future))} {
+craft::craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future)
+    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help, std::move(maze_future))} {
 }
 
 craft::~craft() = default;
@@ -3002,6 +3004,12 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                     ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
                     if (this->m_pimpl->m_gui.capture_mouse)
                         SDL_SetRelativeMouseMode(SDL_TRUE);
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Help")) {
+                    ImGui::Text(this->m_pimpl->m_help.data());
+                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+                    ImGui::Text(github_repo);
                     ImGui::EndTabItem();
                 }
                 ImGui::EndTabBar();
