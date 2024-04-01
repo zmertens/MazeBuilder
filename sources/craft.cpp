@@ -1512,26 +1512,29 @@ struct craft::craft_impl {
      * @return
      */
     void set_grid(shared_ptr<mazes::cell> const& _cell, unique_ptr<mazes::grid> const& _grid, Player *p) {
-
+        static constexpr unsigned int row_offset = 3, col_offset = 3;
         if (_cell != nullptr) {
             set_grid(_cell->get_left(), _grid, p);
-            set_block(_cell->get_row(), _grid->get_height(), _cell->get_column(), 5);
-            record_block(_cell->get_row(), _grid->get_height(), _cell->get_column(), 5);
+            // create vertical walls
+            if (!_cell->is_linked(_cell->get_east())) {
+                for (auto r{ _cell->get_row() }; r < _cell->get_row() + row_offset; r++) {
+                    for (auto y{ _grid->get_height() }; y < _grid->get_height() + row_offset; y++) {
+                        set_block(r, y, _cell->get_column(), 6);
+                        record_block(r, y, _cell->get_column(), 6);
+                    }
+                }
+            }
+            // create horizontal walls
+            if (!_cell->is_linked(_cell->get_south())) {
+                for (auto c{ _cell->get_column() }; c < _cell->get_column() + col_offset; c++) {
+                    for (auto y{ _grid->get_height() }; y < _grid->get_height() + row_offset; y++) {
+                        set_block(_cell->get_row(), y, c, 5);
+                        record_block(_cell->get_row(), y, c, 5);
+                    }
+                }
+            }
             set_grid(_cell->get_right(), _grid, p);
         }
-
-        //auto&& itr = sv.cbegin();
-        //auto row_x{ 0u }, col_z{ 0u };
-        //while (itr != sv.cend() && row_x < _grid->get_rows() && col_z < _grid->get_columns()) {
-        //    switch (*itr) {
-        //    case '\n': row_x++; col_z = 0; break;
-        //    case ' ': col_z++; break;
-        //    case '+': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
-        //    case '-': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
-        //    case '|': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
-        //    }
-        //    itr++;
-        //} // while
     } // set_grid
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
