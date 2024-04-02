@@ -4,6 +4,8 @@ Build mazes in console or 3D, and save, export to file.
 
 ![Textured maze with solution in white](textures/maze_in_green_32x32.bmp)
 
+![Release screenshot](textures/maze_builder_release1.png)
+
 ## CMake
 
 This project uses `cmake` to build and test. It uses `find_package` or `FetchContent` to get SDL and Catch2 if necessary. Modern hardware supporting OpenGL 3.0 is required.
