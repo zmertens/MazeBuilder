@@ -33,6 +33,7 @@ Originally written in C99, ported to C++17
 #include <string_view>
 #include <algorithm>
 #include <unordered_map>
+#include <iostream>
 
 #include <noise/noise.h>
 #include <tinycthread/tinycthread.h>
@@ -1511,29 +1512,28 @@ struct craft::craft_impl {
      * @param p
      * @return
      */
-    void set_grid(shared_ptr<mazes::cell> const& _cell, unique_ptr<mazes::grid> const& _grid, Player *p) {
-        static constexpr unsigned int row_offset = 3, col_offset = 3;
-        if (_cell != nullptr) {
-            set_grid(_cell->get_left(), _grid, p);
-            // create vertical walls
-            if (!_cell->is_linked(_cell->get_east())) {
-                for (auto r{ _cell->get_row() }; r < _cell->get_row() + row_offset; r++) {
-                    for (auto y{ _grid->get_height() }; y < _grid->get_height() + row_offset; y++) {
-                        set_block(r, y, _cell->get_column(), 6);
-                        record_block(r, y, _cell->get_column(), 6);
+    void set_grid(unsigned int y, const string& temp_s) {
+        istringstream iss{ temp_s.data() };
+        string line;
+        unsigned int row_x = 0;
+        while (getline(iss, line, '\n')) {
+            unsigned int col_z = 0;
+            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                if (*itr == ' ') {
+                    col_z++;
+                }
+                else if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // found a barrier/wall
+                    static constexpr unsigned int starting_height = 25u;
+                    for (auto h{ starting_height }; h < starting_height + y; h++) {
+                        set_block(row_x, h, col_z, 6);
+                        record_block(row_x, h, col_z, 6);
                     }
+                    col_z++;
                 }
             }
-            // create horizontal walls
-            if (!_cell->is_linked(_cell->get_south())) {
-                for (auto c{ _cell->get_column() }; c < _cell->get_column() + col_offset; c++) {
-                    for (auto y{ _grid->get_height() }; y < _grid->get_height() + row_offset; y++) {
-                        set_block(_cell->get_row(), y, c, 5);
-                        record_block(_cell->get_row(), y, c, 5);
-                    }
-                }
-            }
-            set_grid(_cell->get_right(), _grid, p);
+            
+            row_x++;
         }
     } // set_grid
 
@@ -3149,7 +3149,10 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             if (success_from_maze_fut && ready_to_compute) {
                 // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
                 // now that the _grid is calculated, set the blocks in the 3D world by set_grid
-                this->m_pimpl->set_grid(_grid->get_root(), _grid, me);
+                stringstream ss;
+                ss << *_grid.get();
+                string temp_s{ ss.str() };
+                this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
                 ready_to_compute = false;
             }
 
