@@ -187,3 +187,17 @@ TEST_CASE("Threading mazes and appending together", "[threading mazes]") {
     for (auto&& i : increments)
         REQUIRE(i);
 }
+
+TEST_CASE("Perfect mazes should be solvable", "[solve maze]") {
+    unique_ptr<grid> _grid_from_sw{ make_unique<grid>(50, 50) };
+
+    auto&& future_grid_from_sw = std::async(std::launch::async, [&] {
+        mazes::sidewinder sw;
+        return sw.run(_grid_from_sw, get_int, false);
+        });
+    // check maze algo completes
+    REQUIRE(future_grid_from_sw.get());
+    // check that maze can be solved (find shortest-path)
+    bool maze_is_solved{ _grid_from_sw->is_solveable() };
+    REQUIRE(maze_is_solved);
+}

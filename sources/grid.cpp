@@ -55,7 +55,7 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
         vector<shared_ptr<cell>> sorted_cells;
         sorted_cells.reserve(this->m_rows * this->m_columns);
         // populate a vector of cells from the grid (doesn't matter if it's sorted here, just need it filled)
-        this->sort(this->m_binary_search_tree_root, ref(sorted_cells));
+        this->populate_vec(ref(sorted_cells));
         this->sort_by_row_then_col(ref(sorted_cells));
         configure_cells(ref(sorted_cells));
     }
@@ -172,6 +172,13 @@ shared_ptr<cell> grid::get_root() const noexcept {
 }
 
 /**
+* Populate (instantiate a linear vector of cells using the data in the grid)
+*/
+void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept {
+    this->sort(this->get_root(), ref(_cells));
+}
+
+/**
  * Iterate through the other_grid and insert to the current grid's root
  * Increment other_grid's indices 'i' by this current grid's max + 'i'
 */
@@ -206,6 +213,13 @@ shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, unsigned int i
     } else {
         return search(start->get_right(), index);
     }
+}
+
+/**
+* Find Dijkstra's shortest path
+*/
+bool grid::is_solveable() const noexcept {
+    return false;
 }
 
 void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {

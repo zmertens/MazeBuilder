@@ -1,11 +1,10 @@
 #include "world.h"
-#include "config.h"
 
 #include <noise/noise.h>
 
 using namespace std;
 
-void world::create_world(int p, int q, world_func func, Map *m) {
+void world::create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept {
     int pad = 1;
     for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
         for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {

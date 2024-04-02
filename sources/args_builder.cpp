@@ -17,8 +17,7 @@ It is preferred to parse program arguments but the map is useful for testing
 using namespace mazes;
 
 args_builder::args_builder(const std::string& v, const std::string& h, const std::vector<std::string>& args_vec)
-: state {args_state::READY_TO_ROCK}
-, args_vec{args_vec} {
+: args_vec{args_vec} {
     args_map.emplace("version", v);
     args_map.emplace("help", h);
     args_map.emplace("algorithm", "binary_tree");
@@ -28,15 +27,15 @@ args_builder::args_builder(const std::string& v, const std::string& h, const std
     args_map.emplace("width", "100");
     args_map.emplace("length", "100");
     args_map.emplace("height", "10");
-
+    // ready to rock = 2
+    args_map.emplace("state", "2");
 }
 
 /*
 It's up to the caller to prepare an args map with all the defaults
 */
 args_builder::args_builder(const std::unordered_map<std::string, std::string>& args) 
-: state {args_state::READY_TO_ROCK}
-, args_map{args}
+: args_map{args}
 , args_vec{} {
 
 }
@@ -57,16 +56,12 @@ std::string args_builder::get_help() const noexcept {
     return args_map.at("help");
 }
 
-std::string args_builder::get_algo() const noexcept {
+std::string args_builder::get_algorithm() const noexcept {
     return this->args_map.at("algorithm");
 }
 
 std::string args_builder::get_output() const noexcept {
     return this->args_map.at("output");
-}
-
-args_state args_builder::get_state() const noexcept {
-    return this->state;
 }
 
 unsigned int args_builder::get_width() const noexcept {
@@ -79,6 +74,16 @@ unsigned int args_builder::get_length() const noexcept {
 
 unsigned int args_builder::get_height() const noexcept {
     return atoi(this->args_map.at("height").c_str());
+}
+
+mazes::args_state args_builder::get_state() const noexcept {
+    unsigned int _state = atoi(this->args_map.at("state").c_str());
+    switch (_state) {
+    case 0: return args_state::JUST_NEEDS_HELP;
+    case 1: return args_state::JUST_NEEDS_VERSION;
+    case 2: return args_state::READY_TO_ROCK;
+    default: return args_state::JUST_NEEDS_HELP;
+    }
 }
 
 // parse args before returning the map if it's non-empty
@@ -124,8 +129,8 @@ void args_builder::gather_args() {
     regex length_regex ("--length=[\\d]+|^-l$", regex_constants::ECMAScript);
     // short option -h is changed because of the --help short option
     regex height_regex ("--height=[\\d]+|^-y$", regex_constants::ECMAScript);
-    regex help_regex ("(^--help$|^\\-h$)", regex_constants::ECMAScript);
-    regex version_regex ("(^--version$|^\\-v$)", regex_constants::ECMAScript);
+    regex help_regex ("--help|^-h$", regex_constants::ECMAScript);
+    regex version_regex ("--version|^-v", regex_constants::ECMAScript);
     regex algo_regex ("--algorithm=[\\w]+|^-a$", regex_constants::ECMAScript);
     regex output_regex ("(^--output=[\\w\\\\.]+|^\\-o$)", regex_constants::ECMAScript);
 
@@ -140,10 +145,10 @@ void args_builder::gather_args() {
         }
 
         if (regex_match(current, help_regex)) {
-            this->state = args_state::JUST_NEEDS_HELP;
+            args_map["state"] = "0";
             break;
         } else if (regex_match(current, version_regex)) {
-            this->state = args_state::JUST_NEEDS_VERSION;
+            args_map["state"] = "1";
             break;
         } else if (regex_match(current, interactive_regex)) {
             args_map["interactive"] = "1";

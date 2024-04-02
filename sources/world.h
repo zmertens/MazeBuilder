@@ -5,16 +5,12 @@
 #include <memory>
 
 #include "map.h"
-#include "maze_algo_interface.h"
-#include "binary_tree.h"
-
-class grid;
 
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_world(int p, int q, world_func func, Map *m);
+    void create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept;
 private:
 };
 

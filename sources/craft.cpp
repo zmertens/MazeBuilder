@@ -20,6 +20,11 @@ Originally written in C99, ported to C++17
 #endif
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
+// Struggling with CMake build config and so I added this for Release builds
+#if defined(DEBUGGING)
+#undef DEBUGGING
+#endif
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -27,29 +32,69 @@ Originally written in C99, ported to C++17
 #include <string>
 #include <string_view>
 #include <algorithm>
+#include <unordered_map>
+#include <iostream>
 
-#include "config.h"
+#include <noise/noise.h>
+#include <tinycthread/tinycthread.h>
+
+#include "util.h"
+#include "world.h"
 #include "cube.h"
 #include "db.h"
 #include "item.h"
-
 #include "matrix.h"
-#include <noise/noise.h>
-#include <tinycthread/tinycthread.h>
-#include "util.h"
-#include "world.h"
 
 #include "grid.h"
 #include "cell.h"
+#include "writer.h"
 
 #define DUMP_GL_EXTENSIONS 0
 
-#define XZ_SIZE (CHUNK_SIZE * 3 + 2)
-#define XZ_LO (CHUNK_SIZE)
-#define XZ_HI (CHUNK_SIZE * 2 + 1)
-#define Y_SIZE 258
-#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
-#define XZ(x, z) ((x) * XZ_SIZE + (z))
+// basic configurations
+#define KEY_FORWARD SDL_SCANCODE_W
+#define KEY_BACKWARD SDL_SCANCODE_S
+#define KEY_LEFT SDL_SCANCODE_A
+#define KEY_RIGHT SDL_SCANCODE_D
+#define KEY_JUMP SDL_SCANCODE_SPACE
+#define KEY_FLY SDL_SCANCODE_TAB
+#define KEY_OBSERVE SDL_SCANCODE_O
+#define KEY_OBSERVE_INSET SDL_SCANCODE_P
+#define KEY_ITEM_NEXT SDL_SCANCODE_E
+#define KEY_ITEM_PREV SDL_SCANCODE_R
+#define KEY_ZOOM SDL_SCANCODE_LSHIFT
+#define KEY_ORTHO SDL_SCANCODE_F
+#define KEY_CHAT SDL_SCANCODE_T
+#define KEY_COMMAND SDL_SCANCODE_SLASH
+#define KEY_SIGN SDL_SCANCODE_GRAVE
+
+#define WINDOW_WIDTH 1024
+#define WINDOW_HEIGHT 768
+#define VSYNC 1
+#define SCROLL_THRESHOLD 0.1
+#define MAX_MESSAGES 4
+#define DB_PATH "craft.db"
+#define USE_CACHE 1
+#define DAY_LENGTH 600
+#define INVERT_MOUSE 0
+
+// rendering options
+#define SHOW_LIGHTS 1
+#define SHOW_ITEM 1
+#define SHOW_CROSSHAIRS 1
+#define SHOW_WIREFRAME 1
+#define SHOW_INFO_TEXT 1
+#define SHOW_CHAT_TEXT 1
+#define SHOW_PLAYER_NAMES 1
+
+#define CRAFT_KEY_SIGN '`'
+
+// advanced parameters
+#define CREATE_CHUNK_RADIUS 10
+#define RENDER_CHUNK_RADIUS 10
+#define RENDER_SIGN_RADIUS 4
+#define DELETE_CHUNK_RADIUS 14
+#define COMMIT_INTERVAL 5
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
@@ -71,6 +116,16 @@ using namespace mazes;
 using namespace std;
 
 struct craft::craft_impl {
+    typedef struct {
+        int chunk_size;
+        bool show_trees;
+        bool show_plants;
+        bool show_clouds;
+        bool fullscreen;
+        bool color_mode_dark;
+        bool capture_mouse;
+    } dear_imgui_helper;
+
     typedef struct {
         Map map;
         Map lights;
@@ -188,17 +243,35 @@ struct craft::craft_impl {
         Block copy1;
     } Model;
 
+    typedef struct {
+        int faces;
+        GLfloat* data;
+    } chunk_to_write_to;
+
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
+    const std::string_view& m_version;
+    const std::string_view& m_help;
     std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
-    std::packaged_task<bool(const std::string& data)> m_task_writer;
+    mazes::writer m_writer;
+    std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
+    std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
     unique_ptr<Model> m_model;
+    dear_imgui_helper m_gui;
+    std::string m_current_mesh_str;
 
-    craft_impl(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func, std::packaged_task<bool(const std::string& data)> task_writes)
-    : m_window_name{window_name}
-    , m_maze_func{maze_func}
-    , m_task_writer(std::move(task_writes))
-    , m_model{make_unique<Model>()} {
+    craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
+        : m_window_name{ window_name }
+        , m_version{ version }
+        , m_help{help}
+        , m_maze_func{ maze_func }
+        , m_writer{}
+        , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
+            convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
+        , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
+        , m_model{make_unique<Model>()}
+        , m_gui{32, true, true, true, false, true, false}
+        , m_current_mesh_str{} {
 
     }
 
@@ -207,7 +280,7 @@ struct craft::craft_impl {
         int running = 1;
         // never call the factory with this caller
         string_view sv {"dummy"};
-        craft caller {sv, {}, {}};
+        craft caller{ sv, {}, {}, {} };
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -262,7 +335,7 @@ struct craft::craft_impl {
     }
 
     int chunked(float x) const {
-        return SDL_floorf(SDL_roundf(x) / CHUNK_SIZE);
+        return SDL_floorf(SDL_roundf(x) / this->m_gui.chunk_size);
     }
     double get_time() const {
     	return (SDL_GetTicks() + (double) this->m_model->start_time - (double) this->m_model->start_ticks) / 1000.0;
@@ -655,9 +728,9 @@ struct craft::craft_impl {
     int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
         float miny_f = static_cast<float>(miny);
         float maxy_f = static_cast<float>(maxy);
-        float x = static_cast<float>(p * CHUNK_SIZE - 1);
-        float z = static_cast<float>(q * CHUNK_SIZE - 1);
-        float d = static_cast<float>(CHUNK_SIZE + 1);
+        float x = static_cast<float>(p * this->m_gui.chunk_size - 1);
+        float z = static_cast<float>(q * this->m_gui.chunk_size - 1);
+        float d = static_cast<float>(this->m_gui.chunk_size + 1);
         float points[8][3] = {
             {x + 0.f, miny_f, z + 0.f},
             {x + d, miny_f, z + 0.f},
@@ -1019,6 +1092,12 @@ struct craft::craft_impl {
     } // occlusion
 
     void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
+#define XZ_SIZE (this->m_gui.chunk_size * 3 + 2)
+#define XZ_LO (this->m_gui.chunk_size)
+#define XZ_HI (this->m_gui.chunk_size * 2 + 1)
+#define Y_SIZE 258
+#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
+#define XZ(x, z) ((x) * XZ_SIZE + (z))
         if (x + w < XZ_LO || z + w < XZ_LO) {
             return;
         }
@@ -1048,9 +1127,9 @@ struct craft::craft_impl {
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
-        int ox = item->p * CHUNK_SIZE - CHUNK_SIZE - 1;
+        int ox = item->p * this->m_gui.chunk_size - this->m_gui.chunk_size - 1;
         int oy = -1;
-        int oz = item->q * CHUNK_SIZE - CHUNK_SIZE - 1;
+        int oz = item->q * this->m_gui.chunk_size - this->m_gui.chunk_size - 1;
 
         // check for lights
         int has_light = 0;
@@ -1219,6 +1298,16 @@ struct craft::craft_impl {
         item->maxy = maxy;
         item->faces = faces;
         item->data = data;
+
+        // check if the grid has been computed (blocks set), if so, setup the writer
+        // setting up the writer calls util.cpp::convert_grid_to_mesh_str
+        static bool already_written = false;
+        if (item->p == 0 && item->q == 0 && !already_written) {
+            //this->m_setup_writer({ faces, data });
+            convert_data_to_mesh_str(item->faces, item->data, ref(this->m_current_mesh_str));
+            //SDL_Log("In compute chunk: mesh_str: %s\n", this->m_current_mesh_str.c_str());
+            already_written = true;
+        }
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1269,11 +1358,16 @@ struct craft::craft_impl {
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
-        _world.create_world(p, q, map_set_func, block_map);        
+        auto&& gui_options = this->m_gui;
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
 
+    /**
+    * @brief called by ensure_chunk_workers, create_chunk
+    * @return
+    */
     void init_chunk(Chunk *chunk, int p, int q) {
         chunk->p = p;
         chunk->q = q;
@@ -1287,9 +1381,9 @@ struct craft::craft_impl {
         db_load_signs(signs, p, q);
         Map *block_map = &chunk->map;
         Map *light_map = &chunk->lights;
-        int dx = p * CHUNK_SIZE - 1;
+        int dx = p * this->m_gui.chunk_size - 1;
         int dy = 0;
-        int dz = q * CHUNK_SIZE - 1;
+        int dz = q * this->m_gui.chunk_size - 1;
         map_alloc(block_map, dx, dy, dz, 0x7fff);
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
@@ -1412,32 +1506,36 @@ struct craft::craft_impl {
     }
 
     /**
-     * @brief compute_grid takes player coords, and builds a 3D grid using grid row, column, height
-     * It string parses the grid.
+     * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
+     * Calling set_grid, set_block will trigger compute_chunk
      * @param _grid
      * @param p
-     * @return The worker item with the grid data, faces
+     * @return
      */
-    void compute_grid(unique_ptr<mazes::grid> const& _grid, Player *p) {
-        stringstream ss;
-        ss << *_grid.get();
-        string sv{ ss.str() };
-#if defined(DEBUGGING)
-        SDL_Log("Computing grid str: %s\n", sv);
-#endif
-        auto&& itr = sv.cbegin();
-        auto row_x{ 0u }, col_z{ 0u };
-        while (itr != sv.end() && row_x < _grid->get_rows() && col_z < _grid->get_columns()) {
-            switch (*itr) {
-            case '\n': row_x++; col_z = 0; break;
-            case ' ': col_z++; break;
-            case '+': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
-            case '-': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
-            case '|': col_z++; set_block(row_x, 25, col_z, 3); record_block(row_x, 25, col_z, 3); break;
+    void set_grid(unsigned int y, const string& temp_s) {
+        istringstream iss{ temp_s.data() };
+        string line;
+        unsigned int row_x = 0;
+        while (getline(iss, line, '\n')) {
+            unsigned int col_z = 0;
+            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                if (*itr == ' ') {
+                    col_z++;
+                }
+                else if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // found a barrier/wall
+                    static constexpr unsigned int starting_height = 25u;
+                    for (auto h{ starting_height }; h < starting_height + y; h++) {
+                        set_block(row_x, h, col_z, 6);
+                        record_block(row_x, h, col_z, 6);
+                    }
+                    col_z++;
+                }
             }
-            itr++;
-        } // while
-    } // compute_grid
+            
+            row_x++;
+        }
+    } // set_grid
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
@@ -1466,10 +1564,10 @@ struct craft::craft_impl {
                     continue;
                 }
                 int distance = MAX(ABS(dp), ABS(dq));
-                int invisible = !chunk_visible(planes, a, b, 0, 256);
+                int invisible = ~chunk_visible(planes, a, b, 0, 256);
                 int priority = 0;
                 if (chunk) {
-                    priority = chunk->buffer && chunk->dirty;
+                    priority = chunk->buffer & chunk->dirty;
                 }
                 int score = (invisible << 24) | (priority << 16) | distance;
                 if (score < best_score) {
@@ -1711,7 +1809,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 0);
         glUniform1i(attrib->extra1, 2);
         glUniform1f(attrib->extra2, light);
-        glUniform1f(attrib->extra3, this->m_model->render_radius * CHUNK_SIZE);
+        glUniform1f(attrib->extra3, this->m_model->render_radius * this->m_gui.chunk_size);
         glUniform1i(attrib->extra4, this->m_model->ortho);
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
@@ -2203,8 +2301,14 @@ struct craft::craft_impl {
         }
     }
 
-    // https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    int handle_events(double dt) {
+    /**
+    * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
+    * This function also checks if user is interacting with gui to prevent mouse hiding
+    * @param dt
+    * @param running reference to running loop in game loop
+    * @return bool return true when event handle successfully
+    */
+    bool handle_events(double dt, bool& running) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2219,61 +2323,62 @@ struct craft::craft_impl {
 
         SDL_Keymod mod_state = SDL_GetModState();
 
-        int control = mod_state ;//& (KMOD_LCTRL | KMOD_RCTRL | KMOD_LGUI | KMOD_RGUI);
-        int exclusive = SDL_GetRelativeMouseMode();
+        int control = mod_state;
+        
+        bool capture_mouse = this->m_gui.capture_mouse;
 
         while (SDL_PollEvent(&e)) {
-            /*
-            if (e.type == this->m_model->userevent) {
-
-                code = e.user.code;
-                switch (code) {
-                }
-            }
-            */
+            ImGui_ImplSDL3_ProcessEvent(&e);
             switch (e.type) {
-            case SDL_EVENT_QUIT:
-                return 1;
-            case SDL_EVENT_KEY_UP:
+            case SDL_EVENT_QUIT: {
+                running = false;
+                return true;
+            }
+            case SDL_EVENT_KEY_UP: {
                 sc = e.key.keysym.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE:
                     if (this->m_model->typing) {
                         this->m_model->typing = 0;
-                    } else if (exclusive) {
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
                     } else {
-                        return 1;
+                        // show mouse
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        this->m_gui.capture_mouse = !this->m_gui.capture_mouse;
+                        capture_mouse = !capture_mouse;
                     }
                 }
                 break;
-
-            case SDL_EVENT_KEY_DOWN:
+            }
+            case SDL_EVENT_KEY_DOWN: {
                 sc = e.key.keysym.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_RETURN:
                     if (this->m_model->typing) {
                         if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
                             if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                                this->m_model->typing_buffer[this->m_model->text_len] = '\r'; // TODO? \n?
-                                this->m_model->typing_buffer[this->m_model->text_len+1] = '\0';
+                                this->m_model->typing_buffer[this->m_model->text_len] = '\n';
+                                this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
                             }
-                        } else {
+                        }
+                        else {
                             this->m_model->typing = 0;
                             if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-                                Player *player = this->m_model->players;
+                                Player* player = this->m_model->players;
                                 int x, y, z, face;
                                 if (hit_test_face(player, &x, &y, &z, &face)) {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
-                            } else if (this->m_model->typing_buffer[0] == '/') {
+                            }
+                            else if (this->m_model->typing_buffer[0] == '/') {
                                 this->parse_command(this->m_model->typing_buffer, 1);
                             }
                         }
-                    } else {
+                    }
+                    else {
                         if (control) {
                             this->on_right_click();
-                        } else {
+                        }
+                        else {
                             this->on_left_click();
                         }
                     }
@@ -2286,7 +2391,8 @@ struct craft::craft_impl {
                             this->m_model->suppress_char = 1;
                             SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                 MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                        } else {
+                        }
+                        else {
                             parse_command(clip_buffer, 0);
                         }
                     }
@@ -2311,7 +2417,7 @@ struct craft::craft_impl {
 
                 case KEY_FLY:
                     if (!this->m_model->typing)
-                        this->m_model->flying = !this->m_model->flying;
+                        this->m_model->flying = ~this->m_model->flying;
                     break;
 
                 case KEY_ITEM_NEXT:
@@ -2335,25 +2441,6 @@ struct craft::craft_impl {
                         this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
 
-                    /*
-                case KEY_ORTHO:
-                    break;
-                case KEY_ZOOM:
-                    break;
-                case KEY_FORWARD:
-                    break;
-                case KEY_BACKWARD:
-                    break;
-                case KEY_LEFT:
-                    break;
-                case KEY_RIGHT:
-                    break;
-                case KEY_UP:
-                    break;
-                case KEY_DOWN:
-                    break;
-                    */
-
                 case KEY_CHAT:
                     this->m_model->typing = 1;
                     this->m_model->typing_buffer[0] = '\0';
@@ -2376,86 +2463,92 @@ struct craft::craft_impl {
                 }
 
                 break;
-
-            case SDL_EVENT_TEXT_INPUT:
+            } // SDL_EVENT_KEY_DOWN
+            case SDL_EVENT_TEXT_INPUT: {
                 // could probably just do text[text_len++] = e.text.text[0]
                 // since I only handle ascii
-                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH -1) {
+                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                     strcat(this->m_model->typing_buffer, e.text.text);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                     //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
                     //SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                 }
                 break;
-
-            case SDL_EVENT_MOUSE_MOTION:
-                if (exclusive) {
+            }
+            case SDL_EVENT_MOUSE_MOTION: {
+                if (capture_mouse) {
                     s->rx += e.motion.xrel * m;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * m;
-                    } else {
+                    }
+                    else {
                         s->ry -= e.motion.yrel * m;
                     }
                     if (s->rx < 0) {
                         s->rx += RADIANS(360);
                     }
-                    if (s->rx >= RADIANS(360)){
+                    if (s->rx >= RADIANS(360)) {
                         s->rx -= RADIANS(360);
                     }
                     s->ry = MAX(s->ry, -RADIANS(90));
                     s->ry = MIN(s->ry, RADIANS(90));
                 }
                 break;
-
-            case SDL_EVENT_MOUSE_BUTTON_DOWN:
-                if (e.button.button == SDL_BUTTON_LEFT) {
-                    if (exclusive) {
-                        if (control) {
-                            on_right_click();
-                        } else {
-                            on_left_click();
-                        }
-                    } else {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+                if (capture_mouse && e.button.button == SDL_BUTTON_LEFT) {
+                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                    if (control) {
+                        on_right_click();
                     }
-                } else if (e.button.button == SDL_BUTTON_RIGHT) {
-                    if (exclusive) {
-                        if (control) {
-                            on_light();
-                        } else {
-                            on_right_click();
-                        }
+                    else {
+                        on_left_click();
                     }
-                } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (exclusive) {
+                }
+                else if (capture_mouse && e.button.button == SDL_BUTTON_RIGHT) {
+                    if (control) {
+                        on_light();
+                    }
+                    else {
+                        on_right_click();
+                    }
+                }
+                else if (e.button.button == SDL_BUTTON_MIDDLE) {
+                    if (capture_mouse) {
                         on_middle_click();
                     }
                 }
 
                 break;
-
-            case SDL_EVENT_MOUSE_WHEEL:
-                // TODO might have to change this to force 1 step
-                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                    this->m_model->item_index += e.wheel.y;
-                } else {
-                    this->m_model->item_index -= e.wheel.y;
+            }
+            case SDL_EVENT_MOUSE_WHEEL: {
+                if (capture_mouse) {
+                    // TODO might have to change this to force 1 step
+                    if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
+                        this->m_model->item_index += e.wheel.y;
+                    }
+                    else {
+                        this->m_model->item_index -= e.wheel.y;
+                    }
+                    if (this->m_model->item_index < 0)
+                        this->m_model->item_index = item_count - 1;
+                    else
+                        this->m_model->item_index %= item_count;
                 }
-                if (this->m_model->item_index < 0)
-                    this->m_model->item_index = item_count -1;
-                else
-                    this->m_model->item_index %= item_count;
                 break;
+            }
             case SDL_EVENT_WINDOW_RESIZED: {
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
             }
             case SDL_EVENT_WINDOW_SHOWN: {
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
             }
             } // switch
-        }
+        } // SDL_Event
 
         const Uint8 *state = SDL_GetKeyboardState(NULL);
 
@@ -2513,7 +2606,7 @@ struct craft::craft_impl {
             s->y = highest_block(s->x, s->z) + 2;
         }
 
-        return 0;
+        return true;
 
     } // handle_events
 
@@ -2522,7 +2615,7 @@ struct craft::craft_impl {
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
         int window_width = WINDOW_WIDTH;
         int window_height = WINDOW_HEIGHT;
-        if (FULLSCREEN) {
+        if (this->m_gui.fullscreen) {
             SDL_DisplayID display = SDL_GetPrimaryDisplay();
             int num_modes = 0;
             const SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
@@ -2561,7 +2654,7 @@ struct craft::craft_impl {
 
         SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
 
-        SDL_GL_SetSwapInterval(1);
+        SDL_GL_SetSwapInterval(VSYNC);
 
         auto icon_path{ "textures/maze_in_green_32x32.bmp" };
         SDL_Surface* icon_surface = SDL_LoadBMP(icon_path);
@@ -2594,8 +2687,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future, std::packaged_task<bool(const std::string& data)> task_writes)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, std::move(maze_future), std::move(task_writes))} {
+craft::craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future)
+    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help, std::move(maze_future))} {
 }
 
 craft::~craft() = default;
@@ -2625,7 +2718,7 @@ craft::~craft() = default;
 */
 bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 
-    // run a default maze to flex muscle memories (computers have muscles?)
+    // run a default maze to get things going
     bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
 
     srand(time(NULL));
@@ -2645,7 +2738,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     }
 
     SDL_ShowWindow(m_pimpl->m_model->window);
-    SDL_SetRelativeMouseMode(SDL_TRUE);
+    SDL_SetRelativeMouseMode(SDL_FALSE);
 
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL loader failed (%s)\n", SDL_GetError());
@@ -2653,7 +2746,9 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
         return false;
     }
 
+#if defined(DEBUGGING)
     dump_opengl_info(DUMP_GL_EXTENSIONS);
+#endif
 
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
@@ -2762,36 +2857,38 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
-
-    // Setup Platform/Renderer backends
+    // Setup ImGui Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
     const char* glsl_version = "#version 130";
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+    // - If no fonts are loaded, dear imgui will use the default font. 
+    // You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+    // - If the file cannot be loaded, the function will return a nullptr. 
+    //  Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
+    // - The fonts will be rasterized at a given size (w/ oversampling) 
+    // and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
     // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
     // - Read 'docs/FONTS.md' for more instructions and details.
     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. See Makefile.emscripten for details.
+    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. 
+    //  See Makefile.emscripten for details.
     //io.Fonts->AddFontDefault();
-    //io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
+    io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+    //io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     //IM_ASSERT(font != nullptr);
 
     // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
+    bool show_demo_window = false;
+    bool show_builder_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    
+    auto&& writer_fut{ this->m_pimpl->m_writer_task.get_future() };
 
     // MAIN LOOP //
     bool running = true;
@@ -2839,62 +2936,92 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             update_fps(&fps);
             double now = SDL_GetTicks();
             double dt = (now - previous) / 1000.0;
-            dt = MIN(dt, 0.2);
-            dt = MAX(dt, 0.0);
+            dt = SDL_min(dt, 0.2);
+            dt = SDL_max(dt, 0.0);
             previous = now;
 
-            if (m_pimpl->handle_events(dt)) {
-                running = false;
-                break;
+            if (m_pimpl->handle_events(dt, running)) {
+                if (!running)
+                    break;
             }
             if (m_pimpl->m_model->mode_changed) {
                 m_pimpl->m_model->mode_changed = 0;
                 break;
             }
+            
 
             // Start the Dear ImGui frame
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplSDL3_NewFrame();
             ImGui::NewFrame();
 
-            // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+            // Show the big demo window?
             if (show_demo_window)
                 ImGui::ShowDemoWindow(&show_demo_window);
+            // GUI Title Bar
+            ImGui::Begin(this->m_pimpl->m_version.data());
+            // GUI Tabs
+            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+                if (ImGui::BeginTabItem("Builder")) {
+                    ImGui::Text("Builder settings");
+                    ImGui::Text("Output");
+                    ImGui::Text("Width");
+                    ImGui::Text("Length");
+                    ImGui::Text("Height");
+                    ImGui::Text("Seed");
+                    if (ImGui::TreeNode("Algorithms")) {
+                        static const char* algos[2] = {"binary_tree", "sidewinder"};
+                        static int algos_current_idx{ 0 };
+                        auto preview{ algos[algos_current_idx] };
 
-            // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-            {
-                static float f = 0.0f;
-                static int counter = 0;
+                        if (ImGui::BeginCombo("algorithm", preview)) {
+                            for (int n = 0; n < 2; n++) {
+                                const bool is_selected = (algos_current_idx == n);
+                                if (ImGui::Selectable(algos[n], is_selected))
+                                    algos_current_idx = n;
 
-                ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-                ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-                ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-                ImGui::Checkbox("Another Window", &show_another_window);
-
-                ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-                ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-                if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                    counter++;
-                ImGui::SameLine();
-                ImGui::Text("counter = %d", counter);
-
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-                ImGui::End();
+                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
+                        }
+                        ImGui::TreePop();
+                    }
+                    
+                    ImGui::Button("Build!");
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Graphics")) {
+                    ImGui::Text("Graphic settings");
+                    auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
+                    ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
+                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen);
+                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
+                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
+                    if (this->m_pimpl->m_gui.color_mode_dark)
+                        ImGui::StyleColorsDark();
+                    else
+                        ImGui::StyleColorsLight();
+                    ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
+                    if (this->m_pimpl->m_gui.capture_mouse)
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Help")) {
+                    ImGui::Text(this->m_pimpl->m_help.data());
+                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+                    ImGui::Text(github_repo);
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
             }
 
-            // 3. Show another simple window.
-            if (show_another_window)
-            {
-                ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-                ImGui::Text("Hello from another window!");
-                if (ImGui::Button("Close Me"))
-                    show_another_window = false;
-                ImGui::End();
-            }
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+            ImGui::End();
 
-                // FLUSH DATABASE //
+            // FLUSH DATABASE //
             if (now - last_commit > COMMIT_INTERVAL) {
                 last_commit = now;
                 db_commit();
@@ -3018,29 +3145,35 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);     
                 }
             }
+            static bool ready_to_compute = true;
+            if (success_from_maze_fut && ready_to_compute) {
+                // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
+                // now that the _grid is calculated, set the blocks in the 3D world by set_grid
+                stringstream ss;
+                ss << *_grid.get();
+                string temp_s{ ss.str() };
+                this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
+                ready_to_compute = false;
+            }
 
             // interactive should always be true in craft::run, but just check it
-            static bool lets_write = true;
-            if (interactive && lets_write) {
-                lets_write = false;
-                // maze_future.get() is a blocking call, but we're almost done here anyway
-                // the _grid function parameter is updated from the future.get() call
-                if (success_from_maze_fut) {
-#if defined(DEBUGGING)
-                    SDL_Log("Computing grid: %p\n", _grid.get());
-#endif
-                    
+            // get() is a blocking call, but we need to check that there is mesh str rdy
+            static bool mesh_write_now = false;
+            if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
+                //auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
+                // call the task writer to asynchronously write the file (should flip the future)
+                this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
+                this->m_pimpl->m_current_mesh_str.clear();
+                mesh_write_now = true;
+            }
 
-                    // set blocks and call util functions to get grid data (c++ string)
-                    this->m_pimpl->compute_grid(_grid, me);
-                    
-                    // auto&& _grid_str = convert_grid_to_str(my_grid_worker_item->faces, my_grid_worker_item->data);
-                    // call the task writer with string data, to write the file
-                    // this->m_pimpl->m_task_writer(_grid_str);
-                }
-                // running = false exits the main loop, break exits the event loop
-                // running = false;
-                // break;
+            if (mesh_write_now) {
+                // check success
+                bool success_writing = writer_fut.get();
+#if defined(DEBUGGING)
+                SDL_Log("mesh writing success= %d\n", success_writing);
+#endif
+                mesh_write_now = false;
             }
 
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -25,7 +25,7 @@ public:
     bool is_interactive() const noexcept;
     std::string get_version() const noexcept;
     std::string get_help() const noexcept;
-    std::string get_algo() const noexcept;
+    std::string get_algorithm() const noexcept;
     std::string get_output() const noexcept;
     unsigned int get_width() const noexcept;
     unsigned int get_length() const noexcept;
@@ -37,8 +37,8 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
         std::stringstream ss;
-        for (auto&& k : args.build()) {
-            ss << "INFO: " << k.first << ", " << k.second << "\n";
+        for (auto&& [k, v] : args.build()) {
+            ss << "INFO: " << k << ", " << v << "\n";
         }
 
         return os << ss.str() << "\n";
@@ -48,7 +48,6 @@ private:
     void gather_args();
     std::unordered_map<std::string, std::string> args_map;
     std::vector<std::string> args_vec;
-    args_state state;
 };
 
 }

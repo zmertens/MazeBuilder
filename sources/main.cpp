@@ -14,9 +14,14 @@
 #include "maze_types_enum.h"
 #include "writer.h"
 
+// Struggling with CMake build config and so I added this for Release builds
+#if defined(DEBUGGING)
+#undef DEBUGGING
+#endif
+
 int main(int argc, char* argv[]) {
 
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.0.1]";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.3.0]";
 
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
@@ -38,16 +43,13 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < argc; i++) {
         args_vec.emplace_back(argv[i]);
     }
-
+    
     try {
         mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
-        mazes::args_state state_of_args {args.get_state()};
         auto&& args_map {args.build()};
-
-#if defined(DEBUGGING)
-        std::cout << args << std::endl;
-#endif
-
+        // this needs to get called after args.build() because of internal parsing
+        auto state_of_args{ args.get_state() };
+        
         if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
             std::cout << HELP_MSG << std::endl;
             return EXIT_SUCCESS;
@@ -104,15 +106,17 @@ int main(int argc, char* argv[]) {
         };
         std::packaged_task<bool(const std::string& data)> task_writes (write_func);
 
-        mazes::maze_types maze_algo = get_maze_type_from_algo(args.get_algo());
+        mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
         bool success = false;
         if (args.is_interactive()) {
             // string views don't own the data, they have less copying overhead
             std::string_view sv {"craft-sdl3"};
-            craft maze_builder_3D {sv, maze_factory, std::move(task_writes)};
+            std::string_view version_view{ MAZE_BUILDER_VERSION };
+            std::string_view help_view{ HELP_MSG };
+            craft maze_builder_3D {sv, version_view, help_view, maze_factory};
             success = maze_builder_3D.run(_grid, get_int, args.is_interactive());
         } else {
-            success = maze_factory(maze_algo).get();
+            success = maze_factory(my_maze_type).get();
         }
 
         if (success && !args.is_interactive()) {
@@ -128,11 +132,11 @@ int main(int argc, char* argv[]) {
                 std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
             }
         } else if (!success){
-            std::cerr << "ERROR: " << args.get_algo() << " failed!!" << std::endl;
+            std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
         }
     
     } catch (std::exception& ex) {
-        std::cerr << "ERROR: " << ex.what() << std::endl; 
+        std::cerr << ex.what() << std::endl; 
     }
 
     return EXIT_SUCCESS;
