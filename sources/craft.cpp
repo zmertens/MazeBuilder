@@ -2652,7 +2652,7 @@ struct craft::craft_impl {
         this->m_model->window = SDL_CreateWindow(m_window_name.data(), window_width, window_height, window_flags);
         this->m_model->context = (SDL_GLContext*) SDL_GL_CreateContext(this->m_model->window);
 
-        SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
+        SDL_GL_MakeCurrent(this->m_model->window, *this->m_model->context);
 
         SDL_GL_SetSwapInterval(VSYNC);
 
@@ -3214,7 +3214,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     gl_check_for_error();
 #endif
 
-    SDL_GL_DeleteContext(m_pimpl->m_model->context);
+    SDL_GL_DeleteContext(*m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
