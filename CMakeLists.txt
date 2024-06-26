@@ -72,11 +72,6 @@ add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
 
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
-if (WIN32)
-    target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE "C:\\Program Files (x86)\\SDL3\\include")
-    include_directories("C:\\Program Files (x86)\\SDL3\\include")
-endif()
-
 add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${TINY_C_THREAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
@@ -160,6 +155,8 @@ if(MINGW OR WIN32)
         
     find_package(OpenGL REQUIRED)
 
+    target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE "C:\\Program Files (x86)\\SDL3\\include")
+
     # Find/Configure SDL
     find_package(SDL3 QUIET)
     if(SDL3_FOUND)
@@ -172,6 +169,7 @@ if(MINGW OR WIN32)
         fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
+    
     target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
