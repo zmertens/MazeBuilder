@@ -15,9 +15,9 @@
 #include "writer.h"
 
 // Struggling with CMake build config and so I added this for Release builds
-#if defined(DEBUGGING)
-#undef DEBUGGING
-#endif
+// #if defined(DEBUGGING)
+// #undef DEBUGGING
+// #endif
 
 int main(int argc, char* argv[]) {
 
