@@ -83,6 +83,18 @@ target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURC
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
 
+include(FetchContent)
+function(fetch_lib_from_git name_of_lib tag git_repo)
+    FetchContent_Declare(
+        ${name_of_lib}
+        GIT_REPOSITORY ${git_repo}
+        GIT_TAG ${tag}
+        GIT_SHALLOW TRUE
+        GIT_PROGRESS TRUE
+    )
+    FetchContent_MakeAvailable(${name_of_lib})
+endfunction()
+
 if(EMSCRIPTEN)
     message(INFO ": Building SDL app for Web!")
 
@@ -92,19 +104,11 @@ if(EMSCRIPTEN)
     endif()
 
     set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html")
-
-    include(FetchContent)
+    # SDL3 isn't available as an Emscripten port (yet), so fetch it
+    message(INFO ": Getting SDL via FetchContent")
+    fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
     set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-    FetchContent_Declare(
-        SDL
-        GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG main
-        GIT_SHALLOW TRUE
-        GIT_PROGRESS TRUE
-    )
-    message(INFO ": Getting SDL via FetchContent")
-    FetchContent_MakeAvailable(SDL)
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     
     target_link_libraries(${MAZE_BUILDER_OUTFILE} Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
@@ -143,18 +147,8 @@ if(UNIX AND NOT EMSCRIPTEN)
 
     # If all else fails, download SDL
     if(NOT SDL3_FOUND)
-        include(FetchContent)
-        set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
-        set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-        FetchContent_Declare(
-            SDL
-            GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-            GIT_TAG main
-            GIT_SHALLOW TRUE
-            GIT_PROGRESS TRUE
-        )
-        message(INFO ": Getting SDL via FetchContent")
-        FetchContent_MakeAvailable(SDL)
+        # Call custom function to fetch from git
+        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
@@ -162,6 +156,22 @@ if(UNIX AND NOT EMSCRIPTEN)
 endif()
 
 if(MINGW OR WIN32)
+    message(INFO ": Building SDL app for Desktop WINDOWS!")
+        
+    find_package(OpenGL REQUIRED)
+
+    # Find/Configure SDL
+    find_package(SDL3 QUIET)
+    if(SDL3_FOUND)
+        message(INFO ": Getting SDL via find_package")
+    endif()
+
+    # If all else fails, download SDL
+    if(NOT SDL3_FOUND)
+        # Call custom function to fetch from git
+        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
+        set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+    endif()
     target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
@@ -174,15 +184,8 @@ if(BUILD_TESTS)
         message(INFO ": Getting Catch2 via find_package")
     endif()
     if(NOT CATCH2_FOUND)
-        include(FetchContent)
-        FetchContent_Declare(
-            Catch2
-            GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-            GIT_TAG v3.4.0
-            GIT_SHALLOW TRUE
-            GIT_PROGRESS TRUE)
         message(INFO ": Getting Catch2 via FetchContent")
-        FetchContent_MakeAvailable(Catch2)
+        fetch_lib_from_git(Catch2 v3.4.0 https://github.com/catchorg/Catch2.git)
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
@@ -193,7 +196,4 @@ if(BUILD_TESTS)
     target_compile_features(${MAZE_BUILDER_TESTS_OUTFILE} PUBLIC cxx_std_17)
     target_link_libraries(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE ${MAZE_BUILDER_LIB} Threads::Threads Catch2::Catch2WithMain)
     target_include_directories(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources")
-    include(CTest)
-    include(Catch)
-    catch_discover_tests(${MAZE_BUILDER_TESTS_OUTFILE})
 endif()
