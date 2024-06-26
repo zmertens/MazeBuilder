@@ -9,21 +9,16 @@ Originally written in C99, ported to C++17
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#include <emscripten/emscripten_mainloop_stub.h>
+#else
 #include <glad/glad.h>
+#endif
 
 #include <SDL3/SDL.h>
 
-#if defined(IMGUI_IMPL_OPENGL_ES2)
-#include <SDL3/SDL_opengles2.h>
-#else
-#include <SDL3/SDL_opengl.h>
-#endif
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
-
-// Struggling with CMake build config and so I added this for Release builds
-#if defined(DEBUGGING)
-#undef DEBUGGING
-#endif
 
 #include <cstdio>
 #include <cstdlib>
@@ -2265,7 +2260,7 @@ struct craft::craft_impl {
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
             set_block(hx, hy, hz, 0);
             record_block(hx, hy, hz, 0);
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
             SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
 #endif
             if (is_plant(get_block(hx, hy + 1, hz))) {
@@ -2282,7 +2277,7 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
                 SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
 #endif
             }
@@ -2335,7 +2330,7 @@ struct craft::craft_impl {
                 return true;
             }
             case SDL_EVENT_KEY_UP: {
-                sc = e.key.keysym.scancode;
+                sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE:
                     if (this->m_model->typing) {
@@ -2350,7 +2345,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_KEY_DOWN: {
-                sc = e.key.keysym.scancode;
+                sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_RETURN:
                     if (this->m_model->typing) {
@@ -2445,19 +2440,19 @@ struct craft::craft_impl {
                     this->m_model->typing = 1;
                     this->m_model->typing_buffer[0] = '\0';
                     this->m_model->text_len = 0;
-                    SDL_StartTextInput();
+                    SDL_StartTextInput(this->m_model->window);
                     break;
 
                 case KEY_COMMAND:
                     this->m_model->typing = 1;
                     this->m_model->typing_buffer[0] = '\0';
-                    SDL_StartTextInput();
+                    SDL_StartTextInput(this->m_model->window);
                     break;
 
                 case KEY_SIGN:
                     this->m_model->typing = 1;
                     this->m_model->typing_buffer[0] = '\0';
-                    SDL_StartTextInput();
+                    SDL_StartTextInput(this->m_model->window);
                     break;
 
                 }
@@ -2610,6 +2605,9 @@ struct craft::craft_impl {
 
     } // handle_events
 
+    /**
+     * @brief Create SDL/GL window and context, check display modes
+     */
     void create_window_and_context() {
         this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
@@ -2622,7 +2620,7 @@ struct craft::craft_impl {
             if (modes) {
                 for (int i = 0; i < num_modes; ++i) {
                     const SDL_DisplayMode *mode = modes[i];
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
                     SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n", display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
 #endif
                 }
@@ -2638,11 +2636,18 @@ struct craft::craft_impl {
             window_flags |= SDL_WINDOW_RESIZABLE;
         }
 
-    #if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-    #else
+#else
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+#endif
+
+#if defined(__EMSCRIPTEN__)
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+#else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
-    #endif // DEBUGGING
+#endif
+
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
         SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
@@ -2746,7 +2751,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
         return false;
     }
 
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
     dump_opengl_info(DUMP_GL_EXTENSIONS);
 #endif
 
@@ -2925,7 +2930,12 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 
         // BEGIN EVENT LOOP //
         int previous = SDL_GetTicks();
-        while (1) {
+#if defined(__EMSCRIPTEN__)
+        EMSCRIPTEN_MAINLOOP_BEGIN
+#else
+        while (1)
+#endif
+        {
             glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
             // FRAME RATE //
             if (m_pimpl->m_model->time_changed) {
@@ -2940,15 +2950,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             dt = SDL_max(dt, 0.0);
             previous = now;
 
-            if (m_pimpl->handle_events(dt, running)) {
-                if (!running)
-                    break;
-            }
-            if (m_pimpl->m_model->mode_changed) {
-                m_pimpl->m_model->mode_changed = 0;
-                break;
-            }
-            
+            m_pimpl->handle_events(dt, running);
 
             // Start the Dear ImGui frame
             ImGui_ImplOpenGL3_NewFrame();
@@ -3170,7 +3172,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
             if (mesh_write_now) {
                 // check success
                 bool success_writing = writer_fut.get();
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
                 SDL_Log("mesh writing success= %d\n", success_writing);
 #endif
                 mesh_write_now = false;
@@ -3178,10 +3180,14 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
             SDL_GL_SwapWindow(m_pimpl->m_model->window);
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
             gl_check_for_error();
 #endif
         } // EVENT LOOP
+
+#if defined(__EMSCRIPTEN__)
+        EMSCRIPTEN_MAINLOOP_END;
+#endif
 
         // SHUTDOWN //
         db_save_state(s->x, s->y, s->z, s->rx, s->ry);
@@ -3192,7 +3198,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
         m_pimpl->delete_all_players();
     } // MAIN LOOP
 
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
     SDL_Log("Cleaning up ImGui objects. . .");
     SDL_Log("Cleaning up OpenGL objects. . .");
     SDL_Log("Cleaning up SDL objects. . .");
@@ -3210,7 +3216,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
     gl_check_for_error();
 #endif
 

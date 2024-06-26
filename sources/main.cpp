@@ -14,11 +14,6 @@
 #include "maze_types_enum.h"
 #include "writer.h"
 
-// Struggling with CMake build config and so I added this for Release builds
-#if defined(DEBUGGING)
-#undef DEBUGGING
-#endif
-
 int main(int argc, char* argv[]) {
 
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.3.0]";
@@ -75,7 +70,7 @@ int main(int argc, char* argv[]) {
             } else if (algo.compare("sidewinder") == 0) {
                 return mazes::maze_types::SIDEWINDER;
             } else {
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
                 cout << "INFO: Using default maze algorithm, \"binary_tree\"\n";
 #endif
                 return mazes::maze_types::BINARY_TREE;
@@ -125,7 +120,7 @@ int main(int argc, char* argv[]) {
             ss << *_grid.get();
             task_writes(ss.str());
             if (fut_writer.get()) {
-#if defined(DEBUGGING)
+#if defined(MAZE_DEBUG)
                 std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
 #endif
             } else {
