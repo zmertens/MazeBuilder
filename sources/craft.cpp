@@ -2729,7 +2729,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open, compute the maze first
  * @param interactive = false
 */
-bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
+bool EMSCRIPTEN_KEEPALIVE craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 
     // run a default maze to get things going
     bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();

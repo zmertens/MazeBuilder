@@ -3,6 +3,13 @@ cmake_minimum_required(VERSION 3.2...3.5)
 cmake_policy(SET CMP0058 NEW)
 cmake_policy(SET CMP0072 NEW)
 
+# The following thread-related commands must be before project()
+set(CMAKE_THREAD_LIBS_INIT "-pthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+
 project(maze_builder)
 
 set(MAZE_BUILDER_OUTFILE "maze_builder")
@@ -12,6 +19,9 @@ set(MAZE_BUILDER_LIB "maze_builder_lib")
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
 option(BUILD_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
@@ -66,8 +76,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
     add_compile_definitions("MAZE_DEBUG")
 endif()
 
-find_package(Threads REQUIRED)
-
 add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
 
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
@@ -106,10 +114,12 @@ if(EMSCRIPTEN)
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${MAZE_BUILDER_LIB})
     
-    target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE 
-        "SHELL:-s FULL_ES3=1 -s MIN_WEBGL_VERSION=2 -s ASSERTIONS --shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten/shell_minimal.html"
+    target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
+    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -gsource-map"
+    	"SHELL:-s FULL_ES3=1 -s MIN_WEBGL_VERSION=2 -s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1"
+        "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_vertex.glsl@/shaders/block_vertex.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_fragment.glsl@/shaders/block_fragment.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/line_vertex.glsl@/shaders/line_vertex.glsl"
@@ -126,7 +136,7 @@ if(EMSCRIPTEN)
 endif()
 
 if(APPLE AND NOT EMSCRIPTEN)
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 if(UNIX AND NOT EMSCRIPTEN)
@@ -147,7 +157,7 @@ if(UNIX AND NOT EMSCRIPTEN)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 if(MINGW OR WIN32)
@@ -170,7 +180,7 @@ if(MINGW OR WIN32)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
     
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL Threads::Threads SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
 endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
@@ -192,6 +202,7 @@ if(BUILD_TESTS)
     # These tests can use the Catch2-provided main
     add_executable(${MAZE_BUILDER_TESTS_OUTFILE} ${TEST_FILES})
     target_compile_features(${MAZE_BUILDER_TESTS_OUTFILE} PUBLIC cxx_std_17)
-    target_link_libraries(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE ${MAZE_BUILDER_LIB} Threads::Threads Catch2::Catch2WithMain)
+    target_link_libraries(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE ${MAZE_BUILDER_LIB} Catch2::Catch2WithMain)
     target_include_directories(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources")
 endif()
+
