@@ -13,8 +13,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_BUILD_TYPE RelWithDebInfo)
-
 option(BUILD_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
 set(DEAR_IMGUI_SRCS
@@ -63,12 +61,9 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp)
 
-string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "RelWithDebInfo" ENABLE_DEBUGGING)
-string(COMPARE EQUAL "${CMAKE_BUILD_TYPE}" "Debug" ENABLE_DEBUGGING2)
-
-if(ENABLE_DEBUGGING OR ENABLE_DEBUGGING2)
-    message(INFO ": DEBUGGING enabled for ${PROJECT_NAME}")
-    add_compile_definitions("DEBUGGING")
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
+    add_compile_definitions("MAZE_DEBUG")
 endif()
 
 find_package(Threads REQUIRED)

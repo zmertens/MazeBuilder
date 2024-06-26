@@ -75,7 +75,7 @@ Private function to load file using SDL-specific functions
 //        if (SDL_RWread(io, data, data_size) != data_size) {
 //            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RWread failed: %s\n", SDL_GetError());
 //        }
-//#if defined(DEBUGGING)
+//#if defined(MAZE_DEBUG)
 //        SDL_Log("Reading file % s\n", path);
 //#endif
 //        SDL_RWclose(io);
