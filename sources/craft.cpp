@@ -199,7 +199,7 @@ struct craft::craft_impl {
 
     typedef struct {
         SDL_Window *window;
-        SDL_GLContext *context;
+        SDL_GLContext context;
         Worker workers[WORKERS];
         Chunk chunks[MAX_CHUNKS];
         int chunk_count;
@@ -2637,6 +2637,7 @@ struct craft::craft_impl {
         }
 
 #if defined(MAZE_DEBUG)
+        SDL_Log(SDL_LOG_CATEGORY_APPLICATION, "Using SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
@@ -2655,9 +2656,16 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         
         this->m_model->window = SDL_CreateWindow(m_window_name.data(), window_width, window_height, window_flags);
-        this->m_model->context = (SDL_GLContext*) SDL_GL_CreateContext(this->m_model->window);
+        if (this->m_model->window == nullptr) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
+        }
+        this->m_model->context = SDL_GL_CreateContext(this->m_model->window);
 
-        SDL_GL_MakeCurrent(this->m_model->window, *this->m_model->context);
+        if (this->m_model->context == nullptr) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_GL_CreateContext failed (%s)\n", SDL_GetError());
+        }
+
+        SDL_GL_MakeCurrent(this->m_model->window, this->m_model->context);
 
         SDL_GL_SetSwapInterval(VSYNC);
 
@@ -3220,7 +3228,7 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     gl_check_for_error();
 #endif
 
-    SDL_GL_DeleteContext(*m_pimpl->m_model->context);
+    SDL_GL_DeleteContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
