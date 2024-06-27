@@ -2729,7 +2729,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open, compute the maze first
  * @param interactive = false
 */
-bool EMSCRIPTEN_KEEPALIVE craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
+bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
 
     // run a default maze to get things going
     bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
@@ -2753,20 +2753,17 @@ bool EMSCRIPTEN_KEEPALIVE craft::run(unique_ptr<mazes::grid> const& _grid, std::
     SDL_ShowWindow(m_pimpl->m_model->window);
     SDL_SetRelativeMouseMode(SDL_FALSE);
 
+#if !defined(__EMSCRIPTEN__)
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL loader failed (%s)\n", SDL_GetError());
         SDL_Quit();
         return false;
     }
+#endif
 
 #if defined(MAZE_DEBUG)
     dump_opengl_info(DUMP_GL_EXTENSIONS);
 #endif
-
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glLogicOp(GL_INVERT);
-    glClearColor(0, 0, 0, 1);
 
     // LOAD TEXTURES //
     GLuint texture;
@@ -2852,6 +2849,10 @@ bool EMSCRIPTEN_KEEPALIVE craft::run(unique_ptr<mazes::grid> const& _grid, std::
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
     
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
+    glClearColor(0, 0, 0, 1);
+
     snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
