@@ -77,7 +77,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
 endif()
 
 add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
-
+target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
 add_executable(${MAZE_BUILDER_OUTFILE} ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${TINY_C_THREAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
@@ -114,7 +114,7 @@ if(EMSCRIPTEN)
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -gsource-map"
@@ -136,7 +136,7 @@ if(EMSCRIPTEN)
 endif()
 
 if(APPLE AND NOT EMSCRIPTEN)
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
 endif()
 
 if(UNIX AND NOT EMSCRIPTEN)
@@ -157,10 +157,10 @@ if(UNIX AND NOT EMSCRIPTEN)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
 endif()
 
-if(MINGW OR WIN32)
+if(MINGW OR WIN32 AND NOT EMSCRIPTEN)
     message(INFO ": Building SDL app for Desktop WINDOWS!")
         
     find_package(OpenGL REQUIRED)
@@ -180,7 +180,7 @@ if(MINGW OR WIN32)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
     
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL SDL3::SDL3 ${MAZE_BUILDER_LIB})
+    target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
 endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
