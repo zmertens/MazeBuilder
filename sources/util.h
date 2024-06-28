@@ -35,7 +35,6 @@ char *tokenize(char *str, const char *delim, char **key);
 int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
-void dump_opengl_info(bool dumpExtensions);
 
 void convert_data_to_mesh_str(int faces, GLfloat *data, std::string& mesh_str);
 

@@ -11,6 +11,7 @@ Originally written in C99, ported to C++17
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
+#include <SDL3/SDL_opengles2.h>
 #include <emscripten/emscripten_mainloop_stub.h>
 #else
 #include <glad/glad.h>
@@ -43,8 +44,6 @@ Originally written in C99, ported to C++17
 #include "grid.h"
 #include "cell.h"
 #include "writer.h"
-
-#define DUMP_GL_EXTENSIONS 0
 
 // basic configurations
 #define KEY_FORWARD SDL_SCANCODE_W
@@ -247,7 +246,6 @@ struct craft::craft_impl {
     const std::string_view& m_window_name;
     const std::string_view& m_version;
     const std::string_view& m_help;
-    std::function<std::future<bool>(mazes::maze_types mtype)> m_maze_func;
     mazes::writer m_writer;
     std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
     std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
@@ -255,11 +253,10 @@ struct craft::craft_impl {
     dear_imgui_helper m_gui;
     std::string m_current_mesh_str;
 
-    craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_func)
+    craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help)
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
-        , m_maze_func{ maze_func }
         , m_writer{}
         , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
             convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
@@ -275,7 +272,7 @@ struct craft::craft_impl {
         int running = 1;
         // never call the factory with this caller
         string_view sv {"dummy"};
-        craft caller{ sv, {}, {}, {} };
+        craft caller{ sv, {}, {} };
         while (running) {
             mtx_lock(&worker->mtx);
             while (worker->state != WORKER_BUSY) {
@@ -2644,6 +2641,9 @@ struct craft::craft_impl {
 #endif
 
 #if defined(__EMSCRIPTEN__)
+#if defined(MAZE_DEBUG)
+        SDL_Log("Setting SDL_GL_CONTEXT_PROFILE_ES\n");
+#endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
@@ -2700,8 +2700,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types mtype)> maze_future)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help, std::move(maze_future))} {
+craft::craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help)
+    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help)} {
 }
 
 craft::~craft() = default;
@@ -2729,10 +2729,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open, compute the maze first
  * @param interactive = false
 */
-bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
-
-    // run a default maze to get things going
-    bool success_from_maze_fut = this->m_pimpl->m_maze_func(mazes::maze_types::BINARY_TREE).get();
+bool craft::run(bool interactive) const noexcept {
 
     srand(time(NULL));
     rand();
@@ -2762,469 +2759,492 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
 #endif
 
 #if defined(MAZE_DEBUG)
-    dump_opengl_info(DUMP_GL_EXTENSIONS);
+    const GLubyte *renderer = glGetString(GL_RENDERER);
+    const GLubyte *vendor = glGetString(GL_VENDOR);
+    const GLubyte *version = glGetString(GL_VERSION);
+    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
+
+    GLint major, minor;
+    glGetIntegerv(GL_MAJOR_VERSION, &major);
+    glGetIntegerv(GL_MINOR_VERSION, &minor);
+	
+	SDL_Log("-------------------------------------------------------------\n");
+    SDL_Log("GL Vendor    : %s\n", vendor);
+    SDL_Log("GL Renderer  : %s\n", renderer);
+    SDL_Log("GL Version   : %s\n", version);
+    SDL_Log("GL Version   : %d.%d\n", major, minor);
+    SDL_Log("GLSL Version : %s\n", glslVersion);
+    SDL_Log("-------------------------------------------------------------\n");
+    bool dump_exts = false;
+    if (dump_exts) {
+        GLint nExtensions;
+        glGetIntegerv(GL_NUM_EXTENSIONS, &nExtensions);
+        for (int i = 0; i < nExtensions; i++) {
+            SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
+        }
+    }
 #endif
 
+//     glEnable(GL_CULL_FACE);
+//     glEnable(GL_DEPTH_TEST);
+//     glClearColor(0, 0, 0, 1);
+
     // LOAD TEXTURES //
-    GLuint texture;
-    glGenTextures(1, &texture);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    load_png_texture("textures/texture.png");
+//     GLuint texture;
+//     glGenTextures(1, &texture);
+//     glActiveTexture(GL_TEXTURE0);
+//     glBindTexture(GL_TEXTURE_2D, texture);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+//     load_png_texture("textures/texture.png");
 
-    GLuint font;
-    glGenTextures(1, &font);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, font);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    load_png_texture("textures/font.png");
+//     GLuint font;
+//     glGenTextures(1, &font);
+//     glActiveTexture(GL_TEXTURE1);
+//     glBindTexture(GL_TEXTURE_2D, font);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//     load_png_texture("textures/font.png");
 
-    GLuint sky;
-    glGenTextures(1, &sky);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, sky);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    load_png_texture("textures/sky.png");
+//     GLuint sky;
+//     glGenTextures(1, &sky);
+//     glActiveTexture(GL_TEXTURE2);
+//     glBindTexture(GL_TEXTURE_2D, sky);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+//     load_png_texture("textures/sky.png");
 
-    GLuint sign;
-    glGenTextures(1, &sign);
-    glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, sign);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    load_png_texture("textures/sign.png");
+//     GLuint sign;
+//     glGenTextures(1, &sign);
+//     glActiveTexture(GL_TEXTURE3);
+//     glBindTexture(GL_TEXTURE_2D, sign);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+//     load_png_texture("textures/sign.png");
 
-    // LOAD SHADERS //
-    craft_impl::Attrib block_attrib = {0};
-    craft_impl::Attrib line_attrib = {0};
-    craft_impl::Attrib text_attrib = {0};
-    craft_impl::Attrib sky_attrib = {0};
-    GLuint program;
+//     // LOAD SHADERS //
+//     craft_impl::Attrib block_attrib = {0};
+//     craft_impl::Attrib line_attrib = {0};
+//     craft_impl::Attrib text_attrib = {0};
+//     craft_impl::Attrib sky_attrib = {0};
+//     GLuint program;
 
-    program = load_program(
-        "shaders/block_vertex.glsl", "shaders/block_fragment.glsl");
-    block_attrib.program = program;
-    block_attrib.position = glGetAttribLocation(program, "position");
-    block_attrib.normal = glGetAttribLocation(program, "normal");
-    block_attrib.uv = glGetAttribLocation(program, "uv");
-    block_attrib.matrix = glGetUniformLocation(program, "matrix");
-    block_attrib.sampler = glGetUniformLocation(program, "sampler");
-    block_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
-    block_attrib.extra2 = glGetUniformLocation(program, "daylight");
-    block_attrib.extra3 = glGetUniformLocation(program, "fog_distance");
-    block_attrib.extra4 = glGetUniformLocation(program, "ortho");
-    block_attrib.camera = glGetUniformLocation(program, "camera");
-    block_attrib.timer = glGetUniformLocation(program, "timer");
+//     program = load_program(
+//         "shaders/block_vertex.glsl", "shaders/block_fragment.glsl");
+//     block_attrib.program = program;
+//     block_attrib.position = glGetAttribLocation(program, "position");
+//     block_attrib.normal = glGetAttribLocation(program, "normal");
+//     block_attrib.uv = glGetAttribLocation(program, "uv");
+//     block_attrib.matrix = glGetUniformLocation(program, "matrix");
+//     block_attrib.sampler = glGetUniformLocation(program, "sampler");
+//     block_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
+//     block_attrib.extra2 = glGetUniformLocation(program, "daylight");
+//     block_attrib.extra3 = glGetUniformLocation(program, "fog_distance");
+//     block_attrib.extra4 = glGetUniformLocation(program, "ortho");
+//     block_attrib.camera = glGetUniformLocation(program, "camera");
+//     block_attrib.timer = glGetUniformLocation(program, "timer");
 
-    program = load_program(
-        "shaders/line_vertex.glsl", "shaders/line_fragment.glsl");
-    line_attrib.program = program;
-    line_attrib.position = glGetAttribLocation(program, "position");
-    line_attrib.matrix = glGetUniformLocation(program, "matrix");
+//     program = load_program(
+//         "shaders/line_vertex.glsl", "shaders/line_fragment.glsl");
+//     line_attrib.program = program;
+//     line_attrib.position = glGetAttribLocation(program, "position");
+//     line_attrib.matrix = glGetUniformLocation(program, "matrix");
 
-    program = load_program(
-        "shaders/text_vertex.glsl", "shaders/text_fragment.glsl");
-    text_attrib.program = program;
-    text_attrib.position = glGetAttribLocation(program, "position");
-    text_attrib.uv = glGetAttribLocation(program, "uv");
-    text_attrib.matrix = glGetUniformLocation(program, "matrix");
-    text_attrib.sampler = glGetUniformLocation(program, "sampler");
-    text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
+//     program = load_program(
+//         "shaders/text_vertex.glsl", "shaders/text_fragment.glsl");
+//     text_attrib.program = program;
+//     text_attrib.position = glGetAttribLocation(program, "position");
+//     text_attrib.uv = glGetAttribLocation(program, "uv");
+//     text_attrib.matrix = glGetUniformLocation(program, "matrix");
+//     text_attrib.sampler = glGetUniformLocation(program, "sampler");
+//     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
 
-    program = load_program(
-        "shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
-    sky_attrib.program = program;
-    sky_attrib.position = glGetAttribLocation(program, "position");
-    // @TODO: use GLSL layout attribs!
-    //  currently sky normal vec3 is optimized out by GLSL compiler
-    sky_attrib.normal = 1; //glGetAttribLocation(program, "normal");
-    sky_attrib.uv = glGetAttribLocation(program, "uv");
-    sky_attrib.matrix = glGetUniformLocation(program, "matrix");
-    sky_attrib.sampler = glGetUniformLocation(program, "sampler");
-    sky_attrib.timer = glGetUniformLocation(program, "timer");
+//     program = load_program(
+//         "shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
+//     sky_attrib.program = program;
+//     sky_attrib.position = glGetAttribLocation(program, "position");
+//     // @TODO: use GLSL layout attribs!
+//     //  currently sky normal vec3 is optimized out by GLSL compiler
+//     sky_attrib.normal = 1; //glGetAttribLocation(program, "normal");
+//     sky_attrib.uv = glGetAttribLocation(program, "uv");
+//     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
+//     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
+//     sky_attrib.timer = glGetUniformLocation(program, "timer");
+
+//     snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
+
+//     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
+//     m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
+//     m_pimpl->m_model->delete_radius = DELETE_CHUNK_RADIUS;
+//     m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
+
+//     // INITIALIZE WORKER THREADS
+//     m_pimpl->init_worker_threads();
+
+//     // DEAR IMGUI INIT //
+//     // Setup Dear ImGui context
+//     IMGUI_CHECKVERSION();
+//     ImGui::CreateContext();
+//     ImGuiIO& io = ImGui::GetIO(); (void)io;
+//     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+//     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+//     // Setup ImGui Platform/Renderer backends
+//     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
+//     const char* glsl_version = "#version 130";
+//     ImGui_ImplOpenGL3_Init(glsl_version);
+
+//     // Load Fonts
+//     // - If no fonts are loaded, dear imgui will use the default font. 
+//     // You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
+//     // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
+//     // - If the file cannot be loaded, the function will return a nullptr. 
+//     //  Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
+//     // - The fonts will be rasterized at a given size (w/ oversampling) 
+//     // and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
+//     // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
+//     // - Read 'docs/FONTS.md' for more instructions and details.
+//     // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
+//     // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. 
+//     //  See Makefile.emscripten for details.
+//     //io.Fonts->AddFontDefault();
+//     io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
+//     //io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 16.0f);
+//     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
+//     //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
+//     //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
+//     //IM_ASSERT(font != nullptr);
+
+//     // Our state
+//     bool show_demo_window = false;
+//     bool show_builder_gui = true;
+//     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0, 0, 0, 1);
-
-    snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
-
-    m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
-    m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
-    m_pimpl->m_model->delete_radius = DELETE_CHUNK_RADIUS;
-    m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
-
-    // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads();
-
-    // DEAR IMGUI INIT //
-    // Setup Dear ImGui context
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-
-    // Setup ImGui Platform/Renderer backends
-    ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
-    const char* glsl_version = "#version 130";
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. 
-    // You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. 
-    //  Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) 
-    // and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. 
-    //  See Makefile.emscripten for details.
-    //io.Fonts->AddFontDefault();
-    io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    //io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    //io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    //ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-    //IM_ASSERT(font != nullptr);
-
-    // Our state
-    bool show_demo_window = false;
-    bool show_builder_gui = true;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-    
-    auto&& writer_fut{ this->m_pimpl->m_writer_task.get_future() };
+//     auto&& writer_fut{ this->m_pimpl->m_writer_task.get_future() };
 
     // MAIN LOOP //
     bool running = true;
     while (running) {
 
-        // DATABASE INITIALIZATION //
-        if (USE_CACHE) {
-            db_enable();
-            if (db_init(m_pimpl->m_model->db_path)) {
-                return -1;
-            }
-        }
+//         // DATABASE INITIALIZATION //
+//         if (USE_CACHE) {
+//             db_enable();
+//             if (db_init(m_pimpl->m_model->db_path)) {
+//                 return -1;
+//             }
+//         }
 
-        // LOCAL VARIABLES //
-        m_pimpl->reset_model();
-        FPS fps = {0, 0, 0};
-        double last_commit = SDL_GetTicks();
+//         // LOCAL VARIABLES //
+//         m_pimpl->reset_model();
+//         FPS fps = {0, 0, 0};
+//         double last_commit = SDL_GetTicks();
         
-        GLuint sky_buffer = m_pimpl->gen_sky_buffer();
+//         GLuint sky_buffer = m_pimpl->gen_sky_buffer();
         
-        craft_impl::Player *me = m_pimpl->m_model->players;
-        craft_impl::State *s = &m_pimpl->m_model->players->state;
-        me->id = 0;
-        me->name[0] = '\0';
-        me->buffer = 0;
-        m_pimpl->m_model->player_count = 1;
+//         craft_impl::Player *me = m_pimpl->m_model->players;
+//         craft_impl::State *s = &m_pimpl->m_model->players->state;
+//         me->id = 0;
+//         me->name[0] = '\0';
+//         me->buffer = 0;
+//         m_pimpl->m_model->player_count = 1;
 
-        // LOAD STATE FROM DATABASE //
-        int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
-        m_pimpl->force_chunks(me);
-        if (!loaded) {
-            s->y = m_pimpl->highest_block(s->x, s->z) + 2;
-        }
+//         // LOAD STATE FROM DATABASE //
+//         int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
+//         m_pimpl->force_chunks(me);
+//         if (!loaded) {
+//             s->y = m_pimpl->highest_block(s->x, s->z) + 2;
+//         }
 
         // BEGIN EVENT LOOP //
-        int previous = SDL_GetTicks();
+        // int previous = SDL_GetTicks();
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_BEGIN
 #else
         while (1)
 #endif
         {
-            glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
-            // FRAME RATE //
-            if (m_pimpl->m_model->time_changed) {
-                m_pimpl->m_model->time_changed = 0;
-                last_commit = SDL_GetTicks();
-                SDL_memset(&fps, 0, sizeof(fps));
-            }
-            update_fps(&fps);
-            double now = SDL_GetTicks();
-            double dt = (now - previous) / 1000.0;
-            dt = SDL_min(dt, 0.2);
-            dt = SDL_max(dt, 0.0);
-            previous = now;
+//             glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
+//             // FRAME RATE //
+//             if (m_pimpl->m_model->time_changed) {
+//                 m_pimpl->m_model->time_changed = 0;
+//                 last_commit = SDL_GetTicks();
+//                 SDL_memset(&fps, 0, sizeof(fps));
+//             }
+//             update_fps(&fps);
+//             double now = SDL_GetTicks();
+//             double dt = (now - previous) / 1000.0;
+//             dt = SDL_min(dt, 0.2);
+//             dt = SDL_max(dt, 0.0);
+//             previous = now;
 
-            m_pimpl->handle_events(dt, running);
+//             m_pimpl->handle_events(dt, running);
 
-            // Start the Dear ImGui frame
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplSDL3_NewFrame();
-            ImGui::NewFrame();
+//             // Start the Dear ImGui frame
+//             ImGui_ImplOpenGL3_NewFrame();
+//             ImGui_ImplSDL3_NewFrame();
+//             ImGui::NewFrame();
 
-            // Show the big demo window?
-            if (show_demo_window)
-                ImGui::ShowDemoWindow(&show_demo_window);
-            // GUI Title Bar
-            ImGui::Begin(this->m_pimpl->m_version.data());
-            // GUI Tabs
-            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
-                if (ImGui::BeginTabItem("Builder")) {
-                    ImGui::Text("Builder settings");
-                    ImGui::Text("Output");
-                    ImGui::Text("Width");
-                    ImGui::Text("Length");
-                    ImGui::Text("Height");
-                    ImGui::Text("Seed");
-                    if (ImGui::TreeNode("Algorithms")) {
-                        static const char* algos[2] = {"binary_tree", "sidewinder"};
-                        static int algos_current_idx{ 0 };
-                        auto preview{ algos[algos_current_idx] };
+//             // Show the big demo window?
+//             if (show_demo_window)
+//                 ImGui::ShowDemoWindow(&show_demo_window);
+//             // GUI Title Bar
+//             ImGui::Begin(this->m_pimpl->m_version.data());
+//             // GUI Tabs
+//             ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+//             if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+//                 if (ImGui::BeginTabItem("Builder")) {
+//                     ImGui::Text("Builder settings");
+//                     ImGui::Text("Output");
+//                     ImGui::Text("Width");
+//                     ImGui::Text("Length");
+//                     ImGui::Text("Height");
+//                     ImGui::Text("Seed");
+//                     if (ImGui::TreeNode("Algorithms")) {
+//                         static const char* algos[2] = {"binary_tree", "sidewinder"};
+//                         static int algos_current_idx{ 0 };
+//                         auto preview{ algos[algos_current_idx] };
 
-                        if (ImGui::BeginCombo("algorithm", preview)) {
-                            for (int n = 0; n < 2; n++) {
-                                const bool is_selected = (algos_current_idx == n);
-                                if (ImGui::Selectable(algos[n], is_selected))
-                                    algos_current_idx = n;
+//                         if (ImGui::BeginCombo("algorithm", preview)) {
+//                             for (int n = 0; n < 2; n++) {
+//                                 const bool is_selected = (algos_current_idx == n);
+//                                 if (ImGui::Selectable(algos[n], is_selected))
+//                                     algos_current_idx = n;
 
-                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                                if (is_selected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                        ImGui::TreePop();
-                    }
+//                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+//                                 if (is_selected)
+//                                     ImGui::SetItemDefaultFocus();
+//                             }
+//                             ImGui::EndCombo();
+//                         }
+//                         ImGui::TreePop();
+//                     }
                     
-                    ImGui::Button("Build!");
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Graphics")) {
-                    ImGui::Text("Graphic settings");
-                    auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
-                    ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
-                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen);
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
-                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
-                    if (this->m_pimpl->m_gui.color_mode_dark)
-                        ImGui::StyleColorsDark();
-                    else
-                        ImGui::StyleColorsLight();
-                    ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
-                    if (this->m_pimpl->m_gui.capture_mouse)
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Help")) {
-                    ImGui::Text(this->m_pimpl->m_help.data());
-                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
-                    ImGui::Text(github_repo);
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            }
+//                     ImGui::Button("Build!");
+//                     ImGui::EndTabItem();
+//                 }
+//                 if (ImGui::BeginTabItem("Graphics")) {
+//                     ImGui::Text("Graphic settings");
+//                     auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
+//                     ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
+//                     if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen);
+//                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
+//                     ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
+//                     if (this->m_pimpl->m_gui.color_mode_dark)
+//                         ImGui::StyleColorsDark();
+//                     else
+//                         ImGui::StyleColorsLight();
+//                     ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
+//                     if (this->m_pimpl->m_gui.capture_mouse)
+//                         SDL_SetRelativeMouseMode(SDL_TRUE);
+//                     ImGui::EndTabItem();
+//                 }
+//                 if (ImGui::BeginTabItem("Help")) {
+//                     ImGui::Text(this->m_pimpl->m_help.data());
+//                     static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+//                     ImGui::Text(github_repo);
+//                     ImGui::EndTabItem();
+//                 }
+//                 ImGui::EndTabBar();
+//             }
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-            ImGui::End();
+//             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+//             ImGui::End();
 
-            // FLUSH DATABASE //
-            if (now - last_commit > COMMIT_INTERVAL) {
-                last_commit = now;
-                db_commit();
-            }
+//             // FLUSH DATABASE //
+//             if (now - last_commit > COMMIT_INTERVAL) {
+//                 last_commit = now;
+//                 db_commit();
+//             }
             
-            // PREPARE TO RENDER //
-            m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
-            m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
+//             // PREPARE TO RENDER //
+//             m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
+//             m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
             
-            m_pimpl->delete_chunks();
-            m_pimpl->del_buffer(me->buffer);
+//             m_pimpl->delete_chunks();
+//             m_pimpl->del_buffer(me->buffer);
             
-            me->buffer = m_pimpl->gen_player_buffer(s->x, s->y, s->z, s->rx, s->ry);
-            for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
-                m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
-            }
+//             me->buffer = m_pimpl->gen_player_buffer(s->x, s->y, s->z, s->rx, s->ry);
+//             for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
+//                 m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
+//             }
         
-            craft_impl::Player *player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
+//             craft_impl::Player *player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
         
-            // RENDER 3-D SCENE //
-            ImGui::Render();
+//             // RENDER 3-D SCENE //
+//             ImGui::Render();
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            int face_count = m_pimpl->render_chunks(&block_attrib, player);
-            m_pimpl->render_signs(&text_attrib, player);
-            m_pimpl->render_sign(&text_attrib, player);
-            m_pimpl->render_players(&block_attrib, player);
-            if (SHOW_WIREFRAME) {
-                m_pimpl->render_wireframe(&line_attrib, player);
-            }
+//             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//             m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
+//             glClear(GL_DEPTH_BUFFER_BIT);
+//             int face_count = m_pimpl->render_chunks(&block_attrib, player);
+//             m_pimpl->render_signs(&text_attrib, player);
+//             m_pimpl->render_sign(&text_attrib, player);
+//             m_pimpl->render_players(&block_attrib, player);
+//             if (SHOW_WIREFRAME) {
+//                 m_pimpl->render_wireframe(&line_attrib, player);
+//             }
             
-            // RENDER HUD //
-            glClear(GL_DEPTH_BUFFER_BIT);
-            if (SHOW_CROSSHAIRS) {
-               m_pimpl->render_crosshairs(&line_attrib);
-            }
-            if (SHOW_ITEM) {
-                m_pimpl->render_item(&block_attrib);
-            }
+//             // RENDER HUD //
+//             glClear(GL_DEPTH_BUFFER_BIT);
+//             if (SHOW_CROSSHAIRS) {
+//                m_pimpl->render_crosshairs(&line_attrib);
+//             }
+//             if (SHOW_ITEM) {
+//                 m_pimpl->render_item(&block_attrib);
+//             }
             
-            // RENDER TEXT //
-            char text_buffer[1024];
-            float ts = 12 * m_pimpl->m_model->scale;
-            float tx = ts / 2;
-            float ty = m_pimpl->m_model->height - ts;
-            if (SHOW_INFO_TEXT) {
-                int hour = m_pimpl->time_of_day() * 24;
-                char am_pm = hour < 12 ? 'a' : 'p';
-                hour = hour % 12;
-                hour = hour ? hour : 12;
-                snprintf(
-                    text_buffer, 1024,
-                    "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
-                    m_pimpl->chunked(s->x), m_pimpl->chunked(s->z), s->x, s->y, s->z,
-                    m_pimpl->m_model->player_count, m_pimpl->m_model->chunk_count,
-                    face_count * 2, hour, am_pm, fps.fps);
-                m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-                ty -= ts * 2;
-            }
-            if (SHOW_CHAT_TEXT) {
-                for (int i = 0; i < MAX_MESSAGES; i++) {
-                    int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
-                    if (strlen(m_pimpl->m_model->messages[index])) {
-                        m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
-                            m_pimpl->m_model->messages[index]);
-                        ty -= ts * 2;
-                    }
-                }
-            }
-            if (m_pimpl->m_model->typing) {
-                snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
-                m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-            }
-            if (SHOW_PLAYER_NAMES) {
-                if (player != me) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, ts, ts, player->name);
-                }
-                craft_impl::Player *other = m_pimpl->player_crosshair(player);
-                if (other) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, m_pimpl->m_model->height / 2 - ts - 24, ts, other->name);
-                }
-            }
+//             // RENDER TEXT //
+//             char text_buffer[1024];
+//             float ts = 12 * m_pimpl->m_model->scale;
+//             float tx = ts / 2;
+//             float ty = m_pimpl->m_model->height - ts;
+//             if (SHOW_INFO_TEXT) {
+//                 int hour = m_pimpl->time_of_day() * 24;
+//                 char am_pm = hour < 12 ? 'a' : 'p';
+//                 hour = hour % 12;
+//                 hour = hour ? hour : 12;
+//                 snprintf(
+//                     text_buffer, 1024,
+//                     "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
+//                     m_pimpl->chunked(s->x), m_pimpl->chunked(s->z), s->x, s->y, s->z,
+//                     m_pimpl->m_model->player_count, m_pimpl->m_model->chunk_count,
+//                     face_count * 2, hour, am_pm, fps.fps);
+//                 m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
+//                 ty -= ts * 2;
+//             }
+//             if (SHOW_CHAT_TEXT) {
+//                 for (int i = 0; i < MAX_MESSAGES; i++) {
+//                     int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
+//                     if (strlen(m_pimpl->m_model->messages[index])) {
+//                         m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
+//                             m_pimpl->m_model->messages[index]);
+//                         ty -= ts * 2;
+//                     }
+//                 }
+//             }
+//             if (m_pimpl->m_model->typing) {
+//                 snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
+//                 m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
+//             }
+//             if (SHOW_PLAYER_NAMES) {
+//                 if (player != me) {
+//                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, ts, ts, player->name);
+//                 }
+//                 craft_impl::Player *other = m_pimpl->player_crosshair(player);
+//                 if (other) {
+//                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, m_pimpl->m_model->height / 2 - ts - 24, ts, other->name);
+//                 }
+//             }
         
-            // RENDER PICTURE IN PICTURE //
-            if (m_pimpl->m_model->observe2) {
-                player = m_pimpl->m_model->players + m_pimpl->m_model->observe2;
+//             // RENDER PICTURE IN PICTURE //
+//             if (m_pimpl->m_model->observe2) {
+//                 player = m_pimpl->m_model->players + m_pimpl->m_model->observe2;
 
-                int pw = 256 * m_pimpl->m_model->scale;
-                int ph = 256 * m_pimpl->m_model->scale;
-                int offset = 32 * m_pimpl->m_model->scale;
-                int pad = 3 * m_pimpl->m_model->scale;
-                int sw = pw + pad * 2;
-                int sh = ph + pad * 2;
+//                 int pw = 256 * m_pimpl->m_model->scale;
+//                 int ph = 256 * m_pimpl->m_model->scale;
+//                 int offset = 32 * m_pimpl->m_model->scale;
+//                 int pad = 3 * m_pimpl->m_model->scale;
+//                 int sw = pw + pad * 2;
+//                 int sh = ph + pad * 2;
 
-                glEnable(GL_SCISSOR_TEST);
-                glScissor(m_pimpl->m_model->width - sw - offset + pad, offset - pad, sw, sh);
-                glClear(GL_COLOR_BUFFER_BIT);
-                glDisable(GL_SCISSOR_TEST);
-                glClear(GL_DEPTH_BUFFER_BIT);
-                glViewport(m_pimpl->m_model->width - pw - offset, offset, pw, ph);
+//                 glEnable(GL_SCISSOR_TEST);
+//                 glScissor(m_pimpl->m_model->width - sw - offset + pad, offset - pad, sw, sh);
+//                 glClear(GL_COLOR_BUFFER_BIT);
+//                 glDisable(GL_SCISSOR_TEST);
+//                 glClear(GL_DEPTH_BUFFER_BIT);
+//                 glViewport(m_pimpl->m_model->width - pw - offset, offset, pw, ph);
 
-                m_pimpl->m_model->width = pw;
-                m_pimpl->m_model->height = ph;
-                m_pimpl->m_model->ortho = 0;
-                m_pimpl->m_model->fov = 65;
+//                 m_pimpl->m_model->width = pw;
+//                 m_pimpl->m_model->height = ph;
+//                 m_pimpl->m_model->ortho = 0;
+//                 m_pimpl->m_model->fov = 65;
                 
-                m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
+//                 m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
                 
-                glClear(GL_DEPTH_BUFFER_BIT);
-                m_pimpl->render_chunks(&block_attrib, player);
+//                 glClear(GL_DEPTH_BUFFER_BIT);
+//                 m_pimpl->render_chunks(&block_attrib, player);
                 
-                m_pimpl->render_signs(&text_attrib, player);
+//                 m_pimpl->render_signs(&text_attrib, player);
                 
-                m_pimpl->render_players(&block_attrib, player);
+//                 m_pimpl->render_players(&block_attrib, player);
                 
-                glClear(GL_DEPTH_BUFFER_BIT);
+//                 glClear(GL_DEPTH_BUFFER_BIT);
                 
-                if (SHOW_PLAYER_NAMES) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);     
-                }
-            }
-            static bool ready_to_compute = true;
-            if (success_from_maze_fut && ready_to_compute) {
-                // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
-                // now that the _grid is calculated, set the blocks in the 3D world by set_grid
-                stringstream ss;
-                ss << *_grid.get();
-                string temp_s{ ss.str() };
-                this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
-                ready_to_compute = false;
-            }
+//                 if (SHOW_PLAYER_NAMES) {
+//                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);     
+//                 }
+//             }
+//             static bool ready_to_compute = true;
+//             if (success_from_maze_fut && ready_to_compute) {
+//                 // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
+//                 // now that the _grid is calculated, set the blocks in the 3D world by set_grid
+//                 stringstream ss;
+//                 ss << *_grid.get();
+//                 string temp_s{ ss.str() };
+//                 this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
+//                 ready_to_compute = false;
+//             }
 
-            // interactive should always be true in craft::run, but just check it
-            // get() is a blocking call, but we need to check that there is mesh str rdy
-            static bool mesh_write_now = false;
-            if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
-                //auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
-                // call the task writer to asynchronously write the file (should flip the future)
-                this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
-                this->m_pimpl->m_current_mesh_str.clear();
-                mesh_write_now = true;
-            }
+//             // interactive should always be true in craft::run, but just check it
+//             // get() is a blocking call, but we need to check that there is mesh str rdy
+//             static bool mesh_write_now = false;
+//             if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
+//                 //auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
+//                 // call the task writer to asynchronously write the file (should flip the future)
+//                 this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
+//                 this->m_pimpl->m_current_mesh_str.clear();
+//                 mesh_write_now = true;
+//             }
 
-            if (mesh_write_now) {
-                // check success
-                bool success_writing = writer_fut.get();
-#if defined(MAZE_DEBUG)
-                SDL_Log("mesh writing success= %d\n", success_writing);
-#endif
-                mesh_write_now = false;
-            }
+//             if (mesh_write_now) {
+//                 // check success
+//                 bool success_writing = writer_fut.get();
+// #if defined(MAZE_DEBUG)
+//                 SDL_Log("mesh writing success= %d\n", success_writing);
+// #endif
+//                 mesh_write_now = false;
+//             }
 
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-            SDL_GL_SwapWindow(m_pimpl->m_model->window);
-#if defined(MAZE_DEBUG)
-            gl_check_for_error();
-#endif
+//             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+//             SDL_GL_SwapWindow(m_pimpl->m_model->window);
+// #if defined(MAZE_DEBUG)
+//             gl_check_for_error();
+// #endif
         } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_END;
 #endif
 
-        // SHUTDOWN //
-        db_save_state(s->x, s->y, s->z, s->rx, s->ry);
-        db_close();
-        db_disable();
-        m_pimpl->del_buffer(sky_buffer);
-        m_pimpl->delete_all_chunks();
-        m_pimpl->delete_all_players();
+//         // SHUTDOWN //
+//         db_save_state(s->x, s->y, s->z, s->rx, s->ry);
+//         db_close();
+//         db_disable();
+//         m_pimpl->del_buffer(sky_buffer);
+//         m_pimpl->delete_all_chunks();
+//         m_pimpl->delete_all_players();
     } // MAIN LOOP
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("Cleaning up ImGui objects. . .");
-    SDL_Log("Cleaning up OpenGL objects. . .");
-    SDL_Log("Cleaning up SDL objects. . .");
-#endif
+// #if defined(MAZE_DEBUG)
+//     SDL_Log("Cleaning up ImGui objects. . .");
+//     SDL_Log("Cleaning up OpenGL objects. . .");
+//     SDL_Log("Cleaning up SDL objects. . .");
+// #endif
 
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
+//     ImGui_ImplOpenGL3_Shutdown();
+//     ImGui_ImplSDL3_Shutdown();
+//     ImGui::DestroyContext();
 
-    glDeleteTextures(1, &texture);
-    glDeleteTextures(1, &font);
-    glDeleteTextures(1, &sky);
-    glDeleteTextures(1, &sign);
-    glDeleteProgram(block_attrib.program);
-    glDeleteProgram(text_attrib.program);
-    glDeleteProgram(sky_attrib.program);
-    glDeleteProgram(line_attrib.program);
+//     glDeleteTextures(1, &texture);
+//     glDeleteTextures(1, &font);
+//     glDeleteTextures(1, &sky);
+//     glDeleteTextures(1, &sign);
+//     glDeleteProgram(block_attrib.program);
+//     glDeleteProgram(text_attrib.program);
+//     glDeleteProgram(sky_attrib.program);
+//     glDeleteProgram(line_attrib.program);
 #if defined(MAZE_DEBUG)
     gl_check_for_error();
 #endif
@@ -3233,6 +3253,5 @@ bool craft::run(unique_ptr<mazes::grid> const& _grid, std::function<int(int, int
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
-    // get the result of the maze generation
-    return success_from_maze_fut;
+    return true;
 } // run

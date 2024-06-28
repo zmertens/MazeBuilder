@@ -246,33 +246,6 @@ int wrap(const char *input, int max_width, char *output, int max_length) {
     return line_number;
 }
 
-void dump_opengl_info(bool dumpExtensions) {
-    const GLubyte *renderer = glGetString(GL_RENDERER);
-    const GLubyte *vendor = glGetString(GL_VENDOR);
-    const GLubyte *version = glGetString(GL_VERSION);
-    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
-
-    GLint major, minor;
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-	
-	SDL_Log("-------------------------------------------------------------\n");
-    SDL_Log("GL Vendor    : %s\n", vendor);
-    SDL_Log("GL Renderer  : %s\n", renderer);
-    SDL_Log("GL Version   : %s\n", version);
-    SDL_Log("GL Version   : %d.%d\n", major, minor);
-    SDL_Log("GLSL Version : %s\n", glslVersion);
-    SDL_Log("-------------------------------------------------------------\n");
-
-    if (dumpExtensions) {
-        GLint nExtensions;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &nExtensions);
-        for (int i = 0; i < nExtensions; i++) {
-            SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
-        }
-    }
-}
-
 /**
  * @brief convert_data_to_mesh_str takes the OpenGL data and maps it to Wavefront Obj file format
  * @param faces

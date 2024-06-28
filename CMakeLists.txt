@@ -78,6 +78,7 @@ target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
 add_executable(${MAZE_BUILDER_OUTFILE} ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${TINY_C_THREAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
+target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten)
@@ -103,23 +104,25 @@ if(EMSCRIPTEN)
         message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE is not set. Please specify the path to the Emscripten toolchain file.")
     endif()
 
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
+
     set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
     message(INFO ": Getting SDL via FetchContent")
     fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
     set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
-
+    # Set compile options for all targets to include atomics and bulk-memory
+    add_compile_options("SHELL:-matomics -mbulk-memory -DIMGUI_IMPL_OPENGL_ES3")
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-    
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
-    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -gsource-map"
-    	"SHELL:-s FULL_ES3=1 -s MIN_WEBGL_VERSION=2 -s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1"
+    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1"
+        "SHELL:-s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1"
+        "SHELL:-matomics -mbulk-memory -s FULL_ES3=1 -s MAX_WEBGL_VERSION=2"
+    	"SHELL:-s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s DEMANGLE_SUPPORT=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_vertex.glsl@/shaders/block_vertex.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_fragment.glsl@/shaders/block_fragment.glsl"
@@ -134,6 +137,9 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/texture.png@/textures/texture.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/font.png@/textures/font.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/maze_in_green_32x32.bmp@/textures/maze_in_green_32x32.bmp")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s DEMANGLE_SUPPORT=1")
+    endif()
 endif()
 
 if(APPLE AND NOT EMSCRIPTEN)
