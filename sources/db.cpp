@@ -116,7 +116,11 @@ int db_init(char *path) {
         "insert or replace into key (p, q, key) "
         "values (?, ?, ?);";
     int rc;
+#if defined(__EMSCRIPTEN__)
+    rc = sqlite3_open(":memory:", &db);
+#else
     rc = sqlite3_open(path, &db);
+#endif
     if (rc) return rc;
     rc = sqlite3_exec(db, create_query, NULL, NULL, NULL);
     if (rc) return rc;

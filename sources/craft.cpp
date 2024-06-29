@@ -3027,6 +3027,8 @@ bool craft::run() const noexcept {
         while (1)
 #endif
         {
+            // update gl if viewport has change (example, going or leaving fullscreen mode)
+            glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
             // FRAME RATE 
             if (m_pimpl->m_model->time_changed) {
                 m_pimpl->m_model->time_changed = 0;
@@ -3088,19 +3090,18 @@ bool craft::run() const noexcept {
                 if (ImGui::BeginTabItem("Graphics")) {
                     ImGui::Text("Graphic settings");
                     auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
-                    ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
-                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen) {
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
-                        glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
-                    }
+                    // ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
+                    // if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen) {
+                        // SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
+                    // }
                     ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
                     if (this->m_pimpl->m_gui.color_mode_dark)
                         ImGui::StyleColorsDark();
                     else
                         ImGui::StyleColorsLight();
-                    ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
-                    if (this->m_pimpl->m_gui.capture_mouse)
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                    // ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
+                    // if (this->m_pimpl->m_gui.capture_mouse)
+                        // SDL_SetRelativeMouseMode(SDL_TRUE);
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Help")) {
