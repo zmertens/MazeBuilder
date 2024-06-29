@@ -11,7 +11,6 @@ Originally written in C99, ported to C++17
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
-#include <SDL3/SDL_opengles2.h>
 #include <emscripten/emscripten_mainloop_stub.h>
 #else
 #include <glad/glad.h>
@@ -222,7 +221,7 @@ struct craft::craft_impl {
         int flying;
         int item_index;
         int scale;
-        int ortho;
+        bool ortho;
         float fov;
         int suppress_char;
         int mode_changed;
@@ -501,7 +500,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    // Sky Attrib doesn't use normals, so quickly check for that
+    // Sky Attrib doesn't use normals and the GLSL compiler may optimize it out
     void draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -1534,7 +1533,7 @@ struct craft::craft_impl {
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
         float matrix[16];
-        set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+        set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
         int p = chunked(s->x);
@@ -1793,7 +1792,7 @@ struct craft::craft_impl {
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
@@ -1804,7 +1803,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->extra1, 2);
         glUniform1f(attrib->extra2, light);
         glUniform1f(attrib->extra3, this->m_model->render_radius * this->m_gui.chunk_size);
-        glUniform1i(attrib->extra4, this->m_model->ortho);
+        glUniform1i(attrib->extra4, static_cast<int>(this->m_model->ortho));
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
@@ -1827,7 +1826,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
         glUseProgram(attrib->program);
@@ -1860,7 +1859,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 3);
@@ -1880,7 +1879,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
@@ -1914,7 +1913,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, this->m_model->ortho, this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (is_obstacle(hw)) {
@@ -2465,7 +2464,7 @@ struct craft::craft_impl {
                     strcat(this->m_model->typing_buffer, e.text.text);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                     //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
-                    //SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
+                    //SDL_LogError(SDL_LOG_CATEGORY_ERROR, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                 }
                 break;
             }
@@ -2648,6 +2647,9 @@ struct craft::craft_impl {
 #endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #else
+#if defined(MAZE_DEBUG)
+        SDL_Log("Setting SDL_GL_CONTEXT_PROFILE_CORE\n");
+#endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #endif
 
@@ -2879,7 +2881,7 @@ bool craft::run() const noexcept {
 #endif
     sky_attrib.program = program;
     sky_attrib.position = glGetAttribLocation(program, "position");
-    sky_attrib.normal = 1;
+    sky_attrib.normal = 1; // glGetAttribLocation(program, "normal");
     sky_attrib.uv = glGetAttribLocation(program, "uv");
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
@@ -2951,12 +2953,17 @@ bool craft::run() const noexcept {
                 case GL_OUT_OF_MEMORY: error = "OUT_OF_MEMORY"; break;
                 case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
             }
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, 
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR,
                 "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error.c_str(), file, line);
         }
         return errorCode;
     };
 #define check_for_gl_err() _check_for_gl_err(__FILE__, __LINE__)
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("Checking gl errors prior to main loop\n");
+    check_for_gl_err();
+#endif
 
     // MAIN LOOP 
     bool running = true;
@@ -2975,8 +2982,16 @@ bool craft::run() const noexcept {
         FPS fps = {0, 0, 0};
         double last_commit = SDL_GetTicks();
     
+#if defined(MAZE_DEBUG)
+        SDL_Log("Before m_pimpl->gen_sky_buffer()\n");
+        check_for_gl_err();
+#endif
         GLuint sky_buffer = m_pimpl->gen_sky_buffer();
-    
+#if defined(MAZE_DEBUG)
+        SDL_Log("After m_pimpl->gen_sky_buffer()\n");
+        check_for_gl_err();
+#endif    
+
         craft_impl::Player *me = m_pimpl->m_model->players;
         craft_impl::State *s = &m_pimpl->m_model->players->state;
         me->id = 0;
@@ -2986,10 +3001,23 @@ bool craft::run() const noexcept {
 
         // LOAD STATE FROM DATABASE 
         int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
+#if defined(MAZE_DEBUG)
+        SDL_Log("Before m_pimpl->force_chunks(me);\n");
+        check_for_gl_err();
+#endif    
         m_pimpl->force_chunks(me);
+#if defined(MAZE_DEBUG)
+        SDL_Log("After m_pimpl->force_chunks(me);\n");
+        check_for_gl_err();
+#endif    
         if (!loaded) {
             s->y = m_pimpl->highest_block(s->x, s->z) + 2;
         }
+
+#if defined(MAZE_DEBUG)
+        SDL_Log("Checking gl errors prior to event loop\n");
+        check_for_gl_err();
+#endif
 
         // BEGIN EVENT LOOP 
         int previous = SDL_GetTicks();
@@ -2999,7 +3027,6 @@ bool craft::run() const noexcept {
         while (1)
 #endif
         {
-            glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
             // FRAME RATE 
             if (m_pimpl->m_model->time_changed) {
                 m_pimpl->m_model->time_changed = 0;
@@ -3062,8 +3089,10 @@ bool craft::run() const noexcept {
                     ImGui::Text("Graphic settings");
                     auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
                     ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
-                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen)
+                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen) {
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
+                        glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
+                    }
                     ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
                     if (this->m_pimpl->m_gui.color_mode_dark)
                         ImGui::StyleColorsDark();
@@ -3108,12 +3137,11 @@ bool craft::run() const noexcept {
     
             craft_impl::Player *player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
     
-            // RENDER 3-D SCENE 
-            ImGui::Render();
-
+            // RENDER 3-D SCENE
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
             glClear(GL_DEPTH_BUFFER_BIT);
+
             int face_count = m_pimpl->render_chunks(&block_attrib, player);
             m_pimpl->render_signs(&text_attrib, player);
             m_pimpl->render_sign(&text_attrib, player);
@@ -3121,16 +3149,16 @@ bool craft::run() const noexcept {
             if (SHOW_WIREFRAME) {
                 m_pimpl->render_wireframe(&line_attrib, player);
             }
-        
+
             // RENDER HUD 
             glClear(GL_DEPTH_BUFFER_BIT);
             if (SHOW_CROSSHAIRS) {
-            m_pimpl->render_crosshairs(&line_attrib);
+                m_pimpl->render_crosshairs(&line_attrib);
             }
             if (SHOW_ITEM) {
                 m_pimpl->render_item(&block_attrib);
             }
-        
+
             // RENDER TEXT 
             char text_buffer[1024];
             float ts = 12 * m_pimpl->m_model->scale;
@@ -3168,12 +3196,12 @@ bool craft::run() const noexcept {
                 if (player != me) {
                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, ts, ts, player->name);
                 }
-                craft_impl::Player *other = m_pimpl->player_crosshair(player);
+                craft_impl::Player* other = m_pimpl->player_crosshair(player);
                 if (other) {
                     m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, m_pimpl->m_model->height / 2 - ts - 24, ts, other->name);
                 }
             }
-    
+
             // RENDER PICTURE IN PICTURE 
             if (m_pimpl->m_model->observe2) {
                 player = m_pimpl->m_model->players + m_pimpl->m_model->observe2;
@@ -3194,24 +3222,25 @@ bool craft::run() const noexcept {
 
                 m_pimpl->m_model->width = pw;
                 m_pimpl->m_model->height = ph;
-                m_pimpl->m_model->ortho = 0;
+                m_pimpl->m_model->ortho = false;
                 m_pimpl->m_model->fov = 65;
-            
+
                 m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
-            
+
                 glClear(GL_DEPTH_BUFFER_BIT);
                 m_pimpl->render_chunks(&block_attrib, player);
-            
+
                 m_pimpl->render_signs(&text_attrib, player);
-            
+
                 m_pimpl->render_players(&block_attrib, player);
-            
+
                 glClear(GL_DEPTH_BUFFER_BIT);
-            
+
                 if (SHOW_PLAYER_NAMES) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);     
+                    m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);
                 }
             } // render picture in picture
+
 
 //             static bool ready_to_compute = true;
 //             if (success_from_maze_fut && ready_to_compute) {
@@ -3242,12 +3271,13 @@ bool craft::run() const noexcept {
 // #endif
 //                 mesh_write_now = false;
 //             }
-
-            glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-            glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
+            
+            ImGui::Render();
+   
             ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+   
             SDL_GL_SwapWindow(m_pimpl->m_model->window);
+
 #if defined(MAZE_DEBUG)
             check_for_gl_err();
 #endif

@@ -3,7 +3,7 @@
 uniform mat4 matrix;
 uniform vec3 camera;
 uniform float fog_distance;
-uniform int ortho;
+uniform bool is_ortho;
 
 attribute vec4 position;
 attribute vec3 normal;
@@ -25,7 +25,7 @@ void main() {
     fragment_ao = 0.3 + (1.0 - uv.z) * 0.7;
     fragment_light = uv.w;
     diffuse = max(0.0, dot(normal, light_direction));
-    if (bool(ortho)) {
+    if (is_ortho) {
         fog_factor = 0.0;
         fog_height = 0.0;
     }

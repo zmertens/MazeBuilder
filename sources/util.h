@@ -42,7 +42,4 @@ int wrap(const char *input, int max_width, char *output, int max_length);
 
 void convert_data_to_mesh_str(int faces, GLfloat *data, std::string& mesh_str);
 
-#define gl_check_for_error() glCheckError_(__FILE__, __LINE__)
-GLenum glCheckError_(const char *file, int line);
-
 #endif
