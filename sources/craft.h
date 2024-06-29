@@ -3,12 +3,7 @@
 
 #include <string>
 #include <string_view>
-
-#include "maze_algo_interface.h"
-#include "maze_types_enum.h"
-
-class grid;
-class writer;
+#include <memory>
 
 class craft {
 public:
@@ -17,7 +12,7 @@ public:
     // craft(const craft& rhs);
     // craft& operator=(const craft& rhs);
 
-    bool run(bool interactive = false) const noexcept;
+    bool run() const noexcept;
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;

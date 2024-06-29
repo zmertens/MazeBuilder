@@ -15,9 +15,6 @@
 #include "maze_types_enum.h"
 #include "writer.h"
 
-#include <SDL3/SDL.h>
-#include <GLES3/gl3.h>
-
 int main(int argc, char* argv[]) {
 
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1]";
@@ -119,7 +116,7 @@ int main(int argc, char* argv[]) {
             // this is redundant: first check grid is computed as maze, then run interactively
             // (different meanings of the word 'success' here)...
             if (success) {
-                success = maze_builder_3D.run(args.is_interactive());
+                success = maze_builder_3D.run();
             }
         } else {
             success = maze_factory(my_maze_type);

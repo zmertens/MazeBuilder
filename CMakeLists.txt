@@ -77,7 +77,7 @@ add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
 target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
-add_executable(${MAZE_BUILDER_OUTFILE} ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${TINY_C_THREAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp)
+add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${TINY_C_THREAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
@@ -119,26 +119,24 @@ if(EMSCRIPTEN)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
-    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1"
-        "SHELL:-s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1"
-        "SHELL:-matomics -mbulk-memory -s FULL_ES3=1 -s MAX_WEBGL_VERSION=2"
-    	"SHELL:-s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s DEMANGLE_SUPPORT=1"
+    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1"
+        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten/shell_minimal.html"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_vertex.glsl@/shaders/block_vertex.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/block_fragment.glsl@/shaders/block_fragment.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/line_vertex.glsl@/shaders/line_vertex.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/line_fragment.glsl@/shaders/line_fragment.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_vertex.glsl@/shaders/sky_vertex.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_fragment.glsl@/shaders/sky_fragment.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/text_vertex.glsl@/shaders/text_vertex.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/text_fragment.glsl@/shaders/text_fragment.glsl"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/sign.png@/textures/sign.png"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/sky.png@/textures/sky.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/line_vertex.es.glsl@/shaders/es/line_vertex.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/line_fragment.es.glsl@/shaders/es/line_fragment.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/sky_vertex.es.glsl@/shaders/es/sky_vertex.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/sky_fragment.es.glsl@/shaders/es/sky_fragment.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/text_vertex.es.glsl@/shaders/es/text_vertex.es.glsl"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/text_fragment.es.glsl@/shaders/es/text_fragment.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/texture.png@/textures/texture.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/font.png@/textures/font.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/sign.png@/textures/sign.png"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/sky.png@/textures/sky.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/maze_in_green_32x32.bmp@/textures/maze_in_green_32x32.bmp")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s DEMANGLE_SUPPORT=1")
+        target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-s ASSERTIONS=2 -s SAFE_HEAP=1 -s STACK_OVERFLOW_CHECK=1 -s DEMANGLE_SUPPORT=1 -gsource-map")
     endif()
 endif()
 
