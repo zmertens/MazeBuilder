@@ -29,6 +29,7 @@ jobs:
 
     # Step to download Emsdk
     - name: Download Emsdk
+      uses: actions/checkout@v3
       with:
         repository: emscripten-core/emsdk
         path: 'emsdk'
@@ -54,7 +55,7 @@ jobs:
       run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Build Default
-      run: cmake --build ${{github.workspace}}/build-default --config ${{env.BUILD_TYPE}}-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: cmake --build ${{github.workspace}}/build-default --config ${{env.BUILD_TYPE}}
     
     - name: Test
       working-directory: ${{github.workspace}}/build-default
