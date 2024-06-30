@@ -25,19 +25,39 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y libglfw3-dev libglm-dev mesa-utils libfreetype6-dev libvulkan-dev libxinerama-dev libxcursor-dev libxi-dev
+        sudo apt-get install -y mesa-common-dev mesa-utils libglu1-mesa-dev libvulkan-dev libxinerama-dev libxcursor-dev libxi-dev
 
-    - name: Configure CMake
-      # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
-      # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+    # Step to download Emsdk
+    - name: Download Emsdk
+      with:
+        repository: emscripten-core/emsdk
+        path: 'emsdk'
 
-    - name: Build
-      # Build your program with the given configuration
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}}
+    # Step to install and activate the latest Emscripten SDK
+    - name: Install Emscripten
+      run: |
+        cd emsdk
+        ./emsdk install latest
+        ./emsdk activate latest
+        source ./emsdk_env.sh
 
+    # Configure CMake with Emscripten toolchain
+    - name: Configure CMake for Emscripten
+      run: cmake -B ${{github.workspace}}/build-emscripten -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+
+    # Build with Emscripten
+    - name: Build with Emscripten
+      run: cmake --build ${{github.workspace}}/build-emscripten --config ${{env.BUILD_TYPE}}
+
+# Configure CMake for default build (without Emscripten)
+    - name: Configure CMake for Default Build
+      run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+
+    - name: Build Default
+      run: cmake --build ${{github.workspace}}/build-default --config ${{env.BUILD_TYPE}}-DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+    
     - name: Test
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{github.workspace}}/build-default
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
