@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.2...3.5)
 
+# Generators using Ninja can tell if the build files are generated as a side effect of running the command, which can help avoid unnecessary rebuilds.
 cmake_policy(SET CMP0058 NEW)
+# Prefers to use GLVND (OpenGL Vendor Neutral Dispatch) libraries for OpenGL.
 cmake_policy(SET CMP0072 NEW)
 
 # The following thread-related commands must be before project()
