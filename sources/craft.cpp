@@ -2635,7 +2635,7 @@ struct craft::craft_impl {
         }
 
 #if defined(MAZE_DEBUG)
-        SDL_Log("Using SDL_GL_CONTEXT_DEBUG_FLAG\n");
+        SDL_Log("Settings SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
