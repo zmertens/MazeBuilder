@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
         bool success = false;
         if (args.is_interactive()) {
             // string views don't own the data, they have less copying overhead
-            std::string_view window_title_view {"craft-sdl3"};
+            std::string_view window_title_view {"Maze Builder"};
             std::string_view version_view{ MAZE_BUILDER_VERSION };
             std::string_view help_view{ HELP_MSG };
             craft maze_builder_3D {window_title_view, version_view, help_view};
