@@ -1,7 +1,7 @@
 # Maze Builder
 
 Build and download mazes interactively or using the command-line interface (CLI).
-This project emphasizes conveniance and simplicity in order to achieve a tangible maze in 3D or ASCII-format which can be integrated into game engines, renderers, or data-processing systems.
+This project emphasizes conveniance and simplicity in order to achieve a tangible maze in Wavefront object or ASCII formats which can then be integrated into game engines, renderers, or data-processing systems.
 
 [Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
@@ -25,7 +25,7 @@ where `${my/mazebuilder/repo}` is the directory containg the Git repo for Maze B
 | CMAKE_BUILD_TYPE | RelWithDebInfo | The build type can determine compiler optimizations and switches. |
 
 
-Additionally, the Maze Builder can be built for the web using Emscripten. Build with toolchain file:
+Additionally, the Maze Builder can be built for the web using [Emscripten](https://emscripten.org/). Build with toolchain file:
 
 ```sh
 cmake -S . -B . -DCMAKE_TOOLCHAIN_FILE=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake 

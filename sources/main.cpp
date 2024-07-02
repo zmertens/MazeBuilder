@@ -5,7 +5,7 @@
 #include <string_view>
 #include <sstream>
 #include <future>
-#include <chrono>
+#include <algorithm>
 
 #include "craft.h"
 #include "grid.h"
@@ -17,7 +17,11 @@
 
 int main(int argc, char* argv[]) {
 
+#if defined(MAZE_DEBUG)
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1] - DEBUG";
+#else
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1]";
+#endif
 
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
@@ -39,7 +43,15 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < argc; i++) {
         args_vec.emplace_back(argv[i]);
     }
-    
+
+    // Force the -i param when compiling to the web
+#if defined(__EMSCRIPTEN__)
+    auto it_i = std::find(args_vec.begin(), args_vec.end(), "-i");
+    auto it_interactive = std::find(args_vec.begin(), args_vec.end(), "--interactive");
+    if (it_i == args_vec.end() && it_interactive == args_vec.end()) {
+        args_vec.push_back("-i");
+    }
+#endif
 
     mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
     auto&& args_map {args.build()};
