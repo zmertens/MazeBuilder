@@ -75,7 +75,7 @@ Private function to load file using SDL-specific functions
 //        if (SDL_RWread(io, data, data_size) != data_size) {
 //            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RWread failed: %s\n", SDL_GetError());
 //        }
-//#if defined(DEBUGGING)
+//#if defined(MAZE_DEBUG)
 //        SDL_Log("Reading file % s\n", path);
 //#endif
 //        SDL_RWclose(io);
@@ -246,33 +246,6 @@ int wrap(const char *input, int max_width, char *output, int max_length) {
     return line_number;
 }
 
-void dump_opengl_info(bool dumpExtensions) {
-    const GLubyte *renderer = glGetString(GL_RENDERER);
-    const GLubyte *vendor = glGetString(GL_VENDOR);
-    const GLubyte *version = glGetString(GL_VERSION);
-    const GLubyte *glslVersion = glGetString(GL_SHADING_LANGUAGE_VERSION);
-
-    GLint major, minor;
-    glGetIntegerv(GL_MAJOR_VERSION, &major);
-    glGetIntegerv(GL_MINOR_VERSION, &minor);
-	
-	SDL_Log("-------------------------------------------------------------\n");
-    SDL_Log("GL Vendor    : %s\n", vendor);
-    SDL_Log("GL Renderer  : %s\n", renderer);
-    SDL_Log("GL Version   : %s\n", version);
-    SDL_Log("GL Version   : %d.%d\n", major, minor);
-    SDL_Log("GLSL Version : %s\n", glslVersion);
-    SDL_Log("-------------------------------------------------------------\n");
-
-    if (dumpExtensions) {
-        GLint nExtensions;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &nExtensions);
-        for (int i = 0; i < nExtensions; i++) {
-            SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
-        }
-    }
-}
-
 /**
  * @brief convert_data_to_mesh_str takes the OpenGL data and maps it to Wavefront Obj file format
  * @param faces
@@ -422,25 +395,4 @@ void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     oss.clear();
 } // convert_data_to_mesh_str
 
-GLenum glCheckError_(const char *file, int line)
-{
-    GLenum errorCode;
-    while ((errorCode = glGetError()) != GL_NO_ERROR)
-    {
-        std::string error = "";
-        switch (errorCode)
-        {
-            case GL_INVALID_ENUM: error = "INVALID_ENUM"; break;
-            case GL_INVALID_VALUE: error = "INVALID_VALUE"; break;
-            case GL_INVALID_OPERATION: error = "INVALID_OPERATION"; break;
-            case GL_STACK_OVERFLOW: error = "STACK_OVERFLOW"; break;
-            case GL_STACK_UNDERFLOW: error = "STACK_UNDERFLOW"; break;
-            case GL_OUT_OF_MEMORY: error = "OUT_OF_MEMORY"; break;
-            case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
-        }
-        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, 
-            "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error.c_str(), file, line);
-    }
-    return errorCode;
-}
 

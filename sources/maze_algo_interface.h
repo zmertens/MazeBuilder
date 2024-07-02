@@ -11,7 +11,7 @@ class grid;
 
 class maze_algo_interface {
 public:
-    virtual bool run(std::unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) const noexcept = 0;
+    virtual bool run(const std::unique_ptr<mazes::grid>& _grid, const std::function<int(int, int)>& get_int, bool interactive = false) const noexcept = 0;
 };
 }
 #endif // MAZE_ALGO_INTERFACE_HPP
