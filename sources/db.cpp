@@ -41,14 +41,6 @@ int db_init(char *path) {
         return 0;
     }
     static const char *create_query =
-        "attach database 'auth.db' as auth;"
-        "create table if not exists auth.identity_token ("
-        "   username text not null,"
-        "   token text not null,"
-        "   selected int not null"
-        ");"
-        "create unique index if not exists auth.identity_token_username_idx"
-        "   on identity_token (username);"
         "create table if not exists state ("
         "   x float not null,"
         "   y float not null,"
@@ -122,34 +114,34 @@ int db_init(char *path) {
     rc = sqlite3_open(path, &db);
 #endif
     if (rc) return rc;
-    rc = sqlite3_exec(db, create_query, NULL, NULL, NULL);
+    rc = sqlite3_exec(db, create_query, nullptr, nullptr, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(
-        db, insert_block_query, -1, &insert_block_stmt, NULL);
+        db, insert_block_query, -1, &insert_block_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(
-        db, insert_light_query, -1, &insert_light_stmt, NULL);
+        db, insert_light_query, -1, &insert_light_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(
-        db, insert_sign_query, -1, &insert_sign_stmt, NULL);
+        db, insert_sign_query, -1, &insert_sign_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(
-        db, delete_sign_query, -1, &delete_sign_stmt, NULL);
+        db, delete_sign_query, -1, &delete_sign_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(
-        db, delete_signs_query, -1, &delete_signs_stmt, NULL);
+        db, delete_signs_query, -1, &delete_signs_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, load_blocks_query, -1, &load_blocks_stmt, NULL);
+    rc = sqlite3_prepare_v2(db, load_blocks_query, -1, &load_blocks_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, load_lights_query, -1, &load_lights_stmt, NULL);
+    rc = sqlite3_prepare_v2(db, load_lights_query, -1, &load_lights_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, load_signs_query, -1, &load_signs_stmt, NULL);
+    rc = sqlite3_prepare_v2(db, load_signs_query, -1, &load_signs_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, get_key_query, -1, &get_key_stmt, NULL);
+    rc = sqlite3_prepare_v2(db, get_key_query, -1, &get_key_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, set_key_query, -1, &set_key_stmt, NULL);
+    rc = sqlite3_prepare_v2(db, set_key_query, -1, &set_key_stmt, nullptr);
     if (rc) return rc;
-    sqlite3_exec(db, "begin;", NULL, NULL, NULL);
+    sqlite3_exec(db, "begin;", nullptr, nullptr, nullptr);
     db_worker_start("");
     return 0;
 }
@@ -159,7 +151,7 @@ void db_close() {
         return;
     }
     db_worker_stop();
-    sqlite3_exec(db, "commit;", NULL, NULL, NULL);
+    sqlite3_exec(db, "commit;", nullptr, nullptr, nullptr);
     sqlite3_finalize(insert_block_stmt);
     sqlite3_finalize(insert_light_stmt);
     sqlite3_finalize(insert_sign_stmt);
@@ -184,98 +176,9 @@ void db_commit() {
 }
 
 void _db_commit() {
-    sqlite3_exec(db, "commit; begin;", NULL, NULL, NULL);
+    sqlite3_exec(db, "commit; begin;", nullptr, nullptr, nullptr);
 }
 
-void db_auth_set(char *username, char *identity_token) {
-    if (!db_enabled) {
-        return;
-    }
-    static const char *query =
-        "insert or replace into auth.identity_token "
-        "(username, token, selected) values (?, ?, ?);";
-    sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
-    sqlite3_bind_text(stmt, 1, username, -1, NULL);
-    sqlite3_bind_text(stmt, 2, identity_token, -1, NULL);
-    sqlite3_bind_int(stmt, 3, 1);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    db_auth_select(username);
-}
-
-int db_auth_select(char *username) {
-    if (!db_enabled) {
-        return 0;
-    }
-    db_auth_select_none();
-    static const char *query =
-        "update auth.identity_token set selected = 1 where username = ?;";
-    sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
-    sqlite3_bind_text(stmt, 1, username, -1, NULL);
-    sqlite3_step(stmt);
-    sqlite3_finalize(stmt);
-    return sqlite3_changes(db);
-}
-
-void db_auth_select_none() {
-    if (!db_enabled) {
-        return;
-    }
-    sqlite3_exec(db, "update auth.identity_token set selected = 0;",
-        NULL, NULL, NULL);
-}
-
-int db_auth_get(
-    char *username,
-    char *identity_token, int identity_token_length)
-{
-    if (!db_enabled) {
-        return 0;
-    }
-    static const char *query =
-        "select token from auth.identity_token "
-        "where username = ?;";
-    int result = 0;
-    sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
-    sqlite3_bind_text(stmt, 1, username, -1, NULL);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char *a = (const char *)sqlite3_column_text(stmt, 0);
-        strncpy(identity_token, a, identity_token_length - 1);
-        identity_token[identity_token_length - 1] = '\0';
-        result = 1;
-    }
-    sqlite3_finalize(stmt);
-    return result;
-}
-
-int db_auth_get_selected(
-    char *username, int username_length,
-    char *identity_token, int identity_token_length)
-{
-    if (!db_enabled) {
-        return 0;
-    }
-    static const char *query =
-        "select username, token from auth.identity_token "
-        "where selected = 1;";
-    int result = 0;
-    sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        const char *a = (const char *)sqlite3_column_text(stmt, 0);
-        const char *b = (const char *)sqlite3_column_text(stmt, 1);
-        strncpy(username, a, username_length - 1);
-        username[username_length - 1] = '\0';
-        strncpy(identity_token, b, identity_token_length - 1);
-        identity_token[identity_token_length - 1] = '\0';
-        result = 1;
-    }
-    sqlite3_finalize(stmt);
-    return result;
-}
 
 void db_save_state(float x, float y, float z, float rx, float ry) {
     if (!db_enabled) {
@@ -284,8 +187,8 @@ void db_save_state(float x, float y, float z, float rx, float ry) {
     static const char *query =
         "insert into state (x, y, z, rx, ry) values (?, ?, ?, ?, ?);";
     sqlite3_stmt *stmt;
-    sqlite3_exec(db, "delete from state;", NULL, NULL, NULL);
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
+    sqlite3_exec(db, "delete from state;", nullptr, nullptr, nullptr);
+    sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
     sqlite3_bind_double(stmt, 1, x);
     sqlite3_bind_double(stmt, 2, y);
     sqlite3_bind_double(stmt, 3, z);
@@ -303,7 +206,7 @@ int db_load_state(float *x, float *y, float *z, float *rx, float *ry) {
         "select x, y, z, rx, ry from state;";
     int result = 0;
     sqlite3_stmt *stmt;
-    sqlite3_prepare_v2(db, query, -1, &stmt, NULL);
+    sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         *x = sqlite3_column_double(stmt, 0);
         *y = sqlite3_column_double(stmt, 1);
@@ -371,7 +274,7 @@ void db_insert_sign(
     sqlite3_bind_int(insert_sign_stmt, 4, y);
     sqlite3_bind_int(insert_sign_stmt, 5, z);
     sqlite3_bind_int(insert_sign_stmt, 6, face);
-    sqlite3_bind_text(insert_sign_stmt, 7, text, -1, NULL);
+    sqlite3_bind_text(insert_sign_stmt, 7, text, -1, nullptr);
     sqlite3_step(insert_sign_stmt);
 }
 
@@ -402,7 +305,7 @@ void db_delete_all_signs() {
     if (!db_enabled) {
         return;
     }
-    sqlite3_exec(db, "delete from sign;", NULL, NULL, NULL);
+    sqlite3_exec(db, "delete from sign;", nullptr, nullptr, nullptr);
 }
 
 void db_load_blocks(Map *map, int p, int q) {
@@ -509,7 +412,7 @@ void db_worker_stop() {
     ring_put_exit(&ring);
     cnd_signal(&cnd);
     mtx_unlock(&mtx);
-    thrd_join(thrd, NULL);
+    thrd_join(thrd, nullptr);
     cnd_destroy(&cnd);
     mtx_destroy(&load_mtx);
     mtx_destroy(&mtx);

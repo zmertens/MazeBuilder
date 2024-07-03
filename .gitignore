@@ -27,3 +27,6 @@ scripts/*.jpg
 scripts/*.jpeg
 scripts/*.JPG
 scripts/*.JPEG
+
+# Dear Imgui config
+*.ini
