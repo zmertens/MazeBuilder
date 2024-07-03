@@ -92,7 +92,7 @@ Originally written in C99, ported to C++17
 
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
-#define WORKERS 4
+#define NUM_WORKERS 4
 #define MAX_TEXT_LENGTH 256
 #define MAX_NAME_LENGTH 32
 #define MAX_PATH_LENGTH 256
@@ -292,10 +292,9 @@ struct craft::craft_impl {
 
 
     void init_worker_threads() {
-        this->m_model->workers.reserve(WORKERS);
-        for (int i = 0; i < this->m_model->workers.size(); i++) {
+        this->m_model->workers.reserve(NUM_WORKERS);
+        for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
-            // Worker *worker = this->m_model->workers + i;
             worker->index = i;
             worker->state = WORKER_IDLE;
             SDL_Mutex *sdl_mtx = SDL_CreateMutex();
@@ -310,10 +309,12 @@ struct craft::craft_impl {
             if (sdl_cnd == nullptr) {
 #if defined(MAZE_DEBUG)
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create condition variable: %s", SDL_GetError());
-#endif            
+#endif            	
+				return;
             }
             worker->cnd = sdl_cnd;
-            SDL_CreateThread(worker_run, "worker thread", worker->thrd);
+            worker->thrd = SDL_CreateThread(worker_run, "worker thread", worker.get());
+            this->m_model->workers.emplace_back(move(worker));
         }
     }
 
@@ -1582,7 +1583,7 @@ struct craft::craft_impl {
             for (int dq = -r; dq <= r; dq++) {
                 int a = p + dp;
                 int b = q + dq;
-                int index = (ABS(a) ^ ABS(b)) % WORKERS;
+                int index = (SDL_abs(a) ^ SDL_abs(b)) % NUM_WORKERS;
                 if (index != worker->index) {
                     continue;
                 }
@@ -1590,7 +1591,7 @@ struct craft::craft_impl {
                 if (chunk && !chunk->dirty) {
                     continue;
                 }
-                int distance = SDL_max(ABS(dp), ABS(dq));
+                int distance = SDL_max(SDL_abs(dp), SDL_abs(dq));
                 int invisible = ~chunk_visible(planes, a, b, 0, 256);
                 int priority = 0;
                 if (chunk) {
