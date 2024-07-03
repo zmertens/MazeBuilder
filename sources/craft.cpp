@@ -220,7 +220,7 @@ struct craft::craft_impl {
         int flying;
         int item_index;
         int scale;
-        bool ortho;
+        bool is_ortho;
         float fov;
         int suppress_char;
         int mode_changed;
@@ -769,7 +769,7 @@ struct craft::craft_impl {
             {x + 0.f, maxy_f, z + d},
             {x + d, maxy_f, z + d}
         };
-        int n = this->m_model->ortho ? 4 : 6;
+        int n = this->m_model->is_ortho ? 4 : 6;
         for (int i = 0; i < n; i++) {
             int in = 0;
             int out = 0;
@@ -1567,7 +1567,7 @@ struct craft::craft_impl {
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
         float matrix[16];
-        set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+        set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
         int p = chunked(s->x);
@@ -1825,7 +1825,7 @@ struct craft::craft_impl {
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
@@ -1836,7 +1836,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->extra1, 2);
         glUniform1f(attrib->extra2, light);
         glUniform1f(attrib->extra3, this->m_model->render_radius * this->m_gui.chunk_size);
-        glUniform1i(attrib->extra4, static_cast<int>(this->m_model->ortho));
+        glUniform1i(attrib->extra4, static_cast<int>(this->m_model->is_ortho));
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
@@ -1859,7 +1859,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
         glUseProgram(attrib->program);
@@ -1892,7 +1892,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 3);
@@ -1912,7 +1912,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
@@ -1946,7 +1946,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model->width, this->m_model->height,
-            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->ortho), this->m_model->render_radius);
+            s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (is_obstacle(hw)) {
@@ -2346,8 +2346,6 @@ struct craft::craft_impl {
         SDL_Keymod mod_state = SDL_GetModState();
 
         int control = mod_state;
-        
-        bool capture_mouse = this->m_gui.capture_mouse;
 
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -2362,11 +2360,6 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_ESCAPE:
                     if (this->m_model->typing) {
                         this->m_model->typing = 0;
-                    } else {
-                        // show mouse
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
-                        this->m_gui.capture_mouse = !this->m_gui.capture_mouse;
-                        capture_mouse = !capture_mouse;
                     }
                 }
                 break;
@@ -2374,7 +2367,7 @@ struct craft::craft_impl {
             case SDL_EVENT_KEY_DOWN: {
                 sc = e.key.scancode;
                 switch (sc) {
-                case SDL_SCANCODE_RETURN:
+                case SDL_SCANCODE_RETURN: {
                     if (this->m_model->typing) {
                         if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
                             if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
@@ -2483,8 +2476,14 @@ struct craft::craft_impl {
                     break;
 
                 }
-
-                break;
+                case SDL_SCANCODE_ESCAPE: {
+                    if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode()) {
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        this->m_gui.capture_mouse = false;
+                    }
+                    break;
+                }
+                } // switch
             } // SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
                 // could probably just do text[text_len++] = e.text.text[0]
@@ -2498,7 +2497,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_MOTION: {
-                if (capture_mouse) {
+                if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode()) {
                     s->rx += e.motion.xrel * m;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * m;
@@ -2518,8 +2517,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (capture_mouse && e.button.button == SDL_BUTTON_LEFT) {
-                    SDL_SetRelativeMouseMode(SDL_TRUE);
+                if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_LEFT) {
                     if (control) {
                         on_right_click();
                     }
@@ -2527,7 +2525,7 @@ struct craft::craft_impl {
                         on_left_click();
                     }
                 }
-                else if (capture_mouse && e.button.button == SDL_BUTTON_RIGHT) {
+                else if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_RIGHT) {
                     if (control) {
                         on_light();
                     }
@@ -2536,7 +2534,7 @@ struct craft::craft_impl {
                     }
                 }
                 else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (capture_mouse) {
+                    if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode()) {
                         on_middle_click();
                     }
                 }
@@ -2544,7 +2542,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (capture_mouse) {
+                if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode()) {
                     // TODO might have to change this to force 1 step
                     if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                         this->m_model->item_index += e.wheel.y;
@@ -2581,7 +2579,7 @@ struct craft::craft_impl {
 
         if (!this->m_model->typing) {
             float m = dt * 1.0;  // what is this for?
-            this->m_model->ortho = state[KEY_ORTHO] ? 64 : 0;
+            this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
             if (state[KEY_FORWARD]) sz--;
             if (state[KEY_BACKWARD]) sz++;
@@ -3016,7 +3014,7 @@ bool craft::run() const noexcept {
     }
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("Ccheck_for_gl_err() prior to event loop\n");
+    SDL_Log("check_for_gl_err() prior to event loop\n");
     check_for_gl_err();
 #endif
 
@@ -3053,72 +3051,89 @@ bool craft::run() const noexcept {
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
-        // GUI Title Bar
-        ImGui::Begin(this->m_pimpl->m_version.data());
-        // GUI Tabs
-        ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-        if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
-            if (ImGui::BeginTabItem("Builder")) {
-                ImGui::Text("Builder settings");
-                ImGui::Text("Output");
-                ImGui::Text("Width");
-                ImGui::Text("Length");
-                ImGui::Text("Height");
-                ImGui::Text("Seed");
-                if (ImGui::TreeNode("Algorithms")) {
-                    static const char* algos[2] = {"binary_tree", "sidewinder"};
-                    static int algos_current_idx{ 0 };
-                    auto preview{ algos[algos_current_idx] };
+        if (show_builder_gui) {
+            // GUI Title Bar
+            ImGui::Begin(this->m_pimpl->m_version.data());
+            // GUI Tabs
+            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+                if (ImGui::BeginTabItem("Builder")) {
+                    ImGui::Text("Builder settings");
+                    ImGui::Text("Output");
+                    ImGui::Text("Width");
+                    ImGui::Text("Length");
+                    ImGui::Text("Height");
+                    ImGui::Text("Seed");
+                    if (ImGui::TreeNode("Algorithms")) {
+                        static const char* algos[2] = {"binary_tree", "sidewinder"};
+                        static int algos_current_idx{ 0 };
+                        auto preview{ algos[algos_current_idx] };
 
-                    if (ImGui::BeginCombo("algorithm", preview)) {
-                        for (int n = 0; n < 2; n++) {
-                            const bool is_selected = (algos_current_idx == n);
-                            if (ImGui::Selectable(algos[n], is_selected))
-                                algos_current_idx = n;
+                        if (ImGui::BeginCombo("algorithm", preview)) {
+                            for (int n = 0; n < 2; n++) {
+                                const bool is_selected = (algos_current_idx == n);
+                                if (ImGui::Selectable(algos[n], is_selected))
+                                    algos_current_idx = n;
 
-                            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                            if (is_selected)
-                                ImGui::SetItemDefaultFocus();
+                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();
+                            }
+                            ImGui::EndCombo();
                         }
-                        ImGui::EndCombo();
+                        ImGui::TreePop();
                     }
-                    ImGui::TreePop();
+                
+                    ImGui::Button("Build!");
+                    ImGui::EndTabItem();
                 }
-            
-                ImGui::Button("Build!");
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Graphics")) {
-                ImGui::Text("Graphic settings");
-                auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
-                // ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
-                // if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen) {
-                    // SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, this->m_pimpl->m_gui.fullscreen);
-                // }
-                ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
-                if (this->m_pimpl->m_gui.color_mode_dark)
-                    ImGui::StyleColorsDark();
-                else
-                    ImGui::StyleColorsLight();
-                // ImGui::Checkbox("Capture Mouse (ESC to Release)", &this->m_pimpl->m_gui.capture_mouse);
-                // if (this->m_pimpl->m_gui.capture_mouse)
-                    // SDL_SetRelativeMouseMode(SDL_TRUE);
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Help")) {
-                ImGui::Text("%s\n", this->m_pimpl->m_help.data());
-                static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
-                ImGui::Text("\n");
-                ImGui::Text(github_repo);
-                ImGui::Text("\n");
-                ImGui::EndTabItem();
-            }
-            ImGui::EndTabBar();
-        } // imgui tab handler
+                if (ImGui::BeginTabItem("Graphics")) {
+                    ImGui::Text("Graphic settings");
+                    
+                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
+                    if (this->m_pimpl->m_gui.color_mode_dark)
+                        ImGui::StyleColorsDark();
+                    else
+                        ImGui::StyleColorsLight();
+                    
+                    auto last_fullscreen_mode = this->m_pimpl->m_gui.fullscreen;
+                    ImGui::Checkbox("Fullscreen", &this->m_pimpl->m_gui.fullscreen);
+                    if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen && this->m_pimpl->m_gui.fullscreen) {
+                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_TRUE);
+                    } else if (last_fullscreen_mode != this->m_pimpl->m_gui.fullscreen && !this->m_pimpl->m_gui.fullscreen) {
+                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_FALSE);
+                    }
+                    
+                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &this->m_pimpl->m_gui.capture_mouse);
+                    if (this->m_pimpl->m_gui.capture_mouse && !SDL_GetRelativeMouseMode()) {
+                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        // Hide GUI when the user captures the mouse
+                        // show_builder_gui = false;
+                    } else if (!show_builder_gui && !this->m_pimpl->m_gui.capture_mouse) {
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        show_builder_gui = true;
+                    }
+                
+                    // When ESCAPE is pressed and the mouse is captured, the SDL_Event loop will catch and release the mouse
+                    
+                    ImGui::EndTabItem();
+                }
+                if (ImGui::BeginTabItem("Help")) {
+                    ImGui::Text("%s\n", this->m_pimpl->m_help.data());
+                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+                    ImGui::Text("\n");
+                    ImGui::Text(github_repo);
+                    ImGui::Text("\n");
+                    ImGui::EndTabItem();
+                }
+                ImGui::EndTabBar();
+            } // imgui tab handler
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
 
+        } // show_builder_gui
+        
         // FLUSH DATABASE 
         if (now - last_commit > COMMIT_INTERVAL) {
             last_commit = now;
@@ -3224,7 +3239,7 @@ bool craft::run() const noexcept {
 
             m_pimpl->m_model->width = pw;
             m_pimpl->m_model->height = ph;
-            m_pimpl->m_model->ortho = false;
+            m_pimpl->m_model->is_ortho = false;
             m_pimpl->m_model->fov = 65;
 
             m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
