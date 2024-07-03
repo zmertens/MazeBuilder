@@ -9,8 +9,14 @@ class craft {
 public:
     craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help);
     ~craft();
-    // craft(const craft& rhs);
-    // craft& operator=(const craft& rhs);
+
+    // Delete copy constructor and copy assignment operator
+    craft(const craft&) = delete;
+    craft& operator=(const craft&) = delete;
+
+    // Default move constructor and move assignment operator
+    craft(craft&&) = default;
+    craft& operator=(craft&&) = default;
 
     bool run() const noexcept;
 private:

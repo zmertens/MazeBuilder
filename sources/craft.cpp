@@ -2744,24 +2744,6 @@ craft::craft(const std::string_view& window_name, const std::string_view& versio
 
 craft::~craft() = default;
 
-// craft::craft(const craft& rhs)
-// : m_pimpl{nullptr} {
-//     if (rhs.m_pimpl) {
-//         this->m_pimpl = make_unique<craft_impl>(*rhs.m_pimpl);
-//     }
-// }
-
-// craft& craft::operator=(const craft& rhs) {
-//     if (!rhs.m_pimpl) {
-//         this->m_pimpl.reset();
-//     } else if (!this->m_pimpl) {
-//         this->m_pimpl = make_unique<craft_impl>(*rhs.m_pimpl);
-//     } else {
-//         *this->m_pimpl = *rhs.m_pimpl;
-//     }
-
-//     return *this;
-// }
 
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
