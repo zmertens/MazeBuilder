@@ -2,7 +2,8 @@
 #include "db.h"
 #include "ring.h"
 #include <sqlite/sqlite3.h>
-#include <tinycthread/tinycthread.h>
+
+#include <SDL3/SDL.h>
 
 static int db_enabled = 0;
 
@@ -19,10 +20,10 @@ static sqlite3_stmt *get_key_stmt;
 static sqlite3_stmt *set_key_stmt;
 
 static Ring ring;
-static thrd_t thrd;
-static mtx_t mtx;
-static cnd_t cnd;
-static mtx_t load_mtx;
+static SDL_Thread *thrd;
+static SDL_Mutex *mtx;
+static SDL_Condition *cnd;
+static SDL_Mutex *load_mtx;
 
 void db_enable() {
     db_enabled = 1;
@@ -142,7 +143,8 @@ int db_init(char *path) {
     rc = sqlite3_prepare_v2(db, set_key_query, -1, &set_key_stmt, nullptr);
     if (rc) return rc;
     sqlite3_exec(db, "begin;", nullptr, nullptr, nullptr);
-    db_worker_start("");
+    static constexpr auto p = "";
+    db_worker_start(p);
     return 0;
 }
 
@@ -169,10 +171,10 @@ void db_commit() {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&mtx);
+    SDL_LockMutex(mtx);
     ring_put_commit(&ring);
-    cnd_signal(&cnd);
-    mtx_unlock(&mtx);
+    SDL_SignalCondition(cnd);
+    SDL_UnlockMutex(mtx);
 }
 
 void _db_commit() {
@@ -223,10 +225,10 @@ void db_insert_block(int p, int q, int x, int y, int z, int w) {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&mtx);
+    SDL_LockMutex(mtx);
     ring_put_block(&ring, p, q, x, y, z, w);
-    cnd_signal(&cnd);
-    mtx_unlock(&mtx);
+    SDL_SignalCondition(cnd);
+    SDL_UnlockMutex(mtx);
 }
 
 void _db_insert_block(int p, int q, int x, int y, int z, int w) {
@@ -244,10 +246,10 @@ void db_insert_light(int p, int q, int x, int y, int z, int w) {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&mtx);
+    SDL_LockMutex(mtx);
     ring_put_light(&ring, p, q, x, y, z, w);
-    cnd_signal(&cnd);
-    mtx_unlock(&mtx);
+    SDL_SignalCondition(cnd);
+    SDL_UnlockMutex(mtx);
 }
 
 void _db_insert_light(int p, int q, int x, int y, int z, int w) {
@@ -312,7 +314,7 @@ void db_load_blocks(Map *map, int p, int q) {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&load_mtx);
+    SDL_LockMutex(load_mtx);
     sqlite3_reset(load_blocks_stmt);
     sqlite3_bind_int(load_blocks_stmt, 1, p);
     sqlite3_bind_int(load_blocks_stmt, 2, q);
@@ -323,14 +325,14 @@ void db_load_blocks(Map *map, int p, int q) {
         int w = sqlite3_column_int(load_blocks_stmt, 3);
         map_set(map, x, y, z, w);
     }
-    mtx_unlock(&load_mtx);
+    SDL_UnlockMutex(load_mtx);
 }
 
 void db_load_lights(Map *map, int p, int q) {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&load_mtx);
+    SDL_LockMutex(load_mtx);
     sqlite3_reset(load_lights_stmt);
     sqlite3_bind_int(load_lights_stmt, 1, p);
     sqlite3_bind_int(load_lights_stmt, 2, q);
@@ -341,7 +343,7 @@ void db_load_lights(Map *map, int p, int q) {
         int w = sqlite3_column_int(load_lights_stmt, 3);
         map_set(map, x, y, z, w);
     }
-    mtx_unlock(&load_mtx);
+    SDL_UnlockMutex(load_mtx);
 }
 
 void db_load_signs(SignList *list, int p, int q) {
@@ -379,10 +381,10 @@ void db_set_key(int p, int q, int key) {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&mtx);
+    SDL_LockMutex(mtx);
     ring_put_key(&ring, p, q, key);
-    cnd_signal(&cnd);
-    mtx_unlock(&mtx);
+    SDL_SignalCondition(cnd);
+    SDL_UnlockMutex(mtx);
 }
 
 void _db_set_key(int p, int q, int key) {
@@ -393,29 +395,29 @@ void _db_set_key(int p, int q, int key) {
     sqlite3_step(set_key_stmt);
 }
 
-void db_worker_start(char *path) {
+void db_worker_start(const char *path) {
     if (!db_enabled) {
         return;
     }
     ring_alloc(&ring, 1024);
-    mtx_init(&mtx, mtx_plain);
-    mtx_init(&load_mtx, mtx_plain);
-    cnd_init(&cnd);
-    thrd_create(&thrd, db_worker_run, path);
+    mtx = SDL_CreateMutex();
+    load_mtx = SDL_CreateMutex();
+    cnd = SDL_CreateCondition();
+    SDL_CreateThread(db_worker_run, path, thrd);
 }
 
 void db_worker_stop() {
     if (!db_enabled) {
         return;
     }
-    mtx_lock(&mtx);
+    SDL_LockMutex(mtx);
     ring_put_exit(&ring);
-    cnd_signal(&cnd);
-    mtx_unlock(&mtx);
-    thrd_join(thrd, nullptr);
-    cnd_destroy(&cnd);
-    mtx_destroy(&load_mtx);
-    mtx_destroy(&mtx);
+    SDL_SignalCondition(cnd);
+    SDL_UnlockMutex(mtx);
+    SDL_WaitThread(thrd, nullptr);
+    SDL_DestroyCondition(cnd);
+    SDL_DestroyMutex(load_mtx);
+    SDL_DestroyMutex(mtx);
     ring_free(&ring);
 }
 
@@ -423,11 +425,11 @@ int db_worker_run(void *arg) {
     int running = 1;
     while (running) {
         RingEntry e;
-        mtx_lock(&mtx);
+        SDL_LockMutex(mtx);
         while (!ring_get(&ring, &e)) {
-            cnd_wait(&cnd, &mtx);
+            SDL_WaitCondition(cnd, mtx);
         }
-        mtx_unlock(&mtx);
+        SDL_UnlockMutex(mtx);
         switch (e.type) {
             case BLOCK:
                 _db_insert_block(e.p, e.q, e.x, e.y, e.z, e.w);

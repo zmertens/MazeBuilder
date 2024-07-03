@@ -33,7 +33,6 @@ Originally written in C99, ported to C++17
 #include <future>
 
 #include <noise/noise.h>
-#include <tinycthread/tinycthread.h>
 
 #include "util.h"
 #include "world.h"
@@ -119,7 +118,7 @@ struct craft::craft_impl {
         bool fullscreen;
         bool color_mode_dark;
         bool capture_mouse;
-    } dear_imgui_helper;
+    } DearImGuiHelper;
 
     typedef struct {
         Map map;
@@ -151,9 +150,9 @@ struct craft::craft_impl {
     typedef struct {
         int index;
         int state;
-        thrd_t thrd;
-        mtx_t mtx;
-        cnd_t cnd;
+        SDL_Thread *thrd;
+        SDL_Mutex *mtx;
+        SDL_Condition *cnd;
         WorkerItem item;
     } Worker;
 
@@ -200,7 +199,7 @@ struct craft::craft_impl {
     typedef struct {
         SDL_Window *window;
         SDL_GLContext context;
-        Worker workers[WORKERS];
+        std::vector<std::unique_ptr<Worker>> workers;
         Chunk chunks[MAX_CHUNKS];
         int chunk_count;
         int create_radius;
@@ -241,17 +240,17 @@ struct craft::craft_impl {
     typedef struct {
         int faces;
         GLfloat* data;
-    } chunk_to_write_to;
+    } ChunkToWriteTo;
 
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
     const std::string_view& m_version;
     const std::string_view& m_help;
     mazes::writer m_writer;
-    std::packaged_task<void(const chunk_to_write_to&, std::string&)> m_setup_writer;
+    std::packaged_task<void(const ChunkToWriteTo&, std::string&)> m_setup_writer;
     std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
     unique_ptr<Model> m_model;
-    dear_imgui_helper m_gui;
+    DearImGuiHelper m_gui;
     std::string m_current_mesh_str;
 
     craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help)
@@ -259,7 +258,7 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_writer{}
-        , m_setup_writer{ [](const chunk_to_write_to& c, auto mesh_str)->void {
+        , m_setup_writer{ [](const ChunkToWriteTo& c, auto mesh_str)->void {
             convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
         , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
@@ -271,55 +270,74 @@ struct craft::craft_impl {
     static int worker_run(void *arg) {
         Worker *worker = (Worker *)arg;
         int running = 1;
-        // never call the factory with this caller
         string_view sv {"dummy"};
         craft caller{ sv, {}, {} };
         while (running) {
-            mtx_lock(&worker->mtx);
+            SDL_LockMutex(worker->mtx);
             while (worker->state != WORKER_BUSY) {
-                cnd_wait(&worker->cnd, &worker->mtx);
+                SDL_WaitCondition(worker->cnd, worker->mtx);
             }
-            mtx_unlock(&worker->mtx);
+            SDL_UnlockMutex(worker->mtx);
             WorkerItem *worker_item = &worker->item;
             if (worker_item->load) {
                 caller.m_pimpl->load_chunk(worker_item);
             }
             caller.m_pimpl->compute_chunk(worker_item);
-            mtx_lock(&worker->mtx);
+            SDL_LockMutex(worker->mtx);
             worker->state = WORKER_DONE;
-            mtx_unlock(&worker->mtx);
+            SDL_UnlockMutex(worker->mtx);
         }
         return 0;
     } // worker_run
 
 
     void init_worker_threads() {
-        for (int i = 0; i < WORKERS; i++) {
-            Worker *worker = this->m_model->workers + i;
+        this->m_model->workers.reserve(WORKERS);
+        for (int i = 0; i < this->m_model->workers.size(); i++) {
+            auto worker = make_unique<Worker>();
+            // Worker *worker = this->m_model->workers + i;
             worker->index = i;
             worker->state = WORKER_IDLE;
-            mtx_init(&worker->mtx, mtx_plain);
-            cnd_init(&worker->cnd);
-            thrd_create(&worker->thrd, worker_run, worker);
+            SDL_Mutex *sdl_mtx = SDL_CreateMutex();
+            if (sdl_mtx == nullptr) {
+#if defined(MAZE_DEBUG)
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create mutex: %s", SDL_GetError());
+#endif
+                return;
+            }
+            worker->mtx = sdl_mtx;
+            SDL_Condition *sdl_cnd = SDL_CreateCondition();
+            if (sdl_cnd == nullptr) {
+#if defined(MAZE_DEBUG)
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create condition variable: %s", SDL_GetError());
+#endif            
+            }
+            worker->cnd = sdl_cnd;
+            SDL_CreateThread(worker_run, "worker thread", worker->thrd);
         }
     }
 
-//     /**
-//      * Cleanup the worker threads
-//      */
-//     void cleanup_worker_threads() {
-//         for (int i = 0; i < WORKERS; i++) {
-//             int thread_return_val = 0;
-//             thread_return_val = cnd_signal(&this->m_model->workers[i].cnd);
-// #if defined(MAZE_DEBUG)
-//             if (thread_return_val != -1) {
-//                 cout << "INFO: Worker thread " << i << " joined successfully\n";
-//             } else {
-//                 cout << "ERROR: Worker thread " << i << " failed to join\n";
-//             }
-// #endif
-//         }
-//     }
+    /**
+     * Cleanup the worker threads
+     */
+    void cleanup_worker_threads() {
+        for (auto&& w : this->m_model->workers) {
+            SDL_Thread *thread = w->thrd;
+            // Wait for the thread to complete its execution
+            int threadReturnValue;
+            SDL_WaitThread(thread, &threadReturnValue);
+            // Optionally, log the return value or perform some checks
+#if defined(MAZE_DEBUG)
+            SDL_Log("Thread finished with return value: %d", threadReturnValue);
+#endif
+            // Clean up the mutex and condition variable
+            SDL_DestroyMutex(w->mtx);
+            SDL_DestroyCondition(w->cnd);
+        }
+
+        // Clear the vector after all threads have been joined
+        this->m_model->workers.clear();
+    }
 
     void del_buffer(GLuint buffer) {
         glDeleteBuffers(1, &buffer);
@@ -1454,9 +1472,8 @@ struct craft::craft_impl {
     }
 
     void check_workers() {
-        for (int i = 0; i < WORKERS; i++) {
-            Worker *worker = this->m_model->workers + i;
-            mtx_lock(&worker->mtx);
+        for (auto&& worker : this->m_model->workers) {
+            SDL_LockMutex(worker->mtx);
             if (worker->state == WORKER_DONE) {
                 WorkerItem *item = &worker->item;
                 Chunk *chunk = find_chunk(item->p, item->q);
@@ -1487,7 +1504,7 @@ struct craft::craft_impl {
                 }
                 worker->state = WORKER_IDLE;
             }
-            mtx_unlock(&worker->mtx);
+            SDL_UnlockMutex(worker->mtx);
         }
     }
 
@@ -1630,19 +1647,18 @@ struct craft::craft_impl {
         }
         chunk->dirty = 0;
         worker->state = WORKER_BUSY;
-        cnd_signal(&worker->cnd);
+        SDL_SignalCondition(worker->cnd);
     } // ensure chunks worker
 
     void ensure_chunks(Player *player) {
         check_workers();
         force_chunks(player);
-        for (int i = 0; i < WORKERS; i++) {
-            Worker *worker = this->m_model->workers + i;
-            mtx_lock(&worker->mtx);
+        for (auto&& worker : this->m_model->workers) {
+            SDL_LockMutex(worker->mtx);
             if (worker->state == WORKER_IDLE) {
-                ensure_chunks_worker(player, worker);
+                ensure_chunks_worker(player, worker.get());
             }
-            mtx_unlock(&worker->mtx);
+            SDL_UnlockMutex(worker->mtx);
         }
     }
 
@@ -2979,7 +2995,7 @@ bool craft::run() const noexcept {
 #define check_for_gl_err() _check_for_gl_err(__FILE__, __LINE__)
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("Checking gl errors prior to the event loop\n");
+    SDL_Log("check_for_gl_err() prior to the db init\n");
     check_for_gl_err();
 #endif
 
@@ -3018,7 +3034,7 @@ bool craft::run() const noexcept {
     }
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("Checking gl errors prior to event loop\n");
+    SDL_Log("Ccheck_for_gl_err() prior to event loop\n");
     check_for_gl_err();
 #endif
 
@@ -3290,7 +3306,6 @@ bool craft::run() const noexcept {
 #if defined(__EMSCRIPTEN__)
             emscripten_cancel_main_loop();
 #endif
-            break;
         }
     }  // EVENT LOOP
 
