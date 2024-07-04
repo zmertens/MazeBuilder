@@ -41,6 +41,8 @@ Originally written in C99, ported to C++17
 #include "item.h"
 #include "matrix.h"
 
+#include "maze_types_enum.h"
+#include "maze_factory.h"
 #include "grid.h"
 #include "cell.h"
 #include "writer.h"
@@ -1332,9 +1334,7 @@ struct craft::craft_impl {
         // setting up the writer calls util.cpp::convert_grid_to_mesh_str
         static bool already_written = false;
         if (item->p == 0 && item->q == 0 && !already_written) {
-            //this->m_setup_writer({ faces, data });
             convert_data_to_mesh_str(item->faces, item->data, ref(this->m_current_mesh_str));
-            //SDL_Log("In compute chunk: mesh_str: %s\n", this->m_current_mesh_str.c_str());
             already_written = true;
         }
     } // compute_chunk
@@ -2361,8 +2361,16 @@ struct craft::craft_impl {
                     break;
                 }
                 case SDL_EVENT_KEY_DOWN: {
+                    
                     sc = e.key.scancode;
                     switch (sc) {
+                    case SDL_SCANCODE_ESCAPE: {
+                        if (SDL_GetRelativeMouseMode()) {
+                            SDL_SetRelativeMouseMode(SDL_FALSE);
+                            this->m_gui.capture_mouse = false;
+                        }
+                        break;
+                    }
                     case SDL_SCANCODE_RETURN: {
                         if (this->m_model->typing) {
                             if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
@@ -2370,8 +2378,7 @@ struct craft::craft_impl {
                                     this->m_model->typing_buffer[this->m_model->text_len] = '\n';
                                     this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
                                 }
-                            }
-                            else {
+                            } else {
                                 this->m_model->typing = 0;
                                 if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
                                     Player* player = this->m_model->players;
@@ -2379,17 +2386,14 @@ struct craft::craft_impl {
                                     if (hit_test_face(player, &x, &y, &z, &face)) {
                                         set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                     }
-                                }
-                                else if (this->m_model->typing_buffer[0] == '/') {
+                                } else if (this->m_model->typing_buffer[0] == '/') {
                                     this->parse_command(this->m_model->typing_buffer, 1);
                                 }
                             }
-                        }
-                        else {
+                        } else {
                             if (control) {
                                 this->on_right_click();
-                            }
-                            else {
+                            } else {
                                 this->on_left_click();
                             }
                         }
@@ -2402,8 +2406,7 @@ struct craft::craft_impl {
                                 this->m_model->suppress_char = 1;
                                 SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                     MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                            }
-                            else {
+                            } else {
                                 parse_command(clip_buffer, 0);
                             }
                         }
@@ -2424,7 +2427,7 @@ struct craft::craft_impl {
                     case SDL_SCANCODE_8: [[fallthrough]];
                     case SDL_SCANCODE_9: {
                         if (!this->m_model->typing)
-                        this->m_model->item_index = (sc - SDL_SCANCODE_1);
+                            this->m_model->item_index = (sc - SDL_SCANCODE_1);
                         break;
                     }
                     case KEY_FLY: {
@@ -2475,20 +2478,13 @@ struct craft::craft_impl {
                         break;
 
                     }
-                    case SDL_SCANCODE_ESCAPE: {
-                        if (SDL_GetRelativeMouseMode()) {
-                            SDL_SetRelativeMouseMode(SDL_FALSE);
-                            this->m_gui.capture_mouse = false;
-                        }
-                        break;
-                    }
-                    default: break;
                     } // switch
+                    break;
                 } // case SDL_EVENT_KEY_DOWN
                 case SDL_EVENT_TEXT_INPUT: {
                     // could probably just do text[text_len++] = e.text.text[0]
                     // since I only handle ascii
-                    if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                    if (this->m_gui.capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                         strcat(this->m_model->typing_buffer, e.text.text);
                         this->m_model->text_len += SDL_strlen(e.text.text);
                         //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
@@ -2581,15 +2577,18 @@ struct craft::craft_impl {
             float m = dt * 1.0;  // what is this for?
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
-            if (state[KEY_FORWARD]) sz--;
-            if (state[KEY_BACKWARD]) sz++;
-            if (state[KEY_LEFT]) sx--;
-            if (state[KEY_RIGHT]) sx++;
-            if (state[SDL_SCANCODE_LEFT]) s->rx -= m;
-            if (state[SDL_SCANCODE_RIGHT]) s->rx += m;
-            if (state[SDL_SCANCODE_UP]) s->ry += m;
-            if (state[SDL_SCANCODE_DOWN]) s->ry -= m;
+            if (this->m_gui.capture_mouse) {
+                if (state[KEY_FORWARD]) sz--;
+                if (state[KEY_BACKWARD]) sz++;
+                if (state[KEY_LEFT]) sx--;
+                if (state[KEY_RIGHT]) sx++;
+                if (state[SDL_SCANCODE_LEFT]) s->rx -= m;
+                if (state[SDL_SCANCODE_RIGHT]) s->rx += m;
+                if (state[SDL_SCANCODE_UP]) s->ry += m;
+                if (state[SDL_SCANCODE_DOWN]) s->ry -= m;
+            }
         }
+
         float vx, vy, vz;
         get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
         if (!this->m_model->typing) {
@@ -2654,12 +2653,12 @@ struct craft::craft_impl {
                     SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n", display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
 #endif
                 }
-            }
-            
-            window_width = modes[num_modes - 1]->w;
-            window_height = modes[num_modes - 1]->h;
+                window_width = modes[num_modes - 1]->w;
+                window_height = modes[num_modes - 1]->h;
 
-            SDL_free(modes);
+                SDL_free(modes);
+            }
+           
 
             window_flags |= SDL_WINDOW_FULLSCREEN;
         } else {
@@ -2746,7 +2745,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run() const noexcept {
+bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
 
     srand(time(nullptr));
     rand();
@@ -2948,10 +2947,7 @@ bool craft::run() const noexcept {
     // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
     // ImFont* im_font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
     // IM_ASSERT(im_font != nullptr);
-
-    // Imgui state management variables
-    bool show_demo_window = false;
-    bool show_builder_gui = true;
+    
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     auto _check_for_gl_err = [](const char *file, int line) -> GLenum {
@@ -3039,6 +3035,17 @@ bool craft::run() const noexcept {
         dt = SDL_max(dt, 0.0);
         previous = now;
 
+        // ImGui window variables
+        static bool show_demo_window = false;
+        static bool show_builder_gui = true;
+        static bool build_button_pressed = false;
+        static int current_maze_width = 1;
+        static int current_maze_length = 1;
+        static int current_maze_height = 1;
+        static int current_maze_seed = 35;
+        static string_view current_maze_algo = "binary_tree";
+        static char current_maze_outfile[64] = "";
+
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3049,6 +3056,7 @@ bool craft::run() const noexcept {
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
+
         if (show_builder_gui) {
             // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.data());
@@ -3057,11 +3065,23 @@ bool craft::run() const noexcept {
             if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
-                    ImGui::Text("Output");
-                    ImGui::Text("Width");
-                    ImGui::Text("Length");
-                    ImGui::Text("Height");
-                    ImGui::Text("Seed");
+           
+                    static unsigned int MAX_MAZE_WIDTH = 1000;
+                    if (ImGui::SliderInt("Width", &current_maze_width, 1, MAX_MAZE_WIDTH)) {
+						current_maze_width = current_maze_width;
+					}
+                    static unsigned int MAX_MAZE_LENGTH = 1000;
+                    if (ImGui::SliderInt("Length", &current_maze_length, 1, MAX_MAZE_LENGTH)) {
+                        current_maze_length = current_maze_length;
+                    }
+                    static unsigned int MAX_MAZE_HEIGHT = 50;
+                    if (ImGui::SliderInt("Height", &current_maze_height, 1, MAX_MAZE_HEIGHT)) {
+						current_maze_height = current_maze_height;
+					}
+                    if (ImGui::SliderInt("Seed", &current_maze_seed, 1, 100)) {
+                        current_maze_seed = current_maze_seed;
+                    }
+                    ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
                     if (ImGui::TreeNode("Algorithms")) {
                         static const char* algos[2] = {"binary_tree", "sidewinder"};
                         static int algos_current_idx{ 0 };
@@ -3070,9 +3090,10 @@ bool craft::run() const noexcept {
                         if (ImGui::BeginCombo("algorithm", preview)) {
                             for (int n = 0; n < 2; n++) {
                                 const bool is_selected = (algos_current_idx == n);
-                                if (ImGui::Selectable(algos[n], is_selected))
+                                if (ImGui::Selectable(algos[n], is_selected)) {
                                     algos_current_idx = n;
-
+                                    current_maze_algo = algos[algos_current_idx];
+                                }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)
                                     ImGui::SetItemDefaultFocus();
@@ -3081,8 +3102,21 @@ bool craft::run() const noexcept {
                         }
                         ImGui::TreePop();
                     }
-                
-                    ImGui::Button("Build!");
+
+                    if (!IM_ARRAYSIZE(current_maze_outfile)) {
+                        if (ImGui::Button("Build!"))
+                            build_button_pressed = true;
+                    } else {
+                        // Disable the button
+                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
+
+                        // Render the button
+                        ImGui::Button("Disabled Button");
+
+                        // Re-enable items and revert style change
+                        ImGui::PopStyleVar();
+                    }
+                    
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Graphics")) {
@@ -3121,7 +3155,7 @@ bool craft::run() const noexcept {
                 }
                 ImGui::EndTabBar();
             } // imgui tab handler
-
+            ImGui::NewLine();
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
 
@@ -3255,36 +3289,35 @@ bool craft::run() const noexcept {
             }
         } // render picture in picture
 
+        if (build_button_pressed) {
+            auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
+                using namespace std;
+                if (algo.compare("binary_tree") == 0) {
+                    return mazes::maze_types::BINARY_TREE;
+                } else if (algo.compare("sidewinder") == 0) {
+                    return mazes::maze_types::SIDEWINDER;
+                } else {
+                    return mazes::maze_types::INVALID_ALGO;
+                }
+            };
 
-        static bool ready_to_compute = true;
-//        if (ready_to_compute) {
-//            // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
-//            // now that the _grid is calculated, set the blocks in the 3D world by set_grid
-//            stringstream ss;
-//            ss << *_grid.get();
-//            string temp_s{ ss.str() };
-//            this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
-//            ready_to_compute = false;
-//        }
-//
-//             // interactive should always be true in craft::run, but just check it
-//             // get() is a blocking call, but we need to check that there is mesh str rdy
-//             static bool mesh_write_now = false;
-//             if (!this->m_pimpl->m_current_mesh_str.empty() && !mesh_write_now) {
-//                 auto&& grid_str{ this->m_pimpl->m_grid_future.get() };
-//                 // call the task writer to asynchronously write the file (should flip the future)
-//                 this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
-//                 this->m_pimpl->m_current_mesh_str.clear();
-//                 mesh_write_now = true;
-//             }
-//
-//             if (mesh_write_now) {
-//                 bool success_writing = writer_fut.get();
-//#if defined(MAZE_DEBUG)
-//                 SDL_Log("mesh writing success= %d\n", success_writing);
-//#endif
-//                 mesh_write_now = false;
-//        }
+            mazes::maze_types my_maze_type = get_maze_type_from_algo("binary_tree");
+            auto _grid{ std::make_unique<mazes::grid>(100, 100, 25) };
+            bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+            stringstream ss;
+            ss << *_grid.get();
+            string temp_s{ ss.str() };
+            this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
+
+            this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
+            this->m_pimpl->m_current_mesh_str.clear();
+
+#if defined(MAZE_DEBUG)
+            SDL_Log("Mesh writing success= %d\n", 1);
+#endif
+
+            build_button_pressed = false;
+        }
             
         ImGui::Render();
 

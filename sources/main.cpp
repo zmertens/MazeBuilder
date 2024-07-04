@@ -5,6 +5,7 @@
 #include <string_view>
 #include <sstream>
 #include <future>
+#include <thread>
 #include <algorithm>
 
 #include "craft.h"
@@ -82,9 +83,6 @@ int main(int argc, char* argv[]) {
         } else if (algo.compare("sidewinder") == 0) {
             return mazes::maze_types::SIDEWINDER;
         } else {
-#if defined(MAZE_DEBUG)
-            cout << "INFO: Using default maze algorithm, \"binary_tree\"\n";
-#endif
             return mazes::maze_types::INVALID_ALGO;
         }
     };
@@ -97,7 +95,7 @@ int main(int argc, char* argv[]) {
             std::string_view version_view{ MAZE_BUILDER_VERSION };
             std::string_view help_view{ HELP_MSG };
             craft maze_builder_3D {window_title_view, version_view, help_view};
-            success = maze_builder_3D.run();
+            success = maze_builder_3D.run(std::ref(get_int));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
@@ -112,7 +110,8 @@ int main(int argc, char* argv[]) {
                 auto&& fut_writer = task_writes.get_future();
                 std::stringstream ss;
                 ss << *_grid.get();
-                task_writes(ss.str());
+                std::thread thread_writer(std::move(task_writes), ss.str());
+                thread_writer.join();
                 if (fut_writer.get()) {
 #if defined(MAZE_DEBUG)
                     std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;

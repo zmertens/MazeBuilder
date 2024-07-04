@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <memory>
+#include <functional>
 
 class craft {
 public:
@@ -18,7 +19,7 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run() const noexcept;
+    bool run(const std::function<int(int, int)>& get_int) const noexcept;
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
