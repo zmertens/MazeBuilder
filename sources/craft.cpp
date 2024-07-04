@@ -124,6 +124,17 @@ struct craft::craft_impl {
     } DearImGuiHelper;
 
     typedef struct {
+        SDL_Mutex* mtx;
+        vector<GLfloat> data;
+
+        void add_data(const GLfloat* item_data, size_t size) {
+            SDL_LockMutex(this->mtx);
+            this->data.insert(this->data.end(), item_data, item_data + size);
+            SDL_UnlockMutex(this->mtx);
+        }
+    } VertexDataCollector;
+
+    typedef struct {
         Map map;
         Map lights;
         SignList signs;
@@ -157,6 +168,8 @@ struct craft::craft_impl {
         SDL_Mutex *mtx;
         SDL_Condition *cnd;
         WorkerItem item;
+        shared_ptr<VertexDataCollector> collector;
+        bool should_stop;
     } Worker;
 
     typedef struct {
@@ -240,17 +253,11 @@ struct craft::craft_impl {
         Block copy1;
     } Model;
 
-    typedef struct {
-        int faces;
-        GLfloat* data;
-    } MazeChunk;
-
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
     const std::string_view& m_version;
     const std::string_view& m_help;
     mazes::writer m_writer;
-    std::packaged_task<void(const MazeChunk&, std::string&)> m_setup_writer;
     std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
     unique_ptr<Model> m_model;
     DearImGuiHelper m_gui;
@@ -261,8 +268,6 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_writer{}
-        , m_setup_writer{ [](const MazeChunk& c, auto mesh_str)->void {
-            convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
         , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
         , m_gui{32, true, true, true, false, true, false}
@@ -272,20 +277,23 @@ struct craft::craft_impl {
 
     static int worker_run(void *arg) {
         Worker *worker = (Worker *)arg;
-        int running = 1;
         string_view sv {"dummy"};
         craft caller{ sv, {}, {} };
-        while (running) {
+        while (1) {
             SDL_LockMutex(worker->mtx);
-            while (worker->state != WORKER_BUSY) {
+            while (worker->state != WORKER_BUSY && !worker->should_stop) {
                 SDL_WaitCondition(worker->cnd, worker->mtx);
             }
+            if (worker->should_stop) {
+				SDL_UnlockMutex(worker->mtx);
+				break;
+			}
             SDL_UnlockMutex(worker->mtx);
             WorkerItem *worker_item = &worker->item;
             if (worker_item->load) {
                 caller.m_pimpl->load_chunk(worker_item);
             }
-            caller.m_pimpl->compute_chunk(worker_item);
+            caller.m_pimpl->compute_chunk(worker_item, worker->collector);
             SDL_LockMutex(worker->mtx);
             worker->state = WORKER_DONE;
             SDL_UnlockMutex(worker->mtx);
@@ -294,10 +302,11 @@ struct craft::craft_impl {
     } // worker_run
 
 
-    void init_worker_threads() {
+    void init_worker_threads(const shared_ptr<VertexDataCollector>& collector) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
+            worker->collector = collector;
             worker->index = i;
             worker->state = WORKER_IDLE;
             SDL_Mutex *sdl_mtx = SDL_CreateMutex();
@@ -325,19 +334,25 @@ struct craft::craft_impl {
      * Cleanup the worker threads
      */
     void cleanup_worker_threads() {
+        // signal all worker threads to stop
+        for (auto&& w : this->m_model->workers) {
+            SDL_LockMutex(w->mtx);
+            w->should_stop = true;
+            SDL_SignalCondition(w->cnd);
+            SDL_UnlockMutex(w->mtx);
+        }
+        // Wait for threads to join
         for (auto&& w : this->m_model->workers) {
             // Wait for the thread to complete its execution
             int threadReturnValue = -1;
-            //SDL_WaitThread(w->thrd, &threadReturnValue);
-            // Optionally, log the return value or perform some checks
+            SDL_WaitThread(w->thrd, &threadReturnValue);
 #if defined(MAZE_DEBUG)
-            SDL_Log("Thread finished with return value: %d", threadReturnValue);
+            SDL_Log("Worker thread finished with return value: %d", threadReturnValue);
 #endif
             // Clean up the mutex and condition variable
             SDL_DestroyMutex(w->mtx);
             SDL_DestroyCondition(w->cnd);
         }
-
         // Clear the vector after all threads have been joined
         this->m_model->workers.clear();
     }
@@ -1153,7 +1168,8 @@ struct craft::craft_impl {
         light_fill(opaque, light, x, y, z + 1, w, 0);
     }
 
-    void compute_chunk(WorkerItem *item) {
+    // Handles terrain generation in a multithreaded environment
+    void compute_chunk(WorkerItem *item, const shared_ptr<VertexDataCollector>& collector = nullptr) {
         char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
@@ -1253,7 +1269,8 @@ struct craft::craft_impl {
         } END_MAP_FOR_EACH;
 
         // generate geometry
-        GLfloat *data = malloc_faces(10, faces);
+        static constexpr int components = 10;
+        GLfloat *data = malloc_faces(components, faces);
         int offset = 0;
         MAP_FOR_EACH(map, ex, ey, ez, ew) {
             if (ew <= 0) {
@@ -1330,13 +1347,8 @@ struct craft::craft_impl {
         item->faces = faces;
         item->data = data;
 
-        // check if the grid has been computed (blocks set), if so, setup the writer
-        // setting up the writer calls util.cpp::convert_grid_to_mesh_str
-        static bool already_written = false;
-        if (item->p == 0 && item->q == 0 && !already_written) {
-            convert_data_to_mesh_str(item->faces, item->data, ref(this->m_current_mesh_str));
-            already_written = true;
-        }
+        //if (collector)
+        //    collector->add_data(data, faces * 6 * components);
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1509,6 +1521,7 @@ struct craft::craft_impl {
         }
     }
 
+    // Used to init the terrain (chunks) around the player
     void force_chunks(Player *player) {
         State *s = &player->state;
         int p = chunked(s->x);
@@ -1537,11 +1550,11 @@ struct craft::craft_impl {
      * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
      * Calling set_grid, set_block will trigger compute_chunk
      * @param _grid
-     * @param p
+     * @param grid_as_ascii
      * @return
      */
-    void set_grid(unsigned int y, const string& temp_s) {
-        istringstream iss{ temp_s.data() };
+    void set_grid(unsigned int y, const string& grid_as_ascii) {
+        istringstream iss{ grid_as_ascii.data() };
         string line;
         unsigned int row_x = 0;
         while (getline(iss, line, '\n')) {
@@ -1579,8 +1592,8 @@ struct craft::craft_impl {
         bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
         stringstream ss;
         ss << *_grid.get();
-        string temp_s{ ss.str() };
-        this->set_grid(_grid->get_height(), ref(temp_s));
+        string grid_as_ascii{ ss.str() };
+        this->set_grid(_grid->get_height(), ref(grid_as_ascii));
 
         this->m_writer_task(outfile, ref(this->m_current_mesh_str));
         this->m_current_mesh_str.clear();
@@ -2931,7 +2944,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
 
     // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads();
+    shared_ptr<craft_impl::VertexDataCollector> collector = make_shared<craft_impl::VertexDataCollector>();
+    m_pimpl->init_worker_threads(ref(collector));
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -3161,14 +3175,15 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::EndDisabled();
                     }
 
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                    if (ImGui::Button("Reset")) {
-                        current_maze_outfile[0] = '.';
-                        current_maze_outfile[1] = 'o';
-                        current_maze_outfile[2] = 'b';
-                        current_maze_outfile[3] = 'j';
-                    }
-                    ImGui::PopStyleColor();
+                    // clear all vertex data
+                    //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+                    //if (ImGui::Button("Reset")) {
+                    //    current_maze_outfile[0] = '.';
+                    //    current_maze_outfile[1] = 'o';
+                    //    current_maze_outfile[2] = 'b';
+                    //    current_maze_outfile[3] = 'j';
+                    //}
+                    //ImGui::PopStyleColor();
                     
                     ImGui::EndTabItem();
                 }
@@ -3363,6 +3378,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         EMSCRIPTEN_MAINLOOP_END;
 #endif
 
+#if defined(MAZE_DEBUG)
+    SDL_Log("Cleaning up ImGui objects. . .");
+    SDL_Log("Cleaning up OpenGL objects. . .");
+    SDL_Log("Cleaning up SDL objects. . .");
+#endif
+
+    m_pimpl->cleanup_worker_threads();
+
     // SHUTDOWN 
     db_save_state(s->x, s->y, s->z, s->rx, s->ry);
     db_close();
@@ -3374,14 +3397,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     SDL_Log("check_for_gl_err() at the end of the event loop\n");
     check_for_gl_err();
 #endif
-
-#if defined(MAZE_DEBUG)
-    SDL_Log("Cleaning up ImGui objects. . .");
-    SDL_Log("Cleaning up OpenGL objects. . .");
-    SDL_Log("Cleaning up SDL objects. . .");
-#endif
-
-     m_pimpl->cleanup_worker_threads();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
