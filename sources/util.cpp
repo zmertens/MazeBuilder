@@ -253,9 +253,8 @@ int wrap(const char *input, int max_width, char *output, int max_length) {
  * @param mesh_str the string which will contain the mesh data
  * @return
  */
-void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
+std::string convert_data_to_mesh_str(int faces, const std::vector<GLfloat>& data) {
     using namespace std;
-
     struct Vec2 {
         float x;
         float y;
@@ -391,8 +390,9 @@ void convert_data_to_mesh_str(int faces, GLfloat* data, std::string& mesh_str) {
     auto&& ofs = oss;
     const auto result = thinks::WriteObj(ofs, pos_mapper, face_mapper, tex_mapper, nml_mapper);
     // update the mesh_str parameter
-    mesh_str = oss.str();
+    auto mesh_str = oss.str();
     oss.clear();
+    return mesh_str;
 } // convert_data_to_mesh_str
 
 

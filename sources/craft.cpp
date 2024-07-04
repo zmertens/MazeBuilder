@@ -31,6 +31,7 @@ Originally written in C99, ported to C++17
 #include <iostream>
 #include <thread>
 #include <future>
+#include <chrono>
 
 #include <noise/noise.h>
 
@@ -125,10 +126,12 @@ struct craft::craft_impl {
 
     typedef struct {
         SDL_Mutex* mtx;
+        int faces;
         vector<GLfloat> data;
 
-        void add_data(const GLfloat* item_data, size_t size) {
+        void add_data(int faces, const GLfloat* item_data, size_t size) {
             SDL_LockMutex(this->mtx);
+            this->faces = faces;
             this->data.insert(this->data.end(), item_data, item_data + size);
             SDL_UnlockMutex(this->mtx);
         }
@@ -257,21 +260,16 @@ struct craft::craft_impl {
     const std::string_view& m_window_name;
     const std::string_view& m_version;
     const std::string_view& m_help;
-    mazes::writer m_writer;
-    std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
+
     unique_ptr<Model> m_model;
     DearImGuiHelper m_gui;
-    std::string m_current_mesh_str;
 
     craft_impl(const std::string_view& window_name, const std::string_view& version, const std::string_view& help)
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
-        , m_writer{}
-        , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
-        , m_gui{32, true, true, true, false, true, false}
-        , m_current_mesh_str{} {
+        , m_gui{32, true, true, true, false, true, false} {
 
     }
 
@@ -303,6 +301,17 @@ struct craft::craft_impl {
 
 
     void init_worker_threads(const shared_ptr<VertexDataCollector>& collector) {
+        // ensure collector is not null and has mutex initialized
+        if (collector != nullptr) {
+            collector->mtx = SDL_CreateMutex();
+            if (collector->mtx == nullptr) {
+#if defined(MAZE_DEBUG)
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Error creating mutex for collector: %s", SDL_GetError());
+#endif
+                return;
+            }
+        }
+
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
@@ -1347,8 +1356,8 @@ struct craft::craft_impl {
         item->faces = faces;
         item->data = data;
 
-        //if (collector)
-        //    collector->add_data(data, faces * 6 * components);
+        if (collector)
+            collector->add_data(faces, data, faces * 6 * components);
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1548,7 +1557,7 @@ struct craft::craft_impl {
 
     /**
      * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
-     * Calling set_grid, set_block will trigger compute_chunk
+     * Calling set_grid, set_block, record_block to DB
      * @param _grid
      * @param grid_as_ascii
      * @return
@@ -1585,7 +1594,7 @@ struct craft::craft_impl {
     bool build_maze(const function<int(int, int)>& get_int, 
         const function<maze_types(const string& algo)> get_maze_algo_from_str,
         int current_maze_width, int current_maze_length, int current_maze_height,
-        int current_maze_seed, const string& current_maze_algo, const string& outfile) {
+        int current_maze_seed, const string& current_maze_algo) {
 
         mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
         auto _grid{ std::make_unique<mazes::grid>(current_maze_width, current_maze_length, current_maze_height) };
@@ -1595,13 +1604,37 @@ struct craft::craft_impl {
         string grid_as_ascii{ ss.str() };
         this->set_grid(_grid->get_height(), ref(grid_as_ascii));
 
-        this->m_writer_task(outfile, ref(this->m_current_mesh_str));
-        this->m_current_mesh_str.clear();
-
 #if defined(MAZE_DEBUG)
         SDL_Log("Gen maze success= %d\n", static_cast<int>(success));
 #endif
         return success;
+    }
+
+    // Return true when maze has been written
+    bool write_maze(const string& filename, const string& fut_mesh_str) {
+        // get the mesh str when the future has completed, don't block the main thread
+        if (!fut_mesh_str.empty()) {
+            auto&& mesh_str = fut_mesh_str;
+            SDL_Log(mesh_str.c_str());
+            // get ready to write to file
+            writer maze_writer;
+            packaged_task<bool(const string& out_file, const string& mesh)> maze_writing_task{ [&maze_writer](auto out, auto mesh)->bool
+                { return maze_writer.write(out, mesh); } };
+            auto writing_results = maze_writing_task.get_future();
+            thread maze_writing_thread{ move(maze_writing_task), filename, mesh_str };
+            maze_writing_thread.detach();
+            return writing_results.valid();
+        } else {
+            return false;
+        }
+	}
+
+    // Write the mesh from the collector to file
+    string get_mesh_future_str(const shared_ptr<VertexDataCollector>& collector) const {
+        if (collector)
+            return convert_data_to_mesh_str(collector->faces, collector->data);
+        else
+            return "";
     }
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
@@ -3106,25 +3139,25 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
-           
+
                     static unsigned int MAX_MAZE_WIDTH = 1000;
                     if (ImGui::SliderInt("Width", &current_maze_width, 1, MAX_MAZE_WIDTH)) {
-						current_maze_width = current_maze_width;
-					}
+                        current_maze_width = current_maze_width;
+                    }
                     static unsigned int MAX_MAZE_LENGTH = 1000;
                     if (ImGui::SliderInt("Length", &current_maze_length, 1, MAX_MAZE_LENGTH)) {
                         current_maze_length = current_maze_length;
                     }
                     static unsigned int MAX_MAZE_HEIGHT = 50;
                     if (ImGui::SliderInt("Height", &current_maze_height, 1, MAX_MAZE_HEIGHT)) {
-						current_maze_height = current_maze_height;
-					}
+                        current_maze_height = current_maze_height;
+                    }
                     if (ImGui::SliderInt("Seed", &current_maze_seed, 1, 100)) {
                         current_maze_seed = current_maze_seed;
                     }
                     ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
                     if (ImGui::TreeNode("Algorithms")) {
-                        static const char* algos[2] = {"binary_tree", "sidewinder"};
+                        static const char* algos[2] = { "binary_tree", "sidewinder" };
                         static int algos_current_idx{ 0 };
                         auto preview{ algos[algos_current_idx] };
                         ImGui::SameLine();
@@ -3144,25 +3177,29 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::TreePop();
                     }
 
+                    atomic<bool> writing_results { false};
                     // Check if user has added a prefix to the Wavefront object file and the build button has not been pressed
                     if (!build_button_pressed && current_maze_outfile[0] != '.') {
-                        string temp_outfile{ current_maze_outfile };
                         if (ImGui::Button("Build!")) {
                             build_button_pressed = true;
-                            current_maze_outfile[0] = '.';
-                            current_maze_outfile[1] = 'o';
-                            current_maze_outfile[2] = 'b';
-                            current_maze_outfile[3] = 'j';
                             this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, 
                                 current_maze_width, current_maze_length, current_maze_height, 
-                                current_maze_seed, current_maze_algo, temp_outfile);
+                                current_maze_seed, current_maze_algo);
                         } else {
                             ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", temp_outfile.c_str());
+                            ImGui::Text("Building maze... %s\n", current_maze_outfile);
                         }
                     } else {
-                        if (build_button_pressed)
+                        if (build_button_pressed) {
+                            // finally write the maze to a file
+                            auto fut_mesh_str = this->m_pimpl->get_mesh_future_str(collector);
+                            if (!fut_mesh_str.empty()) {
+                                writing_results.store(this->m_pimpl->write_maze(current_maze_outfile, fut_mesh_str));
+                            }
+
                             build_button_pressed = false;
+                        }
+    
                         // Disable the button
                         ImGui::BeginDisabled(true);
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
@@ -3175,14 +3212,20 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::EndDisabled();
                     }
 
-                    // clear all vertex data
+                    if (writing_results.load()) {
+						ImGui::Text("Maze written to %s\n", current_maze_outfile);
+                    }
+
+                    // Resets all vertex data
                     //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     //if (ImGui::Button("Reset")) {
-                    //    current_maze_outfile[0] = '.';
-                    //    current_maze_outfile[1] = 'o';
-                    //    current_maze_outfile[2] = 'b';
-                    //    current_maze_outfile[3] = 'j';
+                    //}                            for (auto i = 0; i < IM_ARRAYSIZE(current_maze_outfile); ++i) {
+                    //    current_maze_outfile[i] = '\0';
                     //}
+                    //current_maze_outfile[0] = '.';
+                    //current_maze_outfile[1] = 'o';
+                    //current_maze_outfile[2] = 'b';
+                    //current_maze_outfile[3] = 'j';
                     //ImGui::PopStyleColor();
                     
                     ImGui::EndTabItem();

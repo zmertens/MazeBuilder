@@ -40,6 +40,6 @@ int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
 
-void convert_data_to_mesh_str(int faces, GLfloat *data, std::string& mesh_str);
+std::string convert_data_to_mesh_str(int faces, const std::vector<GLfloat>& data);
 
 #endif
