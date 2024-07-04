@@ -6,6 +6,8 @@
 #include <memory>
 #include <functional>
 
+#include "maze_types_enum.h"
+
 class craft {
 public:
     craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help);
@@ -19,7 +21,7 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run(const std::function<int(int, int)>& get_int) const noexcept;
+    bool run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;

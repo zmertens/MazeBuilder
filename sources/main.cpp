@@ -95,7 +95,7 @@ int main(int argc, char* argv[]) {
             std::string_view version_view{ MAZE_BUILDER_VERSION };
             std::string_view help_view{ HELP_MSG };
             craft maze_builder_3D {window_title_view, version_view, help_view};
-            success = maze_builder_3D.run(std::ref(get_int));
+            success = maze_builder_3D.run(std::ref(get_int), std::ref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };

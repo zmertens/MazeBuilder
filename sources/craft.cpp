@@ -119,6 +119,7 @@ struct craft::craft_impl {
         bool show_clouds;
         bool fullscreen;
         bool color_mode_dark;
+        bool reset_grid;
         bool capture_mouse;
     } DearImGuiHelper;
 
@@ -1387,7 +1388,7 @@ struct craft::craft_impl {
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
+        //_world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1563,6 +1564,32 @@ struct craft::craft_impl {
             row_x++;
         }
     } // set_grid
+
+    /**
+     * @brief Build button clicked, set the grid and write the maze to an Wavefront object file
+     * @return
+     */
+    bool build_maze(const function<int(int, int)>& get_int, 
+        const function<maze_types(const string& algo)> get_maze_algo_from_str,
+        int current_maze_width, int current_maze_length, int current_maze_height,
+        int current_maze_seed, const string& current_maze_algo, const string& outfile) {
+
+        mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
+        auto _grid{ std::make_unique<mazes::grid>(current_maze_width, current_maze_length, current_maze_height) };
+        bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+        stringstream ss;
+        ss << *_grid.get();
+        string temp_s{ ss.str() };
+        this->set_grid(_grid->get_height(), ref(temp_s));
+
+        this->m_writer_task(outfile, ref(this->m_current_mesh_str));
+        this->m_current_mesh_str.clear();
+
+#if defined(MAZE_DEBUG)
+        SDL_Log("Gen maze success= %d\n", static_cast<int>(success));
+#endif
+        return success;
+    }
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
@@ -2741,7 +2768,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
+bool craft::run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
 
     srand(time(nullptr));
     rand();
@@ -3039,12 +3066,12 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
         static bool show_demo_window = false;
         static bool show_builder_gui = true;
         static bool build_button_pressed = false;
-        static int current_maze_width = 1;
-        static int current_maze_length = 1;
+        static int current_maze_width = 25;
+        static int current_maze_length = 42;
         static int current_maze_height = 1;
         static int current_maze_seed = 35;
-        static string_view current_maze_algo = "binary_tree";
-        static char current_maze_outfile[64] = "";
+        static string current_maze_algo = "binary_tree";
+        static char current_maze_outfile[64] = ".obj";
 
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
@@ -3086,7 +3113,7 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
                         static const char* algos[2] = {"binary_tree", "sidewinder"};
                         static int algos_current_idx{ 0 };
                         auto preview{ algos[algos_current_idx] };
-
+                        ImGui::SameLine();
                         if (ImGui::BeginCombo("algorithm", preview)) {
                             for (int n = 0; n < 2; n++) {
                                 const bool is_selected = (algos_current_idx == n);
@@ -3103,19 +3130,45 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
                         ImGui::TreePop();
                     }
 
-                    if (!IM_ARRAYSIZE(current_maze_outfile)) {
-                        if (ImGui::Button("Build!"))
+                    // Check if user has added a prefix to the Wavefront object file and the build button has not been pressed
+                    if (!build_button_pressed && current_maze_outfile[0] != '.') {
+                        string temp_outfile{ current_maze_outfile };
+                        if (ImGui::Button("Build!")) {
                             build_button_pressed = true;
+                            current_maze_outfile[0] = '.';
+                            current_maze_outfile[1] = 'o';
+                            current_maze_outfile[2] = 'b';
+                            current_maze_outfile[3] = 'j';
+                            this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, 
+                                current_maze_width, current_maze_length, current_maze_height, 
+                                current_maze_seed, current_maze_algo, temp_outfile);
+                        } else {
+                            ImGui::SameLine();
+                            ImGui::Text("Building maze... %s\n", temp_outfile.c_str());
+                        }
                     } else {
+                        if (build_button_pressed)
+                            build_button_pressed = false;
                         // Disable the button
+                        ImGui::BeginDisabled(true);
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
 
-                        // Render the button
-                        ImGui::Button("Disabled Button");
+                        // Render the button - don't need to check if the button is pressed because it's disabled
+                        ImGui::Button("Build!");
 
                         // Re-enable items and revert style change
                         ImGui::PopStyleVar();
+                        ImGui::EndDisabled();
                     }
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+                    if (ImGui::Button("Reset")) {
+                        current_maze_outfile[0] = '.';
+                        current_maze_outfile[1] = 'o';
+                        current_maze_outfile[2] = 'b';
+                        current_maze_outfile[3] = 'j';
+                    }
+                    ImGui::PopStyleColor();
                     
                     ImGui::EndTabItem();
                 }
@@ -3288,36 +3341,6 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
                 m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);
             }
         } // render picture in picture
-
-        if (build_button_pressed) {
-            auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
-                using namespace std;
-                if (algo.compare("binary_tree") == 0) {
-                    return mazes::maze_types::BINARY_TREE;
-                } else if (algo.compare("sidewinder") == 0) {
-                    return mazes::maze_types::SIDEWINDER;
-                } else {
-                    return mazes::maze_types::INVALID_ALGO;
-                }
-            };
-
-            mazes::maze_types my_maze_type = get_maze_type_from_algo("binary_tree");
-            auto _grid{ std::make_unique<mazes::grid>(100, 100, 25) };
-            bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
-            stringstream ss;
-            ss << *_grid.get();
-            string temp_s{ ss.str() };
-            this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
-
-            this->m_pimpl->m_writer_task("out3.obj", ref(this->m_pimpl->m_current_mesh_str));
-            this->m_pimpl->m_current_mesh_str.clear();
-
-#if defined(MAZE_DEBUG)
-            SDL_Log("Mesh writing success= %d\n", 1);
-#endif
-
-            build_button_pressed = false;
-        }
             
         ImGui::Render();
 
