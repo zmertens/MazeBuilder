@@ -10,7 +10,7 @@ using namespace mazes;
 using namespace std;
 
 /**
-* Generates a perfect maze if done correctly (no loops)
+ * Generates a perfect maze if done correctly (no loops) by using "runs" to carve east-west
  * @param interactive = false
 */
 bool sidewinder::run(unique_ptr<grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
@@ -31,7 +31,7 @@ bool sidewinder::run(unique_ptr<grid> const& _grid, std::function<int(int, int)>
             at_eastern_boundary = true;
         if (itr->get()->get_north() == nullptr)
             at_northern_boundary = true;
-        // verify the sidewinder is reaching eastern wall and then flip a coin to go north
+        // verify the sidewinder is reaching eastern wall and then flip a coin to go north or not
         bool should_close_out = at_eastern_boundary || (!at_northern_boundary && get_int(0, 1) == 0);
         if (should_close_out) {
             auto random_index{ get_int(0, store.size() - 1) };
@@ -40,9 +40,10 @@ bool sidewinder::run(unique_ptr<grid> const& _grid, std::function<int(int, int)>
                 random_cell->link(random_cell, random_cell->get_north(), true);
                 store.clear();
             }
-            else if (itr->get()->get_east() != nullptr) {
-                itr->get()->link(*itr, itr->get()->get_east(), true);
-            }
+            // ensure last row is updated correctly
+            last_row = itr->get()->get_row();
+        } else if (!at_eastern_boundary) {
+            itr->get()->link(*itr, itr->get()->get_east(), true);
         }
     }
     return true;

@@ -55,7 +55,8 @@ set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp)
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
@@ -173,8 +174,6 @@ if(MINGW OR WIN32 AND NOT EMSCRIPTEN)
     message(INFO ": Building SDL app for Desktop WINDOWS!")
         
     find_package(OpenGL REQUIRED)
-
-    target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE "C:\\Program Files (x86)\\SDL3\\include")
 
     # Find/Configure SDL
     find_package(SDL3 QUIET)

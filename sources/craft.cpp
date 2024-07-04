@@ -240,14 +240,14 @@ struct craft::craft_impl {
     typedef struct {
         int faces;
         GLfloat* data;
-    } ChunkToWriteTo;
+    } MazeChunk;
 
     // Public member so the pimpl can access and manipulate
     const std::string_view& m_window_name;
     const std::string_view& m_version;
     const std::string_view& m_help;
     mazes::writer m_writer;
-    std::packaged_task<void(const ChunkToWriteTo&, std::string&)> m_setup_writer;
+    std::packaged_task<void(const MazeChunk&, std::string&)> m_setup_writer;
     std::packaged_task<bool(const std::string& out, const std::string& data)> m_writer_task;
     unique_ptr<Model> m_model;
     DearImGuiHelper m_gui;
@@ -258,7 +258,7 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_writer{}
-        , m_setup_writer{ [](const ChunkToWriteTo& c, auto mesh_str)->void {
+        , m_setup_writer{ [](const MazeChunk& c, auto mesh_str)->void {
             convert_data_to_mesh_str(c.faces, c.data, ref(mesh_str)); } }
         , m_writer_task{ [this](auto out, auto data)->bool { return this->m_writer.write(out, data); } }
         , m_model{make_unique<Model>()}
@@ -2748,7 +2748,7 @@ craft::~craft() = default;
 */
 bool craft::run() const noexcept {
 
-    srand(time(NULL));
+    srand(time(nullptr));
     rand();
 
     // SDL INITIALIZATION //
@@ -2953,8 +2953,6 @@ bool craft::run() const noexcept {
     bool show_demo_window = false;
     bool show_builder_gui = true;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
-    // auto&& writer_fut{ this->m_pimpl->m_writer_task.get_future() };
 
     auto _check_for_gl_err = [](const char *file, int line) -> GLenum {
         GLenum errorCode;
@@ -3258,17 +3256,17 @@ bool craft::run() const noexcept {
         } // render picture in picture
 
 
-//             static bool ready_to_compute = true;
-//             if (success_from_maze_fut && ready_to_compute) {
-//                 // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
-//                 // now that the _grid is calculated, set the blocks in the 3D world by set_grid
-//                 stringstream ss;
-//                 ss << *_grid.get();
-//                 string temp_s{ ss.str() };
-//                 this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
-//                 ready_to_compute = false;
-//             }
-
+        static bool ready_to_compute = true;
+//        if (ready_to_compute) {
+//            // the _grid reference is calculated when success_from_maze_fut.get() is called (blocking)
+//            // now that the _grid is calculated, set the blocks in the 3D world by set_grid
+//            stringstream ss;
+//            ss << *_grid.get();
+//            string temp_s{ ss.str() };
+//            this->m_pimpl->set_grid(_grid->get_height(), ref(temp_s));
+//            ready_to_compute = false;
+//        }
+//
 //             // interactive should always be true in craft::run, but just check it
 //             // get() is a blocking call, but we need to check that there is mesh str rdy
 //             static bool mesh_write_now = false;
@@ -3279,14 +3277,14 @@ bool craft::run() const noexcept {
 //                 this->m_pimpl->m_current_mesh_str.clear();
 //                 mesh_write_now = true;
 //             }
-
+//
 //             if (mesh_write_now) {
 //                 bool success_writing = writer_fut.get();
-// #if defined(MAZE_DEBUG)
+//#if defined(MAZE_DEBUG)
 //                 SDL_Log("mesh writing success= %d\n", success_writing);
-// #endif
+//#endif
 //                 mesh_write_now = false;
-//             }
+//        }
             
         ImGui::Render();
 

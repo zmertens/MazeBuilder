@@ -9,10 +9,9 @@
 
 #include "craft.h"
 #include "grid.h"
-#include "binary_tree.h"
-#include "sidewinder.h"
 #include "args_builder.h"
 #include "maze_types_enum.h"
+#include "maze_factory.h"
 #include "writer.h"
 
 int main(int argc, char* argv[]) {
@@ -86,37 +85,11 @@ int main(int argc, char* argv[]) {
 #if defined(MAZE_DEBUG)
             cout << "INFO: Using default maze algorithm, \"binary_tree\"\n";
 #endif
-            return mazes::maze_types::BINARY_TREE;
-        }
-    };
-
-    auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height())};
-
-    auto maze_factory = [&_grid, &get_int](mazes::maze_types maze_type) {
-        switch (maze_type) {
-            case mazes::maze_types::BINARY_TREE: {
-                static mazes::binary_tree bt;
-                // return std::async([&] {
-                    return bt.run(std::ref(_grid), get_int);
-                // });
-            }
-            case mazes::maze_types::SIDEWINDER: {
-                static mazes::sidewinder sw;
-                // return std::async([&] {
-                    return sw.run(std::ref(_grid), get_int);
-                // });
-            }
+            return mazes::maze_types::INVALID_ALGO;
         }
     };
 
     try {
-        mazes::writer my_writer;
-        auto write_func = [&my_writer, &args](auto data)->bool {
-            return my_writer.write(args.get_output(), data);
-        };
-        std::packaged_task<bool(const std::string& data)> task_writes (write_func);
-
-        mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
         bool success = false;
         if (args.is_interactive()) {
             // string views don't own the data, they have less copying overhead
@@ -124,30 +97,34 @@ int main(int argc, char* argv[]) {
             std::string_view version_view{ MAZE_BUILDER_VERSION };
             std::string_view help_view{ HELP_MSG };
             craft maze_builder_3D {window_title_view, version_view, help_view};
-            success = maze_factory(my_maze_type);
-            // this is redundant: first check grid is computed as maze, then run interactively
-            // (different meanings of the word 'success' here)...
-            if (success) {
-                success = maze_builder_3D.run();
-            }
+            success = maze_builder_3D.run();
         } else {
-            success = maze_factory(my_maze_type);
-        }
+            mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
+            auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
+            success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+            if (success) {
+                mazes::writer my_writer;
+                auto write_func = [&my_writer, &args](auto data)->bool {
+                    return my_writer.write(args.get_output(), data);
+                    };
+                std::packaged_task<bool(const std::string& data)> task_writes(write_func);
 
-        if (success && !args.is_interactive()) {
-            auto&& fut_writer = task_writes.get_future();
-            std::stringstream ss;
-            ss << *_grid.get();
-            task_writes(ss.str());
-            if (fut_writer.get()) {
+                auto&& fut_writer = task_writes.get_future();
+                std::stringstream ss;
+                ss << *_grid.get();
+                task_writes(ss.str());
+                if (fut_writer.get()) {
 #if defined(MAZE_DEBUG)
-                std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
+                    std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
 #endif
-            } else {
-                std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+                }
+                else {
+                    std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+                }
             }
-        } else if (!success){
-            std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
+            else {
+                std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
+            }
         }
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 

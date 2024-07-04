@@ -6,7 +6,8 @@ namespace mazes {
         BINARY_TREE,
         SIDEWINDER,
         WILSONS,
-        ALDOUS_BRODER
+        ALDOUS_BRODER,
+        INVALID_ALGO
     };
 }
 
