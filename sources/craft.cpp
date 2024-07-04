@@ -325,10 +325,9 @@ struct craft::craft_impl {
      */
     void cleanup_worker_threads() {
         for (auto&& w : this->m_model->workers) {
-            SDL_Thread *thread = w->thrd;
             // Wait for the thread to complete its execution
-            int threadReturnValue;
-            SDL_WaitThread(thread, &threadReturnValue);
+            int threadReturnValue = -1;
+            //SDL_WaitThread(w->thrd, &threadReturnValue);
             // Optionally, log the return value or perform some checks
 #if defined(MAZE_DEBUG)
             SDL_Log("Thread finished with return value: %d", threadReturnValue);
@@ -2431,7 +2430,7 @@ struct craft::craft_impl {
                         break;
                     }
                     case KEY_FLY: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->flying = ~this->m_model->flying;
                         break;
                     }
@@ -2573,26 +2572,23 @@ struct craft::craft_impl {
 
         const Uint8 *state = SDL_GetKeyboardState(nullptr);
 
-        if (!this->m_model->typing) {
-            float m = dt * 1.0;  // what is this for?
+        if (!this->m_model->typing && this->m_gui.capture_mouse) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
-            if (this->m_gui.capture_mouse) {
-                if (state[KEY_FORWARD]) sz--;
-                if (state[KEY_BACKWARD]) sz++;
-                if (state[KEY_LEFT]) sx--;
-                if (state[KEY_RIGHT]) sx++;
-                if (state[SDL_SCANCODE_LEFT]) s->rx -= m;
-                if (state[SDL_SCANCODE_RIGHT]) s->rx += m;
-                if (state[SDL_SCANCODE_UP]) s->ry += m;
-                if (state[SDL_SCANCODE_DOWN]) s->ry -= m;
-            }
+            if (state[KEY_FORWARD]) sz--;
+            if (state[KEY_BACKWARD]) sz++;
+            if (state[KEY_LEFT]) sx--;
+            if (state[KEY_RIGHT]) sx++;
+            if (state[SDL_SCANCODE_LEFT]) s->rx -= m;
+            if (state[SDL_SCANCODE_RIGHT]) s->rx += m;
+            if (state[SDL_SCANCODE_UP]) s->ry += m;
+            if (state[SDL_SCANCODE_DOWN]) s->ry -= m;
         }
 
         float vx, vy, vz;
         get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
         if (!this->m_model->typing) {
-            if (state[KEY_JUMP]) {
+            if (state[KEY_JUMP] && this->m_gui.capture_mouse) {
                 if (this->m_model->flying) {
                     vy = 1;
                 }
@@ -2998,6 +2994,10 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
     me->buffer = 0;
     m_pimpl->m_model->player_count = 1;
 
+    // magic variables to prevent black screen on load - configured in handle_events()
+    this->m_pimpl->m_model->is_ortho = 0;
+    this->m_pimpl->m_model->fov = 65;
+
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
 
@@ -3358,7 +3358,7 @@ bool craft::run(const std::function<int(int, int)>& get_int) const noexcept {
     SDL_Log("Cleaning up SDL objects. . .");
 #endif
 
-    // m_pimpl->cleanup_worker_threads();
+     m_pimpl->cleanup_worker_threads();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
