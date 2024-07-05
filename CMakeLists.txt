@@ -107,22 +107,22 @@ if(EMSCRIPTEN)
     endif()
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory --bind")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
-    set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html")
+    set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".js" LINK_FLAGS "-lembind")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
     message(INFO ": Getting SDL via FetchContent")
     fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
     set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
     # Set compile options for all targets to include atomics and bulk-memory
-    add_compile_options("SHELL:-matomics -mbulk-memory -DIMGUI_IMPL_OPENGL_ES3")
+    add_compile_options("SHELL:-matomics -mbulk-memory")
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
-        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2"
+        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"

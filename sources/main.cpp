@@ -10,13 +10,21 @@
 
 #include "craft.h"
 
+std::string do_stuff() {
+	return "doin stuff";
+}
+
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
     // bind the getter method from C++ so that it can be accessed in the frontend JS
     // Create a binding function to access vertex data
     EMSCRIPTEN_BINDINGS(maze_builder_module) {
-        emscripten::class_<craft>("craft").function("get_vertex_data", &craft::get_vertex_data);
+        emscripten::function("do_stuff", &do_stuff);  
     }
+//        emscripten::function_<craft>("craft")
+  //          .constructor<std::string_view, std::string_view, std::string_view>()
+    //        .function("get_vertex_data", &craft::get_vertex_data);
+//    }
 #endif
 
 #include "grid.h"

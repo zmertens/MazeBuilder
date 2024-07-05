@@ -22,7 +22,9 @@ public:
     craft& operator=(craft&&) = default;
 
     bool run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
+    
     std::string get_vertex_data() const noexcept;
+
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
