@@ -120,7 +120,6 @@ struct craft::craft_impl {
         bool show_clouds;
         bool fullscreen;
         bool color_mode_dark;
-        bool reset_grid;
         bool capture_mouse;
     } DearImGuiHelper;
 
@@ -1611,26 +1610,25 @@ struct craft::craft_impl {
     }
 
     // Return true when maze has been written
-    bool write_maze(const string& filename, const string& fut_mesh_str) {
-        // get the mesh str when the future has completed, don't block the main thread
-        if (!fut_mesh_str.empty()) {
-            auto&& mesh_str = fut_mesh_str;
-            SDL_Log(mesh_str.c_str());
+    future<bool> write_maze(const string& filename, const shared_ptr<VertexDataCollector>& collector) {
+        if (collector) {
             // get ready to write to file
             writer maze_writer;
-            packaged_task<bool(const string& out_file, const string& mesh)> maze_writing_task{ [&maze_writer](auto out, auto mesh)->bool
-                { return maze_writer.write(out, mesh); } };
+            packaged_task<bool(const string& out_file)> maze_writing_task{ [&maze_writer, &collector, this](auto out)->bool { 
+                return maze_writer.write(out, get_mesh_str(collector)); } 
+            };
             auto writing_results = maze_writing_task.get_future();
-            thread maze_writing_thread{ move(maze_writing_task), filename, mesh_str };
-            maze_writing_thread.detach();
-            return writing_results.valid();
+            thread(move(maze_writing_task), filename ).detach();
+            return writing_results;
         } else {
-            return false;
+            promise<bool> p;
+            p.set_value(false);
+            return p.get_future();
         }
-	}
+    }
 
     // Write the mesh from the collector to file
-    string get_mesh_future_str(const shared_ptr<VertexDataCollector>& collector) const {
+    string get_mesh_str(const shared_ptr<VertexDataCollector>& collector) const {
         if (collector)
             return convert_data_to_mesh_str(collector->faces, collector->data);
         else
@@ -3043,9 +3041,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     check_for_gl_err();
 #endif
 
-    // MAIN LOOP 
-    bool running = true;
-
     // DATABASE INITIALIZATION 
     if (USE_CACHE) {
         db_enable();
@@ -3086,7 +3081,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     check_for_gl_err();
 #endif
 
-    // BEGIN EVENT LOOP 
+    // BEGIN EVENT LOOP
+    future<bool> fut_writing_results;
+    bool running = true;
     int previous = SDL_GetTicks();
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -3112,14 +3109,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         // ImGui window variables
         static bool show_demo_window = false;
         static bool show_builder_gui = true;
-        static bool build_button_pressed = false;
         static int current_maze_width = 25;
         static int current_maze_length = 42;
-        static int current_maze_height = 1;
+        static int current_maze_height = 5;
         static int current_maze_seed = 35;
         static string current_maze_algo = "binary_tree";
         static char current_maze_outfile[64] = ".obj";
-
+        static bool write_success {false};
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3177,7 +3173,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::TreePop();
                     }
 
-                    atomic<bool> writing_results { false};
+                    auto reset_current_outfile = []() {
+                        for (auto i = 0; i < IM_ARRAYSIZE(current_maze_outfile); ++i) {
+                            current_maze_outfile[i] = '\0';
+                        }
+                        current_maze_outfile[0] = '.';
+                        current_maze_outfile[1] = 'o';
+                        current_maze_outfile[2] = 'b';
+                        current_maze_outfile[3] = 'j';
+                    };
+
+                    bool build_button_pressed = false;
                     // Check if user has added a prefix to the Wavefront object file and the build button has not been pressed
                     if (!build_button_pressed && current_maze_outfile[0] != '.') {
                         if (ImGui::Button("Build!")) {
@@ -3190,16 +3196,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                             ImGui::Text("Building maze... %s\n", current_maze_outfile);
                         }
                     } else {
-                        if (build_button_pressed) {
-                            // finally write the maze to a file
-                            auto fut_mesh_str = this->m_pimpl->get_mesh_future_str(collector);
-                            if (!fut_mesh_str.empty()) {
-                                writing_results.store(this->m_pimpl->write_maze(current_maze_outfile, fut_mesh_str));
-                            }
-
-                            build_button_pressed = false;
-                        }
-    
                         // Disable the button
                         ImGui::BeginDisabled(true);
                         ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
@@ -3212,21 +3208,38 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::EndDisabled();
                     }
 
-                    if (writing_results.load()) {
-						ImGui::Text("Maze written to %s\n", current_maze_outfile);
+                    // Check if the build button has been pressed
+                    if (build_button_pressed) {
+                        // finally write the maze to a file
+                        fut_writing_results = this->m_pimpl->write_maze(current_maze_outfile, collector);
+                        build_button_pressed = false;
+                    }
+
+                    // Check if the future is ready, this check happens before checking if the button was pressed to avoid multiple writes
+                    if (fut_writing_results.valid() && fut_writing_results.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        write_success = fut_writing_results.get();
+                    }
+
+                    if (write_success) {
+                        ImGui::NewLine();
+                        ImGui::Text("Maze written to %s\n", current_maze_outfile);
+                        ImGui::NewLine();
+                    } else {
+                        // ImGui::NewLine();
+                        // ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+                        // ImGui::Text("Error writing maze to %s\n", current_maze_outfile);
+                        // ImGui::PopStyleColor();    
                     }
 
                     // Resets all vertex data
-                    //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                    //if (ImGui::Button("Reset")) {
-                    //}                            for (auto i = 0; i < IM_ARRAYSIZE(current_maze_outfile); ++i) {
-                    //    current_maze_outfile[i] = '\0';
-                    //}
-                    //current_maze_outfile[0] = '.';
-                    //current_maze_outfile[1] = 'o';
-                    //current_maze_outfile[2] = 'b';
-                    //current_maze_outfile[3] = 'j';
-                    //ImGui::PopStyleColor();
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+                    if (ImGui::Button("Reset")) {
+                        // collector.reset();
+                        reset_current_outfile();
+                        build_button_pressed = false;
+                        write_success = false;
+                    }
+                    ImGui::PopStyleColor();
                     
                     ImGui::EndTabItem();
                 }
