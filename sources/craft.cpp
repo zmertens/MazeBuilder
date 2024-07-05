@@ -124,19 +124,6 @@ struct craft::craft_impl {
     } DearImGuiHelper;
 
     typedef struct {
-        SDL_Mutex* mtx;
-        int faces;
-        vector<GLfloat> data;
-
-        void add_data(int faces, const GLfloat* item_data, size_t size) {
-            SDL_LockMutex(this->mtx);
-            this->faces = faces;
-            this->data.insert(this->data.end(), item_data, item_data + size);
-            SDL_UnlockMutex(this->mtx);
-        }
-    } VertexDataCollector;
-
-    typedef struct {
         Map map;
         Map lights;
         SignList signs;
@@ -170,7 +157,6 @@ struct craft::craft_impl {
         SDL_Mutex *mtx;
         SDL_Condition *cnd;
         WorkerItem item;
-        shared_ptr<VertexDataCollector> collector;
         bool should_stop;
     } Worker;
 
@@ -290,7 +276,7 @@ struct craft::craft_impl {
             if (worker_item->load) {
                 caller.m_pimpl->load_chunk(worker_item);
             }
-            caller.m_pimpl->compute_chunk(worker_item, worker->collector);
+            caller.m_pimpl->compute_chunk(worker_item);
             SDL_LockMutex(worker->mtx);
             worker->state = WORKER_DONE;
             SDL_UnlockMutex(worker->mtx);
@@ -299,22 +285,10 @@ struct craft::craft_impl {
     } // worker_run
 
 
-    void init_worker_threads(const shared_ptr<VertexDataCollector>& collector) {
-        // ensure collector is not null and has mutex initialized
-        if (collector != nullptr) {
-            collector->mtx = SDL_CreateMutex();
-            if (collector->mtx == nullptr) {
-#if defined(MAZE_DEBUG)
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Error creating mutex for collector: %s", SDL_GetError());
-#endif
-                return;
-            }
-        }
-
+    void init_worker_threads() {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
-            worker->collector = collector;
             worker->index = i;
             worker->state = WORKER_IDLE;
             SDL_Mutex *sdl_mtx = SDL_CreateMutex();
@@ -1177,7 +1151,7 @@ struct craft::craft_impl {
     }
 
     // Handles terrain generation in a multithreaded environment
-    void compute_chunk(WorkerItem *item, const shared_ptr<VertexDataCollector>& collector = nullptr) {
+    void compute_chunk(WorkerItem *item) {
         char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
@@ -1354,9 +1328,6 @@ struct craft::craft_impl {
         item->maxy = maxy;
         item->faces = faces;
         item->data = data;
-
-        if (collector)
-            collector->add_data(faces, data, faces * 6 * components);
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) {
@@ -1408,7 +1379,7 @@ struct craft::craft_impl {
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        //_world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1557,11 +1528,12 @@ struct craft::craft_impl {
     /**
      * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
      * Calling set_grid, set_block, record_block to DB
+     * Specify a "starting_height" to try to put the maze above the heightmap (mountains)
      * @param _grid
      * @param grid_as_ascii
      * @return
      */
-    void set_grid(unsigned int y, const string& grid_as_ascii) {
+    void set_grid(unsigned int y, const string& grid_as_ascii, vector<GLfloat>& gg)  {
         istringstream iss{ grid_as_ascii.data() };
         string line;
         unsigned int row_x = 0;
@@ -1570,13 +1542,17 @@ struct craft::craft_impl {
             for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
                 if (*itr == ' ') {
                     col_z++;
-                }
-                else if (*itr == '+' || *itr == '-' || *itr == '|') {
-                    // found a barrier/wall
-                    static constexpr unsigned int starting_height = 25u;
+                } else if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // check for barriers and walls then iterate up/down
+                    static constexpr unsigned int starting_height = 30u;
                     for (auto h{ starting_height }; h < starting_height + y; h++) {
-                        set_block(row_x, h, col_z, 6);
-                        record_block(row_x, h, col_z, 6);
+                        int w = items[this->m_model->item_index];
+                        set_block(row_x, h, col_z, w);
+                        record_block(row_x, h, col_z, w);
+                        // update the model that stores the maze blocks
+                        gg.emplace_back(row_x);
+                        gg.emplace_back(h);
+                        gg.emplace_back(col_z);
                     }
                     col_z++;
                 }
@@ -1593,7 +1569,8 @@ struct craft::craft_impl {
     bool build_maze(const function<int(int, int)>& get_int, 
         const function<maze_types(const string& algo)> get_maze_algo_from_str,
         int current_maze_width, int current_maze_length, int current_maze_height,
-        int current_maze_seed, const string& current_maze_algo) {
+        int current_maze_seed, const string& current_maze_algo,
+        vector<GLfloat>& gg) {
 
         mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
         auto _grid{ std::make_unique<mazes::grid>(current_maze_width, current_maze_length, current_maze_height) };
@@ -1601,7 +1578,7 @@ struct craft::craft_impl {
         stringstream ss;
         ss << *_grid.get();
         string grid_as_ascii{ ss.str() };
-        this->set_grid(_grid->get_height(), ref(grid_as_ascii));
+        this->set_grid(_grid->get_height(), ref(grid_as_ascii), gg);
 
 #if defined(MAZE_DEBUG)
         SDL_Log("Gen maze success= %d\n", static_cast<int>(success));
@@ -1610,12 +1587,29 @@ struct craft::craft_impl {
     }
 
     // Return true when maze has been written
-    future<bool> write_maze(const string& filename, const shared_ptr<VertexDataCollector>& collector) {
-        if (collector) {
+    future<bool> write_maze(const string& filename, const vector<GLfloat>& gg) {
+        // helper lambda to write the Wavefront object file
+        auto convert_data_to_mesh_str = [](const vector<GLfloat>& gg) {
+            stringstream ss;
+            ss << "# https://www.github.com/zmertens/MazeBuilder\n";
+            for (size_t i = 0; i + 2 < gg.size(); i += 3) {
+                ss << "v " << gg.at(i) << " " << gg.at(i + 1) << " " << gg.at(i + 2) << "\n";
+            }
+            // assume that each consecutive 3 vertices are a triangle
+            // note that we start counting with 1 for Wavefront object files
+            for (size_t i = 1; i <= gg.size() / 3; i += 1) {
+                if (i + 2 <= gg.size()) {
+                    ss << "f " << i << " " << (i + 1) << " " << (i + 2) << "\n";
+                }
+            }
+            return ss.str();
+        };
+
+        if (!gg.empty()) {
             // get ready to write to file
             writer maze_writer;
-            packaged_task<bool(const string& out_file)> maze_writing_task{ [&maze_writer, &collector, this](auto out)->bool { 
-                return maze_writer.write(out, get_mesh_str(collector)); } 
+            packaged_task<bool(const string& out_file)> maze_writing_task{ [&maze_writer, &gg, &convert_data_to_mesh_str](auto out)->bool {
+                return maze_writer.write(out, convert_data_to_mesh_str(gg)); } 
             };
             auto writing_results = maze_writing_task.get_future();
             thread(move(maze_writing_task), filename ).detach();
@@ -1625,14 +1619,6 @@ struct craft::craft_impl {
             p.set_value(false);
             return p.get_future();
         }
-    }
-
-    // Write the mesh from the collector to file
-    string get_mesh_str(const shared_ptr<VertexDataCollector>& collector) const {
-        if (collector)
-            return convert_data_to_mesh_str(collector->faces, collector->data);
-        else
-            return "";
     }
 
     void ensure_chunks_worker(Player *player, Worker *worker) {
@@ -2496,7 +2482,7 @@ struct craft::craft_impl {
                     case SDL_SCANCODE_7: [[fallthrough]];
                     case SDL_SCANCODE_8: [[fallthrough]];
                     case SDL_SCANCODE_9: {
-                        if (!this->m_model->typing)
+                        if (this->m_gui.capture_mouse && !this->m_model->typing)
                             this->m_model->item_index = (sc - SDL_SCANCODE_1);
                         break;
                     }
@@ -2975,8 +2961,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
 
     // INITIALIZE WORKER THREADS
-    shared_ptr<craft_impl::VertexDataCollector> collector = make_shared<craft_impl::VertexDataCollector>();
-    m_pimpl->init_worker_threads(ref(collector));
+    m_pimpl->init_worker_threads();
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -3082,6 +3067,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 #endif
 
     // BEGIN EVENT LOOP
+    vector<GLfloat> vertex_data;
     future<bool> fut_writing_results;
     bool running = true;
     int previous = SDL_GetTicks();
@@ -3190,7 +3176,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                             build_button_pressed = true;
                             this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, 
                                 current_maze_width, current_maze_length, current_maze_height, 
-                                current_maze_seed, current_maze_algo);
+                                current_maze_seed, current_maze_algo, ref(vertex_data));
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", current_maze_outfile);
@@ -3211,11 +3197,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     // Check if the build button has been pressed
                     if (build_button_pressed) {
                         // finally write the maze to a file
-                        fut_writing_results = this->m_pimpl->write_maze(current_maze_outfile, collector);
+                        fut_writing_results = this->m_pimpl->write_maze(current_maze_outfile, vertex_data);
                         build_button_pressed = false;
                     }
 
-                    // Check if the future is ready, this check happens before checking if the button was pressed to avoid multiple writes
+                    // Check if the future is ready, calling .get() should only happen when the future is ready and non-blocking
                     if (fut_writing_results.valid() && fut_writing_results.wait_for(chrono::seconds(0)) == future_status::ready) {
                         write_success = fut_writing_results.get();
                     }
@@ -3234,7 +3220,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     // Resets all vertex data
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     if (ImGui::Button("Reset")) {
-                        // collector.reset();
+                        vertex_data.clear();
                         reset_current_outfile();
                         build_button_pressed = false;
                         write_success = false;
@@ -3442,10 +3428,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 
     m_pimpl->cleanup_worker_threads();
 
-    // SHUTDOWN 
+#if defined(MAZE_DEBUG)
+    SDL_Log("Closing DB. . .\n");
+#endif
+
     db_save_state(s->x, s->y, s->z, s->rx, s->ry);
     db_close();
     db_disable();
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("Deleting buffer objects. . .");
+#endif
     m_pimpl->del_buffer(sky_buffer);
     m_pimpl->delete_all_chunks();
     m_pimpl->delete_all_players();
