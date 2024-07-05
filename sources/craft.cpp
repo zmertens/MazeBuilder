@@ -11,7 +11,7 @@ Originally written in C99, ported to C++17
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
-#include <emscripten/emscripten_mainloop_stub.h>
+#include <emscripten_local/emscripten_mainloop_stub.h>
 #else
 #include <glad/glad.h>
 #endif
@@ -3466,3 +3466,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 
     return true;
 }  // run
+
+std::string craft::get_vertex_data() const noexcept {
+    return "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
+}

@@ -9,6 +9,16 @@
 #include <algorithm>
 
 #include "craft.h"
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/bind.h>
+    // bind the getter method from C++ so that it can be accessed in the frontend JS
+    // Create a binding function to access vertex data
+    EMSCRIPTEN_BINDINGS(maze_builder_module) {
+        emscripten::class_<craft>("craft").function("get_vertex_data", &craft::get_vertex_data);
+    }
+#endif
+
 #include "grid.h"
 #include "args_builder.h"
 #include "maze_types_enum.h"
@@ -44,8 +54,8 @@ int main(int argc, char* argv[]) {
         args_vec.emplace_back(argv[i]);
     }
 
-    // Force the -i param when compiling to the web
 #if defined(__EMSCRIPTEN__)
+    // Force the -i param when compiling to the web
     auto it_i = std::find(args_vec.begin(), args_vec.end(), "-i");
     auto it_interactive = std::find(args_vec.begin(), args_vec.end(), "--interactive");
     if (it_i == args_vec.end() && it_interactive == args_vec.end()) {

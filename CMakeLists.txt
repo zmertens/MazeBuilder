@@ -83,7 +83,7 @@ add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
-target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten)
+target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
 
 include(FetchContent)
@@ -107,7 +107,7 @@ if(EMSCRIPTEN)
     endif()
 
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory --bind")
 
     set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
@@ -123,7 +123,7 @@ if(EMSCRIPTEN)
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
         "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2"
-        "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten/shell_minimal.html"
+        "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/line_vertex.es.glsl@/shaders/es/line_vertex.es.glsl"
