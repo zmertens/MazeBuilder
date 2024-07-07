@@ -3319,7 +3319,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         } else {
                             ImGui::NewLine(); ImGui::NewLine();
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-                            ImGui::Text("Failed to write maze: %s", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Failed to write maze: %s", this->m_pimpl->m_gui.outfile.c_str());
                             ImGui::NewLine();
                             ImGui::PopStyleColor();
                         }
