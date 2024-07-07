@@ -1,6 +1,12 @@
 /*
-Craft engine builds voxels as chunks and can run maze-generating algorithms
-Originally written in C99, ported to C++17
+ * Craft engine builds voxels as chunks and can run maze-generating algorithms
+ * Generated mazes are stored in-memory and in an offline database
+ * Vertex and indice data is stored in buffers and rendered using OpenGL
+ * Supports writing to Wavefront OBJ files
+ * Interfaces with Emscripten to provide data in JSON-format to web applications
+ * 
+ * 
+ * Originally written in C99, ported to C++17
 */
 
 #include "craft.h"
@@ -123,6 +129,10 @@ struct craft::craft_impl {
         bool color_mode_dark;
         bool capture_mouse;
         std::string outfile;
+        int build_width;
+        int build_height;
+        int build_length;
+        int seed;
     } DearImGuiHelper;
 
     typedef struct {
@@ -268,7 +278,8 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_model{make_unique<Model>()}
-        , m_gui{32, true, true, true, false, true, false}
+        // chunk_size, show_trees, show_plants, show_clouds, fullscreen, color_mode_dark, capture_mouse, build_width, build_height, build_length, seed
+        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 24, 10, 50}
         , m_vertices{}
         , m_faces{} {
 
@@ -1550,10 +1561,39 @@ struct craft::craft_impl {
      * @return
      */
     void set_grid(unsigned int height, const string& grid_as_ascii)  {
-        auto add_block = [this](unsigned int x, unsigned int y, unsigned int z) {
-            unsigned int base_index = this->m_vertices.size();
-            this->m_vertices.push_back({ static_cast<GLfloat>(x), static_cast<GLfloat>(y), static_cast<GLfloat>(z) });
-            this->m_faces.push_back({{base_index}});
+        auto add_block = [this](float x, float y, float z, float block_size) {
+            // Calculate the base index for the new vertices
+            unsigned int baseIndex = this->m_vertices.size() + 1; // OBJ format is 1-based indexing
+
+            // Define the 8 vertices of the cube
+            this->m_vertices.push_back({ x, y, z });
+            this->m_vertices.push_back({ x + block_size, y, z });
+            this->m_vertices.push_back({ x + block_size, y + block_size, z });
+            this->m_vertices.push_back({ x, y + block_size, z });
+            this->m_vertices.push_back({ x, y, z + block_size });
+            this->m_vertices.push_back({ x + block_size, y, z + block_size });
+            this->m_vertices.push_back({ x + block_size, y + block_size, z + block_size });
+            this->m_vertices.push_back({ x, y + block_size, z + block_size });
+
+            // Define faces using the vertices above (12 triangles for 6 faces)
+            // Front face
+            this->m_faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+            this->m_faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+            // Back face
+            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+            // Left face
+            this->m_faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+            this->m_faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+            // Right face
+            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+            // Top face
+            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+            // Bottom face
+            this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+            this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
 		};
 
 
@@ -1568,12 +1608,13 @@ struct craft::craft_impl {
                 } else if (*itr == '+' || *itr == '-' || *itr == '|') {
                     // check for barriers and walls then iterate up/down
                     static constexpr unsigned int starting_height = 30u;
+                    static constexpr float block_size = 1.0f;
                     for (auto h{ starting_height }; h < starting_height + height; h++) {
                         int w = items[this->m_model->item_index];
                         set_block(row_x, h, col_z, w);
                         record_block(row_x, h, col_z, w);
                         // update the data source that stores the grid for writing to file
-                        add_block(row_x, h, col_z);
+                        add_block(row_x, h, col_z, block_size);
                     }
                     col_z++;
                 }
@@ -1588,12 +1629,10 @@ struct craft::craft_impl {
      * @return
      */
     bool build_maze(const function<int(int, int)>& get_int, 
-        const function<maze_types(const string& algo)> get_maze_algo_from_str,
-        int current_maze_width, int current_maze_length, int current_maze_height,
-        int current_maze_seed, const string& current_maze_algo) {
+        const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) {
 
         mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
-        auto _grid{ std::make_unique<mazes::grid>(current_maze_width, current_maze_length, current_maze_height) };
+        auto _grid{ std::make_unique<mazes::grid>(this->m_gui.build_width, this->m_gui.build_length, this->m_gui.build_height) };
         bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
         stringstream ss;
         ss << *_grid.get();
@@ -3118,10 +3157,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         // ImGui window variables
         static bool show_demo_window = false;
         static bool show_builder_gui = true;
-        static int current_maze_width = 25;
-        static int current_maze_length = 42;
-        static int current_maze_height = 5;
-        static int current_maze_seed = 35;
         static string current_maze_algo = "binary_tree";
         static char current_maze_outfile[64] = ".obj";
         static bool write_success {false};
@@ -3146,19 +3181,19 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     ImGui::Text("Builder settings");
 
                     static unsigned int MAX_MAZE_WIDTH = 1000;
-                    if (ImGui::SliderInt("Width", &current_maze_width, 1, MAX_MAZE_WIDTH)) {
-                        current_maze_width = current_maze_width;
+                    if (ImGui::SliderInt("Width", &this->m_pimpl->m_gui.build_width, 1, MAX_MAZE_WIDTH)) {
+
                     }
                     static unsigned int MAX_MAZE_LENGTH = 1000;
-                    if (ImGui::SliderInt("Length", &current_maze_length, 1, MAX_MAZE_LENGTH)) {
-                        current_maze_length = current_maze_length;
+                    if (ImGui::SliderInt("Length", &this->m_pimpl->m_gui.build_length, 1, MAX_MAZE_LENGTH)) {
+
                     }
                     static unsigned int MAX_MAZE_HEIGHT = 50;
-                    if (ImGui::SliderInt("Height", &current_maze_height, 1, MAX_MAZE_HEIGHT)) {
-                        current_maze_height = current_maze_height;
+                    if (ImGui::SliderInt("Height", &this->m_pimpl->m_gui.build_height, 1, MAX_MAZE_HEIGHT)) {
+                      
                     }
-                    if (ImGui::SliderInt("Seed", &current_maze_seed, 1, 100)) {
-                        current_maze_seed = current_maze_seed;
+                    if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, 100)) {
+
                     }
                     ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
                     if (ImGui::TreeNode("Algorithms")) {
@@ -3198,9 +3233,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         if (ImGui::Button("Build!")) {
                             build_button_pressed = true;
                             this->m_pimpl->m_gui.outfile = current_maze_outfile;
-                            this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, 
-                                current_maze_width, current_maze_length, current_maze_height, 
-                                current_maze_seed, current_maze_algo);
+                            this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, current_maze_algo);
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", current_maze_outfile);
