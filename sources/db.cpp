@@ -403,7 +403,7 @@ void db_worker_start(const char *path) {
     mtx = SDL_CreateMutex();
     load_mtx = SDL_CreateMutex();
     cnd = SDL_CreateCondition();
-    SDL_CreateThread(db_worker_run, path, thrd);
+    thrd = SDL_CreateThread(db_worker_run, path, nullptr);
 }
 
 void db_worker_stop() {

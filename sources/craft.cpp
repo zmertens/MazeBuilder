@@ -334,6 +334,7 @@ struct craft::craft_impl {
             if (worker_item->load) {
                 caller.m_pimpl->load_chunk(worker_item);
             }
+            
             caller.m_pimpl->compute_chunk(worker_item);
             SDL_LockMutex(worker->mtx);
             worker->state = WORKER_DONE;
@@ -2527,7 +2528,7 @@ struct craft::craft_impl {
                 case SDL_EVENT_KEY_UP: {
                     sc = e.key.scancode;
                     switch (sc) {
-                    case SDL_SCANCODE_ESCAPE:
+                    case SDL_SCANCODE_INSERT:
                         if (this->m_model->typing) {
                             this->m_model->typing = 0;
                         }
@@ -2539,10 +2540,8 @@ struct craft::craft_impl {
                     sc = e.key.scancode;
                     switch (sc) {
                     case SDL_SCANCODE_ESCAPE: {
-                        if (SDL_GetRelativeMouseMode()) {
-                            SDL_SetRelativeMouseMode(SDL_FALSE);
-                            this->m_gui.capture_mouse = false;
-                        }
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        this->m_gui.capture_mouse = false;
                         this->m_gui.fullscreen = false;
                         break;
                     }

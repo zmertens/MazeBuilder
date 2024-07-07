@@ -123,8 +123,7 @@ if(EMSCRIPTEN)
     fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
     set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-    # Set compile options for all targets to include atomics and bulk-memory
-    add_compile_options("SHELL:-matomics -mbulk-memory")
+
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     

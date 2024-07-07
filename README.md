@@ -32,6 +32,7 @@ cmake -S . -B . -DCMAKE_TOOLCHAIN_FILE=${my/emsdk/repo}/upstream/emscripten/cmak
 ```
 
 Where `${my/emsdk/repo}` is the directory containing the Git repo for Emscripten's emsdk.
+Run a local server using the included [secure_http_server.py](secure_http_server.py) file and modifying the [minimal shell](deps/emscripten_local/shell_minimal.html) to not run asynchrously.
 
 ## Commands and Help Message
 
