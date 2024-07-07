@@ -41,6 +41,7 @@
 #include <utility>
 
 #include <noise/noise.h>
+#include <tinycthread/tinycthread.h>
 
 #include "util.h"
 #include "world.h"
@@ -196,9 +197,12 @@ struct craft::craft_impl {
     typedef struct {
         int index;
         int state;
-        SDL_Thread *thrd;
-        SDL_Mutex *mtx;
-        SDL_Condition *cnd;
+        thrd_t tiny_thrd;
+        mtx_t tiny_mtx;
+        cnd_t tiny_cnd;
+        // SDL_Thread *thrd;
+        // SDL_Mutex *mtx;
+        // SDL_Condition *cnd;
         WorkerItem item;
         bool should_stop;
     } Worker;
@@ -321,24 +325,30 @@ struct craft::craft_impl {
         
         craft caller{ {}, {}, {} };
         while (1) {
-            SDL_LockMutex(worker->mtx);
+            // SDL_LockMutex(worker->mtx);
+            mtx_lock(&worker->tiny_mtx);
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
-                SDL_WaitCondition(worker->cnd, worker->mtx);
+                cnd_wait(&worker->tiny_cnd, &worker->tiny_mtx);
+                // SDL_WaitCondition(worker->cnd, worker->mtx);
             }
             if (worker->should_stop) {
-				SDL_UnlockMutex(worker->mtx);
+                mtx_unlock(&worker->tiny_mtx);
+				// SDL_UnlockMutex(worker->mtx);
 				break;
 			}
-            SDL_UnlockMutex(worker->mtx);
+            // SDL_UnlockMutex(worker->mtx);
+            mtx_unlock(&worker->tiny_mtx);
             WorkerItem *worker_item = &worker->item;
             if (worker_item->load) {
                 caller.m_pimpl->load_chunk(worker_item);
             }
             
             caller.m_pimpl->compute_chunk(worker_item);
-            SDL_LockMutex(worker->mtx);
+            // SDL_LockMutex(worker->mtx);
+            mtx_lock(&worker->tiny_mtx);
             worker->state = WORKER_DONE;
-            SDL_UnlockMutex(worker->mtx);
+            mtx_unlock(&worker->tiny_mtx);
+            // SDL_UnlockMutex(worker->mtx);
         }
         return 0;
     } // worker_run
@@ -350,23 +360,26 @@ struct craft::craft_impl {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            SDL_Mutex *sdl_mtx = SDL_CreateMutex();
-            if (sdl_mtx == nullptr) {
-#if defined(MAZE_DEBUG)
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create mutex: %s", SDL_GetError());
-#endif
-                return;
-            }
-            worker->mtx = sdl_mtx;
-            SDL_Condition *sdl_cnd = SDL_CreateCondition();
-            if (sdl_cnd == nullptr) {
-#if defined(MAZE_DEBUG)
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create condition variable: %s", SDL_GetError());
-#endif            	
-				return;
-            }
-            worker->cnd = sdl_cnd;
-            worker->thrd = SDL_CreateThread(worker_run, "worker thread", worker.get());
+//             SDL_Mutex *sdl_mtx = SDL_CreateMutex();
+//             if (sdl_mtx == nullptr) {
+// #if defined(MAZE_DEBUG)
+//                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create mutex: %s", SDL_GetError());
+// #endif
+//                 return;
+//             }
+//             worker->mtx = sdl_mtx;
+//             SDL_Condition *sdl_cnd = SDL_CreateCondition();
+//             if (sdl_cnd == nullptr) {
+// #if defined(MAZE_DEBUG)
+//                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create condition variable: %s", SDL_GetError());
+// #endif            	
+// 				return;
+//             }
+//             worker->cnd = sdl_cnd;
+//             worker->thrd = SDL_CreateThread(worker_run, "worker thread", worker.get());
+            mtx_init(&worker->tiny_mtx, mtx_plain);
+            cnd_init(&worker->tiny_cnd);
+            thrd_create(&worker->tiny_thrd, worker_run, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -377,22 +390,28 @@ struct craft::craft_impl {
     void cleanup_worker_threads() {
         // signal all worker threads to stop
         for (auto&& w : this->m_model->workers) {
-            SDL_LockMutex(w->mtx);
+            // SDL_LockMutex(w->mtx);
+            mtx_lock(&w->tiny_mtx);
             w->should_stop = true;
-            SDL_SignalCondition(w->cnd);
-            SDL_UnlockMutex(w->mtx);
+            cnd_signal(&w->tiny_cnd);
+            mtx_unlock(&w->tiny_mtx);
+            // SDL_SignalCondition(w->cnd);
+            // SDL_UnlockMutex(w->mtx);
         }
         // Wait for threads to join
         for (auto&& w : this->m_model->workers) {
             // Wait for the thread to complete its execution
             int threadReturnValue = -1;
-            SDL_WaitThread(w->thrd, &threadReturnValue);
+            thrd_join(w->tiny_thrd, &threadReturnValue);
+            // SDL_WaitThread(w->thrd, &threadReturnValue);
 #if defined(MAZE_DEBUG)
             SDL_Log("Worker thread finished with return value: %d", threadReturnValue);
 #endif
             // Clean up the mutex and condition variable
-            SDL_DestroyMutex(w->mtx);
-            SDL_DestroyCondition(w->cnd);
+            // SDL_DestroyMutex(w->mtx);
+            // SDL_DestroyCondition(w->cnd);
+            mtx_destroy(&w->tiny_mtx);
+            cnd_destroy(&w->tiny_cnd);
         }
         // Clear the vector after all threads have been joined
         this->m_model->workers.clear();
@@ -1524,7 +1543,8 @@ struct craft::craft_impl {
 
     void check_workers() {
         for (auto&& worker : this->m_model->workers) {
-            SDL_LockMutex(worker->mtx);
+            // SDL_LockMutex(worker->mtx);
+            mtx_lock(&worker->tiny_mtx);
             if (worker->state == WORKER_DONE) {
                 WorkerItem *item = &worker->item;
                 Chunk *chunk = find_chunk(item->p, item->q);
@@ -1555,7 +1575,8 @@ struct craft::craft_impl {
                 }
                 worker->state = WORKER_IDLE;
             }
-            SDL_UnlockMutex(worker->mtx);
+            // SDL_UnlockMutex(worker->mtx);
+            mtx_unlock(&worker->tiny_mtx);
         }
     }
 
@@ -1823,18 +1844,21 @@ struct craft::craft_impl {
         }
         chunk->dirty = 0;
         worker->state = WORKER_BUSY;
-        SDL_SignalCondition(worker->cnd);
+        // SDL_SignalCondition(worker->cnd);
+        cnd_signal(&worker->tiny_cnd);
     } // ensure chunks worker
 
     void ensure_chunks(Player *player) {
         check_workers();
         force_chunks(player);
         for (auto&& worker : this->m_model->workers) {
-            SDL_LockMutex(worker->mtx);
+            // SDL_LockMutex(worker->mtx);
+            mtx_lock(&worker->tiny_mtx);
             if (worker->state == WORKER_IDLE) {
                 ensure_chunks_worker(player, worker.get());
             }
-            SDL_UnlockMutex(worker->mtx);
+            // SDL_UnlockMutex(worker->mtx);
+            mtx_unlock(&worker->tiny_mtx);
         }
     }
 
