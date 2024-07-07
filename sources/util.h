@@ -1,7 +1,11 @@
 #ifndef _util_h_
 #define _util_h_
 
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
 #include <glad/glad.h>
+#endif
 
 #include <string>
 #include <vector>
@@ -35,11 +39,5 @@ char *tokenize(char *str, const char *delim, char **key);
 int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
-void dump_opengl_info(bool dumpExtensions);
-
-void convert_data_to_mesh_str(int faces, GLfloat *data, std::string& mesh_str);
-
-#define gl_check_for_error() glCheckError_(__FILE__, __LINE__)
-GLenum glCheckError_(const char *file, int line);
 
 #endif

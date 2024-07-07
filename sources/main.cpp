@@ -5,23 +5,34 @@
 #include <string_view>
 #include <sstream>
 #include <future>
+#include <thread>
+#include <algorithm>
 
 #include "craft.h"
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/bind.h>
+    // bind a getter method from C++ so that it can be accessed in the frontend with JS
+    EMSCRIPTEN_BINDINGS(maze_builder_module) {
+        emscripten::class_<craft>("craft")
+            .constructor<std::string, std::string, std::string>()
+            .function("get_vertex_data_as_json", &craft::get_vertex_data_as_json);
+   }
+#endif
+
 #include "grid.h"
-#include "binary_tree.h"
-#include "sidewinder.h"
 #include "args_builder.h"
 #include "maze_types_enum.h"
+#include "maze_factory.h"
 #include "writer.h"
-
-// Struggling with CMake build config and so I added this for Release builds
-#if defined(DEBUGGING)
-#undef DEBUGGING
-#endif
 
 int main(int argc, char* argv[]) {
 
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[2.3.0]";
+#if defined(MAZE_DEBUG)
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1] - DEBUG";
+#else
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1]";
+#endif
 
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
@@ -43,98 +54,88 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < argc; i++) {
         args_vec.emplace_back(argv[i]);
     }
-    
-    try {
-        mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
-        auto&& args_map {args.build()};
-        // this needs to get called after args.build() because of internal parsing
-        auto state_of_args{ args.get_state() };
-        
-        if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
-            std::cout << HELP_MSG << std::endl;
-            return EXIT_SUCCESS;
-        } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
-            std::cout << MAZE_BUILDER_VERSION << std::endl;
-            return EXIT_SUCCESS;
-        }
 
-        auto use_this_for_seed = args_map.at("seed");
-        auto get_int = [](int low, int high) -> int {
-            using namespace std;
-            random_device rd;
-            seed_seq seed {rd()};
-            mt19937 rng_engine {seed};
-            uniform_int_distribution<int> dist {low, high};
-            return dist(rng_engine);
-        };
-
-        auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
-            using namespace std;
-            if (algo.compare("binary_tree") == 0) {
-                return mazes::maze_types::BINARY_TREE;
-            } else if (algo.compare("sidewinder") == 0) {
-                return mazes::maze_types::SIDEWINDER;
-            } else {
-#if defined(DEBUGGING)
-                cout << "INFO: Using default maze algorithm, \"binary_tree\"\n";
+#if defined(__EMSCRIPTEN__)
+    // Force the -i param when compiling to the web
+    auto it_i = std::find(args_vec.begin(), args_vec.end(), "-i");
+    auto it_interactive = std::find(args_vec.begin(), args_vec.end(), "--interactive");
+    if (it_i == args_vec.end() && it_interactive == args_vec.end()) {
+        args_vec.push_back("-i");
+    }
 #endif
-                return mazes::maze_types::BINARY_TREE;
-            }
-        };
 
-        auto _grid {std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height())};
+    mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
+    auto&& args_map {args.build()};
+    // this needs to get called after args.build() because of internal parsing
+    auto state_of_args{ args.get_state() };
+    
+    if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
+        std::cout << HELP_MSG << std::endl;
+        return EXIT_SUCCESS;
+    } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
+        std::cout << MAZE_BUILDER_VERSION << std::endl;
+        return EXIT_SUCCESS;
+    }
 
-        auto maze_factory = [&_grid, &get_int](mazes::maze_types maze_type) {
-            switch (maze_type) {
-                case mazes::maze_types::BINARY_TREE: {
-                    static mazes::binary_tree bt;
-                    return std::async([&] {
-                        return bt.run(std::ref(_grid), get_int);
-                    });
-                }
-                case mazes::maze_types::SIDEWINDER: {
-                    static mazes::sidewinder sw;
-                    return std::async([&] {
-                        return sw.run(std::ref(_grid), get_int);
-                    });
-                }
-            }
-        };
-        mazes::writer my_writer;
-        auto write_func = [&my_writer, &args](auto data)->bool {
-            return my_writer.write(args.get_output(), data);
-        };
-        std::packaged_task<bool(const std::string& data)> task_writes (write_func);
+    auto use_this_for_seed = args_map.at("seed");
+    auto get_int = [](int low, int high) -> int {
+        using namespace std;
+        random_device rd;
+        seed_seq seed {rd()};
+        mt19937 rng_engine {seed};
+        uniform_int_distribution<int> dist {low, high};
+        return dist(rng_engine);
+    };
 
-        mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
+    auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
+        using namespace std;
+        if (algo.compare("binary_tree") == 0) {
+            return mazes::maze_types::BINARY_TREE;
+        } else if (algo.compare("sidewinder") == 0) {
+            return mazes::maze_types::SIDEWINDER;
+        } else {
+            return mazes::maze_types::INVALID_ALGO;
+        }
+    };
+
+    try {
         bool success = false;
         if (args.is_interactive()) {
-            // string views don't own the data, they have less copying overhead
-            std::string_view sv {"craft-sdl3"};
-            std::string_view version_view{ MAZE_BUILDER_VERSION };
-            std::string_view help_view{ HELP_MSG };
-            craft maze_builder_3D {sv, version_view, help_view, maze_factory};
-            success = maze_builder_3D.run(_grid, get_int, args.is_interactive());
+            
+            std::string window_title {"Maze Builder"};
+            std::string version { MAZE_BUILDER_VERSION };
+            std::string help { HELP_MSG };
+            craft maze_builder_3D {window_title, version, help };
+            success = maze_builder_3D.run(std::ref(get_int), std::ref(get_maze_type_from_algo));
         } else {
-            success = maze_factory(my_maze_type).get();
-        }
+            mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
+            auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
+            success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+            if (success) {
+                mazes::writer my_writer;
+                auto write_func = [&my_writer, &args](auto data)->bool {
+                    return my_writer.write(args.get_output(), data);
+                    };
+                std::packaged_task<bool(const std::string& data)> task_writes(write_func);
 
-        if (success && !args.is_interactive()) {
-            auto&& fut_writer = task_writes.get_future();
-            std::stringstream ss;
-            ss << *_grid.get();
-            task_writes(ss.str());
-            if (fut_writer.get()) {
-#if defined(DEBUGGING)
-                std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
+                auto&& fut_writer = task_writes.get_future();
+                std::stringstream ss;
+                ss << *_grid.get();
+                std::thread thread_writer(std::move(task_writes), ss.str());
+                thread_writer.join();
+                if (fut_writer.get()) {
+#if defined(MAZE_DEBUG)
+                    std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
 #endif
-            } else {
-                std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+                }
+                else {
+                    std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+                }
             }
-        } else if (!success){
-            std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
+            else {
+                std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
+            }
         }
-    
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }

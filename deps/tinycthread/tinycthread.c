@@ -590,4 +590,3 @@ int _tthread_clock_gettime(clockid_t clk_id, struct timespec *ts)
   return 0;
 }
 #endif // _TTHREAD_EMULATE_CLOCK_GETTIME_
-

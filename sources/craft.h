@@ -2,24 +2,28 @@
 #define CRAFT_H
 
 #include <string>
-#include <string_view>
-#include <functional>
 #include <memory>
-#include <future>
+#include <functional>
 
-#include "maze_algo_interface.h"
 #include "maze_types_enum.h"
 
-class grid;
-class writer;
-
-class craft : public mazes::maze_algo_interface {
+class craft {
 public:
-    craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help, std::function<std::future<bool>(mazes::maze_types)> maze_func);
+    craft(const std::string& window_name, const std::string& version, const std::string& help);
     ~craft();
-    // craft(const craft& rhs);
-    // craft& operator=(const craft& rhs);
-    bool run(std::unique_ptr<mazes::grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) const noexcept override;
+
+    // Delete copy constructor and copy assignment operator
+    craft(const craft&) = delete;
+    craft& operator=(const craft&) = delete;
+
+    // Default move constructor and move assignment operator
+    craft(craft&&) = default;
+    craft& operator=(craft&&) = default;
+
+    bool run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
+    
+    std::string get_vertex_data_as_json() const noexcept;
+
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
