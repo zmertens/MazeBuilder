@@ -6,11 +6,19 @@ cmake_policy(SET CMP0058 NEW)
 cmake_policy(SET CMP0072 NEW)
 
 # The following thread-related commands must be before project()
-set(CMAKE_THREAD_LIBS_INIT "-pthread")
-set(CMAKE_HAVE_THREADS_LIBRARY 1)
-set(CMAKE_USE_WIN32_THREADS_INIT 0)
-set(CMAKE_USE_PTHREADS_INIT 1)
-set(THREADS_PREFER_PTHREAD_FLAG ON)
+if(WIN32)
+  # Use native Win32 threads on Windows
+  set(CMAKE_USE_WIN32_THREADS_INIT ON)
+  set(CMAKE_USE_PTHREADS_INIT OFF)
+else()
+  # Use pthreads on Unix-like systems
+  set(CMAKE_THREAD_LIBS_INIT "-pthread")
+  set(CMAKE_HAVE_THREADS_LIBRARY 1)
+  set(CMAKE_USE_WIN32_THREADS_INIT OFF)
+  set(CMAKE_USE_PTHREADS_INIT ON)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+endif()
+
 
 project(maze_builder)
 

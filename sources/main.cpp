@@ -10,21 +10,14 @@
 
 #include "craft.h"
 
-std::string do_stuff() {
-	return "doin stuff";
-}
-
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
-    // bind the getter method from C++ so that it can be accessed in the frontend JS
-    // Create a binding function to access vertex data
+    // bind a getter method from C++ so that it can be accessed in the frontend with JS
     EMSCRIPTEN_BINDINGS(maze_builder_module) {
-        emscripten::function("do_stuff", &do_stuff);  
-    }
-//        emscripten::function_<craft>("craft")
-  //          .constructor<std::string_view, std::string_view, std::string_view>()
-    //        .function("get_vertex_data", &craft::get_vertex_data);
-//    }
+        emscripten::class_<craft>("craft")
+            .constructor<std::string, std::string, std::string>()
+            .function("get_vertex_data_as_json", &craft::get_vertex_data_as_json);
+   }
 #endif
 
 #include "grid.h"
@@ -108,11 +101,11 @@ int main(int argc, char* argv[]) {
     try {
         bool success = false;
         if (args.is_interactive()) {
-            // string views don't own the data, they have less copying overhead
-            std::string_view window_title_view {"Maze Builder"};
-            std::string_view version_view{ MAZE_BUILDER_VERSION };
-            std::string_view help_view{ HELP_MSG };
-            craft maze_builder_3D {window_title_view, version_view, help_view};
+            
+            std::string window_title {"Maze Builder"};
+            std::string version { MAZE_BUILDER_VERSION };
+            std::string help { HELP_MSG };
+            craft maze_builder_3D {window_title, version, help };
             success = maze_builder_3D.run(std::ref(get_int), std::ref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());

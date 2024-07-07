@@ -2,7 +2,6 @@
 #define CRAFT_H
 
 #include <string>
-#include <string_view>
 #include <memory>
 #include <functional>
 
@@ -10,7 +9,7 @@
 
 class craft {
 public:
-    craft(const std::string_view& window_name, const std::string_view& version, const std::string_view& help);
+    craft(const std::string& window_name, const std::string& version, const std::string& help);
     ~craft();
 
     // Delete copy constructor and copy assignment operator
@@ -23,7 +22,7 @@ public:
 
     bool run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
     
-    std::string get_vertex_data() const noexcept;
+    std::string get_vertex_data_as_json() const noexcept;
 
 private:
     struct craft_impl;
