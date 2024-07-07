@@ -117,7 +117,7 @@ if(EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
-    set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".js" LINK_FLAGS "-lembind")
+    set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
     message(INFO ": Getting SDL via FetchContent")
     fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
