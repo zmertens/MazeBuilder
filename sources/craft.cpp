@@ -135,6 +135,37 @@ struct craft::craft_impl {
         int seed;
     } DearImGuiHelper;
 
+    struct Maze {
+        std::string maze;
+        std::mutex maze_mutx;
+        void set_maze(const std::string& maze) {
+            std::lock_guard<std::mutex> lock(maze_mutx);
+            this->maze = maze;
+        };
+        std::string get_maze() {
+            std::lock_guard<std::mutex> lock(maze_mutx);
+            return maze;
+        }
+    };
+
+    struct ProgressTracker {
+        std::atomic<int> current_step;
+        std::atomic<int> total_steps;
+        
+        std::mutex msg_mutx;
+        std::string message;
+        
+        void set_msg(const std::string& msg) {
+            std::lock_guard<std::mutex> lock(msg_mutx);
+			message = msg;
+        }
+
+        std::string get_msg() {
+            std::lock_guard<std::mutex> lock(msg_mutx);
+            return message;
+        }
+    };
+
     typedef struct {
         Map map;
         Map lights;
@@ -279,7 +310,7 @@ struct craft::craft_impl {
         , m_help{help}
         , m_model{make_unique<Model>()}
         // chunk_size, show_trees, show_plants, show_clouds, fullscreen, color_mode_dark, capture_mouse, build_width, build_height, build_length, seed
-        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 24, 10, 50}
+        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 5, 10, 50}
         , m_vertices{}
         , m_faces{} {
 
@@ -1560,8 +1591,8 @@ struct craft::craft_impl {
      * @param grid_as_ascii
      * @return
      */
-    void set_grid(unsigned int height, const string& grid_as_ascii)  {
-        auto add_block = [this](float x, float y, float z, float block_size) {
+    bool set_grid(unsigned int height, const string& grid_as_ascii)  {
+        auto add_block_to_vertex_data = [this](float x, float y, float z, float block_size) {
             // Calculate the base index for the new vertices
             unsigned int baseIndex = this->m_vertices.size() + 1; // OBJ format is 1-based indexing
 
@@ -1594,67 +1625,80 @@ struct craft::craft_impl {
             // Bottom face
             this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
             this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-		};
+        }; // add_block_to_vertex_data
 
 
-        istringstream iss{ grid_as_ascii.data() };
-        string line;
-        unsigned int row_x = 0;
-        while (getline(iss, line, '\n')) {
-            unsigned int col_z = 0;
-            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-                if (*itr == ' ') {
-                    col_z++;
-                } else if (*itr == '+' || *itr == '-' || *itr == '|') {
-                    // check for barriers and walls then iterate up/down
-                    static constexpr unsigned int starting_height = 30u;
-                    static constexpr float block_size = 1.0f;
-                    for (auto h{ starting_height }; h < starting_height + height; h++) {
-                        int w = items[this->m_model->item_index];
-                        set_block(row_x, h, col_z, w);
-                        record_block(row_x, h, col_z, w);
-                        // update the data source that stores the grid for writing to file
-                        add_block(row_x, h, col_z, block_size);
+            istringstream iss{ grid_as_ascii.data() };
+            string line;
+            unsigned int row_x = 0;
+            while (getline(iss, line, '\n')) {
+                unsigned int col_z = 0;
+                for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                    if (*itr == ' ') {
+                        col_z++;
+                    } else if (*itr == '+' || *itr == '-' || *itr == '|') {
+                        // check for barriers and walls then iterate up/down
+                        static constexpr unsigned int starting_height = 30u;
+                        static constexpr float block_size = 1.0f;
+                        for (auto h{ starting_height }; h < starting_height + height; h++) {
+                            int w = items[this->m_model->item_index];
+                            // set the block in the craft
+                            set_block(row_x, h, col_z, w);
+                            record_block(row_x, h, col_z, w);
+                            // update the data source that stores the grid for writing to file
+                            add_block_to_vertex_data(row_x, h, col_z, block_size);
+                        }
+                        col_z++;
                     }
-                    col_z++;
                 }
-            }
-            
-            row_x++;
-        }
+
+                row_x++;
+            } // getline
+        return true;
     } // set_grid
 
     /**
-     * @brief Build button clicked, set the grid and write the maze to an Wavefront object file
+     * @brief Generate a grid containing a maze in ASCII format which will be used to write and display the maze
      * @return
      */
-    bool build_maze(const function<int(int, int)>& get_int, 
-        const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) {
+    std::string gen_maze(const function<int(int, int)>& get_int, const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) {
 
         mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
+
         auto _grid{ std::make_unique<mazes::grid>(this->m_gui.build_width, this->m_gui.build_length, this->m_gui.build_height) };
-        bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+
+	    bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+
+        if (!success) {
+            return "";
+        }
+
         stringstream ss;
         ss << *_grid.get();
         string grid_as_ascii{ ss.str() };
-        this->set_grid(_grid->get_height(), ref(grid_as_ascii));
 
-#if defined(MAZE_DEBUG)
-        SDL_Log("Gen maze success= %d\n", static_cast<int>(success));
-#endif
-        return success;
+        return grid_as_ascii;
     }
 
     // Return true when maze has been written
-    future<bool> write_maze(const string& filename) {
+    future<bool> write_maze(unique_ptr<ProgressTracker> const& progress, const string& filename) {
         // helper lambda to write the Wavefront object file
         auto convert_data_to_mesh_str = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
             stringstream ss;
             ss << "# https://www.github.com/zmertens/MazeBuilder\n";
+
+            // keep track of writing progress
+            int total_verts = vertices.size();
+            int total_faces = faces.size();
+            
+            size_t t = total_verts + total_faces;
+            size_t c = 0;
             // Write vertices
             for (const auto& vertex : vertices) {
                 ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
+                c++;
             }
+
             // Write faces
             for (const auto& face : faces) {
                 ss << "f";
@@ -1662,10 +1706,22 @@ struct craft::craft_impl {
                     ss << " " << index;
                 }
                 ss << "\n";
+                c++;
             }
+
+#if defined(MAZE_DEBUG)
+            SDL_Log("Writing maze progress: %d/%d", c, t);
+
+#endif
+
             return ss.str();
         };
-    
+
+        if (progress) {
+            //progress->current_step.store(c);
+            //progress->total_steps.store(t);
+        }
+   
 
         if (!filename.empty()) {
             // get ready to write to file
@@ -2751,35 +2807,36 @@ struct craft::craft_impl {
     } // handle_events
 
     /**
-     * @brief Create SDL/GL window and context, check display modes
+     * @brief Check fullscreen modes avaialble and update the model
      */
-    void create_window_and_context() {
-        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
-        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
-        int window_width = WINDOW_WIDTH;
-        int window_height = WINDOW_HEIGHT;
+    void set_model_using_fullscreen_modes() {
         if (this->m_gui.fullscreen) {
             SDL_DisplayID display = SDL_GetPrimaryDisplay();
             int num_modes = 0;
-            const SDL_DisplayMode **modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
+            const SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
             if (modes) {
                 for (int i = 0; i < num_modes; ++i) {
-                    const SDL_DisplayMode *mode = modes[i];
+                    const SDL_DisplayMode* mode = modes[i];
 #if defined(MAZE_DEBUG)
                     SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n", display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
 #endif
                 }
-                window_width = modes[num_modes - 1]->w;
-                window_height = modes[num_modes - 1]->h;
+                this->m_model->width = modes[num_modes - 1]->w;
+                this->m_model->height = modes[num_modes - 1]->h;
 
                 SDL_free(modes);
             }
-           
-
-            window_flags |= SDL_WINDOW_FULLSCREEN;
-        } else {
-            window_flags |= SDL_WINDOW_RESIZABLE;
         }
+    }
+
+    /**
+     * @brief Create SDL/GL window and context, check display modes
+     */
+    void create_window_and_context() {
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
+        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
+        int window_width = WINDOW_WIDTH;
+        int window_height = WINDOW_HEIGHT;
 
 #if defined(MAZE_DEBUG)
         SDL_Log("Settings SDL_GL_CONTEXT_DEBUG_FLAG\n");
@@ -3130,7 +3187,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 #endif
 
     // BEGIN EVENT LOOP
-    future<bool> fut_writing_results;
+    craft_impl::Maze maze{ "" };
+    future<bool> write_success;
+    auto progress_tracker = std::make_unique<craft::craft_impl::ProgressTracker>();
+
     bool running = true;
     int previous = SDL_GetTicks();
 #if defined(__EMSCRIPTEN__)
@@ -3159,7 +3219,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         static bool show_builder_gui = true;
         static string current_maze_algo = "binary_tree";
         static char current_maze_outfile[64] = ".obj";
-        static bool write_success {false};
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3180,15 +3239,15 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
 
-                    static unsigned int MAX_MAZE_WIDTH = 1000;
+                    static unsigned int MAX_MAZE_WIDTH = 100;
                     if (ImGui::SliderInt("Width", &this->m_pimpl->m_gui.build_width, 1, MAX_MAZE_WIDTH)) {
 
                     }
-                    static unsigned int MAX_MAZE_LENGTH = 1000;
+                    static unsigned int MAX_MAZE_LENGTH = 100;
                     if (ImGui::SliderInt("Length", &this->m_pimpl->m_gui.build_length, 1, MAX_MAZE_LENGTH)) {
 
                     }
-                    static unsigned int MAX_MAZE_HEIGHT = 50;
+                    static unsigned int MAX_MAZE_HEIGHT = 15;
                     if (ImGui::SliderInt("Height", &this->m_pimpl->m_gui.build_height, 1, MAX_MAZE_HEIGHT)) {
                       
                     }
@@ -3227,13 +3286,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         current_maze_outfile[3] = 'j';
                     };
 
-                    bool build_button_pressed = false;
-                    // Check if user has added a prefix to the Wavefront object file and the build button has not been pressed
-                    if (!build_button_pressed && current_maze_outfile[0] != '.') {
+                    // Check if user has added a prefix to the Wavefront object file
+                    if (current_maze_outfile[0] != '.') {
                         if (ImGui::Button("Build!")) {
-                            build_button_pressed = true;
                             this->m_pimpl->m_gui.outfile = current_maze_outfile;
-                            this->m_pimpl->build_maze(get_int, get_maze_algo_from_str, current_maze_algo);
+                            maze.set_maze(this->m_pimpl->gen_maze(get_int, get_maze_algo_from_str, current_maze_algo));
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", current_maze_outfile);
@@ -3251,32 +3308,48 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::EndDisabled();
                     }
 
-                    // Check if the build button has been pressed
-                    if (build_button_pressed) {
-                        // finally write the maze to a file
-                        // Web version uses a React button to download the maze
-#if !defined(__EMSCRIPTEN__)
-                        fut_writing_results = this->m_pimpl->write_maze(current_maze_outfile);
-#endif
-                        build_button_pressed = false;
+                    // Check if maze is available and then perform two sequential operations:
+                    // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
+                    // 2. Write the maze to a Wavefront object file using the vertex data
+                    if (!maze.get_maze().empty()) {
+                        // set grid in craft - 3D world - update class members which store vertex data
+                        bool success = this->m_pimpl->set_grid(this->m_pimpl->m_gui.build_height, maze.get_maze());
+                        if (success) {
+                            write_success = this->m_pimpl->write_maze(progress_tracker, this->m_pimpl->m_gui.outfile);
+                        } else {
+                            ImGui::NewLine(); ImGui::NewLine();
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
+                            ImGui::Text("Failed to write maze: %s", this->m_pimpl->m_gui.outfile);
+                            ImGui::NewLine();
+                            ImGui::PopStyleColor();
+                        }
+                        maze.set_maze("");
                     }
 
-                    // Check if the future is ready, calling .get() should only happen when the future is ready and non-blocking
-                    if (fut_writing_results.valid() && fut_writing_results.wait_for(chrono::seconds(0)) == future_status::ready) {
-                        write_success = fut_writing_results.get();
-                    }
-                    // Dont display a message on the web browser, let JS handle that
-                    if (write_success) {
+                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        // call the writer future and get the result
+                        bool success = write_success.get();
 #if !defined(__EMSCRIPTEN__)
-                        ImGui::NewLine();
-                        ImGui::Text("Maze written to %s\n", current_maze_outfile);
-                        ImGui::NewLine();
+                        if (success) {
+                            // Dont display a message on the web browser, let the web browser handle that
+                            ImGui::NewLine();
+                            ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::NewLine();
+                        } else {
+                            ImGui::NewLine();
+                            ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::NewLine();
+                        }
 #endif
-                    } else {
-                        // ImGui::NewLine();
-                        // ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                        // ImGui::Text("Error writing maze to %s\n", current_maze_outfile);
-                        // ImGui::PopStyleColor();    
+                        maze.set_maze("");
+                    }
+                    if (progress_tracker) {
+                        // Show progress when writing
+                        //ImGui::NewLine(); ImGui::NewLine();
+                        //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+                        //ImGui::Text("Progress: %d / %d", progress_tracker->current_step.load(), progress_tracker->total_steps.load());
+                        //ImGui::NewLine();
+                        //ImGui::PopStyleColor();
                     }
 
                     // Resets all vertex data
@@ -3285,8 +3358,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         this->m_pimpl->m_vertices.clear();
                         this->m_pimpl->m_faces.clear();
                         reset_current_outfile();
-                        build_button_pressed = false;
-                        write_success = false;
+                        this->m_pimpl->m_gui.outfile.clear();
+                        maze.set_maze("");
                     }
                     ImGui::PopStyleColor();
                     
@@ -3305,9 +3378,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     ImGui::Checkbox("Fullscreen (ESC to Exit)", &this->m_pimpl->m_gui.fullscreen);
                     if (this->m_pimpl->m_gui.fullscreen) {
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_TRUE);
+                        //this->m_pimpl->set_model_using_fullscreen_modes();
                     } else {
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_FALSE);
                     }
+
+                    SDL_GetWindowSizeInPixels(this->m_pimpl->m_model->window, &this->m_pimpl->m_model->width, &this->m_pimpl->m_model->height);
                     
                     ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &this->m_pimpl->m_gui.capture_mouse);
                     if (this->m_pimpl->m_gui.capture_mouse && !SDL_GetRelativeMouseMode()) {
@@ -3472,7 +3548,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             check_for_gl_err();
 #endif
 
-        if (events_handled_success && !running) {
+        if (!events_handled_success || !running) {
 #if defined(__EMSCRIPTEN__)
             emscripten_cancel_main_loop();
 #endif
