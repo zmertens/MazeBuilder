@@ -1691,8 +1691,8 @@ struct craft::craft_impl {
             int total_verts = vertices.size();
             int total_faces = faces.size();
             
-            size_t t = total_verts + total_faces;
-            size_t c = 0;
+            int t = total_verts + total_faces;
+            int c = 0;
             // Write vertices
             for (const auto& vertex : vertices) {
                 ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
