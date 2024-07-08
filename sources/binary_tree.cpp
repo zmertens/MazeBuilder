@@ -3,22 +3,24 @@
 #include <memory>
 #include <vector>
 #include <functional>
+#include <random>
 
 #include "cell.h"
 #include "grid.h"
 
 /**
- * @param interactive = false
-*/
-bool mazes::binary_tree::run(std::unique_ptr<grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
-	return this->run_on_cell(_grid->get_root(), get_int);
+ * @brief Generate maze in the direction of NORTH and EAST, starting in bottom-left corner of 2D grid
+ *
+ */
+bool mazes::binary_tree::run(std::unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
+	return this->run_on_cell(_grid->get_root(), std::cref(get_int), cref(rng));
 }
 
-bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, std::function<int(int, int)> const& get_int) const noexcept {
+bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     using namespace std;
     using namespace mazes;
     if (_cell != nullptr) {
-        this->run_on_cell(_cell->get_left(), get_int);
+        this->run_on_cell(_cell->get_left(), cref(get_int), cref(rng));
         vector<shared_ptr<cell>> neighbors;
         if (_cell->get_north() != nullptr) {
             neighbors.emplace_back(_cell->get_north());
@@ -33,7 +35,7 @@ bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, std::fu
             if (neighbor != nullptr)
                 _cell->link(_cell, neighbor, true);
         }
-        this->run_on_cell(_cell->get_right(), get_int);
+        this->run_on_cell(_cell->get_right(), cref(get_int), cref(rng));
     } // if
     return true;
 }

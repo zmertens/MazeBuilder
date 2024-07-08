@@ -29,9 +29,9 @@
 int main(int argc, char* argv[]) {
 
 #if defined(MAZE_DEBUG)
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1] - DEBUG";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.1.5] - DEBUG";
 #else
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1]";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.1.5]";
 #endif
 
     static constexpr auto HELP_MSG = R"help(
@@ -77,12 +77,10 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    auto use_this_for_seed = args_map.at("seed");
-    auto get_int = [](int low, int high) -> int {
+    auto seed_as_ul = std::stoul(args_map.at("seed"));
+    std::mt19937 rng_engine{ seed_as_ul };
+    auto get_int = [&rng_engine](int low, int high) -> int {
         using namespace std;
-        random_device rd;
-        seed_seq seed {rd()};
-        mt19937 rng_engine {seed};
         uniform_int_distribution<int> dist {low, high};
         return dist(rng_engine);
     };
@@ -106,11 +104,13 @@ int main(int argc, char* argv[]) {
             std::string version { MAZE_BUILDER_VERSION };
             std::string help { HELP_MSG };
             craft maze_builder_3D {window_title, version, help };
-            success = maze_builder_3D.run(std::ref(get_int), std::ref(get_maze_type_from_algo));
+            // craft uses it's own RNG engine, which looks a lot like the one here
+            success = maze_builder_3D.run(seed_as_ul, std::cref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
-            success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+            
+            success = mazes::maze_factory::gen_maze(my_maze_type, std::ref(_grid), std::cref(get_int), std::cref(rng_engine));
             if (success) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &args](auto data)->bool {

@@ -38,6 +38,7 @@
 #include <thread>
 #include <future>
 #include <chrono>
+#include <random>
 #include <utility>
 
 #include <noise/noise.h>
@@ -1683,13 +1684,14 @@ struct craft::craft_impl {
      * @brief Generate a grid containing a maze in ASCII format which will be used to write and display the maze
      * @return
      */
-    std::string gen_maze(const function<int(int, int)>& get_int, const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) {
+    std::string gen_maze(const function<int(int, int)>& get_int, const std::mt19937& rng,
+        const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) const noexcept {
 
         mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
 
         auto _grid{ std::make_unique<mazes::grid>(this->m_gui.build_width, this->m_gui.build_length, this->m_gui.build_height) };
 
-	    bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+	    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng));
 
         if (!success) {
             return "";
@@ -2941,10 +2943,14 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
-
-    srand(time(nullptr));
-    rand();
+bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
+    // Init RNG engine
+    std::mt19937 rng_machine{ seed };
+    this->m_pimpl->m_gui.seed = seed;
+    auto get_int = [&rng_machine](int min, int max) {
+		std::uniform_int_distribution<int> dist{ min, max };
+		return dist(rng_machine);
+	};
 
     // SDL INITIALIZATION //
     if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
@@ -3213,7 +3219,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     craft_impl::Maze maze{ "" };
     future<bool> write_success;
     auto progress_tracker = std::make_unique<craft::craft_impl::ProgressTracker>();
-
     bool running = true;
     int previous = SDL_GetTicks();
 #if defined(__EMSCRIPTEN__)
@@ -3274,8 +3279,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     if (ImGui::SliderInt("Height", &this->m_pimpl->m_gui.build_height, 1, MAX_MAZE_HEIGHT)) {
                       
                     }
-                    if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, 100)) {
-
+                    static unsigned int MAX_SEED_VAL = 1'000'000;
+                    if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, MAX_SEED_VAL)) {
+                        rng_machine.seed(static_cast<unsigned long>(this->m_pimpl->m_gui.seed));
                     }
                     ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
                     if (ImGui::TreeNode("Algorithms")) {
@@ -3313,7 +3319,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                     if (current_maze_outfile[0] != '.') {
                         if (ImGui::Button("Build!")) {
                             this->m_pimpl->m_gui.outfile = current_maze_outfile;
-                            maze.set_maze(this->m_pimpl->gen_maze(get_int, get_maze_algo_from_str, current_maze_algo));
+                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(current_maze_algo)));
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", current_maze_outfile);

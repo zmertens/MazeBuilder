@@ -11,9 +11,9 @@ using namespace std;
 
 /**
  * Generates a perfect maze if done correctly (no loops) by using "runs" to carve east-west
- * @param interactive = false
-*/
-bool sidewinder::run(unique_ptr<grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive) const noexcept {
+ * "Runs" are row-like passages that are carved by the sidewinder algorithm
+ */
+bool sidewinder::run(unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
     std::vector<shared_ptr<cell>> sorted_cells;
