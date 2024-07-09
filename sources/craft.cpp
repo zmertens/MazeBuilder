@@ -44,7 +44,6 @@
 #include <utility>
 
 #include <noise/noise.h>
-#include <tinycthread/tinycthread.h>
 
 #include "util.h"
 #include "world.h"
