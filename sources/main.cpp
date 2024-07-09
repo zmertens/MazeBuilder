@@ -2,11 +2,12 @@
 #include <memory>
 #include <exception>
 #include <iostream>
-#include <string_view>
 #include <sstream>
 #include <future>
 #include <thread>
 #include <algorithm>
+#include <vector>
+#include <list>
 
 #include "craft.h"
 
@@ -85,6 +86,7 @@ int main(int argc, char* argv[]) {
         return dist(rng_engine);
     };
 
+    std::list<std::string> algos = { "binary_tree", "sidewinder" };
     auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
         using namespace std;
         if (algo.compare("binary_tree") == 0) {
@@ -105,7 +107,7 @@ int main(int argc, char* argv[]) {
             std::string help { HELP_MSG };
             craft maze_builder_3D {window_title, version, help };
             // craft uses it's own RNG engine, which looks a lot like the one here
-            success = maze_builder_3D.run(seed_as_ul, std::cref(get_maze_type_from_algo));
+            success = maze_builder_3D.run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };

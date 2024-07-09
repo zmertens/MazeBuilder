@@ -131,11 +131,22 @@ struct craft::craft_impl {
         bool fullscreen;
         bool color_mode_dark;
         bool capture_mouse;
-        std::string outfile;
+        char outfile[64] = ".obj";
         int build_width;
         int build_height;
         int build_length;
         int seed;
+        std::string algo;
+
+        void reset_outfile() {
+            for (auto i = 0; i < IM_ARRAYSIZE(outfile); ++i) {
+                outfile[i] = '\0';
+            }
+            outfile[0] = '.';
+            outfile[1] = 'o';
+            outfile[2] = 'b';
+            outfile[3] = 'j';
+        }
     } DearImGuiHelper;
 
     struct Maze {
@@ -152,20 +163,19 @@ struct craft::craft_impl {
     };
 
     struct ProgressTracker {
-        std::atomic<int> current_step;
-        std::atomic<int> total_steps;
+        std::atomic<std::chrono::steady_clock::time_point> start_time;
+        std::atomic<std::chrono::steady_clock::time_point> end_time;
         
-        std::mutex msg_mutx;
-        std::string message;
-        
-        void set_msg(const std::string& msg) {
-            std::lock_guard<std::mutex> lock(msg_mutx);
-			message = msg;
+        void start() {
+            start_time.store(std::chrono::steady_clock::now());
         }
 
-        std::string get_msg() {
-            std::lock_guard<std::mutex> lock(msg_mutx);
-            return message;
+        void stop() {
+            end_time.store(std::chrono::steady_clock::now());
+        }
+
+        double get_duration_in_seconds() {
+            return std::chrono::duration<double>(end_time.load() - start_time.load()).count();
         }
     };
 
@@ -315,8 +325,10 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_model{make_unique<Model>()}
-        // chunk_size, show_trees, show_plants, show_clouds, fullscreen, color_mode_dark, capture_mouse, build_width, build_height, build_length, seed
-        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 5, 10, 50}
+        // chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
+        // (continued)... color_mode_dark, capture_mouse, build_width, 
+        // (continued)... build_height, build_length, seed, algo
+        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 5, 10, 50, "binary_tree"}
         , m_vertices{}
         , m_faces{} {
 
@@ -1608,14 +1620,14 @@ struct craft::craft_impl {
     }
 
     /**
-     * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
-     * Calling set_grid, set_block, record_block to DB
+     * @brief set_vertex_data parses the grid, and builds a 3D grid using grid row, column, height
+     * Calling set_vertex_data, set_block, record_block to DB
      * Specify a "starting_height" to try to put the maze above the heightmap (mountains)
      * @param height of the grid
      * @param grid_as_ascii
      * @return
      */
-    bool set_grid(unsigned int height, const string& grid_as_ascii)  {
+    bool set_vertex_data(unsigned int height, const string& grid_as_ascii)  {
         auto add_block_to_vertex_data = [this](float x, float y, float z, float block_size) {
             // Calculate the base index for the new vertices
             unsigned int baseIndex = this->m_vertices.size() + 1; // OBJ format is 1-based indexing
@@ -1679,7 +1691,7 @@ struct craft::craft_impl {
                 row_x++;
             } // getline
         return true;
-    } // set_grid
+    } // set_vertex_data
 
     /**
      * @brief Generate a grid containing a maze in ASCII format which will be used to write and display the maze
@@ -1706,7 +1718,7 @@ struct craft::craft_impl {
     }
 
     // Return true when maze has been written
-    future<bool> write_maze(unique_ptr<ProgressTracker> const& progress, const string& filename) {
+    future<bool> write_maze(const string& filename) {
         // helper lambda to write the Wavefront object file
         auto convert_data_to_mesh_str = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
             stringstream ss;
@@ -1736,24 +1748,16 @@ struct craft::craft_impl {
 
 #if defined(MAZE_DEBUG)
             SDL_Log("Writing maze progress: %d/%d", c, t);
-
 #endif
 
             return ss.str();
-        };
-
-        if (progress) {
-            //progress->current_step.store(c);
-            //progress->total_steps.store(t);
-        }
-   
+        }; // convert_data_to_mesh_str
 
         if (!filename.empty()) {
             // get ready to write to file
             writer maze_writer;
             packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &maze_writer, &convert_data_to_mesh_str](auto out)->bool {
-                return maze_writer.write(out, convert_data_to_mesh_str(this->m_vertices, this->m_faces)); } 
-            };
+                return maze_writer.write(out, convert_data_to_mesh_str(this->m_vertices, this->m_faces)); }};
             auto writing_results = maze_writing_task.get_future();
             thread(std::move(maze_writing_task), filename ).detach();
             return writing_results;
@@ -2944,7 +2948,8 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
+bool craft::run(unsigned long seed, const std::list<std::string>& algos,
+    const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
     // Init RNG engine
     std::mt19937 rng_machine{ seed };
     this->m_pimpl->m_gui.seed = seed;
@@ -3204,7 +3209,7 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
     // BEGIN EVENT LOOP
     craft_impl::Maze maze{ "" };
     future<bool> write_success;
-    auto progress_tracker = std::make_unique<craft::craft_impl::ProgressTracker>();
+    auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     bool running = true;
     int previous = SDL_GetTicks();
 #if defined(__EMSCRIPTEN__)
@@ -3231,8 +3236,6 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
         // ImGui window variables
         static bool show_demo_window = false;
         static bool show_builder_gui = true;
-        static string current_maze_algo = "binary_tree";
-        static char current_maze_outfile[64] = ".obj";
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3270,18 +3273,16 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
                     if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, MAX_SEED_VAL)) {
                         rng_machine.seed(static_cast<unsigned long>(this->m_pimpl->m_gui.seed));
                     }
-                    ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
-                    if (ImGui::TreeNode("Algorithms")) {
-                        static const char* algos[2] = { "binary_tree", "sidewinder" };
-                        static int algos_current_idx{ 0 };
-                        auto preview{ algos[algos_current_idx] };
-                        ImGui::SameLine();
-                        if (ImGui::BeginCombo("algorithm", preview)) {
-                            for (int n = 0; n < 2; n++) {
-                                const bool is_selected = (algos_current_idx == n);
-                                if (ImGui::Selectable(algos[n], is_selected)) {
-                                    algos_current_idx = n;
-                                    current_maze_algo = algos[algos_current_idx];
+                    ImGui::InputText("Outfile", &this->m_pimpl->m_gui.outfile[0], IM_ARRAYSIZE(this->m_pimpl->m_gui.outfile));
+                    if (ImGui::TreeNode("Maze Generator")) {
+                        auto preview{ this->m_pimpl->m_gui.algo.c_str() };
+                        ImGui::NewLine();
+                        ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
+                        if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
+                            for (const auto& itr : algos) {
+                                bool is_selected = (itr == this->m_pimpl->m_gui.algo);
+                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
+                                    this->m_pimpl->m_gui.algo = itr;
                                 }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)
@@ -3289,27 +3290,17 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
                             }
                             ImGui::EndCombo();
                         }
+                        ImGui::NewLine();
                         ImGui::TreePop();
                     }
 
-                    auto reset_current_outfile = []() {
-                        for (auto i = 0; i < IM_ARRAYSIZE(current_maze_outfile); ++i) {
-                            current_maze_outfile[i] = '\0';
-                        }
-                        current_maze_outfile[0] = '.';
-                        current_maze_outfile[1] = 'o';
-                        current_maze_outfile[2] = 'b';
-                        current_maze_outfile[3] = 'j';
-                    };
-
                     // Check if user has added a prefix to the Wavefront object file
-                    if (current_maze_outfile[0] != '.') {
+                    if (this->m_pimpl->m_gui.outfile[0] != '.') {
                         if (ImGui::Button("Build!")) {
-                            this->m_pimpl->m_gui.outfile = current_maze_outfile;
-                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(current_maze_algo)));
+                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(this->m_pimpl->m_gui.algo)));
                         } else {
                             ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", current_maze_outfile);
+                            ImGui::Text("Building maze... %s\n", this->m_pimpl->m_gui.outfile);
                         }
                     } else {
                         // Disable the button
@@ -3329,13 +3320,15 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
                     // 2. Write the maze to a Wavefront object file using the vertex data
                     if (!maze.get_maze().empty()) {
                         // set grid in craft - 3D world - update class members which store vertex data
-                        bool success = this->m_pimpl->set_grid(this->m_pimpl->m_gui.build_height, maze.get_maze());
+                        bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze());
                         if (success) {
-                            write_success = this->m_pimpl->write_maze(progress_tracker, this->m_pimpl->m_gui.outfile);
+                            progress_tracker->start();
+                            write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile);
+                            progress_tracker->stop();
                         } else {
                             ImGui::NewLine(); ImGui::NewLine();
                             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-                            ImGui::Text("Failed to write maze: %s", this->m_pimpl->m_gui.outfile.c_str());
+                            ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
                             ImGui::NewLine();
                             ImGui::PopStyleColor();
                         }
@@ -3349,11 +3342,11 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
                         if (success) {
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile.c_str());
+                            ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile);
                             ImGui::NewLine();
                         } else {
                             ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile.c_str());
+                            ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile);
                             ImGui::NewLine();
                         }
 #endif
@@ -3361,20 +3354,19 @@ bool craft::run(unsigned long seed, const std::function<mazes::maze_types(const 
                     }
                     if (progress_tracker) {
                         // Show progress when writing
-                        //ImGui::NewLine(); ImGui::NewLine();
-                        //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                        //ImGui::Text("Progress: %d / %d", progress_tracker->current_step.load(), progress_tracker->total_steps.load());
-                        //ImGui::NewLine();
-                        //ImGui::PopStyleColor();
+                        ImGui::NewLine(); ImGui::NewLine();
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+                        ImGui::Text("Finished writing maze in %f seconds", progress_tracker->get_duration_in_seconds());
+                        ImGui::NewLine();
+                        ImGui::PopStyleColor();
                     }
 
-                    // Resets all vertex data
+                    // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     if (ImGui::Button("Reset")) {
                         this->m_pimpl->m_vertices.clear();
                         this->m_pimpl->m_faces.clear();
-                        reset_current_outfile();
-                        this->m_pimpl->m_gui.outfile.clear();
+                        this->m_pimpl->m_gui.reset_outfile();
                         maze.set_maze("");
                     }
                     ImGui::PopStyleColor();

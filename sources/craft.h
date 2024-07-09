@@ -4,7 +4,7 @@
 #include <string>
 #include <memory>
 #include <functional>
-#include <random>
+#include <list>
 
 #include "maze_types_enum.h"
 
@@ -21,7 +21,8 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run(unsigned long seed, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
+    bool run(unsigned long seed, const std::list<std::string>& algos, 
+        const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
     
     std::string get_vertex_data_as_json() const noexcept;
 
