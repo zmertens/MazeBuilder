@@ -318,9 +318,6 @@ struct craft::craft_impl {
 
     DearImGuiHelper m_gui;
 
-    vector<Vertex> m_vertices;
-    vector<Face> m_faces;
-
     craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
         : m_window_name{ window_name }
         , m_version{ version }
@@ -329,9 +326,7 @@ struct craft::craft_impl {
         // chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
         // (continued)... build_height, build_length, seed, algo
-        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 5, 10, 50, "binary_tree"}
-        , m_vertices{}
-        , m_faces{} {
+        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"} {
 
     }
 
@@ -1591,69 +1586,69 @@ struct craft::craft_impl {
      * @param grid_as_ascii
      * @return
      */
-    bool set_vertex_data(unsigned int height, const string& grid_as_ascii)  {
-        auto add_block_to_vertex_data = [this](float x, float y, float z, float block_size) {
+    bool set_vertex_data(unsigned int height, const string& grid_as_ascii, vector<Vertex>& vertices, vector<Face>& faces)  {
+        auto add_block_to_vertex_data = [this, &vertices, &faces](float x, float y, float z, float block_size) {
             // Calculate the base index for the new vertices
-            unsigned int baseIndex = this->m_vertices.size() + 1; // OBJ format is 1-based indexing
+            unsigned int baseIndex = vertices.size() + 1; // OBJ format is 1-based indexing
 
             // Define the 8 vertices of the cube
-            this->m_vertices.push_back({ x, y, z });
-            this->m_vertices.push_back({ x + block_size, y, z });
-            this->m_vertices.push_back({ x + block_size, y + block_size, z });
-            this->m_vertices.push_back({ x, y + block_size, z });
-            this->m_vertices.push_back({ x, y, z + block_size });
-            this->m_vertices.push_back({ x + block_size, y, z + block_size });
-            this->m_vertices.push_back({ x + block_size, y + block_size, z + block_size });
-            this->m_vertices.push_back({ x, y + block_size, z + block_size });
+            vertices.push_back({ x, y, z });
+            vertices.push_back({ x + block_size, y, z });
+            vertices.push_back({ x + block_size, y + block_size, z });
+            vertices.push_back({ x, y + block_size, z });
+            vertices.push_back({ x, y, z + block_size });
+            vertices.push_back({ x + block_size, y, z + block_size });
+            vertices.push_back({ x + block_size, y + block_size, z + block_size });
+            vertices.push_back({ x, y + block_size, z + block_size });
 
             // Define faces using the vertices above (12 triangles for 6 faces)
             // Front face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+            faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+            faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
             // Back face
-            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+            faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+            faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
             // Left face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+            faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+            faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
             // Right face
-            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+            faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+            faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
             // Top face
-            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+            faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+            faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
             // Bottom face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
+            faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+            faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
         }; // add_block_to_vertex_data
 
 
-            istringstream iss{ grid_as_ascii.data() };
-            string line;
-            unsigned int row_x = 0;
-            while (getline(iss, line, '\n')) {
-                unsigned int col_z = 0;
-                for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-                    if (*itr == ' ') {
-                        col_z++;
-                    } else if (*itr == '+' || *itr == '-' || *itr == '|') {
-                        // check for barriers and walls then iterate up/down
-                        static constexpr unsigned int starting_height = 30u;
-                        static constexpr float block_size = 1.0f;
-                        for (auto h{ starting_height }; h < starting_height + height; h++) {
-                            int w = items[this->m_model->item_index];
-                            // set the block in the craft
-                            set_block(row_x, h, col_z, w);
-                            record_block(row_x, h, col_z, w);
-                            // update the data source that stores the grid for writing to file
-                            add_block_to_vertex_data(row_x, h, col_z, block_size);
-                        }
-                        col_z++;
+        istringstream iss{ grid_as_ascii.data() };
+        string line;
+        unsigned int row_x = 0;
+        while (getline(iss, line, '\n')) {
+            unsigned int col_z = 0;
+            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                if (*itr == ' ') {
+                    col_z++;
+                } else if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // check for barriers and walls then iterate up/down
+                    static constexpr unsigned int starting_height = 30u;
+                    static constexpr float block_size = 1.0f;
+                    for (auto h{ starting_height }; h < starting_height + height; h++) {
+                        int w = items[this->m_model->item_index];
+                        // set the block in the craft
+                        set_block(row_x, h, col_z, w);
+                        record_block(row_x, h, col_z, w);
+                        // update the data source that stores the grid for writing to file
+                        add_block_to_vertex_data(row_x, h, col_z, block_size);
                     }
+                    col_z++;
                 }
+            }
 
-                row_x++;
-            } // getline
+            row_x++;
+        } // getline
         return true;
     } // set_vertex_data
 
@@ -1682,7 +1677,7 @@ struct craft::craft_impl {
     }
 
     // Return true when maze has been written
-    future<bool> write_maze(const string& filename) {
+    future<bool> write_maze(const string& filename, atomic<bool>& writing_maze, const vector<Vertex>& vertices, const vector<Face>& faces) {
         // helper lambda to write the Wavefront object file
         auto convert_data_to_mesh_str = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
             stringstream ss;
@@ -1720,8 +1715,9 @@ struct craft::craft_impl {
         if (!filename.empty()) {
             // get ready to write to file
             writer maze_writer;
-            packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &maze_writer, &convert_data_to_mesh_str](auto out)->bool {
-                return maze_writer.write(out, convert_data_to_mesh_str(this->m_vertices, this->m_faces)); }};
+            packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &writing_maze, &vertices, &faces, &maze_writer, &convert_data_to_mesh_str](auto out)->bool {
+                writing_maze = true;
+                return maze_writer.write(out, convert_data_to_mesh_str(vertices, faces)); }};
             auto writing_results = maze_writing_task.get_future();
             thread(std::move(maze_writing_task), filename ).detach();
             return writing_results;
@@ -3169,7 +3165,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     // BEGIN EVENT LOOP
     craft_impl::Maze maze{ "" };
+    vector<craft_impl::Vertex> vertices;
+    vector<craft_impl::Face> faces;
+    atomic<bool> writing_maze = false;
     future<bool> write_success;
+
+    auto reset_fields = [this, &maze, &vertices, &faces]() {
+        this->m_pimpl->m_gui.reset_outfile();
+        maze.set_maze("");
+        vertices.clear();
+		faces.clear();
+	};
+
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     bool running = true;
     int previous = SDL_GetTicks();
@@ -3257,7 +3264,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
                     // Check if user has added a prefix to the Wavefront object file
                     if (this->m_pimpl->m_gui.outfile[0] != '.') {
-                        if (ImGui::Button("Build!")) {
+                        if (!writing_maze && ImGui::Button("Build!")) {
                             maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(this->m_pimpl->m_gui.algo)));
                         } else {
                             ImGui::SameLine();
@@ -3276,27 +3283,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                         ImGui::EndDisabled();
                     }
 
-                    // Check if maze is available and then perform two sequential operations:
-                    // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
-                    // 2. Write the maze to a Wavefront object file using the vertex data
-                    if (!maze.get_maze().empty()) {
-                        // set grid in craft - 3D world - update class members which store vertex data
-                        bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze());
-                        if (success) {
-                            progress_tracker->start();
-                            write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile);
-                            progress_tracker->stop();
-                        } else {
-                            ImGui::NewLine(); ImGui::NewLine();
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-                            ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
-                            ImGui::NewLine();
-                            ImGui::PopStyleColor();
-                        }
-                        maze.set_maze("");
-                    }
-
-                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                    if (writing_maze && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        writing_maze = false;
                         // call the writer future and get the result
                         bool success = write_success.get();
 #if !defined(__EMSCRIPTEN__)
@@ -3305,6 +3293,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                             ImGui::NewLine();
                             ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile);
                             ImGui::NewLine();
+                            reset_fields();
                         } else {
                             ImGui::NewLine();
                             ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile);
@@ -3325,10 +3314,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     if (ImGui::Button("Reset")) {
-                        this->m_pimpl->m_vertices.clear();
-                        this->m_pimpl->m_faces.clear();
-                        this->m_pimpl->m_gui.reset_outfile();
-                        maze.set_maze("");
+                        reset_fields();
                     }
                     ImGui::PopStyleColor();
                     
@@ -3383,6 +3369,27 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // This action reveals the GUI anytime the user hits ESCAPE
         if (!this->m_pimpl->m_gui.capture_mouse && !show_builder_gui && !SDL_GetRelativeMouseMode()) {
             show_builder_gui = true;
+        }
+
+        // Check if maze is available and then perform two sequential operations:
+        // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
+        // 2. Write the maze to a Wavefront object file using the vertex data
+        if (!maze.get_maze().empty()) {
+            // set grid in craft - 3D world - update class members which store vertex data
+            bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze(), ref(vertices), ref(faces));
+            writing_maze = true;
+            if (success) {
+                progress_tracker->start();
+                write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile, ref(writing_maze), cref(vertices), cref(faces));
+                progress_tracker->stop();
+            } else {
+                ImGui::NewLine(); ImGui::NewLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
+                ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
+                ImGui::NewLine();
+                ImGui::PopStyleColor();
+            }
+            maze.set_maze("");
         }
 
         // FLUSH DATABASE 
@@ -3605,6 +3612,6 @@ std::string craft::get_vertex_data_as_json() const noexcept {
 
         return ss.str();
     };
-
-    return json_writer(this->m_pimpl->m_vertices, this->m_pimpl->m_faces);
+    return "";
+    //return json_writer(this->m_pimpl->m_vertices, this->m_pimpl->m_faces);
 }
