@@ -186,6 +186,7 @@ struct craft::craft_impl {
     typedef struct {
         Map map;
         Map lights;
+        Map mazes;
         SignList signs;
         int p;
         int q;
@@ -204,10 +205,12 @@ struct craft::craft_impl {
         int load;
         Map *block_maps[3][3];
         Map *light_maps[3][3];
+        Map* maze_maps[3][3];
         int miny;
         int maxy;
         int faces;
         GLfloat *data;
+        std::istringstream iss;
     } WorkerItem;
 
     typedef struct {
@@ -318,6 +321,8 @@ struct craft::craft_impl {
 
     DearImGuiHelper m_gui;
 
+    Maze m_maze;
+
     craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
         : m_window_name{ window_name }
         , m_version{ version }
@@ -326,14 +331,13 @@ struct craft::craft_impl {
         // chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
         // (continued)... build_height, build_length, seed, algo
-        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"} {
+        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"}
+        , m_maze{} {
 
     }
 
-    static int worker_run(void *arg) {
+    int worker_run(void *arg) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
-        
-        craft caller{ {}, {}, {} };
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
                 unique_lock<mutex> u_lck(worker->mtx);
@@ -345,10 +349,10 @@ struct craft::craft_impl {
 
             WorkerItem *worker_item = &worker->item;
             if (worker_item->load) {
-                caller.m_pimpl->load_chunk(worker_item);
+                this->load_chunk(worker_item);
             }
             
-            caller.m_pimpl->compute_chunk(worker_item);
+            this->compute_chunk(worker_item);
 
             worker->mtx.lock();
             worker->state = WORKER_DONE;
@@ -364,7 +368,7 @@ struct craft::craft_impl {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            worker->thrd = thread(worker_run, worker.get());
+            worker->thrd = thread([this](void* arg) { this->worker_run(arg); }, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -1229,11 +1233,11 @@ struct craft::craft_impl {
         // populate opaque array
         for (int a = 0; a < 3; a++) {
             for (int b = 0; b < 3; b++) {
-                Map *map = item->block_maps[a][b];
-                if (!map) {
+                Map *block_map = item->block_maps[a][b];
+                if (!block_map) {
                     continue;
                 }
-                MAP_FOR_EACH(map, ex, ey, ez, ew) {
+                MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
                     int x = ex - ox;
                     int y = ey - oy;
                     int z = ez - oz;
@@ -1272,13 +1276,13 @@ struct craft::craft_impl {
             }
         }
 
-        Map *map = item->block_maps[1][1];
+        Map *block_map = item->block_maps[1][1];
 
         // count exposed faces
         int miny = 256;
         int maxy = 0;
         int faces = 0;
-        MAP_FOR_EACH(map, ex, ey, ez, ew) {
+        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
             if (ew <= 0) {
                 continue;
             }
@@ -1304,10 +1308,11 @@ struct craft::craft_impl {
         } END_MAP_FOR_EACH;
 
         // generate geometry
+        // each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
         static constexpr int components = 10;
         GLfloat *data = malloc_faces(components, faces);
         int offset = 0;
-        MAP_FOR_EACH(map, ex, ey, ez, ew) {
+        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
             if (ew <= 0) {
                 continue;
             }
@@ -1406,10 +1411,12 @@ struct craft::craft_impl {
                 if (other) {
                     item->block_maps[dp + 1][dq + 1] = &other->map;
                     item->light_maps[dp + 1][dq + 1] = &other->lights;
+                    item->maze_maps[dp + 1][dq + 1] = &other->mazes;
                 }
                 else {
                     item->block_maps[dp + 1][dq + 1] = 0;
                     item->light_maps[dp + 1][dq + 1] = 0;
+                    item->maze_maps[dp + 1][dq + 1] = 0;
                 }
             }
         }
@@ -1427,14 +1434,44 @@ struct craft::craft_impl {
     void load_chunk(WorkerItem *item) {
         int p = item->p;
         int q = item->q;
+
+        this->m_maze.set_maze("+ -- - +-- - +-- - ++-- - +-- - +-- - +-- - +-- - ++\n"
+            "|               |                       |\n"
+            "++-- - +-- - +++-- - +++++\n"
+            "|   |           |   |       |   |   |   |\n"
+            " + -- - ++ + -- - +-- - +-- - ++-- - ++ +\n"
+            "|       |   |               |       |   |\n"
+            "++-- - +-- - ++-- - +-- - +-- - +-- - +-- - ++\n"
+            "|   |           |                       |\n"
+            "+ -- - ++ + -- - ++-- - ++ + -- - ++\n"
+            "|       |   |       |       |   |       |\n"
+            "+ -- - +-- - ++-- - ++-- - ++-- - +-- - ++\n"
+            "|           |       |       |           |\n"
+            "++ + -- - +-- - +-- - +-- - ++ + -- - ++\n"
+            "|   |   |                   |   |       |\n"
+            "+ -- - ++++ + -- - +-- - ++-- - ++\n"
+            "|       |   |   |   |           |       |\n"
+            "+ -- - ++ + -- - +-- - +-- - ++ + -- - ++\n"
+            "|       |   |               |   |       |\n"
+            "+ -- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +)");
+        istringstream iss{ this->m_maze.get_maze().data() };
+
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds, gui_options.build_height, std::move(iss));
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
+        //Map* maze_map = item->maze_maps[1][1];
+
+        /*if (item->iss.str().size() > 0)
+            SDL_Log("\n%s\n", item->iss.str().c_str());*/
+
+        //auto&& iss = item->iss;
+        //_world.create_maze(p, q, items[this->m_model->item_index], gui_options.build_height, map_set_func, maze_map, gui_options.chunk_size, std::move(iss));
+        //db_load_blocks(maze_map, p, q);
     }
 
     /**
@@ -1453,11 +1490,13 @@ struct craft::craft_impl {
         sign_list_alloc(signs, 16);
         db_load_signs(signs, p, q);
         Map *block_map = &chunk->map;
+        Map *maze_map = &chunk->mazes;
         Map *light_map = &chunk->lights;
         int dx = p * this->m_gui.chunk_size - 1;
         int dy = 0;
         int dz = q * this->m_gui.chunk_size - 1;
         map_alloc(block_map, dx, dy, dz, 0x7fff);
+        map_alloc(maze_map, dx, dy, dz, 0x7fff);
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
@@ -1469,6 +1508,7 @@ struct craft::craft_impl {
         item->p = chunk->p;
         item->q = chunk->q;
         item->block_maps[1][1] = &chunk->map;
+        item->maze_maps[1][1] = &chunk->mazes;
         item->light_maps[1][1] = &chunk->lights;
         load_chunk(item);
     }
@@ -1493,6 +1533,7 @@ struct craft::craft_impl {
             }
             if (remove_chunk) {
                 map_free(&chunk->map);
+                map_free(&chunk->mazes);
                 map_free(&chunk->lights);
                 sign_list_free(&chunk->signs);
                 del_buffer(chunk->buffer);
@@ -1508,6 +1549,7 @@ struct craft::craft_impl {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             map_free(&chunk->map);
+            map_free(&chunk->mazes);
             map_free(&chunk->lights);
             sign_list_free(&chunk->signs);
             del_buffer(chunk->buffer);
@@ -1525,11 +1567,14 @@ struct craft::craft_impl {
                 if (chunk) {
                     if (item->load) {
                         Map *block_map = item->block_maps[1][1];
+                        Map *maze_map = item->maze_maps[1][1];
                         Map *light_map = item->light_maps[1][1];
                         map_free(&chunk->map);
                         map_free(&chunk->lights);
+                        map_free(&chunk->mazes);
                         map_copy(&chunk->map, block_map);
                         map_copy(&chunk->lights, light_map);
+                        map_copy(&chunk->mazes, maze_map);
                     }
                     generate_chunk(chunk, item);
                 }
@@ -1544,6 +1589,11 @@ struct craft::craft_impl {
                         if (light_map) {
                             map_free(light_map);
                             free(light_map);
+                        }
+                        Map *maze_map = item->maze_maps[a][b];
+                        if (maze_map) {
+                            map_free(maze_map);
+                            free(maze_map);
                         }
                     }
                 }
@@ -1802,10 +1852,14 @@ struct craft::craft_impl {
                     map_copy(light_map, &other->lights);
                     item->block_maps[dp + 1][dq + 1] = block_map;
                     item->light_maps[dp + 1][dq + 1] = light_map;
+                    Map* maze_map = (Map*)malloc(sizeof(Map));
+                    map_copy(maze_map, &other->mazes);
+                    item->maze_maps[dp + 1][dq + 1] = maze_map;
                 }
                 else {
                     item->block_maps[dp + 1][dq + 1] = 0;
                     item->light_maps[dp + 1][dq + 1] = 0;
+                    item->maze_maps[dp + 1][dq + 1] = 0;
                 }
             }
         }
@@ -3170,9 +3224,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     atomic<bool> writing_maze = false;
     future<bool> write_success;
 
-    auto reset_fields = [this, &maze, &vertices, &faces]() {
+    auto reset_fields = [this, &vertices, &faces]() {
         this->m_pimpl->m_gui.reset_outfile();
-        maze.set_maze("");
+        this->m_pimpl->m_maze.set_maze("");
         vertices.clear();
 		faces.clear();
 	};
@@ -3265,7 +3319,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     // Check if user has added a prefix to the Wavefront object file
                     if (this->m_pimpl->m_gui.outfile[0] != '.') {
                         if (!writing_maze && ImGui::Button("Build!")) {
-                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(this->m_pimpl->m_gui.algo)));
+                            this->m_pimpl->m_maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(this->m_pimpl->m_gui.algo)));
+                            //if (!this->m_pimpl->m_maze.get_maze().empty())
+                            //    SDL_Log("\n%s\n", this->m_pimpl->m_maze.get_maze().c_str());
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", this->m_pimpl->m_gui.outfile);
@@ -3300,7 +3356,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                             ImGui::NewLine();
                         }
 #endif
-                        maze.set_maze("");
+                        //this->m_pimpl->m_maze.set_maze("");
                     }
                     if (progress_tracker) {
                         // Show progress when writing
@@ -3374,23 +3430,24 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // Check if maze is available and then perform two sequential operations:
         // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
         // 2. Write the maze to a Wavefront object file using the vertex data
-        if (!maze.get_maze().empty()) {
-            // set grid in craft - 3D world - update class members which store vertex data
-            bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze(), ref(vertices), ref(faces));
-            writing_maze = true;
-            if (success) {
-                progress_tracker->start();
-                write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile, ref(writing_maze), cref(vertices), cref(faces));
-                progress_tracker->stop();
-            } else {
-                ImGui::NewLine(); ImGui::NewLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-                ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
-                ImGui::NewLine();
-                ImGui::PopStyleColor();
-            }
-            maze.set_maze("");
-        }
+        //if (!this->m_pimpl->m_maze.get_maze().empty()) {
+        //    // set grid in craft - 3D world - update class members which store vertex data
+        //    //bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze(), ref(vertices), ref(faces));
+        //    bool success = true;
+        //    writing_maze = true;
+        //    if (success) {
+        //        progress_tracker->start();
+        //        write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile, ref(writing_maze), cref(vertices), cref(faces));
+        //        progress_tracker->stop();
+        //    } else {
+        //        ImGui::NewLine(); ImGui::NewLine();
+        //        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
+        //        ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
+        //        ImGui::NewLine();
+        //        ImGui::PopStyleColor();
+        //    }
+        //    //this->m_pimpl->m_maze.set_maze("");
+        //}
 
         // FLUSH DATABASE 
         if (now - last_commit > COMMIT_INTERVAL) {
