@@ -4,6 +4,8 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
+#include <tuple>
 
 #include "map.h"
 
@@ -11,8 +13,8 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS, unsigned int height, std::istringstream maze) const noexcept;
-    void create_maze(int p, int q, int w, unsigned int height, world_func func, Map* m, const int CHUNK_SIZE, std::istringstream maze) const noexcept;
+    void create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, 
+        const bool SHOW_PLANTS, const bool SHOW_CLOUDS, unsigned int height, const std::vector<std::tuple<std::string, int, int>>& maze_parts) const noexcept;
 private:
 };
 

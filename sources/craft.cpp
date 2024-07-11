@@ -42,6 +42,7 @@
 #include <chrono>
 #include <random>
 #include <utility>
+#include <tuple>
 
 #include <noise/noise.h>
 
@@ -98,7 +99,7 @@
 
 // advanced parameters
 #define CREATE_CHUNK_RADIUS 10
-#define RENDER_CHUNK_RADIUS 10
+#define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
 #define COMMIT_INTERVAL 5
@@ -152,6 +153,9 @@ struct craft::craft_impl {
     struct Maze {
         std::string maze;
         std::mutex maze_mutx;
+
+        Maze(const std::string& mz) : maze{mz} {}
+
         void set_maze(const std::string& maze) {
             std::lock_guard<std::mutex> lock(maze_mutx);
             this->maze = maze;
@@ -186,7 +190,6 @@ struct craft::craft_impl {
     typedef struct {
         Map map;
         Map lights;
-        Map mazes;
         SignList signs;
         int p;
         int q;
@@ -205,12 +208,12 @@ struct craft::craft_impl {
         int load;
         Map *block_maps[3][3];
         Map *light_maps[3][3];
-        Map* maze_maps[3][3];
         int miny;
         int maxy;
         int faces;
         GLfloat *data;
-        std::istringstream iss;
+        // Tuple holds a single line in maze, row with respect to maze string, max_width of line
+        std::vector<std::tuple<std::string, int, int>> maze_parts;
     } WorkerItem;
 
     typedef struct {
@@ -321,8 +324,6 @@ struct craft::craft_impl {
 
     DearImGuiHelper m_gui;
 
-    Maze m_maze;
-
     craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
         : m_window_name{ window_name }
         , m_version{ version }
@@ -331,8 +332,7 @@ struct craft::craft_impl {
         // chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
         // (continued)... build_height, build_length, seed, algo
-        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"}
-        , m_maze{} {
+        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"} {
 
     }
 
@@ -1411,12 +1411,10 @@ struct craft::craft_impl {
                 if (other) {
                     item->block_maps[dp + 1][dq + 1] = &other->map;
                     item->light_maps[dp + 1][dq + 1] = &other->lights;
-                    item->maze_maps[dp + 1][dq + 1] = &other->mazes;
                 }
                 else {
                     item->block_maps[dp + 1][dq + 1] = 0;
                     item->light_maps[dp + 1][dq + 1] = 0;
-                    item->maze_maps[dp + 1][dq + 1] = 0;
                 }
             }
         }
@@ -1435,43 +1433,15 @@ struct craft::craft_impl {
         int p = item->p;
         int q = item->q;
 
-        this->m_maze.set_maze("+ -- - +-- - +-- - ++-- - +-- - +-- - +-- - +-- - ++\n"
-            "|               |                       |\n"
-            "++-- - +-- - +++-- - +++++\n"
-            "|   |           |   |       |   |   |   |\n"
-            " + -- - ++ + -- - +-- - +-- - ++-- - ++ +\n"
-            "|       |   |               |       |   |\n"
-            "++-- - +-- - ++-- - +-- - +-- - +-- - +-- - ++\n"
-            "|   |           |                       |\n"
-            "+ -- - ++ + -- - ++-- - ++ + -- - ++\n"
-            "|       |   |       |       |   |       |\n"
-            "+ -- - +-- - ++-- - ++-- - ++-- - +-- - ++\n"
-            "|           |       |       |           |\n"
-            "++ + -- - +-- - +-- - +-- - ++ + -- - ++\n"
-            "|   |   |                   |   |       |\n"
-            "+ -- - ++++ + -- - +-- - ++-- - ++\n"
-            "|       |   |   |   |           |       |\n"
-            "+ -- - ++ + -- - +-- - +-- - ++ + -- - ++\n"
-            "|       |   |               |   |       |\n"
-            "+ -- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +-- - +)");
-        istringstream iss{ this->m_maze.get_maze().data() };
-
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds, gui_options.build_height, std::move(iss));
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, 
+            gui_options.show_plants, gui_options.show_clouds, gui_options.build_height, cref(item->maze_parts));
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
-        //Map* maze_map = item->maze_maps[1][1];
-
-        /*if (item->iss.str().size() > 0)
-            SDL_Log("\n%s\n", item->iss.str().c_str());*/
-
-        //auto&& iss = item->iss;
-        //_world.create_maze(p, q, items[this->m_model->item_index], gui_options.build_height, map_set_func, maze_map, gui_options.chunk_size, std::move(iss));
-        //db_load_blocks(maze_map, p, q);
     }
 
     /**
@@ -1490,13 +1460,11 @@ struct craft::craft_impl {
         sign_list_alloc(signs, 16);
         db_load_signs(signs, p, q);
         Map *block_map = &chunk->map;
-        Map *maze_map = &chunk->mazes;
         Map *light_map = &chunk->lights;
         int dx = p * this->m_gui.chunk_size - 1;
         int dy = 0;
         int dz = q * this->m_gui.chunk_size - 1;
         map_alloc(block_map, dx, dy, dz, 0x7fff);
-        map_alloc(maze_map, dx, dy, dz, 0x7fff);
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
@@ -1508,7 +1476,6 @@ struct craft::craft_impl {
         item->p = chunk->p;
         item->q = chunk->q;
         item->block_maps[1][1] = &chunk->map;
-        item->maze_maps[1][1] = &chunk->mazes;
         item->light_maps[1][1] = &chunk->lights;
         load_chunk(item);
     }
@@ -1533,7 +1500,6 @@ struct craft::craft_impl {
             }
             if (remove_chunk) {
                 map_free(&chunk->map);
-                map_free(&chunk->mazes);
                 map_free(&chunk->lights);
                 sign_list_free(&chunk->signs);
                 del_buffer(chunk->buffer);
@@ -1545,11 +1511,14 @@ struct craft::craft_impl {
         this->m_model->chunk_count = count;
     }
 
+    /**
+     * @brief Deletes all chunks regardless of player state
+     *
+     */
     void delete_all_chunks() {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             map_free(&chunk->map);
-            map_free(&chunk->mazes);
             map_free(&chunk->lights);
             sign_list_free(&chunk->signs);
             del_buffer(chunk->buffer);
@@ -1567,14 +1536,11 @@ struct craft::craft_impl {
                 if (chunk) {
                     if (item->load) {
                         Map *block_map = item->block_maps[1][1];
-                        Map *maze_map = item->maze_maps[1][1];
                         Map *light_map = item->light_maps[1][1];
                         map_free(&chunk->map);
                         map_free(&chunk->lights);
-                        map_free(&chunk->mazes);
                         map_copy(&chunk->map, block_map);
                         map_copy(&chunk->lights, light_map);
-                        map_copy(&chunk->mazes, maze_map);
                     }
                     generate_chunk(chunk, item);
                 }
@@ -1589,11 +1555,6 @@ struct craft::craft_impl {
                         if (light_map) {
                             map_free(light_map);
                             free(light_map);
-                        }
-                        Map *maze_map = item->maze_maps[a][b];
-                        if (maze_map) {
-                            map_free(maze_map);
-                            free(maze_map);
                         }
                     }
                 }
@@ -1707,11 +1668,10 @@ struct craft::craft_impl {
      * @return
      */
     std::string gen_maze(const function<int(int, int)>& get_int, const std::mt19937& rng,
-        const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) const noexcept {
+        unsigned int width, unsigned int length, unsigned int height,
+        const maze_types my_maze_type) const noexcept {
 
-        mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
-
-        auto _grid{ std::make_unique<mazes::grid>(this->m_gui.build_width, this->m_gui.build_length, this->m_gui.build_height) };
+        auto _grid{ std::make_unique<mazes::grid>(width, length, height) };
 
 	    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng));
 
@@ -1778,6 +1738,12 @@ struct craft::craft_impl {
         }
     } // write_maze
 
+    /**
+     * @brief Calculate  an index based on the chunk coordinates
+     *  Check if the chunk is assigned to the current worker thread
+     * @param p
+     *
+     */
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
         float matrix[16];
@@ -1810,6 +1776,7 @@ struct craft::craft_impl {
                 if (chunk) {
                     priority = chunk->buffer & chunk->dirty;
                 }
+                // Check for chunk to update based on lowest score
                 int score = (invisible << 24) | (priority << 16) | distance;
                 if (score < best_score) {
                     best_score = score;
@@ -1825,6 +1792,7 @@ struct craft::craft_impl {
         int b = best_b;
         int load = 0;
         Chunk *chunk = find_chunk(a, b);
+        // Check if the chunk is already loaded
         if (!chunk) {
             load = 1;
             if (this->m_model->chunk_count < MAX_CHUNKS) {
@@ -1852,14 +1820,10 @@ struct craft::craft_impl {
                     map_copy(light_map, &other->lights);
                     item->block_maps[dp + 1][dq + 1] = block_map;
                     item->light_maps[dp + 1][dq + 1] = light_map;
-                    Map* maze_map = (Map*)malloc(sizeof(Map));
-                    map_copy(maze_map, &other->mazes);
-                    item->maze_maps[dp + 1][dq + 1] = maze_map;
                 }
                 else {
                     item->block_maps[dp + 1][dq + 1] = 0;
                     item->light_maps[dp + 1][dq + 1] = 0;
-                    item->maze_maps[dp + 1][dq + 1] = 0;
                 }
             }
         }
@@ -2032,6 +1996,10 @@ struct craft::craft_impl {
         }
     }
 
+    /**
+     * @brief Prepares to render by ensuring the chunks are loaded
+     *
+     */
     int render_chunks(Attrib *attrib, Player *player) {
         int result = 0;
         State *s = &player->state;
@@ -3217,16 +3185,64 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     check_for_gl_err();
 #endif
 
-    // BEGIN EVENT LOOP
-    craft_impl::Maze maze{ "" };
+    // Init some local vars for handling maze duties
+    auto my_maze_type = get_maze_algo_from_str("sidewinder");
+    craft_impl::Maze maze{ this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine),
+        this->m_pimpl->m_gui.build_width, this->m_pimpl->m_gui.build_length, this->m_pimpl->m_gui.build_height,
+        my_maze_type)};
+
     vector<craft_impl::Vertex> vertices;
     vector<craft_impl::Face> faces;
     atomic<bool> writing_maze = false;
     future<bool> write_success;
 
-    auto reset_fields = [this, &vertices, &faces]() {
+    auto distribute_maze_parts = [this](const std::string& maze) {
+        istringstream iss{ maze };
+        string line;
+        vector<tuple<string, int, int>> lines;
+
+        // 1) Split the maze string into lines
+        int line_with_respect_to_maze = 0;
+        int max_width = 0;
+        while (getline(iss, line, '\n')) {
+            int part_width = line.length();
+            max_width = max(part_width, max_width);
+            lines.emplace_back(line, line_with_respect_to_maze++, max_width);
+        }
+
+        // 2) Calc how many lines each worker thread will get
+        int total_lines = lines.size();
+        auto num_workers = this->m_pimpl->m_model->workers.size();
+        int lines_per_worker = total_lines / num_workers;
+        int extra_lines = total_lines % num_workers;
+
+        // 3) Distribute the lines to the worker threads
+        auto it = lines.begin();
+        int last_line = 0;
+        for (auto i{ 0 }; i < num_workers; i++) {
+            auto&& worker = this->m_pimpl->m_model->workers.at(i);
+            
+            // Calc the number of lines this worker gets
+            int num_lines_this_worker = lines_per_worker + (i < extra_lines ? 1 : 0);
+            vector<tuple<string, int, int>> worker_lines(it, it + num_lines_this_worker);
+
+            // Assign work
+            //worker->item.maze_parts = worker_lines;
+            // This tuple holds the lines this worker will process, starting row and starting col
+            //  with respect to the original maze string
+            worker->item.maze_parts = worker_lines;
+#if defined(MAZE_DEBUG)
+            SDL_Log("Worker: %d gets starts processing at line: %d\n", i, last_line);
+#endif
+            // Skip the iterator ahead based on the number of lines this worker got
+            advance(it, num_lines_this_worker);
+            last_line += num_lines_this_worker;
+        }
+    }; // distribute_maze_parts
+
+    auto reset_fields = [this, &maze, &vertices, &faces]() {
         this->m_pimpl->m_gui.reset_outfile();
-        this->m_pimpl->m_maze.set_maze("");
+        maze.set_maze("");
         vertices.clear();
 		faces.clear();
 	};
@@ -3234,6 +3250,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     bool running = true;
     int previous = SDL_GetTicks();
+    // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
@@ -3319,9 +3336,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     // Check if user has added a prefix to the Wavefront object file
                     if (this->m_pimpl->m_gui.outfile[0] != '.') {
                         if (!writing_maze && ImGui::Button("Build!")) {
-                            this->m_pimpl->m_maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), cref(get_maze_algo_from_str), cref(this->m_pimpl->m_gui.algo)));
-                            //if (!this->m_pimpl->m_maze.get_maze().empty())
-                            //    SDL_Log("\n%s\n", this->m_pimpl->m_maze.get_maze().c_str());
+                            auto my_maze_type = get_maze_algo_from_str(this->m_pimpl->m_gui.algo);
+                            auto width = this->m_pimpl->m_gui.build_width;
+                            auto length = this->m_pimpl->m_gui.build_length;
+                            auto height = this->m_pimpl->m_gui.build_height;
+                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), 
+                                width, length, height, my_maze_type));
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", this->m_pimpl->m_gui.outfile);
@@ -3448,6 +3468,16 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         //    }
         //    //this->m_pimpl->m_maze.set_maze("");
         //}
+        static bool distributed_parts = false;
+        if (!maze.get_maze().empty() && !distributed_parts) {
+            distribute_maze_parts(maze.get_maze());
+   //         // tell the workers to load chunks
+   //         for (auto&& worker : this->m_pimpl->m_model->workers) {
+			//	worker->item.load = 1;
+			//}
+            distributed_parts = true;
+            //maze.set_maze("");
+        }
 
         // FLUSH DATABASE 
         if (now - last_commit > COMMIT_INTERVAL) {
@@ -3455,6 +3485,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             db_commit();
         }
     
+        craft_impl::Player* player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
+
         // PREPARE TO RENDER 
         m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
         m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
@@ -3466,8 +3498,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
-
-        craft_impl::Player *player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
 
         // RENDER 3-D SCENE
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3588,7 +3618,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             emscripten_cancel_main_loop();
 #endif
         }
-    }  // EVENT LOOP
+    } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_END;
