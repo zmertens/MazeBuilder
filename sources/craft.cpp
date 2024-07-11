@@ -213,7 +213,7 @@ struct craft::craft_impl {
         int faces;
         GLfloat *data;
         // Tuple holds a single line in maze, row with respect to maze string, max_width of line
-        std::vector<std::tuple<std::string, int, int>> maze_parts;
+        std::vector<std::tuple<string::iterator, string::iterator, int>> maze_parts;
     } WorkerItem;
 
     typedef struct {
@@ -3199,20 +3199,19 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     auto distribute_maze_parts = [this](const std::string& maze) {
         istringstream iss{ maze };
         string line;
-        vector<tuple<string, int, int>> lines;
+        vector<tuple<string::iterator, string::iterator, int>> lines;
 
         // 1) Split the maze string into lines
         int line_with_respect_to_maze = 0;
-        int max_width = 0;
         while (getline(iss, line, '\n')) {
-            int part_width = line.length();
-            max_width = max(part_width, max_width);
-            lines.emplace_back(line, line_with_respect_to_maze++, max_width);
+            lines.emplace_back(line.begin(), line.end(), line_with_respect_to_maze++);
         }
 
         // 2) Calc how many lines each worker thread will get
         int total_lines = lines.size();
-        auto num_workers = this->m_pimpl->m_model->workers.size();
+        const int workers_size = this->m_pimpl->m_model->workers.size();
+        // prevent division by zero
+        auto num_workers = (workers_size == 0) ? 1 : workers_size;
         int lines_per_worker = total_lines / num_workers;
         int extra_lines = total_lines % num_workers;
 
@@ -3224,18 +3223,20 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             
             // Calc the number of lines this worker gets
             int num_lines_this_worker = lines_per_worker + (i < extra_lines ? 1 : 0);
-            vector<tuple<string, int, int>> worker_lines(it, it + num_lines_this_worker);
+            // vector<tuple<string, int, int>> worker_lines(it, it + num_lines_this_worker);
 
-            // Assign work
-            //worker->item.maze_parts = worker_lines;
-            // This tuple holds the lines this worker will process, starting row and starting col
-            //  with respect to the original maze string
-            worker->item.maze_parts = worker_lines;
+            string::iterator worker_lines_begin = get<0>(*it);
+            advance(it, num_lines_this_worker);
+            string::iterator worker_lines_end = get<0>(*it);
+            // This tuple holds the lines this worker will process, 
+            // starting and end points with iterators
+            // Holds an integer with the starting line number WRT to the maze
+            // std::tuple<std::string::iterator, std::string::iterator, int> line_tuple = make_tuple();
+            worker->item.maze_parts.emplace_back(worker_lines_begin, worker_lines_end, last_line);
 #if defined(MAZE_DEBUG)
             SDL_Log("Worker: %d gets starts processing at line: %d\n", i, last_line);
 #endif
             // Skip the iterator ahead based on the number of lines this worker got
-            advance(it, num_lines_this_worker);
             last_line += num_lines_this_worker;
         }
     }; // distribute_maze_parts
