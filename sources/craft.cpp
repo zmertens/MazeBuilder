@@ -153,9 +153,9 @@ struct craft::craft_impl {
         }
     } DearImGuiHelper;
 
-    struct Vertex {
-        GLfloat x, y, z;
-    };
+    //struct Vertex {
+    //    float x, y, z;
+    //};
 
     struct Face {
         std::vector<unsigned int> vertices;
@@ -169,7 +169,8 @@ struct craft::craft_impl {
         // Mutable allows for const methods to modify the object
         mutable std::shared_mutex write_mtx;
         std::mutex maze_mutx;
-        std::vector<Vertex> vertices;
+        // Tuple (p, q, x, y, z, w)
+        std::vector<std::tuple<int, int, int, int, int, int>> vertices;
         std::vector<Face> faces;
 
         Maze(const std::string& mz) : maze(mz), vertices(), faces() {};
@@ -187,18 +188,18 @@ struct craft::craft_impl {
             return maze;
         }
 
-        void set_data(const std::vector<Vertex>& new_vertices, const std::vector<Face>& new_faces) {
+        void set_data(const std::vector<std::tuple<int, int, int, int, int, int>>& new_vertices, const std::vector<Face>& new_faces) {
             std::unique_lock<std::mutex> lock(maze_mutx);
             this->vertices = new_vertices;
             this->faces = new_faces;
         }
 
-        const std::vector<Vertex>& get_vertices() {
+        std::vector<std::tuple<int, int, int, int, int, int>> get_vertices() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
 			return vertices;
 		}
 
-        const std::vector<Face>& get_faces() {
+        std::vector<Face> get_faces() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
 			return faces;
 		}
@@ -213,7 +214,7 @@ struct craft::craft_impl {
         // Return a future for when maze has been written
         std::future<bool> write_maze_as_wavefront_obj(const std::string& filename) const {
             // helper lambda to write the Wavefront object file
-            auto create_wavefront_obj = [this](const vector<Vertex>& vertices, const vector<Face>& faces)->string {
+            auto create_wavefront_obj = [this](const vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<Face>& faces)->string {
                 using namespace std;
                 stringstream ss;
                 ss << "# https://www.github.com/zmertens/MazeBuilder\n";
@@ -226,7 +227,10 @@ struct craft::craft_impl {
                 int c = 0;
                 // Write vertices
                 for (const auto& vertex : vertices) {
-                    ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
+                    float x = static_cast<float>(get<2>(vertex));
+                    float y = static_cast<float>(get<3>(vertex));
+                    float z = static_cast<float>(get<4>(vertex));
+                    ss << "v " << x << " " << y << " " << z << "\n";
                     c++;
                 }
 
@@ -485,11 +489,11 @@ struct craft::craft_impl {
         this->m_model->workers.clear();
     }
 
-    void del_buffer(GLuint buffer) {
+    void del_buffer(GLuint buffer) const {
         glDeleteBuffers(1, &buffer);
     }
 
-    GLuint gen_buffer(GLsizei size, GLfloat *data) {
+    GLuint gen_buffer(GLsizei size, GLfloat *data) const {
         GLuint buffer;
         glGenBuffers(1, &buffer);
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -498,11 +502,11 @@ struct craft::craft_impl {
         return buffer;
     }
 
-    GLfloat *malloc_faces(int components, int faces) {
+    GLfloat *malloc_faces(int components, int faces) const {
         return (GLfloat*) malloc(sizeof(GLfloat) * 6 * components * faces);
     }
 
-    GLuint gen_faces(int components, int faces, GLfloat *data) {
+    GLuint gen_faces(int components, int faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
         free(data);
         return buffer;
@@ -883,7 +887,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    Chunk *find_chunk(int p, int q) {
+    Chunk *find_chunk(int p, int q) const {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             if (chunk->p == p && chunk->q == q) {
@@ -942,7 +946,7 @@ struct craft::craft_impl {
         return 1;
     } // chunk_visible
 
-    int highest_block(float x, float z) {
+    int highest_block(float x, float z) const {
         int result = -1;
         int nx = SDL_roundf(x);
         int nz = SDL_roundf(z);
@@ -1049,7 +1053,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int collide(int height, float *x, float *y, float *z) {
+    int collide(int height, float *x, float *y, float *z) const {
         int result = 0;
         int p = this->chunked(*x);
         int q = this->chunked(*z);
@@ -1091,7 +1095,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) {
+    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const {
         int nx = SDL_roundf(x);
         int ny = SDL_roundf(y);
         int nz = SDL_roundf(z);
@@ -1103,7 +1107,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int _gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) {
+    int _gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) const {
         static constexpr int glyph_dx[8] = {0, 0, -1, 1, 1, 0, -1, 0};
         static constexpr int glyph_dz[8] = {1, -1, 0, 0, 0, -1, 0, 1};
         static constexpr int line_dx[8] = {0, 0, 0, 0, 0, 1, 0, -1};
@@ -1165,7 +1169,7 @@ struct craft::craft_impl {
         return count;
     }
 
-    void gen_sign_buffer(Chunk *chunk) {
+    void gen_sign_buffer(Chunk *chunk) const {
         SignList *signs = &chunk->signs;
 
         // first pass - count characters
@@ -1188,7 +1192,7 @@ struct craft::craft_impl {
         chunk->sign_faces = faces;
     }
 
-    int has_lights(Chunk *chunk) {
+    int has_lights(Chunk *chunk) const {
         if (!SHOW_LIGHTS) {
             return 0;
         }
@@ -1210,7 +1214,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void dirty_chunk(Chunk *chunk) {
+    void dirty_chunk(Chunk *chunk) const {
         chunk->dirty = 1;
         if (has_lights(chunk)) {
             for (int dp = -1; dp <= 1; dp++) {
@@ -1224,7 +1228,7 @@ struct craft::craft_impl {
         }
     }
 
-    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) {
+    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) const {
         static constexpr int lookup3[6][4][3] = {
             {{0, 1, 3}, {2, 1, 5}, {6, 3, 7}, {8, 5, 7}},
             {{18, 19, 21}, {20, 19, 23}, {24, 21, 25}, {26, 23, 25}},
@@ -1265,7 +1269,7 @@ struct craft::craft_impl {
         }
     } // occlusion
 
-    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
+    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) const {
 #define XZ_SIZE (this->m_gui.chunk_size * 3 + 2)
 #define XZ_LO (this->m_gui.chunk_size)
 #define XZ_HI (this->m_gui.chunk_size * 2 + 1)
@@ -1297,7 +1301,7 @@ struct craft::craft_impl {
     }
 
     // Handles terrain generation in a multithreaded environment
-    void compute_chunk(WorkerItem *item) {
+    void compute_chunk(WorkerItem *item) const {
         char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
         char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
@@ -1477,7 +1481,7 @@ struct craft::craft_impl {
         item->data = data;
     } // compute_chunk
 
-    void generate_chunk(Chunk *chunk, WorkerItem *item) {
+    void generate_chunk(Chunk *chunk, WorkerItem *item) const {
         chunk->miny = item->miny;
         chunk->maxy = item->maxy;
         chunk->faces = item->faces;
@@ -1486,7 +1490,7 @@ struct craft::craft_impl {
         this->gen_sign_buffer(chunk);
     }
 
-    void gen_chunk_buffer(Chunk *chunk) {
+    void gen_chunk_buffer(Chunk *chunk) const {
         WorkerItem _item;
         WorkerItem *item = &_item;
         item->p = chunk->p;
@@ -1784,7 +1788,7 @@ struct craft::craft_impl {
         }
     }
 
-    void unset_sign(int x, int y, int z) {
+    void unset_sign(int x, int y, int z) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1800,7 +1804,7 @@ struct craft::craft_impl {
         }
     }
 
-    void unset_sign_face(int x, int y, int z, int face) {
+    void unset_sign_face(int x, int y, int z, int face) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1816,7 +1820,7 @@ struct craft::craft_impl {
         }
     }
 
-    void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) {
+    void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) const {
         if (strlen(text) == 0) {
             unset_sign_face(x, y, z, face);
             return;
@@ -1832,13 +1836,13 @@ struct craft::craft_impl {
         db_insert_sign(p, q, x, y, z, face, text);
     }
 
-    void set_sign(int x, int y, int z, int face, const char *text) {
+    void set_sign(int x, int y, int z, int face, const char *text) const {
         int p = chunked(x);
         int q = chunked(z);
         _set_sign(p, q, x, y, z, face, text, 1);
     }
 
-    void toggle_light(int x, int y, int z) {
+    void toggle_light(int x, int y, int z) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1851,7 +1855,7 @@ struct craft::craft_impl {
         }
     }
 
-    void set_light(int p, int q, int x, int y, int z, int w) {
+    void set_light(int p, int q, int x, int y, int z, int w) const {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->lights;
@@ -1865,7 +1869,7 @@ struct craft::craft_impl {
         }
     }
 
-    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) {
+    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->map;
@@ -1885,7 +1889,7 @@ struct craft::craft_impl {
         }
     }
 
-    void set_block(int x, int y, int z, int w) {
+    void set_block(int x, int y, int z, int w) const {
         int p = chunked(x);
         int q = chunked(z);
         _set_block(p, q, x, y, z, w, 1);
@@ -1904,6 +1908,59 @@ struct craft::craft_impl {
             }
         }
     }
+
+    // Helper function to modify signs and lights before setting blocks in DB
+    void _set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks, int dirty) const {
+        for (auto&& block : blocks) {
+            int p = get<0>(block);
+            int q = get<1>(block);
+            int x = get<2>(block);
+            int y = get<3>(block);
+            int z = get<4>(block);
+            int w = get<5>(block);
+            Chunk* chunk = find_chunk(p, q);
+            if (chunk) {
+                Map* map = &chunk->map;
+                if (map_set(map, x, y, z, w)) {
+                    if (dirty) {
+                        dirty_chunk(chunk);
+                    }
+                    db_insert_block(p, q, x, y, z, w);
+                }
+            } else {
+                // pass
+            }
+            if (w == 0 && chunked(x) == p && chunked(z) == q) {
+                unset_sign(x, y, z);
+                set_light(p, q, x, y, z, 0);
+            }
+        } // for
+        db_insert_blocks(blocks);
+    }
+
+    // Tuple(p, q, x, y, z, w)
+    void set_blocks_from_vec(std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
+        // Erase blocks outside the chunk
+        blocks.erase(remove_if(blocks.begin(), blocks.end(), [this](auto& block) {
+            int x = get<0>(block);
+            int z = get<2>(block);
+            int p = this->chunked(x);
+            int q = this->chunked(z);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
+                        return true;
+                    }
+
+                }
+            }
+            // Keep the block
+            get<0>(block) = p;
+            get<1>(block) = q;
+            return false;
+        }), blocks.end());
+        _set_blocks_from_vec(blocks, 1);
+	}
 
     void record_block(int x, int y, int z, int w) {
         SDL_memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
@@ -3148,7 +3205,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     craft_impl::Maze maze2{ gen_maze(gui_opts.build_width, gui_opts.build_length, gui_opts.build_height, my_maze_type)};
 
     /**
-    * @brief Parses the grid, and builds a 3D grid using (x, y, z) and index elements
+    * @brief Parses the grid, and builds a 3D grid using (p, q, x, y, z, w) and index elements
+    *   p, q, and w are initialize with default values - set later
     * Calling this function will also call set_block, record_block to DB
     * Specify a "starting_height" to try to put the maze above the heightmap (mountains), and below the clouds
     * @param height of the grid
@@ -3156,20 +3214,20 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     * @return
     */
     auto compute_maze_geometry = [this, &maze2](unsigned int height) {
-        auto add_block_to_vertex_data = [&maze2](float x, float y, float z, float block_size) {
+        auto add_block_to_vertex_data = [&maze2](int x, int y, int z, int block_size) {
             // Calculate the base index for the new vertices
             // OBJ format is 1-based indexing
             unsigned int baseIndex = maze2.vertices.size() + 1;
 
             // Define the 8 vertices of the cube
-            maze2.vertices.push_back({ x, y, z });
-            maze2.vertices.push_back({ x + block_size, y, z });
-            maze2.vertices.push_back({ x + block_size, y + block_size, z });
-            maze2.vertices.push_back({ x, y + block_size, z });
-            maze2.vertices.push_back({ x, y, z + block_size });
-            maze2.vertices.push_back({ x + block_size, y, z + block_size });
-            maze2.vertices.push_back({ x + block_size, y + block_size, z + block_size });
-            maze2.vertices.push_back({ x, y + block_size, z + block_size });
+            maze2.vertices.push_back({ 0, 0, x, y, z, -1 });
+            maze2.vertices.push_back({ 0, 0, x + block_size, y, z, -1 });
+            maze2.vertices.push_back({ 0, 0, x + block_size, y + block_size, z, -1 });
+            maze2.vertices.push_back({ 0, 0, x, y + block_size, z, -1 });
+            maze2.vertices.push_back({ 0, 0, x, y, z + block_size, -1 });
+            maze2.vertices.push_back({ 0, 0, x + block_size, y, z + block_size, -1 });
+            maze2.vertices.push_back({ 0, 0, x + block_size, y + block_size, z + block_size, -1 });
+            maze2.vertices.push_back({ 0, 0, x, y + block_size, z + block_size, -1 });
 
             // Define faces using the vertices above (12 triangles for 6 faces)
             // Front face
@@ -3201,10 +3259,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                 if (*itr == '+' || *itr == '-' || *itr == '|') {
                     // check for barriers and walls then iterate up/down
                     static constexpr unsigned int starting_height = 30u;
-                    static constexpr float block_size = 1.0f;
+                    static constexpr unsigned int block_size = 1;
                     for (auto h{ starting_height }; h < starting_height + height; h++) {
                         // update the data source that stores the grid for writing to file
-                        add_block_to_vertex_data(static_cast<float>(row_x), static_cast<float>(h), static_cast<float>(col_z), block_size);
+                        add_block_to_vertex_data(row_x, h, col_z, block_size);
                         //this->m_pimpl->set_block(row_x, h, col_z, 7);
                         //this->m_pimpl->record_block(row_x, h, col_z, 7);
                     }
@@ -3220,14 +3278,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     // This is just a de-facto maze for the app launch
     compute_maze_geometry(gui_opts.build_height);
 
-    auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<craft_impl::Vertex>& vertices) {
-        int w = get_int(0, 10);
+    auto set_maze_in_craft = [this, &get_int, &rng_machine](vector<tuple<int, int, int, int, int, int>>& vertices) {
         // set the block in the craft, this performs a DB insert query
-        for (const auto& vertex : vertices) {
-            w = get_int(0, 10);
-			this->m_pimpl->set_block(vertex.x, vertex.y, vertex.z, w);
-			this->m_pimpl->record_block(vertex.x, vertex.y, vertex.z, w);
+        for (auto vertex : vertices) {
+            int w = get_int(0, 10);
+            get<5>(vertex) = w;
 		}
+        this->m_pimpl->set_blocks_from_vec(vertices);
 	}; // set_maze_in_craft
 
 //    auto distribute_maze_parts = [this, &maze2]() {
@@ -3290,8 +3347,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 	};
 
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
-
-    write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
 
     bool running = true;
     int previous = SDL_GetTicks();
@@ -3403,8 +3458,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                         bool success = write_success.get();
                         auto&& last_outfile = gui_opts.outfile;
                         if (success) {
-                            // Render the maze in Craft
-                            //set_maze_in_craft();
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
                             ImGui::Text("Maze written to %s\n", last_outfile);
@@ -3509,7 +3562,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         static bool maze_set_in_craft = false;
         if (!maze_set_in_craft) {
-            set_maze_in_craft(cref(maze2.get_vertices()));
+            // Use get_vertices() here for thread-safety?
+            set_maze_in_craft(ref(maze2.vertices));
             maze_set_in_craft = true;
         }
 
@@ -3709,14 +3763,14 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 // returns JSON-encoded string:
 //  return "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
 std::string craft::get_vertex_data_as_json() const noexcept {
-    auto json_writer = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
+    auto json_writer = [this](const std::vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<craft_impl::Face>& faces) {
         stringstream ss;
         // Set key if outfile is specified
         ss << "{\"name\":\"" << this->m_pimpl->m_gui.outfile << "\", \"data\":[";
         // Wavefront object file header
         ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
         for (const auto& vertex : vertices) {
-            ss << ",\"v " << vertex.x << " " << vertex.y << " " << vertex.z << "\\n\"";
+            ss << ",\"v " << get<2>(vertex) << " " << get<3>(vertex) << " " << get<4>(vertex) << "\\n\"";
         }
         
         // Note in writing the face that the index is 1-based

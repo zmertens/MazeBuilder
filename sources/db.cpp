@@ -237,6 +237,18 @@ void db_insert_block(int p, int q, int x, int y, int z, int w) {
     mtx.unlock();
 }
 
+void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) {
+	if (!db_enabled) {
+		return;
+	}
+	mtx.lock();
+	for (const auto& block : blocks) {
+		ring_put_block(&ring, std::get<0>(block), std::get<1>(block), std::get<2>(block), std::get<3>(block), std::get<4>(block), std::get<5>(block));
+	}
+	cnd.notify_one();
+	mtx.unlock();
+}
+
 void _db_insert_block(int p, int q, int x, int y, int z, int w) {
     sqlite3_reset(insert_block_stmt);
     sqlite3_bind_int(insert_block_stmt, 1, p);

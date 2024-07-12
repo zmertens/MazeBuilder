@@ -1,6 +1,9 @@
 #ifndef _db_h_
 #define _db_h_
 
+#include <vector>
+#include <tuple>
+
 #include "map.h"
 #include "sign.h"
 
@@ -13,6 +16,7 @@ void db_commit();
 void db_save_state(float x, float y, float z, float rx, float ry);
 int db_load_state(float *x, float *y, float *z, float *rx, float *ry);
 void db_insert_block(int p, int q, int x, int y, int z, int w);
+void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks);
 void db_insert_light(int p, int q, int x, int y, int z, int w);
 void db_insert_sign(
     int p, int q, int x, int y, int z, int face, const char *text);
