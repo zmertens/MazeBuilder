@@ -188,22 +188,6 @@ struct craft::craft_impl {
             return maze;
         }
 
-        void set_data(const std::vector<std::tuple<int, int, int, int, int, int>>& new_vertices, const std::vector<Face>& new_faces) {
-            std::unique_lock<std::mutex> lock(maze_mutx);
-            this->vertices = new_vertices;
-            this->faces = new_faces;
-        }
-
-        std::vector<std::tuple<int, int, int, int, int, int>> get_vertices() {
-			std::lock_guard<std::mutex> lock(maze_mutx);
-			return vertices;
-		}
-
-        std::vector<Face> get_faces() {
-			std::lock_guard<std::mutex> lock(maze_mutx);
-			return faces;
-		}
-
         void clear() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
             maze.clear();
@@ -214,7 +198,7 @@ struct craft::craft_impl {
         // Return a future for when maze has been written
         std::future<bool> write_maze_as_wavefront_obj(const std::string& filename) const {
             // helper lambda to write the Wavefront object file
-            auto create_wavefront_obj = [this](const vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<Face>& faces)->string {
+            auto create_wavefront_obj = [](const vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<Face>& faces)->string {
                 using namespace std;
                 stringstream ss;
                 ss << "# https://www.github.com/zmertens/MazeBuilder\n";
@@ -425,7 +409,7 @@ struct craft::craft_impl {
         // show_builder_gui, chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
         // (continued)... build_height, build_length, seed, algo, build_now
-        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 46, 10, 10, 50, "binary_tree", false} {
+        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 46, 18, 10, 50, "binary_tree", false} {
 
     }
 
@@ -1925,7 +1909,7 @@ struct craft::craft_impl {
                     if (dirty) {
                         dirty_chunk(chunk);
                     }
-                    db_insert_block(p, q, x, y, z, w);
+                    //db_insert_block(p, q, x, y, z, w);
                 }
             } else {
                 // pass
@@ -1941,7 +1925,25 @@ struct craft::craft_impl {
     // Tuple(p, q, x, y, z, w)
     void set_blocks_from_vec(std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
         // Erase blocks outside the chunk
-        blocks.erase(remove_if(blocks.begin(), blocks.end(), [this](auto& block) {
+        //blocks.range(remove_if(blocks.begin(), blocks.end(), [this](auto& block) {
+        //    int x = get<0>(block);
+        //    int z = get<2>(block);
+        //    int p = this->chunked(x);
+        //    int q = this->chunked(z);
+        //    for (int dx = -1; dx <= 1; dx++) {
+        //        for (int dz = -1; dz <= 1; dz++) {
+        //            if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
+        //                return true;
+        //            }
+
+        //        }
+        //    }
+        //    // Keep the block
+        //    get<0>(block) = p;
+        //    get<1>(block) = q;
+        //    return false;
+        //}), blocks.end());
+        for (auto& block : blocks) {
             int x = get<0>(block);
             int z = get<2>(block);
             int p = this->chunked(x);
@@ -1949,7 +1951,7 @@ struct craft::craft_impl {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
-                        return true;
+                        continue;
                     }
 
                 }
@@ -1957,9 +1959,8 @@ struct craft::craft_impl {
             // Keep the block
             get<0>(block) = p;
             get<1>(block) = q;
-            return false;
-        }), blocks.end());
-        _set_blocks_from_vec(blocks, 1);
+        }
+        _set_blocks_from_vec(cref(blocks), 1);
 	}
 
     void record_block(int x, int y, int z, int w) {
@@ -3280,11 +3281,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
     auto set_maze_in_craft = [this, &get_int, &rng_machine](vector<tuple<int, int, int, int, int, int>>& vertices) {
         // set the block in the craft, this performs a DB insert query
-        for (auto vertex : vertices) {
+        for (auto& vertex : vertices) {
             int w = get_int(0, 10);
             get<5>(vertex) = w;
 		}
-        this->m_pimpl->set_blocks_from_vec(vertices);
+        this->m_pimpl->set_blocks_from_vec(ref(vertices));
 	}; // set_maze_in_craft
 
 //    auto distribute_maze_parts = [this, &maze2]() {
@@ -3553,18 +3554,22 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             // 2. Write the maze to a Wavefront object file using the computed data
             if (!maze2.get_maze().empty()) {
                 compute_maze_geometry(height);
+                set_maze_in_craft(ref(maze2.vertices));
                 // Writing the maze will run in the background
-                //write_success = write_maze_as_wavefront_obj(gui_opts.outfile, cref(maze2.get_vertices()), cref(maze2.get_faces()));
+                write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
             } else {
                 // Failed to set maze
             }
         }
 
-        static bool maze_set_in_craft = false;
-        if (!maze_set_in_craft) {
-            // Use get_vertices() here for thread-safety?
+        static bool do_the_thing = true;
+        if (do_the_thing) {
+            do_the_thing = false;
             set_maze_in_craft(ref(maze2.vertices));
-            maze_set_in_craft = true;
+            // Write the sample maze to file when debugging
+#if defined(MAZE_DEBUG)
+            write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
+#endif
         }
 
         // FLUSH DATABASE 

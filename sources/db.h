@@ -18,8 +18,7 @@ int db_load_state(float *x, float *y, float *z, float *rx, float *ry);
 void db_insert_block(int p, int q, int x, int y, int z, int w);
 void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks);
 void db_insert_light(int p, int q, int x, int y, int z, int w);
-void db_insert_sign(
-    int p, int q, int x, int y, int z, int face, const char *text);
+void db_insert_sign(int p, int q, int x, int y, int z, int face, const char *text);
 void db_delete_sign(int x, int y, int z, int face);
 void db_delete_signs(int x, int y, int z);
 void db_delete_all_signs();

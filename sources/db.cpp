@@ -237,18 +237,6 @@ void db_insert_block(int p, int q, int x, int y, int z, int w) {
     mtx.unlock();
 }
 
-void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) {
-	if (!db_enabled) {
-		return;
-	}
-	mtx.lock();
-	for (const auto& block : blocks) {
-		ring_put_block(&ring, std::get<0>(block), std::get<1>(block), std::get<2>(block), std::get<3>(block), std::get<4>(block), std::get<5>(block));
-	}
-	cnd.notify_one();
-	mtx.unlock();
-}
-
 void _db_insert_block(int p, int q, int x, int y, int z, int w) {
     sqlite3_reset(insert_block_stmt);
     sqlite3_bind_int(insert_block_stmt, 1, p);
@@ -258,6 +246,31 @@ void _db_insert_block(int p, int q, int x, int y, int z, int w) {
     sqlite3_bind_int(insert_block_stmt, 5, z);
     sqlite3_bind_int(insert_block_stmt, 6, w);
     sqlite3_step(insert_block_stmt);
+}
+
+void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) {
+    if (!db_enabled) {
+        return;
+    }
+    mtx.lock();
+    int* blocks_array = new int[blocks.size() * 6];
+    memcpy(blocks_array, blocks.data(), blocks.size() * 6 * sizeof(int));
+    ring_put_blocks(&ring, blocks_array);
+    cnd.notify_one();
+    mtx.unlock();
+}
+
+void _db_insert_blocks(int* blocks) {
+    for (int i = 0; i < sizeof(*blocks) / 6; i++) {
+        sqlite3_reset(insert_block_stmt);
+        sqlite3_bind_int(insert_block_stmt, 1, blocks[i * 6]);
+        sqlite3_bind_int(insert_block_stmt, 2, blocks[i * 6 + 1]);
+        sqlite3_bind_int(insert_block_stmt, 3, blocks[i * 6 + 2]);
+        sqlite3_bind_int(insert_block_stmt, 4, blocks[i * 6 + 3]);
+        sqlite3_bind_int(insert_block_stmt, 5, blocks[i * 6 + 4]);
+        sqlite3_bind_int(insert_block_stmt, 6, blocks[i * 6 + 5]);
+        sqlite3_step(insert_block_stmt);
+    }
 }
 
 void db_insert_light(int p, int q, int x, int y, int z, int w) {
@@ -456,6 +469,9 @@ int db_worker_run(void *arg) {
             case BLOCK:
                 _db_insert_block(e.p, e.q, e.x, e.y, e.z, e.w);
                 break;
+            case BLOCKS:
+				_db_insert_blocks(e.blocks);
+				break;
             case LIGHT:
                 _db_insert_light(e.p, e.q, e.x, e.y, e.z, e.w);
                 break;
