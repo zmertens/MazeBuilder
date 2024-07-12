@@ -193,12 +193,12 @@ struct craft::craft_impl {
             this->faces = new_faces;
         }
 
-        std::vector<Vertex> get_vertices() {
+        const std::vector<Vertex>& get_vertices() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
 			return vertices;
 		}
 
-        std::vector<Face> get_faces() {
+        const std::vector<Face>& get_faces() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
 			return faces;
 		}
@@ -3220,10 +3220,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     // This is just a de-facto maze for the app launch
     compute_maze_geometry(gui_opts.build_height);
 
-    auto set_maze_in_craft = [this, &maze2, &get_int, &rng_machine]() {
+    auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<craft_impl::Vertex>& vertices) {
         int w = get_int(0, 10);
         // set the block in the craft, this performs a DB insert query
-        for (const auto& vertex : maze2.get_vertices()) {
+        for (const auto& vertex : vertices) {
             w = get_int(0, 10);
 			this->m_pimpl->set_block(vertex.x, vertex.y, vertex.z, w);
 			this->m_pimpl->record_block(vertex.x, vertex.y, vertex.z, w);
@@ -3398,7 +3398,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                         ImGui::EndDisabled();
                     }
 
-                    if (write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
                         // Call the writer future and get the result
                         bool success = write_success.get();
                         auto&& last_outfile = gui_opts.outfile;
@@ -3509,7 +3509,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         static bool maze_set_in_craft = false;
         if (!maze_set_in_craft) {
-            //set_maze_in_craft(cref(vertices));
+            set_maze_in_craft(cref(maze2.get_vertices()));
             maze_set_in_craft = true;
         }
 
@@ -3698,7 +3698,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
 
-    SDL_GL_DeleteContext(m_pimpl->m_model->context);
+    SDL_GL_DestroyContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
