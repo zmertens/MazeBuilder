@@ -39,6 +39,7 @@
 #include <thread>
 #include <future>
 #include <mutex>
+#include <shared_mutex>
 #include <chrono>
 #include <random>
 #include <utility>
@@ -125,6 +126,7 @@ using namespace std;
 
 struct craft::craft_impl {
     typedef struct {
+        bool show_builder_gui;
         int chunk_size;
         bool show_trees;
         bool show_plants;
@@ -138,6 +140,7 @@ struct craft::craft_impl {
         int build_length;
         int seed;
         std::string algo;
+        bool build_now;
 
         void reset_outfile() {
             for (auto i = 0; i < IM_ARRAYSIZE(outfile); ++i) {
@@ -150,12 +153,31 @@ struct craft::craft_impl {
         }
     } DearImGuiHelper;
 
+    struct Vertex {
+        GLfloat x, y, z;
+    };
+
+    struct Face {
+        std::vector<unsigned int> vertices;
+    };
+
+    /**
+     * Thread safe maze features for concurrent reading and writing
+     */
     struct Maze {
         std::string maze;
+        // Mutable allows for const methods to modify the object
+        mutable std::shared_mutex write_mtx;
         std::mutex maze_mutx;
+        std::vector<Vertex> vertices;
+        std::vector<Face> faces;
 
-        Maze(const std::string& mz) : maze{mz} {}
+        Maze(const std::string& mz) : maze(mz), vertices(), faces() {};
 
+        /**
+         * @brief Generate a grid containing a maze in 2D / ASCII format
+         * @return
+         */
         void set_maze(const std::string& maze) {
             std::lock_guard<std::mutex> lock(maze_mutx);
             this->maze = maze;
@@ -164,7 +186,84 @@ struct craft::craft_impl {
             std::lock_guard<std::mutex> lock(maze_mutx);
             return maze;
         }
-    };
+
+        void set_data(const std::vector<Vertex>& new_vertices, const std::vector<Face>& new_faces) {
+            std::unique_lock<std::mutex> lock(maze_mutx);
+            this->vertices = new_vertices;
+            this->faces = new_faces;
+        }
+
+        std::vector<Vertex> get_vertices() {
+			std::lock_guard<std::mutex> lock(maze_mutx);
+			return vertices;
+		}
+
+        std::vector<Face> get_faces() {
+			std::lock_guard<std::mutex> lock(maze_mutx);
+			return faces;
+		}
+
+        void clear() {
+			std::lock_guard<std::mutex> lock(maze_mutx);
+            maze.clear();
+			vertices.clear();
+			faces.clear();
+		}
+
+        // Return a future for when maze has been written
+        std::future<bool> write_maze_as_wavefront_obj(const std::string& filename) const {
+            // helper lambda to write the Wavefront object file
+            auto create_wavefront_obj = [this](const vector<Vertex>& vertices, const vector<Face>& faces)->string {
+                using namespace std;
+                stringstream ss;
+                ss << "# https://www.github.com/zmertens/MazeBuilder\n";
+
+                // keep track of writing progress
+                int total_verts = vertices.size();
+                int total_faces = faces.size();
+
+                int t = total_verts + total_faces;
+                int c = 0;
+                // Write vertices
+                for (const auto& vertex : vertices) {
+                    ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
+                    c++;
+                }
+
+                // Write faces
+                for (const auto& face : faces) {
+                    ss << "f";
+                    for (auto index : face.vertices) {
+                        ss << " " << index;
+                    }
+                    ss << "\n";
+                    c++;
+                }
+
+#if defined(MAZE_DEBUG)
+                SDL_Log("Writing maze progress: %d/%d", c, t);
+#endif
+
+                return ss.str();
+            }; // create_wavefront_obj
+
+            if (!filename.empty()) {
+                // get ready to write to file
+                packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &create_wavefront_obj](auto out)->bool {
+                    unique_lock<shared_mutex> lock(this->write_mtx);
+                    writer maze_writer;
+                    return maze_writer.write(out, create_wavefront_obj(this->vertices, this->faces)); } };
+                auto writing_results = maze_writing_task.get_future();
+                thread(std::move(maze_writing_task), filename).detach();
+                return writing_results;
+            } else {
+                promise<bool> p;
+                p.set_value(false);
+                return p.get_future();
+            }
+        }; // write_maze_as_wavefront_obj
+
+    }; // Maze
 
     struct ProgressTracker {
         std::atomic<std::chrono::steady_clock::time_point> start_time;
@@ -212,8 +311,6 @@ struct craft::craft_impl {
         int maxy;
         int faces;
         GLfloat *data;
-        // Tuple holds a single line in maze, row with respect to maze string, max_width of line
-        std::vector<std::tuple<string::iterator, string::iterator, int>> maze_parts;
     } WorkerItem;
 
     typedef struct {
@@ -306,14 +403,6 @@ struct craft::craft_impl {
         Block copy0;
         Block copy1;
     } Model;
-    
-    struct Vertex {
-        GLfloat x, y, z;
-    };
-
-    struct Face {
-        std::vector<GLuint> vertices;
-    };
 
     // Note: These are public members
     const std::string& m_window_name;
@@ -329,10 +418,10 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_model{make_unique<Model>()}
-        // chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
+        // show_builder_gui, chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
-        // (continued)... build_height, build_length, seed, algo
-        , m_gui{32, true, true, true, false, true, false, ".obj", 46, 5, 10, 50, "binary_tree"} {
+        // (continued)... build_height, build_length, seed, algo, build_now
+        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 46, 10, 10, 50, "binary_tree", false} {
 
     }
 
@@ -1439,7 +1528,7 @@ struct craft::craft_impl {
         static world _world;
         auto&& gui_options = this->m_gui;
         _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, 
-            gui_options.show_plants, gui_options.show_clouds, gui_options.build_height, cref(item->maze_parts));
+            gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1588,155 +1677,6 @@ struct craft::craft_impl {
             }
         }
     }
-
-    /**
-     * @brief set_vertex_data parses the grid, and builds a 3D grid using grid row, column, height
-     * Calling set_vertex_data, set_block, record_block to DB
-     * Specify a "starting_height" to try to put the maze above the heightmap (mountains)
-     * @param height of the grid
-     * @param grid_as_ascii
-     * @return
-     */
-    bool set_vertex_data(unsigned int height, const string& grid_as_ascii, vector<Vertex>& vertices, vector<Face>& faces)  {
-        auto add_block_to_vertex_data = [this, &vertices, &faces](float x, float y, float z, float block_size) {
-            // Calculate the base index for the new vertices
-            unsigned int baseIndex = vertices.size() + 1; // OBJ format is 1-based indexing
-
-            // Define the 8 vertices of the cube
-            vertices.push_back({ x, y, z });
-            vertices.push_back({ x + block_size, y, z });
-            vertices.push_back({ x + block_size, y + block_size, z });
-            vertices.push_back({ x, y + block_size, z });
-            vertices.push_back({ x, y, z + block_size });
-            vertices.push_back({ x + block_size, y, z + block_size });
-            vertices.push_back({ x + block_size, y + block_size, z + block_size });
-            vertices.push_back({ x, y + block_size, z + block_size });
-
-            // Define faces using the vertices above (12 triangles for 6 faces)
-            // Front face
-            faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-            faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
-            // Back face
-            faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-            faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
-            // Left face
-            faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-            faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
-            // Right face
-            faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-            faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
-            // Top face
-            faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-            faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
-            // Bottom face
-            faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-            faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-        }; // add_block_to_vertex_data
-
-
-        istringstream iss{ grid_as_ascii.data() };
-        string line;
-        unsigned int row_x = 0;
-        while (getline(iss, line, '\n')) {
-            unsigned int col_z = 0;
-            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-                if (*itr == ' ') {
-                    col_z++;
-                } else if (*itr == '+' || *itr == '-' || *itr == '|') {
-                    // check for barriers and walls then iterate up/down
-                    static constexpr unsigned int starting_height = 30u;
-                    static constexpr float block_size = 1.0f;
-                    for (auto h{ starting_height }; h < starting_height + height; h++) {
-                        int w = items[this->m_model->item_index];
-                        // set the block in the craft
-                        set_block(row_x, h, col_z, w);
-                        record_block(row_x, h, col_z, w);
-                        // update the data source that stores the grid for writing to file
-                        add_block_to_vertex_data(row_x, h, col_z, block_size);
-                    }
-                    col_z++;
-                }
-            }
-
-            row_x++;
-        } // getline
-        return true;
-    } // set_vertex_data
-
-    /**
-     * @brief Generate a grid containing a maze in ASCII format which will be used to write and display the maze
-     * @return
-     */
-    std::string gen_maze(const function<int(int, int)>& get_int, const std::mt19937& rng,
-        unsigned int width, unsigned int length, unsigned int height,
-        const maze_types my_maze_type) const noexcept {
-
-        auto _grid{ std::make_unique<mazes::grid>(width, length, height) };
-
-	    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng));
-
-        if (!success) {
-            return "";
-        }
-
-        stringstream ss;
-        ss << *_grid.get();
-        string grid_as_ascii{ ss.str() };
-
-        return grid_as_ascii;
-    }
-
-    // Return true when maze has been written
-    future<bool> write_maze(const string& filename, atomic<bool>& writing_maze, const vector<Vertex>& vertices, const vector<Face>& faces) {
-        // helper lambda to write the Wavefront object file
-        auto convert_data_to_mesh_str = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
-            stringstream ss;
-            ss << "# https://www.github.com/zmertens/MazeBuilder\n";
-
-            // keep track of writing progress
-            int total_verts = vertices.size();
-            int total_faces = faces.size();
-            
-            int t = total_verts + total_faces;
-            int c = 0;
-            // Write vertices
-            for (const auto& vertex : vertices) {
-                ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
-                c++;
-            }
-
-            // Write faces
-            for (const auto& face : faces) {
-                ss << "f";
-                for (auto index : face.vertices) {
-                    ss << " " << index;
-                }
-                ss << "\n";
-                c++;
-            }
-
-#if defined(MAZE_DEBUG)
-            SDL_Log("Writing maze progress: %d/%d", c, t);
-#endif
-
-            return ss.str();
-        }; // convert_data_to_mesh_str
-
-        if (!filename.empty()) {
-            // get ready to write to file
-            writer maze_writer;
-            packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &writing_maze, &vertices, &faces, &maze_writer, &convert_data_to_mesh_str](auto out)->bool {
-                writing_maze = true;
-                return maze_writer.write(out, convert_data_to_mesh_str(vertices, faces)); }};
-            auto writing_results = maze_writing_task.get_future();
-            thread(std::move(maze_writing_task), filename ).detach();
-            return writing_results;
-        } else {
-            promise<bool> p;
-            p.set_value(false);
-            return p.get_future();
-        }
-    } // write_maze
 
     /**
      * @brief Calculate  an index based on the chunk coordinates
@@ -2553,6 +2493,7 @@ struct craft::craft_impl {
                         SDL_SetRelativeMouseMode(SDL_FALSE);
                         this->m_gui.capture_mouse = false;
                         this->m_gui.fullscreen = false;
+                        this->m_gui.show_builder_gui = true;
                         break;
                     }
                     case SDL_SCANCODE_RETURN: {
@@ -2927,8 +2868,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(unsigned long seed, const std::list<std::string>& algos,
-    const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
+bool craft::run(unsigned long seed, const std::list<std::string>& algos, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
     // Init RNG engine
     std::mt19937 rng_machine{ seed };
     this->m_pimpl->m_gui.seed = seed;
@@ -3186,69 +3126,173 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 #endif
 
     // Init some local vars for handling maze duties
-    auto my_maze_type = get_maze_algo_from_str("sidewinder");
-    craft_impl::Maze maze{ this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine),
-        this->m_pimpl->m_gui.build_width, this->m_pimpl->m_gui.build_length, this->m_pimpl->m_gui.build_height,
-        my_maze_type)};
-
-    vector<craft_impl::Vertex> vertices;
-    vector<craft_impl::Face> faces;
-    atomic<bool> writing_maze = false;
+    auto my_maze_type = get_maze_algo_from_str(algos.back());
     future<bool> write_success;
 
-    auto distribute_maze_parts = [this](const std::string& maze) {
-        istringstream iss{ maze };
+    auto gen_maze = [this, &get_int, &rng_machine](unsigned int width, unsigned int length, unsigned int height, maze_types my_maze_type) -> string {
+        auto _grid{ std::make_unique<mazes::grid>(width, length, height) };
+
+        bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng_machine));
+
+        if (!success) {
+            return "";
+        }
+
+        stringstream ss;
+        ss << *_grid.get();
+        string grid_as_ascii{ ss.str() };
+        return grid_as_ascii;
+    }; // gen_maze
+
+    auto&& gui_opts = this->m_pimpl->m_gui;
+    craft_impl::Maze maze2{ gen_maze(gui_opts.build_width, gui_opts.build_length, gui_opts.build_height, my_maze_type)};
+
+    /**
+    * @brief Parses the grid, and builds a 3D grid using (x, y, z) and index elements
+    * Calling this function will also call set_block, record_block to DB
+    * Specify a "starting_height" to try to put the maze above the heightmap (mountains), and below the clouds
+    * @param height of the grid
+    * @param grid_as_ascii
+    * @return
+    */
+    auto compute_maze_geometry = [this, &maze2](unsigned int height) {
+        auto add_block_to_vertex_data = [&maze2](float x, float y, float z, float block_size) {
+            // Calculate the base index for the new vertices
+            // OBJ format is 1-based indexing
+            unsigned int baseIndex = maze2.vertices.size() + 1;
+
+            // Define the 8 vertices of the cube
+            maze2.vertices.push_back({ x, y, z });
+            maze2.vertices.push_back({ x + block_size, y, z });
+            maze2.vertices.push_back({ x + block_size, y + block_size, z });
+            maze2.vertices.push_back({ x, y + block_size, z });
+            maze2.vertices.push_back({ x, y, z + block_size });
+            maze2.vertices.push_back({ x + block_size, y, z + block_size });
+            maze2.vertices.push_back({ x + block_size, y + block_size, z + block_size });
+            maze2.vertices.push_back({ x, y + block_size, z + block_size });
+
+            // Define faces using the vertices above (12 triangles for 6 faces)
+            // Front face
+            maze2.faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+            maze2.faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+            // Back face
+            maze2.faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+            maze2.faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+            // Left face
+            maze2.faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+            maze2.faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+            // Right face
+            maze2.faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+            maze2.faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+            // Top face
+            maze2.faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+            maze2.faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+            // Bottom face
+            maze2.faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+            maze2.faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
+        }; // add_block_to_vertex_data
+
+        istringstream iss{ maze2.get_maze().data() };
         string line;
-        vector<tuple<string::iterator, string::iterator, int>> lines;
-
-        // 1) Split the maze string into lines
-        int line_with_respect_to_maze = 0;
+        unsigned int row_x = 0;
         while (getline(iss, line, '\n')) {
-            lines.emplace_back(line.begin(), line.end(), line_with_respect_to_maze++);
-        }
+            unsigned int col_z = 0;
+            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // check for barriers and walls then iterate up/down
+                    static constexpr unsigned int starting_height = 30u;
+                    static constexpr float block_size = 1.0f;
+                    for (auto h{ starting_height }; h < starting_height + height; h++) {
+                        // update the data source that stores the grid for writing to file
+                        add_block_to_vertex_data(static_cast<float>(row_x), static_cast<float>(h), static_cast<float>(col_z), block_size);
+                        //this->m_pimpl->set_block(row_x, h, col_z, 7);
+                        //this->m_pimpl->record_block(row_x, h, col_z, 7);
+                    }
+        
+                }
+                col_z++;
+            }
 
-        // 2) Calc how many lines each worker thread will get
-        int total_lines = lines.size();
-        const int workers_size = this->m_pimpl->m_model->workers.size();
-        // prevent division by zero
-        auto num_workers = (workers_size == 0) ? 1 : workers_size;
-        int lines_per_worker = total_lines / num_workers;
-        int extra_lines = total_lines % num_workers;
+            row_x++;
+        } // getline
+    }; // compute_maze_geometry
 
-        // 3) Distribute the lines to the worker threads
-        auto it = lines.begin();
-        int last_line = 0;
-        for (auto i{ 0 }; i < num_workers; i++) {
-            auto&& worker = this->m_pimpl->m_model->workers.at(i);
-            
-            // Calc the number of lines this worker gets
-            int num_lines_this_worker = lines_per_worker + (i < extra_lines ? 1 : 0);
-            // vector<tuple<string, int, int>> worker_lines(it, it + num_lines_this_worker);
+    // This is just a de-facto maze for the app launch
+    compute_maze_geometry(gui_opts.build_height);
 
-            string::iterator worker_lines_begin = get<0>(*it);
-            advance(it, num_lines_this_worker);
-            string::iterator worker_lines_end = get<0>(*it);
-            // This tuple holds the lines this worker will process, 
-            // starting and end points with iterators
-            // Holds an integer with the starting line number WRT to the maze
-            // std::tuple<std::string::iterator, std::string::iterator, int> line_tuple = make_tuple();
-            worker->item.maze_parts.emplace_back(worker_lines_begin, worker_lines_end, last_line);
-#if defined(MAZE_DEBUG)
-            SDL_Log("Worker: %d gets starts processing at line: %d\n", i, last_line);
-#endif
-            // Skip the iterator ahead based on the number of lines this worker got
-            last_line += num_lines_this_worker;
-        }
-    }; // distribute_maze_parts
+    auto set_maze_in_craft = [this, &maze2, &get_int, &rng_machine]() {
+        int w = get_int(0, 10);
+        // set the block in the craft, this performs a DB insert query
+        for (const auto& vertex : maze2.get_vertices()) {
+            w = get_int(0, 10);
+			this->m_pimpl->set_block(vertex.x, vertex.y, vertex.z, w);
+			this->m_pimpl->record_block(vertex.x, vertex.y, vertex.z, w);
+		}
+	}; // set_maze_in_craft
 
-    auto reset_fields = [this, &maze, &vertices, &faces]() {
-        this->m_pimpl->m_gui.reset_outfile();
-        maze.set_maze("");
-        vertices.clear();
-		faces.clear();
+//    auto distribute_maze_parts = [this, &maze2]() {
+//        // iterate over the maze and split by delimiter
+//        static constexpr auto delimiter = '\n';
+//        vector<tuple<string::const_iterator, string::const_iterator>> lines;
+//
+//        // 1) Split the maze into lines by delimiter
+//        auto start_of_maze = maze_str.cbegin();
+//        for (auto it = start_of_maze; it != maze_str.cend(); it++) {
+//            if (*it == delimiter || (it + 1) == maze_str.cend()) {
+//                auto end_of_line = (*it == delimiter) ? it : it + 1;
+//                lines.emplace_back(start_of_maze, end_of_line);
+//                start_of_maze = it + 1;
+//            }
+//        }
+//
+//        // 2) Calc how many lines each worker thread will get
+//        size_t total_lines = lines.size();
+//        size_t workers_size = this->m_pimpl->m_model->workers.size();
+//        // prevent division by zero
+//        auto num_workers = (workers_size == 0) ? 1 : workers_size;
+//        size_t lines_per_worker = total_lines / num_workers;
+//        size_t extra_lines = total_lines % num_workers;
+//
+//        // 3) Distribute the lines to the worker threads
+//        auto it = lines.cbegin();
+//        size_t last_line = 0;
+//        tuple<string::const_iterator, string::const_iterator> maze_parts;
+//        for (auto i{ 0 }; i < num_workers; i++) {
+//            auto&& worker = this->m_pimpl->m_model->workers.at(i);
+//            lock_guard<mutex> lock{ worker->mtx };
+//
+//            // Calc the number of lines this worker gets
+//            size_t num_lines_this_worker = lines_per_worker + (i < extra_lines ? 1 : 0);
+//
+//            string::const_iterator worker_lines_begin = get<0>(*it);
+//            advance(it, num_lines_this_worker - 1);
+//            string::const_iterator worker_lines_end = get<1>(*it);
+//            advance(it, 1);
+//
+//#if defined(MAZE_DEBUG)
+//            string maze_part{ worker_lines_begin, worker_lines_end };
+//            SDL_Log("Worker: %d gets starts processing at line %d with string length: %d\n",
+//                static_cast<int>(i), static_cast<int>(last_line), static_cast<int>(maze_part.length()));
+//#endif
+//            // Skip the iterator ahead based on the number of lines this worker got
+//            last_line += num_lines_this_worker;
+//
+//            // This tuple holds the begin, end points that this worker will process
+//            maze_parts = make_tuple(worker_lines_begin, worker_lines_end);
+//            // This compute_maze_parts will set the coords for the world per each worker thread
+//            compute_maze_parts(std::move(worker), cref(maze_parts));
+//        } // num_workers
+//    }; // distribute_maze_parts
+
+    auto reset_fields = [&gui_opts, &maze2]() {
+        gui_opts.reset_outfile();
+        maze2.clear();
 	};
 
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
+
+    write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
+
     bool running = true;
     int previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
@@ -3275,7 +3319,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         // ImGui window variables
         static bool show_demo_window = false;
-        static bool show_builder_gui = true;
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3287,7 +3330,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        if (show_builder_gui) {
+        if (gui_opts.show_builder_gui) {
             ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.data());
@@ -3298,31 +3341,31 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     ImGui::Text("Builder settings");
 
                     static unsigned int MAX_MAZE_WIDTH = 100;
-                    if (ImGui::SliderInt("Width", &this->m_pimpl->m_gui.build_width, 1, MAX_MAZE_WIDTH)) {
+                    if (ImGui::SliderInt("Width", &gui_opts.build_width, 1, MAX_MAZE_WIDTH)) {
 
                     }
                     static unsigned int MAX_MAZE_LENGTH = 100;
-                    if (ImGui::SliderInt("Length", &this->m_pimpl->m_gui.build_length, 1, MAX_MAZE_LENGTH)) {
+                    if (ImGui::SliderInt("Length", &gui_opts.build_length, 1, MAX_MAZE_LENGTH)) {
 
                     }
                     static unsigned int MAX_MAZE_HEIGHT = 15;
-                    if (ImGui::SliderInt("Height", &this->m_pimpl->m_gui.build_height, 1, MAX_MAZE_HEIGHT)) {
+                    if (ImGui::SliderInt("Height", &gui_opts.build_height, 1, MAX_MAZE_HEIGHT)) {
                       
                     }
                     static unsigned int MAX_SEED_VAL = 1'000'000;
-                    if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, MAX_SEED_VAL)) {
-                        rng_machine.seed(static_cast<unsigned long>(this->m_pimpl->m_gui.seed));
+                    if (ImGui::SliderInt("Seed", &gui_opts.seed, 1, MAX_SEED_VAL)) {
+                        rng_machine.seed(static_cast<unsigned long>(gui_opts.seed));
                     }
-                    ImGui::InputText("Outfile", &this->m_pimpl->m_gui.outfile[0], IM_ARRAYSIZE(this->m_pimpl->m_gui.outfile));
+                    ImGui::InputText("Outfile", &gui_opts.outfile[0], IM_ARRAYSIZE(gui_opts.outfile));
                     if (ImGui::TreeNode("Maze Generator")) {
-                        auto preview{ this->m_pimpl->m_gui.algo.c_str() };
+                        auto preview{ gui_opts.algo.c_str() };
                         ImGui::NewLine();
                         ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
                         if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
                             for (const auto& itr : algos) {
-                                bool is_selected = (itr == this->m_pimpl->m_gui.algo);
+                                bool is_selected = (itr == gui_opts.algo);
                                 if (ImGui::Selectable(itr.c_str(), is_selected)) {
-                                    this->m_pimpl->m_gui.algo = itr;
+                                    gui_opts.algo = itr;
                                 }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)
@@ -3335,17 +3378,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     }
 
                     // Check if user has added a prefix to the Wavefront object file
-                    if (this->m_pimpl->m_gui.outfile[0] != '.') {
-                        if (!writing_maze && ImGui::Button("Build!")) {
-                            auto my_maze_type = get_maze_algo_from_str(this->m_pimpl->m_gui.algo);
-                            auto width = this->m_pimpl->m_gui.build_width;
-                            auto length = this->m_pimpl->m_gui.build_length;
-                            auto height = this->m_pimpl->m_gui.build_height;
-                            maze.set_maze(this->m_pimpl->gen_maze(cref(get_int), cref(rng_machine), 
-                                width, length, height, my_maze_type));
+                    if (gui_opts.outfile[0] != '.') {
+                        if (!gui_opts.build_now && ImGui::Button("Build!")) {
+                            gui_opts.build_now = true;
                         } else {
                             ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Building maze... %s\n", gui_opts.outfile);
                         }
                     } else {
                         // Disable the button
@@ -3360,24 +3398,23 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                         ImGui::EndDisabled();
                     }
 
-                    if (writing_maze && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                        writing_maze = false;
-                        // call the writer future and get the result
+                    if (write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                        // Call the writer future and get the result
                         bool success = write_success.get();
-#if !defined(__EMSCRIPTEN__)
+                        auto&& last_outfile = gui_opts.outfile;
                         if (success) {
+                            // Render the maze in Craft
+                            //set_maze_in_craft();
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Maze written to %s\n", last_outfile);
                             ImGui::NewLine();
-                            reset_fields();
                         } else {
                             ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Failed to write maze: %s\n", last_outfile);
                             ImGui::NewLine();
                         }
-#endif
-                        //this->m_pimpl->m_maze.set_maze("");
+                        reset_fields();
                     }
                     if (progress_tracker) {
                         // Show progress when writing
@@ -3400,15 +3437,15 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 if (ImGui::BeginTabItem("Graphics")) {
                     ImGui::Text("Graphic settings");
                     
-                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
-                    if (this->m_pimpl->m_gui.color_mode_dark)
+                    ImGui::Checkbox("Dark Mode", &gui_opts.color_mode_dark);
+                    if (gui_opts.color_mode_dark)
                         ImGui::StyleColorsDark();
                     else
                         ImGui::StyleColorsLight();
                     
                     // fullscreen off on launch
-                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &this->m_pimpl->m_gui.fullscreen);
-                    if (this->m_pimpl->m_gui.fullscreen) {
+                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui_opts.fullscreen);
+                    if (gui_opts.fullscreen) {
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_TRUE);
                         //this->m_pimpl->set_model_using_fullscreen_modes();
                     } else {
@@ -3417,11 +3454,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
                     SDL_GetWindowSizeInPixels(this->m_pimpl->m_model->window, &this->m_pimpl->m_model->width, &this->m_pimpl->m_model->height);
                     
-                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &this->m_pimpl->m_gui.capture_mouse);
-                    if (this->m_pimpl->m_gui.capture_mouse && !SDL_GetRelativeMouseMode()) {
+                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui_opts.capture_mouse);
+                    if (gui_opts.capture_mouse) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         // Hide GUI when the user captures the mouse
-                        show_builder_gui = false;
+                        gui_opts.show_builder_gui = false;
                     }
                                     
                     ImGui::EndTabItem();
@@ -3444,40 +3481,36 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         // When ESCAPE is pressed and the mouse is captured, the SDL_Event loop will catch and release the mouse
         // This action reveals the GUI anytime the user hits ESCAPE
-        if (!this->m_pimpl->m_gui.capture_mouse && !show_builder_gui && !SDL_GetRelativeMouseMode()) {
-            show_builder_gui = true;
+        if (!gui_opts.capture_mouse && !gui_opts.show_builder_gui) {
+            gui_opts.show_builder_gui = true;
         }
 
-        // Check if maze is available and then perform two sequential operations:
-        // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
-        // 2. Write the maze to a Wavefront object file using the vertex data
-        //if (!this->m_pimpl->m_maze.get_maze().empty()) {
-        //    // set grid in craft - 3D world - update class members which store vertex data
-        //    //bool success = this->m_pimpl->set_vertex_data(this->m_pimpl->m_gui.build_height, maze.get_maze(), ref(vertices), ref(faces));
-        //    bool success = true;
-        //    writing_maze = true;
-        //    if (success) {
-        //        progress_tracker->start();
-        //        write_success = this->m_pimpl->write_maze(this->m_pimpl->m_gui.outfile, ref(writing_maze), cref(vertices), cref(faces));
-        //        progress_tracker->stop();
-        //    } else {
-        //        ImGui::NewLine(); ImGui::NewLine();
-        //        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-        //        ImGui::Text("Failed to set maze: %s", this->m_pimpl->m_gui.outfile);
-        //        ImGui::NewLine();
-        //        ImGui::PopStyleColor();
-        //    }
-        //    //this->m_pimpl->m_maze.set_maze("");
-        //}
-        static bool distributed_parts = false;
-        if (!maze.get_maze().empty() && !distributed_parts) {
-            distribute_maze_parts(maze.get_maze());
-   //         // tell the workers to load chunks
-   //         for (auto&& worker : this->m_pimpl->m_model->workers) {
-			//	worker->item.load = 1;
-			//}
-            distributed_parts = true;
-            //maze.set_maze("");
+        if (gui_opts.build_now) {
+            // Clear the default maze
+            maze2.clear();
+            gui_opts.build_now = false;
+            auto my_maze_type = get_maze_algo_from_str(gui_opts.algo);
+            auto width = gui_opts.build_width;
+            auto length = gui_opts.build_length;
+            auto height = gui_opts.build_height;
+            maze2.set_maze(gen_maze(width, length, height, my_maze_type));
+
+            // Check if maze is available and then perform two sequential operations:
+            // 1. Compute maze geometry for 3D coordinates (includes a height value)
+            // 2. Write the maze to a Wavefront object file using the computed data
+            if (!maze2.get_maze().empty()) {
+                compute_maze_geometry(height);
+                // Writing the maze will run in the background
+                //write_success = write_maze_as_wavefront_obj(gui_opts.outfile, cref(maze2.get_vertices()), cref(maze2.get_faces()));
+            } else {
+                // Failed to set maze
+            }
+        }
+
+        static bool maze_set_in_craft = false;
+        if (!maze_set_in_craft) {
+            //set_maze_in_craft(cref(vertices));
+            maze_set_in_craft = true;
         }
 
         // FLUSH DATABASE 

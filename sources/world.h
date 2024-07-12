@@ -15,8 +15,7 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 class world {
 public:
     void create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, 
-        const bool SHOW_PLANTS, const bool SHOW_CLOUDS, unsigned int height, 
-        const std::vector<std::tuple<std::string::iterator, std::string::iterator, int>>& maze_parts) const noexcept;
+        const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept;
 private:
 };
 
