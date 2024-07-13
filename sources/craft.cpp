@@ -125,7 +125,7 @@ using namespace mazes;
 using namespace std;
 
 struct craft::craft_impl {
-    typedef struct {
+    struct DearImGuiHelper {
         bool show_builder_gui;
         int chunk_size;
         bool show_trees;
@@ -151,7 +151,7 @@ struct craft::craft_impl {
             outfile[2] = 'b';
             outfile[3] = 'j';
         }
-    } DearImGuiHelper;
+    };
 
     //struct Vertex {
     //    float x, y, z;
@@ -163,17 +163,22 @@ struct craft::craft_impl {
 
     /**
      * Thread safe maze features for concurrent reading and writing
+     * Shared Locks allow for fast, concurrent reading
      */
     struct Maze {
+    private:
         std::string maze;
         // Mutable allows for const methods to modify the object
-        mutable std::shared_mutex write_mtx;
+        mutable std::shared_mutex verts_mtx;
         std::mutex maze_mutx;
         // Tuple (p, q, x, y, z, w)
-        std::vector<std::tuple<int, int, int, int, int, int>> vertices;
+        // Write vertices contain block sizes and are designed for Wavefront OBJ file writing
+        std::vector<std::tuple<int, int, int, int, int, int>> write_vertices;
+        // Render vertices are designed for rendering in Craft
+        std::vector<std::tuple<int, int, int, int, int, int>> render_vertices;
         std::vector<Face> faces;
-
-        Maze(const std::string& mz) : maze(mz), vertices(), faces() {};
+    public:
+        Maze(const std::string& mz) : maze(mz), write_vertices(), render_vertices(), faces() {};
 
         /**
          * @brief Generate a grid containing a maze in 2D / ASCII format
@@ -185,32 +190,92 @@ struct craft::craft_impl {
         };
         std::string get_maze() {
             std::lock_guard<std::mutex> lock(maze_mutx);
-            return maze;
+            return this->maze;
         }
 
         void clear() {
 			std::lock_guard<std::mutex> lock(maze_mutx);
+            std::lock_guard<std::shared_mutex> lock_verts(verts_mtx);
             maze.clear();
-			vertices.clear();
+			write_vertices.clear();
+            render_vertices.clear();
 			faces.clear();
 		}
+
+        auto get_render_vertices() const {
+			std::shared_lock<std::shared_mutex> lock(verts_mtx);
+			return this->render_vertices;
+		}
+
+        auto get_write_vertices() const {
+            std::shared_lock<std::shared_mutex> lock(verts_mtx);
+            return this->write_vertices;
+        }
+
+        auto get_faces() const {
+            std::shared_lock<std::shared_mutex> lock(verts_mtx);
+            return this->faces;
+        }
+
+        /**
+         * @brief Update the maze with a new block, updating geometric write and render vertices
+         *  Write vertices are used for Wavefront OBJ file writing
+         *  Render vertices are used for rendering in Craft
+         */
+        void add_block(int x, int y, int z, int w, int block_size) {
+            std::lock_guard<std::shared_mutex> lock(verts_mtx);
+            // Calculate the base index for the new vertices
+            // OBJ format is 1-based indexing
+            unsigned int baseIndex = this->write_vertices.size() + 1;
+            // Define the 8 vertices of the cube
+            this->write_vertices.emplace_back(0, 0, x, y, z, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y, z, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y + block_size, z, w);
+            this->write_vertices.emplace_back(0, 0, x, y + block_size, z, w);
+            this->write_vertices.emplace_back(0, 0, x, y, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y + block_size, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x, y + block_size, z + block_size, w);
+
+            this->render_vertices.emplace_back(0, 0, x, y, z, w);
+
+            // Define faces using the vertices above (12 triangles for 6 faces)
+            // Front face
+            this->faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+            this->faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+            // Back face
+            this->faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+            this->faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+            // Left face
+            this->faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+            this->faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+            // Right face
+            this->faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+            this->faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+            // Top face
+            this->faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+            this->faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+            // Bottom face
+            this->faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+            this->faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
+        } // add_block
 
         // Return a future for when maze has been written
         std::future<bool> write_maze_as_wavefront_obj(const std::string& filename) const {
             // helper lambda to write the Wavefront object file
-            auto create_wavefront_obj = [](const vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<Face>& faces)->string {
+            auto create_wavefront_obj = [](const vector<std::tuple<int, int, int, int, int, int>>& write_vertices, const vector<Face>& faces)->string {
                 using namespace std;
                 stringstream ss;
                 ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
                 // keep track of writing progress
-                int total_verts = vertices.size();
+                int total_verts = write_vertices.size();
                 int total_faces = faces.size();
 
                 int t = total_verts + total_faces;
                 int c = 0;
                 // Write vertices
-                for (const auto& vertex : vertices) {
+                for (const auto& vertex : write_vertices) {
                     float x = static_cast<float>(get<2>(vertex));
                     float y = static_cast<float>(get<3>(vertex));
                     float z = static_cast<float>(get<4>(vertex));
@@ -238,9 +303,8 @@ struct craft::craft_impl {
             if (!filename.empty()) {
                 // get ready to write to file
                 packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &create_wavefront_obj](auto out)->bool {
-                    unique_lock<shared_mutex> lock(this->write_mtx);
                     writer maze_writer;
-                    return maze_writer.write(out, create_wavefront_obj(this->vertices, this->faces)); } };
+                    return maze_writer.write(out, create_wavefront_obj(this->get_write_vertices(), this->get_faces())); }};
                 auto writing_results = maze_writing_task.get_future();
                 thread(std::move(maze_writing_task), filename).detach();
                 return writing_results;
@@ -401,6 +465,8 @@ struct craft::craft_impl {
 
     DearImGuiHelper m_gui;
 
+    std::unique_ptr<Maze> m_maze;
+
     craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
         : m_window_name{ window_name }
         , m_version{ version }
@@ -409,7 +475,8 @@ struct craft::craft_impl {
         // show_builder_gui, chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
         // (continued)... color_mode_dark, capture_mouse, build_width, 
         // (continued)... build_height, build_length, seed, algo, build_now
-        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 46, 18, 10, 50, "binary_tree", false} {
+        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 18, 10, 25, 50, "binary_tree", false}
+        , m_maze{make_unique<Maze>("")} {
 
     }
 
@@ -1905,15 +1972,12 @@ struct craft::craft_impl {
             Chunk* chunk = find_chunk(p, q);
             if (chunk) {
                 Map* map = &chunk->map;
-                if (map_set(map, x, y, z, w)) {
-                    if (dirty) {
-                        dirty_chunk(chunk);
-                    }
-                    //db_insert_block(p, q, x, y, z, w);
+                if (dirty && map_set(map, x, y, z, w)) {
+                    dirty_chunk(chunk);
                 }
             } else {
-                // pass
-            }
+                // Pass
+			}
             if (w == 0 && chunked(x) == p && chunked(z) == q) {
                 unset_sign(x, y, z);
                 set_light(p, q, x, y, z, 0);
@@ -1923,44 +1987,30 @@ struct craft::craft_impl {
     }
 
     // Tuple(p, q, x, y, z, w)
-    void set_blocks_from_vec(std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
-        // Erase blocks outside the chunk
-        //blocks.range(remove_if(blocks.begin(), blocks.end(), [this](auto& block) {
-        //    int x = get<0>(block);
-        //    int z = get<2>(block);
-        //    int p = this->chunked(x);
-        //    int q = this->chunked(z);
-        //    for (int dx = -1; dx <= 1; dx++) {
-        //        for (int dz = -1; dz <= 1; dz++) {
-        //            if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
-        //                return true;
-        //            }
-
-        //        }
-        //    }
-        //    // Keep the block
-        //    get<0>(block) = p;
-        //    get<1>(block) = q;
-        //    return false;
-        //}), blocks.end());
+    void set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
+        std::vector<std::tuple<int, int, int, int, int, int>> adjusted_blocks;
+        // Adjust blocks to account for chunk boundaries
         for (auto& block : blocks) {
-            int x = get<0>(block);
-            int z = get<2>(block);
-            int p = this->chunked(x);
-            int q = this->chunked(z);
+            int x {get<2>(block)};
+            int z {get<4>(block)};
+            int p {chunked(x)};
+            int q {chunked(z)};
+            // Check if block is on the edge of the chunk
+            bool on_the_edge = false;
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
                         continue;
                     }
-
+                    on_the_edge = true;
+                    adjusted_blocks.push_back(make_tuple(p + dx, q + dz, x, get<3>(block), z, -get<5>(block)));
                 }
             }
-            // Keep the block
-            get<0>(block) = p;
-            get<1>(block) = q;
+            if (!on_the_edge) {
+				adjusted_blocks.push_back(block);
+			}
         }
-        _set_blocks_from_vec(cref(blocks), 1);
+        _set_blocks_from_vec(cref(adjusted_blocks), 1);
 	}
 
     void record_block(int x, int y, int z, int w) {
@@ -2886,7 +2936,7 @@ struct craft::craft_impl {
         SDL_GL_SetSwapInterval(VSYNC);
 
         auto icon_path{ "textures/maze_in_green_32x32.bmp" };
-        SDL_Surface* icon_surface = SDL_LoadBMP(icon_path);
+        SDL_Surface *icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path, "rb"), SDL_TRUE);
         if (icon_surface) {
             SDL_SetWindowIcon(this->m_model->window, icon_surface);
             SDL_DestroySurface(icon_surface);
@@ -3203,7 +3253,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     }; // gen_maze
 
     auto&& gui_opts = this->m_pimpl->m_gui;
-    craft_impl::Maze maze2{ gen_maze(gui_opts.build_width, gui_opts.build_length, gui_opts.build_height, my_maze_type)};
+    this->m_pimpl->m_maze = make_unique<craft_impl::Maze>(gen_maze(gui_opts.build_width, gui_opts.build_length, gui_opts.build_height, my_maze_type));
+    auto&& maze2 = this->m_pimpl->m_maze;
 
     /**
     * @brief Parses the grid, and builds a 3D grid using (p, q, x, y, z, w) and index elements
@@ -3214,58 +3265,22 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     * @param grid_as_ascii
     * @return
     */
-    auto compute_maze_geometry = [this, &maze2](unsigned int height) {
-        auto add_block_to_vertex_data = [&maze2](int x, int y, int z, int block_size) {
-            // Calculate the base index for the new vertices
-            // OBJ format is 1-based indexing
-            unsigned int baseIndex = maze2.vertices.size() + 1;
-
-            // Define the 8 vertices of the cube
-            maze2.vertices.push_back({ 0, 0, x, y, z, -1 });
-            maze2.vertices.push_back({ 0, 0, x + block_size, y, z, -1 });
-            maze2.vertices.push_back({ 0, 0, x + block_size, y + block_size, z, -1 });
-            maze2.vertices.push_back({ 0, 0, x, y + block_size, z, -1 });
-            maze2.vertices.push_back({ 0, 0, x, y, z + block_size, -1 });
-            maze2.vertices.push_back({ 0, 0, x + block_size, y, z + block_size, -1 });
-            maze2.vertices.push_back({ 0, 0, x + block_size, y + block_size, z + block_size, -1 });
-            maze2.vertices.push_back({ 0, 0, x, y + block_size, z + block_size, -1 });
-
-            // Define faces using the vertices above (12 triangles for 6 faces)
-            // Front face
-            maze2.faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-            maze2.faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
-            // Back face
-            maze2.faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-            maze2.faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
-            // Left face
-            maze2.faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-            maze2.faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
-            // Right face
-            maze2.faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-            maze2.faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
-            // Top face
-            maze2.faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-            maze2.faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
-            // Bottom face
-            maze2.faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-            maze2.faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-        }; // add_block_to_vertex_data
-
-        istringstream iss{ maze2.get_maze().data() };
+    auto compute_maze_geometry = [&maze2, &get_int, &rng_machine](unsigned int height) {    
+        istringstream iss{ maze2->get_maze().data() };
         string line;
         unsigned int row_x = 0;
         while (getline(iss, line, '\n')) {
             unsigned int col_z = 0;
             for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
                 if (*itr == '+' || *itr == '-' || *itr == '|') {
-                    // check for barriers and walls then iterate up/down
+                    // Check for barriers and walls then iterate up/down
                     static constexpr unsigned int starting_height = 30u;
                     static constexpr unsigned int block_size = 1;
+                    auto w{ get_int(0, 10) };
                     for (auto h{ starting_height }; h < starting_height + height; h++) {
-                        // update the data source that stores the grid for writing to file
-                        add_block_to_vertex_data(row_x, h, col_z, block_size);
-                        //this->m_pimpl->set_block(row_x, h, col_z, 7);
-                        //this->m_pimpl->record_block(row_x, h, col_z, 7);
+                        // Update the data source that stores the maze geometry
+                        // There are 2 data sources, one for rendering and one for writing
+                        maze2->add_block(row_x, h, col_z, w, block_size);
                     }
         
                 }
@@ -3276,16 +3291,15 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         } // getline
     }; // compute_maze_geometry
 
-    // This is just a de-facto maze for the app launch
-    compute_maze_geometry(gui_opts.build_height);
-
-    auto set_maze_in_craft = [this, &get_int, &rng_machine](vector<tuple<int, int, int, int, int, int>>& vertices) {
-        // set the block in the craft, this performs a DB insert query
-        for (auto& vertex : vertices) {
-            int w = get_int(0, 10);
-            get<5>(vertex) = w;
+    auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<tuple<int, int, int, int, int, int>>& vertices) {
+        // Set the block in the craft, this performs a DB insert query
+        //this->m_pimpl->set_blocks_from_vec(cref(vertices));
+        for (auto&& block : vertices) {
+            // Set the block in the DB
+            this->m_pimpl->set_block(get<2>(block), get<3>(block), get<4>(block), get<5>(block));
+			// Record the block in craft
+			this->m_pimpl->record_block(get<2>(block), get<3>(block), get<4>(block), get<5>(block));
 		}
-        this->m_pimpl->set_blocks_from_vec(ref(vertices));
 	}; // set_maze_in_craft
 
 //    auto distribute_maze_parts = [this, &maze2]() {
@@ -3344,7 +3358,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
     auto reset_fields = [&gui_opts, &maze2]() {
         gui_opts.reset_outfile();
-        maze2.clear();
+        maze2->clear();
 	};
 
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
@@ -3396,11 +3410,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
 
-                    static unsigned int MAX_MAZE_WIDTH = 100;
+                    static unsigned int MAX_MAZE_WIDTH = 32;
                     if (ImGui::SliderInt("Width", &gui_opts.build_width, 1, MAX_MAZE_WIDTH)) {
 
                     }
-                    static unsigned int MAX_MAZE_LENGTH = 100;
+                    static unsigned int MAX_MAZE_LENGTH = 32;
                     if (ImGui::SliderInt("Length", &gui_opts.build_length, 1, MAX_MAZE_LENGTH)) {
 
                     }
@@ -3408,8 +3422,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     if (ImGui::SliderInt("Height", &gui_opts.build_height, 1, MAX_MAZE_HEIGHT)) {
                       
                     }
-                    static unsigned int MAX_SEED_VAL = 1'000'000;
-                    if (ImGui::SliderInt("Seed", &gui_opts.seed, 1, MAX_SEED_VAL)) {
+                    static unsigned int MAX_SEED_VAL = 1'000;
+                    if (ImGui::SliderInt("Seed", &gui_opts.seed, 0, MAX_SEED_VAL)) {
                         rng_machine.seed(static_cast<unsigned long>(gui_opts.seed));
                     }
                     ImGui::InputText("Outfile", &gui_opts.outfile[0], IM_ARRAYSIZE(gui_opts.outfile));
@@ -3454,10 +3468,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                         ImGui::EndDisabled();
                     }
 
+                    // Let JavaScript handle file downloads in web browser
+#if !defined(__EMSCRIPTEN)  
                     if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
                         // Call the writer future and get the result
                         bool success = write_success.get();
-                        auto&& last_outfile = gui_opts.outfile;
+                        auto&& last_outfile = gui_opts.outfile;                      
                         if (success) {
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
@@ -3470,11 +3486,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                         }
                         reset_fields();
                     }
+#endif
                     if (progress_tracker) {
                         // Show progress when writing
                         ImGui::NewLine(); ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                        ImGui::Text("Finished writing maze in %f ms", progress_tracker->get_duration_in_ms());
+                        ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
                         ImGui::NewLine();
                         ImGui::PopStyleColor();
                     }
@@ -3541,35 +3558,31 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         if (gui_opts.build_now) {
             // Clear the default maze
-            maze2.clear();
+            maze2->clear();
             gui_opts.build_now = false;
+            progress_tracker->start();
             auto my_maze_type = get_maze_algo_from_str(gui_opts.algo);
             auto width = gui_opts.build_width;
             auto length = gui_opts.build_length;
             auto height = gui_opts.build_height;
-            maze2.set_maze(gen_maze(width, length, height, my_maze_type));
+            maze2->set_maze(gen_maze(width, length, height, my_maze_type));
 
             // Check if maze is available and then perform two sequential operations:
             // 1. Compute maze geometry for 3D coordinates (includes a height value)
             // 2. Write the maze to a Wavefront object file using the computed data
-            if (!maze2.get_maze().empty()) {
+            if (!maze2->get_maze().empty()) {
                 compute_maze_geometry(height);
-                set_maze_in_craft(ref(maze2.vertices));
-                // Writing the maze will run in the background
-                write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
+                set_maze_in_craft(maze2->get_render_vertices());
+                // Writing the maze will run in the background - only do that on Desktop
+#if !defined(__EMSCRIPTEN__ )
+                write_success = maze2->write_maze_as_wavefront_obj(gui_opts.outfile);
+#elif defined(__EMSCRIPTEN__) && defined(MAZE_DEBUG)
+                SDL_Log("json data rdy: %d\n", this->is_json_rdy());
+#endif
             } else {
                 // Failed to set maze
             }
-        }
-
-        static bool do_the_thing = true;
-        if (do_the_thing) {
-            do_the_thing = false;
-            set_maze_in_craft(ref(maze2.vertices));
-            // Write the sample maze to file when debugging
-#if defined(MAZE_DEBUG)
-            write_success = maze2.write_maze_as_wavefront_obj(gui_opts.outfile);
-#endif
+            progress_tracker->stop();
         }
 
         // FLUSH DATABASE 
@@ -3764,14 +3777,24 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     return true;
 }  // run
 
-// Used by Emscripten mostly to produce a JSON string containing the vertex data
-// returns JSON-encoded string:
-//  return "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
-std::string craft::get_vertex_data_as_json() const noexcept {
-    auto json_writer = [this](const std::vector<std::tuple<int, int, int, int, int, int>>& vertices, const vector<craft_impl::Face>& faces) {
+bool craft::is_json_rdy() const noexcept {
+    return this->m_pimpl->m_maze->get_write_vertices().size() != 0 && this->m_pimpl->m_maze->get_faces().size() != 0;
+}
+
+/**
+ * 
+ * 
+ * @brief Used by Emscripten mostly to produce a JSON string containing the vertex data
+ * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
+ */
+std::string craft::get_json() const noexcept {
+    auto&& my_maze = this->m_pimpl->m_maze;
+    auto json_writer = [&my_maze] (const string& outfile) -> string {
+        auto&& vertices = my_maze->get_write_vertices();
+        auto&& faces = my_maze->get_faces();
         stringstream ss;
         // Set key if outfile is specified
-        ss << "{\"name\":\"" << this->m_pimpl->m_gui.outfile << "\", \"data\":[";
+        ss << "{\"name\":\"" << outfile << "\", \"data\":[";
         // Wavefront object file header
         ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
         for (const auto& vertex : vertices) {
@@ -3790,8 +3813,11 @@ std::string craft::get_vertex_data_as_json() const noexcept {
 
         ss << "]}";
 
+#if defined(MAZE_DEBUG)
+    SDL_Log("%s\n", my_maze->get_maze().c_str());
+#endif
+
         return ss.str();
     };
-    return "";
-    //return json_writer(this->m_pimpl->m_vertices, this->m_pimpl->m_faces);
+    return json_writer(this->m_pimpl->m_gui.outfile);
 }

@@ -24,12 +24,12 @@ public:
     bool run(unsigned long seed, const std::list<std::string>& algos, 
         const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
     
-    std::string get_vertex_data_as_json() const noexcept;
+    bool is_json_rdy() const noexcept;
+    std::string get_json() const noexcept;
 
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
-
 };
 
 #endif // CRAFT_H

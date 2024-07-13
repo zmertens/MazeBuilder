@@ -9,6 +9,11 @@
 #include <vector>
 #include <list>
 
+#include "grid.h"
+#include "args_builder.h"
+#include "maze_types_enum.h"
+#include "maze_factory.h"
+#include "writer.h"
 #include "craft.h"
 
 #if defined(__EMSCRIPTEN__)
@@ -17,15 +22,10 @@
     EMSCRIPTEN_BINDINGS(maze_builder_module) {
         emscripten::class_<craft>("craft")
             .constructor<std::string, std::string, std::string>()
-            .function("get_vertex_data_as_json", &craft::get_vertex_data_as_json);
+            .function("is_json_rdy", &craft::is_json_rdy)
+            .function("get_json", &craft::get_json);
    }
 #endif
-
-#include "grid.h"
-#include "args_builder.h"
-#include "maze_types_enum.h"
-#include "maze_factory.h"
-#include "writer.h"
 
 int main(int argc, char* argv[]) {
 
