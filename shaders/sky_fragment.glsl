@@ -1,11 +1,13 @@
-#version 120
+#version 330 core
 
 uniform sampler2D sampler;
 uniform float timer;
 
-varying vec2 fragment_uv;
+in vec2 fragment_uv;
+
+out vec4 fragColor;
 
 void main() {
     vec2 uv = vec2(timer, fragment_uv.t);
-    gl_FragColor = texture2D(sampler, uv);
+    fragColor = vec4(texture(sampler, uv).rgb, 1.0);
 }

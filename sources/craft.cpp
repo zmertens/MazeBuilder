@@ -2186,12 +2186,10 @@ struct craft::craft_impl {
         if (is_obstacle(hw)) {
             glUseProgram(attrib->program);
             glLineWidth(1);
-            // glEnable(GL_COLOR_LOGIC_OP);
             glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
             GLuint wireframe_buffer = gen_wireframe_buffer(hx, hy, hz, 0.53);
             draw_lines(attrib, wireframe_buffer, 3, 24);
             del_buffer(wireframe_buffer);
-            // glDisable(GL_COLOR_LOGIC_OP);
         }
     }
 
@@ -2200,12 +2198,10 @@ struct craft::craft_impl {
         set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
         glUseProgram(attrib->program);
         glLineWidth(4 * this->m_model->scale);
-        // glEnable(GL_COLOR_LOGIC_OP);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         GLuint crosshair_buffer = gen_crosshair_buffer();
         draw_lines(attrib, crosshair_buffer, 2, 4);
         del_buffer(crosshair_buffer);
-        // glDisable(GL_COLOR_LOGIC_OP);
     }
 
     void render_item(Attrib *attrib) {
@@ -3089,9 +3085,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     program = load_program("shaders/block_vertex.glsl", "shaders/block_fragment.glsl");
 #endif
     block_attrib.program = program;
-    block_attrib.position = glGetAttribLocation(program, "position");
-    block_attrib.normal = glGetAttribLocation(program, "normal");
-    block_attrib.uv = glGetAttribLocation(program, "uv");
+    block_attrib.position = 0;
+    block_attrib.normal = 1;
+    block_attrib.uv = 2;
     block_attrib.matrix = glGetUniformLocation(program, "matrix");
     block_attrib.sampler = glGetUniformLocation(program, "sampler");
     block_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
@@ -3107,7 +3103,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     program = load_program("shaders/line_vertex.glsl", "shaders/line_fragment.glsl");
 #endif
     line_attrib.program = program;
-    line_attrib.position = glGetAttribLocation(program, "position");
+    line_attrib.position = 0;
     line_attrib.matrix = glGetUniformLocation(program, "matrix");
 
 #if defined(__EMSCRIPTEN__)
@@ -3116,8 +3112,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     program = load_program("shaders/text_vertex.glsl", "shaders/text_fragment.glsl");
 #endif
     text_attrib.program = program;
-    text_attrib.position = glGetAttribLocation(program, "position");
-    text_attrib.uv = glGetAttribLocation(program, "uv");
+    text_attrib.position = 0;
+    text_attrib.uv = 1;
     text_attrib.matrix = glGetUniformLocation(program, "matrix");
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
@@ -3128,9 +3124,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     program = load_program("shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
 #endif
     sky_attrib.program = program;
-    sky_attrib.position = glGetAttribLocation(program, "position");
-    sky_attrib.normal = 1; // glGetAttribLocation(program, "normal");
-    sky_attrib.uv = glGetAttribLocation(program, "uv");
+    sky_attrib.position = 0;
+    sky_attrib.normal = 1;
+    sky_attrib.uv = 2;
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
