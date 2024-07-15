@@ -554,12 +554,12 @@ struct craft::craft_impl {
     }
 
     GLfloat *malloc_faces(int components, int faces) const {
-        return (GLfloat*) malloc(sizeof(GLfloat) * 6 * components * faces);
+        return (GLfloat*) SDL_malloc(sizeof(GLfloat) * 6 * components * faces);
     }
 
     GLuint gen_faces(int components, int faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
-        free(data);
+        SDL_free(data);
         return buffer;
     }
 
@@ -837,7 +837,7 @@ struct craft::craft_impl {
         if (interpolate) {
             State *s1 = &player->state1;
             State *s2 = &player->state2;
-            memcpy(s1, s2, sizeof(State));
+            SDL_memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
             s2->t = get_time();
             if (s2->rx - s1->rx > PI) {
@@ -881,7 +881,7 @@ struct craft::craft_impl {
         int count = this->m_model->player_count;
         this->del_buffer(player->buffer);
         Player *other = this->m_model->players + (--count);
-        memcpy(player, other, sizeof(Player));
+        SDL_memcpy(player, other, sizeof(Player));
         this->m_model->player_count = count;
     }
 
@@ -1227,7 +1227,7 @@ struct craft::craft_impl {
         int max_faces = 0;
         for (int i = 0; i < signs->size; i++) {
             Sign *e = signs->data + i;
-            max_faces += strlen(e->text);
+            max_faces += SDL_strlen(e->text);
         }
 
         // second pass - generate geometry
@@ -1353,9 +1353,9 @@ struct craft::craft_impl {
 
     // Handles terrain generation in a multithreaded environment
     void compute_chunk(WorkerItem *item) const {
-        char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
+        char *opaque = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        char *light = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        char *highest = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
         int ox = item->p * this->m_gui.chunk_size - this->m_gui.chunk_size - 1;
         int oy = -1;
@@ -1522,9 +1522,9 @@ struct craft::craft_impl {
             offset += total * 60;
         } END_MAP_FOR_EACH;
 
-        free(opaque);
-        free(light);
-        free(highest);
+        SDL_free(opaque);
+        SDL_free(light);
+        SDL_free(highest);
 
         item->miny = miny;
         item->maxy = maxy;
@@ -1649,7 +1649,7 @@ struct craft::craft_impl {
                 del_buffer(chunk->buffer);
                 del_buffer(chunk->sign_buffer);
                 Chunk *other = this->m_model->chunks + (--count);
-                memcpy(chunk, other, sizeof(Chunk));
+                SDL_memcpy(chunk, other, sizeof(Chunk));
             }
         }
         this->m_model->chunk_count = count;
@@ -1694,11 +1694,11 @@ struct craft::craft_impl {
                         Map *light_map = item->light_maps[a][b];
                         if (block_map) {
                             map_free(block_map);
-                            free(block_map);
+                            SDL_free(block_map);
                         }
                         if (light_map) {
                             map_free(light_map);
-                            free(light_map);
+                            SDL_free(light_map);
                         }
                     }
                 }
@@ -1809,9 +1809,9 @@ struct craft::craft_impl {
                     other = find_chunk(chunk->p + dp, chunk->q + dq);
                 }
                 if (other) {
-                    Map *block_map = (Map*) malloc(sizeof(Map));
+                    Map *block_map = (Map*) SDL_malloc(sizeof(Map));
                     map_copy(block_map, &other->map);
-                    Map *light_map = (Map*) malloc(sizeof(Map));
+                    Map *light_map = (Map*) SDL_malloc(sizeof(Map));
                     map_copy(light_map, &other->lights);
                     item->block_maps[dp + 1][dq + 1] = block_map;
                     item->light_maps[dp + 1][dq + 1] = light_map;
@@ -1872,7 +1872,7 @@ struct craft::craft_impl {
     }
 
     void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) const {
-        if (strlen(text) == 0) {
+        if (SDL_strlen(text) == 0) {
             unset_sign_face(x, y, z, face);
             return;
         }
@@ -2232,7 +2232,7 @@ struct craft::craft_impl {
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 1);
         glUniform1i(attrib->extra1, 0);
-        int length = strlen(text);
+        int length = SDL_strlen(text);
         x -= n * justify * (length - 1) / 2;
         GLuint buffer = gen_text_buffer(x, y, n, text);
         draw_text(attrib, buffer, length);
@@ -2240,15 +2240,13 @@ struct craft::craft_impl {
     }
 
     void add_message(const char *text) {
-        printf("%s\n", text);
-        snprintf(
-            this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
+        SDL_snprintf(this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
         this->m_model->message_index = (this->m_model->message_index + 1) % MAX_MESSAGES;
     }
 
     void copy() {
-        memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
-        memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
+        SDL_memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
+        SDL_memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
     }
 
     void paste() {
@@ -2434,9 +2432,6 @@ struct craft::craft_impl {
     }
 
     void parse_command(const char *buffer, int forward) {
-        char username[128] = {0};
-        char token[128] = {0};
-        char filename[MAX_PATH_LENGTH];
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2555,7 +2550,7 @@ struct craft::craft_impl {
 
     /**
     * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    * This function also checks if user is interacting with gui to prevent mouse hiding
+    * @brief This function also checks if user is interacting with the GUI
     * @param dt
     * @param running reference to running loop in game loop
     * @return bool return true when event handle successfully
@@ -2582,10 +2577,6 @@ struct craft::craft_impl {
                 case SDL_EVENT_KEY_UP: {
                     sc = e.key.scancode;
                     switch (sc) {
-                    case SDL_SCANCODE_INSERT:
-                        if (this->m_model->typing) {
-                            this->m_model->typing = 0;
-                        }
                     }
                     break;
                 }
@@ -2598,11 +2589,12 @@ struct craft::craft_impl {
                         this->m_gui.capture_mouse = false;
                         this->m_gui.fullscreen = false;
                         this->m_gui.show_builder_gui = true;
+                        this->m_model->typing = 0;
                         break;
                     }
                     case SDL_SCANCODE_RETURN: {
                         if (this->m_model->typing) {
-                            if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
+                            if (mod_state) {
                                 if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                                     this->m_model->typing_buffer[this->m_model->text_len] = '\n';
                                     this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
@@ -2616,6 +2608,7 @@ struct craft::craft_impl {
                                         set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                     }
                                 } else if (this->m_model->typing_buffer[0] == '/') {
+
                                     this->parse_command(this->m_model->typing_buffer, 1);
                                 }
                             }
@@ -2638,22 +2631,19 @@ struct craft::craft_impl {
                             } else {
                                 parse_command(clip_buffer, 0);
                             }
+                            SDL_free(clip_buffer);
                         }
                         break;
                     }
-                    case SDL_SCANCODE_0: {
-                        if (!this->m_model->typing)
-                            this->m_model->item_index = 9;
-                        break;
-                    }
-                    case SDL_SCANCODE_1: [[fallthrough]];
-                    case SDL_SCANCODE_2: [[fallthrough]];
-                    case SDL_SCANCODE_3: [[fallthrough]];
-                    case SDL_SCANCODE_4: [[fallthrough]];
-                    case SDL_SCANCODE_5: [[fallthrough]];
-                    case SDL_SCANCODE_6: [[fallthrough]];
-                    case SDL_SCANCODE_7: [[fallthrough]];
-                    case SDL_SCANCODE_8: [[fallthrough]];
+                    case SDL_SCANCODE_0:
+                    case SDL_SCANCODE_1:
+                    case SDL_SCANCODE_2:
+                    case SDL_SCANCODE_3:
+                    case SDL_SCANCODE_4:
+                    case SDL_SCANCODE_5:
+                    case SDL_SCANCODE_6:
+                    case SDL_SCANCODE_7:
+                    case SDL_SCANCODE_8:
                     case SDL_SCANCODE_9: {
                         if (this->m_gui.capture_mouse && !this->m_model->typing)
                             this->m_model->item_index = (sc - SDL_SCANCODE_1);
@@ -2665,12 +2655,12 @@ struct craft::craft_impl {
                         break;
                     }
                     case KEY_ITEM_NEXT: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                         break;
                     }
                     case KEY_ITEM_PREV: {
-                        if (!this->m_model->typing) {
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
                             this->m_model->item_index--;
                             if (this->m_model->item_index < 0)
                                 this->m_model->item_index = item_count - 1;
@@ -2678,32 +2668,38 @@ struct craft::craft_impl {
                         break;
                     }
                     case KEY_OBSERVE: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
                         break;
                     }
                     case KEY_OBSERVE_INSET: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                         break;
                     }
                     case KEY_CHAT: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        this->m_model->text_len = 0;
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            this->m_model->text_len = 0;
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
                     }
                     case KEY_COMMAND: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
                     }
                     case KEY_SIGN: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
 
                     }
@@ -2711,13 +2707,9 @@ struct craft::craft_impl {
                     break;
                 } // case SDL_EVENT_KEY_DOWN
                 case SDL_EVENT_TEXT_INPUT: {
-                    // could probably just do text[text_len++] = e.text.text[0]
-                    // since I only handle ascii
                     if (this->m_gui.capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                        strcat(this->m_model->typing_buffer, e.text.text);
+                        SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
                         this->m_model->text_len += SDL_strlen(e.text.text);
-                        //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
-                        //SDL_LogError(SDL_LOG_CATEGORY_ERROR, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                     }
                     break;
                 }
@@ -3130,8 +3122,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
-
-    snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
+    
+    SDL_snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
     m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
@@ -3633,7 +3625,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             char am_pm = hour < 12 ? 'a' : 'p';
             hour = hour % 12;
             hour = hour ? hour : 12;
-            snprintf(
+            SDL_snprintf(
                 text_buffer, 1024,
                 "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
                 m_pimpl->chunked(s->x), m_pimpl->chunked(s->z), s->x, s->y, s->z,
@@ -3645,7 +3637,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         if (SHOW_CHAT_TEXT) {
             for (int i = 0; i < MAX_MESSAGES; i++) {
                 int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
-                if (strlen(m_pimpl->m_model->messages[index])) {
+                if (SDL_strlen(m_pimpl->m_model->messages[index])) {
                     m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
                         m_pimpl->m_model->messages[index]);
                     ty -= ts * 2;
@@ -3653,7 +3645,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             }
         }
         if (m_pimpl->m_model->typing) {
-            snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
+            SDL_snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
             m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
         }
         if (SHOW_PLAYER_NAMES) {
