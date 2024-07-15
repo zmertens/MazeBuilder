@@ -34,7 +34,7 @@ void update_fps(FPS *fps) {
     double now = SDL_GetTicks();
     double elapsed = now - fps->since;
     if (elapsed >= 1) {
-        // fps->fps = round(fps->frames / elapsed);
+         fps->fps = round(fps->frames / elapsed);
         fps->fps = SDL_roundf(fps->frames * 1000.0 / elapsed);
         fps->frames = 0;
         fps->since = now;
@@ -56,31 +56,49 @@ char *load_file(const char *path) {
     return data;
 }
 
-/*
-Private function to load file using SDL-specific functions
-*/
-//char* load_file_using_sdl(const char* path) {
-//    
-//    char* data;
-//
-//    // Open binary file
-//    SDL_RWops* io = SDL_RWFromFile(path, "rb");
-//    if (io != nullptr) {
-//        Sint64 data_size = SDL_RWsize(io);
-//        data = (char*) SDL_malloc(data_size + 1);
-//        if (SDL_RWread(io, data, data_size) != data_size) {
-//            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RWread failed: %s\n", SDL_GetError());
-//        }
-//#if defined(MAZE_DEBUG)
-//        SDL_Log("Reading file % s\n", path);
-//#endif
-//        SDL_RWclose(io);
-//    } else {
-//        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: SDL_RWops failed: %s", SDL_GetError());
-//    }
-//
-//    return data;
-//}
+/**
+ * @brief Private function to load file using SDL-specific functions
+ */
+char* load_file_using_sdl(const char* path) {
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("Reading file % s\n", path);
+#endif
+
+    // Open binary file
+    SDL_IOStream* io = SDL_IOFromFile(path, "r");
+    if (io == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_IOFromFile failed: %s", SDL_GetError());
+        return nullptr;
+    }
+    auto data_size = SDL_GetIOSize(io);
+    // Allocate memory for the file content + null terminator
+    auto data = (char*) SDL_malloc(data_size + 1);
+
+    if (data == nullptr) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_malloc failed: %s", SDL_GetError());
+        SDL_CloseIO(io);
+		return nullptr;
+	}
+
+    // Read file into memory
+    auto nb_read_total = 0, nb_read = SDL_TRUE;
+    auto buf = data;
+    while (nb_read_total < data_size && nb_read != SDL_FALSE) {
+        nb_read = SDL_ReadIO(io, buf, (data_size - nb_read_total));
+        nb_read_total += nb_read;
+        buf += nb_read;
+    }
+
+    SDL_CloseIO(io);
+    if (nb_read_total != data_size) {
+        SDL_free(data);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to read complete file: %s", SDL_GetError());
+        return nullptr;
+    }
+    data[nb_read_total] = '\0';
+    return data;
+}
 
 GLuint make_shader(GLenum type, const char *source) {
     GLuint shader = glCreateShader(type);
@@ -93,16 +111,16 @@ GLuint make_shader(GLenum type, const char *source) {
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
         GLchar *info = (GLchar*) calloc(length, sizeof(GLchar));
         glGetShaderInfoLog(shader, length, NULL, info);
-        fprintf(stderr, "glCompileShader failed:\n%s\n", info);
-        free(info);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "glCompileShader failed:\n%s\n", info);
+        SDL_free(info);
     }
     return shader;
 }
 
 GLuint load_shader(GLenum type, const char *path) {
-    char *data = load_file(path);
+    char *data = load_file_using_sdl(path);
     GLuint result = make_shader(type, data);
-    free(data);
+    SDL_free(data);
     return result;
 }
 
@@ -118,8 +136,8 @@ GLuint make_program(GLuint shader1, GLuint shader2) {
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
         GLchar *info = (GLchar*) calloc(length, sizeof(GLchar));
         glGetProgramInfoLog(program, length, NULL, info);
-        fprintf(stderr, "glLinkProgram failed: %s\n", info);
-        free(info);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "glLinkProgram failed: %s\n", info);
+        SDL_free(info);
     }
     glDetachShader(program, shader1);
     glDetachShader(program, shader2);
@@ -146,7 +164,7 @@ void flip_image_vertical(
         SDL_memcpy(new_data + j * stride, data + i * stride, stride);
     }
     SDL_memcpy(data, new_data, size);
-    free(new_data);
+    SDL_free(new_data);
 }
 
 void load_png_texture(const char *file_name) {
@@ -157,8 +175,7 @@ void load_png_texture(const char *file_name) {
     unsigned char *data = stbi_load(file_name, &width, &height, &n, 0);
     // ... replace '0' with '1'..'4' to force that many components per pixel
     if (data == nullptr) {
-        fprintf(stderr, "stb_load %s failed, error %u\n", file_name, error);
-        exit(1);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "std_load %s failed, error %u\n", file_name, error);
     }
     flip_image_vertical(data, width, height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
@@ -200,7 +217,7 @@ int char_width(char input) {
 
 int string_width(const char *input) {
     int result = 0;
-    int length = strlen(input);
+    int length = SDL_strlen(input);
     for (int i = 0; i < length; i++) {
         result += char_width(input[i]);
     }
@@ -209,7 +226,7 @@ int string_width(const char *input) {
 
 int wrap(const char *input, int max_width, char *output, int max_length) {
     *output = '\0';
-    char *text = (char*) malloc(sizeof(char) * (strlen(input) + 1));
+    char *text = (char*) SDL_malloc(sizeof(char) * (SDL_strlen(input) + 1));
     strcpy(text, input);
     int space_width = char_width(' ');
     int line_number = 0;
@@ -238,6 +255,6 @@ int wrap(const char *input, int max_width, char *output, int max_length) {
         strncat(output, "\n", max_length - strlen(output) - 1);
         line = tokenize(NULL, "\r\n", &key1);
     }
-    free(text);
+    SDL_free(text);
     return line_number;
 }
