@@ -62,7 +62,7 @@ char *load_file(const char *path) {
 char* load_file_using_sdl(const char* path) {
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("Reading file % s\n", path);
+    SDL_Log("Reading file %s\n", path);
 #endif
 
     // Open binary file
