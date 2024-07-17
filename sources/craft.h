@@ -22,14 +22,23 @@ public:
     craft& operator=(craft&&) = default;
 
     bool run(unsigned long seed, const std::list<std::string>& algos, 
-        const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
+        const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) noexcept;
     
-    bool is_json_rdy() const noexcept;
+    void set_json(const std::string& s) noexcept;
     std::string get_json() const noexcept;
-
+    int get_x() const noexcept;
+    void set_x(int new_x);
+    
+    // Singleton pattern
+    static std::shared_ptr<craft> get_instance(const std::string& w, const std::string& v, const std::string& h) {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(w, v, h);
+        return instance;
+    }
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
+    std::string json;
+    int x;
 };
 
 #endif // CRAFT_H

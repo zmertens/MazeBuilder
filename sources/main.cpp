@@ -18,26 +18,31 @@
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
+
     // bind a getter method from C++ so that it can be accessed in the frontend with JS
     EMSCRIPTEN_BINDINGS(maze_builder_module) {
         emscripten::class_<craft>("craft")
-            .constructor<std::string, std::string, std::string>()
-            .function("is_json_rdy", &craft::is_json_rdy)
-            .function("get_json", &craft::get_json);
+            .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
+            .constructor<const std::string&, const std::string&, const std::string&>()
+            .property("json", &craft::get_json, &craft::set_json)
+            .property("x", &craft::get_x, &craft::set_x)
+            .function("set_json", &craft::set_json)
+            .function("get_json", &craft::get_json)
+            .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
    }
 #endif
 
 int main(int argc, char* argv[]) {
 
 #if defined(MAZE_DEBUG)
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.1.5] - DEBUG";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5] - DEBUG";
 #else
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.1.5]";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5]";
 #endif
 
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder [OPTION]... [OUT_FILE]
-        Generates mazes in ASCII-format or Wavefront object format
+        Generates mazes and exports to ASCII-format or Wavefront object format
         Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
         Options specify how to generate the maze and file output:
           -a, --algorithm    binary_tree [default], sidewinder
@@ -46,7 +51,8 @@ int main(int argc, char* argv[]) {
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
-          -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
+          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
+                                when in interactive mode
           -h, --help         display this help message
           -v, --version      display program version
     )help";
@@ -105,9 +111,9 @@ int main(int argc, char* argv[]) {
             std::string window_title {"Maze Builder"};
             std::string version { MAZE_BUILDER_VERSION };
             std::string help { HELP_MSG };
-            craft maze_builder_3D {window_title, version, help };
+            auto&& maze_builder_3D = craft::get_instance(window_title, version, help);
             // craft uses it's own RNG engine, which looks a lot like the one here
-            success = maze_builder_3D.run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
+            success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };

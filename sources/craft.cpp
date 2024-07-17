@@ -2623,7 +2623,7 @@ struct craft::craft_impl {
                     }
                     case SDL_SCANCODE_V: {
                         if (control) {
-                            char* clip_buffer = SDL_GetClipboardText();
+                            auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
                             if (this->m_model->typing) {
                                 this->m_model->suppress_char = 1;
                                 SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
@@ -2964,7 +2964,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(unsigned long seed, const std::list<std::string>& algos, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
+bool craft::run(unsigned long seed, const std::list<std::string>& algos, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) noexcept {
     // Init RNG engine
     std::mt19937 rng_machine{ seed };
     this->m_pimpl->m_gui.seed = seed;
@@ -3349,6 +3349,33 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         maze2->clear();
 	};
 
+    auto json_writer = [&maze2](const string& outfile) -> string {
+        auto&& vertices = maze2->get_write_vertices();
+        auto&& faces = maze2->get_faces();
+        stringstream ss;
+        // Set key if outfile is specified
+        ss << "{\"name\":\"" << outfile << "\", \"data\":[";
+        // Wavefront object file header
+        ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
+        for (const auto& vertex : vertices) {
+            ss << ",\"v " << get<2>(vertex) << " " << get<3>(vertex) << " " << get<4>(vertex) << "\\n\"";
+        }
+
+        // Note in writing the face that the index is 1-based
+        // Also, there is no space after the 'f', until the loop
+        for (const auto& face : faces) {
+            ss << ",\"f";
+            for (auto index : face.vertices) {
+                ss << " " << index;
+            }
+            ss << "\\n\"";
+        }
+
+        ss << "]}";
+
+        return ss.str();
+    };
+
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
 
     bool running = true;
@@ -3461,18 +3488,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
                         // Call the writer future and get the result
                         bool success = write_success.get();
-                        auto&& last_outfile = gui_opts.outfile;                      
-                        if (success) {
+                        if (success && gui_opts.outfile[0] != '.') {
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", last_outfile);
+                            ImGui::Text("Maze written to %s\n", gui_opts.outfile);
                             ImGui::NewLine();
                         } else {
                             ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", last_outfile);
+                            ImGui::Text("Failed to write maze: %s\n", gui_opts.outfile);
                             ImGui::NewLine();
                         }
-                        reset_fields();
+                        // Reset outfile's first char and that will disable the Build! button
+                        gui_opts.outfile[0] = '.';
                     }
 #endif
                     if (progress_tracker) {
@@ -3564,8 +3591,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                 // Writing the maze will run in the background - only do that on Desktop
 #if !defined(__EMSCRIPTEN__ )
                 write_success = maze2->write_maze_as_wavefront_obj(gui_opts.outfile);
-#elif defined(__EMSCRIPTEN__) && defined(MAZE_DEBUG)
-                SDL_Log("json data rdy: %d\n", this->is_json_rdy());
+#elif defined(__EMSCRIPTEN__)
+                auto&& maze_str = json_writer(gui_opts.outfile);
+                this->set_json(maze_str);
+                reset_fields();
+                //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
 #endif
             } else {
                 // Failed to set maze
@@ -3765,8 +3795,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     return true;
 }  // run
 
-bool craft::is_json_rdy() const noexcept {
-    return this->m_pimpl->m_maze->get_write_vertices().size() != 0 && this->m_pimpl->m_maze->get_faces().size() != 0;
+void craft::set_json(const string& s) noexcept {
+    this->json = s;
 }
 
 /**
@@ -3776,36 +3806,14 @@ bool craft::is_json_rdy() const noexcept {
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::get_json() const noexcept {
-    auto&& my_maze = this->m_pimpl->m_maze;
-    auto json_writer = [&my_maze] (const string& outfile) -> string {
-        auto&& vertices = my_maze->get_write_vertices();
-        auto&& faces = my_maze->get_faces();
-        stringstream ss;
-        // Set key if outfile is specified
-        ss << "{\"name\":\"" << outfile << "\", \"data\":[";
-        // Wavefront object file header
-        ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
-        for (const auto& vertex : vertices) {
-            ss << ",\"v " << get<2>(vertex) << " " << get<3>(vertex) << " " << get<4>(vertex) << "\\n\"";
-        }
-        
-        // Note in writing the face that the index is 1-based
-        // Also, there is no space after the 'f', until the loop
-        for (const auto& face : faces) {
-            ss << ",\"f";
-            for (auto index : face.vertices) {
-                ss << " " << index;
-            }
-            ss << "\\n\"";
-        }
-
-        ss << "]}";
-
-#if defined(MAZE_DEBUG)
-    SDL_Log("%s\n", my_maze->get_maze().c_str());
-#endif
-
-        return ss.str();
-    };
-    return json_writer(this->m_pimpl->m_gui.outfile);
+    return this->json;
 }
+
+int craft::get_x() const noexcept {
+    return this->x;
+}
+void craft::set_x(int new_x) {
+    this->x = new_x;
+
+}
+
