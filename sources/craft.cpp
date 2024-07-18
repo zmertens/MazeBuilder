@@ -3808,12 +3808,3 @@ void craft::set_json(const string& s) noexcept {
 std::string craft::get_json() const noexcept {
     return this->json;
 }
-
-int craft::get_x() const noexcept {
-    return this->x;
-}
-void craft::set_x(int new_x) {
-    this->x = new_x;
-
-}
-

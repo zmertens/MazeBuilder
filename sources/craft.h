@@ -26,8 +26,6 @@ public:
     
     void set_json(const std::string& s) noexcept;
     std::string get_json() const noexcept;
-    int get_x() const noexcept;
-    void set_x(int new_x);
     
     // Singleton pattern
     static std::shared_ptr<craft> get_instance(const std::string& w, const std::string& v, const std::string& h) {
@@ -38,7 +36,6 @@ private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
     std::string json;
-    int x;
 };
 
 #endif // CRAFT_H

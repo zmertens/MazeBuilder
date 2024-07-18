@@ -25,7 +25,6 @@
             .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
             .constructor<const std::string&, const std::string&, const std::string&>()
             .property("json", &craft::get_json, &craft::set_json)
-            .property("x", &craft::get_x, &craft::set_x)
             .function("set_json", &craft::set_json)
             .function("get_json", &craft::get_json)
             .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
@@ -41,10 +40,9 @@ int main(int argc, char* argv[]) {
 #endif
 
     static constexpr auto HELP_MSG = R"help(
-        Usages: maze_builder [OPTION]... [OUT_FILE]
+        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to ASCII-format or Wavefront object format
         Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
-        Options specify how to generate the maze and file output:
           -a, --algorithm    binary_tree [default], sidewinder
           -s, --seed         seed for the random number generator [mt19937]
           -w, --width        maze width [default=100]
@@ -52,7 +50,6 @@ int main(int argc, char* argv[]) {
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
-                                when in interactive mode
           -h, --help         display this help message
           -v, --version      display program version
     )help";
@@ -75,6 +72,11 @@ int main(int argc, char* argv[]) {
     auto&& args_map {args.build()};
     // this needs to get called after args.build() because of internal parsing
     auto state_of_args{ args.get_state() };
+#if defined(MAZE_DEBUG)
+    for (auto&& [k, v] : args.build()) {
+            std::cout << "INFO: " << k << ", " << v << "\n";
+    }
+#endif
     
     if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
         std::cout << HELP_MSG << std::endl;
@@ -84,7 +86,8 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    auto seed_as_ul = std::stoul(args_map.at("seed"));
+    auto user_seed_or_not = static_cast<unsigned long>(args.get_seed());
+    auto seed_as_ul = user_seed_or_not;
     std::mt19937 rng_engine{ seed_as_ul };
     auto get_int = [&rng_engine](int low, int high) -> int {
         using namespace std;
