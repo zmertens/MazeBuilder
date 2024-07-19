@@ -62,6 +62,20 @@ void ring_put_block(Ring *ring, int p, int q, int x, int y, int z, int w) {
     entry.y = y;
     entry.z = z;
     entry.w = w;
+    entry.blocks = nullptr;
+    ring_put(ring, &entry);
+}
+
+void ring_put_blocks(Ring* ring, int *blocks) {
+    RingEntry entry;
+    entry.type = BLOCKS;
+    entry.p = 0;
+    entry.q = 0;
+    entry.x = 0;
+    entry.y = 0;
+    entry.z = 0;
+    entry.w = 0;
+    entry.blocks = blocks;
     ring_put(ring, &entry);
 }
 

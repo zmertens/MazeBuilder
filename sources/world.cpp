@@ -4,7 +4,7 @@
 
 using namespace std;
 
-void world::create_world(int p, int q, world_func func, Map *m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept {
+void world::create_world(int p, int q, world_func func, Map* m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept {
     int pad = 1;
     for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
         for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {
@@ -14,7 +14,7 @@ void world::create_world(int p, int q, world_func func, Map *m, const int CHUNK_
             }
             int x = p * CHUNK_SIZE + dx;
             int z = q * CHUNK_SIZE + dz;
-            
+
             float f = simplex2(static_cast<float>(x) * 0.01, static_cast<float>(z) * 0.01, 4, 0.5, 2);
             float g = simplex2(static_cast<float>(-x) * 0.01, static_cast<float>(-z) * 0.01, 2, 0.9, 2);
             int mh = g * 32 + 16;

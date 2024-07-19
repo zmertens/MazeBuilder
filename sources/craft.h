@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <list>
 
 #include "maze_types_enum.h"
 
@@ -20,14 +21,21 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept;
+    bool run(unsigned long seed, const std::list<std::string>& algos, 
+        const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) noexcept;
     
-    std::string get_vertex_data_as_json() const noexcept;
-
+    void set_json(const std::string& s) noexcept;
+    std::string get_json() const noexcept;
+    
+    // Singleton pattern
+    static std::shared_ptr<craft> get_instance(const std::string& w, const std::string& v, const std::string& h) {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(w, v, h);
+        return instance;
+    }
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
-
+    std::string json;
 };
 
 #endif // CRAFT_H

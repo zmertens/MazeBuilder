@@ -62,9 +62,9 @@ bool writer::write(const std::string& filename, const std::string& data) const {
 	// open file stream and start writing the data as per the file type
 	try {
 		if (ftype == file_types::PLAIN_TEXT) {
-			this->write_plain_text(filename, data);
+			this->write_file(filename, data);
 		} else if (ftype == file_types::WAVEFRONT_OBJ_FILE) {
-			this->write_wavefront_obj(filename, data);
+			this->write_file(filename, data);
 		} else {
 			throw new runtime_error("Unknown file type for filename: " + filename);
 		}
@@ -74,16 +74,9 @@ bool writer::write(const std::string& filename, const std::string& data) const {
 	}
 }
 
-void writer::write_wavefront_obj(const std::string& filename, const std::string& data) const {
+void writer::write_file(const std::string& filename, const std::string& data) const {
     filesystem::path data_path {filename};
     ofstream out_writer {data_path};
-	out_writer << data;
-	out_writer.close();
-}
-
-void writer::write_plain_text(const std::string& filename, const std::string& data) const {
-	filesystem::path data_path{ filename };
-	ofstream out_writer{ data_path };
 	out_writer << data;
 	out_writer.close();
 }

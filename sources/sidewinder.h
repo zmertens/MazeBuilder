@@ -4,6 +4,7 @@
 #include <functional>
 #include <memory>
 #include <vector>
+#include <random>
 
 #include "maze_algo_interface.h"
 
@@ -14,7 +15,7 @@ class cell;
 
 class sidewinder : public maze_algo_interface {
 public:
-    bool run(std::unique_ptr<grid> const& _grid, std::function<int(int, int)> const& get_int, bool interactive = false) const noexcept override;
+    bool run(std::unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
 // hide recursive implementation for now
 //private:
 //    bool run_on_cell(std::shared_ptr<cell> const& _cell, std::function<int(int, int)> const& get_int) const noexcept;

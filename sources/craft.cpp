@@ -14,6 +14,7 @@
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
+#include "nunito_sans.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
@@ -37,11 +38,14 @@
 #include <iostream>
 #include <thread>
 #include <future>
+#include <mutex>
+#include <shared_mutex>
 #include <chrono>
+#include <random>
 #include <utility>
+#include <tuple>
 
 #include <noise/noise.h>
-#include <tinycthread/tinycthread.h>
 
 #include "util.h"
 #include "world.h"
@@ -96,7 +100,7 @@
 
 // advanced parameters
 #define CREATE_CHUNK_RADIUS 10
-#define RENDER_CHUNK_RADIUS 10
+#define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
 #define COMMIT_INTERVAL 5
@@ -121,7 +125,8 @@ using namespace mazes;
 using namespace std;
 
 struct craft::craft_impl {
-    typedef struct {
+    struct DearImGuiHelper {
+        bool show_builder_gui;
         int chunk_size;
         bool show_trees;
         bool show_plants;
@@ -129,41 +134,207 @@ struct craft::craft_impl {
         bool fullscreen;
         bool color_mode_dark;
         bool capture_mouse;
-        std::string outfile;
+        char outfile[64] = ".obj";
         int build_width;
         int build_height;
         int build_length;
         int seed;
-    } DearImGuiHelper;
+        std::string algo;
+        bool build_now;
 
+        void reset_outfile() {
+            for (auto i = 0; i < IM_ARRAYSIZE(outfile); ++i) {
+                outfile[i] = '\0';
+            }
+            outfile[0] = '.';
+            outfile[1] = 'o';
+            outfile[2] = 'b';
+            outfile[3] = 'j';
+        }
+    };
+
+    //struct Vertex {
+    //    float x, y, z;
+    //};
+
+    struct Face {
+        std::vector<unsigned int> vertices;
+    };
+
+    /**
+     * Thread safe maze features for concurrent reading and writing
+     * Shared Locks allow for fast, concurrent reading
+     */
     struct Maze {
+    private:
         std::string maze;
+        // Mutable allows for const methods to modify the object
+        mutable std::shared_mutex verts_mtx;
         std::mutex maze_mutx;
+        // Tuple (p, q, x, y, z, w)
+        // Write vertices contain block sizes and are designed for Wavefront OBJ file writing
+        std::vector<std::tuple<int, int, int, int, int, int>> write_vertices;
+        // Render vertices are designed for rendering in Craft
+        std::vector<std::tuple<int, int, int, int, int, int>> render_vertices;
+        std::vector<Face> faces;
+    public:
+        Maze(const std::string& mz) : maze(mz), write_vertices(), render_vertices(), faces() {};
+
+        /**
+         * @brief Generate a grid containing a maze in 2D / ASCII format
+         * @return
+         */
         void set_maze(const std::string& maze) {
             std::lock_guard<std::mutex> lock(maze_mutx);
             this->maze = maze;
         };
         std::string get_maze() {
             std::lock_guard<std::mutex> lock(maze_mutx);
-            return maze;
+            return this->maze;
         }
-    };
+
+        void clear() {
+			std::lock_guard<std::mutex> lock(maze_mutx);
+            std::lock_guard<std::shared_mutex> lock_verts(verts_mtx);
+            maze.clear();
+			write_vertices.clear();
+            render_vertices.clear();
+			faces.clear();
+		}
+
+        auto get_render_vertices() const {
+			std::shared_lock<std::shared_mutex> lock(verts_mtx);
+			return this->render_vertices;
+		}
+
+        auto get_write_vertices() const {
+            std::shared_lock<std::shared_mutex> lock(verts_mtx);
+            return this->write_vertices;
+        }
+
+        auto get_faces() const {
+            std::shared_lock<std::shared_mutex> lock(verts_mtx);
+            return this->faces;
+        }
+
+        /**
+         * @brief Update the maze with a new block, updating geometric write and render vertices
+         *  Write vertices are used for Wavefront OBJ file writing
+         *  Render vertices are used for rendering in Craft
+         */
+        void add_block(int x, int y, int z, int w, int block_size) {
+            std::lock_guard<std::shared_mutex> lock(verts_mtx);
+            // Calculate the base index for the new vertices
+            // OBJ format is 1-based indexing
+            unsigned int baseIndex = this->write_vertices.size() + 1;
+            // Define the 8 vertices of the cube
+            this->write_vertices.emplace_back(0, 0, x, y, z, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y, z, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y + block_size, z, w);
+            this->write_vertices.emplace_back(0, 0, x, y + block_size, z, w);
+            this->write_vertices.emplace_back(0, 0, x, y, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x + block_size, y + block_size, z + block_size, w);
+            this->write_vertices.emplace_back(0, 0, x, y + block_size, z + block_size, w);
+
+            this->render_vertices.emplace_back(0, 0, x, y, z, w);
+
+            // Define faces using the vertices above (12 triangles for 6 faces)
+            // Front face
+            this->faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+            this->faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+            // Back face
+            this->faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+            this->faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+            // Left face
+            this->faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+            this->faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+            // Right face
+            this->faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+            this->faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+            // Top face
+            this->faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+            this->faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+            // Bottom face
+            this->faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+            this->faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
+        } // add_block
+
+        // Return a future for when maze has been written
+        std::future<bool> write_maze_as_wavefront_obj(const std::string& filename) const {
+            // helper lambda to write the Wavefront object file
+            auto create_wavefront_obj = [](const vector<std::tuple<int, int, int, int, int, int>>& write_vertices, const vector<Face>& faces)->string {
+                using namespace std;
+                stringstream ss;
+                ss << "# https://www.github.com/zmertens/MazeBuilder\n";
+
+                // keep track of writing progress
+                int total_verts = write_vertices.size();
+                int total_faces = faces.size();
+
+                int t = total_verts + total_faces;
+                int c = 0;
+                // Write vertices
+                for (const auto& vertex : write_vertices) {
+                    float x = static_cast<float>(get<2>(vertex));
+                    float y = static_cast<float>(get<3>(vertex));
+                    float z = static_cast<float>(get<4>(vertex));
+                    ss << "v " << x << " " << y << " " << z << "\n";
+                    c++;
+                }
+
+                // Write faces
+                for (const auto& face : faces) {
+                    ss << "f";
+                    for (auto index : face.vertices) {
+                        ss << " " << index;
+                    }
+                    ss << "\n";
+                    c++;
+                }
+
+#if defined(MAZE_DEBUG)
+                SDL_Log("Writing maze progress: %d/%d", c, t);
+#endif
+
+                return ss.str();
+            }; // create_wavefront_obj
+
+            if (!filename.empty()) {
+                // get ready to write to file
+                packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &create_wavefront_obj](auto out)->bool {
+                    writer maze_writer;
+                    return maze_writer.write(out, create_wavefront_obj(this->get_write_vertices(), this->get_faces())); }};
+                auto writing_results = maze_writing_task.get_future();
+                thread(std::move(maze_writing_task), filename).detach();
+                return writing_results;
+            } else {
+                promise<bool> p;
+                p.set_value(false);
+                return p.get_future();
+            }
+        }; // write_maze_as_wavefront_obj
+
+    }; // Maze
 
     struct ProgressTracker {
-        std::atomic<int> current_step;
-        std::atomic<int> total_steps;
+        std::atomic<std::chrono::steady_clock::time_point> start_time;
+        std::atomic<std::chrono::steady_clock::time_point> end_time;
         
-        std::mutex msg_mutx;
-        std::string message;
-        
-        void set_msg(const std::string& msg) {
-            std::lock_guard<std::mutex> lock(msg_mutx);
-			message = msg;
+        void start() {
+            start_time.store(std::chrono::steady_clock::now());
         }
 
-        std::string get_msg() {
-            std::lock_guard<std::mutex> lock(msg_mutx);
-            return message;
+        void stop() {
+            end_time.store(std::chrono::steady_clock::now());
+        }
+
+        double get_duration_in_seconds() {
+            return std::chrono::duration<double>(end_time.load() - start_time.load()).count();
+        }
+
+        double get_duration_in_ms() {
+            return std::chrono::duration<double>(end_time.load() - start_time.load()).count() * 1000.0;
         }
     };
 
@@ -197,12 +368,9 @@ struct craft::craft_impl {
     typedef struct {
         int index;
         int state;
-        thrd_t tiny_thrd;
-        mtx_t tiny_mtx;
-        cnd_t tiny_cnd;
-        // SDL_Thread *thrd;
-        // SDL_Mutex *mtx;
-        // SDL_Condition *cnd;
+        std::thread thrd;
+        std::mutex mtx;
+        std::condition_variable cnd;
         WorkerItem item;
         bool should_stop;
     } Worker;
@@ -287,14 +455,6 @@ struct craft::craft_impl {
         Block copy0;
         Block copy1;
     } Model;
-    
-    struct Vertex {
-        GLfloat x, y, z;
-    };
-
-    struct Face {
-        std::vector<GLuint> vertices;
-    };
 
     // Note: These are public members
     const std::string& m_window_name;
@@ -305,50 +465,42 @@ struct craft::craft_impl {
 
     DearImGuiHelper m_gui;
 
-    vector<Vertex> m_vertices;
-    vector<Face> m_faces;
+    std::unique_ptr<Maze> m_maze;
 
     craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
         , m_model{make_unique<Model>()}
-        // chunk_size, show_trees, show_plants, show_clouds, fullscreen, color_mode_dark, capture_mouse, build_width, build_height, build_length, seed
-        , m_gui{32, true, true, true, false, true, false, "my.obj", 46, 5, 10, 50}
-        , m_vertices{}
-        , m_faces{} {
+        // show_builder_gui, chunk_size, show_trees, show_plants, show_clouds, fullscreen, 
+        // (continued)... color_mode_dark, capture_mouse, build_width, 
+        // (continued)... build_height, build_length, seed, algo, build_now
+        , m_gui{true, 32, true, true, true, false, true, false, ".obj", 18, 10, 25, 50, "binary_tree", false}
+        , m_maze{make_unique<Maze>("")} {
 
     }
 
-    static int worker_run(void *arg) {
-        Worker *worker = (Worker *)arg;
-        
-        craft caller{ {}, {}, {} };
+    int worker_run(void *arg) {
+        Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
-            // SDL_LockMutex(worker->mtx);
-            mtx_lock(&worker->tiny_mtx);
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
-                cnd_wait(&worker->tiny_cnd, &worker->tiny_mtx);
-                // SDL_WaitCondition(worker->cnd, worker->mtx);
+                unique_lock<mutex> u_lck(worker->mtx);
+                worker->cnd.wait(u_lck);
             }
             if (worker->should_stop) {
-                mtx_unlock(&worker->tiny_mtx);
-				// SDL_UnlockMutex(worker->mtx);
 				break;
 			}
-            // SDL_UnlockMutex(worker->mtx);
-            mtx_unlock(&worker->tiny_mtx);
+
             WorkerItem *worker_item = &worker->item;
             if (worker_item->load) {
-                caller.m_pimpl->load_chunk(worker_item);
+                this->load_chunk(worker_item);
             }
             
-            caller.m_pimpl->compute_chunk(worker_item);
-            // SDL_LockMutex(worker->mtx);
-            mtx_lock(&worker->tiny_mtx);
+            this->compute_chunk(worker_item);
+
+            worker->mtx.lock();
             worker->state = WORKER_DONE;
-            mtx_unlock(&worker->tiny_mtx);
-            // SDL_UnlockMutex(worker->mtx);
+            worker->mtx.unlock();
         }
         return 0;
     } // worker_run
@@ -360,26 +512,7 @@ struct craft::craft_impl {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-//             SDL_Mutex *sdl_mtx = SDL_CreateMutex();
-//             if (sdl_mtx == nullptr) {
-// #if defined(MAZE_DEBUG)
-//                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create mutex: %s", SDL_GetError());
-// #endif
-//                 return;
-//             }
-//             worker->mtx = sdl_mtx;
-//             SDL_Condition *sdl_cnd = SDL_CreateCondition();
-//             if (sdl_cnd == nullptr) {
-// #if defined(MAZE_DEBUG)
-//                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create condition variable: %s", SDL_GetError());
-// #endif            	
-// 				return;
-//             }
-//             worker->cnd = sdl_cnd;
-//             worker->thrd = SDL_CreateThread(worker_run, "worker thread", worker.get());
-            mtx_init(&worker->tiny_mtx, mtx_plain);
-            cnd_init(&worker->tiny_cnd);
-            thrd_create(&worker->tiny_thrd, worker_run, worker.get());
+            worker->thrd = thread([this](void* arg) { this->worker_run(arg); }, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -390,38 +523,28 @@ struct craft::craft_impl {
     void cleanup_worker_threads() {
         // signal all worker threads to stop
         for (auto&& w : this->m_model->workers) {
-            // SDL_LockMutex(w->mtx);
-            mtx_lock(&w->tiny_mtx);
+            w->mtx.lock();
             w->should_stop = true;
-            cnd_signal(&w->tiny_cnd);
-            mtx_unlock(&w->tiny_mtx);
-            // SDL_SignalCondition(w->cnd);
-            // SDL_UnlockMutex(w->mtx);
+            w->cnd.notify_one();
+            w->mtx.unlock();
         }
         // Wait for threads to join
         for (auto&& w : this->m_model->workers) {
             // Wait for the thread to complete its execution
-            int threadReturnValue = -1;
-            thrd_join(w->tiny_thrd, &threadReturnValue);
-            // SDL_WaitThread(w->thrd, &threadReturnValue);
+            w->thrd.join();
 #if defined(MAZE_DEBUG)
-            SDL_Log("Worker thread finished with return value: %d", threadReturnValue);
+            SDL_Log("Worker thread %d finished!", w->index);
 #endif
-            // Clean up the mutex and condition variable
-            // SDL_DestroyMutex(w->mtx);
-            // SDL_DestroyCondition(w->cnd);
-            mtx_destroy(&w->tiny_mtx);
-            cnd_destroy(&w->tiny_cnd);
         }
         // Clear the vector after all threads have been joined
         this->m_model->workers.clear();
     }
 
-    void del_buffer(GLuint buffer) {
+    void del_buffer(GLuint buffer) const {
         glDeleteBuffers(1, &buffer);
     }
 
-    GLuint gen_buffer(GLsizei size, GLfloat *data) {
+    GLuint gen_buffer(GLsizei size, GLfloat *data) const {
         GLuint buffer;
         glGenBuffers(1, &buffer);
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -430,13 +553,13 @@ struct craft::craft_impl {
         return buffer;
     }
 
-    GLfloat *malloc_faces(int components, int faces) {
-        return (GLfloat*) malloc(sizeof(GLfloat) * 6 * components * faces);
+    GLfloat *malloc_faces(int components, int faces) const {
+        return (GLfloat*) SDL_malloc(sizeof(GLfloat) * 6 * components * faces);
     }
 
-    GLuint gen_faces(int components, int faces, GLfloat *data) {
+    GLuint gen_faces(int components, int faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
-        free(data);
+        SDL_free(data);
         return buffer;
     }
 
@@ -714,7 +837,7 @@ struct craft::craft_impl {
         if (interpolate) {
             State *s1 = &player->state1;
             State *s2 = &player->state2;
-            memcpy(s1, s2, sizeof(State));
+            SDL_memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
             s2->t = get_time();
             if (s2->rx - s1->rx > PI) {
@@ -758,7 +881,7 @@ struct craft::craft_impl {
         int count = this->m_model->player_count;
         this->del_buffer(player->buffer);
         Player *other = this->m_model->players + (--count);
-        memcpy(player, other, sizeof(Player));
+        SDL_memcpy(player, other, sizeof(Player));
         this->m_model->player_count = count;
     }
 
@@ -815,7 +938,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    Chunk *find_chunk(int p, int q) {
+    Chunk *find_chunk(int p, int q) const {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             if (chunk->p == p && chunk->q == q) {
@@ -874,7 +997,7 @@ struct craft::craft_impl {
         return 1;
     } // chunk_visible
 
-    int highest_block(float x, float z) {
+    int highest_block(float x, float z) const {
         int result = -1;
         int nx = SDL_roundf(x);
         int nz = SDL_roundf(z);
@@ -981,7 +1104,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int collide(int height, float *x, float *y, float *z) {
+    int collide(int height, float *x, float *y, float *z) const {
         int result = 0;
         int p = this->chunked(*x);
         int q = this->chunked(*z);
@@ -1023,7 +1146,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) {
+    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const {
         int nx = SDL_roundf(x);
         int ny = SDL_roundf(y);
         int nz = SDL_roundf(z);
@@ -1035,7 +1158,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    int _gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) {
+    int _gen_sign_buffer(GLfloat *data, float x, float y, float z, int face, const char *text) const {
         static constexpr int glyph_dx[8] = {0, 0, -1, 1, 1, 0, -1, 0};
         static constexpr int glyph_dz[8] = {1, -1, 0, 0, 0, -1, 0, 1};
         static constexpr int line_dx[8] = {0, 0, 0, 0, 0, 1, 0, -1};
@@ -1097,14 +1220,14 @@ struct craft::craft_impl {
         return count;
     }
 
-    void gen_sign_buffer(Chunk *chunk) {
+    void gen_sign_buffer(Chunk *chunk) const {
         SignList *signs = &chunk->signs;
 
         // first pass - count characters
         int max_faces = 0;
         for (int i = 0; i < signs->size; i++) {
             Sign *e = signs->data + i;
-            max_faces += strlen(e->text);
+            max_faces += SDL_strlen(e->text);
         }
 
         // second pass - generate geometry
@@ -1120,7 +1243,7 @@ struct craft::craft_impl {
         chunk->sign_faces = faces;
     }
 
-    int has_lights(Chunk *chunk) {
+    int has_lights(Chunk *chunk) const {
         if (!SHOW_LIGHTS) {
             return 0;
         }
@@ -1142,7 +1265,7 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void dirty_chunk(Chunk *chunk) {
+    void dirty_chunk(Chunk *chunk) const {
         chunk->dirty = 1;
         if (has_lights(chunk)) {
             for (int dp = -1; dp <= 1; dp++) {
@@ -1156,7 +1279,7 @@ struct craft::craft_impl {
         }
     }
 
-    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) {
+    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) const {
         static constexpr int lookup3[6][4][3] = {
             {{0, 1, 3}, {2, 1, 5}, {6, 3, 7}, {8, 5, 7}},
             {{18, 19, 21}, {20, 19, 23}, {24, 21, 25}, {26, 23, 25}},
@@ -1197,7 +1320,7 @@ struct craft::craft_impl {
         }
     } // occlusion
 
-    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) {
+    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) const {
 #define XZ_SIZE (this->m_gui.chunk_size * 3 + 2)
 #define XZ_LO (this->m_gui.chunk_size)
 #define XZ_HI (this->m_gui.chunk_size * 2 + 1)
@@ -1229,10 +1352,10 @@ struct craft::craft_impl {
     }
 
     // Handles terrain generation in a multithreaded environment
-    void compute_chunk(WorkerItem *item) {
-        char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
+    void compute_chunk(WorkerItem *item) const {
+        char *opaque = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        char *light = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        char *highest = (char *)SDL_calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
         int ox = item->p * this->m_gui.chunk_size - this->m_gui.chunk_size - 1;
         int oy = -1;
@@ -1254,11 +1377,11 @@ struct craft::craft_impl {
         // populate opaque array
         for (int a = 0; a < 3; a++) {
             for (int b = 0; b < 3; b++) {
-                Map *map = item->block_maps[a][b];
-                if (!map) {
+                Map *block_map = item->block_maps[a][b];
+                if (!block_map) {
                     continue;
                 }
-                MAP_FOR_EACH(map, ex, ey, ez, ew) {
+                MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
                     int x = ex - ox;
                     int y = ey - oy;
                     int z = ez - oz;
@@ -1297,13 +1420,13 @@ struct craft::craft_impl {
             }
         }
 
-        Map *map = item->block_maps[1][1];
+        Map *block_map = item->block_maps[1][1];
 
         // count exposed faces
         int miny = 256;
         int maxy = 0;
         int faces = 0;
-        MAP_FOR_EACH(map, ex, ey, ez, ew) {
+        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
             if (ew <= 0) {
                 continue;
             }
@@ -1329,10 +1452,11 @@ struct craft::craft_impl {
         } END_MAP_FOR_EACH;
 
         // generate geometry
+        // each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
         static constexpr int components = 10;
         GLfloat *data = malloc_faces(components, faces);
         int offset = 0;
-        MAP_FOR_EACH(map, ex, ey, ez, ew) {
+        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
             if (ew <= 0) {
                 continue;
             }
@@ -1398,9 +1522,9 @@ struct craft::craft_impl {
             offset += total * 60;
         } END_MAP_FOR_EACH;
 
-        free(opaque);
-        free(light);
-        free(highest);
+        SDL_free(opaque);
+        SDL_free(light);
+        SDL_free(highest);
 
         item->miny = miny;
         item->maxy = maxy;
@@ -1408,7 +1532,7 @@ struct craft::craft_impl {
         item->data = data;
     } // compute_chunk
 
-    void generate_chunk(Chunk *chunk, WorkerItem *item) {
+    void generate_chunk(Chunk *chunk, WorkerItem *item) const {
         chunk->miny = item->miny;
         chunk->maxy = item->maxy;
         chunk->faces = item->faces;
@@ -1417,7 +1541,7 @@ struct craft::craft_impl {
         this->gen_sign_buffer(chunk);
     }
 
-    void gen_chunk_buffer(Chunk *chunk) {
+    void gen_chunk_buffer(Chunk *chunk) const {
         WorkerItem _item;
         WorkerItem *item = &_item;
         item->p = chunk->p;
@@ -1452,12 +1576,14 @@ struct craft::craft_impl {
     void load_chunk(WorkerItem *item) {
         int p = item->p;
         int q = item->q;
+
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, gui_options.show_plants, gui_options.show_clouds);
+        _world.create_world(p, q, map_set_func, block_map, gui_options.chunk_size, gui_options.show_trees, 
+            gui_options.show_plants, gui_options.show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1523,12 +1649,16 @@ struct craft::craft_impl {
                 del_buffer(chunk->buffer);
                 del_buffer(chunk->sign_buffer);
                 Chunk *other = this->m_model->chunks + (--count);
-                memcpy(chunk, other, sizeof(Chunk));
+                SDL_memcpy(chunk, other, sizeof(Chunk));
             }
         }
         this->m_model->chunk_count = count;
     }
 
+    /**
+     * @brief Deletes all chunks regardless of player state
+     *
+     */
     void delete_all_chunks() {
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
@@ -1543,8 +1673,7 @@ struct craft::craft_impl {
 
     void check_workers() {
         for (auto&& worker : this->m_model->workers) {
-            // SDL_LockMutex(worker->mtx);
-            mtx_lock(&worker->tiny_mtx);
+            worker->mtx.lock();
             if (worker->state == WORKER_DONE) {
                 WorkerItem *item = &worker->item;
                 Chunk *chunk = find_chunk(item->p, item->q);
@@ -1565,18 +1694,17 @@ struct craft::craft_impl {
                         Map *light_map = item->light_maps[a][b];
                         if (block_map) {
                             map_free(block_map);
-                            free(block_map);
+                            SDL_free(block_map);
                         }
                         if (light_map) {
                             map_free(light_map);
-                            free(light_map);
+                            SDL_free(light_map);
                         }
                     }
                 }
                 worker->state = WORKER_IDLE;
             }
-            // SDL_UnlockMutex(worker->mtx);
-            mtx_unlock(&worker->tiny_mtx);
+            worker->mtx.unlock();
         }
     }
 
@@ -1606,161 +1734,11 @@ struct craft::craft_impl {
     }
 
     /**
-     * @brief set_grid parses the grid, and builds a 3D grid using grid row, column, height
-     * Calling set_grid, set_block, record_block to DB
-     * Specify a "starting_height" to try to put the maze above the heightmap (mountains)
-     * @param height of the grid
-     * @param grid_as_ascii
-     * @return
+     * @brief Calculate  an index based on the chunk coordinates
+     *  Check if the chunk is assigned to the current worker thread
+     * @param p
+     *
      */
-    bool set_grid(unsigned int height, const string& grid_as_ascii)  {
-        auto add_block_to_vertex_data = [this](float x, float y, float z, float block_size) {
-            // Calculate the base index for the new vertices
-            unsigned int baseIndex = this->m_vertices.size() + 1; // OBJ format is 1-based indexing
-
-            // Define the 8 vertices of the cube
-            this->m_vertices.push_back({ x, y, z });
-            this->m_vertices.push_back({ x + block_size, y, z });
-            this->m_vertices.push_back({ x + block_size, y + block_size, z });
-            this->m_vertices.push_back({ x, y + block_size, z });
-            this->m_vertices.push_back({ x, y, z + block_size });
-            this->m_vertices.push_back({ x + block_size, y, z + block_size });
-            this->m_vertices.push_back({ x + block_size, y + block_size, z + block_size });
-            this->m_vertices.push_back({ x, y + block_size, z + block_size });
-
-            // Define faces using the vertices above (12 triangles for 6 faces)
-            // Front face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
-            // Back face
-            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-            this->m_faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
-            // Left face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
-            // Right face
-            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-            this->m_faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
-            // Top face
-            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-            this->m_faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
-            // Bottom face
-            this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-            this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-        }; // add_block_to_vertex_data
-
-
-            istringstream iss{ grid_as_ascii.data() };
-            string line;
-            unsigned int row_x = 0;
-            while (getline(iss, line, '\n')) {
-                unsigned int col_z = 0;
-                for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-                    if (*itr == ' ') {
-                        col_z++;
-                    } else if (*itr == '+' || *itr == '-' || *itr == '|') {
-                        // check for barriers and walls then iterate up/down
-                        static constexpr unsigned int starting_height = 30u;
-                        static constexpr float block_size = 1.0f;
-                        for (auto h{ starting_height }; h < starting_height + height; h++) {
-                            int w = items[this->m_model->item_index];
-                            // set the block in the craft
-                            set_block(row_x, h, col_z, w);
-                            record_block(row_x, h, col_z, w);
-                            // update the data source that stores the grid for writing to file
-                            add_block_to_vertex_data(row_x, h, col_z, block_size);
-                        }
-                        col_z++;
-                    }
-                }
-
-                row_x++;
-            } // getline
-        return true;
-    } // set_grid
-
-    /**
-     * @brief Generate a grid containing a maze in ASCII format which will be used to write and display the maze
-     * @return
-     */
-    std::string gen_maze(const function<int(int, int)>& get_int, const function<maze_types(const string& algo)> get_maze_algo_from_str, const string& current_maze_algo) {
-
-        mazes::maze_types my_maze_type = get_maze_algo_from_str(current_maze_algo);
-
-        auto _grid{ std::make_unique<mazes::grid>(this->m_gui.build_width, this->m_gui.build_length, this->m_gui.build_height) };
-
-	    bool success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
-
-        if (!success) {
-            return "";
-        }
-
-        stringstream ss;
-        ss << *_grid.get();
-        string grid_as_ascii{ ss.str() };
-
-        return grid_as_ascii;
-    }
-
-    // Return true when maze has been written
-    future<bool> write_maze(unique_ptr<ProgressTracker> const& progress, const string& filename) {
-        // helper lambda to write the Wavefront object file
-        auto convert_data_to_mesh_str = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
-            stringstream ss;
-            ss << "# https://www.github.com/zmertens/MazeBuilder\n";
-
-            // keep track of writing progress
-            int total_verts = vertices.size();
-            int total_faces = faces.size();
-            
-            int t = total_verts + total_faces;
-            int c = 0;
-            // Write vertices
-            for (const auto& vertex : vertices) {
-                ss << "v " << vertex.x << " " << vertex.y << " " << vertex.z << "\n";
-                c++;
-            }
-
-            // Write faces
-            for (const auto& face : faces) {
-                ss << "f";
-                for (auto index : face.vertices) {
-                    ss << " " << index;
-                }
-                ss << "\n";
-                c++;
-            }
-
-#if defined(MAZE_DEBUG)
-            SDL_Log("Writing maze progress: %d/%d", c, t);
-
-#endif
-
-            return ss.str();
-        };
-
-        if (progress) {
-            //progress->current_step.store(c);
-            //progress->total_steps.store(t);
-        }
-   
-
-        if (!filename.empty()) {
-            // get ready to write to file
-            writer maze_writer;
-            packaged_task<bool(const string& out_file)> maze_writing_task{ [this, &maze_writer, &convert_data_to_mesh_str](auto out)->bool {
-                return maze_writer.write(out, convert_data_to_mesh_str(this->m_vertices, this->m_faces)); } 
-            };
-            auto writing_results = maze_writing_task.get_future();
-            thread(std::move(maze_writing_task), filename ).detach();
-            return writing_results;
-        } else {
-            promise<bool> p;
-            p.set_value(false);
-            return p.get_future();
-        }
-    } // write_maze
-
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
         float matrix[16];
@@ -1793,6 +1771,7 @@ struct craft::craft_impl {
                 if (chunk) {
                     priority = chunk->buffer & chunk->dirty;
                 }
+                // Check for chunk to update based on lowest score
                 int score = (invisible << 24) | (priority << 16) | distance;
                 if (score < best_score) {
                     best_score = score;
@@ -1808,6 +1787,7 @@ struct craft::craft_impl {
         int b = best_b;
         int load = 0;
         Chunk *chunk = find_chunk(a, b);
+        // Check if the chunk is already loaded
         if (!chunk) {
             load = 1;
             if (this->m_model->chunk_count < MAX_CHUNKS) {
@@ -1829,9 +1809,9 @@ struct craft::craft_impl {
                     other = find_chunk(chunk->p + dp, chunk->q + dq);
                 }
                 if (other) {
-                    Map *block_map = (Map*) malloc(sizeof(Map));
+                    Map *block_map = (Map*) SDL_malloc(sizeof(Map));
                     map_copy(block_map, &other->map);
-                    Map *light_map = (Map*) malloc(sizeof(Map));
+                    Map *light_map = (Map*) SDL_malloc(sizeof(Map));
                     map_copy(light_map, &other->lights);
                     item->block_maps[dp + 1][dq + 1] = block_map;
                     item->light_maps[dp + 1][dq + 1] = light_map;
@@ -1844,25 +1824,22 @@ struct craft::craft_impl {
         }
         chunk->dirty = 0;
         worker->state = WORKER_BUSY;
-        // SDL_SignalCondition(worker->cnd);
-        cnd_signal(&worker->tiny_cnd);
+        worker->cnd.notify_one();
     } // ensure chunks worker
 
     void ensure_chunks(Player *player) {
         check_workers();
         force_chunks(player);
         for (auto&& worker : this->m_model->workers) {
-            // SDL_LockMutex(worker->mtx);
-            mtx_lock(&worker->tiny_mtx);
+            worker->mtx.lock();
             if (worker->state == WORKER_IDLE) {
                 ensure_chunks_worker(player, worker.get());
             }
-            // SDL_UnlockMutex(worker->mtx);
-            mtx_unlock(&worker->tiny_mtx);
+            worker->mtx.unlock();
         }
     }
 
-    void unset_sign(int x, int y, int z) {
+    void unset_sign(int x, int y, int z) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1878,7 +1855,7 @@ struct craft::craft_impl {
         }
     }
 
-    void unset_sign_face(int x, int y, int z, int face) {
+    void unset_sign_face(int x, int y, int z, int face) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1894,8 +1871,8 @@ struct craft::craft_impl {
         }
     }
 
-    void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) {
-        if (strlen(text) == 0) {
+    void _set_sign(int p, int q, int x, int y, int z, int face, const char *text, int dirty) const {
+        if (SDL_strlen(text) == 0) {
             unset_sign_face(x, y, z, face);
             return;
         }
@@ -1910,13 +1887,13 @@ struct craft::craft_impl {
         db_insert_sign(p, q, x, y, z, face, text);
     }
 
-    void set_sign(int x, int y, int z, int face, const char *text) {
+    void set_sign(int x, int y, int z, int face, const char *text) const {
         int p = chunked(x);
         int q = chunked(z);
         _set_sign(p, q, x, y, z, face, text, 1);
     }
 
-    void toggle_light(int x, int y, int z) {
+    void toggle_light(int x, int y, int z) const {
         int p = chunked(x);
         int q = chunked(z);
         Chunk *chunk = find_chunk(p, q);
@@ -1929,7 +1906,7 @@ struct craft::craft_impl {
         }
     }
 
-    void set_light(int p, int q, int x, int y, int z, int w) {
+    void set_light(int p, int q, int x, int y, int z, int w) const {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->lights;
@@ -1943,7 +1920,7 @@ struct craft::craft_impl {
         }
     }
 
-    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) {
+    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const {
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->map;
@@ -1963,7 +1940,7 @@ struct craft::craft_impl {
         }
     }
 
-    void set_block(int x, int y, int z, int w) {
+    void set_block(int x, int y, int z, int w) const {
         int p = chunked(x);
         int q = chunked(z);
         _set_block(p, q, x, y, z, w, 1);
@@ -1982,6 +1959,59 @@ struct craft::craft_impl {
             }
         }
     }
+
+    // Helper function to modify signs and lights before setting blocks in DB
+    void _set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks, int dirty) const {
+        for (auto&& block : blocks) {
+            int p = get<0>(block);
+            int q = get<1>(block);
+            int x = get<2>(block);
+            int y = get<3>(block);
+            int z = get<4>(block);
+            int w = get<5>(block);
+            Chunk* chunk = find_chunk(p, q);
+            if (chunk) {
+                Map* map = &chunk->map;
+                if (dirty && map_set(map, x, y, z, w)) {
+                    dirty_chunk(chunk);
+                }
+            } else {
+                // Pass
+			}
+            if (w == 0 && chunked(x) == p && chunked(z) == q) {
+                unset_sign(x, y, z);
+                set_light(p, q, x, y, z, 0);
+            }
+        } // for
+        db_insert_blocks(blocks);
+    }
+
+    // Tuple(p, q, x, y, z, w)
+    void set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
+        std::vector<std::tuple<int, int, int, int, int, int>> adjusted_blocks;
+        // Adjust blocks to account for chunk boundaries
+        for (auto& block : blocks) {
+            int x {get<2>(block)};
+            int z {get<4>(block)};
+            int p {chunked(x)};
+            int q {chunked(z)};
+            // Check if block is on the edge of the chunk
+            bool on_the_edge = false;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
+                        continue;
+                    }
+                    on_the_edge = true;
+                    adjusted_blocks.push_back(make_tuple(p + dx, q + dz, x, get<3>(block), z, -get<5>(block)));
+                }
+            }
+            if (!on_the_edge) {
+				adjusted_blocks.push_back(block);
+			}
+        }
+        _set_blocks_from_vec(cref(adjusted_blocks), 1);
+	}
 
     void record_block(int x, int y, int z, int w) {
         SDL_memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
@@ -2014,6 +2044,10 @@ struct craft::craft_impl {
         }
     }
 
+    /**
+     * @brief Prepares to render by ensuring the chunks are loaded
+     *
+     */
     int render_chunks(Attrib *attrib, Player *player) {
         int result = 0;
         State *s = &player->state;
@@ -2152,12 +2186,10 @@ struct craft::craft_impl {
         if (is_obstacle(hw)) {
             glUseProgram(attrib->program);
             glLineWidth(1);
-            // glEnable(GL_COLOR_LOGIC_OP);
             glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
             GLuint wireframe_buffer = gen_wireframe_buffer(hx, hy, hz, 0.53);
             draw_lines(attrib, wireframe_buffer, 3, 24);
             del_buffer(wireframe_buffer);
-            // glDisable(GL_COLOR_LOGIC_OP);
         }
     }
 
@@ -2166,12 +2198,10 @@ struct craft::craft_impl {
         set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
         glUseProgram(attrib->program);
         glLineWidth(4 * this->m_model->scale);
-        // glEnable(GL_COLOR_LOGIC_OP);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         GLuint crosshair_buffer = gen_crosshair_buffer();
         draw_lines(attrib, crosshair_buffer, 2, 4);
         del_buffer(crosshair_buffer);
-        // glDisable(GL_COLOR_LOGIC_OP);
     }
 
     void render_item(Attrib *attrib) {
@@ -2202,7 +2232,7 @@ struct craft::craft_impl {
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 1);
         glUniform1i(attrib->extra1, 0);
-        int length = strlen(text);
+        int length = SDL_strlen(text);
         x -= n * justify * (length - 1) / 2;
         GLuint buffer = gen_text_buffer(x, y, n, text);
         draw_text(attrib, buffer, length);
@@ -2210,15 +2240,13 @@ struct craft::craft_impl {
     }
 
     void add_message(const char *text) {
-        printf("%s\n", text);
-        snprintf(
-            this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
+        SDL_snprintf(this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
         this->m_model->message_index = (this->m_model->message_index + 1) % MAX_MESSAGES;
     }
 
     void copy() {
-        memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
-        memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
+        SDL_memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
+        SDL_memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
     }
 
     void paste() {
@@ -2404,9 +2432,6 @@ struct craft::craft_impl {
     }
 
     void parse_command(const char *buffer, int forward) {
-        char username[128] = {0};
-        char token[128] = {0};
-        char filename[MAX_PATH_LENGTH];
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2525,7 +2550,7 @@ struct craft::craft_impl {
 
     /**
     * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    * This function also checks if user is interacting with gui to prevent mouse hiding
+    * @brief This function also checks if user is interacting with the GUI
     * @param dt
     * @param running reference to running loop in game loop
     * @return bool return true when event handle successfully
@@ -2552,10 +2577,6 @@ struct craft::craft_impl {
                 case SDL_EVENT_KEY_UP: {
                     sc = e.key.scancode;
                     switch (sc) {
-                    case SDL_SCANCODE_INSERT:
-                        if (this->m_model->typing) {
-                            this->m_model->typing = 0;
-                        }
                     }
                     break;
                 }
@@ -2567,11 +2588,13 @@ struct craft::craft_impl {
                         SDL_SetRelativeMouseMode(SDL_FALSE);
                         this->m_gui.capture_mouse = false;
                         this->m_gui.fullscreen = false;
+                        this->m_gui.show_builder_gui = true;
+                        this->m_model->typing = 0;
                         break;
                     }
                     case SDL_SCANCODE_RETURN: {
                         if (this->m_model->typing) {
-                            if (mod_state /*& (KMOD_LSHIFT | KMOD_RSHIFT)*/) {
+                            if (mod_state) {
                                 if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                                     this->m_model->typing_buffer[this->m_model->text_len] = '\n';
                                     this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
@@ -2585,6 +2608,7 @@ struct craft::craft_impl {
                                         set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                     }
                                 } else if (this->m_model->typing_buffer[0] == '/') {
+
                                     this->parse_command(this->m_model->typing_buffer, 1);
                                 }
                             }
@@ -2599,7 +2623,7 @@ struct craft::craft_impl {
                     }
                     case SDL_SCANCODE_V: {
                         if (control) {
-                            char* clip_buffer = SDL_GetClipboardText();
+                            auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
                             if (this->m_model->typing) {
                                 this->m_model->suppress_char = 1;
                                 SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
@@ -2607,22 +2631,19 @@ struct craft::craft_impl {
                             } else {
                                 parse_command(clip_buffer, 0);
                             }
+                            SDL_free(clip_buffer);
                         }
                         break;
                     }
-                    case SDL_SCANCODE_0: {
-                        if (!this->m_model->typing)
-                            this->m_model->item_index = 9;
-                        break;
-                    }
-                    case SDL_SCANCODE_1: [[fallthrough]];
-                    case SDL_SCANCODE_2: [[fallthrough]];
-                    case SDL_SCANCODE_3: [[fallthrough]];
-                    case SDL_SCANCODE_4: [[fallthrough]];
-                    case SDL_SCANCODE_5: [[fallthrough]];
-                    case SDL_SCANCODE_6: [[fallthrough]];
-                    case SDL_SCANCODE_7: [[fallthrough]];
-                    case SDL_SCANCODE_8: [[fallthrough]];
+                    case SDL_SCANCODE_0:
+                    case SDL_SCANCODE_1:
+                    case SDL_SCANCODE_2:
+                    case SDL_SCANCODE_3:
+                    case SDL_SCANCODE_4:
+                    case SDL_SCANCODE_5:
+                    case SDL_SCANCODE_6:
+                    case SDL_SCANCODE_7:
+                    case SDL_SCANCODE_8:
                     case SDL_SCANCODE_9: {
                         if (this->m_gui.capture_mouse && !this->m_model->typing)
                             this->m_model->item_index = (sc - SDL_SCANCODE_1);
@@ -2634,12 +2655,12 @@ struct craft::craft_impl {
                         break;
                     }
                     case KEY_ITEM_NEXT: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                         break;
                     }
                     case KEY_ITEM_PREV: {
-                        if (!this->m_model->typing) {
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
                             this->m_model->item_index--;
                             if (this->m_model->item_index < 0)
                                 this->m_model->item_index = item_count - 1;
@@ -2647,32 +2668,38 @@ struct craft::craft_impl {
                         break;
                     }
                     case KEY_OBSERVE: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
                         break;
                     }
                     case KEY_OBSERVE_INSET: {
-                        if (!this->m_model->typing)
+                        if (!this->m_model->typing && this->m_gui.capture_mouse)
                             this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                         break;
                     }
                     case KEY_CHAT: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        this->m_model->text_len = 0;
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            this->m_model->text_len = 0;
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
                     }
                     case KEY_COMMAND: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
                     }
                     case KEY_SIGN: {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
+                        if (!this->m_model->typing && this->m_gui.capture_mouse) {
+                            this->m_model->typing = 1;
+                            this->m_model->typing_buffer[0] = '\0';
+                            SDL_StartTextInput(this->m_model->window);
+                        }
                         break;
 
                     }
@@ -2680,13 +2707,9 @@ struct craft::craft_impl {
                     break;
                 } // case SDL_EVENT_KEY_DOWN
                 case SDL_EVENT_TEXT_INPUT: {
-                    // could probably just do text[text_len++] = e.text.text[0]
-                    // since I only handle ascii
                     if (this->m_gui.capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                        strcat(this->m_model->typing_buffer, e.text.text);
+                        SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
                         this->m_model->text_len += SDL_strlen(e.text.text);
-                        //SDL_Log("text is \"%s\" \"%s\" %d %d\n", this->m_model->typing_buffer, composition, cursor, selection_len);
-                        //SDL_LogError(SDL_LOG_CATEGORY_ERROR, "text is \"%s\" \"%s\" %d %d\n", text, composition, cursor, selection_len);
                     }
                     break;
                 }
@@ -2901,7 +2924,7 @@ struct craft::craft_impl {
         SDL_GL_SetSwapInterval(VSYNC);
 
         auto icon_path{ "textures/maze_in_green_32x32.bmp" };
-        SDL_Surface* icon_surface = SDL_LoadBMP(icon_path);
+        SDL_Surface *icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path, "rb"), SDL_TRUE);
         if (icon_surface) {
             SDL_SetWindowIcon(this->m_model->window, icon_surface);
             SDL_DestroySurface(icon_surface);
@@ -2941,10 +2964,14 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(const std::function<int(int, int)>& get_int, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
-
-    srand(time(nullptr));
-    rand();
+bool craft::run(unsigned long seed, const std::list<std::string>& algos, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) noexcept {
+    // Init RNG engine
+    std::mt19937 rng_machine{ seed };
+    this->m_pimpl->m_gui.seed = seed;
+    auto get_int = [&rng_machine](int min, int max) {
+		std::uniform_int_distribution<int> dist{ min, max };
+		return dist(rng_machine);
+	};
 
     // SDL INITIALIZATION //
     if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
@@ -3050,9 +3077,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     program = load_program("shaders/block_vertex.glsl", "shaders/block_fragment.glsl");
 #endif
     block_attrib.program = program;
-    block_attrib.position = glGetAttribLocation(program, "position");
-    block_attrib.normal = glGetAttribLocation(program, "normal");
-    block_attrib.uv = glGetAttribLocation(program, "uv");
+    block_attrib.position = 0;
+    block_attrib.normal = 1;
+    block_attrib.uv = 2;
     block_attrib.matrix = glGetUniformLocation(program, "matrix");
     block_attrib.sampler = glGetUniformLocation(program, "sampler");
     block_attrib.extra1 = glGetUniformLocation(program, "sky_sampler");
@@ -3068,7 +3095,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     program = load_program("shaders/line_vertex.glsl", "shaders/line_fragment.glsl");
 #endif
     line_attrib.program = program;
-    line_attrib.position = glGetAttribLocation(program, "position");
+    line_attrib.position = 0;
     line_attrib.matrix = glGetUniformLocation(program, "matrix");
 
 #if defined(__EMSCRIPTEN__)
@@ -3077,8 +3104,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     program = load_program("shaders/text_vertex.glsl", "shaders/text_fragment.glsl");
 #endif
     text_attrib.program = program;
-    text_attrib.position = glGetAttribLocation(program, "position");
-    text_attrib.uv = glGetAttribLocation(program, "uv");
+    text_attrib.position = 0;
+    text_attrib.uv = 1;
     text_attrib.matrix = glGetUniformLocation(program, "matrix");
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
@@ -3089,14 +3116,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     program = load_program("shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
 #endif
     sky_attrib.program = program;
-    sky_attrib.position = glGetAttribLocation(program, "position");
-    sky_attrib.normal = 1; // glGetAttribLocation(program, "normal");
-    sky_attrib.uv = glGetAttribLocation(program, "uv");
+    sky_attrib.position = 0;
+    sky_attrib.normal = 1;
+    sky_attrib.uv = 2;
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
-
-    snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
+    
+    SDL_snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
     m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
@@ -3123,26 +3150,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 #endif
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
 
-    // Load Fonts
-    // - If no fonts are loaded, dear imgui will use the default font. 
-    // You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-    // - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-    // - If the file cannot be loaded, the function will return a nullptr. 
-    // Please handle those errors in your application (e.this->m_model. use an assertion, or display an error and quit).
-    // - The fonts will be rasterized at a given size (w/ oversampling) 
-    // and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which ImGui_ImplXXXX_NewFrame below will call.
-    // - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-    // - Read 'docs/FONTS.md' for more instructions and details.
-    // - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-    // - Our Emscripten build process allows embedding fonts to be accessible at runtime from the "fonts/" folder. 
-    // See Makefile.emscripten for details.
-    io.Fonts->AddFontDefault();
-    // io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-    // io.Fonts->AddFontFromFileTTF("./DroidSans.ttf", 16.0f);
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-    // io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-    // ImFont* im_font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesJapanese());
-    // IM_ASSERT(im_font != nullptr);
+    ImFont *nunito_sans_font = io.Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
+
+#if defined(MAZE_DEBUG)
+    IM_ASSERT(nunito_sans_font != nullptr);
+#endif
     
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
@@ -3209,13 +3221,166 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     check_for_gl_err();
 #endif
 
-    // BEGIN EVENT LOOP
-    craft_impl::Maze maze{ "" };
+    // Init some local vars for handling maze duties
+    auto my_maze_type = get_maze_algo_from_str(algos.back());
     future<bool> write_success;
-    auto progress_tracker = std::make_unique<craft::craft_impl::ProgressTracker>();
+
+    auto gen_maze = [this, &get_int, &rng_machine](unsigned int width, unsigned int length, unsigned int height, maze_types my_maze_type) -> string {
+        auto _grid{ std::make_unique<mazes::grid>(width, length, height) };
+
+        bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng_machine));
+
+        if (!success) {
+            return "";
+        }
+
+        stringstream ss;
+        ss << *_grid.get();
+        string grid_as_ascii{ ss.str() };
+        return grid_as_ascii;
+    }; // gen_maze
+
+    auto&& gui_opts = this->m_pimpl->m_gui;
+    this->m_pimpl->m_maze = make_unique<craft_impl::Maze>(gen_maze(gui_opts.build_width, gui_opts.build_length, gui_opts.build_height, my_maze_type));
+    auto&& maze2 = this->m_pimpl->m_maze;
+
+    /**
+    * @brief Parses the grid, and builds a 3D grid using (p, q, x, y, z, w) and index elements
+    *   p, q, and w are initialize with default values - set later
+    * Calling this function will also call set_block, record_block to DB
+    * Specify a "starting_height" to try to put the maze above the heightmap (mountains), and below the clouds
+    * @param height of the grid
+    * @param grid_as_ascii
+    * @return
+    */
+    auto compute_maze_geometry = [&maze2, &get_int, &rng_machine](unsigned int height) {    
+        istringstream iss{ maze2->get_maze().data() };
+        string line;
+        unsigned int row_x = 0;
+        while (getline(iss, line, '\n')) {
+            unsigned int col_z = 0;
+            for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+                if (*itr == '+' || *itr == '-' || *itr == '|') {
+                    // Check for barriers and walls then iterate up/down
+                    static constexpr unsigned int starting_height = 30u;
+                    static constexpr unsigned int block_size = 1;
+                    auto w{ get_int(1, 10) };
+                    for (auto h{ starting_height }; h < starting_height + height; h++) {
+                        // Update the data source that stores the maze geometry
+                        // There are 2 data sources, one for rendering and one for writing
+                        maze2->add_block(row_x, h, col_z, w, block_size);
+                    }
+        
+                }
+                col_z++;
+            }
+
+            row_x++;
+        } // getline
+    }; // compute_maze_geometry
+
+    auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<tuple<int, int, int, int, int, int>>& vertices) {
+        // Set the block in the craft, this performs a DB insert query
+        //this->m_pimpl->set_blocks_from_vec(cref(vertices));
+        for (auto&& block : vertices) {
+            // Set the block in the DB
+            this->m_pimpl->set_block(get<2>(block), get<3>(block), get<4>(block), get<5>(block));
+			// Record the block in craft
+			this->m_pimpl->record_block(get<2>(block), get<3>(block), get<4>(block), get<5>(block));
+		}
+	}; // set_maze_in_craft
+
+//    auto distribute_maze_parts = [this, &maze2]() {
+//        // iterate over the maze and split by delimiter
+//        static constexpr auto delimiter = '\n';
+//        vector<tuple<string::const_iterator, string::const_iterator>> lines;
+//
+//        // 1) Split the maze into lines by delimiter
+//        auto start_of_maze = maze_str.cbegin();
+//        for (auto it = start_of_maze; it != maze_str.cend(); it++) {
+//            if (*it == delimiter || (it + 1) == maze_str.cend()) {
+//                auto end_of_line = (*it == delimiter) ? it : it + 1;
+//                lines.emplace_back(start_of_maze, end_of_line);
+//                start_of_maze = it + 1;
+//            }
+//        }
+//
+//        // 2) Calc how many lines each worker thread will get
+//        size_t total_lines = lines.size();
+//        size_t workers_size = this->m_pimpl->m_model->workers.size();
+//        // prevent division by zero
+//        auto num_workers = (workers_size == 0) ? 1 : workers_size;
+//        size_t lines_per_worker = total_lines / num_workers;
+//        size_t extra_lines = total_lines % num_workers;
+//
+//        // 3) Distribute the lines to the worker threads
+//        auto it = lines.cbegin();
+//        size_t last_line = 0;
+//        tuple<string::const_iterator, string::const_iterator> maze_parts;
+//        for (auto i{ 0 }; i < num_workers; i++) {
+//            auto&& worker = this->m_pimpl->m_model->workers.at(i);
+//            lock_guard<mutex> lock{ worker->mtx };
+//
+//            // Calc the number of lines this worker gets
+//            size_t num_lines_this_worker = lines_per_worker + (i < extra_lines ? 1 : 0);
+//
+//            string::const_iterator worker_lines_begin = get<0>(*it);
+//            advance(it, num_lines_this_worker - 1);
+//            string::const_iterator worker_lines_end = get<1>(*it);
+//            advance(it, 1);
+//
+//#if defined(MAZE_DEBUG)
+//            string maze_part{ worker_lines_begin, worker_lines_end };
+//            SDL_Log("Worker: %d gets starts processing at line %d with string length: %d\n",
+//                static_cast<int>(i), static_cast<int>(last_line), static_cast<int>(maze_part.length()));
+//#endif
+//            // Skip the iterator ahead based on the number of lines this worker got
+//            last_line += num_lines_this_worker;
+//
+//            // This tuple holds the begin, end points that this worker will process
+//            maze_parts = make_tuple(worker_lines_begin, worker_lines_end);
+//            // This compute_maze_parts will set the coords for the world per each worker thread
+//            compute_maze_parts(std::move(worker), cref(maze_parts));
+//        } // num_workers
+//    }; // distribute_maze_parts
+
+    auto reset_fields = [&gui_opts, &maze2]() {
+        gui_opts.reset_outfile();
+        maze2->clear();
+	};
+
+    auto json_writer = [&maze2](const string& outfile) -> string {
+        auto&& vertices = maze2->get_write_vertices();
+        auto&& faces = maze2->get_faces();
+        stringstream ss;
+        // Set key if outfile is specified
+        ss << "{\"name\":\"" << outfile << "\", \"data\":[";
+        // Wavefront object file header
+        ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
+        for (const auto& vertex : vertices) {
+            ss << ",\"v " << get<2>(vertex) << " " << get<3>(vertex) << " " << get<4>(vertex) << "\\n\"";
+        }
+
+        // Note in writing the face that the index is 1-based
+        // Also, there is no space after the 'f', until the loop
+        for (const auto& face : faces) {
+            ss << ",\"f";
+            for (auto index : face.vertices) {
+                ss << " " << index;
+            }
+            ss << "\\n\"";
+        }
+
+        ss << "]}";
+
+        return ss.str();
+    };
+
+    auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
 
     bool running = true;
     int previous = SDL_GetTicks();
+    // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
@@ -3239,9 +3404,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 
         // ImGui window variables
         static bool show_demo_window = false;
-        static bool show_builder_gui = true;
-        static string current_maze_algo = "binary_tree";
-        static char current_maze_outfile[64] = ".obj";
         bool events_handled_success = m_pimpl->handle_events(dt, running);
 
         // Start the Dear ImGui frame
@@ -3253,7 +3415,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        if (show_builder_gui) {
+        if (gui_opts.show_builder_gui) {
+            ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.data());
             // GUI Tabs
@@ -3262,33 +3425,32 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
 
-                    static unsigned int MAX_MAZE_WIDTH = 100;
-                    if (ImGui::SliderInt("Width", &this->m_pimpl->m_gui.build_width, 1, MAX_MAZE_WIDTH)) {
+                    static unsigned int MAX_MAZE_WIDTH = 32;
+                    if (ImGui::SliderInt("Width", &gui_opts.build_width, 1, MAX_MAZE_WIDTH)) {
 
                     }
-                    static unsigned int MAX_MAZE_LENGTH = 100;
-                    if (ImGui::SliderInt("Length", &this->m_pimpl->m_gui.build_length, 1, MAX_MAZE_LENGTH)) {
+                    static unsigned int MAX_MAZE_LENGTH = 32;
+                    if (ImGui::SliderInt("Length", &gui_opts.build_length, 1, MAX_MAZE_LENGTH)) {
 
                     }
                     static unsigned int MAX_MAZE_HEIGHT = 15;
-                    if (ImGui::SliderInt("Height", &this->m_pimpl->m_gui.build_height, 1, MAX_MAZE_HEIGHT)) {
+                    if (ImGui::SliderInt("Height", &gui_opts.build_height, 1, MAX_MAZE_HEIGHT)) {
                       
                     }
-                    if (ImGui::SliderInt("Seed", &this->m_pimpl->m_gui.seed, 1, 100)) {
-
+                    static unsigned int MAX_SEED_VAL = 1'000;
+                    if (ImGui::SliderInt("Seed", &gui_opts.seed, 0, MAX_SEED_VAL)) {
+                        rng_machine.seed(static_cast<unsigned long>(gui_opts.seed));
                     }
-                    ImGui::InputText("Outfile", &current_maze_outfile[0], IM_ARRAYSIZE(current_maze_outfile));
-                    if (ImGui::TreeNode("Algorithms")) {
-                        static const char* algos[2] = { "binary_tree", "sidewinder" };
-                        static int algos_current_idx{ 0 };
-                        auto preview{ algos[algos_current_idx] };
-                        ImGui::SameLine();
-                        if (ImGui::BeginCombo("algorithm", preview)) {
-                            for (int n = 0; n < 2; n++) {
-                                const bool is_selected = (algos_current_idx == n);
-                                if (ImGui::Selectable(algos[n], is_selected)) {
-                                    algos_current_idx = n;
-                                    current_maze_algo = algos[algos_current_idx];
+                    ImGui::InputText("Outfile", &gui_opts.outfile[0], IM_ARRAYSIZE(gui_opts.outfile));
+                    if (ImGui::TreeNode("Maze Generator")) {
+                        auto preview{ gui_opts.algo.c_str() };
+                        ImGui::NewLine();
+                        ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
+                        if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
+                            for (const auto& itr : algos) {
+                                bool is_selected = (itr == gui_opts.algo);
+                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
+                                    gui_opts.algo = itr;
                                 }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)
@@ -3296,27 +3458,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                             }
                             ImGui::EndCombo();
                         }
+                        ImGui::NewLine();
                         ImGui::TreePop();
                     }
 
-                    auto reset_current_outfile = []() {
-                        for (auto i = 0; i < IM_ARRAYSIZE(current_maze_outfile); ++i) {
-                            current_maze_outfile[i] = '\0';
-                        }
-                        current_maze_outfile[0] = '.';
-                        current_maze_outfile[1] = 'o';
-                        current_maze_outfile[2] = 'b';
-                        current_maze_outfile[3] = 'j';
-                    };
-
                     // Check if user has added a prefix to the Wavefront object file
-                    if (current_maze_outfile[0] != '.') {
-                        if (ImGui::Button("Build!")) {
-                            this->m_pimpl->m_gui.outfile = current_maze_outfile;
-                            maze.set_maze(this->m_pimpl->gen_maze(get_int, get_maze_algo_from_str, current_maze_algo));
+                    if (gui_opts.outfile[0] != '.') {
+                        if (!gui_opts.build_now && ImGui::Button("Build!")) {
+                            gui_opts.build_now = true;
                         } else {
                             ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", current_maze_outfile);
+                            ImGui::Text("Building maze... %s\n", gui_opts.outfile);
                         }
                     } else {
                         // Disable the button
@@ -3331,58 +3483,38 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                         ImGui::EndDisabled();
                     }
 
-                    // Check if maze is available and then perform two sequential operations:
-                    // 1. Set the blocks of the maze (this will update the class member variables storing vertex data
-                    // 2. Write the maze to a Wavefront object file using the vertex data
-                    if (!maze.get_maze().empty()) {
-                        // set grid in craft - 3D world - update class members which store vertex data
-                        bool success = this->m_pimpl->set_grid(this->m_pimpl->m_gui.build_height, maze.get_maze());
-                        if (success) {
-                            write_success = this->m_pimpl->write_maze(progress_tracker, this->m_pimpl->m_gui.outfile);
-                        } else {
-                            ImGui::NewLine(); ImGui::NewLine();
-                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.9f, 0.83f, 0.015f, 1.0f));
-                            ImGui::Text("Failed to write maze: %s", this->m_pimpl->m_gui.outfile.c_str());
-                            ImGui::NewLine();
-                            ImGui::PopStyleColor();
-                        }
-                        maze.set_maze("");
-                    }
-
+                    // Let JavaScript handle file downloads in web browser
+#if !defined(__EMSCRIPTEN)  
                     if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                        // call the writer future and get the result
+                        // Call the writer future and get the result
                         bool success = write_success.get();
-#if !defined(__EMSCRIPTEN__)
-                        if (success) {
+                        if (success && gui_opts.outfile[0] != '.') {
                             // Dont display a message on the web browser, let the web browser handle that
                             ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Maze written to %s\n", gui_opts.outfile);
                             ImGui::NewLine();
                         } else {
                             ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", this->m_pimpl->m_gui.outfile);
+                            ImGui::Text("Failed to write maze: %s\n", gui_opts.outfile);
                             ImGui::NewLine();
                         }
-#endif
-                        maze.set_maze("");
+                        // Reset outfile's first char and that will disable the Build! button
+                        gui_opts.outfile[0] = '.';
                     }
+#endif
                     if (progress_tracker) {
                         // Show progress when writing
-                        //ImGui::NewLine(); ImGui::NewLine();
-                        //ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                        //ImGui::Text("Progress: %d / %d", progress_tracker->current_step.load(), progress_tracker->total_steps.load());
-                        //ImGui::NewLine();
-                        //ImGui::PopStyleColor();
+                        ImGui::NewLine(); ImGui::NewLine();
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+                        ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
+                        ImGui::NewLine();
+                        ImGui::PopStyleColor();
                     }
 
-                    // Resets all vertex data
+                    // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     if (ImGui::Button("Reset")) {
-                        this->m_pimpl->m_vertices.clear();
-                        this->m_pimpl->m_faces.clear();
-                        reset_current_outfile();
-                        this->m_pimpl->m_gui.outfile.clear();
-                        maze.set_maze("");
+                        reset_fields();
                     }
                     ImGui::PopStyleColor();
                     
@@ -3391,15 +3523,15 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
                 if (ImGui::BeginTabItem("Graphics")) {
                     ImGui::Text("Graphic settings");
                     
-                    ImGui::Checkbox("Dark Mode", &this->m_pimpl->m_gui.color_mode_dark);
-                    if (this->m_pimpl->m_gui.color_mode_dark)
+                    ImGui::Checkbox("Dark Mode", &gui_opts.color_mode_dark);
+                    if (gui_opts.color_mode_dark)
                         ImGui::StyleColorsDark();
                     else
                         ImGui::StyleColorsLight();
                     
                     // fullscreen off on launch
-                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &this->m_pimpl->m_gui.fullscreen);
-                    if (this->m_pimpl->m_gui.fullscreen) {
+                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui_opts.fullscreen);
+                    if (gui_opts.fullscreen) {
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_TRUE);
                         //this->m_pimpl->set_model_using_fullscreen_modes();
                     } else {
@@ -3408,11 +3540,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
 
                     SDL_GetWindowSizeInPixels(this->m_pimpl->m_model->window, &this->m_pimpl->m_model->width, &this->m_pimpl->m_model->height);
                     
-                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &this->m_pimpl->m_gui.capture_mouse);
-                    if (this->m_pimpl->m_gui.capture_mouse && !SDL_GetRelativeMouseMode()) {
+                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui_opts.capture_mouse);
+                    if (gui_opts.capture_mouse) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         // Hide GUI when the user captures the mouse
-                        show_builder_gui = false;
+                        gui_opts.show_builder_gui = false;
                     }
                                     
                     ImGui::EndTabItem();
@@ -3430,11 +3562,45 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             ImGui::NewLine();
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
-
+            ImGui::PopFont();
         } // show_builder_gui
+
         // When ESCAPE is pressed and the mouse is captured, the SDL_Event loop will catch and release the mouse
-        if (!this->m_pimpl->m_gui.capture_mouse && !show_builder_gui && !SDL_GetRelativeMouseMode()) {
-            show_builder_gui = true;
+        // This action reveals the GUI anytime the user hits ESCAPE
+        if (!gui_opts.capture_mouse && !gui_opts.show_builder_gui) {
+            gui_opts.show_builder_gui = true;
+        }
+
+        if (gui_opts.build_now) {
+            // Clear the default maze
+            maze2->clear();
+            gui_opts.build_now = false;
+            progress_tracker->start();
+            auto my_maze_type = get_maze_algo_from_str(gui_opts.algo);
+            auto width = gui_opts.build_width;
+            auto length = gui_opts.build_length;
+            auto height = gui_opts.build_height;
+            maze2->set_maze(gen_maze(width, length, height, my_maze_type));
+
+            // Check if maze is available and then perform two sequential operations:
+            // 1. Compute maze geometry for 3D coordinates (includes a height value)
+            // 2. Write the maze to a Wavefront object file using the computed data
+            if (!maze2->get_maze().empty()) {
+                compute_maze_geometry(height);
+                set_maze_in_craft(maze2->get_render_vertices());
+                // Writing the maze will run in the background - only do that on Desktop
+#if !defined(__EMSCRIPTEN__ )
+                write_success = maze2->write_maze_as_wavefront_obj(gui_opts.outfile);
+#elif defined(__EMSCRIPTEN__)
+                auto&& maze_str = json_writer(gui_opts.outfile);
+                this->set_json(maze_str);
+                reset_fields();
+                //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
+#endif
+            } else {
+                // Failed to set maze
+            }
+            progress_tracker->stop();
         }
 
         // FLUSH DATABASE 
@@ -3443,6 +3609,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             db_commit();
         }
     
+        craft_impl::Player* player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
+
         // PREPARE TO RENDER 
         m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
         m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
@@ -3454,8 +3622,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
-
-        craft_impl::Player *player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
 
         // RENDER 3-D SCENE
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3489,7 +3655,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             char am_pm = hour < 12 ? 'a' : 'p';
             hour = hour % 12;
             hour = hour ? hour : 12;
-            snprintf(
+            SDL_snprintf(
                 text_buffer, 1024,
                 "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
                 m_pimpl->chunked(s->x), m_pimpl->chunked(s->z), s->x, s->y, s->z,
@@ -3501,7 +3667,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
         if (SHOW_CHAT_TEXT) {
             for (int i = 0; i < MAX_MESSAGES; i++) {
                 int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
-                if (strlen(m_pimpl->m_model->messages[index])) {
+                if (SDL_strlen(m_pimpl->m_model->messages[index])) {
                     m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
                         m_pimpl->m_model->messages[index]);
                     ty -= ts * 2;
@@ -3509,7 +3675,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             }
         }
         if (m_pimpl->m_model->typing) {
-            snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
+            SDL_snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
             m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
         }
         if (SHOW_PLAYER_NAMES) {
@@ -3576,7 +3742,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
             emscripten_cancel_main_loop();
 #endif
         }
-    }  // EVENT LOOP
+    } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_END;
@@ -3622,41 +3788,23 @@ bool craft::run(const std::function<int(int, int)>& get_int, const std::function
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
 
-    SDL_GL_DeleteContext(m_pimpl->m_model->context);
+    SDL_GL_DestroyContext(m_pimpl->m_model->context);
     SDL_DestroyWindow(m_pimpl->m_model->window);
     SDL_Quit();
 
     return true;
 }  // run
 
-// Used by Emscripten mostly to produce a JSON string containing the vertex data
-// returns JSON-encoded string:
-//  return "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
-std::string craft::get_vertex_data_as_json() const noexcept {
-    auto json_writer = [this](const vector<craft_impl::Vertex>& vertices, const vector<craft_impl::Face>& faces) {
-        stringstream ss;
-        // Set key if outfile is specified
-        ss << "{\"name\":\"" << this->m_pimpl->m_gui.outfile << "\", \"data\":[";
-        // Wavefront object file header
-        ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
-        for (const auto& vertex : vertices) {
-            ss << ",\"v " << vertex.x << " " << vertex.y << " " << vertex.z << "\\n\"";
-        }
-        
-        // Note in writing the face that the index is 1-based
-        // Also, there is no space after the 'f', until the loop
-        for (const auto& face : faces) {
-            ss << ",\"f";
-            for (auto index : face.vertices) {
-                ss << " " << index;
-            }
-            ss << "\\n\"";
-        }
+void craft::set_json(const string& s) noexcept {
+    this->json = s;
+}
 
-        ss << "]}";
-
-        return ss.str();
-    };
-
-    return json_writer(this->m_pimpl->m_vertices, this->m_pimpl->m_faces);
+/**
+ * 
+ * 
+ * @brief Used by Emscripten mostly to produce a JSON string containing the vertex data
+ * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
+ */
+std::string craft::get_json() const noexcept {
+    return this->json;
 }

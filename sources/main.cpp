@@ -2,50 +2,54 @@
 #include <memory>
 #include <exception>
 #include <iostream>
-#include <string_view>
 #include <sstream>
 #include <future>
 #include <thread>
 #include <algorithm>
-
-#include "craft.h"
-
-#if defined(__EMSCRIPTEN__)
-#include <emscripten/bind.h>
-    // bind a getter method from C++ so that it can be accessed in the frontend with JS
-    EMSCRIPTEN_BINDINGS(maze_builder_module) {
-        emscripten::class_<craft>("craft")
-            .constructor<std::string, std::string, std::string>()
-            .function("get_vertex_data_as_json", &craft::get_vertex_data_as_json);
-   }
-#endif
+#include <vector>
+#include <list>
 
 #include "grid.h"
 #include "args_builder.h"
 #include "maze_types_enum.h"
 #include "maze_factory.h"
 #include "writer.h"
+#include "craft.h"
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/bind.h>
+
+    // bind a getter method from C++ so that it can be accessed in the frontend with JS
+    EMSCRIPTEN_BINDINGS(maze_builder_module) {
+        emscripten::class_<craft>("craft")
+            .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
+            .constructor<const std::string&, const std::string&, const std::string&>()
+            .property("json", &craft::get_json, &craft::set_json)
+            .function("set_json", &craft::set_json)
+            .function("get_json", &craft::get_json)
+            .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
+   }
+#endif
 
 int main(int argc, char* argv[]) {
 
 #if defined(MAZE_DEBUG)
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1] - DEBUG";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5] - DEBUG";
 #else
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.0.1]";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5]";
 #endif
 
     static constexpr auto HELP_MSG = R"help(
-        Usages: maze_builder [OPTION]... [OUT_FILE]
-        Generates mazes in ASCII-format or Wavefront object format
-        Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
-        Options specify how to generate the maze and file output:
+        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
+        Generates mazes and exports to ASCII-format or Wavefront object format
+        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
           -a, --algorithm    binary_tree [default], sidewinder
           -s, --seed         seed for the random number generator [mt19937]
           -w, --width        maze width [default=100]
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
-          -o, --output       stdout [default], plain text [.txt] or Wavefront object format [.obj]
+          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
           -h, --help         display this help message
           -v, --version      display program version
     )help";
@@ -68,6 +72,11 @@ int main(int argc, char* argv[]) {
     auto&& args_map {args.build()};
     // this needs to get called after args.build() because of internal parsing
     auto state_of_args{ args.get_state() };
+#if defined(MAZE_DEBUG)
+    for (auto&& [k, v] : args.build()) {
+            std::cout << "INFO: " << k << ", " << v << "\n";
+    }
+#endif
     
     if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
         std::cout << HELP_MSG << std::endl;
@@ -77,16 +86,16 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    auto use_this_for_seed = args_map.at("seed");
-    auto get_int = [](int low, int high) -> int {
+    auto user_seed_or_not = static_cast<unsigned long>(args.get_seed());
+    auto seed_as_ul = user_seed_or_not;
+    std::mt19937 rng_engine{ seed_as_ul };
+    auto get_int = [&rng_engine](int low, int high) -> int {
         using namespace std;
-        random_device rd;
-        seed_seq seed {rd()};
-        mt19937 rng_engine {seed};
         uniform_int_distribution<int> dist {low, high};
         return dist(rng_engine);
     };
 
+    std::list<std::string> algos = { "binary_tree", "sidewinder" };
     auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
         using namespace std;
         if (algo.compare("binary_tree") == 0) {
@@ -105,12 +114,14 @@ int main(int argc, char* argv[]) {
             std::string window_title {"Maze Builder"};
             std::string version { MAZE_BUILDER_VERSION };
             std::string help { HELP_MSG };
-            craft maze_builder_3D {window_title, version, help };
-            success = maze_builder_3D.run(std::ref(get_int), std::ref(get_maze_type_from_algo));
+            auto&& maze_builder_3D = craft::get_instance(window_title, version, help);
+            // craft uses it's own RNG engine, which looks a lot like the one here
+            success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
-            success = mazes::maze_factory::gen_maze(my_maze_type, _grid, get_int);
+            
+            success = mazes::maze_factory::gen_maze(my_maze_type, std::ref(_grid), std::cref(get_int), std::cref(rng_engine));
             if (success) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &args](auto data)->bool {

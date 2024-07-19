@@ -30,7 +30,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(BUILD_TESTS "Build ${PROJECT_NAME} tests" OFF)
+option(BUILD_MAZE_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
 set(DEAR_IMGUI_SRCS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui.cpp
@@ -55,7 +55,6 @@ set(DEAR_IMGUI_HEADERS
 set(GLAD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c)
 set(NOISE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c)
-set(TINY_C_THREAD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/tinycthread/tinycthread.c)
 
 set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/args_builder.cpp
@@ -88,7 +87,7 @@ add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
 target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
-add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES} ${TINY_C_THREAD_SOURCES})
+add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
@@ -129,8 +128,8 @@ if(EMSCRIPTEN)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
-    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
-        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1"
+    	"SHELL:-s PTHREAD_POOL_SIZE=4 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
+        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"
@@ -201,8 +200,9 @@ endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
 
-if(BUILD_TESTS)
+if(BUILD_MAZE_TESTS)
     find_package(Catch2 3 QUIET)
     if(CATCH2_FOUND)
         message(INFO ": Getting Catch2 via find_package")
@@ -213,10 +213,13 @@ if(BUILD_TESTS)
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
+    enable_testing()
+
     file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
 
     # These tests can use the Catch2-provided main
     add_executable(${MAZE_BUILDER_TESTS_OUTFILE} ${TEST_FILES})
+    add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_OUTFILE})
     target_compile_features(${MAZE_BUILDER_TESTS_OUTFILE} PUBLIC cxx_std_17)
     target_link_libraries(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE ${MAZE_BUILDER_LIB} Catch2::Catch2WithMain)
     target_include_directories(${MAZE_BUILDER_TESTS_OUTFILE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/sources")
