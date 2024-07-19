@@ -3264,7 +3264,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     // Check for barriers and walls then iterate up/down
                     static constexpr unsigned int starting_height = 30u;
                     static constexpr unsigned int block_size = 1;
-                    auto w{ get_int(0, 10) };
+                    auto w{ get_int(1, 10) };
                     for (auto h{ starting_height }; h < starting_height + height; h++) {
                         // Update the data source that stores the maze geometry
                         // There are 2 data sources, one for rendering and one for writing

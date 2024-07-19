@@ -28,7 +28,7 @@ where `${my/mazebuilder/repo}` is the directory containg the Git repo for Maze B
 |--------------|---------|-------------
 | BUILD_MAZE_TESTS | OFF | Build with maze algorithm testing via Catch2. |
 | CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for Emscripten builds. |
-| CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRelease, Release, RelWithDebInfo, Debug`. |
+| CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRel, Release, RelWithDebInfo, Debug`. |
 
 
 Additionally, the Maze Builder can be built for the web using [Emscripten](https://emscripten.org/). Build with the toolchain file:
@@ -46,7 +46,7 @@ Run a local server using the included [secure_http_server.py](secure_http_server
 ```sh
 Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
 Generates mazes and exports to ASCII-format or Wavefront object format
-Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
+Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
   -a, --algorithm    binary_tree [default], sidewinder
   -s, --seed         seed for the random number generator [mt19937]
   -w, --width        maze width [default=100]
@@ -58,12 +58,12 @@ Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
   -v, --version      display program version
 ```
 
-Specify a seed and a `binary tree` algorithm:
+Specify a seed and a `binary tree` maze-generating algorithm:
 ```sh
 ./maze_builder --seed=1337 --algorithm=binary_tree -o bt.txt
 ```
 
-Make Maze Builder run as `interactive` with a `seed`:
+Make Maze Builder run in an `interactive` mode:
 ```sh
 ./maze_builder -i
 ```

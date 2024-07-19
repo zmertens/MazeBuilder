@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
     static constexpr auto HELP_MSG = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to ASCII-format or Wavefront object format
-        Example: maze_builder -w 10 -l 10 -a binary_tree > out_maze.txt
+        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
           -a, --algorithm    binary_tree [default], sidewinder
           -s, --seed         seed for the random number generator [mt19937]
           -w, --width        maze width [default=100]
