@@ -21,6 +21,8 @@
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
+//  2024-07-18: Update for SDL3 api changes: SDL_GetClipboardText() string ownership change. (#7801)
+//  2024-07-15: Update for SDL3 api changes: SDL_GetProperty() change to SDL_GetPointerProperty(). (#7794)
 //  2024-07-02: Update for SDL3 api changes: SDLK_x renames and SDLK_KP_x removals (#7761, #7762).
 //  2024-07-01: Update for SDL3 api changes: SDL_SetTextInputRect() changed to SDL_SetTextInputArea().
 //  2024-06-26: Update for SDL3 api changes: SDL_StartTextInput()/SDL_StopTextInput()/SDL_SetTextInputRect() functions signatures.
@@ -115,7 +117,8 @@ static const char* ImGui_ImplSDL3_GetClipboardText(void*)
     ImGui_ImplSDL3_Data* bd = ImGui_ImplSDL3_GetBackendData();
     if (bd->ClipboardTextData)
         SDL_free(bd->ClipboardTextData);
-    bd->ClipboardTextData = const_cast<char*>(SDL_GetClipboardText());
+    const char* sdl_clipboard_text = SDL_GetClipboardText();
+    bd->ClipboardTextData = sdl_clipboard_text ? SDL_strdup(sdl_clipboard_text) : NULL;
     return bd->ClipboardTextData;
 }
 
@@ -636,7 +639,7 @@ static void ImGui_ImplSDL3_UpdateGamepads()
     {
         ImGui_ImplSDL3_CloseGamepads();
         int sdl_gamepads_count = 0;
-        SDL_JoystickID* sdl_gamepads = SDL_GetGamepads(&sdl_gamepads_count);
+        SDL_JoystickID* sdl_gamepads = const_cast<unsigned int*>(SDL_GetGamepads(&sdl_gamepads_count));
         for (int n = 0; n < sdl_gamepads_count; n++)
             if (SDL_Gamepad* gamepad = SDL_OpenGamepad(sdl_gamepads[n]))
             {

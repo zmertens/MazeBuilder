@@ -2859,18 +2859,15 @@ struct craft::craft_impl {
         if (this->m_gui.fullscreen) {
             SDL_DisplayID display = SDL_GetPrimaryDisplay();
             int num_modes = 0;
-            const SDL_DisplayMode** modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
+            const SDL_DisplayMode * const *modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
             if (modes) {
                 for (int i = 0; i < num_modes; ++i) {
-                    const SDL_DisplayMode* mode = modes[i];
+                    const SDL_DisplayMode *mode = modes[i];
 #if defined(MAZE_DEBUG)
-                    SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n", display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
+                    SDL_Log("Display %" SDL_PRIu32 " mode %d: %dx%d@%gx %gHz\n",
+                            display, i, mode->w, mode->h, mode->pixel_density, mode->refresh_rate);
 #endif
                 }
-                this->m_model->width = modes[num_modes - 1]->w;
-                this->m_model->height = modes[num_modes - 1]->h;
-
-                SDL_free(modes);
             }
         }
     }
