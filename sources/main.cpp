@@ -34,9 +34,9 @@
 int main(int argc, char* argv[]) {
 
 #if defined(MAZE_DEBUG)
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5] - DEBUG";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.10.7] - DEBUG";
 #else
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.3.5]";
+    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.10.7]";
 #endif
 
     static constexpr auto HELP_MSG = R"help(

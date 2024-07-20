@@ -559,7 +559,7 @@ struct craft::craft_impl {
 
     GLuint gen_faces(int components, int faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
-        SDL_free(data);
+        // SDL_free(data);
         return buffer;
     }
 
@@ -1694,11 +1694,9 @@ struct craft::craft_impl {
                         Map *light_map = item->light_maps[a][b];
                         if (block_map) {
                             map_free(block_map);
-                            SDL_free(block_map);
                         }
                         if (light_map) {
                             map_free(light_map);
-                            SDL_free(light_map);
                         }
                     }
                 }
@@ -1809,9 +1807,10 @@ struct craft::craft_impl {
                     other = find_chunk(chunk->p + dp, chunk->q + dq);
                 }
                 if (other) {
-                    Map *block_map = (Map*) SDL_malloc(sizeof(Map));
+                    // These maps are freed using C-library free function
+                    Map *block_map = (Map*) malloc(sizeof(Map));
                     map_copy(block_map, &other->map);
-                    Map *light_map = (Map*) SDL_malloc(sizeof(Map));
+                    Map *light_map = (Map*) malloc(sizeof(Map));
                     map_copy(light_map, &other->lights);
                     item->block_maps[dp + 1][dq + 1] = block_map;
                     item->light_maps[dp + 1][dq + 1] = light_map;
