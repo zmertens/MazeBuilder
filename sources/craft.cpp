@@ -557,9 +557,11 @@ struct craft::craft_impl {
         return (GLfloat*) SDL_malloc(sizeof(GLfloat) * 6 * components * faces);
     }
 
+    /**
+     * Generate a buffer for faces - data is not freed here
+     */
     GLuint gen_faces(int components, int faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
-        // SDL_free(data);
         return buffer;
     }
 
