@@ -82,8 +82,8 @@
 #define VSYNC 1
 #define SCROLL_THRESHOLD 0.1
 #define MAX_MESSAGES 4
-#define DB_PATH "craft.db"
-#define USE_CACHE 1
+static constexpr auto DB_PATH = "craft.db";
+static constexpr auto USE_CACHE = true;
 #define DAY_LENGTH 600
 #define INVERT_MOUSE 0
 
@@ -108,7 +108,7 @@
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
-#define MAX_TEXT_LENGTH 256
+static constexpr auto MAX_TEXT_LENGTH = 256;
 #define MAX_NAME_LENGTH 32
 #define MAX_PATH_LENGTH 256
 #define MAX_ADDR_LENGTH 256
@@ -226,7 +226,7 @@ struct craft::craft_impl {
             std::lock_guard<std::shared_mutex> lock(verts_mtx);
             // Calculate the base index for the new vertices
             // OBJ format is 1-based indexing
-            unsigned int baseIndex = this->write_vertices.size() + 1;
+            unsigned int baseIndex = static_cast<unsigned int>(this->write_vertices.size() + 1);
             // Define the 8 vertices of the cube
             this->write_vertices.emplace_back(0, 0, x, y, z, w);
             this->write_vertices.emplace_back(0, 0, x + block_size, y, z, w);
@@ -269,8 +269,8 @@ struct craft::craft_impl {
                 ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
                 // keep track of writing progress
-                int total_verts = write_vertices.size();
-                int total_faces = faces.size();
+                int total_verts = static_cast<int>(write_vertices.size());
+                int total_faces = static_cast<int>(faces.size());
 
                 int t = total_verts + total_faces;
                 int c = 0;
@@ -429,7 +429,7 @@ struct craft::craft_impl {
         int player_count;
         int typing;
         char typing_buffer[MAX_TEXT_LENGTH];
-        int text_len;
+        size_t text_len;
         int message_index;
         char messages[MAX_MESSAGES][MAX_TEXT_LENGTH];
         int width;
@@ -553,44 +553,46 @@ struct craft::craft_impl {
         return buffer;
     }
 
-    GLfloat *malloc_faces(int components, int faces) const {
+    GLfloat *malloc_faces(std::size_t components, std::size_t faces) const {
         return (GLfloat*) SDL_malloc(sizeof(GLfloat) * 6 * components * faces);
     }
 
     /**
      * Generate a buffer for faces - data is not freed here
      */
-    GLuint gen_faces(int components, int faces, GLfloat *data) const {
+    GLuint gen_faces(GLsizei components, GLsizei faces, GLfloat *data) const {
         GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
         return buffer;
     }
 
     int chunked(float x) const {
-        return SDL_floorf(SDL_roundf(x) / this->m_gui.chunk_size);
+        return static_cast<int>((SDL_roundf(x) / this->m_gui.chunk_size));
     }
+
     double get_time() const {
     	return (SDL_GetTicks() + (double) this->m_model->start_time - (double) this->m_model->start_ticks) / 1000.0;
     }
+
     float time_of_day() const {
         if (this->m_model->day_length <= 0) {
             return 0.5;
         }
         float t;
-        t = get_time();
+        t = static_cast<float>(get_time());
         t = t / this->m_model->day_length;
-        t = t - (int)t;
+        t = static_cast<float>(t - static_cast<int>(t));
         return t;
     }
 
     float get_daylight() const {
-        float timer = time_of_day();
+        float timer = static_cast<float>(time_of_day());
         if (timer < 0.5) {
-            float t = (timer - 0.25) * 100;
-            return 1 / (1 + SDL_powf(2, -t));
+            float t = (timer - 0.25f) * 100.f;
+            return 1 / (1 + SDL_powf(2.f, -t));
         }
         else {
-            float t = (timer - 0.85) * 100;
-            return 1 - 1 / (1 + SDL_powf(2, -t));
+            float t = (timer - 0.85f) * 100.f;
+            return 1 - 1 / (1 + SDL_powf(2.f, -t));
         }
     }
 
@@ -607,9 +609,9 @@ struct craft::craft_impl {
 
     void get_sight_vector(float rx, float ry, float *vx, float *vy, float *vz) const {
         float m = SDL_cosf(ry);
-        *vx = SDL_cosf(rx - RADIANS(90)) * m;
+        *vx = SDL_cosf(rx - static_cast<float>(RADIANS(90))) * m;
         *vy = SDL_sinf(ry);
-        *vz = SDL_sinf(rx - RADIANS(90)) * m;
+        *vz = SDL_sinf(rx - static_cast<float>(RADIANS(90))) * m;
     }
 
     void get_motion_vector(int flying, int sz, int sx, float rx, float ry,
@@ -618,7 +620,7 @@ struct craft::craft_impl {
         if (!sz && !sx) {
             return;
         }
-        float strafe = SDL_atan2f(sz, sx);
+        float strafe = SDL_atan2f(static_cast<float>(sz), static_cast<float>(sx));
         if (flying) {
             float m = SDL_cosf(ry);
             float y = SDL_sinf(ry);
@@ -697,7 +699,7 @@ struct craft::craft_impl {
     }
 
     GLuint gen_text_buffer(float x, float y, float n, char *text) {
-        int length = strlen(text);
+        GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
         GLfloat *data = malloc_faces(4, length);
         for (int i = 0; i < length; i++) {
             make_character(data + i * 24, x, y, n / 2, n, text[i]);
@@ -759,7 +761,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    void draw_triangles_2d(Attrib *attrib, GLuint buffer, int count) {
+    void draw_triangles_2d(Attrib *attrib, GLuint buffer, GLsizei count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
         glEnableVertexAttribArray(attrib->position);
         glEnableVertexAttribArray(attrib->uv);
@@ -791,7 +793,7 @@ struct craft::craft_impl {
         draw_triangles_3d_ao(attrib, buffer, count);
     }
 
-    void draw_text(Attrib *attrib, GLuint buffer, int length) {
+    void draw_text(Attrib *attrib, GLuint buffer, GLsizei length) {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         draw_triangles_2d(attrib, buffer, length * 6);
@@ -841,12 +843,12 @@ struct craft::craft_impl {
             State *s2 = &player->state2;
             SDL_memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
-            s2->t = get_time();
-            if (s2->rx - s1->rx > PI) {
-                s1->rx += 2 * PI;
+            s2->t = static_cast<float>(get_time());
+            if (s2->rx - s1->rx > static_cast<float>(PI)) {
+                s1->rx += static_cast<float>(2 * PI);
             }
-            if (s1->rx - s2->rx > PI) {
-                s1->rx -= 2 * PI;
+            if (s1->rx - s2->rx > static_cast<float>(PI)) {
+                s1->rx -= static_cast<float>(2 * PI);
             }
         }
         else {
@@ -860,11 +862,11 @@ struct craft::craft_impl {
     void interpolate_player(Player *player) {
         State *s1 = &player->state1;
         State *s2 = &player->state2;
-        float t1 = s2->t - s1->t;
-        float t2 = this->get_time() - s2->t;
-        t1 = SDL_min(t1, 1);
-        t1 = SDL_max(t1, 0.1);
-        float p = SDL_min(t2 / t1, 1);
+        float t1 = static_cast<float>(s2->t - s1->t);
+        float t2 = static_cast<float>(this->get_time()) - s2->t;
+        t1 = SDL_min(t1, 1.f);
+        t1 = SDL_max(t1, 0.1f);
+        float p = SDL_min(t2 / t1, 1.f);
         this->update_player(
             player,
             s1->x + (s2->x - s1->x) * p,
@@ -901,7 +903,7 @@ struct craft::craft_impl {
         float x = s2->x - s1->x;
         float y = s2->y - s1->y;
         float z = s2->z - s1->z;
-        return SDL_sqrt(x * x + y * y + z * z);
+        return SDL_sqrtf(x * x + y * y + z * z);
     }
 
     float player_crosshair_distance(Player *p1, Player *p2) {
@@ -916,12 +918,12 @@ struct craft::craft_impl {
         float x = s2->x - px;
         float y = s2->y - py;
         float z = s2->z - pz;
-        return SDL_sqrt(x * x + y * y + z * z);
+        return SDL_sqrtf(x * x + y * y + z * z);
     }
 
     Player *player_crosshair(Player *player) {
         Player *result = 0;
-        float threshold = RADIANS(5);
+        float threshold = static_cast<float>(RADIANS(5));
         float best = 0;
         for (int i = 0; i < this->m_model->player_count; i++) {
             Player *other = this->m_model->players + i;
@@ -1001,8 +1003,8 @@ struct craft::craft_impl {
 
     int highest_block(float x, float z) const {
         int result = -1;
-        int nx = SDL_roundf(x);
-        int nz = SDL_roundf(z);
+        int nx = static_cast<int>(SDL_roundf(x));
+        int nz = static_cast<int>(SDL_roundf(z));
         int p = this->chunked(x);
         int q = this->chunked(z);
         Chunk *chunk = this->find_chunk(p, q);
@@ -1024,9 +1026,9 @@ struct craft::craft_impl {
         int py = 0;
         int pz = 0;
         for (int i = 0; i < max_distance * m; i++) {
-            int nx = SDL_roundf(x);
-            int ny = SDL_roundf(y);
-            int nz = SDL_roundf(z);
+            int nx = SDL_lroundf(x);
+            int ny = SDL_lroundf(y);
+            int nz = SDL_lroundf(z);
             if (nx != px || ny != py || nz != pz) {
                 int hw = map_get(map, nx, ny, nz);
                 if (hw > 0) {
@@ -1061,7 +1063,7 @@ struct craft::craft_impl {
             int hw = this->_hit_test(&chunk->map, 8, previous,
                 x, y, z, vx, vy, vz, &hx, &hy, &hz);
             if (hw > 0) {
-                float d = SDL_sqrt(SDL_powf(hx - x, 2) + SDL_powf(hy - y, 2) + SDL_powf(hz - z, 2));
+                float d = SDL_sqrtf(SDL_powf(hx - x, 2) + SDL_powf(hy - y, 2) + SDL_powf(hz - z, 2));
                 if (best == 0 || d < best) {
                     best = d;
                     *bx = hx; *by = hy; *bz = hz;
@@ -1095,12 +1097,13 @@ struct craft::craft_impl {
                 *face = 3; return 1;
             }
             if (dx == 0 && dy == 1 && dz == 0) {
-                int degrees = SDL_roundf(DEGREES(SDL_atan2f(s->x - hx, s->z - hz)));
-                if (degrees < 0) {
-                    degrees += 360;
+                float degrees = SDL_roundf(static_cast<float>(DEGREES(SDL_atan2(s->x - hx, s->z - hz))));
+                if (degrees < 0.f) {
+                    degrees += 360.f;
                 }
-                int top = ((degrees + 45) / 90) % 4;
-                *face = 4 + top; return 1;
+                int top = static_cast<int>(((degrees + 45.f) / 90.f)) % 4;
+                *face = 4 + top;
+                return 1;
             }
         }
         return 0;
@@ -1115,9 +1118,9 @@ struct craft::craft_impl {
             return result;
         }
         Map *map = &chunk->map;
-        int nx = SDL_roundf(*x);
-        int ny = SDL_roundf(*y);
-        int nz = SDL_roundf(*z);
+        int nx = static_cast<int>(SDL_roundf(*x));
+        int ny = static_cast<int>(SDL_roundf(*y));
+        int nz = static_cast<int>(SDL_roundf(*z));
         float px = *x - nx;
         float py = *y - ny;
         float pz = *z - nz;
@@ -1149,9 +1152,9 @@ struct craft::craft_impl {
     }
 
     int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const {
-        int nx = SDL_roundf(x);
-        int ny = SDL_roundf(y);
-        int nz = SDL_roundf(z);
+        int nx = static_cast<int>(SDL_roundf(x));
+        int ny = static_cast<int>(SDL_roundf(y));
+        int nz = static_cast<int>(SDL_roundf(z));
         for (int i = 0; i < height; i++) {
             if (nx == hx && ny - i == hy && nz == hz) {
                 return 1;
@@ -1170,27 +1173,27 @@ struct craft::craft_impl {
             return 0;
         }
         int count = 0;
-        float max_width = 64;
-        float line_height = 1.25;
+        float max_width = 64.f;
+        float line_height = 1.25f;
         char lines[1024];
-        int rows = wrap(text, max_width, lines, 1024);
+        int rows = wrap(text, static_cast<int>(max_width), lines, 1024);
         rows = SDL_min(rows, 5);
         int dx = glyph_dx[face];
         int dz = glyph_dz[face];
         int ldx = line_dx[face];
         int ldy = line_dy[face];
         int ldz = line_dz[face];
-        float n = 1.0 / (max_width / 10);
-        float sx = x - n * (rows - 1) * (line_height / 2) * ldx;
-        float sy = y - n * (rows - 1) * (line_height / 2) * ldy;
-        float sz = z - n * (rows - 1) * (line_height / 2) * ldz;
+        float n = 1.0f / (max_width / 10.f);
+        float sx = x - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldx;
+        float sy = y - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldy;
+        float sz = z - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldz;
         char *key;
         // util.h -> tokenize
         char *line = tokenize(lines, "\n", &key);
         while (line) {
-            int length = strlen(line);
+            size_t length = SDL_strlen(line);
             int line_width = string_width(line);
-            line_width = SDL_min(line_width, max_width);
+            line_width = static_cast<int>(SDL_min(line_width, max_width));
             float rx = sx - dx * line_width / max_width / 2;
             float ry = sy;
             float rz = sz - dz * line_width / max_width / 2;
@@ -1226,7 +1229,7 @@ struct craft::craft_impl {
         SignList *signs = &chunk->signs;
 
         // first pass - count characters
-        int max_faces = 0;
+        size_t max_faces = 0;
         for (int i = 0; i < signs->size; i++) {
             Sign *e = signs->data + i;
             max_faces += SDL_strlen(e->text);
@@ -1234,15 +1237,18 @@ struct craft::craft_impl {
 
         // second pass - generate geometry
         GLfloat *data = malloc_faces(5, max_faces);
-        int faces = 0;
+        size_t faces = 0;
         for (int i = 0; i < signs->size; i++) {
             Sign *e = signs->data + i;
-            faces += this->_gen_sign_buffer(data + faces * 30, e->x, e->y, e->z, e->face, e->text);
+            faces += static_cast<size_t>(this->_gen_sign_buffer(data + static_cast<int>(faces) * 30, 
+                static_cast<float>(e->x),
+                static_cast<float>(e->y),
+                static_cast<float>(e->z), e->face, e->text));
         }
 
         this->del_buffer(chunk->sign_buffer);
-        chunk->sign_buffer = this->gen_faces(5, faces, data);
-        chunk->sign_faces = faces;
+        chunk->sign_buffer = this->gen_faces(5, static_cast<GLsizei>(faces), data);
+        chunk->sign_faces = static_cast<int>(faces);
     }
 
     int has_lights(Chunk *chunk) const {
@@ -1315,9 +1321,9 @@ struct craft::craft_impl {
                 if (is_light) {
                     light_sum = 15 * 4 * 10;
                 }
-                float total = curve[value] + shade_sum / 4.0;
-                ao[i][j] = SDL_min(total, 1.0);
-                light[i][j] = light_sum / 15.0 / 4.0;
+                float total = curve[value] + shade_sum / 4.0f;
+                ao[i][j] = SDL_min(total, 1.0f);
+                light[i][j] = light_sum / 15.0f / 4.0f;
             }
         }
     } // occlusion
@@ -1488,7 +1494,7 @@ struct craft::craft_impl {
                         if (y + dy <= highest[XZ(x + dx, z + dz)]) {
                             for (int oy = 0; oy < 8; oy++) {
                                 if (opaque[XYZ(x + dx, y + dy + oy, z + dz)]) {
-                                    shades[index] = 1.0 - oy * 0.125;
+                                    shades[index] = 1.0f - oy * 0.125f;
                                     break;
                                 }
                             }
@@ -1510,16 +1516,17 @@ struct craft::craft_impl {
                         max_light = SDL_max(max_light, light[a][b]);
                     }
                 }
-                float rotation = simplex2(ex, ez, 4, 0.5, 2) * 360;
+                float rotation = simplex2(static_cast<float>(ex), static_cast<float>(ez), 4, 0.5f, 2.f) * 360.f;
                 make_plant(
                     data + offset, min_ao, max_light,
-                    ex, ey, ez, 0.5, ew, rotation);
+                    static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez),
+                    0.5f, ew, rotation);
             }
             else {
                 make_cube(
                     data + offset, ao, light,
                     f1, f2, f3, f4, f5, f6,
-                    ex, ey, ez, 0.5, ew);
+                    static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez), 0.5f, ew);
             }
             offset += total * 60;
         } END_MAP_FOR_EACH;
@@ -1841,8 +1848,8 @@ struct craft::craft_impl {
     }
 
     void unset_sign(int x, int y, int z) const {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             SignList *signs = &chunk->signs;
@@ -1857,8 +1864,8 @@ struct craft::craft_impl {
     }
 
     void unset_sign_face(int x, int y, int z, int face) const {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             SignList *signs = &chunk->signs;
@@ -1889,14 +1896,14 @@ struct craft::craft_impl {
     }
 
     void set_sign(int x, int y, int z, int face, const char *text) const {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         _set_sign(p, q, x, y, z, face, text, 1);
     }
 
     void toggle_light(int x, int y, int z) const {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->lights;
@@ -1935,25 +1942,25 @@ struct craft::craft_impl {
         else {
             db_insert_block(p, q, x, y, z, w);
         }
-        if (w == 0 && chunked(x) == p && chunked(z) == q) {
+        if (w == 0 && chunked(static_cast<float>(x)) == p && chunked(static_cast<float>(z)) == q) {
             unset_sign(x, y, z);
             set_light(p, q, x, y, z, 0);
         }
     }
 
     void set_block(int x, int y, int z, int w) const {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         _set_block(p, q, x, y, z, w, 1);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 if (dx == 0 && dz == 0) {
                     continue;
                 }
-                if (dx && chunked(x + dx) == p) {
+                if (dx && chunked(static_cast<float>(x + dx)) == p) {
                     continue;
                 }
-                if (dz && chunked(z + dz) == q) {
+                if (dz && chunked(static_cast<float>(z + dz)) == q) {
                     continue;
                 }
                 _set_block(p + dx, q + dz, x, y, z, -w, 1);
@@ -1979,7 +1986,7 @@ struct craft::craft_impl {
             } else {
                 // Pass
 			}
-            if (w == 0 && chunked(x) == p && chunked(z) == q) {
+            if (w == 0 && chunked(static_cast<float>(x)) == p && chunked(static_cast<float>(z)) == q) {
                 unset_sign(x, y, z);
                 set_light(p, q, x, y, z, 0);
             }
@@ -1994,13 +2001,13 @@ struct craft::craft_impl {
         for (auto& block : blocks) {
             int x {get<2>(block)};
             int z {get<4>(block)};
-            int p {chunked(x)};
-            int q {chunked(z)};
+            int p {chunked(static_cast<float>(x))};
+            int q {chunked(static_cast<float>(z))};
             // Check if block is on the edge of the chunk
             bool on_the_edge = false;
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    if ((dx == 0 && dz == 0) || (dx && this->chunked(x + dx) == p) || (dz && this->chunked(z + dz) == q)) {
+                    if ((dx == 0 && dz == 0) || (dx && this->chunked(static_cast<float>(x + dx)) == p) || (dz && this->chunked(static_cast<float>(z + dz)) == q)) {
                         continue;
                     }
                     on_the_edge = true;
@@ -2023,8 +2030,8 @@ struct craft::craft_impl {
     }
 
     int get_block(int x, int y, int z) {
-        int p = chunked(x);
-        int q = chunked(z);
+        int p = chunked(static_cast<float>(x));
+        int q = chunked(static_cast<float>(z));
         Chunk *chunk = find_chunk(p, q);
         if (chunk) {
             Map *map = &chunk->map;
@@ -2070,7 +2077,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 0);
         glUniform1i(attrib->extra1, 2);
         glUniform1f(attrib->extra2, light);
-        glUniform1f(attrib->extra3, this->m_model->render_radius * this->m_gui.chunk_size);
+        glUniform1f(attrib->extra3, static_cast<GLfloat>(this->m_model->render_radius * this->m_gui.chunk_size));
         glUniform1i(attrib->extra4, static_cast<int>(this->m_model->is_ortho));
         glUniform1f(attrib->timer, this->time_of_day());
         for (int i = 0; i < this->m_model->chunk_count; i++) {
@@ -2136,7 +2143,7 @@ struct craft::craft_impl {
         SDL_strlcpy(text, this->m_model->typing_buffer + 1, MAX_SIGN_LENGTH);
         text[MAX_SIGN_LENGTH - 1] = '\0';
         GLfloat *data = malloc_faces(5, SDL_strlen(text));
-        int length = _gen_sign_buffer(data, x, y, z, face, text);
+        int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face, text);
         GLuint buffer = gen_faces(5, length, data);
         draw_sign(attrib, buffer, length);
         del_buffer(buffer);
@@ -2188,7 +2195,7 @@ struct craft::craft_impl {
             glUseProgram(attrib->program);
             glLineWidth(1);
             glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-            GLuint wireframe_buffer = gen_wireframe_buffer(hx, hy, hz, 0.53);
+            GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy), static_cast<float>(hz), 0.53f);
             draw_lines(attrib, wireframe_buffer, 3, 24);
             del_buffer(wireframe_buffer);
         }
@@ -2198,7 +2205,7 @@ struct craft::craft_impl {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
         glUseProgram(attrib->program);
-        glLineWidth(4 * this->m_model->scale);
+        glLineWidth(static_cast<GLfloat>(4 * this->m_model->scale));
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         GLuint crosshair_buffer = gen_crosshair_buffer();
         draw_lines(attrib, crosshair_buffer, 2, 4);
@@ -2233,7 +2240,7 @@ struct craft::craft_impl {
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 1);
         glUniform1i(attrib->extra1, 0);
-        int length = SDL_strlen(text);
+        GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
         x -= n * justify * (length - 1) / 2;
         GLuint buffer = gen_text_buffer(x, y, n, text);
         draw_text(attrib, buffer, length);
@@ -2358,7 +2365,7 @@ struct craft::craft_impl {
                         float dx = x + offsets[i][0] - cx;
                         float dy = y + offsets[i][1] - cy;
                         float dz = z + offsets[i][2] - cz;
-                        float d = SDL_sqrt(dx * dx + dy * dy + dz * dz);
+                        float d = SDL_sqrtf(dx * dx + dy * dy + dz * dz);
                         if (d < radius) {
                             inside = 1;
                         }
@@ -2561,7 +2568,7 @@ struct craft::craft_impl {
         State* s = &this->m_model->players->state;
         int sz = 0;
         int sx = 0;
-        float m = 0.0025;
+        float m = 0.0025f;
         int sc = -1, code = -1;
 
         SDL_Keymod mod_state = SDL_GetModState();
@@ -2575,14 +2582,7 @@ struct craft::craft_impl {
                     running = false;
                     break;
                 }
-                case SDL_EVENT_KEY_UP: {
-                    sc = e.key.scancode;
-                    switch (sc) {
-                    }
-                    break;
-                }
                 case SDL_EVENT_KEY_DOWN: {
-                    
                     sc = e.key.scancode;
                     switch (sc) {
                     case SDL_SCANCODE_ESCAPE: {
@@ -2724,13 +2724,13 @@ struct craft::craft_impl {
                             s->ry -= e.motion.yrel * m;
                         }
                         if (s->rx < 0) {
-                            s->rx += RADIANS(360);
+                            s->rx += static_cast<float>(RADIANS(360));
                         }
-                        if (s->rx >= RADIANS(360)) {
-                            s->rx -= RADIANS(360);
+                        if (s->rx >= static_cast<float>(RADIANS(360))) {
+                            s->rx -= static_cast<float>(RADIANS(360));
                         }
-                        s->ry = SDL_max(s->ry, -RADIANS(90));
-                        s->ry = SDL_min(s->ry, RADIANS(90));
+                        s->ry = SDL_max(s->ry, static_cast<float>(-1.0 * RADIANS(90)));
+                        s->ry = SDL_min(s->ry, static_cast<float>(RADIANS(90)));
                     }
                     break;
                 }
@@ -2763,10 +2763,10 @@ struct craft::craft_impl {
                     if (this->m_gui.capture_mouse && SDL_GetRelativeMouseMode()) {
                         // TODO might have to change this to force 1 step
                         if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                            this->m_model->item_index += e.wheel.y;
+                            this->m_model->item_index += static_cast<int>(e.wheel.y);
                         }
                         else {
-                            this->m_model->item_index -= e.wheel.y;
+                            this->m_model->item_index -= static_cast<int>(e.wheel.y);
                         }
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
@@ -2797,7 +2797,7 @@ struct craft::craft_impl {
 
         if (!this->m_model->typing && this->m_gui.capture_mouse) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
-            this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
+            this->m_model->fov = static_cast<float>(state[KEY_ZOOM] ? 15 : 65);
             if (state[KEY_FORWARD]) sz--;
             if (state[KEY_BACKWARD]) sz++;
             if (state[KEY_LEFT]) sx--;
@@ -2820,13 +2820,13 @@ struct craft::craft_impl {
                 }
             }
         }
-        float speed = this->m_model->flying ? 20 : 5;
-        int estimate = SDL_roundf(SDL_sqrtf(
-            SDL_powf(vx * speed, 2) +
-            SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
-            SDL_powf(vz * speed, 2)) * dt * 8);
+        float speed = static_cast<float>(this->m_model->flying ? 20 : 5);
+        int estimate = static_cast<int>(SDL_roundf(SDL_sqrtf(
+            SDL_powf(vx * speed, 2.f) +
+            SDL_powf(vy * speed + static_cast<float>(SDL_abs(static_cast<int>(dy))) * 2.f, 2.f) +
+            SDL_powf(vz * speed, 2.f)) * static_cast<float>(dt) * 8.f));
         int step = SDL_max(8, estimate);
-        float ut = dt / step;
+        float ut = static_cast<float>(dt / static_cast<double>(step));
         vx = vx * ut * speed;
         vy = vy * ut * speed;
         vz = vz * ut * speed;
@@ -2846,7 +2846,7 @@ struct craft::craft_impl {
             }
         }
         if (s->y < 0) {
-            s->y = highest_block(s->x, s->z) + 2;
+            s->y = static_cast<float>(highest_block(s->x, s->z) + 2);
         }
 
         return true;
@@ -3183,14 +3183,14 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     if (USE_CACHE) {
         db_enable();
         if (db_init(m_pimpl->m_model->db_path)) {
-            return -1;
+            return false;
         }
     }
 
     // LOCAL VARIABLES 
     m_pimpl->reset_model();
     FPS fps = {0, 0, 0};
-    double last_commit = SDL_GetTicks();
+    uint64_t last_commit = SDL_GetTicks();
 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
@@ -3211,7 +3211,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     m_pimpl->force_chunks(me);
 
     if (!loaded) {
-        s->y = m_pimpl->highest_block(s->x, s->z) + 2;
+        s->y = static_cast<float>(m_pimpl->highest_block(s->x, s->z) + 2);
     }
 
 #if defined(MAZE_DEBUG)
@@ -3377,7 +3377,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
 
     bool running = true;
-    int previous = SDL_GetTicks();
+    uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -3394,8 +3394,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             SDL_memset(&fps, 0, sizeof(fps));
         }
         update_fps(&fps);
-        double now = SDL_GetTicks();
-        double dt = (now - previous) / 1000.0;
+        uint64_t now = SDL_GetTicks();
+        double dt = static_cast<double>(now - previous) / 1000.0;
         dt = SDL_min(dt, 0.2);
         dt = SDL_max(dt, 0.0);
         previous = now;
@@ -3645,11 +3645,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         // RENDER TEXT 
         char text_buffer[1024];
-        float ts = 12 * m_pimpl->m_model->scale;
-        float tx = ts / 2;
+        float ts = static_cast<float>(12 * m_pimpl->m_model->scale);
+        float tx = ts / 2.f;
         float ty = m_pimpl->m_model->height - ts;
         if (SHOW_INFO_TEXT) {
-            int hour = m_pimpl->time_of_day() * 24;
+            int hour = static_cast<int>(m_pimpl->time_of_day()) * 24;
             char am_pm = hour < 12 ? 'a' : 'p';
             hour = hour % 12;
             hour = hour ? hour : 12;
@@ -3678,11 +3678,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         }
         if (SHOW_PLAYER_NAMES) {
             if (player != me) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, ts, ts, player->name);
+                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, ts, ts, player->name);
             }
             craft_impl::Player* other = m_pimpl->player_crosshair(player);
             if (other) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, m_pimpl->m_model->width / 2, m_pimpl->m_model->height / 2 - ts - 24, ts, other->name);
+                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, static_cast<float>(m_pimpl->m_model->height) / 2.f - ts - 24.f, ts, other->name);
             }
         }
 
@@ -3721,7 +3721,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             glClear(GL_DEPTH_BUFFER_BIT);
 
             if (SHOW_PLAYER_NAMES) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, pw / 2, ts, ts, player->name);
+                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(pw) / 2.f, ts, ts, player->name);
             }
         } // render picture in picture
             

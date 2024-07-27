@@ -1,8 +1,8 @@
 # Maze Builder
 
 Build and download mazes interactively or using the command-line interface (CLI).
-This project emphasizes conveniance and simplicity in order to design and export mazes to Wavefront object or ASCII formats.
-The exports can then be integrated into game engines and renderers like Unity, Godot, and Blender.
+This project fosters rapid prototyping. Go from a random 100X100 maze to exporting straight to Wavefront object files.
+The exports can then be integrated into game engines and renderers like Unity, Godot, Blender and so forth.
 
 [Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
 

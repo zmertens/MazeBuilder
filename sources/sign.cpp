@@ -2,10 +2,12 @@
 #include <string.h>
 #include "sign.h"
 
-void sign_list_alloc(SignList *list, int capacity) {
+#include <cstdlib>
+
+void sign_list_alloc(SignList *list, std::size_t capacity) {
     list->capacity = capacity;
     list->size = 0;
-    list->data = (Sign *)calloc(capacity, sizeof(Sign));
+    list->data = (Sign *)calloc(capacity, static_cast<std::size_t>(sizeof(Sign)));
 }
 
 void sign_list_free(SignList *list) {
@@ -15,7 +17,7 @@ void sign_list_free(SignList *list) {
 void sign_list_grow(SignList *list) {
     SignList new_list;
     sign_list_alloc(&new_list, list->capacity * 2);
-    memcpy(new_list.data, list->data, list->size * sizeof(Sign));
+    memcpy(new_list.data, list->data, list->size * static_cast<std::size_t>(sizeof(Sign)));
     free(list->data);
     list->capacity = new_list.capacity;
     list->data = new_list.data;
