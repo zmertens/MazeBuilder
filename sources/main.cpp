@@ -24,7 +24,6 @@
         emscripten::class_<craft>("craft")
             .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
             .constructor<const std::string&, const std::string&, const std::string&>()
-            .property("json", &craft::get_json, &craft::set_json)
             .function("set_json", &craft::set_json)
             .function("get_json", &craft::get_json)
             .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());

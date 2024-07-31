@@ -1,7 +1,7 @@
 # Maze Builder
 
 Build and download mazes interactively or using the command-line interface (CLI).
-This project fosters rapid prototyping. Go from a random 100X100 maze to exporting straight to Wavefront object files.
+This project enables rapid prototyping and simplicity. Go from a randomly-generated 100X100 maze straight to exporting it to Wavefront object files.
 The exports can then be integrated into game engines and renderers like Unity, Godot, Blender and so forth.
 
 [Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
