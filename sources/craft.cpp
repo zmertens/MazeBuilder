@@ -3441,7 +3441,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     };
 
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
-
+    int triangle_faces = 0;
     bool running = true;
     uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
@@ -3485,9 +3485,26 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.data());
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+
+            int hour = static_cast<int>(m_pimpl->time_of_day()) * 24;
+            char am_pm = hour < 12 ? 'p' : 'a';
+            hour = hour % 12;
+            hour = hour ? hour : 12;
+
+            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(s->x), m_pimpl->chunked(s->z));
+            ImGui::NewLine();
+            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %2f", s->x, s->y, s->z);
+            ImGui::NewLine();
+            ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
+            ImGui::NewLine();
+            ImGui::Text("time: %d%cm", hour, am_pm);
+
             // GUI Tabs
             ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
             if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+
                 if (ImGui::BeginTabItem("Builder")) {
                     ImGui::Text("Builder settings");
 
@@ -3631,8 +3648,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                 }
                 ImGui::EndTabBar();
             } // imgui tab handler
-            ImGui::NewLine();
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
             ImGui::End();
             ImGui::PopFont();
         } // show_builder_gui
@@ -3655,8 +3670,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 #if !defined(__EMSCRIPTEN__ )
                 write_success = maze2->write_maze_as_wavefront_obj(gui->outfile);
 #elif defined(__EMSCRIPTEN__)
-                auto&& maze_str = json_writer(gui->outfile);
-                this->set_json(maze_str);
+                auto&& maze_json = json_writer(gui->outfile);
+                this->m_pimpl->m_gui->maze_json = maze_json;
                 reset_fields();
                 //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
 #endif
@@ -3691,7 +3706,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        int face_count = m_pimpl->render_chunks(&block_attrib, player);
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, player);
         m_pimpl->render_signs(&text_attrib, player);
         m_pimpl->render_sign(&text_attrib, player);
         m_pimpl->render_players(&block_attrib, player);
@@ -3713,20 +3728,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         float ts = static_cast<float>(12 * m_pimpl->m_model->scale);
         float tx = ts / 2.f;
         float ty = m_pimpl->m_model->height - ts;
-        if (SHOW_INFO_TEXT) {
-            int hour = static_cast<int>(m_pimpl->time_of_day()) * 24;
-            char am_pm = hour < 12 ? 'a' : 'p';
-            hour = hour % 12;
-            hour = hour ? hour : 12;
-            SDL_snprintf(
-                text_buffer, 1024,
-                "(%d, %d) (%.2f, %.2f, %.2f) [%d, %d, %d] %d%cm %dfps",
-                m_pimpl->chunked(s->x), m_pimpl->chunked(s->z), s->x, s->y, s->z,
-                m_pimpl->m_model->player_count, m_pimpl->m_model->chunk_count,
-                face_count * 2, hour, am_pm, fps.fps);
-            m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-            ty -= ts * 2;
-        }
         if (SHOW_CHAT_TEXT) {
             for (int i = 0; i < MAX_MESSAGES; i++) {
                 int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
