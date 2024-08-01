@@ -2508,7 +2508,7 @@ struct craft::craft_impl {
         }
     }
 
-    void parse_command(const char *buffer, int forward) {
+    void parse_command(const char *buffer) {
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2528,6 +2528,15 @@ struct craft::craft_impl {
         }
         else if (SDL_strcmp(buffer, "/tree") == 0) {
             tree(&this->m_model->block0);
+        }
+        else if (SDL_sscanf(buffer, "/move %d %d %d", &xc, &yc, &zc) == 3) {
+            auto&& ps = this->m_model->players->state;
+            ps.x = xc;
+            ps.y = yc;
+            ps.z = zc;
+#if defined(MAZE_DEBUG)
+            SDL_Log("/move (%d, %d, %d)", xc, yc, zc);
+#endif
         }
         else if (SDL_sscanf(buffer, "/array %d %d %d", &xc, &yc, &zc) == 3) {
             array(&this->m_model->block1, &this->m_model->block0, xc, yc, zc);
@@ -2680,7 +2689,7 @@ struct craft::craft_impl {
                                     }
                                 } else if (this->m_model->typing_buffer[0] == '/') {
 
-                                    this->parse_command(this->m_model->typing_buffer, 1);
+                                    this->parse_command(this->m_model->typing_buffer);
                                 }
                             }
                         } else {
@@ -2700,7 +2709,7 @@ struct craft::craft_impl {
                                 SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                     MAX_TEXT_LENGTH - this->m_model->text_len - 1);
                             } else {
-                                parse_command(clip_buffer, 0);
+                                parse_command(clip_buffer);
                             }
                             SDL_free(clip_buffer);
                         }
@@ -3059,6 +3068,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         SDL_Quit();
         return false;
     }
+#endif
+
+#if defined(MAZE_DEBUG)
+    this->m_pimpl->check_fullscreen_modes();
 #endif
 
 #if defined(MAZE_DEBUG)
@@ -3494,11 +3507,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             hour = hour ? hour : 12;
 
             ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(s->x), m_pimpl->chunked(s->z));
-            ImGui::NewLine();
-            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %2f", s->x, s->y, s->z);
-            ImGui::NewLine();
+            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", s->x, s->y, s->z);
             ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-            ImGui::NewLine();
             ImGui::Text("time: %d%cm", hour, am_pm);
 
             // GUI Tabs
@@ -3587,7 +3597,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 #endif
                     if (progress_tracker) {
                         // Show progress when writing
-                        ImGui::NewLine(); ImGui::NewLine();
+                        ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
                         ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
                         ImGui::NewLine();
@@ -3612,24 +3622,27 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     else
                         ImGui::StyleColorsLight();
                     
-                    // fullscreen off on launch, prevent setting it every frame
+                    // Prevent setting SDL_Window settings every frame
+                    static bool last_fullscreen = gui->fullscreen;
                     ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
-                    if (gui->fullscreen) {
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_TRUE);
-#if defined(MAZE_DEBUG)
-                        this->m_pimpl->check_fullscreen_modes();
-#endif
-                    } else {
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, SDL_FALSE);
-                    }
-                    
+                    bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
+                    last_fullscreen = gui->fullscreen;
+                    if (update_fullscreen)
+                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
+
                     ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui->capture_mouse);
                     if (gui->capture_mouse) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
                         show_mb_gui = false;
                     }
 
+                    static bool last_vsync = gui->vsync;
                     ImGui::Checkbox("VSYNC", &gui->vsync);
+                    bool update_vsync = (last_vsync != gui->vsync) ? true : false;
+                    last_vsync = gui->vsync;
+                    if (update_vsync)
+                        SDL_GL_SetSwapInterval(gui->vsync);
+
                     ImGui::Checkbox("Show Lights", &gui->show_lights);
                     ImGui::Checkbox("Show Items", &gui->show_items);
                     ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
