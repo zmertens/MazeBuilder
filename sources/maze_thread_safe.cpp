@@ -17,7 +17,6 @@ maze_thread_safe::maze_thread_safe(const std::string& maze, unsigned int height)
 
 void maze_thread_safe::set_maze(const std::string& maze, unsigned int height) noexcept {
     std::lock_guard<std::mutex> lock(m_maze_mutx);
-    this->clear();
     this->m_maze = maze;
     this->m_height = height;
     this->compute_geometry();
