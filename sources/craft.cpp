@@ -546,7 +546,9 @@ struct craft::craft_impl {
         , m_model{make_unique<Model>()}
         , m_maze{make_unique<Maze>("")}
         , m_gui{ make_unique<Gui>() } {
-
+        m_model->width = INIT_WINDOW_WIDTH;
+        m_model->height = INIT_WINDOW_HEIGHT;
+        m_model->scale = 1;
     }
 
     int worker_run(void *arg) {
@@ -2657,278 +2659,266 @@ struct craft::craft_impl {
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
             switch (e.type) {
-                case SDL_EVENT_QUIT: {
-                    running = false;
+            case SDL_EVENT_QUIT: {
+                running = false;
+                break;
+            }
+            case SDL_EVENT_KEY_DOWN: {
+                sc = e.key.scancode;
+                switch (sc) {
+                case SDL_SCANCODE_ESCAPE: {
+                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    show_mb_gui = true;
+                    this->m_gui->capture_mouse = false;
+                    this->m_gui->fullscreen = false;
+                    this->m_model->typing = 0;
                     break;
                 }
-                case SDL_EVENT_KEY_DOWN: {
-                    sc = e.key.scancode;
-                    switch (sc) {
-                    case SDL_SCANCODE_ESCAPE: {
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
-                        show_mb_gui = true;
-                        this->m_gui->capture_mouse = false;
-                        this->m_gui->fullscreen = false;
-                        this->m_model->typing = 0;
-                        break;
-                    }
-                    case SDL_SCANCODE_RETURN: {
-                        if (this->m_model->typing) {
-                            if (mod_state) {
-                                if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                                    this->m_model->typing_buffer[this->m_model->text_len] = '\n';
-                                    this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
-                                }
-                            } else {
-                                this->m_model->typing = 0;
-                                if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-                                    Player* player = this->m_model->players;
-                                    int x, y, z, face;
-                                    if (hit_test_face(player, &x, &y, &z, &face)) {
-                                        set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
-                                    }
-                                } else if (this->m_model->typing_buffer[0] == '/') {
-
-                                    this->parse_command(this->m_model->typing_buffer);
-                                }
+                case SDL_SCANCODE_RETURN: {
+                    if (this->m_model->typing) {
+                        if (mod_state) {
+                            if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                                this->m_model->typing_buffer[this->m_model->text_len] = '\n';
+                                this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
                             }
                         } else {
-                            if (control) {
-                                this->on_right_click();
-                            } else {
-                                this->on_left_click();
+                            this->m_model->typing = 0;
+                            if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
+                                Player* player = this->m_model->players;
+                                int x, y, z, face;
+                                if (hit_test_face(player, &x, &y, &z, &face)) {
+                                    set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
+                                }
+                            } else if (this->m_model->typing_buffer[0] == '/') {
+
+                                this->parse_command(this->m_model->typing_buffer);
                             }
                         }
-                        break;
-                    }
-                    case SDL_SCANCODE_V: {
+                    } else {
                         if (control) {
-                            auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
-                            if (this->m_model->typing) {
-                                this->m_model->suppress_char = 1;
-                                SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
-                                    MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                            } else {
-                                parse_command(clip_buffer);
-                            }
-                            SDL_free(clip_buffer);
+                            this->on_right_click();
+                        } else {
+                            this->on_left_click();
                         }
-                        break;
-                    }
-                    case SDL_SCANCODE_0:
-                    case SDL_SCANCODE_1:
-                    case SDL_SCANCODE_2:
-                    case SDL_SCANCODE_3:
-                    case SDL_SCANCODE_4:
-                    case SDL_SCANCODE_5:
-                    case SDL_SCANCODE_6:
-                    case SDL_SCANCODE_7:
-                    case SDL_SCANCODE_8:
-                    case SDL_SCANCODE_9: {
-                        if (this->m_gui->capture_mouse && !this->m_model->typing)
-                            this->m_model->item_index = (sc - SDL_SCANCODE_1);
-                        break;
-                    }
-                    case KEY_FLY: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse)
-                            this->m_model->flying = ~this->m_model->flying;
-                        break;
-                    }
-                    case KEY_ITEM_NEXT: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse)
-                            this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
-                        break;
-                    }
-                    case KEY_ITEM_PREV: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse) {
-                            this->m_model->item_index--;
-                            if (this->m_model->item_index < 0)
-                                this->m_model->item_index = item_count - 1;
-                        }
-                        break;
-                    }
-                    case KEY_OBSERVE: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse)
-                            this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
-                        break;
-                    }
-                    case KEY_OBSERVE_INSET: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse)
-                            this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
-                        break;
-                    }
-                    case KEY_CHAT: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse) {
-                            this->m_model->typing = 1;
-                            this->m_model->typing_buffer[0] = '\0';
-                            this->m_model->text_len = 0;
-                            SDL_StartTextInput(this->m_model->window);
-                        }
-                        break;
-                    }
-                    case KEY_COMMAND: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse) {
-                            this->m_model->typing = 1;
-                            this->m_model->typing_buffer[0] = '\0';
-                            SDL_StartTextInput(this->m_model->window);
-                        }
-                        break;
-                    }
-                    case KEY_SIGN: {
-                        if (!this->m_model->typing && this->m_gui->capture_mouse) {
-                            this->m_model->typing = 1;
-                            this->m_model->typing_buffer[0] = '\0';
-                            SDL_StartTextInput(this->m_model->window);
-                        }
-                        break;
-
-                    }
-                    } // switch
-                    break;
-                } // case SDL_EVENT_KEY_DOWN
-                case SDL_EVENT_TEXT_INPUT: {
-                    if (this->m_gui->capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                        SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
-                        this->m_model->text_len += SDL_strlen(e.text.text);
                     }
                     break;
                 }
-                case SDL_EVENT_MOUSE_MOTION: {
-                    if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
-                        s->rx += e.motion.xrel * mouse_mv;
-                        if (INVERT_MOUSE) {
-                            s->ry += e.motion.yrel * mouse_mv;
+                case SDL_SCANCODE_V: {
+                    if (control) {
+                        auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
+                        if (this->m_model->typing) {
+                            this->m_model->suppress_char = 1;
+                            SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
+                                MAX_TEXT_LENGTH - this->m_model->text_len - 1);
+                        } else {
+                            parse_command(clip_buffer);
                         }
-                        else {
-                            s->ry -= e.motion.yrel * mouse_mv;
-                        }
-                        if (s->rx < 0) {
-                            s->rx += static_cast<float>(RADIANS(360));
-                        }
-                        if (s->rx >= static_cast<float>(RADIANS(360))) {
-                            s->rx -= static_cast<float>(RADIANS(360));
-                        }
-                        s->ry = SDL_max(s->ry, static_cast<float>(-1.0 * RADIANS(90)));
-                        s->ry = SDL_min(s->ry, static_cast<float>(RADIANS(90)));
+                        SDL_free(clip_buffer);
                     }
                     break;
                 }
-                case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                    if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_LEFT) {
-                        if (control) {
-                            on_right_click();
-                        }
-                        else {
-                            on_left_click();
-                        }
-                    }
-                    else if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_RIGHT) {
-                        if (control) {
-                            on_light();
-                        }
-                        else {
-                            on_right_click();
-                        }
-                    }
-                    else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                        if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
-                            on_middle_click();
-                        }
-                    }
-
+                case SDL_SCANCODE_0:
+                case SDL_SCANCODE_1:
+                case SDL_SCANCODE_2:
+                case SDL_SCANCODE_3:
+                case SDL_SCANCODE_4:
+                case SDL_SCANCODE_5:
+                case SDL_SCANCODE_6:
+                case SDL_SCANCODE_7:
+                case SDL_SCANCODE_8:
+                case SDL_SCANCODE_9: {
+                    if (!this->m_model->typing)
+                        this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     break;
                 }
-                case SDL_EVENT_MOUSE_WHEEL: {
-                    if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
-                        // TODO might have to change this to force 1 step
-                        if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                            this->m_model->item_index += static_cast<int>(e.wheel.y);
-                        }
-                        else {
-                            this->m_model->item_index -= static_cast<int>(e.wheel.y);
-                        }
+                case KEY_FLY: {
+                    if (!this->m_model->typing)
+                        this->m_model->flying = ~this->m_model->flying;
+                    break;
+                }
+                case KEY_ITEM_NEXT: {
+                    if (!this->m_model->typing)
+                        this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
+                    break;
+                }
+                case KEY_ITEM_PREV: {
+                    if (!this->m_model->typing) {
+                        this->m_model->item_index--;
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
-                        else
-                            this->m_model->item_index %= item_count;
                     }
                     break;
                 }
-                case SDL_EVENT_WINDOW_RESIZED: {
-                    this->m_model->scale = get_scale_factor();
-                    SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                case KEY_OBSERVE: {
+                    if (!this->m_model->typing)
+                        this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
                     break;
                 }
-                case SDL_EVENT_WINDOW_SHOWN: {
-                    this->m_model->scale = get_scale_factor();
-                    SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                case KEY_OBSERVE_INSET: {
+                    if (!this->m_model->typing)
+                        this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
                 }
+                case KEY_CHAT: {
+                    if (!this->m_model->typing) {
+                        this->m_model->typing = 1;
+                        this->m_model->typing_buffer[0] = '\0';
+                        this->m_model->text_len = 0;
+                        SDL_StartTextInput(this->m_model->window);
+                    }
+                    break;
+                }
+                case KEY_COMMAND: {
+                    if (!this->m_model->typing) {
+                        this->m_model->typing = 1;
+                        this->m_model->typing_buffer[0] = '\0';
+                        SDL_StartTextInput(this->m_model->window);
+                    }
+                    break;
+                }
+                case KEY_SIGN: {
+                    if (!this->m_model->typing) {
+                        this->m_model->typing = 1;
+                        this->m_model->typing_buffer[0] = '\0';
+                        SDL_StartTextInput(this->m_model->window);
+                    }
+                    break;
+
+                }
+                } // switch
+                break;
+            } // case SDL_EVENT_KEY_DOWN
+            case SDL_EVENT_TEXT_INPUT: {
+                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                    SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
+                    this->m_model->text_len += SDL_strlen(e.text.text);
+                }
+                break;
+            }
+            case SDL_EVENT_MOUSE_MOTION: {
+                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                    s->rx += e.motion.xrel * mouse_mv;
+                    if (INVERT_MOUSE) {
+                        s->ry += e.motion.yrel * mouse_mv;
+                    } else {
+                        s->ry -= e.motion.yrel * mouse_mv;
+                    }
+                    if (s->rx < 0) {
+                        s->rx += static_cast<float>(RADIANS(360));
+                    }
+                    if (s->rx >= static_cast<float>(RADIANS(360))) {
+                        s->rx -= static_cast<float>(RADIANS(360));
+                    }
+                    s->ry = SDL_max(s->ry, static_cast<float>(-1.0 * RADIANS(90)));
+                    s->ry = SDL_min(s->ry, static_cast<float>(RADIANS(90)));
+                }
+                break;
+            }
+            case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+                if (e.button.button == SDL_BUTTON_LEFT) {
+                    if (control) {
+                        on_right_click();
+                    } else {
+                        on_left_click();
+                    }
+                } else if (e.button.button == SDL_BUTTON_RIGHT) {
+                    if (control) {
+                        on_light();
+                    } else {
+                        on_right_click();
+                    }
+                } else if (e.button.button == SDL_BUTTON_MIDDLE) {
+                    on_middle_click();
+                }
+
+                break;
+            }
+            case SDL_EVENT_MOUSE_WHEEL: {
+                // @TODO might have to change this to force 1 step
+                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
+                    this->m_model->item_index += static_cast<int>(e.wheel.y);
+                } else {
+                    this->m_model->item_index -= static_cast<int>(e.wheel.y);
+                }
+                if (this->m_model->item_index < 0)
+                    this->m_model->item_index = item_count - 1;
+                else
+                    this->m_model->item_index %= item_count;
+                break;
+            case SDL_EVENT_WINDOW_RESIZED: {
+                this->m_model->scale = get_scale_factor();
+                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
+            }
+            case SDL_EVENT_WINDOW_SHOWN: {
+                this->m_model->scale = get_scale_factor();
+                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
+                break;
+            }
             } // switch
-        } // SDL_Event
+            } // SDL_Event
 
-        // Close the app, events handled successfully
-        if (!running) {
-            return true;
-        }
+            // Close the app, events handled successfully
+            if (!running) {
+                return true;
+            }
 
-        const Uint8 *state = SDL_GetKeyboardState(nullptr);
+            const Uint8* state = SDL_GetKeyboardState(nullptr);
 
-        if (!this->m_model->typing && this->m_gui->capture_mouse) {
-            this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
-            this->m_model->fov = static_cast<float>(state[KEY_ZOOM] ? 15 : 65);
-            if (state[KEY_FORWARD]) sz--;
-            if (state[KEY_BACKWARD]) sz++;
-            if (state[KEY_LEFT]) sx--;
-            if (state[KEY_RIGHT]) sx++;
-            if (state[SDL_SCANCODE_LEFT]) s->rx -= dir_mv;
-            if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
-            if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
-            if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
-        }
+            if (!this->m_model->typing) {
+                this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
+                this->m_model->fov = static_cast<float>(state[KEY_ZOOM] ? 15 : 65);
+                if (state[KEY_FORWARD]) sz--;
+                if (state[KEY_BACKWARD]) sz++;
+                if (state[KEY_LEFT]) sx--;
+                if (state[KEY_RIGHT]) sx++;
+                if (state[SDL_SCANCODE_LEFT]) s->rx -= dir_mv;
+                if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
+                if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
+                if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
+            }
 
-        float vx, vy, vz;
-        get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
-        if (!this->m_model->typing) {
-            if (state[KEY_JUMP] && this->m_gui->capture_mouse) {
+            float vx, vy, vz;
+            get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
+            if (!this->m_model->typing) {
+                if (state[KEY_JUMP]) {
+                    if (this->m_model->flying) {
+                        vy = 1;
+                    } else if (dy == 0) {
+                        dy = 8;
+                    }
+                }
+            }
+            float speed = static_cast<float>(this->m_model->flying ? 20 : 5);
+            int estimate = static_cast<int>(SDL_roundf(SDL_sqrtf(
+                SDL_powf(vx * speed, 2.f) +
+                SDL_powf(vy * speed + static_cast<float>(SDL_abs(static_cast<int>(dy))) * 2.f, 2.f) +
+                SDL_powf(vz * speed, 2.f)) * static_cast<float>(dt) * 8.f));
+            int step = SDL_max(8, estimate);
+            float ut = static_cast<float>(dt / static_cast<double>(step));
+            vx = vx * ut * speed;
+            vy = vy * ut * speed;
+            vz = vz * ut * speed;
+            for (int i = 0; i < step; i++) {
                 if (this->m_model->flying) {
-                    vy = 1;
+                    dy = 0;
+                } else {
+                    dy -= ut * 25;
+                    dy = SDL_max(dy, -250);
                 }
-                else if (dy == 0) {
-                    dy = 8;
+                s->x += vx;
+                s->y += vy + dy * ut;
+                s->z += vz;
+                if (collide(2, &s->x, &s->y, &s->z)) {
+                    dy = 0;
                 }
             }
-        }
-        float speed = static_cast<float>(this->m_model->flying ? 20 : 5);
-        int estimate = static_cast<int>(SDL_roundf(SDL_sqrtf(
-            SDL_powf(vx * speed, 2.f) +
-            SDL_powf(vy * speed + static_cast<float>(SDL_abs(static_cast<int>(dy))) * 2.f, 2.f) +
-            SDL_powf(vz * speed, 2.f)) * static_cast<float>(dt) * 8.f));
-        int step = SDL_max(8, estimate);
-        float ut = static_cast<float>(dt / static_cast<double>(step));
-        vx = vx * ut * speed;
-        vy = vy * ut * speed;
-        vz = vz * ut * speed;
-        for (int i = 0; i < step; i++) {
-            if (this->m_model->flying) {
-                dy = 0;
+            if (s->y < 0) {
+                s->y = static_cast<float>(highest_block(s->x, s->z) + 2);
             }
-            else {
-                dy -= ut * 25;
-                dy = SDL_max(dy, -250);
-            }
-            s->x += vx;
-            s->y += vy + dy * ut;
-            s->z += vz;
-            if (collide(2, &s->x, &s->y, &s->z)) {
-                dy = 0;
-            }
-        }
-        if (s->y < 0) {
-            s->y = static_cast<float>(highest_block(s->x, s->z) + 2);
-        }
 
-        return true;
+            return true;
+        } // while
 
     } // handle_events
 
@@ -3280,7 +3270,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     me->buffer = 0;
     m_pimpl->m_model->player_count = 1;
 
-    // magic variables to prevent black screen on load - configured in handle_events()
+    // magic variables to prevent black screen on load - modified in handle_events()
     this->m_pimpl->m_model->is_ortho = 0;
     this->m_pimpl->m_model->fov = 65;
 
@@ -3456,6 +3446,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     int triangle_faces = 0;
     bool running = true;
+
+    auto is_click_inside_gui = [](float m_x, float m_y, float gui_pos_x, float gui_pos_y, float gui_width, float gui_height) {
+        return (m_x >= gui_pos_x) && (m_x < (gui_pos_x + gui_width)) && (m_y >= gui_pos_y) && (m_y < (gui_pos_y + gui_height));
+    };
     uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -3479,10 +3473,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         dt = SDL_max(dt, 0.0);
         previous = now;
 
-        // ImGui window variables
+        // ImGui window state variables
         static bool show_demo_window = false;
         static bool show_mb_gui = true;
         static bool build_maze_now = false;
+
+        // Handle SDL events
         bool events_handled_success = m_pimpl->handle_events(dt, ref(running), ref(show_mb_gui));
 
         // Start the Dear ImGui frame
@@ -3490,10 +3486,24 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
+#if defined(MAZE_DEBUG)
+        if (ImGui::IsMousePosValid()) {
+            float m_x = io.MousePos.x;
+            float m_y = io.MousePos.y;
+            ImGui::Text("Mouse pos: (%g, %g)", m_x, m_y);
+            ImVec2 window_pos = ImGui::GetWindowPos();
+            ImVec2 window_size = ImGui::GetWindowSize();
+            bool is_gui_click = is_click_inside_gui(m_x, m_y, window_pos.x, window_pos.y, window_size.x, window_size.y);
+            ImGui::Text("is_gui_click: %s", is_gui_click ? "true" : "false");
+        } else {
+            ImGui::Text("Mouse pos: <INVALID>");
+        }
+#endif 
+
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
-
+        // Maze Builder GUI
         if (show_mb_gui) {
             ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
