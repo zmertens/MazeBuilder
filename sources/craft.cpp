@@ -417,7 +417,6 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-
     void init_worker_threads() {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
@@ -2479,12 +2478,12 @@ struct craft::craft_impl {
 
     /**
     * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    * @brief This function also checks if user is interacting with the GUI
+    * @brief Handle SDL events
     * @param dt
-    * @param running reference to running loop in game loop
-    * @return bool return true when event handle successfully
+    * @param running is a reference to game loop invariant
+    * @return bool return true when events are handled successfully
     */
-    bool handle_events(double dt, bool& running, bool& show_mb_gui) {
+    bool handle_events(double dt, bool& running) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2504,12 +2503,18 @@ struct craft::craft_impl {
                 running = false;
                 break;
             }
+            case SDL_EVENT_KEY_UP: {
+                sc = e.key.scancode;
+                switch (sc) {
+                }
+                break;
+            }
             case SDL_EVENT_KEY_DOWN: {
+
                 sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE: {
                     SDL_SetRelativeMouseMode(SDL_FALSE);
-                    show_mb_gui = true;
                     this->m_gui->capture_mouse = false;
                     this->m_gui->fullscreen = false;
                     this->m_model->typing = 0;
@@ -2568,22 +2573,22 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    if (!this->m_model->typing)
+                    if (this->m_gui->capture_mouse && !this->m_model->typing)
                         this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     break;
                 }
                 case KEY_FLY: {
-                    if (!this->m_model->typing)
+                    if (!this->m_model->typing && this->m_gui->capture_mouse)
                         this->m_model->flying = ~this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    if (!this->m_model->typing)
+                    if (!this->m_model->typing && this->m_gui->capture_mouse)
                         this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    if (!this->m_model->typing) {
+                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
                         this->m_model->item_index--;
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
@@ -2591,17 +2596,17 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_OBSERVE: {
-                    if (!this->m_model->typing)
+                    if (!this->m_model->typing && this->m_gui->capture_mouse)
                         this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
                     break;
                 }
                 case KEY_OBSERVE_INSET: {
-                    if (!this->m_model->typing)
+                    if (!this->m_model->typing && this->m_gui->capture_mouse)
                         this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
                 }
                 case KEY_CHAT: {
-                    if (!this->m_model->typing) {
+                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         this->m_model->text_len = 0;
@@ -2610,7 +2615,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_COMMAND: {
-                    if (!this->m_model->typing) {
+                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2618,7 +2623,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_SIGN: {
-                    if (!this->m_model->typing) {
+                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2630,7 +2635,7 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
-                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                if (this->m_gui->capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                     SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                 }
@@ -2645,47 +2650,52 @@ struct craft::craft_impl {
                         s->ry -= e.motion.yrel * mouse_mv;
                     }
                     if (s->rx < 0) {
-                        s->rx += static_cast<float>(RADIANS(360));
+                        s->rx += RADIANS(360);
                     }
-                    if (s->rx >= static_cast<float>(RADIANS(360))) {
-                        s->rx -= static_cast<float>(RADIANS(360));
+                    if (s->rx >= RADIANS(360)) {
+                        s->rx -= RADIANS(360);
                     }
-                    s->ry = SDL_max(s->ry, static_cast<float>(-1.0 * RADIANS(90)));
-                    s->ry = SDL_min(s->ry, static_cast<float>(RADIANS(90)));
+                    s->ry = SDL_max(s->ry, -RADIANS(90));
+                    s->ry = SDL_min(s->ry, RADIANS(90));
                 }
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (e.button.button == SDL_BUTTON_LEFT) {
+                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_LEFT) {
                     if (control) {
                         on_right_click();
                     } else {
                         on_left_click();
                     }
-                } else if (e.button.button == SDL_BUTTON_RIGHT) {
+                } else if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_RIGHT) {
                     if (control) {
                         on_light();
                     } else {
                         on_right_click();
                     }
                 } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    on_middle_click();
+                    if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                        on_middle_click();
+                    }
                 }
 
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                // @TODO might have to change this to force 1 step
-                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                    this->m_model->item_index += static_cast<int>(e.wheel.y);
-                } else {
-                    this->m_model->item_index -= static_cast<int>(e.wheel.y);
+                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                    // TODO might have to change this to force 1 step
+                    if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
+                        this->m_model->item_index += e.wheel.y;
+                    } else {
+                        this->m_model->item_index -= e.wheel.y;
+                    }
+                    if (this->m_model->item_index < 0)
+                        this->m_model->item_index = item_count - 1;
+                    else
+                        this->m_model->item_index %= item_count;
                 }
-                if (this->m_model->item_index < 0)
-                    this->m_model->item_index = item_count - 1;
-                else
-                    this->m_model->item_index %= item_count;
                 break;
+            }
             case SDL_EVENT_WINDOW_RESIZED: {
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
@@ -2697,70 +2707,68 @@ struct craft::craft_impl {
                 break;
             }
             } // switch
-            } // SDL_Event
+        } // SDL_Event
 
-            // Close the app, events handled successfully
-            if (!running) {
-                return true;
-            }
-
-            const Uint8* state = SDL_GetKeyboardState(nullptr);
-
-            if (!this->m_model->typing) {
-                this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
-                this->m_model->fov = static_cast<float>(state[KEY_ZOOM] ? 15 : 65);
-                if (state[KEY_FORWARD]) sz--;
-                if (state[KEY_BACKWARD]) sz++;
-                if (state[KEY_LEFT]) sx--;
-                if (state[KEY_RIGHT]) sx++;
-                if (state[SDL_SCANCODE_LEFT]) s->rx -= dir_mv;
-                if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
-                if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
-                if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
-            }
-
-            float vx, vy, vz;
-            get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
-            if (!this->m_model->typing) {
-                if (state[KEY_JUMP]) {
-                    if (this->m_model->flying) {
-                        vy = 1;
-                    } else if (dy == 0) {
-                        dy = 8;
-                    }
-                }
-            }
-            float speed = static_cast<float>(this->m_model->flying ? 20 : 5);
-            int estimate = static_cast<int>(SDL_roundf(SDL_sqrtf(
-                SDL_powf(vx * speed, 2.f) +
-                SDL_powf(vy * speed + static_cast<float>(SDL_abs(static_cast<int>(dy))) * 2.f, 2.f) +
-                SDL_powf(vz * speed, 2.f)) * static_cast<float>(dt) * 8.f));
-            int step = SDL_max(8, estimate);
-            float ut = static_cast<float>(dt / static_cast<double>(step));
-            vx = vx * ut * speed;
-            vy = vy * ut * speed;
-            vz = vz * ut * speed;
-            for (int i = 0; i < step; i++) {
-                if (this->m_model->flying) {
-                    dy = 0;
-                } else {
-                    dy -= ut * 25;
-                    dy = SDL_max(dy, -250);
-                }
-                s->x += vx;
-                s->y += vy + dy * ut;
-                s->z += vz;
-                if (collide(2, &s->x, &s->y, &s->z)) {
-                    dy = 0;
-                }
-            }
-            if (s->y < 0) {
-                s->y = static_cast<float>(highest_block(s->x, s->z) + 2);
-            }
-
+        // Close the app, events handled successfully
+        if (!running) {
             return true;
-        } // while
+        }
 
+        const Uint8* state = SDL_GetKeyboardState(nullptr);
+
+        if (!this->m_model->typing && this->m_gui->capture_mouse) {
+            this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
+            this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
+            if (state[KEY_FORWARD]) sz--;
+            if (state[KEY_BACKWARD]) sz++;
+            if (state[KEY_LEFT]) sx--;
+            if (state[KEY_RIGHT]) sx++;
+            if (state[SDL_SCANCODE_LEFT]) s->rx -= dir_mv;
+            if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
+            if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
+            if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
+        }
+
+        float vx, vy, vz;
+        get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
+        if (!this->m_model->typing) {
+            if (state[KEY_JUMP] && this->m_gui->capture_mouse) {
+                if (this->m_model->flying) {
+                    vy = 1;
+                } else if (dy == 0) {
+                    dy = 8;
+                }
+            }
+        }
+        float speed = this->m_model->flying ? 20 : 5;
+        int estimate = SDL_roundf(SDL_sqrtf(
+            SDL_powf(vx * speed, 2) +
+            SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
+            SDL_powf(vz * speed, 2)) * dt * 8);
+        int step = SDL_max(8, estimate);
+        float ut = dt / step;
+        vx = vx * ut * speed;
+        vy = vy * ut * speed;
+        vz = vz * ut * speed;
+        for (int i = 0; i < step; i++) {
+            if (this->m_model->flying) {
+                dy = 0;
+            } else {
+                dy -= ut * 25;
+                dy = SDL_max(dy, -250);
+            }
+            s->x += vx;
+            s->y += vy + dy * ut;
+            s->z += vz;
+            if (collide(2, &s->x, &s->y, &s->z)) {
+                dy = 0;
+            }
+        }
+        if (s->y < 0) {
+            s->y = highest_block(s->x, s->z) + 2;
+        }
+
+        return true;
     } // handle_events
 
     /**
@@ -3244,11 +3252,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         // ImGui window state variables
         static bool show_demo_window = false;
-        static bool show_mb_gui = true;
+        static bool show_mb_gui = !SDL_GetRelativeMouseMode();
         static bool build_maze_now = false;
 
         // Handle SDL events
-        bool events_handled_success = m_pimpl->handle_events(dt, ref(running), ref(show_mb_gui));
+        bool events_handled_success = m_pimpl->handle_events(dt, ref(running));
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3272,6 +3280,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
+        show_mb_gui = !SDL_GetRelativeMouseMode();
         // Maze Builder GUI
         if (show_mb_gui) {
             ImGui::PushFont(nunito_sans_font);
@@ -3412,7 +3421,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui->capture_mouse);
                     if (gui->capture_mouse) {
                         SDL_SetRelativeMouseMode(SDL_TRUE);
-                        show_mb_gui = false;
+                    } else {
+                        SDL_SetRelativeMouseMode(SDL_FALSE);
                     }
 
                     static bool last_vsync = gui->vsync;
