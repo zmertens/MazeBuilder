@@ -5,6 +5,7 @@
 #include <sstream>
 #include <future>
 #include <thread>
+#include <shared_mutex>
 #include <algorithm>
 #include <vector>
 #include <list>
@@ -13,21 +14,22 @@
 #include "args_builder.h"
 #include "maze_types_enum.h"
 #include "maze_factory.h"
+#include "maze_thread_safe.h"
 #include "writer.h"
 #include "craft.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
-    // bind a getter method from C++ so that it can be accessed in the frontend with JS
-    EMSCRIPTEN_BINDINGS(maze_builder_module) {
-        emscripten::class_<craft>("craft")
-            .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
-            .constructor<const std::string&, const std::string&, const std::string&>()
-            .function("set_json", &craft::set_json)
-            .function("get_json", &craft::get_json)
-            .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
-   }
+// bind a getter method from C++ so that it can be accessed in the frontend with JS
+EMSCRIPTEN_BINDINGS(maze_builder_module) {
+    emscripten::class_<craft>("craft")
+        .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
+        .constructor<const std::string&, const std::string&, const std::string&>()
+        .function("set_json", &craft::set_json)
+        .function("get_json", &craft::get_json)
+        .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
+}
 #endif
 
 int main(int argc, char* argv[]) {
@@ -119,21 +121,23 @@ int main(int argc, char* argv[]) {
         } else {
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
             auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
-            
             success = mazes::maze_factory::gen_maze(my_maze_type, std::ref(_grid), std::cref(get_int), std::cref(rng_engine));
             if (success) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &args](auto data)->bool {
                     return my_writer.write(args.get_output(), data);
-                    };
-                std::packaged_task<bool(const std::string& data)> task_writes(write_func);
-
-                auto&& fut_writer = task_writes.get_future();
+                };
                 std::stringstream ss;
                 ss << *_grid.get();
-                std::thread thread_writer(std::move(task_writes), ss.str());
-                thread_writer.join();
-                if (fut_writer.get()) {
+                maze_thread_safe my_maze{ ss.str(), args.get_height() };
+                bool is_wavefront_file = (my_writer.get_filetype(args.get_output()) == mazes::file_types::WAVEFRONT_OBJ_FILE);
+                if (is_wavefront_file) {
+                    success = write_func(my_maze.to_wavefront_obj_str());
+                } else {
+                    success = write_func(ss.str());
+                }
+                
+                if (success) {
 #if defined(MAZE_DEBUG)
                     std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
 #endif

@@ -58,9 +58,9 @@ Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
   -v, --version      display program version
 ```
 
-Specify a seed and a `binary tree` maze-generating algorithm:
+Specify a seed with the `binary tree` maze-generating algorithm:
 ```sh
-./maze_builder --seed=1337 --algorithm=binary_tree -o bt.txt
+./maze_builder --seed=1337 --algorithm=binary_tree -o bt.obj
 ```
 
 Make Maze Builder run in an `interactive` mode:

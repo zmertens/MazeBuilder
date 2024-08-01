@@ -76,7 +76,8 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
