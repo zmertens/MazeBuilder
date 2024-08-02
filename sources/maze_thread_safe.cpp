@@ -3,6 +3,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "maze_types_enum.h"
+
 using namespace mazes;
 using namespace std;
 
@@ -11,7 +13,7 @@ using namespace std;
  */
 maze_thread_safe::maze_thread_safe(const std::string& maze, unsigned int height) 
     : m_maze(maze), m_height(height)
-    , m_wavefront_obj_vertices(), m_render_vertices(), m_faces() {
+    , m_vertices(), m_faces() {
     this->compute_geometry();
 }
 
@@ -20,7 +22,8 @@ void maze_thread_safe::set_maze(const std::string& maze, unsigned int height) no
     this->m_maze = maze;
     this->m_height = height;
     this->compute_geometry();
-};
+}
+
 std::string maze_thread_safe::get_maze() noexcept {
     std::lock_guard<std::mutex> lock(m_maze_mutx);
     return this->m_maze;
@@ -30,22 +33,27 @@ void maze_thread_safe::clear() noexcept {
     std::lock_guard<std::mutex> lock(m_maze_mutx);
     std::lock_guard<std::shared_mutex> lock_verts(m_verts_mtx);
     m_maze.clear();
-    m_wavefront_obj_vertices.clear();
-    m_render_vertices.clear();
+    m_vertices.clear();
     m_faces.clear();
 }
 
-std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertices() noexcept {
+std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertices() const noexcept {
     std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
-    return this->m_render_vertices;
+
+    vector<tuple<int, int, int, int>> render_vertices (this->m_vertices.size() / 8);
+    for (size_t i = 0; i < this->m_vertices.size(); i += 8) {
+		render_vertices.push_back(this->m_vertices[i]);
+	}
+
+    return render_vertices;
 }
 
-std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_wavefront_obj_vertices() noexcept {
+std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_block_vertices() const noexcept {
     std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
-    return this->m_wavefront_obj_vertices;
+    return this->m_vertices;
 }
 
-std::vector<std::vector<std::uint32_t>> maze_thread_safe::get_faces() noexcept {
+std::vector<std::vector<std::uint32_t>> maze_thread_safe::get_faces() const noexcept {
     std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
     return this->m_faces;
 }
@@ -54,23 +62,21 @@ std::vector<std::vector<std::uint32_t>> maze_thread_safe::get_faces() noexcept {
  * @brief Update the maze with a new block, updating geometric write and render vertices
  *  Write vertices are used for Wavefront OBJ file writing
  *  Render vertices are used for rendering in Craft
-*/
+ */
 void maze_thread_safe::add_block(int x, int y, int z, int w, int block_size) noexcept  {
     std::lock_guard<std::shared_mutex> lock(m_verts_mtx);
     // Calculate the base index for the new vertices
     // OBJ format is 1-based indexing
-    std::uint32_t baseIndex = static_cast<std::uint32_t>(this->m_wavefront_obj_vertices.size() + 1);
+    std::uint32_t baseIndex = static_cast<std::uint32_t>(this->m_vertices.size() + 1);
     // Define the 8 vertices of the cube
-    this->m_wavefront_obj_vertices.emplace_back(x, y, z, w);
-    this->m_wavefront_obj_vertices.emplace_back(x + block_size, y, z, w);
-    this->m_wavefront_obj_vertices.emplace_back(x + block_size, y + block_size, z, w);
-    this->m_wavefront_obj_vertices.emplace_back(x, y + block_size, z, w);
-    this->m_wavefront_obj_vertices.emplace_back(x, y, z + block_size, w);
-    this->m_wavefront_obj_vertices.emplace_back(x + block_size, y, z + block_size, w);
-    this->m_wavefront_obj_vertices.emplace_back(x + block_size, y + block_size, z + block_size, w);
-    this->m_wavefront_obj_vertices.emplace_back(x, y + block_size, z + block_size, w);
-    // Render vertices have an implicit block size of "1 unit", useful for 3D rendering
-    this->m_render_vertices.emplace_back(x, y, z, w);
+    this->m_vertices.emplace_back(x, y, z, w);
+    this->m_vertices.emplace_back(x + block_size, y, z, w);
+    this->m_vertices.emplace_back(x + block_size, y + block_size, z, w);
+    this->m_vertices.emplace_back(x, y + block_size, z, w);
+    this->m_vertices.emplace_back(x, y, z + block_size, w);
+    this->m_vertices.emplace_back(x + block_size, y, z + block_size, w);
+    this->m_vertices.emplace_back(x + block_size, y + block_size, z + block_size, w);
+    this->m_vertices.emplace_back(x, y + block_size, z + block_size, w);
 
     // Define m_faces using the vertices above (12 triangles for 6 m_faces)
     // Front face
@@ -101,13 +107,13 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
     ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
     // keep track of writing progress
-    int total_verts = static_cast<int>(m_wavefront_obj_vertices.size());
+    int total_verts = static_cast<int>(m_vertices.size());
     int total_faces = static_cast<int>(m_faces.size());
 
     int t = total_verts + total_faces;
     int c = 0;
     // Write vertices
-    for (const auto& vertex : m_wavefront_obj_vertices) {
+    for (const auto& vertex : m_vertices) {
         float x = static_cast<float>(get<0>(vertex));
         float y = static_cast<float>(get<1>(vertex));
         float z = static_cast<float>(get<2>(vertex));
@@ -146,7 +152,7 @@ void maze_thread_safe::compute_geometry() noexcept {
     while (getline(iss, line, '\n')) {
         unsigned int col_z = 0;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-            if (*itr == '+' || *itr == '-' || *itr == '|') {
+            if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
                 // Check for barriers and walls then iterate up/down
                 static constexpr unsigned int starting_height = 30u;
                 static constexpr unsigned int block_size = 1;

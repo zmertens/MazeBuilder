@@ -34,7 +34,6 @@
 #include <string>
 #include <string_view>
 #include <algorithm>
-#include <unordered_map>
 #include <iostream>
 #include <thread>
 #include <future>
@@ -145,7 +144,7 @@ struct craft::craft_impl {
         std::string maze_json;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
-            capture_mouse(false), chunk_size(32), show_trees(true),
+            capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(25),
@@ -1626,11 +1625,12 @@ struct craft::craft_impl {
         }
     }
 
-    // Used to init the terrain (chunks) around the player
-    void force_chunks(Player *player) {
+    // Used to init the terrain (chunks) around the player -- skip empty maze parts
+    void force_chunks(Player *player) {     
         State *s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
+
         int r = 1;
         for (int dp = -r; dp <= r; dp++) {
             for (int dq = -r; dq <= r; dq++) {
@@ -2772,7 +2772,7 @@ struct craft::craft_impl {
     } // handle_events
 
     /**
-     * @brief Check fullscreen modes avaialble and update the model
+     * @brief Check what fullscreen modes are avaialble
      */
     void check_fullscreen_modes() {
         SDL_DisplayID display = SDL_GetPrimaryDisplay();
@@ -3126,6 +3126,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
 
+    auto&& render_vertices = this->m_pimpl->m_maze->get_render_vertices();
     m_pimpl->force_chunks(me);
 
     if (!loaded) {
@@ -3194,7 +3195,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 	};
 
     auto json_writer = [&maze2](const string& outfile) -> string {
-        auto&& vertices = maze2->get_wavefront_obj_vertices();
+        auto&& vertices = maze2->get_block_vertices();
         auto&& faces = maze2->get_faces();
         stringstream ss;
         // Set key if outfile is specified
@@ -3466,7 +3467,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             // 1. Compute maze geometry for 3D coordinates (includes a height value)
             // 2. Write the maze to a Wavefront object file using the computed data
             if (!maze2->get_maze().empty()) {
-                set_maze_in_craft(maze2->get_render_vertices());
+                render_vertices = maze2->get_render_vertices();
+                set_maze_in_craft(render_vertices);
                 // Writing the maze will run in the background - only do that on Desktop
 #if !defined(__EMSCRIPTEN__ )
                 write_success = maze_writer_fut(gui->outfile);

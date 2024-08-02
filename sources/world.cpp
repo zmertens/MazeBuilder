@@ -14,7 +14,6 @@ void world::create_world(int p, int q, world_func func, Map* m, const int CHUNK_
             }
             int x = p * CHUNK_SIZE + dx;
             int z = q * CHUNK_SIZE + dz;
-
             func(x, 5, z, 1, m);
 
             //float f = simplex2(static_cast<float>(x) * 0.01, static_cast<float>(z) * 0.01, 4, 0.5, 2);

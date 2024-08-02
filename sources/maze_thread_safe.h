@@ -14,9 +14,9 @@ public:
 	virtual void set_maze(const std::string& maze, unsigned int height) noexcept override;
 	virtual std::string get_maze() noexcept override;
 	virtual void clear() noexcept override;
-	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() noexcept override;
-    virtual std::vector<std::tuple<int, int, int, int>> get_wavefront_obj_vertices() noexcept override;
-	virtual std::vector<std::vector<std::uint32_t>> get_faces() noexcept override;
+	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
+    virtual std::vector<std::tuple<int, int, int, int>> get_block_vertices() const noexcept override;
+	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
 	void add_block(int x, int y, int z, int w, int block_size) noexcept override;
 	std::string to_wavefront_obj_str() const noexcept override;
 
@@ -30,9 +30,7 @@ private:
     std::mutex m_maze_mutx;
     // Tuple (x, y, z, w)
     // Write vertices compute block sizes and are designed for Wavefront OBJ file writing
-    std::vector<std::tuple<int, int, int, int>> m_wavefront_obj_vertices;
-    // Render vertices are designed for rendering in Craft/3D worlds
-    std::vector<std::tuple<int, int, int, int>> m_render_vertices;
+    std::vector<std::tuple<int, int, int, int>> m_vertices;
     std::vector<std::vector<std::uint32_t>> m_faces;
 }; // class
 
