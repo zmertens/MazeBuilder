@@ -111,39 +111,41 @@ int main(int argc, char* argv[]) {
     try {
         bool success = false;
         if (args.is_interactive()) {
-            
+            // Run the SDL app
             std::string window_title {"Maze Builder"};
             std::string version { MAZE_BUILDER_VERSION };
             std::string help { HELP_MSG };
             auto&& maze_builder_3D = craft::get_instance(window_title, version, help);
             // craft uses it's own RNG engine, which looks a lot like the one here
             success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
+            if (!success) {
+                std::cout << "ERROR: Running SDL app failed." << std::endl;
+            }
         } else {
+            // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
-            auto _grid{ std::make_unique<mazes::grid>(args.get_width(), args.get_length(), args.get_height()) };
-            success = mazes::maze_factory::gen_maze(my_maze_type, std::ref(_grid), std::cref(get_int), std::cref(rng_engine));
-            if (success) {
+            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
+                args.get_width(), args.get_length(), args.get_height() };
+            auto&& maze_str = my_maze.get_maze();
+            if (!maze_str.empty()) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &args](auto data)->bool {
                     return my_writer.write(args.get_output(), data);
                 };
-                std::stringstream ss;
-                ss << *_grid.get();
-                maze_thread_safe my_maze{ ss.str(), args.get_height() };
                 bool is_wavefront_file = (my_writer.get_filetype(args.get_output()) == mazes::file_types::WAVEFRONT_OBJ_FILE);
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else {
-                    success = write_func(ss.str());
+                    success = write_func(maze_str);
                 }
                 
                 if (success) {
 #if defined(MAZE_DEBUG)
-                    std::cout << "Writing to file: " << args.get_output() << " complete!!" << std::endl;
+                    std::cout << "INFO: Writing to file: " << args.get_output() << " complete!!" << std::endl;
 #endif
                 }
                 else {
-                    std::cerr << "ERROR: Writing to file " << args.get_output() << std::endl;
+                    std::cerr << "ERROR: Writing to file: " << args.get_output() << std::endl;
                 }
             }
             else {

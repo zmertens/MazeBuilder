@@ -4,17 +4,24 @@
 
 using namespace std;
 
-void world::create_world(int p, int q, world_func func, Map* m, const int CHUNK_SIZE, const bool SHOW_TREES, const bool SHOW_PLANTS, const bool SHOW_CLOUDS) const noexcept {
+void world::create_world(int p, int q, bool is_part_of_maze, world_func func, Map* m,
+    int chunk_size, bool show_trees, bool show_plants, bool show_clouds) const noexcept {
+
+    if (!is_part_of_maze)
+        return;
+
     int pad = 1;
-    for (int dx = -pad; dx < CHUNK_SIZE + pad; dx++) {
-        for (int dz = -pad; dz < CHUNK_SIZE + pad; dz++) {
+    for (int dx = -pad; dx < chunk_size + pad; dx++) {
+        for (int dz = -pad; dz < chunk_size + pad; dz++) {
             int flag = 1;
-            if (dx < 0 || dz < 0 || dx >= CHUNK_SIZE || dz >= CHUNK_SIZE) {
+            if (dx < 0 || dz < 0 || dx >= chunk_size || dz >= chunk_size) {
                 flag = -1;
             }
-            int x = p * CHUNK_SIZE + dx;
-            int z = q * CHUNK_SIZE + dz;
-            func(x, 5, z, 1, m);
+            int x = p * chunk_size + dx;
+            int z = q * chunk_size + dz;
+
+            for (int y = 5; y < 10; y++)
+                func(x, y, z, 5, m);
 
             //float f = simplex2(static_cast<float>(x) * 0.01, static_cast<float>(z) * 0.01, 4, 0.5, 2);
             //float g = simplex2(static_cast<float>(-x) * 0.01, static_cast<float>(-z) * 0.01, 2, 0.9, 2);
@@ -45,7 +52,7 @@ void world::create_world(int p, int q, world_func func, Map* m, const int CHUNK_
             //    // trees
             //    int ok = SHOW_TREES;
             //    if (dx - 4 < 0 || dz - 4 < 0 ||
-            //        dx + 4 >= CHUNK_SIZE || dz + 4 >= CHUNK_SIZE)
+            //        dx + 4 >= chunk_size || dz + 4 >= chunk_size)
             //    {
             //        ok = 0;
             //    }

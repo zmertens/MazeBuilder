@@ -1,51 +1,18 @@
 # Maze Builder
 
 Build and download mazes interactively or using the command-line interface (CLI).
-This project enables rapid prototyping and simplicity. Go from a randomly-generated 100X100 maze straight to exporting it to Wavefront object files.
-The exports can then be integrated into game engines and renderers like Unity, Godot, Blender and so forth.
+Rapidly prototype and build a random maze and export it straight to a Wavefront object file.
+Exports can then be integrated into game engines and renderers like Unity, Godot, Blender and so forth.
 
 [Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
 ![Release screenshot 325](textures/maze_builder_releas325.png)
 
-## CMake
-
-This project uses `cmake` to build and test the project. It uses `find_package` and `FetchContent` to get SDL and Catch2 if necessary. It requires modern hardware supporting pthreads and OpenGL 3.0. The SDL library is used for portability and providing a window to draw on, and Catch2 is used for the tests.
-
-```sh
-cmake -S ${my/mazebuilder/repo} -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_MAZE_TESTS=1
-```
-```sh
-cmake --build build/ -j 4
-```
-```sh
-cd build && ctest --verbose
-```
-
-where `${my/mazebuilder/repo}` is the directory containg the Git repo for Maze Builder.
-
-| CMake Option | Default | Description |
-|--------------|---------|-------------
-| BUILD_MAZE_TESTS | OFF | Build with maze algorithm testing via Catch2. |
-| CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for Emscripten builds. |
-| CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRel, Release, RelWithDebInfo, Debug`. |
-
-
-Additionally, the Maze Builder can be built for the web using [Emscripten](https://emscripten.org/). Build with the toolchain file:
-
-```sh
-cmake -S . -B . -DCMAKE_TOOLCHAIN_FILE=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake 
-```
-
-Where `${my/emsdk/repo}` is the directory containing the Git repo for Emscripten.
-
-Run a local server using the included [secure_http_server.py](secure_http_server.py) file.
-
 ## Commands and Help Message
 
 ```sh
 Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
-Generates mazes and exports to ASCII-format or Wavefront object format
+Generates and exports mazes to string format or Wavefront object format
 Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
   -a, --algorithm    binary_tree [default], sidewinder
   -s, --seed         seed for the random number generator [mt19937]
@@ -58,15 +25,50 @@ Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
   -v, --version      display program version
 ```
 
-Specify a seed with the `binary tree` maze-generating algorithm:
+Specify a seed with the `binary__tree` maze-generating algorithm:
 ```sh
-./maze_builder --seed=1337 --algorithm=binary_tree -o bt.obj
+maze_builder.exe --seed=1337 --algorithm=binary_tree -o bt.obj
 ```
 
-Make Maze Builder run in an `interactive` mode:
+Run Maze Builder in an `interactive` mode:
 ```sh
-./maze_builder -i
+maze_builder.exe -i
 ```
+
+## CMake
+
+This project uses `cmake` to build and test the project. It uses `find_package` and `FetchContent` to get SDL and Catch2 if necessary.
+It requires modern hardware supporting pthreads and OpenGL 3.0. The SDL library is used for portability and providing a window to draw on, and Catch2 is used for the tests.
+
+Navigate to the repo, where `${my/mazebuilder/repo}` is the directory containg the Git repo for Maze Builder.
+
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_MAZE_TESTS=1
+```
+```sh
+cmake --build build/ -j 4
+```
+```sh
+cd build && ctest --verbose
+```
+
+| CMake Option | Default | Description |
+|--------------|---------|-------------
+| BUILD_MAZE_TESTS | OFF | Build with maze algorithm testing via Catch2. |
+| CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for Emscripten builds. |
+| CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRel, Release, RelWithDebInfo, Debug`. |
+
+
+Additionally, the Maze Builder can be built for the web using [Emscripten](https://emscripten.org/) and the toolchain file:
+
+```sh
+cmake -S . -B . -DCMAKE_TOOLCHAIN_FILE=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake 
+```
+
+Where `${my/emsdk/repo}` is the directory containing the Git repo for Emscripten.
+
+In order to run the web app, first run a local server with Python using the included [secure_http_server.py](secure_http_server.py) file.
 
 ## Scripts
 

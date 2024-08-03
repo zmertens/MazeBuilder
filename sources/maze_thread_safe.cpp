@@ -3,6 +3,8 @@
 #include <sstream>
 #include <iostream>
 
+#include "grid.h"
+#include "maze_factory.h"
 #include "maze_types_enum.h"
 
 using namespace mazes;
@@ -11,17 +13,17 @@ using namespace std;
 /**
  * @brief Represent a maze with a thread-safe interface in a 3D grid
  */
-maze_thread_safe::maze_thread_safe(const std::string& maze, unsigned int height) 
-    : m_maze(maze), m_height(height)
-    , m_vertices(), m_faces() {
+maze_thread_safe::maze_thread_safe(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng,
+    unsigned int width, unsigned int length, unsigned int height)
+    : m_maze(), m_width(width), m_length(length), m_height(height)
+    , m_vertices(), m_faces(), m_p_q() {
+    this->m_maze = this->compute_str(my_maze_type, get_int, rng);
     this->compute_geometry();
 }
 
-void maze_thread_safe::set_maze(const std::string& maze, unsigned int height) noexcept {
+void maze_thread_safe::set_maze(const std::string& maze) noexcept {
     std::lock_guard<std::mutex> lock(m_maze_mutx);
     this->m_maze = maze;
-    this->m_height = height;
-    this->compute_geometry();
 }
 
 std::string maze_thread_safe::get_maze() noexcept {
@@ -29,12 +31,19 @@ std::string maze_thread_safe::get_maze() noexcept {
     return this->m_maze;
 }
 
+/**
+ * @brief Clear maze objects and parameters
+ */
 void maze_thread_safe::clear() noexcept {
     std::lock_guard<std::mutex> lock(m_maze_mutx);
     std::lock_guard<std::shared_mutex> lock_verts(m_verts_mtx);
     m_maze.clear();
     m_vertices.clear();
     m_faces.clear();
+    m_p_q.clear();
+    m_width = 0;
+    m_length = 0;
+    m_height = 0;
 }
 
 std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertices() const noexcept {
@@ -48,7 +57,7 @@ std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertice
     return render_vertices;
 }
 
-std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_block_vertices() const noexcept {
+std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_writable_vertices() const noexcept {
     std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
     return this->m_vertices;
 }
@@ -58,46 +67,9 @@ std::vector<std::vector<std::uint32_t>> maze_thread_safe::get_faces() const noex
     return this->m_faces;
 }
 
-/**
- * @brief Update the maze with a new block, updating geometric write and render vertices
- *  Write vertices are used for Wavefront OBJ file writing
- *  Render vertices are used for rendering in Craft
- */
-void maze_thread_safe::add_block(int x, int y, int z, int w, int block_size) noexcept  {
-    std::lock_guard<std::shared_mutex> lock(m_verts_mtx);
-    // Calculate the base index for the new vertices
-    // OBJ format is 1-based indexing
-    std::uint32_t baseIndex = static_cast<std::uint32_t>(this->m_vertices.size() + 1);
-    // Define the 8 vertices of the cube
-    this->m_vertices.emplace_back(x, y, z, w);
-    this->m_vertices.emplace_back(x + block_size, y, z, w);
-    this->m_vertices.emplace_back(x + block_size, y + block_size, z, w);
-    this->m_vertices.emplace_back(x, y + block_size, z, w);
-    this->m_vertices.emplace_back(x, y, z + block_size, w);
-    this->m_vertices.emplace_back(x + block_size, y, z + block_size, w);
-    this->m_vertices.emplace_back(x + block_size, y + block_size, z + block_size, w);
-    this->m_vertices.emplace_back(x, y + block_size, z + block_size, w);
-
-    // Define m_faces using the vertices above (12 triangles for 6 m_faces)
-    // Front face
-    this->m_faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-    this->m_faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
-    // Back face
-    this->m_faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-    this->m_faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
-    // Left face
-    this->m_faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-    this->m_faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
-    // Right face
-    this->m_faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-    this->m_faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
-    // Top face
-    this->m_faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-    this->m_faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
-    // Bottom face
-    this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-    this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-} // add_block
+const maze_thread_safe::pqmap& maze_thread_safe::get_p_q() const noexcept {
+	return this->m_p_q;
+}
 
 // Return a future for when maze has been written
 std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
@@ -138,6 +110,44 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
     return ss.str();
 } // to_wavefront_obj_str
 
+void  maze_thread_safe::set_height(unsigned int height) noexcept {
+    this->m_height = height;
+}
+
+unsigned int  maze_thread_safe::get_height() const noexcept {
+    return this->m_height;
+}
+
+void  maze_thread_safe::set_length(unsigned int length) noexcept {
+    this->m_length = length;
+}
+
+unsigned int  maze_thread_safe::get_length() const noexcept {
+    return this->m_length;
+}
+
+void  maze_thread_safe::set_width(unsigned int width) noexcept {
+    this->m_width = width;
+}
+
+unsigned int  maze_thread_safe::get_width() const noexcept {
+    return this->m_width;
+}
+
+std::string maze_thread_safe::compute_str(maze_types my_maze_type,
+    const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
+    auto g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
+
+    if (!success) {
+        return "";
+    }
+
+    stringstream ss;
+    ss << *g.get();
+    return ss.str();
+} // to_str
+
 /**
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
  * Specify a "starting_height" to try to put the maze above the heightmap (mountains), and below the clouds
@@ -146,6 +156,7 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
  * @return
 */
 void maze_thread_safe::compute_geometry() noexcept {
+    lock_guard<mutex> lock(m_maze_mutx);
     istringstream iss{ m_maze.data() };
     string line;
     unsigned int row_x = 0;
@@ -162,9 +173,51 @@ void maze_thread_safe::compute_geometry() noexcept {
                     // There are 2 data sources, one for rendering and one for writing
                     this->add_block(row_x, h, col_z, w, block_size);
                 }
+                m_p_q[{ row_x, col_z}] = true;
             }
             col_z++;
         }
         row_x++;
     } // getline
 } // compute_geometry
+
+/**
+ * @brief Update the maze with a new block, updating geometric write and render vertices
+ *  Write vertices are used for Wavefront OBJ file writing
+ *  Render vertices are used for rendering in Craft
+ */
+void maze_thread_safe::add_block(int x, int y, int z, int w, int block_size) noexcept {
+    std::lock_guard<std::shared_mutex> lock(m_verts_mtx);
+    // Calculate the base index for the new vertices
+    // OBJ format is 1-based indexing
+    std::uint32_t baseIndex = static_cast<std::uint32_t>(this->m_vertices.size() + 1);
+    // Define the 8 vertices of the cube
+    this->m_vertices.emplace_back(x, y, z, w);
+    this->m_vertices.emplace_back(x + block_size, y, z, w);
+    this->m_vertices.emplace_back(x + block_size, y + block_size, z, w);
+    this->m_vertices.emplace_back(x, y + block_size, z, w);
+    this->m_vertices.emplace_back(x, y, z + block_size, w);
+    this->m_vertices.emplace_back(x + block_size, y, z + block_size, w);
+    this->m_vertices.emplace_back(x + block_size, y + block_size, z + block_size, w);
+    this->m_vertices.emplace_back(x, y + block_size, z + block_size, w);
+
+    // Define m_faces using the vertices above (12 triangles for 6 m_faces)
+    // Front face
+    this->m_faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
+    this->m_faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
+    // Back face
+    this->m_faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
+    this->m_faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
+    // Left face
+    this->m_faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
+    this->m_faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
+    // Right face
+    this->m_faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
+    this->m_faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
+    // Top face
+    this->m_faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
+    this->m_faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
+    // Bottom face
+    this->m_faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
+    this->m_faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
+} // add_block

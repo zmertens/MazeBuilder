@@ -19,6 +19,7 @@ The codebase tries to follow modern C++ coding styles and conventions:
   * **Smart Pointers**: Include `<memory>` and use `std::unique_ptr<T>` or `std::shared_ptr<T>` over `malloc`, `free`, `new`, and `delete`. 
     * It is okay to do `MyClass* class_ptr = &MyClass::obj;`.
   * **Minimal Templates**: Rarely use templates to avoid complex debugging messages.
+  * **Inline Functions**: Never use `inline` on functions, let the compiler handle those optimizations.
   * **Task-Based Programming**: Prefer task-based programming instead of threads. Use futures that return void, `future<void> foo = std::async(std::launch::async, _bar, _param1, _param2);`.
 
 ## Shaders

@@ -147,7 +147,7 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-            outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(25),
+            outfile(".obj"), seed(101), maze_width(100), maze_height(10), maze_length(100),
             maze_algo("binary_tree"), maze_json("") {
         
         }
@@ -384,8 +384,9 @@ struct craft::craft_impl {
         , m_version{ version }
         , m_help{help}
         , m_model{make_unique<Model>()}
-        , m_maze{make_unique<maze_thread_safe>("", 1)}
-        , m_gui{ make_unique<Gui>() } {
+        // Construct maze in run loop
+        , m_maze()
+        , m_gui{make_unique<Gui>()} {
         m_model->width = INIT_WINDOW_WIDTH;
         m_model->height = INIT_WINDOW_HEIGHT;
         m_model->scale = 1;
@@ -1493,15 +1494,24 @@ struct craft::craft_impl {
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
     void load_chunk(WorkerItem *item) {
+        if (!this->m_maze) {
+			return;
+		}
+        
         int p = item->p;
         int q = item->q;
 
+        const auto pq = this->m_maze->get_p_q();
+        bool is_part_of_maze = pq.find({ p, q }) != pq.end();
+        
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, map_set_func, block_map, gui_options->chunk_size, gui_options->show_trees, 
+        _world.create_world(p, q, is_part_of_maze,
+            map_set_func, block_map,
+            gui_options->chunk_size, gui_options->show_trees, 
             gui_options->show_plants, gui_options->show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
@@ -3072,8 +3082,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     IM_ASSERT(nunito_sans_font != nullptr);
 #endif
     
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
-
     auto _check_for_gl_err = [](const char *file, int line) -> GLenum {
         GLenum errorCode;
         while ((errorCode = glGetError()) != GL_NO_ERROR) {
@@ -3126,39 +3134,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
 
-    auto&& render_vertices = this->m_pimpl->m_maze->get_render_vertices();
     m_pimpl->force_chunks(me);
 
     if (!loaded) {
         s->y = static_cast<float>(m_pimpl->highest_block(s->x, s->z) + 2);
     }
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() prior to event loop\n");
-    check_for_gl_err();
-#endif
-
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_algo_from_str(algos.back());
     future<bool> write_success;
 
-    auto gen_maze = [this, &get_int, &rng_machine](unsigned int width, unsigned int length, unsigned int height, maze_types my_maze_type) -> string {
-        auto _grid{ std::make_unique<mazes::grid>(width, length, height) };
-
-        bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(_grid), cref(get_int), cref(rng_machine));
-
-        if (!success) {
-            return "";
-        }
-
-        stringstream ss;
-        ss << *_grid.get();
-        string grid_as_ascii{ ss.str() };
-        return grid_as_ascii;
-    }; // gen_maze
-
     auto&& gui = this->m_pimpl->m_gui;
-    this->m_pimpl->m_maze = make_unique<maze_thread_safe>(gen_maze(gui->maze_width, gui->maze_length, gui->maze_height, my_maze_type), gui->maze_height);
+    this->m_pimpl->m_maze = make_unique<maze_thread_safe>(my_maze_type, cref(get_int), cref(rng_machine), gui->maze_width, gui->maze_length, gui->maze_height);
     auto&& maze2 = this->m_pimpl->m_maze;
 
     auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<tuple<int, int, int, int>>& vertices) {
@@ -3195,7 +3182,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 	};
 
     auto json_writer = [&maze2](const string& outfile) -> string {
-        auto&& vertices = maze2->get_block_vertices();
+        auto&& vertices = maze2->get_writable_vertices();
         auto&& faces = maze2->get_faces();
         stringstream ss;
         // Set key if outfile is specified
@@ -3220,6 +3207,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         return ss.str();
     };
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("check_for_gl_err() prior to event loop\n");
+    check_for_gl_err();
+#endif
 
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     int triangle_faces = 0;
@@ -3461,14 +3453,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             build_maze_now = false;
             progress_tracker->start();
             auto my_maze_type = get_maze_algo_from_str(gui->maze_algo);
-            maze2->set_maze(gen_maze(gui->maze_width, gui->maze_length, gui->maze_height, my_maze_type), gui->maze_height);
+            maze2->set_height(gui->maze_height);
+            maze2->set_width(gui->maze_width);
+            maze2->set_length(gui->maze_length);
+            auto&& maze_str = maze2->compute_str(my_maze_type, get_int, rng_machine);
+            maze2->set_maze(maze_str);
 
             // Check if maze is available and then perform two sequential operations:
             // 1. Compute maze geometry for 3D coordinates (includes a height value)
             // 2. Write the maze to a Wavefront object file using the computed data
             if (!maze2->get_maze().empty()) {
-                render_vertices = maze2->get_render_vertices();
-                set_maze_in_craft(render_vertices);
+                maze2->compute_geometry();
+                set_maze_in_craft(maze2->get_render_vertices());
                 // Writing the maze will run in the background - only do that on Desktop
 #if !defined(__EMSCRIPTEN__ )
                 write_success = maze_writer_fut(gui->outfile);
