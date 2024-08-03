@@ -34,7 +34,7 @@ public:
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
-    const pqmap& maze_thread_safe::get_p_q() const noexcept;
+    const pqmap& get_p_q() const noexcept;
     std::string compute_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
     void compute_geometry() noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
