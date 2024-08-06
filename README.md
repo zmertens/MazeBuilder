@@ -73,8 +73,7 @@ In order to run the web app, first run a local server with Python using the incl
 ## Scripts
 
 The `scripts` directory contains Ruby and Python scripts to build mazes quickly.
-These programs can output to `.png` files or `stdout`. There is a Python script using Blender projects and the Blender API to generate a maze in that interface.
-
+These programs can output to `.png` files or `stdout`.
 ## Resources and Dependencies
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
  - [Full Stack Dev Book](https://www.packtpub.com/en-us/product/full-stack-development-with-spring-boot-and-react-9781801816786)
