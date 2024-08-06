@@ -1,6 +1,8 @@
 #ifndef _sign_h_
 #define _sign_h_
 
+#include <cstdlib>
+
 #define MAX_SIGN_LENGTH 64
 
 typedef struct {
@@ -12,12 +14,12 @@ typedef struct {
 } Sign;
 
 typedef struct {
-    unsigned int capacity;
-    unsigned int size;
+    std::size_t capacity;
+    std::size_t size;
     Sign *data;
 } SignList;
 
-void sign_list_alloc(SignList *list, int capacity);
+void sign_list_alloc(SignList *list, std::size_t capacity);
 void sign_list_free(SignList *list);
 void sign_list_grow(SignList *list);
 void sign_list_add(
