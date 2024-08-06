@@ -2360,6 +2360,35 @@ struct craft::craft_impl {
         }
     }
 
+    void maze(int w, int l, int h) {
+        mt19937 rng{ static_cast<unsigned long>(this->m_gui->seed) };
+        auto get_int = [&rng](int low, int high)->int {
+            uniform_int_distribution<int> dist{ low, high };
+            return dist(rng);
+        };
+        auto get_maze_type = [](auto str)->mazes::maze_types {
+			if (SDL_strcmp(str.c_str(), "binary_tree") == 0) {
+				return maze_types::BINARY_TREE;
+			} else if (SDL_strcmp(str.c_str(), "sidewinder") == 0) {
+				return maze_types::SIDEWINDER;
+			} else {
+				return maze_types::INVALID_ALGO;
+			}
+		};
+        maze_thread_safe mz {get_maze_type(this->m_gui->maze_algo), cref(get_int), cref(rng), 
+            static_cast<unsigned int>(w), static_cast<unsigned int>(l), static_cast<unsigned int>(h)};
+        auto&& vertices = mz.get_render_vertices();
+        auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
+            for (auto&& block : vertices) {
+                // Set the block in the DB
+                this->set_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
+                // Record the block in craft
+                this->record_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
+            }
+        };
+        set_maze_in_craft(cref(vertices));
+    }
+
     void parse_command(const char *buffer) {
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
@@ -2432,7 +2461,10 @@ struct craft::craft_impl {
         else if (SDL_sscanf(buffer, "/cylinder %d", &radius) == 1) {
             cylinder(&this->m_model->block0, &this->m_model->block1, radius, 0);
         }
-    }
+        else if (SDL_sscanf(buffer, "/maze %d %d %d", &xc, &yc, &zc) == 3) {
+            maze(xc, yc, zc);
+        }
+    } // prase command
 
     void on_light() {
         State *s = &this->m_model->players->state;
@@ -2919,9 +2951,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     }
 #endif
 
-#if defined(MAZE_DEBUG)
-    this->m_pimpl->check_fullscreen_modes();
-#endif
+//#if defined(MAZE_DEBUG)
+//    this->m_pimpl->check_fullscreen_modes();
+//#endif
 
 #if defined(MAZE_DEBUG)
     const GLubyte *renderer = glGetString(GL_RENDERER);
@@ -3137,33 +3169,33 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     m_pimpl->force_chunks(me);
 
     if (!loaded) {
-        s->y = static_cast<float>(m_pimpl->highest_block(s->x, s->z) + 2);
+        s->y = static_cast<float>(m_pimpl->highest_block(s->x, s->z) + 5);
     }
 
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_algo_from_str(algos.back());
-    future<bool> write_success;
-
     auto&& gui = this->m_pimpl->m_gui;
-    this->m_pimpl->m_maze = make_unique<maze_thread_safe>(my_maze_type, cref(get_int), cref(rng_machine), gui->maze_width, gui->maze_length, gui->maze_height);
     auto&& maze2 = this->m_pimpl->m_maze;
-
-    auto set_maze_in_craft = [this, &get_int, &rng_machine](const vector<tuple<int, int, int, int>>& vertices) {
-        // Set the block in the craft, this performs a DB insert query
-        //this->m_pimpl->set_blocks_from_vec(cref(vertices));
-        for (auto&& block : vertices) {
-            // Set the block in the DB
-            this->m_pimpl->set_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-			// Record the block in craft
-			this->m_pimpl->record_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-		}
-	}; // set_maze_in_craft
 
     auto reset_fields = [&gui, &maze2]() {
         gui->reset_outfile();
         maze2->clear();
 	};
 
+    promise<void> maze_gen_promise;
+    future<void> maze_gen_future = maze_gen_promise.get_future();
+    auto make_maze_ptr = [&my_maze_type, &get_int, &rng_machine, &maze2, &maze_gen_promise](unsigned int w, unsigned int l, unsigned int h) {
+        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng_machine, w, l, h);
+        maze_gen_promise.set_value();
+    };
+
+    // Generate a default maze to start the app
+    auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
+    progress_tracker->start();
+    thread(make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height).detach();
+    progress_tracker->stop();
+    
+    future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
         if (!filename.empty()) {
             // get ready to write to file
@@ -3213,7 +3245,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     check_for_gl_err();
 #endif
 
-    auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     int triangle_faces = 0;
     bool running = true;
 
@@ -3246,8 +3277,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         // ImGui window state variables
         static bool show_demo_window = false;
         static bool show_mb_gui = !SDL_GetRelativeMouseMode();
-        static bool build_maze_now = false;
-
+        static bool write_maze_now = false;
+        static bool default_maze = true;
         // Handle SDL events
         bool events_handled_success = m_pimpl->handle_events(dt, ref(running));
 
@@ -3325,6 +3356,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                                 bool is_selected = (itr == gui->maze_algo);
                                 if (ImGui::Selectable(itr.c_str(), is_selected)) {
                                     gui->maze_algo = itr;
+                                    my_maze_type = get_maze_algo_from_str(itr);
                                 }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)
@@ -3338,8 +3370,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
                     // Check if user has added a prefix to the Wavefront object file
                     if (gui->outfile[0] != '.') {
-                        if (!build_maze_now && ImGui::Button("Build!")) {
-                            build_maze_now = true;
+                        if (ImGui::Button("Build!")) {
+                            progress_tracker->start();
+                            //Start the maze generation in the background
+                            thread(make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height).detach();
+                            progress_tracker->stop();
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -3447,37 +3482,32 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             ImGui::PopFont();
         } // show_builder_gui
 
-        if (build_maze_now) {
-            // Clear the default maze
-            maze2->clear();
-            build_maze_now = false;
-            progress_tracker->start();
-            auto my_maze_type = get_maze_algo_from_str(gui->maze_algo);
-            maze2->set_height(gui->maze_height);
-            maze2->set_width(gui->maze_width);
-            maze2->set_length(gui->maze_length);
-            auto&& maze_str = maze2->compute_str(my_maze_type, get_int, rng_machine);
-            maze2->set_maze(maze_str);
+        // Check if maze is available and then perform two async operations:
+        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
+        // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
+        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            // Reset the future
+            promise<void> next_promise;
+            maze_gen_promise.swap(next_promise);
+            maze_gen_future = maze_gen_promise.get_future();
+            write_maze_now = default_maze ? false : true;
+            default_maze = false;
+        }
 
-            // Check if maze is available and then perform two sequential operations:
-            // 1. Compute maze geometry for 3D coordinates (includes a height value)
-            // 2. Write the maze to a Wavefront object file using the computed data
-            if (!maze2->get_maze().empty()) {
-                maze2->compute_geometry();
-                set_maze_in_craft(maze2->get_render_vertices());
-                // Writing the maze will run in the background - only do that on Desktop
+        if (write_maze_now && maze2 != nullptr && !maze2->get_maze().empty()) {
+            // Writing the maze will run in the background - only do that on Desktop
+            write_maze_now = false;
 #if !defined(__EMSCRIPTEN__ )
-                write_success = maze_writer_fut(gui->outfile);
+            write_success = maze_writer_fut(gui->outfile);
 #elif defined(__EMSCRIPTEN__)
-                auto&& maze_json = json_writer(gui->outfile);
-                this->m_pimpl->m_gui->maze_json = maze_json;
-                reset_fields();
-                //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
+                // Let web browser handle the file download
+            auto&& maze_json = json_writer(gui->outfile);
+            this->m_pimpl->m_gui->maze_json = maze_json;
+            reset_fields();
+            //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
 #endif
-            } else {
-                // Failed to set maze
-            }
-            progress_tracker->stop();
+        } else {
+            // Failed to set maze
         }
 
         // FLUSH DATABASE 
