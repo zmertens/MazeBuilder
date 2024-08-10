@@ -2556,7 +2556,7 @@ struct craft::craft_impl {
                 sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE: {
-                    SDL_SetRelativeMouseMode(SDL_FALSE);
+                    SDL_SetWindowRelativeMouseMode(this->m_model->window, SDL_FALSE);
                     this->m_gui->capture_mouse = false;
                     this->m_gui->fullscreen = false;
                     this->m_model->typing = 0;
@@ -2684,7 +2684,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_MOTION: {
-                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                     s->rx += e.motion.xrel * mouse_mv;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * mouse_mv;
@@ -2703,20 +2703,20 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_LEFT) {
+                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
                     if (control) {
                         on_right_click();
                     } else {
                         on_left_click();
                     }
-                } else if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode() && e.button.button == SDL_BUTTON_RIGHT) {
+                } else if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
                     if (control) {
                         on_light();
                     } else {
                         on_right_click();
                     }
                 } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                    if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                         on_middle_click();
                     }
                 }
@@ -2724,7 +2724,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (this->m_gui->capture_mouse && SDL_GetRelativeMouseMode()) {
+                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                     // TODO might have to change this to force 1 step
                     if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                         this->m_model->item_index += e.wheel.y;
@@ -2941,7 +2941,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     }
 
     SDL_ShowWindow(m_pimpl->m_model->window);
-    SDL_SetRelativeMouseMode(SDL_FALSE);
+    SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
 
 #if !defined(__EMSCRIPTEN__)
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
@@ -3276,7 +3276,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
         // ImGui window state variables
         static bool show_demo_window = false;
-        static bool show_mb_gui = !SDL_GetRelativeMouseMode();
+        static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
         static bool default_maze = true;
         // Handle SDL events
@@ -3304,7 +3304,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
-        show_mb_gui = !SDL_GetRelativeMouseMode();
+        show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         // Maze Builder GUI
         if (show_mb_gui) {
             ImGui::PushFont(nunito_sans_font);
@@ -3448,9 +3448,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
                     ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui->capture_mouse);
                     if (gui->capture_mouse) {
-                        SDL_SetRelativeMouseMode(SDL_TRUE);
+                        SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
                     } else {
-                        SDL_SetRelativeMouseMode(SDL_FALSE);
+                        SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
                     }
 
                     static bool last_vsync = gui->vsync;
