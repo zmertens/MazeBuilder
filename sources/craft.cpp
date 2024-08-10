@@ -3181,15 +3181,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     auto make_maze_ptr = [&my_maze_type, &get_int, &rng_machine, &maze2](unsigned int w, unsigned int l, unsigned int h) {
         maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng_machine, w, l, h);
     };
-    future<void> maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
 
     // Generate a default maze to start the app
+    future<void> maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
+
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
-    progress_tracker->start();
-    maze_gen_future.get();
-    progress_tracker->stop();
-    p_state->y = 1000.f;
-    p_state->rx = -1.f * p_state->rx;
     
     future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
