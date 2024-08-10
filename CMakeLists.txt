@@ -129,7 +129,7 @@ if(EMSCRIPTEN)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
-    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
+    	"SHELL:-s PTHREAD_POOL_SIZE=6 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
         "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
