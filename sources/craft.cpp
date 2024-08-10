@@ -390,6 +390,7 @@ struct craft::craft_impl {
         m_model->width = INIT_WINDOW_WIDTH;
         m_model->height = INIT_WINDOW_HEIGHT;
         m_model->scale = 1;
+        m_model->day_length = DAY_LENGTH;
     }
 
     int worker_run(void *arg) {
@@ -486,24 +487,24 @@ struct craft::craft_impl {
 
     float time_of_day() const {
         if (this->m_model->day_length <= 0) {
-            return 0.5;
+            return 0.5f;
         }
         float t;
         t = static_cast<float>(get_time());
-        t = t / this->m_model->day_length;
+        t = t / static_cast<float>(this->m_model->day_length);
         t = static_cast<float>(t - static_cast<int>(t));
         return t;
     }
 
     float get_daylight() const {
-        float timer = static_cast<float>(time_of_day());
+        float timer = time_of_day();
         if (timer < 0.5) {
             float t = (timer - 0.25f) * 100.f;
             return 1 / (1 + SDL_powf(2.f, -t));
         }
         else {
             float t = (timer - 0.85f) * 100.f;
-            return 1 - 1 / (1 + SDL_powf(2.f, -t));
+            return 1.f - 1.f / (1.f + SDL_powf(2.f, -t));
         }
     }
 
@@ -3153,7 +3154,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
     craft_impl::Player *me = m_pimpl->m_model->players;
-    craft_impl::State *s = &m_pimpl->m_model->players->state;
+    craft_impl::State *p_state = &m_pimpl->m_model->players->state;
     me->id = 0;
     me->name[0] = '\0';
     me->buffer = 0;
@@ -3164,12 +3165,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     this->m_pimpl->m_model->fov = 65;
 
     // LOAD STATE FROM DATABASE 
-    int loaded = db_load_state(&s->x, &s->y, &s->z, &s->rx, &s->ry);
+    int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
 
     m_pimpl->force_chunks(me);
 
     if (!loaded) {
-        s->y = static_cast<float>(m_pimpl->highest_block(s->x, s->z) + 5);
+        p_state->y = static_cast<float>(m_pimpl->highest_block(p_state->x, p_state->z) + 5);
     }
 
     // Init some local vars for handling maze duties
@@ -3177,23 +3178,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     auto&& gui = this->m_pimpl->m_gui;
     auto&& maze2 = this->m_pimpl->m_maze;
 
-    auto reset_fields = [&gui, &maze2]() {
-        gui->reset_outfile();
-        maze2->clear();
-	};
-
-    promise<void> maze_gen_promise;
-    future<void> maze_gen_future = maze_gen_promise.get_future();
-    auto make_maze_ptr = [&my_maze_type, &get_int, &rng_machine, &maze2, &maze_gen_promise](unsigned int w, unsigned int l, unsigned int h) {
+    auto make_maze_ptr = [&my_maze_type, &get_int, &rng_machine, &maze2](unsigned int w, unsigned int l, unsigned int h) {
         maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng_machine, w, l, h);
-        maze_gen_promise.set_value();
     };
+    future<void> maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
 
     // Generate a default maze to start the app
     auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     progress_tracker->start();
-    thread(make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height).detach();
+    maze_gen_future.get();
     progress_tracker->stop();
+    p_state->y = 1000.f;
+    p_state->rx = -1.f * p_state->rx;
     
     future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
@@ -3259,7 +3255,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     while (running)
 #endif
     {
-        // update gl if viewport has change (example, going or leaving fullscreen mode)
         glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
         // FRAME RATE 
         if (m_pimpl->m_model->time_changed) {
@@ -3278,7 +3273,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         static bool show_demo_window = false;
         static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
-        static bool default_maze = true;
+        static bool first_maze = true;
         // Handle SDL events
         bool events_handled_success = m_pimpl->handle_events(dt, ref(running));
 
@@ -3313,13 +3308,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
-            int hour = static_cast<int>(m_pimpl->time_of_day()) * 24;
+            // Set the time
+            int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
             char am_pm = hour < 12 ? 'p' : 'a';
             hour = hour % 12;
             hour = hour ? hour : 12;
-
-            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(s->x), m_pimpl->chunked(s->z));
-            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", s->x, s->y, s->z);
+            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
+            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
             ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
             ImGui::Text("time: %d%cm", hour, am_pm);
 
@@ -3372,9 +3367,14 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     if (gui->outfile[0] != '.') {
                         if (ImGui::Button("Build!")) {
                             progress_tracker->start();
-                            //Start the maze generation in the background
-                            thread(make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height).detach();
+                            // Start the maze generation in the background
+                            maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
                             progress_tracker->stop();
+                            // Hack to force the chunks to load, will reset the player's position next loop
+                            p_state->y = 1000.f;
+                            p_state->x = 1000.f;
+                            p_state->z = 1000.f;
+                            p_state->rx = -1.f * p_state->rx;
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -3423,7 +3423,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                     ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                     if (ImGui::Button("Reset")) {
-                        reset_fields();
+                        // Clear the GUI
                     }
                     ImGui::PopStyleColor();
                     
@@ -3486,26 +3486,24 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
         // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            // Reset the future
-            promise<void> next_promise;
-            maze_gen_promise.swap(next_promise);
-            maze_gen_future = maze_gen_promise.get_future();
-            write_maze_now = default_maze ? false : true;
-            default_maze = false;
+            p_state->y = 10.f;
+            p_state->x = 0.f;
+            p_state->z = 0.f;
+            // Get the maze and reset the future
+            maze_gen_future.get();
+            // Don't write the first maze that loads when app starts
+            write_maze_now = first_maze ? false : true;
+            first_maze = false;
         }
 
-        if (write_maze_now && maze2 != nullptr && !maze2->get_maze().empty()) {
+        if (write_maze_now) {
             // Writing the maze will run in the background - only do that on Desktop
             write_maze_now = false;
+            // Only write the maze when **NOT** on the web browser
 #if !defined(__EMSCRIPTEN__ )
             write_success = maze_writer_fut(gui->outfile);
-#elif defined(__EMSCRIPTEN__)
-                // Let web browser handle the file download
-            auto&& maze_json = json_writer(gui->outfile);
-            this->m_pimpl->m_gui->maze_json = maze_json;
-            reset_fields();
-            //SDL_Log("Maze JSON: \n%s\n", this->get_json().c_str());
 #endif
+            this->m_pimpl->m_gui->maze_json = json_writer(gui->outfile);
         } else {
             // Failed to set maze
         }
@@ -3525,7 +3523,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
     
-        me->buffer = m_pimpl->gen_player_buffer(s->x, s->y, s->z, s->rx, s->ry);
+        me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
         for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
@@ -3653,7 +3651,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     SDL_Log("Closing DB. . .\n");
 #endif
 
-    db_save_state(s->x, s->y, s->z, s->rx, s->ry);
+    db_save_state(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
     db_close();
     db_disable();
 
