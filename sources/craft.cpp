@@ -1502,7 +1502,7 @@ struct craft::craft_impl {
         int p = item->p;
         int q = item->q;
 
-        const auto pq = this->m_maze->get_p_q();
+        const auto& pq = this->m_maze->get_p_q();
         bool is_part_of_maze = pq.find({ p, q }) != pq.end();
         
         Map *block_map = item->block_maps[1][1];
@@ -3306,7 +3306,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
 
             // Set the time
             int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-            char am_pm = hour < 12 ? 'p' : 'a';
+            char am_pm = hour < 12 ? 'a' : 'p';
             hour = hour % 12;
             hour = hour ? hour : 12;
             ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
@@ -3370,7 +3370,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                             p_state->y = 1000.f;
                             p_state->x = 1000.f;
                             p_state->z = 1000.f;
-                            p_state->rx = -1.f * p_state->rx;
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -3482,9 +3481,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
         // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            // Reset player state to roughly the origin
             p_state->y = 10.f;
             p_state->x = 0.f;
             p_state->z = 0.f;
+            // Look in +x, +y direction
+            p_state->rx = 100;
+            p_state->ry = 100;
             // Get the maze and reset the future
             maze_gen_future.get();
             // Don't write the first maze that loads when app starts
