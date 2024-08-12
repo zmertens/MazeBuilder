@@ -1501,16 +1501,13 @@ struct craft::craft_impl {
         
         int p = item->p;
         int q = item->q;
-
-        const auto& pq = this->m_maze->get_p_q();
-        bool is_part_of_maze = pq.find({ p, q }) != pq.end();
         
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world _world;
         auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, is_part_of_maze,
+        _world.create_world(p, q, cref(this->m_maze),
             map_set_func, block_map,
             gui_options->chunk_size, gui_options->show_trees, 
             gui_options->show_plants, gui_options->show_clouds);
@@ -2361,23 +2358,10 @@ struct craft::craft_impl {
         }
     }
 
-    void maze(int w, int l, int h) {
-        mt19937 rng{ static_cast<unsigned long>(this->m_gui->seed) };
-        auto get_int = [&rng](int low, int high)->int {
-            uniform_int_distribution<int> dist{ low, high };
-            return dist(rng);
-        };
-        auto get_maze_type = [](auto str)->mazes::maze_types {
-			if (SDL_strcmp(str.c_str(), "binary_tree") == 0) {
-				return maze_types::BINARY_TREE;
-			} else if (SDL_strcmp(str.c_str(), "sidewinder") == 0) {
-				return maze_types::SIDEWINDER;
-			} else {
-				return maze_types::INVALID_ALGO;
-			}
-		};
-        maze_thread_safe mz {get_maze_type(this->m_gui->maze_algo), cref(get_int), cref(rng), 
-            static_cast<unsigned int>(w), static_cast<unsigned int>(l), static_cast<unsigned int>(h)};
+    void maze(int w, int l, int h, const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) noexcept {
+        maze_thread_safe mz { get_maze_algo_from_str(this->m_gui->maze_algo), cref(get_int), cref(rng),
+            static_cast<unsigned int>(w), static_cast<unsigned int>(l), static_cast<unsigned int>(h),
+            static_cast<unsigned int>(items[this->m_model->item_index]) };
         auto&& vertices = mz.get_render_vertices();
         auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
             for (auto&& block : vertices) {
@@ -2390,7 +2374,7 @@ struct craft::craft_impl {
         set_maze_in_craft(cref(vertices));
     }
 
-    void parse_command(const char *buffer) {
+    void parse_command(const char *buffer, const function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2463,7 +2447,7 @@ struct craft::craft_impl {
             cylinder(&this->m_model->block0, &this->m_model->block1, radius, 0);
         }
         else if (SDL_sscanf(buffer, "/maze %d %d %d", &xc, &yc, &zc) == 3) {
-            maze(xc, yc, zc);
+            maze(xc, yc, zc, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
         }
     } // prase command
 
@@ -2526,7 +2510,7 @@ struct craft::craft_impl {
     * @param running is a reference to game loop invariant
     * @return bool return true when events are handled successfully
     */
-    bool handle_events(double dt, bool& running) {
+    bool handle_events(double dt, bool& running, const function<mazes::maze_types(const string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2580,7 +2564,7 @@ struct craft::craft_impl {
                                 }
                             } else if (this->m_model->typing_buffer[0] == '/') {
 
-                                this->parse_command(this->m_model->typing_buffer);
+                                this->parse_command(this->m_model->typing_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
                             }
                         }
                     } else {
@@ -2600,7 +2584,7 @@ struct craft::craft_impl {
                             SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
                                 MAX_TEXT_LENGTH - this->m_model->text_len - 1);
                         } else {
-                            parse_command(clip_buffer);
+                            parse_command(clip_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
                         }
                         SDL_free(clip_buffer);
                     }
@@ -2919,14 +2903,9 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(unsigned long seed, const std::list<std::string>& algos, const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) const noexcept {
-    // Init RNG engine
-    std::mt19937 rng_machine{ seed };
-    this->m_pimpl->m_gui->seed = seed;
-    auto get_int = [&rng_machine](int min, int max) {
-		std::uniform_int_distribution<int> dist{ min, max };
-		return dist(rng_machine);
-	};
+bool craft::run(unsigned long seed, const std::list<std::string>& algos, 
+    const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
+    const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
     // SDL INITIALIZATION //
     if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
@@ -3167,8 +3146,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
 
-    m_pimpl->force_chunks(me);
-
     if (!loaded) {
         p_state->y = static_cast<float>(m_pimpl->highest_block(p_state->x, p_state->z) + 5);
     }
@@ -3178,8 +3155,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     auto&& gui = this->m_pimpl->m_gui;
     auto&& maze2 = this->m_pimpl->m_maze;
 
-    auto make_maze_ptr = [&my_maze_type, &get_int, &rng_machine, &maze2](unsigned int w, unsigned int l, unsigned int h) {
-        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng_machine, w, l, h);
+    auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
+        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
     };
 
     // Generate a default maze to start the app
@@ -3240,6 +3217,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
     int triangle_faces = 0;
     bool running = true;
 
+    m_pimpl->force_chunks(me);
+
     auto is_click_inside_gui = [](float m_x, float m_y, float gui_pos_x, float gui_pos_y, float gui_width, float gui_height) {
         return (m_x >= gui_pos_x) && (m_x < (gui_pos_x + gui_width)) && (m_y >= gui_pos_y) && (m_y < (gui_pos_y + gui_height));
     };
@@ -3271,7 +3250,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         static bool write_maze_now = false;
         static bool first_maze = true;
         // Handle SDL events
-        bool events_handled_success = m_pimpl->handle_events(dt, ref(running));
+        bool events_handled_success = m_pimpl->handle_events(dt, ref(running), cref(get_maze_algo_from_str), cref(get_int), cref(rng));
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3300,7 +3279,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
         if (show_mb_gui) {
             ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
-            ImGui::Begin(this->m_pimpl->m_version.data());
+            ImGui::Begin(this->m_pimpl->m_version.c_str());
 
             ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 
@@ -3335,7 +3314,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
                     }
                     static unsigned int MAX_SEED_VAL = 1'000;
                     if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
-                        rng_machine.seed(static_cast<unsigned long>(gui->seed));
+                        rng.seed(static_cast<unsigned long>(gui->seed));
                     }
                     ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                     if (ImGui::TreeNode("Maze Generator")) {
@@ -3485,9 +3464,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos, const s
             p_state->y = 10.f;
             p_state->x = 0.f;
             p_state->z = 0.f;
-            // Look in +x, +y direction
-            p_state->rx = 100;
-            p_state->ry = 100;
             // Get the maze and reset the future
             maze_gen_future.get();
             // Don't write the first maze that loads when app starts

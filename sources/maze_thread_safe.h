@@ -27,7 +27,7 @@ private:
 
 public:
     maze_thread_safe(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng,
-        unsigned int width, unsigned int length, unsigned int height);
+        unsigned int width, unsigned int length, unsigned int height, unsigned int block_type);
 	virtual void set_maze(const std::string& maze) noexcept override;
 	virtual std::string get_maze() noexcept override;
 	virtual void clear() noexcept override;
@@ -36,7 +36,7 @@ public:
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
     const pqmap& get_p_q() const noexcept;
     std::string compute_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
-    void compute_geometry() noexcept override;
+    void compute_geometry(unsigned int block_type = 1) noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
 
     void set_height(unsigned int height) noexcept;
@@ -45,6 +45,8 @@ public:
     unsigned int get_length() const noexcept;
     void set_width(unsigned int width) noexcept;
     unsigned int get_width() const noexcept;
+    void set_block_type(unsigned int block_type) noexcept;
+    unsigned int get_block_type() const noexcept;
 
 private:
 
@@ -52,6 +54,7 @@ private:
 
     std::string m_maze;
     unsigned int m_width, m_length, m_height;
+    unsigned int m_block_type;
     // Mutable allows for const methods to modify the object
     mutable std::shared_mutex m_verts_mtx;
     std::mutex m_maze_mutx;

@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[3.10.7]";
 #endif
 
-    static constexpr auto HELP_MSG = R"help(
+    static constexpr auto MAZE_HELP_MSG = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to ASCII-format or Wavefront object format
         Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
-    mazes::args_builder args (MAZE_BUILDER_VERSION, HELP_MSG, args_vec);
+    mazes::args_builder args (MAZE_BUILDER_VERSION, MAZE_HELP_MSG, args_vec);
     auto&& args_map {args.build()};
     // this needs to get called after args.build() because of internal parsing
     auto state_of_args{ args.get_state() };
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
 #endif
     
     if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
-        std::cout << HELP_MSG << std::endl;
+        std::cout << MAZE_HELP_MSG << std::endl;
         return EXIT_SUCCESS;
     } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
         std::cout << MAZE_BUILDER_VERSION << std::endl;
@@ -112,20 +112,18 @@ int main(int argc, char* argv[]) {
         bool success = false;
         if (args.is_interactive()) {
             // Run the SDL app
-            std::string window_title {"Maze Builder"};
-            std::string version { MAZE_BUILDER_VERSION };
-            std::string help { HELP_MSG };
-            auto&& maze_builder_3D = craft::get_instance(window_title, version, help);
-            // craft uses it's own RNG engine, which looks a lot like the one here
-            success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo));
+            std::string v{ MAZE_BUILDER_VERSION };
+            std::string h{ MAZE_HELP_MSG };
+            auto&& maze_builder_3D = craft::get_instance("Maze Builder", v, h);
+            success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;
             }
         } else {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
-            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
-                args.get_width(), args.get_length(), args.get_height() };
+            unsigned int block_type = 1;
+            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine), args.get_width(), args.get_length(), args.get_height(), block_type };
             auto&& maze_str = my_maze.get_maze();
             if (!maze_str.empty()) {
                 mazes::writer my_writer;
