@@ -1494,23 +1494,19 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem *item) {
-        if (!this->m_maze) {
-			return;
-		}
-        
+    void load_chunk(WorkerItem *item) {        
         int p = item->p;
         int q = item->q;
         
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
-        static world _world;
-        auto&& gui_options = this->m_gui;
-        _world.create_world(p, q, cref(this->m_maze),
+        static world my_world;
+        auto&& gui = this->m_gui;
+        my_world.create_world(p, q, cref(this->m_maze),
             map_set_func, block_map,
-            gui_options->chunk_size, gui_options->show_trees, 
-            gui_options->show_plants, gui_options->show_clouds);
+            gui->chunk_size, gui->show_trees, 
+            gui->show_plants, gui->show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -2504,7 +2500,7 @@ struct craft::craft_impl {
     }
 
     /**
-    * reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
+    * Reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
     * @brief Handle SDL events
     * @param dt
     * @param running is a reference to game loop invariant
@@ -2521,10 +2517,13 @@ struct craft::craft_impl {
 
         SDL_Keymod mod_state = SDL_GetModState();
 
+        bool imgui_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow);
+
         int control = mod_state;
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
+
             switch (e.type) {
             case SDL_EVENT_QUIT: {
                 running = false;
@@ -2548,7 +2547,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case SDL_SCANCODE_RETURN: {
-                    if (this->m_model->typing) {
+                    if (!imgui_focused && this->m_model->typing) {
                         if (mod_state) {
                             if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                                 this->m_model->typing_buffer[this->m_model->text_len] = '\n';
@@ -2563,7 +2562,6 @@ struct craft::craft_impl {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
                             } else if (this->m_model->typing_buffer[0] == '/') {
-
                                 this->parse_command(this->m_model->typing_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
                             }
                         }
@@ -2600,22 +2598,22 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    if (this->m_gui->capture_mouse && !this->m_model->typing)
+                    if (!imgui_focused && !this->m_model->typing)
                         this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     break;
                 }
                 case KEY_FLY: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse)
+                    if (!imgui_focused && !this->m_model->typing)
                         this->m_model->flying = ~this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse)
+                    if (!imgui_focused && !this->m_model->typing)
                         this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
+                    if (!imgui_focused && !this->m_model->typing) {
                         this->m_model->item_index--;
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
@@ -2623,17 +2621,17 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_OBSERVE: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse)
+                    if (!imgui_focused && !this->m_model->typing)
                         this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
                     break;
                 }
                 case KEY_OBSERVE_INSET: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse)
+                    if (!imgui_focused && !this->m_model->typing)
                         this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
                 }
                 case KEY_CHAT: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
+                    if (!imgui_focused && !this->m_model->typing) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         this->m_model->text_len = 0;
@@ -2642,7 +2640,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_COMMAND: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
+                    if (!imgui_focused && !this->m_model->typing) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2650,7 +2648,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_SIGN: {
-                    if (!this->m_model->typing && this->m_gui->capture_mouse) {
+                    if (!imgui_focused && this->m_gui->capture_mouse) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2662,7 +2660,7 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
-                if (this->m_gui->capture_mouse && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                if (!imgui_focused && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                     SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                 }
@@ -2688,20 +2686,20 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
+                if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
                     if (control) {
                         on_right_click();
                     } else {
                         on_left_click();
                     }
-                } else if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
+                } else if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
                     if (control) {
                         on_light();
                     } else {
                         on_right_click();
                     }
                 } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                    if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                         on_middle_click();
                     }
                 }
@@ -2709,7 +2707,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                     // TODO might have to change this to force 1 step
                     if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                         this->m_model->item_index += e.wheel.y;
@@ -2743,7 +2741,7 @@ struct craft::craft_impl {
 
         const Uint8* state = SDL_GetKeyboardState(nullptr);
 
-        if (!this->m_model->typing && this->m_gui->capture_mouse) {
+        if (!(imgui_focused || this->m_model->typing)) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
             if (state[KEY_FORWARD]) sz--;
@@ -3219,9 +3217,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     m_pimpl->force_chunks(me);
 
-    auto is_click_inside_gui = [](float m_x, float m_y, float gui_pos_x, float gui_pos_y, float gui_width, float gui_height) {
-        return (m_x >= gui_pos_x) && (m_x < (gui_pos_x + gui_width)) && (m_y >= gui_pos_y) && (m_y < (gui_pos_y + gui_height));
-    };
     uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -3244,7 +3239,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         dt = SDL_max(dt, 0.0);
         previous = now;
 
-        // ImGui window state variables
+        // Some state variables
         static bool show_demo_window = false;
         static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
@@ -3256,28 +3251,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-
-#if defined(MAZE_DEBUG)
-        if (ImGui::IsMousePosValid()) {
-            float m_x = io.MousePos.x;
-            float m_y = io.MousePos.y;
-            ImGui::Text("Mouse pos: (%g, %g)", m_x, m_y);
-            ImVec2 window_pos = ImGui::GetWindowPos();
-            ImVec2 window_size = ImGui::GetWindowSize();
-            bool is_gui_click = is_click_inside_gui(m_x, m_y, window_pos.x, window_pos.y, window_size.x, window_size.y);
-            ImGui::Text("is_gui_click: %s", is_gui_click ? "true" : "false");
-        } else {
-            ImGui::Text("Mouse pos: <INVALID>");
-        }
-#endif 
-
+        ImGui::PushFont(nunito_sans_font);
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
         show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         // Maze Builder GUI
         if (show_mb_gui) {
-            ImGui::PushFont(nunito_sans_font);
             // GUI Title Bar
             ImGui::Begin(this->m_pimpl->m_version.c_str());
 
@@ -3411,6 +3391,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                         ImGui::StyleColorsDark();
                     else
                         ImGui::StyleColorsLight();
+
+                    ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
                     
                     // Prevent setting SDL_Window settings every frame
                     static bool last_fullscreen = gui->fullscreen;
@@ -3419,13 +3401,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     last_fullscreen = gui->fullscreen;
                     if (update_fullscreen)
                         SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
-
-                    ImGui::Checkbox("Capture Mouse (ESC to Uncapture)", &gui->capture_mouse);
-                    if (gui->capture_mouse) {
-                        SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
-                    } else {
-                        SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
-                    }
 
                     static bool last_vsync = gui->vsync;
                     ImGui::Checkbox("VSYNC", &gui->vsync);
@@ -3438,6 +3413,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                     ImGui::Checkbox("Show Items", &gui->show_items);
                     ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                     ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
+                    ImGui::Checkbox("Show Trees", &gui->show_trees);
+                    ImGui::Checkbox("Show Clouds", &gui->show_clouds);
+                    ImGui::Checkbox("Show Plants", &gui->show_plants);
 
                                     
                     ImGui::EndTabItem();
@@ -3453,8 +3431,22 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 ImGui::EndTabBar();
             } // imgui tab handler
             ImGui::End();
-            ImGui::PopFont();
+            // ImGui::PopFont();
         } // show_builder_gui
+
+        ImGui::Begin("Mouse Capture", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
+        ImGui::SetWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 150, ImGui::GetIO().DisplaySize.y - 50));
+        ImGui::SetWindowSize(ImVec2(150, 50));
+        if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
+            if (this->m_pimpl->m_gui->capture_mouse) {
+                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
+                this->m_pimpl->m_model->flying = 1;
+            } else {
+                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
+            }
+        }
+        ImGui::End();
+        ImGui::PopFont();
 
         // Check if maze is available and then perform two async operations:
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)

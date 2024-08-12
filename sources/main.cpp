@@ -112,9 +112,8 @@ int main(int argc, char* argv[]) {
         bool success = false;
         if (args.is_interactive()) {
             // Run the SDL app
-            std::string v{ MAZE_BUILDER_VERSION };
-            std::string h{ MAZE_HELP_MSG };
-            auto&& maze_builder_3D = craft::get_instance("Maze Builder", v, h);
+            std::string title {"Maze Builder"};
+            auto&& maze_builder_3D = craft::get_instance(std::cref(title), args.get_version(), args.get_help());
             success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;

@@ -9,9 +9,6 @@ using namespace std;
 void world::create_world(int p, int q, const std::unique_ptr<maze_thread_safe>& maze, world_func func, Map* m,
     int chunk_size, bool show_trees, bool show_plants, bool show_clouds) const noexcept {
 
-    const auto& pq = maze->get_p_q();
-    bool is_part_of_maze = pq.find({ p, q }) != pq.end();
-
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
         for (int dz = -pad; dz < chunk_size + pad; dz++) {
@@ -80,6 +77,10 @@ void world::create_world(int p, int q, const std::unique_ptr<maze_thread_safe>& 
                     }
                 }
             }
+            if (maze == nullptr)
+                return;
+            const auto& pq = maze->get_p_q();
+            bool is_part_of_maze = pq.find({ p, q }) != pq.end();
             // Build the maze
             if (is_part_of_maze) {
                 static const unsigned int starting_height = PLANT_STARTING_Y;
