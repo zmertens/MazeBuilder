@@ -3453,9 +3453,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
             // Reset player state to roughly the origin
-            p_state->y = 10.f;
-            p_state->x = 0.f;
-            p_state->z = 0.f;
+            p_state->y = 75.f;
+            p_state->x = 100.f;
+            p_state->z = 100.f;
             // Get the maze and reset the future
             maze_gen_future.get();
             // Don't write the first maze that loads when app starts
@@ -3545,45 +3545,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, static_cast<float>(m_pimpl->m_model->height) / 2.f - ts - 24.f, ts, other->name);
             }
         }
-
-        // RENDER PICTURE IN PICTURE 
-        if (m_pimpl->m_model->observe2) {
-            player = m_pimpl->m_model->players + m_pimpl->m_model->observe2;
-
-            int pw = 256 * m_pimpl->m_model->scale;
-            int ph = 256 * m_pimpl->m_model->scale;
-            int offset = 32 * m_pimpl->m_model->scale;
-            int pad = 3 * m_pimpl->m_model->scale;
-            int sw = pw + pad * 2;
-            int sh = ph + pad * 2;
-
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(m_pimpl->m_model->width - sw - offset + pad, offset - pad, sw, sh);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glDisable(GL_SCISSOR_TEST);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glViewport(m_pimpl->m_model->width - pw - offset, offset, pw, ph);
-
-            m_pimpl->m_model->width = pw;
-            m_pimpl->m_model->height = ph;
-            m_pimpl->m_model->is_ortho = false;
-            m_pimpl->m_model->fov = 65;
-
-            m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
-
-            glClear(GL_DEPTH_BUFFER_BIT);
-            m_pimpl->render_chunks(&block_attrib, player);
-
-            m_pimpl->render_signs(&text_attrib, player);
-
-            m_pimpl->render_players(&block_attrib, player);
-
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            if (SHOW_PLAYER_NAMES) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(pw) / 2.f, ts, ts, player->name);
-            }
-        } // render picture in picture
             
         ImGui::Render();
 
