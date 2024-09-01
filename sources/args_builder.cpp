@@ -48,11 +48,11 @@ bool args_builder::is_interactive() const noexcept {
     return static_cast<bool>(atoi(args_map.at("interactive").c_str()));
 }
 
-std::string args_builder::get_version() const noexcept {
+const std::string& args_builder::get_version() const noexcept {
     return args_map.at("version");
 }
 
-std::string args_builder::get_help() const noexcept {
+const std::string& args_builder::get_help() const noexcept {
     return args_map.at("help");
 }
 

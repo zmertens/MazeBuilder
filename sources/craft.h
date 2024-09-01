@@ -5,6 +5,7 @@
 #include <memory>
 #include <functional>
 #include <list>
+#include <random>
 
 #include "maze_types_enum.h"
 
@@ -22,7 +23,8 @@ public:
     craft& operator=(craft&&) = default;
 
     bool run(unsigned long seed, const std::list<std::string>& algos, 
-        const std::function<mazes::maze_types(const std::string& algo)> get_maze_algo_from_str) noexcept;
+        const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
+        const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
     
     void set_json(const std::string& s) noexcept;
     std::string get_json() const noexcept;
@@ -35,7 +37,6 @@ public:
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
-    std::string json;
 };
 
 #endif // CRAFT_H

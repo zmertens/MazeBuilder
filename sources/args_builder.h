@@ -23,8 +23,8 @@ public:
 
     unsigned int get_seed() const noexcept;
     bool is_interactive() const noexcept;
-    std::string get_version() const noexcept;
-    std::string get_help() const noexcept;
+    const std::string& get_version() const noexcept;
+    const std::string& get_help() const noexcept;
     std::string get_algorithm() const noexcept;
     std::string get_output() const noexcept;
     unsigned int get_width() const noexcept;

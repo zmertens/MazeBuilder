@@ -2,6 +2,10 @@
 #define MAZE_FACTORY_ENUM_H
 
 namespace mazes {
+    static constexpr auto MAZE_BARRIER1 = '|';
+    static constexpr auto MAZE_BARRIER2 = '-';
+    static constexpr auto MAZE_CORNER = '+';
+
     enum class maze_types {
         BINARY_TREE,
         SIDEWINDER,
