@@ -147,7 +147,7 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-            outfile(".obj"), seed(101), maze_width(100), maze_height(10), maze_length(100),
+            outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json("") {
         
         }
@@ -383,10 +383,9 @@ struct craft::craft_impl {
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
-        , m_model{make_unique<Model>()}
-        // Construct maze in run loop
+        , m_model{ make_unique<Model>() }
         , m_maze()
-        , m_gui{make_unique<Gui>()} {
+        , m_gui{ make_unique<Gui>() } {
         m_model->width = INIT_WINDOW_WIDTH;
         m_model->height = INIT_WINDOW_HEIGHT;
         m_model->scale = 1;
@@ -2892,7 +2891,7 @@ struct craft::craft_impl {
 }; // craft_impl
 
 craft::craft(const std::string& window_name, const std::string& version, const std::string& help)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help)} {
+    : m_pimpl{std::make_unique<craft_impl>(cref(window_name), cref(version), cref(help))} {
 }
 
 craft::~craft() = default;

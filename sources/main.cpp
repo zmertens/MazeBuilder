@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[4.0.1]";
 #endif
 
-    static constexpr auto MAZE_HELP_MSG = R"help(
+    static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to ASCII-format or Wavefront object format
         Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
-          -o, --output      stdout [default], plain text [.txt], or Wavefront object format [.obj]
+          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
           -h, --help         display this help message
           -v, --version      display program version
     )help";
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
     auto&& maze_args {args.build()};
     
     if (!maze_args.help.empty()) {
-        std::cout << MAZE_HELP_MSG << std::endl;
+        std::cout << MAZE_BUILDER_HELP << std::endl;
         return EXIT_SUCCESS;
     } else if (!maze_args.version.empty()) {
         std::cout << MAZE_BUILDER_VERSION << std::endl;
@@ -102,10 +102,12 @@ int main(int argc, char* argv[]) {
 
     try {
         bool success = false;
+        // Run the SDL app
         if (maze_args.interactive) {
-            // Run the SDL app
             std::string title {"Maze Builder"};
-            auto&& maze_builder_3D = craft::get_instance(std::cref(title), cref(maze_args.version), cref(maze_args.help));
+            std::string version { MAZE_BUILDER_VERSION };
+            std::string help { MAZE_BUILDER_HELP };
+            auto&& maze_builder_3D = craft::get_instance(std::cref(title), std::cref(version), std::cref(help));
             success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;

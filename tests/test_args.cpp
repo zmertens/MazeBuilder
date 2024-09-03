@@ -78,6 +78,20 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     mazes::args_builder builder2{ cref(SHORT_ARGS) };
     auto&& maze_args2 = builder2.build();
     REQUIRE(maze_args2.interactive == true);
-    // Since 'interactive' is true and before '-h' or '-v', the rest of the params are skipped
+    // Since 'interactive' is true and placed in order before, '-h' or '-v', which are empty
+    REQUIRE(maze_args2.help.empty() == true);
+    REQUIRE(maze_args2.version.empty() == true);
 }
 
+TEST_CASE("Args are bad and cannot be built", "[args]") {
+    static const vector<string> BAD_SHORT_ARGS = {
+    "maze_builder.exe",
+    "-x",
+    "-y",
+    "-z"
+    };
+    // First-come-first-serve and grab 'interactive'
+    mazes::args_builder builder2{ cref(BAD_SHORT_ARGS) };
+    auto&& maze_args2 = builder2.build();
+    REQUIRE_NOTHROW(maze_args2);
+}

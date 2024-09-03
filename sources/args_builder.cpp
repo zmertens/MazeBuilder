@@ -111,13 +111,14 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
 
     string short_val_option {""};
     // skip program name with +1
-    for (auto&& itr {vv.cbegin() + 1}; itr != vv.cend(); itr++) {
+    auto&& itr = vv.cbegin() + 1;
+    for (itr; itr != vv.cend(); itr++) {
         string current {*itr};
         if (regex_match(current, help_regex)) {
-            this->my_args.help = "";
+            this->my_args.help = "REPLACE_WITH_HELP_MESSAGE";
             break;
         } else if (regex_match(current, version_regex)) {
-            this->my_args.version = "";
+            this->my_args.version = "REPLACE_WITH_VERSION_MESSAGE";
             break;
         } else if (regex_match(current, interactive_regex)) {
             this->my_args.interactive = true;
@@ -127,6 +128,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-s") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.seed = atoi((*(itr + 1)).c_str());
+                    itr++;
                 } else {
                     break;
                 }    
@@ -138,6 +140,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-w") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.width = atoi((*(itr + 1)).c_str());
+                    itr++;
                 } else {
                     break;
                 }
@@ -149,6 +152,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-l") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.length = atoi((*(itr + 1)).c_str());
+                    itr++;
                 } else {
                     break;
                 }
@@ -160,6 +164,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-y") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.height = atoi((*(itr + 1)).c_str());
+                    itr++;
                 } else {
                     break;
                 }
@@ -171,6 +176,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-a") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.algorithm = (*(itr + 1));
+                    itr++;
                 } else {
                     break;
                 }
@@ -182,6 +188,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             if (current.compare("-o") == 0) { 
                 if (itr + 1 != vv.cend()) {
                     this->my_args.output = (*(itr + 1));
+                    itr++;
                 } else {
 					break;
 				}
