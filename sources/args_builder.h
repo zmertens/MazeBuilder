@@ -12,42 +12,59 @@
 
 namespace mazes {
 
-enum class args_state {
-    JUST_NEEDS_HELP, JUST_NEEDS_VERSION, READY_TO_ROCK
-};
+    class args {
+    public:
+        std::string output;
+        std::string algorithm;
+        unsigned int seed;
+        unsigned int width;
+        unsigned int length;
+        unsigned int height;
+        bool interactive;
+        std::string version;
+        std::string help;
+    }; // class args
 
 class args_builder : public args_builder_interface {
 public:
-    args_builder(const std::string& v, const std::string& h, const std::vector<std::string>& args_vec);
-    args_builder(const std::unordered_map<std::string, std::string>& args);
+    explicit args_builder(const std::vector<std::string>& vv);
 
-    unsigned int get_seed() const noexcept;
-    bool is_interactive() const noexcept;
-    const std::string& get_version() const noexcept;
-    const std::string& get_help() const noexcept;
-    std::string get_algorithm() const noexcept;
-    std::string get_output() const noexcept;
-    unsigned int get_width() const noexcept;
-    unsigned int get_length() const noexcept;
-    unsigned int get_height() const noexcept;
-    
-    args_state get_state() const noexcept;
+    args_builder& seed(unsigned int seed) noexcept;
+    args_builder& interactive(bool interactive) noexcept;
+    args_builder& version(const std::string& version) noexcept;
+    args_builder& help(const std::string& help) noexcept;
+    args_builder& algorithm(const std::string& algorithm) noexcept;
+    args_builder& output(const std::string& output) noexcept;
+    args_builder& width(unsigned int width) noexcept;
+    args_builder& length(unsigned int length) noexcept;
+    args_builder& height(unsigned int height) noexcept;
+    args_builder& state() noexcept;
 
-    const std::unordered_map<std::string, std::string>& build() override;
+    void clear() noexcept;
 
-    friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
+    const args& build() const noexcept override;
+
+
+    friend std::ostream& operator<<(std::ostream& os, args_builder& args_builder) {
         std::stringstream ss;
-        for (auto&& [k, v] : args.build()) {
-            ss << "INFO: " << k << ", " << v << "\n";
-        }
+
+        auto&& a = args_builder.build();
+
+        ss << "INFO: seed=" << a.seed << "\n";
+        ss << "INFO: interactive=" << a.interactive << "\n";
+        ss << "INFO: algorithm=" << a.algorithm << "\n";
+        ss << "INFO: output=" << a.output << "\n";
+        ss << "INFO: width=" << a.width << "\n";
+        ss << "INFO: length=" << a.length << "\n";
+        ss << "INFO: help=" << a.help << "\n";
+        ss << "INFO: version=" << a.version << "\n";
 
         return os << ss.str() << "\n";
     }
 
 private:
-    void gather_args();
-    std::unordered_map<std::string, std::string> args_map;
-    std::vector<std::string> args_vec;
+    void parse(const std::vector<std::string>& vv) noexcept override;
+    args my_args;
 };
 
 }

@@ -34,6 +34,8 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
 
 int main(int argc, char* argv[]) {
 
+    using namespace std;
+
 #if defined(MAZE_DEBUG)
     static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[4.0.1] - DEBUG";
 #else
@@ -50,15 +52,12 @@ int main(int argc, char* argv[]) {
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -i, --interactive  run program in interactive mode with a GUI
-          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
+          -o, --output      stdout [default], plain text [.txt], or Wavefront object format [.obj]
           -h, --help         display this help message
           -v, --version      display program version
     )help";
 
-    std::vector<std::string> args_vec;
-    for (int i = 0; i < argc; i++) {
-        args_vec.emplace_back(argv[i]);
-    }
+    vector<string> args_vec{ argv, argv + argc };
 
 #if defined(__EMSCRIPTEN__)
     // Force the -i param when compiling to the web
@@ -69,25 +68,18 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
-    mazes::args_builder args (MAZE_BUILDER_VERSION, MAZE_HELP_MSG, args_vec);
-    auto&& args_map {args.build()};
-    // this needs to get called after args.build() because of internal parsing
-    auto state_of_args{ args.get_state() };
-#if defined(MAZE_DEBUG)
-    for (auto&& [k, v] : args.build()) {
-            std::cout << "INFO: " << k << ", " << v << "\n";
-    }
-#endif
+    mazes::args_builder args{ args_vec };
+    auto&& maze_args {args.build()};
     
-    if (state_of_args == mazes::args_state::JUST_NEEDS_HELP) {
+    if (!maze_args.help.empty()) {
         std::cout << MAZE_HELP_MSG << std::endl;
         return EXIT_SUCCESS;
-    } else if (state_of_args == mazes::args_state::JUST_NEEDS_VERSION) {
+    } else if (!maze_args.version.empty()) {
         std::cout << MAZE_BUILDER_VERSION << std::endl;
         return EXIT_SUCCESS;
     }
 
-    auto user_seed_or_not = static_cast<unsigned long>(args.get_seed());
+    auto user_seed_or_not = static_cast<unsigned long>(maze_args.seed);
     auto seed_as_ul = user_seed_or_not;
     std::mt19937 rng_engine{ seed_as_ul };
     auto get_int = [&rng_engine](int low, int high) -> int {
@@ -110,26 +102,28 @@ int main(int argc, char* argv[]) {
 
     try {
         bool success = false;
-        if (args.is_interactive()) {
+        if (maze_args.interactive) {
             // Run the SDL app
             std::string title {"Maze Builder"};
-            auto&& maze_builder_3D = craft::get_instance(std::cref(title), args.get_version(), args.get_help());
+            auto&& maze_builder_3D = craft::get_instance(std::cref(title), cref(maze_args.version), cref(maze_args.help));
             success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;
             }
         } else {
             // Run the command-line program
-            mazes::maze_types my_maze_type = get_maze_type_from_algo(args.get_algorithm());
+            mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
             unsigned int block_type = 1;
-            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine), args.get_width(), args.get_length(), args.get_height(), block_type };
+            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
+                maze_args.width, maze_args.length, maze_args.height,
+                block_type };
             auto&& maze_str = my_maze.get_maze();
             if (!maze_str.empty()) {
                 mazes::writer my_writer;
-                auto write_func = [&my_writer, &args](auto data)->bool {
-                    return my_writer.write(args.get_output(), data);
+                auto write_func = [&my_writer, &maze_args](auto data)->bool {
+                    return my_writer.write(maze_args.output, data);
                 };
-                bool is_wavefront_file = (my_writer.get_filetype(args.get_output()) == mazes::file_types::WAVEFRONT_OBJ_FILE);
+                bool is_wavefront_file = (my_writer.get_filetype(maze_args.output) == mazes::file_types::WAVEFRONT_OBJ_FILE);
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else {
@@ -138,15 +132,15 @@ int main(int argc, char* argv[]) {
                 
                 if (success) {
 #if defined(MAZE_DEBUG)
-                    std::cout << "INFO: Writing to file: " << args.get_output() << " complete!!" << std::endl;
+                    std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
 #endif
                 }
                 else {
-                    std::cerr << "ERROR: Writing to file: " << args.get_output() << std::endl;
+                    std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
                 }
             }
             else {
-                std::cerr << "ERROR: " << args.get_algorithm() << " failed!!" << std::endl;
+                std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
             }
         }
     } catch (std::exception& ex) {
