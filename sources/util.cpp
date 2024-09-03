@@ -82,12 +82,13 @@ char* load_file_using_sdl(const char* path) {
 	}
 
     // Read file into memory
-    auto nb_read_total = 0, nb_read = SDL_TRUE;
+    // SDL_ReadIO returns the number of bytes read, or 0 on error or end of file
+    int nb_read_total = 0, nb_read_size = 1;
     auto buf = data;
-    while (nb_read_total < data_size && nb_read != SDL_FALSE) {
-        nb_read = SDL_ReadIO(io, buf, (data_size - nb_read_total));
-        nb_read_total += nb_read;
-        buf += nb_read;
+    while (nb_read_total < data_size && nb_read_size != 0) {
+        nb_read_size = SDL_ReadIO(io, buf, (data_size - nb_read_total));
+        nb_read_total += nb_read_size;
+        buf += nb_read_size;
     }
 
     SDL_CloseIO(io);
