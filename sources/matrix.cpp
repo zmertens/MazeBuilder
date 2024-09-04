@@ -1,12 +1,9 @@
-#include <math.h>
-
-#include <SDL3/SDL.h>
-
 #include "matrix.h"
-#include "util.h"
+
+#include "craft_utils.h"
 
 void normalize(float *x, float *y, float *z) {
-    float d = SDL_sqrtf((*x) * (*x) + (*y) * (*y) + (*z) * (*z));
+    float d = sqrtf((*x) * (*x) + (*y) * (*y) + (*z) * (*z));
     *x /= d; *y /= d; *z /= d;
 }
 
@@ -50,8 +47,8 @@ void mat_translate(float *matrix, float dx, float dy, float dz) {
 
 void mat_rotate(float *matrix, float x, float y, float z, float angle) {
     normalize(&x, &y, &z);
-    float s = SDL_sinf(angle);
-    float c = SDL_cosf(angle);
+    float s = sinf(angle);
+    float c = cosf(angle);
     float m = 1 - c;
     matrix[0] = m * x * x + c;
     matrix[1] = m * x * y - z * s;
@@ -179,7 +176,7 @@ void mat_perspective(
     float znear, float zfar)
 {
     float ymax, xmax;
-    ymax = znear * SDL_tanf(fov * PI / 360.0);
+    ymax = znear * tanf(fov * M_PI / 360.0);
     xmax = ymax * aspect;
     mat_frustum(matrix, -xmax, xmax, -ymax, ymax, znear, zfar);
 }
@@ -223,7 +220,7 @@ void set_matrix_3d(
     mat_identity(a);
     mat_translate(b, -x, -y, -z);
     mat_multiply(a, b, a);
-    mat_rotate(b, SDL_cosf(rx), 0, SDL_sinf(rx), ry);
+    mat_rotate(b, cosf(rx), 0, sinf(rx), ry);
     mat_multiply(a, b, a);
     mat_rotate(b, 0, 1, 0, -rx);
     mat_multiply(a, b, a);
@@ -243,14 +240,14 @@ void set_matrix_item(float *matrix, int width, int height, int scale) {
     float a[16];
     float b[16];
     float aspect = (float)width / height;
-    float size = 64 * scale;
-    float box = height / size / 2;
-    float xoffset = 1 - size / width * 2;
-    float yoffset = 1 - size / height * 2;
+    float size = 64.f * scale;
+    float box = height / size / 2.f;
+    float xoffset = 1.f - size / width * 2.f;
+    float yoffset = 1.f - size / height * 2.f;
     mat_identity(a);
-    mat_rotate(b, 0, 1, 0, -PI / 4);
+    mat_rotate(b, 0, 1, 0, -M_PI / 4);
     mat_multiply(a, b, a);
-    mat_rotate(b, 1, 0, 0, -PI / 10);
+    mat_rotate(b, 1, 0, 0, -M_PI / 10);
     mat_multiply(a, b, a);
     mat_ortho(b, -box * aspect, box * aspect, -box, box, -1, 1);
     mat_multiply(a, b, a);

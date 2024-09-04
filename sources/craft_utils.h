@@ -1,5 +1,5 @@
-#ifndef _util_h_
-#define _util_h_
+#ifndef CRAFT_UTILS_H
+#define CRAFT_UTILS_H
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
@@ -9,13 +9,14 @@
 
 #include <string>
 #include <vector>
+#include <cmath>
 
-#define PI 3.14159265359
-#define DEGREES(radians) ((radians) * 180 / PI)
-#define RADIANS(degrees) ((degrees) * PI / 180)
-#define ABS(x) ((x) < 0 ? (-(x)) : (x))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define DEGREES(radians) ((radians) * 180 / M_PI)
+#define RADIANS(degrees) ((degrees) * M_PI / 180)
 #define SIGN(x) (((x) > 0) - ((x) < 0))
 
 typedef struct {
@@ -24,12 +25,8 @@ typedef struct {
     double since;
 } FPS;
 
-int rand_int(int n);
-double rand_double();
 void update_fps(FPS *fps);
 
-GLfloat *malloc_faces(int components, int faces);
-GLuint gen_faces(int components, int faces, GLfloat *data);
 GLuint make_shader(GLenum type, const char *source);
 GLuint load_shader(GLenum type, const char *path);
 GLuint make_program(GLuint shader1, GLuint shader2);
@@ -40,4 +37,4 @@ int char_width(char input);
 int string_width(const char *input);
 int wrap(const char *input, int max_width, char *output, int max_length);
 
-#endif
+#endif // CRAF_UTILS_H

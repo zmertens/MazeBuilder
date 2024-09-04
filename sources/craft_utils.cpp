@@ -1,9 +1,9 @@
 /**
- * Utility functions for handling opengl operations, RNG, and meshes
+ * Utility functions for handling OpenGL operations
  *
 */
 
-#include "util.h"
+#include "craft_utils.h"
 
 #include <cstdio>
 #include <cstdlib>

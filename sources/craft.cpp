@@ -2,8 +2,8 @@
  * Craft engine builds voxels as chunks and can run maze-generating algorithms
  * Generated mazes are stored in-memory and in an offline database
  * Vertex and indice data is stored in buffers and rendered using OpenGL
- * Supports writing to Wavefront OBJ files
- * Interfaces with Emscripten to provide data in JSON-format to web applications
+ * Supports RESTful APIs for web applications by passing maze data in JSON format
+ * Interfaces with Emscripten to provide web API support
  * 
  * 
  * Originally written in C99, ported to C++17
@@ -46,7 +46,7 @@
 
 #include <noise/noise.h>
 
-#include "util.h"
+#include "craft_utils.h"
 #include "world.h"
 #include "cube.h"
 #include "db.h"
@@ -386,10 +386,7 @@ struct craft::craft_impl {
         , m_model{ make_unique<Model>() }
         , m_maze()
         , m_gui{ make_unique<Gui>() } {
-        m_model->width = INIT_WINDOW_WIDTH;
-        m_model->height = INIT_WINDOW_HEIGHT;
-        m_model->scale = 1;
-        m_model->day_length = DAY_LENGTH;
+        this->reset_model();
     }
 
     int worker_run(void *arg) {
@@ -755,11 +752,11 @@ struct craft::craft_impl {
             SDL_memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
             s2->t = static_cast<float>(get_time());
-            if (s2->rx - s1->rx > static_cast<float>(PI)) {
-                s1->rx += static_cast<float>(2 * PI);
+            if (s2->rx - s1->rx > static_cast<float>(M_PI)) {
+                s1->rx += static_cast<float>(2 * M_PI);
             }
-            if (s1->rx - s2->rx > static_cast<float>(PI)) {
-                s1->rx -= static_cast<float>(2 * PI);
+            if (s1->rx - s2->rx > static_cast<float>(M_PI)) {
+                s1->rx -= static_cast<float>(2 * M_PI);
             }
         }
         else {
@@ -864,8 +861,8 @@ struct craft::craft_impl {
     }
 
     int chunk_distance(Chunk *chunk, int p, int q) {
-        int dp = ABS(chunk->p - p);
-        int dq = ABS(chunk->q - q);
+        int dp = SDL_abs(chunk->p - p);
+        int dq = SDL_abs(chunk->q - q);
         return SDL_max(dp, dq);
     }
 
@@ -2181,8 +2178,8 @@ struct craft::craft_impl {
         int spx = SIGN(p2->x - p1->x);
         int spz = SIGN(p2->z - p1->z);
         int oy = p1->y - c1->y;
-        int dx = ABS(c2->x - c1->x);
-        int dz = ABS(c2->z - c1->z);
+        int dx = SDL_abs(c2->x - c1->x);
+        int dz = SDL_abs(c2->z - c1->z);
         for (int y = 0; y < 256; y++) {
             for (int x = 0; x <= dx; x++) {
                 for (int z = 0; z <= dz; z++) {
@@ -2821,7 +2818,7 @@ struct craft::craft_impl {
         int window_height = INIT_WINDOW_HEIGHT;
 
 #if defined(MAZE_DEBUG)
-        SDL_Log("Settings SDL_GL_CONTEXT_DEBUG_FLAG\n");
+        SDL_Log("Setting SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
@@ -2884,8 +2881,11 @@ struct craft::craft_impl {
         this->m_model->message_index = 0;
         this->m_model->day_length = DAY_LENGTH;
         this->m_model->start_time = (this->m_model->day_length / 3)*1000;
-        // maybe set start_ticks here?
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
         this->m_model->time_changed = 1;
+        m_model->width = INIT_WINDOW_WIDTH;
+        m_model->height = INIT_WINDOW_HEIGHT;
+        m_model->scale = 1;
     }
 
 }; // craft_impl
@@ -3123,7 +3123,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     }
 
     // LOCAL VARIABLES 
-    m_pimpl->reset_model();
     FPS fps = {0, 0, 0};
     uint64_t last_commit = SDL_GetTicks();
 
