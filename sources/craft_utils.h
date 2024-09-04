@@ -19,14 +19,6 @@
 #define RADIANS(degrees) ((degrees) * M_PI / 180)
 #define SIGN(x) (((x) > 0) - ((x) < 0))
 
-typedef struct {
-    unsigned int fps;
-    unsigned int frames;
-    double since;
-} FPS;
-
-void update_fps(FPS *fps);
-
 GLuint make_shader(GLenum type, const char *source);
 GLuint load_shader(GLenum type, const char *path);
 GLuint make_program(GLuint shader1, GLuint shader2);

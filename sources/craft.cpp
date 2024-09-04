@@ -60,7 +60,7 @@
 #include "cell.h"
 #include "writer.h"
 
-// basic configurations
+// Movement configurations
 #define KEY_FORWARD SDL_SCANCODE_W
 #define KEY_BACKWARD SDL_SCANCODE_S
 #define KEY_LEFT SDL_SCANCODE_A
@@ -77,40 +77,29 @@
 #define KEY_COMMAND SDL_SCANCODE_SLASH
 #define KEY_SIGN SDL_SCANCODE_GRAVE
 
+// Typing config
+#define CRAFT_KEY_SIGN '`'
+
+// World configs
 #define INIT_WINDOW_WIDTH 1024
 #define INIT_WINDOW_HEIGHT 768
 #define SCROLL_THRESHOLD 0.1
-#define MAX_MESSAGES 4
-static constexpr auto DB_PATH = "craft.db";
-static constexpr auto USE_CACHE = true;
+#define DB_PATH "craft.db"
+#define MAX_DB_PATH_LEN 64
+#define USE_CACHE true
 #define DAY_LENGTH 600
 #define INVERT_MOUSE 0
+#define MAX_TEXT_LENGTH 256
 
-// rendering options
-#define SHOW_INFO_TEXT 1
-#define SHOW_CHAT_TEXT 1
-#define SHOW_PLAYER_NAMES 1
-
-#define CRAFT_KEY_SIGN '`'
-
-// advanced parameters
+// Advanced options
 #define CREATE_CHUNK_RADIUS 10
 #define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
 #define COMMIT_INTERVAL 5
-
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
-static constexpr auto MAX_TEXT_LENGTH = 256;
-#define MAX_NAME_LENGTH 32
-#define MAX_PATH_LENGTH 256
-#define MAX_ADDR_LENGTH 256
-
-#define ALIGN_LEFT 0
-#define ALIGN_CENTER 1
-#define ALIGN_RIGHT 2
 
 #define WORKER_IDLE 0
 #define WORKER_BUSY 1
@@ -307,7 +296,7 @@ struct craft::craft_impl {
 
     typedef struct {
         int id;
-        char name[MAX_NAME_LENGTH];
+        std::string name;
         State state;
         State state1;
         State state2;
@@ -341,27 +330,22 @@ struct craft::craft_impl {
         int sign_radius;
         Player players[MAX_PLAYERS];
         int player_count;
-        int typing;
-        char typing_buffer[MAX_TEXT_LENGTH];
-        size_t text_len;
-        int message_index;
-        char messages[MAX_MESSAGES][MAX_TEXT_LENGTH];
         int width;
         int height;
         int observe1;
         int observe2;
-        int flying;
+        bool flying;
         int item_index;
         int scale;
         bool is_ortho;
         float fov;
         int suppress_char;
         int mode_changed;
-        char db_path[MAX_PATH_LENGTH];
-        char server_addr[MAX_ADDR_LENGTH];
-        int server_port;
+        char db_path[MAX_DB_PATH_LEN];
+        bool typing;
+        char typing_buffer[MAX_TEXT_LENGTH];
+        size_t text_len;
         int day_length;
-        int time_changed;
         int start_time;
         int start_ticks;
         Block block0;
@@ -2158,11 +2142,6 @@ struct craft::craft_impl {
         del_buffer(buffer);
     }
 
-    void add_message(const char *text) {
-        SDL_snprintf(this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
-        this->m_model->message_index = (this->m_model->message_index + 1) % MAX_MESSAGES;
-    }
-
     void copy() {
         SDL_memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
         SDL_memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
@@ -2375,7 +2354,7 @@ struct craft::craft_impl {
                 this->m_model->delete_radius = radius + 4;
             }
             else {
-                add_message("Viewing distance must be between 1 and 24.");
+                // Notify user with view parameters
             }
         }
         else if (SDL_strcmp(buffer, "/copy") == 0) {
@@ -2600,7 +2579,7 @@ struct craft::craft_impl {
                 }
                 case KEY_FLY: {
                     if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->flying = ~this->m_model->flying;
+                        this->m_model->flying = !this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
@@ -2873,19 +2852,19 @@ struct craft::craft_impl {
         this->m_model->player_count = 0;
         this->m_model->observe1 = 0;
         this->m_model->observe2 = 0;
-        this->m_model->flying = 0;
+        this->m_model->flying = false;
         this->m_model->item_index = 0;
-        SDL_memset(this->m_model->typing_buffer, 0, sizeof(char) * MAX_TEXT_LENGTH);
-        this->m_model->typing = 0;
-        SDL_memset(this->m_model->messages, 0, sizeof(char) * MAX_MESSAGES * MAX_TEXT_LENGTH);
-        this->m_model->message_index = 0;
         this->m_model->day_length = DAY_LENGTH;
         this->m_model->start_time = (this->m_model->day_length / 3)*1000;
         this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
-        this->m_model->time_changed = 1;
-        m_model->width = INIT_WINDOW_WIDTH;
-        m_model->height = INIT_WINDOW_HEIGHT;
-        m_model->scale = 1;
+        this->m_model->width = INIT_WINDOW_WIDTH;
+        this->m_model->height = INIT_WINDOW_HEIGHT;
+        this->m_model->scale = 1;
+        this->m_model->is_ortho = false;
+        this->m_model->fov = 65.f;
+        SDL_snprintf(this->m_model->db_path, MAX_DB_PATH_LEN, "%s", DB_PATH);
+        this->m_model->typing = false;
+        this->m_model->typing_buffer[0] = '\0';
     }
 
 }; // craft_impl
@@ -3057,8 +3036,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
-    
-    SDL_snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
     m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
     m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
@@ -3117,27 +3094,25 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     // DATABASE INITIALIZATION 
     if (USE_CACHE) {
         db_enable();
-        if (db_init(m_pimpl->m_model->db_path)) {
+        if (db_init(this->m_pimpl->m_model->db_path)) {
+#if defined(MAZE_DEBUG)
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "db_init failed\n");
+#endif
             return false;
         }
     }
 
-    // LOCAL VARIABLES 
-    FPS fps = {0, 0, 0};
-    uint64_t last_commit = SDL_GetTicks();
+    // LOCAL VARIABLES
+    uint64_t previous = SDL_GetTicks();
 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
     craft_impl::Player *me = m_pimpl->m_model->players;
     craft_impl::State *p_state = &m_pimpl->m_model->players->state;
     me->id = 0;
-    me->name[0] = '\0';
+    me->name = "Player(me)";
     me->buffer = 0;
     m_pimpl->m_model->player_count = 1;
-
-    // magic variables to prevent black screen on load - modified in handle_events()
-    this->m_pimpl->m_model->is_ortho = 0;
-    this->m_pimpl->m_model->fov = 65;
 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
@@ -3215,7 +3190,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     m_pimpl->force_chunks(me);
 
-    uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -3223,19 +3197,19 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     while (running)
 #endif
     {
-        glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
+        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
+
         // FRAME RATE 
-        if (m_pimpl->m_model->time_changed) {
-            m_pimpl->m_model->time_changed = 0;
-            last_commit = SDL_GetTicks();
-            SDL_memset(&fps, 0, sizeof(fps));
-        }
-        update_fps(&fps);
         uint64_t now = SDL_GetTicks();
         double dt = static_cast<double>(now - previous) / 1000.0;
         dt = SDL_min(dt, 0.2);
         dt = SDL_max(dt, 0.0);
-        previous = now;
+
+        // FLUSH DATABASE 
+        if (now - previous > COMMIT_INTERVAL) {
+            db_commit();
+            previous = now;
+        }
 
         // Some state variables
         static bool show_demo_window = false;
@@ -3438,7 +3412,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
                 SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
-                this->m_pimpl->m_model->flying = 1;
             } else {
                 SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
             }
@@ -3473,18 +3446,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             // Failed to set maze
         }
 
-        // FLUSH DATABASE 
-        if (now - last_commit > COMMIT_INTERVAL) {
-            last_commit = now;
-            db_commit();
-        }
-    
-        craft_impl::Player* player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
-
         // PREPARE TO RENDER 
-        m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
-        m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
-    
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
     
@@ -3495,15 +3457,15 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         // RENDER 3-D SCENE
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, player);
-        m_pimpl->render_signs(&text_attrib, player);
-        m_pimpl->render_sign(&text_attrib, player);
-        m_pimpl->render_players(&block_attrib, player);
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
+        m_pimpl->render_signs(&text_attrib, me);
+        m_pimpl->render_sign(&text_attrib, me);
+        m_pimpl->render_players(&block_attrib, me);
         if (gui->show_wireframes) {
-            m_pimpl->render_wireframe(&line_attrib, player);
+            m_pimpl->render_wireframe(&line_attrib, me);
         }
 
         // RENDER HUD 
@@ -3514,35 +3476,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib);
         }
-
-        // RENDER TEXT 
-        char text_buffer[1024];
-        float ts = static_cast<float>(12 * m_pimpl->m_model->scale);
-        float tx = ts / 2.f;
-        float ty = m_pimpl->m_model->height - ts;
-        if (SHOW_CHAT_TEXT) {
-            for (int i = 0; i < MAX_MESSAGES; i++) {
-                int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
-                if (SDL_strlen(m_pimpl->m_model->messages[index])) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
-                        m_pimpl->m_model->messages[index]);
-                    ty -= ts * 2;
-                }
-            }
-        }
-        if (m_pimpl->m_model->typing) {
-            SDL_snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
-            m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-        }
-        if (SHOW_PLAYER_NAMES) {
-            if (player != me) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, ts, ts, player->name);
-            }
-            craft_impl::Player* other = m_pimpl->player_crosshair(player);
-            if (other) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, static_cast<float>(m_pimpl->m_model->height) / 2.f - ts - 24.f, ts, other->name);
-            }
-        }
             
         ImGui::Render();
 
@@ -3551,7 +3484,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         SDL_GL_SwapWindow(m_pimpl->m_model->window);
 
 #if defined(MAZE_DEBUG)
-            check_for_gl_err();
+        check_for_gl_err();
 #endif
 
         if (!events_handled_success || !running) {
@@ -3581,12 +3514,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     db_close();
     db_disable();
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("Deleting buffer objects. . .");
-#endif
     m_pimpl->del_buffer(sky_buffer);
     m_pimpl->delete_all_chunks();
     m_pimpl->delete_all_players();
+
 #if defined(MAZE_DEBUG)
     SDL_Log("check_for_gl_err() at the end of the event loop\n");
     check_for_gl_err();

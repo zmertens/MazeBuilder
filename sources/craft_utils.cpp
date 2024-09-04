@@ -19,17 +19,6 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-void update_fps(FPS *fps) {
-    fps->frames++;
-    double now = SDL_GetTicks();
-    double elapsed = now - fps->since;
-    if (elapsed >= 1) {
-        fps->fps = static_cast<unsigned int>(SDL_round(static_cast<double>(fps->frames) * 1000.0 / elapsed));
-        fps->frames = 0;
-        fps->since = now;
-    }
-}
-
 /**
  * @brief Private function to load file using SDL-specific functions
  */
