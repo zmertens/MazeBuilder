@@ -201,7 +201,7 @@ endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
 
 if(BUILD_MAZE_TESTS)
     find_package(Catch2 3 QUIET)

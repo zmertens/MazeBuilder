@@ -29,3 +29,6 @@ scripts/*.JPEG
 
 # Dear Imgui config
 *.ini
+
+# Python
+.venv

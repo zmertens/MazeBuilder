@@ -1,3 +1,11 @@
+'''
+Working through different maze algorithms from the book "Mazes for Programmers" by Jamis Buck
+https://www.amazon.com/Mazes-Programmers-Twisty-Little-Passages/dp/1680500554?ref_=ast_sto_dp
+
+Outputs to terminal or writes a PNG file representing the maze
+'''
+
+from PIL import Image, ImageDraw
 import random
 
 class Cell:
@@ -139,11 +147,45 @@ class BinaryTree:
                 if neighbor is not None:
                     cell.link(neighbor)
 
+class Sidewinder:
+    pass
+
+'''
+Utility function to draw the maze using PIL
+'''
+def draw_maze(grid, cell_size=10):
+    img_width = grid._columns * cell_size
+    img_height = grid._rows * cell_size
+    background = (255, 255, 255)
+    wall = (0, 0, 0)
+
+    img = Image.new("RGB", (img_width + 1, img_height + 1), background)
+    draw = ImageDraw.Draw(img)
+
+    for cell in grid.each_cell():
+        x1 = cell.column * cell_size
+        y1 = cell.row * cell_size
+        x2 = (cell.column + 1) * cell_size
+        y2 = (cell.row + 1) * cell_size
+
+        if cell.north is None:
+            draw.line((x1, y1, x2, y1), fill=wall)
+        if cell.west is None:
+            draw.line((x1, y1, x1, y2), fill=wall)
+        if not cell.is_linked(cell.east):
+            draw.line((x2, y1, x2, y2), fill=wall)
+        if not cell.is_linked(cell.south):
+            draw.line((x1, y2, x2, y2), fill=wall)
+
+    return img
+
 if __name__ == '__main__':
     
     CELL_SIZE = 4
     grid = Grid(10, 10)
     BinaryTree.on(grid)
     
-    print(str(grid))
+    # print(str(grid))
+    img = draw_maze(grid, cell_size=CELL_SIZE)
+    img.save("maze.png")
     
