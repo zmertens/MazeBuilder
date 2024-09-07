@@ -2142,210 +2142,7 @@ struct craft::craft_impl {
         del_buffer(buffer);
     }
 
-    void copy() {
-        SDL_memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
-        SDL_memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
-    }
-
-    void paste() {
-        Block *c1 = &this->m_model->copy1;
-        Block *c2 = &this->m_model->copy0;
-        Block *p1 = &this->m_model->block1;
-        Block *p2 = &this->m_model->block0;
-        int scx = SIGN(c2->x - c1->x);
-        int scz = SIGN(c2->z - c1->z);
-        int spx = SIGN(p2->x - p1->x);
-        int spz = SIGN(p2->z - p1->z);
-        int oy = p1->y - c1->y;
-        int dx = SDL_abs(c2->x - c1->x);
-        int dz = SDL_abs(c2->z - c1->z);
-        for (int y = 0; y < 256; y++) {
-            for (int x = 0; x <= dx; x++) {
-                for (int z = 0; z <= dz; z++) {
-                    int w = get_block(c1->x + x * scx, y, c1->z + z * scz);
-                    builder_block(p1->x + x * spx, y + oy, p1->z + z * spz, w);
-                }
-            }
-        }
-    }
-
-    void array(Block *b1, Block *b2, int xc, int yc, int zc) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int dx = b2->x - b1->x;
-        int dy = b2->y - b1->y;
-        int dz = b2->z - b1->z;
-        xc = dx ? xc : 1;
-        yc = dy ? yc : 1;
-        zc = dz ? zc : 1;
-        for (int i = 0; i < xc; i++) {
-            int x = b1->x + dx * i;
-            for (int j = 0; j < yc; j++) {
-                int y = b1->y + dy * j;
-                for (int k = 0; k < zc; k++) {
-                    int z = b1->z + dz * k;
-                    builder_block(x, y, z, w);
-                }
-            }
-        }
-    }
-
-    void cube(Block *b1, Block *b2, int fill) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int x1 = SDL_min(b1->x, b2->x);
-        int y1 = SDL_min(b1->y, b2->y);
-        int z1 = SDL_min(b1->z, b2->z);
-        int x2 = SDL_max(b1->x, b2->x);
-        int y2 = SDL_max(b1->y, b2->y);
-        int z2 = SDL_max(b1->z, b2->z);
-        int a = (x1 == x2) + (y1 == y2) + (z1 == z2);
-        for (int x = x1; x <= x2; x++) {
-            for (int y = y1; y <= y2; y++) {
-                for (int z = z1; z <= z2; z++) {
-                    if (!fill) {
-                        int n = 0;
-                        n += x == x1 || x == x2;
-                        n += y == y1 || y == y2;
-                        n += z == z1 || z == z2;
-                        if (n <= a) {
-                            continue;
-                        }
-                    }
-                    builder_block(x, y, z, w);
-                }
-            }
-        }
-    }
-
-    void sphere(Block *center, int radius, int fill, int fx, int fy, int fz) {
-        static const float offsets[8][3] = {
-            {-0.5, -0.5, -0.5},
-            {-0.5, -0.5, 0.5},
-            {-0.5, 0.5, -0.5},
-            {-0.5, 0.5, 0.5},
-            {0.5, -0.5, -0.5},
-            {0.5, -0.5, 0.5},
-            {0.5, 0.5, -0.5},
-            {0.5, 0.5, 0.5}
-        };
-        int cx = center->x;
-        int cy = center->y;
-        int cz = center->z;
-        int w = center->w;
-        for (int x = cx - radius; x <= cx + radius; x++) {
-            if (fx && x != cx) {
-                continue;
-            }
-            for (int y = cy - radius; y <= cy + radius; y++) {
-                if (fy && y != cy) {
-                    continue;
-                }
-                for (int z = cz - radius; z <= cz + radius; z++) {
-                    if (fz && z != cz) {
-                        continue;
-                    }
-                    int inside = 0;
-                    int outside = fill;
-                    for (int i = 0; i < 8; i++) {
-                        float dx = x + offsets[i][0] - cx;
-                        float dy = y + offsets[i][1] - cy;
-                        float dz = z + offsets[i][2] - cz;
-                        float d = SDL_sqrtf(dx * dx + dy * dy + dz * dz);
-                        if (d < radius) {
-                            inside = 1;
-                        }
-                        else {
-                            outside = 1;
-                        }
-                    }
-                    if (inside && outside) {
-                        builder_block(x, y, z, w);
-                    }
-                }
-            }
-        }
-    }
-
-    void cylinder(Block *b1, Block *b2, int radius, int fill) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int x1 = SDL_min(b1->x, b2->x);
-        int y1 = SDL_min(b1->y, b2->y);
-        int z1 = SDL_min(b1->z, b2->z);
-        int x2 = SDL_max(b1->x, b2->x);
-        int y2 = SDL_max(b1->y, b2->y);
-        int z2 = SDL_max(b1->z, b2->z);
-        int fx = x1 != x2;
-        int fy = y1 != y2;
-        int fz = z1 != z2;
-        if (fx + fy + fz != 1) {
-            return;
-        }
-        Block block = {x1, y1, z1, w};
-        if (fx) {
-            for (int x = x1; x <= x2; x++) {
-                block.x = x;
-                sphere(&block, radius, fill, 1, 0, 0);
-            }
-        }
-        if (fy) {
-            for (int y = y1; y <= y2; y++) {
-                block.y = y;
-                sphere(&block, radius, fill, 0, 1, 0);
-            }
-        }
-        if (fz) {
-            for (int z = z1; z <= z2; z++) {
-                block.z = z;
-                sphere(&block, radius, fill, 0, 0, 1);
-            }
-        }
-    }
-
-    void tree(Block *block) {
-        int bx = block->x;
-        int by = block->y;
-        int bz = block->z;
-        for (int y = by + 3; y < by + 8; y++) {
-            for (int dx = -3; dx <= 3; dx++) {
-                for (int dz = -3; dz <= 3; dz++) {
-                    int dy = y - (by + 4);
-                    int d = (dx * dx) + (dy * dy) + (dz * dz);
-                    if (d < 11) {
-                        builder_block(bx + dx, y, bz + dz, 15);
-                    }
-                }
-            }
-        }
-        for (int y = by; y < by + 7; y++) {
-            builder_block(bx, y, bz, 5);
-        }
-    }
-
-    void maze(int w, int l, int h, const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) noexcept {
-        maze_thread_safe mz { get_maze_algo_from_str(this->m_gui->maze_algo), cref(get_int), cref(rng),
-            static_cast<unsigned int>(w), static_cast<unsigned int>(l), static_cast<unsigned int>(h),
-            static_cast<unsigned int>(items[this->m_model->item_index]) };
-        auto&& vertices = mz.get_render_vertices();
-        auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
-            for (auto&& block : vertices) {
-                // Set the block in the DB
-                this->set_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-                // Record the block in craft
-                this->record_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-            }
-        };
-        set_maze_in_craft(cref(vertices));
-    }
-
-    void parse_command(const char *buffer, const function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
+    void parse_command(const char *buffer) {
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2354,73 +2151,10 @@ struct craft::craft_impl {
                 this->m_model->delete_radius = radius + 4;
             }
             else {
-                // Notify user with view parameters
+                // Notify user with view correct parameters
             }
         }
-        else if (SDL_strcmp(buffer, "/copy") == 0) {
-            copy();
-        }
-        else if (SDL_strcmp(buffer, "/paste") == 0) {
-            paste();
-        }
-        else if (SDL_strcmp(buffer, "/tree") == 0) {
-            tree(&this->m_model->block0);
-        }
-        else if (SDL_sscanf(buffer, "/move %d %d %d", &xc, &yc, &zc) == 3) {
-            auto&& ps = this->m_model->players->state;
-            ps.x = xc;
-            ps.y = yc;
-            ps.z = zc;
-#if defined(MAZE_DEBUG)
-            SDL_Log("/move (%d, %d, %d)", xc, yc, zc);
-#endif
-        }
-        else if (SDL_sscanf(buffer, "/array %d %d %d", &xc, &yc, &zc) == 3) {
-            array(&this->m_model->block1, &this->m_model->block0, xc, yc, zc);
-        }
-        else if (SDL_sscanf(buffer, "/array %d", &count) == 1) {
-            array(&this->m_model->block1, &this->m_model->block0, count, count, count);
-        }
-        else if (SDL_strcmp(buffer, "/fcube") == 0) {
-            cube(&this->m_model->block0, &this->m_model->block1, 1);
-        }
-        else if (SDL_strcmp(buffer, "/cube") == 0) {
-            cube(&this->m_model->block0, &this->m_model->block1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fsphere %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/sphere %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcirclex %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 1, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/circlex %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 1, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcircley %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/circley %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcirclez %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 0, 1);
-        }
-        else if (SDL_sscanf(buffer, "/circlez %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 0, 1);
-        }
-        else if (SDL_sscanf(buffer, "/fcylinder %d", &radius) == 1) {
-            cylinder(&this->m_model->block0, &this->m_model->block1, radius, 1);
-        }
-        else if (SDL_sscanf(buffer, "/cylinder %d", &radius) == 1) {
-            cylinder(&this->m_model->block0, &this->m_model->block1, radius, 0);
-        }
-        else if (SDL_sscanf(buffer, "/maze %d %d %d", &xc, &yc, &zc) == 3) {
-            maze(xc, yc, zc, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-        }
-    } // prase command
+    } // parse command
 
     void on_light() {
         State *s = &this->m_model->players->state;
@@ -2476,12 +2210,11 @@ struct craft::craft_impl {
 
     /**
     * Reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    * @brief Handle SDL events
+    * @brief Handle SDL events and motion
     * @param dt
-    * @param running is a reference to game loop invariant
-    * @return bool return true when events are handled successfully
+    * @return bool return true when events are handled successfully or not
     */
-    bool handle_events(double dt, bool& running, const function<mazes::maze_types(const string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
+    bool handle_events_and_motion(double dt) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2500,18 +2233,8 @@ struct craft::craft_impl {
             ImGui_ImplSDL3_ProcessEvent(&e);
 
             switch (e.type) {
-            case SDL_EVENT_QUIT: {
-                running = false;
-                break;
-            }
-            case SDL_EVENT_KEY_UP: {
-                sc = e.key.scancode;
-                switch (sc) {
-                }
-                break;
-            }
+            case SDL_EVENT_QUIT: return false;
             case SDL_EVENT_KEY_DOWN: {
-
                 sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE: {
@@ -2537,7 +2260,7 @@ struct craft::craft_impl {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
                             } else if (this->m_model->typing_buffer[0] == '/') {
-                                this->parse_command(this->m_model->typing_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
+                                this->parse_command(this->m_model->typing_buffer);
                             }
                         }
                     } else {
@@ -2549,20 +2272,7 @@ struct craft::craft_impl {
                     }
                     break;
                 }
-                case SDL_SCANCODE_V: {
-                    if (control) {
-                        auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
-                        if (this->m_model->typing) {
-                            this->m_model->suppress_char = 1;
-                            SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
-                                MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                        } else {
-                            parse_command(clip_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-                        }
-                        SDL_free(clip_buffer);
-                    }
-                    break;
-                }
+                // Change block type when mouse is captured
                 case SDL_SCANCODE_0:
                 case SDL_SCANCODE_1:
                 case SDL_SCANCODE_2:
@@ -2595,16 +2305,6 @@ struct craft::craft_impl {
                     }
                     break;
                 }
-                case KEY_OBSERVE: {
-                    if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
-                    break;
-                }
-                case KEY_OBSERVE_INSET: {
-                    if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
-                    break;
-                }
                 case KEY_CHAT: {
                     if (!imgui_focused && !this->m_model->typing) {
                         this->m_model->typing = 1;
@@ -2629,7 +2329,6 @@ struct craft::craft_impl {
                         SDL_StartTextInput(this->m_model->window);
                     }
                     break;
-
                 }
                 } // switch
                 break;
@@ -2708,12 +2407,7 @@ struct craft::craft_impl {
             }
             } // switch
         } // SDL_Event
-
-        // Close the app, events handled successfully
-        if (!running) {
-            return true;
-        }
-
+        // Handle motion updates
         const Uint8* state = SDL_GetKeyboardState(nullptr);
 
         if (!(imgui_focused || this->m_model->typing)) {
@@ -2769,7 +2463,7 @@ struct craft::craft_impl {
         }
 
         return true;
-    } // handle_events
+    } // handle_events_and_motion
 
     /**
      * @brief Check what fullscreen modes are avaialble
@@ -2791,11 +2485,6 @@ struct craft::craft_impl {
      * @brief Create SDL/GL window and context, check display modes
      */
     void create_window_and_context() {
-        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
-        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
-        int window_width = INIT_WINDOW_WIDTH;
-        int window_height = INIT_WINDOW_HEIGHT;
-
 #if defined(MAZE_DEBUG)
         SDL_Log("Setting SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
@@ -2821,7 +2510,9 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         
-        this->m_model->window = SDL_CreateWindow(m_window_name.data(), window_width, window_height, window_flags);
+        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+
+        this->m_model->window = SDL_CreateWindow(m_window_name.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2843,6 +2534,8 @@ struct craft::craft_impl {
         } else {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Couldn't load icon at %s\n", icon_path);
         }
+
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
     } // create_window_and_context
 
     void reset_model() {
@@ -3201,9 +2894,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         // FRAME RATE 
         uint64_t now = SDL_GetTicks();
-        double dt = static_cast<double>(now - previous) / 1000.0;
-        dt = SDL_min(dt, 0.2);
-        dt = SDL_max(dt, 0.0);
+        double dt_ms = static_cast<double>(now - previous) / 1000.0;
+        dt_ms = SDL_min(dt_ms, 0.2);
+        dt_ms = SDL_max(dt_ms, 0.0);
 
         // FLUSH DATABASE 
         if (now - previous > COMMIT_INTERVAL) {
@@ -3211,13 +2904,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             previous = now;
         }
 
-        // Some state variables
+        // Some GUI state variables
         static bool show_demo_window = false;
         static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
         static bool first_maze = true;
-        // Handle SDL events
-        bool events_handled_success = m_pimpl->handle_events(dt, ref(running), cref(get_maze_algo_from_str), cref(get_int), cref(rng));
+        // Handle SDL events and motion updates
+        running = this->m_pimpl->handle_events_and_motion(dt_ms);
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3487,7 +3180,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         check_for_gl_err();
 #endif
 
-        if (!events_handled_success || !running) {
+        if (!running) {
 #if defined(__EMSCRIPTEN__)
             emscripten_cancel_main_loop();
 #endif
