@@ -332,8 +332,6 @@ struct craft::craft_impl {
         int player_count;
         int width;
         int height;
-        int observe1;
-        int observe2;
         bool flying;
         int item_index;
         int scale;
@@ -1530,20 +1528,14 @@ struct craft::craft_impl {
     void delete_chunks() {
         int count = this->m_model->chunk_count;
         State *s1 = &this->m_model->players->state;
-        State *s2 = &(this->m_model->players + this->m_model->observe1)->state;
-        State *s3 = &(this->m_model->players + this->m_model->observe2)->state;
-        State *states[3] = {s1, s2, s3};
         for (int i = 0; i < count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             int remove_chunk = 1;
-            for (int j = 0; j < 3; j++) {
-                State *s = states[j];
-                int p = chunked(s->x);
-                int q = chunked(s->z);
-                if (chunk_distance(chunk, p, q) < this->m_model->delete_radius) {
-                    remove_chunk = 0;
-                    break;
-                }
+            int p = chunked(s1->x);
+            int q = chunked(s1->z);
+            if (chunk_distance(chunk, p, q) < this->m_model->delete_radius) {
+                remove_chunk = 0;
+                break;
             }
             if (remove_chunk) {
                 map_free(&chunk->map);
@@ -2541,10 +2533,12 @@ struct craft::craft_impl {
     void reset_model() {
         SDL_memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
         this->m_model->chunk_count = 0;
+        this->m_model->create_radius = CREATE_CHUNK_RADIUS;
+        this->m_model->render_radius = RENDER_CHUNK_RADIUS;
+        this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
+        this->m_model->sign_radius = RENDER_SIGN_RADIUS;
         SDL_memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
         this->m_model->player_count = 0;
-        this->m_model->observe1 = 0;
-        this->m_model->observe2 = 0;
         this->m_model->flying = false;
         this->m_model->item_index = 0;
         this->m_model->day_length = DAY_LENGTH;
@@ -2730,10 +2724,30 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
 
-    m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
-    m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
-    m_pimpl->m_model->delete_radius = DELETE_CHUNK_RADIUS;
-    m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
+    auto create_fbo = [](auto width, auto height, GLuint& texture)->GLuint {
+        GLuint fbo;
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Check for FBO initialization errors
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FBO initialization failed\n");
+            return 0;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return fbo;
+    };
+
+    GLuint fbo_texture;
+    GLuint fbo = create_fbo(m_pimpl->m_model->width, m_pimpl->m_model->height, fbo_texture);
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads();
@@ -2890,8 +2904,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     while (running)
 #endif
     {
-        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
-
         // FRAME RATE 
         uint64_t now = SDL_GetTicks();
         double dt_ms = static_cast<double>(now - previous) / 1000.0;
@@ -2909,14 +2921,84 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
         static bool first_maze = true;
+
+        // Handle Maze events
+        // Check if maze is available and then perform two async operations:
+        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
+        // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
+        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            // Get the maze and reset the future
+            maze_gen_future.get();
+            // Don't write the first maze that loads when app starts
+            write_maze_now = first_maze ? false : true;
+            first_maze = false;
+        }
+
+        if (write_maze_now) {
+            // Writing the maze will run in the background - only do that on Desktop
+            write_maze_now = false;
+            // Only write the maze when **NOT** on the web browser
+#if !defined(__EMSCRIPTEN__ )
+            write_success = maze_writer_fut(gui->outfile);
+#endif
+            this->m_pimpl->m_gui->maze_json = json_writer(gui->outfile);
+        } else {
+            // Failed to set maze
+        }
+
         // Handle SDL events and motion updates
+        auto last_width = m_pimpl->m_model->width;
+        auto last_height = m_pimpl->m_model->height;
         running = this->m_pimpl->handle_events_and_motion(dt_ms);
+
+        // Bind the FBO that will store the 3D scene
+        if (last_width != m_pimpl->m_model->width || last_height != m_pimpl->m_model->height) {
+            glDeleteFramebuffers(1, &fbo);
+            glDeleteTextures(1, &fbo_texture);
+            fbo = create_fbo(m_pimpl->m_model->width, m_pimpl->m_model->height, fbo_texture);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
+        glClearColor(0.5f, 0.69f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
+        // PREPARE TO RENDER 
+        m_pimpl->delete_chunks();
+        m_pimpl->del_buffer(me->buffer);
+
+        me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
+        for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
+            m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
+        }
+
+        // RENDER 3-D SCENE
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
+        m_pimpl->render_signs(&text_attrib, me);
+        m_pimpl->render_sign(&text_attrib, me);
+        m_pimpl->render_players(&block_attrib, me);
+        if (gui->show_wireframes) {
+            m_pimpl->render_wireframe(&line_attrib, me);
+        }
+
+        glClear(GL_DEPTH_BUFFER_BIT);
+        if (gui->show_crosshairs) {
+            m_pimpl->render_crosshairs(&line_attrib);
+        }
+        if (gui->show_items) {
+            m_pimpl->render_item(&block_attrib);
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
-        ImGui::PushFont(nunito_sans_font);
+        ImGui::PushFont(nunito_sans_font);        
+
         // Show the big demo window?
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
@@ -2990,10 +3072,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                             // Start the maze generation in the background
                             maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
                             progress_tracker->stop();
-                            // Hack to force the chunks to load, will reset the player's position next loop
-                            p_state->y = 1000.f;
-                            p_state->x = 1000.f;
-                            p_state->z = 1000.f;
                         } else {
                             ImGui::SameLine();
                             ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -3110,68 +3188,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             }
         }
         ImGui::End();
+
+        ImGui::Begin("OpenGL Texture");
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), 
+            ImVec2(this->m_pimpl->m_model->width, this->m_pimpl->m_model->height),
+            ImVec2(0, 1), ImVec2(1, 0));
+        ImGui::End();
+
         ImGui::PopFont();
-
-        // Check if maze is available and then perform two async operations:
-        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
-        // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
-        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            // Reset player state to roughly the origin
-            p_state->y = 75.f;
-            p_state->x = 100.f;
-            p_state->z = 100.f;
-            // Get the maze and reset the future
-            maze_gen_future.get();
-            // Don't write the first maze that loads when app starts
-            write_maze_now = first_maze ? false : true;
-            first_maze = false;
-        }
-
-        if (write_maze_now) {
-            // Writing the maze will run in the background - only do that on Desktop
-            write_maze_now = false;
-            // Only write the maze when **NOT** on the web browser
-#if !defined(__EMSCRIPTEN__ )
-            write_success = maze_writer_fut(gui->outfile);
-#endif
-            this->m_pimpl->m_gui->maze_json = json_writer(gui->outfile);
-        } else {
-            // Failed to set maze
-        }
-
-        // PREPARE TO RENDER 
-        m_pimpl->delete_chunks();
-        m_pimpl->del_buffer(me->buffer);
-    
-        me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
-        for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
-            m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
-        }
-
-        // RENDER 3-D SCENE
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
-        m_pimpl->render_signs(&text_attrib, me);
-        m_pimpl->render_sign(&text_attrib, me);
-        m_pimpl->render_players(&block_attrib, me);
-        if (gui->show_wireframes) {
-            m_pimpl->render_wireframe(&line_attrib, me);
-        }
-
-        // RENDER HUD 
-        glClear(GL_DEPTH_BUFFER_BIT);
-        if (gui->show_crosshairs) {
-            m_pimpl->render_crosshairs(&line_attrib);
-        }
-        if (gui->show_items) {
-            m_pimpl->render_item(&block_attrib);
-        }
             
         ImGui::Render();
-
+        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
+        glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         SDL_GL_SwapWindow(m_pimpl->m_model->window);
@@ -3224,6 +3252,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
+    glDeleteTextures(1, &fbo_texture);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(sky_attrib.program);
