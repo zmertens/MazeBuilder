@@ -2206,7 +2206,7 @@ struct craft::craft_impl {
     * @param dt
     * @return bool return true when events are handled successfully or not
     */
-    bool handle_events_and_motion(double dt) {
+    bool handle_events_and_motion(double dt, int& window_resizes) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2388,11 +2388,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_WINDOW_RESIZED: {
-                this->m_model->scale = get_scale_factor();
-                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
-                break;
-            }
-            case SDL_EVENT_WINDOW_SHOWN: {
+                window_resizes = true;
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
                 break;
@@ -2625,10 +2621,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     }
 #endif
 
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0, 0, 0, 1);
-
     // LOAD TEXTURES
     GLuint texture;
     glGenTextures(1, &texture);
@@ -2746,8 +2738,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         return fbo;
     };
 
-    GLuint fbo_texture;
-    GLuint fbo = create_fbo(m_pimpl->m_model->width, m_pimpl->m_model->height, fbo_texture);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads();
@@ -2758,6 +2750,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     ImGuiIO& io = ImGui::GetIO(); (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    io.IniFilename = nullptr;
 
     // Setup ImGui Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
@@ -2823,10 +2817,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-
-    if (!loaded) {
-        p_state->y = static_cast<float>(m_pimpl->highest_block(p_state->x, p_state->z) + 5);
-    }
+    if (loaded)
+        p_state->y = 75.f;
 
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_algo_from_str(algos.back());
@@ -2895,6 +2887,13 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     int triangle_faces = 0;
     bool running = true;
 
+    auto&& sdl_window_w = this->m_pimpl->m_model->width;
+    auto&& sdl_window_h = this->m_pimpl->m_model->height;
+    auto&& io_display_size = io.DisplaySize;
+
+    GLuint fbo_texture;
+    GLuint fbo = create_fbo(sdl_window_w, sdl_window_h, ref(fbo_texture));
+
     m_pimpl->force_chunks(me);
 
     // BEGIN EVENT LOOP
@@ -2918,7 +2917,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         // Some GUI state variables
         static bool show_demo_window = false;
-        static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
         static bool first_maze = true;
 
@@ -2947,20 +2945,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         }
 
         // Handle SDL events and motion updates
-        auto last_width = m_pimpl->m_model->width;
-        auto last_height = m_pimpl->m_model->height;
-        running = this->m_pimpl->handle_events_and_motion(dt_ms);
-
-        // Bind the FBO that will store the 3D scene
-        if (last_width != m_pimpl->m_model->width || last_height != m_pimpl->m_model->height) {
-            glDeleteFramebuffers(1, &fbo);
-            glDeleteTextures(1, &fbo_texture);
-            fbo = create_fbo(m_pimpl->m_model->width, m_pimpl->m_model->height, fbo_texture);
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
-        glClearColor(0.5f, 0.69f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        static int window_resizes = true;
+        running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
+        
         // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
@@ -2970,7 +2957,47 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
 
-        // RENDER 3-D SCENE
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+        ImGui::PushFont(nunito_sans_font);        
+
+        // Show the big demo window?
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
+
+        ImGui::SetNextWindowPos({ 0.f, 690.f + (static_cast<float>(sdl_window_h) - 720.f) });
+        ImGui::SetNextWindowSize({ 400, 30 });
+        ImGui::Begin("Framerate Window",
+            nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar
+        );
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
+
+        ImGui::SetNextWindowPos({ 400, 0 });
+        ImGui::SetNextWindowSize({ 880 + (static_cast<float>(sdl_window_w) - 1280.f), 720.f + (static_cast<float>(sdl_window_h) - 720.f) });
+        ImGui::Begin("Voxels",
+            nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoBringToFrontOnFocus
+        );
+
+        // Bind the FBO that will store the 3D scene
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, sdl_window_w, sdl_window_h);
+        glClearColor(0.5f, 0.69f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -2993,192 +3020,28 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-        ImGui::PushFont(nunito_sans_font);        
+        if (window_resizes) {
+            window_resizes = false;
+            glDeleteFramebuffers(1, &fbo);
+            glDeleteTextures(1, &fbo_texture);
+            fbo = create_fbo(sdl_window_w, sdl_window_h, ref(fbo_texture));
+        }
 
-        // Show the big demo window?
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-        show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
-        // Maze Builder GUI
-        if (show_mb_gui) {
-            // GUI Title Bar
-            ImGui::Begin(this->m_pimpl->m_version.c_str());
+        // Flip UV coordinates for the image
+        ImVec2 uv0 = ImVec2(0.0f, 1.0f);
+        ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+        auto img_size = ImGui::GetWindowSize();
+        glBindTexture(GL_TEXTURE_2D, fbo_texture);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), { img_size.x, img_size.y }, uv0, uv1);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        ImGui::End();
 
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
-            // Set the time
-            int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-            char am_pm = hour < 12 ? 'a' : 'p';
-            hour = hour % 12;
-            hour = hour ? hour : 12;
-            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
-            ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-            ImGui::Text("time: %d%cm", hour, am_pm);
-
-            // GUI Tabs
-            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
-
-                if (ImGui::BeginTabItem("Builder")) {
-                    ImGui::Text("Builder settings");
-
-                    static unsigned int MAX_MAZE_WIDTH = 1000;
-                    if (ImGui::SliderInt("Width", &gui->maze_width, 25, MAX_MAZE_WIDTH)) {
-
-                    }
-                    static unsigned int MAX_MAZE_LENGTH = 1000;
-                    if (ImGui::SliderInt("Length", &gui->maze_length, 25, MAX_MAZE_LENGTH)) {
-
-                    }
-                    static unsigned int MAX_MAZE_HEIGHT = 15;
-                    if (ImGui::SliderInt("Height", &gui->maze_height, 1, MAX_MAZE_HEIGHT)) {
-                      
-                    }
-                    static unsigned int MAX_SEED_VAL = 1'000;
-                    if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
-                        rng.seed(static_cast<unsigned long>(gui->seed));
-                    }
-                    ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
-                    if (ImGui::TreeNode("Maze Generator")) {
-                        auto preview{ gui->maze_algo.c_str() };
-                        ImGui::NewLine();
-                        ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
-                        if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
-                            for (const auto& itr : algos) {
-                                bool is_selected = (itr == gui->maze_algo);
-                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
-                                    gui->maze_algo = itr;
-                                    my_maze_type = get_maze_algo_from_str(itr);
-                                }
-                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                                if (is_selected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                        ImGui::NewLine();
-                        ImGui::TreePop();
-                    }
-
-                    // Check if user has added a prefix to the Wavefront object file
-                    if (gui->outfile[0] != '.') {
-                        if (ImGui::Button("Build!")) {
-                            progress_tracker->start();
-                            // Start the maze generation in the background
-                            maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
-                            progress_tracker->stop();
-                        } else {
-                            ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", gui->outfile);
-                        }
-                    } else {
-                        // Disable the button
-                        ImGui::BeginDisabled(true);
-                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
-
-                        // Render the button - don't need to check if the button is pressed because it's disabled
-                        ImGui::Button("Build!");
-
-                        // Re-enable items and revert style change
-                        ImGui::PopStyleVar();
-                        ImGui::EndDisabled();
-                    }
-
-                    // Let JavaScript handle file downloads in web browser
-#if !defined(__EMSCRIPTEN)  
-                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                        // Call the writer future and get the result
-                        bool success = write_success.get();
-                        if (success && gui->outfile[0] != '.') {
-                            // Dont display a message on the web browser, let the web browser handle that
-                            ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", gui->outfile);
-                            ImGui::NewLine();
-                        } else {
-                            ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", gui->outfile);
-                            ImGui::NewLine();
-                        }
-                        // Reset outfile's first char and that will disable the Build! button
-                        gui->outfile[0] = '.';
-                    }
-#endif
-                    if (progress_tracker) {
-                        // Show progress when writing
-                        ImGui::NewLine();
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                        ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
-                        ImGui::NewLine();
-                        ImGui::PopStyleColor();
-                    }
-
-                    // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                    if (ImGui::Button("Reset")) {
-                        // Clear the GUI
-                    }
-                    ImGui::PopStyleColor();
-                    
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Graphics")) {
-                    ImGui::Text("Graphic settings");
-                    
-                    ImGui::Checkbox("Dark Mode", &gui->color_mode_dark);
-                    if (gui->color_mode_dark)
-                        ImGui::StyleColorsDark();
-                    else
-                        ImGui::StyleColorsLight();
-
-                    ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
-                    
-                    // Prevent setting SDL_Window settings every frame
-                    static bool last_fullscreen = gui->fullscreen;
-                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
-                    bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
-                    last_fullscreen = gui->fullscreen;
-                    if (update_fullscreen)
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
-
-                    static bool last_vsync = gui->vsync;
-                    ImGui::Checkbox("VSYNC", &gui->vsync);
-                    bool update_vsync = (last_vsync != gui->vsync) ? true : false;
-                    last_vsync = gui->vsync;
-                    if (update_vsync)
-                        SDL_GL_SetSwapInterval(gui->vsync);
-
-                    ImGui::Checkbox("Show Lights", &gui->show_lights);
-                    ImGui::Checkbox("Show Items", &gui->show_items);
-                    ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
-                    ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
-                    ImGui::Checkbox("Show Trees", &gui->show_trees);
-                    ImGui::Checkbox("Show Clouds", &gui->show_clouds);
-                    ImGui::Checkbox("Show Plants", &gui->show_plants);
-
-                                    
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Help")) {
-                    ImGui::Text("%s\n", this->m_pimpl->m_help.data());
-                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
-                    ImGui::Text("\n");
-                    ImGui::Text(github_repo);
-                    ImGui::Text("\n");
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            } // imgui tab handler
-            ImGui::End();
-            // ImGui::PopFont();
-        } // show_builder_gui
-
-        ImGui::Begin("Mouse Capture", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-        ImGui::SetWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 150, ImGui::GetIO().DisplaySize.y - 50));
+        ImGui::Begin("Mouse Capture", 
+            nullptr, 
+            ImGuiWindowFlags_NoMove | 
+            ImGuiWindowFlags_NoResize | 
+            ImGuiWindowFlags_NoTitleBar);
+        ImGui::SetWindowPos(ImVec2(sdl_window_w - 150, sdl_window_h - 50));
         ImGui::SetWindowSize(ImVec2(150, 50));
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
@@ -3189,20 +3052,188 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         }
         ImGui::End();
 
-        ImGui::Begin("OpenGL Texture");
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), 
-            ImVec2(this->m_pimpl->m_model->width, this->m_pimpl->m_model->height),
-            ImVec2(0, 1), ImVec2(1, 0));
-        ImGui::End();
+        // Maze Builder GUI
+//        if (show_mb_gui) {
+//            // GUI Title Bar
+//            ImGui::Begin(this->m_pimpl->m_version.c_str());
+//
+//            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
+//
+//            // Set the time
+//            int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
+//            char am_pm = hour < 12 ? 'a' : 'p';
+//            hour = hour % 12;
+//            hour = hour ? hour : 12;
+//            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
+//            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
+//            ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
+//            ImGui::Text("time: %d%cm", hour, am_pm);
+//
+//            // GUI Tabs
+//            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
+//            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
+//
+//                if (ImGui::BeginTabItem("Builder")) {
+//                    ImGui::Text("Builder settings");
+//
+//                    static unsigned int MAX_MAZE_WIDTH = 1000;
+//                    if (ImGui::SliderInt("Width", &gui->maze_width, 25, MAX_MAZE_WIDTH)) {
+//
+//                    }
+//                    static unsigned int MAX_MAZE_LENGTH = 1000;
+//                    if (ImGui::SliderInt("Length", &gui->maze_length, 25, MAX_MAZE_LENGTH)) {
+//
+//                    }
+//                    static unsigned int MAX_MAZE_HEIGHT = 15;
+//                    if (ImGui::SliderInt("Height", &gui->maze_height, 1, MAX_MAZE_HEIGHT)) {
+//                      
+//                    }
+//                    static unsigned int MAX_SEED_VAL = 1'000;
+//                    if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
+//                        rng.seed(static_cast<unsigned long>(gui->seed));
+//                    }
+//                    ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
+//                    if (ImGui::TreeNode("Maze Generator")) {
+//                        auto preview{ gui->maze_algo.c_str() };
+//                        ImGui::NewLine();
+//                        ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
+//                        if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
+//                            for (const auto& itr : algos) {
+//                                bool is_selected = (itr == gui->maze_algo);
+//                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
+//                                    gui->maze_algo = itr;
+//                                    my_maze_type = get_maze_algo_from_str(itr);
+//                                }
+//                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+//                                if (is_selected)
+//                                    ImGui::SetItemDefaultFocus();
+//                            }
+//                            ImGui::EndCombo();
+//                        }
+//                        ImGui::NewLine();
+//                        ImGui::TreePop();
+//                    }
+//
+//                    // Check if user has added a prefix to the Wavefront object file
+//                    if (gui->outfile[0] != '.') {
+//                        if (ImGui::Button("Build!")) {
+//                            progress_tracker->start();
+//                            // Start the maze generation in the background
+//                            maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
+//                            progress_tracker->stop();
+//                        } else {
+//                            ImGui::SameLine();
+//                            ImGui::Text("Building maze... %s\n", gui->outfile);
+//                        }
+//                    } else {
+//                        // Disable the button
+//                        ImGui::BeginDisabled(true);
+//                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
+//
+//                        // Render the button - don't need to check if the button is pressed because it's disabled
+//                        ImGui::Button("Build!");
+//
+//                        // Re-enable items and revert style change
+//                        ImGui::PopStyleVar();
+//                        ImGui::EndDisabled();
+//                    }
+//
+//                    // Let JavaScript handle file downloads in web browser
+//#if !defined(__EMSCRIPTEN)  
+//                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+//                        // Call the writer future and get the result
+//                        bool success = write_success.get();
+//                        if (success && gui->outfile[0] != '.') {
+//                            // Dont display a message on the web browser, let the web browser handle that
+//                            ImGui::NewLine();
+//                            ImGui::Text("Maze written to %s\n", gui->outfile);
+//                            ImGui::NewLine();
+//                        } else {
+//                            ImGui::NewLine();
+//                            ImGui::Text("Failed to write maze: %s\n", gui->outfile);
+//                            ImGui::NewLine();
+//                        }
+//                        // Reset outfile's first char and that will disable the Build! button
+//                        gui->outfile[0] = '.';
+//                    }
+//#endif
+//                    if (progress_tracker) {
+//                        // Show progress when writing
+//                        ImGui::NewLine();
+//                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+//                        ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
+//                        ImGui::NewLine();
+//                        ImGui::PopStyleColor();
+//                    }
+//
+//                    // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
+//                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+//                    if (ImGui::Button("Reset")) {
+//                        // Clear the GUI
+//                    }
+//                    ImGui::PopStyleColor();
+//                    
+//                    ImGui::EndTabItem();
+//                }
+//                if (ImGui::BeginTabItem("Graphics")) {
+//                    ImGui::Text("Graphic settings");
+//                    
+//                    ImGui::Checkbox("Dark Mode", &gui->color_mode_dark);
+//                    if (gui->color_mode_dark)
+//                        ImGui::StyleColorsDark();
+//                    else
+//                        ImGui::StyleColorsLight();
+//
+//                    ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
+//                    
+//                    // Prevent setting SDL_Window settings every frame
+//                    static bool last_fullscreen = gui->fullscreen;
+//                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
+//                    bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
+//                    last_fullscreen = gui->fullscreen;
+//                    if (update_fullscreen)
+//                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
+//
+//                    static bool last_vsync = gui->vsync;
+//                    ImGui::Checkbox("VSYNC", &gui->vsync);
+//                    bool update_vsync = (last_vsync != gui->vsync) ? true : false;
+//                    last_vsync = gui->vsync;
+//                    if (update_vsync)
+//                        SDL_GL_SetSwapInterval(gui->vsync);
+//
+//                    ImGui::Checkbox("Show Lights", &gui->show_lights);
+//                    ImGui::Checkbox("Show Items", &gui->show_items);
+//                    ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
+//                    ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
+//                    ImGui::Checkbox("Show Trees", &gui->show_trees);
+//                    ImGui::Checkbox("Show Clouds", &gui->show_clouds);
+//                    ImGui::Checkbox("Show Plants", &gui->show_plants);
+//
+//                                    
+//                    ImGui::EndTabItem();
+//                }
+//                if (ImGui::BeginTabItem("Help")) {
+//                    ImGui::Text("%s\n", this->m_pimpl->m_help.data());
+//                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+//                    ImGui::Text("\n");
+//                    ImGui::Text(github_repo);
+//                    ImGui::Text("\n");
+//                    ImGui::EndTabItem();
+//                }
+//                ImGui::EndTabBar();
+//            } // imgui tab handler
+//            ImGui::End();
+//            // ImGui::PopFont();
+//        } // show_builder_gui
 
         ImGui::PopFont();
             
         ImGui::Render();
-        glViewport(0, 0, m_pimpl->m_model->width, m_pimpl->m_model->height);
+        glViewport(0, 0, sdl_window_w, sdl_window_h);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        SDL_GL_SwapWindow(m_pimpl->m_model->window);
+        SDL_GL_SwapWindow(this->m_pimpl->m_model->window);
 
 #if defined(MAZE_DEBUG)
         check_for_gl_err();
@@ -3217,12 +3248,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_END;
-#endif
-
-#if defined(MAZE_DEBUG)
-    SDL_Log("Cleaning up ImGui objects. . .");
-    SDL_Log("Cleaning up OpenGL objects. . .");
-    SDL_Log("Cleaning up SDL objects. . .");
 #endif
 
     m_pimpl->cleanup_worker_threads();
@@ -3242,6 +3267,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 #if defined(MAZE_DEBUG)
     SDL_Log("check_for_gl_err() at the end of the event loop\n");
     check_for_gl_err();
+    SDL_Log("Cleaning up ImGui objects. . .");
+    SDL_Log("Cleaning up OpenGL objects. . .");
+    SDL_Log("Cleaning up SDL objects. . .");
 #endif
 
     ImGui_ImplOpenGL3_Shutdown();
@@ -3252,6 +3280,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
+    glDeleteFramebuffers(1, &fbo);
     glDeleteTextures(1, &fbo_texture);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
