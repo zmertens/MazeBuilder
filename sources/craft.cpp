@@ -3030,7 +3030,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        auto img_size = ImGui::GetWindowSize();
+        //auto img_size = ImGui::GetWindowSize();
+        auto img_size = ImGui::GetContentRegionAvail();
         glBindTexture(GL_TEXTURE_2D, fbo_texture);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), { img_size.x, img_size.y }, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
