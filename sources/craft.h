@@ -31,7 +31,7 @@ public:
     
     // Singleton pattern
     static std::shared_ptr<craft> get_instance(const std::string& w, const std::string& v, const std::string& h) {
-        static std::shared_ptr<craft> instance = std::make_shared<craft>(w, v, h);
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::cref(w), std::cref(v), std::cref(h));
         return instance;
     }
 private:

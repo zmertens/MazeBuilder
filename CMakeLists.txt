@@ -75,10 +75,6 @@ function(fetch_lib_from_git name_of_lib tag git_repo)
         GIT_PROGRESS TRUE
     )
 
-    if(${name_of_lib} STREQUAL "raylib")
-        set(GRAPHICS GRAPHICS_API_OPENGL_33)
-    endif()
-
     FetchContent_MakeAvailable(${name_of_lib})
 endfunction()
 

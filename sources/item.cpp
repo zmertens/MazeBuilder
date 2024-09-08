@@ -1,6 +1,10 @@
 #include "item.h"
+<<<<<<< HEAD
 
 #include <cmath>
+=======
+#include "craft_utils.h"
+>>>>>>> dev
 
 const int items[] = {
     // items the user can build

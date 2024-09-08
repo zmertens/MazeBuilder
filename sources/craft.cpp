@@ -2,8 +2,8 @@
  * Craft engine builds voxels as chunks and can run maze-generating algorithms
  * Generated mazes are stored in-memory and in an offline database
  * Vertex and indice data is stored in buffers and rendered using OpenGL
- * Supports writing to Wavefront OBJ files
- * Interfaces with Emscripten to provide data in JSON-format to web applications
+ * Supports RESTful APIs for web applications by passing maze data in JSON format
+ * Interfaces with Emscripten to provide web API support
  * 
  * 
  * Originally written in C99, ported to C++17
@@ -52,38 +52,43 @@
 #include "cell.h"
 #include "writer.h"
 
-// basic configurations
-//#define KEY_FORWARD SDL_SCANCODE_W
-//#define KEY_BACKWARD SDL_SCANCODE_S
-//#define KEY_LEFT SDL_SCANCODE_A
-//#define KEY_RIGHT SDL_SCANCODE_D
-//#define KEY_JUMP SDL_SCANCODE_SPACE
-//#define KEY_FLY SDL_SCANCODE_TAB
-//#define KEY_OBSERVE SDL_SCANCODE_O
-//#define KEY_OBSERVE_INSET SDL_SCANCODE_P
-//#define KEY_ITEM_NEXT SDL_SCANCODE_E
-//#define KEY_ITEM_PREV SDL_SCANCODE_R
-//#define KEY_ZOOM SDL_SCANCODE_LSHIFT
-//#define KEY_ORTHO SDL_SCANCODE_F
-//#define KEY_CHAT SDL_SCANCODE_T
-//#define KEY_COMMAND SDL_SCANCODE_SLASH
-//#define KEY_SIGN SDL_SCANCODE_GRAVE
+// Movement configurations
+#define KEY_FORWARD SDL_SCANCODE_W
+#define KEY_BACKWARD SDL_SCANCODE_S
+#define KEY_LEFT SDL_SCANCODE_A
+#define KEY_RIGHT SDL_SCANCODE_D
+#define KEY_JUMP SDL_SCANCODE_SPACE
+#define KEY_FLY SDL_SCANCODE_TAB
+#define KEY_OBSERVE SDL_SCANCODE_O
+#define KEY_OBSERVE_INSET SDL_SCANCODE_P
+#define KEY_ITEM_NEXT SDL_SCANCODE_E
+#define KEY_ITEM_PREV SDL_SCANCODE_R
+#define KEY_ZOOM SDL_SCANCODE_LSHIFT
+#define KEY_ORTHO SDL_SCANCODE_F
+#define KEY_CHAT SDL_SCANCODE_T
+#define KEY_COMMAND SDL_SCANCODE_SLASH
+#define KEY_SIGN SDL_SCANCODE_GRAVE
 
+// Typing config
+#define CRAFT_KEY_SIGN '`'
+
+// World configs
 #define INIT_WINDOW_WIDTH 1024
 #define INIT_WINDOW_HEIGHT 768
 #define SCROLL_THRESHOLD 0.1
-#define USE_CACHE 1
+#define DB_PATH "craft.db"
+#define MAX_DB_PATH_LEN 64
+#define USE_CACHE true
 #define DAY_LENGTH 600
 #define INVERT_MOUSE 0
+#define MAX_TEXT_LENGTH 256
 
-// rendering options
-// advanced parameters
+// Advanced options
 #define CREATE_CHUNK_RADIUS 10
 #define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
 #define COMMIT_INTERVAL 5
-
 #define MAX_CHUNKS 8192
 #define NUM_WORKERS 4
 
@@ -123,7 +128,7 @@ public:
             capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-            outfile(".obj"), seed(101), maze_width(100), maze_height(10), maze_length(100),
+            outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json("") {
         
         }
@@ -321,7 +326,10 @@ public:
         int render_radius;
         int delete_radius;
         int sign_radius;
-        Player player;
+        Player players[MAX_PLAYERS];
+        int player_count;
+        int width;
+        int height;
         bool flying;
         int item_index;
         int scale;
@@ -329,6 +337,10 @@ public:
         float fov;
         int suppress_char;
         int mode_changed;
+        char db_path[MAX_DB_PATH_LEN];
+        bool typing;
+        char typing_buffer[MAX_TEXT_LENGTH];
+        size_t text_len;
         int day_length;
         bool time_changed;
         int start_time;
@@ -353,8 +365,7 @@ public:
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
-        , m_model{make_unique<Model>()}
-        // Construct maze in run loop
+        , m_model{ make_unique<Model>() }
         , m_maze()
         , m_gui{make_unique<Gui>()} {
         this->reset_model();
@@ -701,11 +712,11 @@ public:
             memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
             s2->t = static_cast<float>(get_time());
-            if (s2->rx - s1->rx > static_cast<float>(PI)) {
-                s1->rx += static_cast<float>(2 * PI);
+            if (s2->rx - s1->rx > static_cast<float>(M_PI)) {
+                s1->rx += static_cast<float>(2 * M_PI);
             }
-            if (s1->rx - s2->rx > static_cast<float>(PI)) {
-                s1->rx -= static_cast<float>(2 * PI);
+            if (s1->rx - s2->rx > static_cast<float>(M_PI)) {
+                s1->rx -= static_cast<float>(2 * M_PI);
             }
         }
         //else {
@@ -1802,25 +1813,53 @@ public:
     }
 
     void render_item(Attrib *attrib) {
-        //float matrix[16];
-        //set_matrix_item(matrix, this->m_model->width, this->m_model->height, this->m_model->scale);
-        //glUseProgram(attrib->program);
-        //glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //glUniform3f(attrib->camera, 0, 0, 5);
-        //glUniform1i(attrib->sampler, 0);
-        //glUniform1f(attrib->timer, time_of_day());
-        //int w = items[this->m_model->item_index];
-        //if (is_plant(w)) {
-        //    std::uint32_t buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
-        //    draw_plant(attrib, buffer);
-        //    del_buffer(buffer);
-        //}
-        //else {
-        //    std::uint32_t buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
-        //    draw_cube(attrib, buffer);
-        //    del_buffer(buffer);
-        //}
+        float matrix[16];
+        set_matrix_item(matrix, this->m_model->width, this->m_model->height, this->m_model->scale);
+        glUseProgram(attrib->program);
+        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+        glUniform3f(attrib->camera, 0, 0, 5);
+        glUniform1i(attrib->sampler, 0);
+        glUniform1f(attrib->timer, time_of_day());
+        int w = items[this->m_model->item_index];
+        if (is_plant(w)) {
+            GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
+            draw_plant(attrib, buffer);
+            del_buffer(buffer);
+        }
+        else {
+            GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
+            draw_cube(attrib, buffer);
+            del_buffer(buffer);
+        }
     }
+
+    void render_text(Attrib *attrib, int justify, float x, float y, float n, char *text) {
+        float matrix[16];
+        set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
+        glUseProgram(attrib->program);
+        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+        glUniform1i(attrib->sampler, 1);
+        glUniform1i(attrib->extra1, 0);
+        GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
+        x -= n * justify * (length - 1) / 2;
+        GLuint buffer = gen_text_buffer(x, y, n, text);
+        draw_text(attrib, buffer, length);
+        del_buffer(buffer);
+    }
+
+    void parse_command(const char *buffer) {
+        int radius, count, xc, yc, zc;
+        if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
+            if (radius >= 1 && radius <= 24) {
+                this->m_model->create_radius = radius;
+                this->m_model->render_radius = radius;
+                this->m_model->delete_radius = radius + 4;
+            }
+            else {
+                // Notify user with view correct parameters
+            }
+        }
+    } // parse command
 
     void on_light() {
         State *s = &this->m_model->player.state;
@@ -2168,8 +2207,8 @@ public:
     //        s->y = highest_block(s->x, s->z) + 2;
     //    }
 
-    //    return true;
-    //} // handle_events
+        return true;
+    } // handle_events
 
     void reset_model() {
         memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
@@ -2190,7 +2229,7 @@ public:
 }; // craft_impl
 
 craft::craft(const std::string& window_name, const std::string& version, const std::string& help)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help)} {
+    : m_pimpl{std::make_unique<craft_impl>(cref(window_name), cref(version), cref(help))} {
 }
 
 craft::~craft() = default;
@@ -2324,16 +2363,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     me->name = "me";
     me->buffer = 0;
 
-    // magic variables to prevent black screen on load - modified in handle_events()
-    this->m_pimpl->m_model->is_ortho = 0;
-    this->m_pimpl->m_model->fov = 65;
-
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-
-    if (!loaded) {
-        p_state->y = static_cast<float>(m_pimpl->highest_block(p_state->x, p_state->z) + 5);
-    }
+    if (loaded)
+        p_state->y = 75.f;
 
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_algo_from_str(algos.back());
@@ -2430,6 +2463,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 			}
 		}
 
+        // Handle Maze events
         // Check if maze is available and then perform two async operations:
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
         // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
@@ -2460,7 +2494,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     
         /*m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
-    
+
         me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
         m_pimpl->interpolate_player(me);*/
 
