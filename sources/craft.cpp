@@ -43,7 +43,6 @@
 
 #include "world.h"
 #include "db.h"
-#include "item.h"
 
 #include "maze_types_enum.h"
 #include "maze_factory.h"
@@ -69,8 +68,9 @@
 #define KEY_COMMAND SDL_SCANCODE_SLASH
 #define KEY_SIGN SDL_SCANCODE_GRAVE
 
-// Typing config
-#define CRAFT_KEY_SIGN '`'
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 // World configs
 #define INIT_WINDOW_WIDTH 1024
@@ -326,7 +326,7 @@ public:
         int render_radius;
         int delete_radius;
         int sign_radius;
-        Player players[MAX_PLAYERS];
+        Player players[1];
         int player_count;
         int width;
         int height;
@@ -526,24 +526,6 @@ public:
         }
     }
 
-    //std::uint32_t gen_crosshair_buffer() {
-    //    float x = static_cast<float>(this->m_model->width) / 2.0f;
-    //    float y = static_cast<float>(this->m_model->height) / 2.0f;
-    //    float p = 10.f * static_cast<float>(this->m_model->scale);
-    //    float data[] = {
-    //        x, y - p, x, y + p,
-    //        x - p, y, x + p, y
-    //    };
-    //    return this->gen_buffer(sizeof(data), data);
-    //}
-
-    std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) {
-    //    float data[72];
-    //    // cube.h -> make_cube_wireframe
-    //    make_cube_wireframe(data, x, y, z, n);
-    //    return this->gen_buffer(sizeof(data), data);
-    }
-
     std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) {
     //    float *data = malloc_faces(10, 6);
     //    float ao[6][4] = {0};
@@ -560,84 +542,57 @@ public:
         return 0;
     }
 
-    std::uint32_t gen_plant_buffer(float x, float y, float z, float n, int w) {
-    //    float *data = malloc_faces(10, 4);
-    //    float ao = 0;
-    //    float light = 1;
-    //    make_plant(data, ao, light, x, y, z, n, w, 45);
-    //    return gen_faces(10, 4, data);
-        return 0;
-    }
+    //void draw_triangles_3d_ao(Attrib *attrib, std::uint32_t buffer, int count) {
+    //    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    //    glEnableVertexAttribArray(attrib->position);
+    //    glEnableVertexAttribArray(attrib->normal);
+    //    glEnableVertexAttribArray(attrib->uv);
+    //    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
+    //        sizeof(float) * 10, 0);
+    //    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE,
+    //        sizeof(float) * 10, (GLvoid *)(sizeof(float) * 3));
+    //    glVertexAttribPointer(attrib->uv, 4, GL_FLOAT, GL_FALSE,
+    //        sizeof(float) * 10, (GLvoid *)(sizeof(float) * 6));
+    //    glDrawArrays(GL_TRIANGLES, 0, count);
+    //    glDisableVertexAttribArray(attrib->position);
+    //    glDisableVertexAttribArray(attrib->normal);
+    //    glDisableVertexAttribArray(attrib->uv);
+    //    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //}
 
-    std::uint32_t gen_player_buffer(float x, float y, float z, float rx, float ry) {
-    //    float *data = malloc_faces(10, 6);
-    //    make_player(data, x, y, z, rx, ry);
-    //    return gen_faces(10, 6, data);
-        return 0;
-    }
+    //void draw_triangles_3d_text(Attrib *attrib, std::uint32_t buffer, int count) {
+    //    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    //    glEnableVertexAttribArray(attrib->position);
+    //    glEnableVertexAttribArray(attrib->uv);
+    //    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
+    //        sizeof(float) * 5, 0);
+    //    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE,
+    //        sizeof(float) * 5, (GLvoid *)(sizeof(float) * 3));
+    //    glDrawArrays(GL_TRIANGLES, 0, count);
+    //    glDisableVertexAttribArray(attrib->position);
+    //    glDisableVertexAttribArray(attrib->uv);
+    //    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //}
 
-    std::uint32_t gen_text_buffer(float x, float y, float n, char *text) {
-    //    GLsizei length = static_cast<GLsizei>(strlen(text));
-    //    float *data = malloc_faces(4, length);
-    //    for (int i = 0; i < length; i++) {
-    //        make_character(data + i * 24, x, y, n / 2, n, text[i]);
-    //        x += n;
-    //    }
-    //    return gen_faces(4, length, data);
-        return 0;
-    }
+    //void draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
+    //    glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
-    void draw_triangles_3d_ao(Attrib *attrib, std::uint32_t buffer, int count) {
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glEnableVertexAttribArray(attrib->position);
-        glEnableVertexAttribArray(attrib->normal);
-        glEnableVertexAttribArray(attrib->uv);
-        glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
-            sizeof(float) * 10, 0);
-        glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE,
-            sizeof(float) * 10, (GLvoid *)(sizeof(float) * 3));
-        glVertexAttribPointer(attrib->uv, 4, GL_FLOAT, GL_FALSE,
-            sizeof(float) * 10, (GLvoid *)(sizeof(float) * 6));
-        glDrawArrays(GL_TRIANGLES, 0, count);
-        glDisableVertexAttribArray(attrib->position);
-        glDisableVertexAttribArray(attrib->normal);
-        glDisableVertexAttribArray(attrib->uv);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
+    //    glEnableVertexAttribArray(attrib->position);
 
-    void draw_triangles_3d_text(Attrib *attrib, std::uint32_t buffer, int count) {
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
-        glEnableVertexAttribArray(attrib->position);
-        glEnableVertexAttribArray(attrib->uv);
-        glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
-            sizeof(float) * 5, 0);
-        glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE,
-            sizeof(float) * 5, (GLvoid *)(sizeof(float) * 3));
-        glDrawArrays(GL_TRIANGLES, 0, count);
-        glDisableVertexAttribArray(attrib->position);
-        glDisableVertexAttribArray(attrib->uv);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
+    //    glEnableVertexAttribArray(attrib->normal);
+    //    glEnableVertexAttribArray(attrib->uv);
 
-    void draw_triangles_3d(Attrib *attrib, GLuint buffer, int count) {
-        glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    //    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, 0);
+    //    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (GLvoid *)(sizeof(float) * 3));
+    //    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (GLvoid *)(sizeof(float) * 6));
+    //    
+    //    glDrawArrays(GL_TRIANGLES, 0, count);
 
-        glEnableVertexAttribArray(attrib->position);
-
-        glEnableVertexAttribArray(attrib->normal);
-        glEnableVertexAttribArray(attrib->uv);
-
-        glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, 0);
-        glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (GLvoid *)(sizeof(float) * 3));
-        glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (GLvoid *)(sizeof(float) * 6));
-        
-        glDrawArrays(GL_TRIANGLES, 0, count);
-
-        glDisableVertexAttribArray(attrib->position);
-        glDisableVertexAttribArray(attrib->normal);
-        glDisableVertexAttribArray(attrib->uv);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
+    //    glDisableVertexAttribArray(attrib->position);
+    //    glDisableVertexAttribArray(attrib->normal);
+    //    glDisableVertexAttribArray(attrib->uv);
+    //    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //}
 
     void draw_triangles_2d(Attrib *attrib, std::uint32_t buffer, std::size_t count) {
     //    glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -704,8 +659,7 @@ public:
     //    draw_cube(attrib, player->buffer);
     }
 
-    void update_player(Player *player, float x, float y, float z, float rx, float ry, int interpolate)
-    {
+    void update_player(Player *player, float x, float y, float z, float rx, float ry, int interpolate) {
         if (interpolate) {
             State *s1 = &player->state1;
             State *s2 = &player->state2;
@@ -761,499 +715,220 @@ public:
         return max(dp, dq);
     }
 
-    int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) {
-        float miny_f = static_cast<float>(miny);
-        float maxy_f = static_cast<float>(maxy);
-        float x = static_cast<float>(p * this->m_gui->chunk_size - 1);
-        float z = static_cast<float>(q * this->m_gui->chunk_size - 1);
-        float d = static_cast<float>(this->m_gui->chunk_size + 1);
-        float points[8][3] = {
-            {x + 0.f, miny_f, z + 0.f},
-            {x + d, miny_f, z + 0.f},
-            {x + 0.f, miny_f, z + d},
-            {x + d, miny_f, z + d},
-            {x + 0.f, maxy_f, z + 0.f},
-            {x + d, maxy_f, z + 0.f},
-            {x + 0.f, maxy_f, z + d},
-            {x + d, maxy_f, z + d}
-        };
-        int n = this->m_model->is_ortho ? 4 : 6;
-        for (int i = 0; i < n; i++) {
-            int in = 0;
-            int out = 0;
-            for (int j = 0; j < 8; j++) {
-                float d =
-                    planes[i][0] * points[j][0] +
-                    planes[i][1] * points[j][1] +
-                    planes[i][2] * points[j][2] +
-                    planes[i][3];
-                if (d < 0) {
-                    out++;
-                }
-                else {
-                    in++;
-                }
-                if (in && out) {
-                    break;
-                }
-            }
-            if (in == 0) {
-                return 0;
-            }
-        }
-        return 1;
-    } // chunk_visible
+    //int highest_block(float x, float z) const {
+    //    int result = -1;
+    //    int nx = static_cast<int>(roundf(x));
+    //    int nz = static_cast<int>(roundf(z));
+    //    int p = this->chunked(x);
+    //    int q = this->chunked(z);
+    //    Chunk *chunk = this->find_chunk(p, q);
+    //    if (chunk) {
+    //        Map *map = &chunk->map;
+    //        MAP_FOR_EACH(map, ex, ey, ez, ew) {
+    //            // item.h -> is_obstacle
+    //            if (is_obstacle(ew) && ex == nx && ez == nz) {
+    //                result = max(result, ey);
+    //            }
+    //        } END_MAP_FOR_EACH;
+    //    }
+    //    return result;
+    //}
 
-    int highest_block(float x, float z) const {
-        int result = -1;
-        int nx = static_cast<int>(roundf(x));
-        int nz = static_cast<int>(roundf(z));
-        int p = this->chunked(x);
-        int q = this->chunked(z);
-        Chunk *chunk = this->find_chunk(p, q);
-        if (chunk) {
-            Map *map = &chunk->map;
-            MAP_FOR_EACH(map, ex, ey, ez, ew) {
-                // item.h -> is_obstacle
-                if (is_obstacle(ew) && ex == nx && ez == nz) {
-                    result = max(result, ey);
-                }
-            } END_MAP_FOR_EACH;
-        }
-        return result;
-    }
-
-    int _hit_test(Map *map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int *hx, int *hy, int *hz) {
-        static constexpr int m = 32;
-        int px = 0;
-        int py = 0;
-        int pz = 0;
-        for (int i = 0; i < max_distance * m; i++) {
-            long nx = lroundf(x);
-            long ny = lroundf(y);
-            long nz = lroundf(z);
-            if (nx != px || ny != py || nz != pz) {
-                int hw = map_get(map, nx, ny, nz);
-                if (hw > 0) {
-                    if (previous) {
-                        *hx = px; *hy = py; *hz = pz;
-                    }
-                    else {
-                        *hx = nx; *hy = ny; *hz = nz;
-                    }
-                    return hw;
-                }
-                px = nx; py = ny; pz = nz;
-            }
-            x += vx / m; y += vy / m; z += vz / m;
-        }
-        return 0;
-    } // _hit_test
-
-    int hit_test(int previous, float x, float y, float z, float rx, float ry, int *bx, int *by, int *bz) {
-        int result = 0;
-        float best = 0;
-        int p = this->chunked(x);
-        int q = this->chunked(z);
-        float vx, vy, vz;
-        this->get_sight_vector(rx, ry, &vx, &vy, &vz);
-        for (int i = 0; i < this->m_model->chunk_count; i++) {
-            Chunk *chunk = this->m_model->chunks + i;
-            if (this->chunk_distance(chunk, p, q) > 1) {
-                continue;
-            }
-            int hx, hy, hz;
-            int hw = this->_hit_test(&chunk->map, 8, previous,
-                x, y, z, vx, vy, vz, &hx, &hy, &hz);
-            if (hw > 0) {
-                float d = sqrtf(powf(hx - x, 2) + powf(hy - y, 2) + powf(hz - z, 2));
-                if (best == 0 || d < best) {
-                    best = d;
-                    *bx = hx; *by = hy; *bz = hz;
-                    result = hw;
-                }
-            }
-        }
-        return result;
-    } // hit_test
-
-    int hit_test_face(Player *player, int *x, int *y, int *z, int *face) {
-        State *s = &player->state;
-        int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
-        // item.h -> is_obstacle
-        if (is_obstacle(w)) {
-            int hx, hy, hz;
-            this->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-            int dx = hx - *x;
-            int dy = hy - *y;
-            int dz = hz - *z;
-            if (dx == -1 && dy == 0 && dz == 0) {
-                *face = 0; return 1;
-            }
-            if (dx == 1 && dy == 0 && dz == 0) {
-                *face = 1; return 1;
-            }
-            if (dx == 0 && dy == 0 && dz == -1) {
-                *face = 2; return 1;
-            }
-            if (dx == 0 && dy == 0 && dz == 1) {
-                *face = 3; return 1;
-            }
-            if (dx == 0 && dy == 1 && dz == 0) {
-                float degrees = roundf(static_cast<float>(180.f / PI * atan2(s->x - hx, s->z - hz)));
-                if (degrees < 0.f) {
-                    degrees += 360.f;
-                }
-                int top = static_cast<int>(((degrees + 45.f) / 90.f)) % 4;
-                *face = 4 + top;
-                return 1;
-            }
-        }
-        return 0;
-    }
-
-    int collide(int height, float *x, float *y, float *z) const {
-        int result = 0;
-        int p = this->chunked(*x);
-        int q = this->chunked(*z);
-        Chunk *chunk = this->find_chunk(p, q);
-        if (!chunk) {
-            return result;
-        }
-        Map *map = &chunk->map;
-        int nx = static_cast<int>(roundf(*x));
-        int ny = static_cast<int>(roundf(*y));
-        int nz = static_cast<int>(roundf(*z));
-        float px = *x - nx;
-        float py = *y - ny;
-        float pz = *z - nz;
-        float pad = 0.25;
-        for (int dy = 0; dy < height; dy++) {
-            // item.h -> is_obstacle
-            if (px < -pad && is_obstacle(map_get(map, nx - 1, ny - dy, nz))) {
-                *x = nx - pad;
-            }
-            if (px > pad && is_obstacle(map_get(map, nx + 1, ny - dy, nz))) {
-                *x = nx + pad;
-            }
-            if (py < -pad && is_obstacle(map_get(map, nx, ny - dy - 1, nz))) {
-                *y = ny - pad;
-                result = 1;
-            }
-            if (py > pad && is_obstacle(map_get(map, nx, ny - dy + 1, nz))) {
-                *y = ny + pad;
-                result = 1;
-            }
-            if (pz < -pad && is_obstacle(map_get(map, nx, ny - dy, nz - 1))) {
-                *z = nz - pad;
-            }
-            if (pz > pad && is_obstacle(map_get(map, nx, ny - dy, nz + 1))) {
-                *z = nz + pad;
-            }
-        }
-        return result;
-    }
-
-    int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const {
-        int nx = static_cast<int>(roundf(x));
-        int ny = static_cast<int>(roundf(y));
-        int nz = static_cast<int>(roundf(z));
-        for (int i = 0; i < height; i++) {
-            if (nx == hx && ny - i == hy && nz == hz) {
-                return 1;
-            }
-        }
-        return 0;
-    }
-
-    int has_lights(Chunk *chunk) const {
-        if (!this->m_gui->show_lights) {
-            return 0;
-        }
-        for (int dp = -1; dp <= 1; dp++) {
-            for (int dq = -1; dq <= 1; dq++) {
-                Chunk *other = chunk;
-                if (dp || dq) {
-                    other = this->find_chunk(chunk->p + dp, chunk->q + dq);
-                }
-                if (!other) {
-                    continue;
-                }
-                Map *map = &other->lights;
-                if (map->size) {
-                    return 1;
-                }
-            }
-        }
-        return 0;
-    }
 
     void dirty_chunk(Chunk *chunk) const {
-        chunk->dirty = 1;
-        if (has_lights(chunk)) {
-            for (int dp = -1; dp <= 1; dp++) {
-                for (int dq = -1; dq <= 1; dq++) {
-                    Chunk *other = this->find_chunk(chunk->p + dp, chunk->q + dq);
-                    if (other) {
-                        other->dirty = 1;
-                    }
-                }
-            }
-        }
-    }
-
-    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) const {
-        static constexpr int lookup3[6][4][3] = {
-            {{0, 1, 3}, {2, 1, 5}, {6, 3, 7}, {8, 5, 7}},
-            {{18, 19, 21}, {20, 19, 23}, {24, 21, 25}, {26, 23, 25}},
-            {{6, 7, 15}, {8, 7, 17}, {24, 15, 25}, {26, 17, 25}},
-            {{0, 1, 9}, {2, 1, 11}, {18, 9, 19}, {20, 11, 19}},
-            {{0, 3, 9}, {6, 3, 15}, {18, 9, 21}, {24, 15, 21}},
-            {{2, 5, 11}, {8, 5, 17}, {20, 11, 23}, {26, 17, 23}}
-        };
-        static constexpr int lookup4[6][4][4] = {
-            {{0, 1, 3, 4}, {1, 2, 4, 5}, {3, 4, 6, 7}, {4, 5, 7, 8}},
-            {{18, 19, 21, 22}, {19, 20, 22, 23}, {21, 22, 24, 25}, {22, 23, 25, 26}},
-            {{6, 7, 15, 16}, {7, 8, 16, 17}, {15, 16, 24, 25}, {16, 17, 25, 26}},
-            {{0, 1, 9, 10}, {1, 2, 10, 11}, {9, 10, 18, 19}, {10, 11, 19, 20}},
-            {{0, 3, 9, 12}, {3, 6, 12, 15}, {9, 12, 18, 21}, {12, 15, 21, 24}},
-            {{2, 5, 11, 14}, {5, 8, 14, 17}, {11, 14, 20, 23}, {14, 17, 23, 26}}
-        };
-        static constexpr float curve[4] = {0.0, 0.25, 0.5, 0.75};
-        for (int i = 0; i < 6; i++) {
-            for (int j = 0; j < 4; j++) {
-                int corner = neighbors[lookup3[i][j][0]];
-                int side1 = neighbors[lookup3[i][j][1]];
-                int side2 = neighbors[lookup3[i][j][2]];
-                int value = side1 && side2 ? 3 : corner + side1 + side2;
-                float shade_sum = 0;
-                float light_sum = 0;
-                int is_light = lights[13] == 15;
-                for (int k = 0; k < 4; k++) {
-                    shade_sum += shades[lookup4[i][j][k]];
-                    light_sum += lights[lookup4[i][j][k]];
-                }
-                if (is_light) {
-                    light_sum = 15 * 4 * 10;
-                }
-                float total = curve[value] + shade_sum / 4.0f;
-                ao[i][j] = min(total, 1.0f);
-                light[i][j] = light_sum / 15.0f / 4.0f;
-            }
-        }
-    } // occlusion
-
-    void light_fill(char *opaque, char *light, int x, int y, int z, int w, int force) const {
-#define XZ_SIZE (this->m_gui->chunk_size * 3 + 2)
-#define XZ_LO (this->m_gui->chunk_size)
-#define XZ_HI (this->m_gui->chunk_size * 2 + 1)
-#define Y_SIZE 258
-#define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
-#define XZ(x, z) ((x) * XZ_SIZE + (z))
-        if (x + w < XZ_LO || z + w < XZ_LO) {
-            return;
-        }
-        if (x - w > XZ_HI || z - w > XZ_HI) {
-            return;
-        }
-        if (y < 0 || y >= Y_SIZE) {
-            return;
-        }
-        if (light[XYZ(x, y, z)] >= w) {
-            return;
-        }
-        if (!force && opaque[XYZ(x, y, z)]) {
-            return;
-        }
-        light[XYZ(x, y, z)] = w--;
-        light_fill(opaque, light, x - 1, y, z, w, 0);
-        light_fill(opaque, light, x + 1, y, z, w, 0);
-        light_fill(opaque, light, x, y - 1, z, w, 0);
-        light_fill(opaque, light, x, y + 1, z, w, 0);
-        light_fill(opaque, light, x, y, z - 1, w, 0);
-        light_fill(opaque, light, x, y, z + 1, w, 0);
+        //chunk->dirty = 1;
+        //if (has_lights(chunk)) {
+        //    for (int dp = -1; dp <= 1; dp++) {
+        //        for (int dq = -1; dq <= 1; dq++) {
+        //            Chunk *other = this->find_chunk(chunk->p + dp, chunk->q + dq);
+        //            if (other) {
+        //                other->dirty = 1;
+        //            }
+        //        }
+        //    }
+        //}
     }
 
     // Handles terrain generation in a multithreaded environment
     void compute_chunk(WorkerItem *item) const {
-        char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-        char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
+        //char *opaque = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        //char *light = (char *)calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
+        //char *highest = (char *)calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
 
-        int ox = item->p * this->m_gui->chunk_size - this->m_gui->chunk_size - 1;
-        int oy = -1;
-        int oz = item->q * this->m_gui->chunk_size - this->m_gui->chunk_size - 1;
+        //int ox = item->p * this->m_gui->chunk_size - this->m_gui->chunk_size - 1;
+        //int oy = -1;
+        //int oz = item->q * this->m_gui->chunk_size - this->m_gui->chunk_size - 1;
 
-        // check for lights
-        int has_light = 0;
-        if (this->m_gui->show_lights) {
-            for (int a = 0; a < 3; a++) {
-                for (int b = 0; b < 3; b++) {
-                    Map *map = item->light_maps[a][b];
-                    if (map && map->size) {
-                        has_light = 1;
-                    }
-                }
-            }
-        }
+        //// check for lights
+        //int has_light = 0;
+        //if (this->m_gui->show_lights) {
+        //    for (int a = 0; a < 3; a++) {
+        //        for (int b = 0; b < 3; b++) {
+        //            Map *map = item->light_maps[a][b];
+        //            if (map && map->size) {
+        //                has_light = 1;
+        //            }
+        //        }
+        //    }
+        //}
 
-        // populate opaque array
-        for (int a = 0; a < 3; a++) {
-            for (int b = 0; b < 3; b++) {
-                Map *block_map = item->block_maps[a][b];
-                if (!block_map) {
-                    continue;
-                }
-                MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
-                    int x = ex - ox;
-                    int y = ey - oy;
-                    int z = ez - oz;
-                    int w = ew;
-                    // TODO: this should be unnecessary
-                    if (x < 0 || y < 0 || z < 0) {
-                        continue;
-                    }
-                    if (x >= XZ_SIZE || y >= Y_SIZE || z >= XZ_SIZE) {
-                        continue;
-                    }
-                    // END TODO
-                    opaque[XYZ(x, y, z)] = !is_transparent(w);
-                    if (opaque[XYZ(x, y, z)]) {
-                        highest[XZ(x, z)] = max(static_cast<int>(highest[XZ(x, z)]), y);
-                    }
-                } END_MAP_FOR_EACH;
-            }
-        }
+        //// populate opaque array
+        //for (int a = 0; a < 3; a++) {
+        //    for (int b = 0; b < 3; b++) {
+        //        Map *block_map = item->block_maps[a][b];
+        //        if (!block_map) {
+        //            continue;
+        //        }
+        //        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
+        //            int x = ex - ox;
+        //            int y = ey - oy;
+        //            int z = ez - oz;
+        //            int w = ew;
+        //            // TODO: this should be unnecessary
+        //            if (x < 0 || y < 0 || z < 0) {
+        //                continue;
+        //            }
+        //            if (x >= XZ_SIZE || y >= Y_SIZE || z >= XZ_SIZE) {
+        //                continue;
+        //            }
+        //            // END TODO
+        //            opaque[XYZ(x, y, z)] = !is_transparent(w);
+        //            if (opaque[XYZ(x, y, z)]) {
+        //                highest[XZ(x, z)] = max(static_cast<int>(highest[XZ(x, z)]), y);
+        //            }
+        //        } END_MAP_FOR_EACH;
+        //    }
+        //}
 
-        // flood fill light intensities
-        if (has_light) {
-            for (int a = 0; a < 3; a++) {
-                for (int b = 0; b < 3; b++) {
-                    Map *map = item->light_maps[a][b];
-                    if (!map) {
-                        continue;
-                    }
-                    MAP_FOR_EACH(map, ex, ey, ez, ew) {
-                        int x = ex - ox;
-                        int y = ey - oy;
-                        int z = ez - oz;
-                        light_fill(opaque, light, x, y, z, ew, 1);
-                    } END_MAP_FOR_EACH;
-                }
-            }
-        }
+        //// flood fill light intensities
+        //if (has_light) {
+        //    for (int a = 0; a < 3; a++) {
+        //        for (int b = 0; b < 3; b++) {
+        //            Map *map = item->light_maps[a][b];
+        //            if (!map) {
+        //                continue;
+        //            }
+        //            MAP_FOR_EACH(map, ex, ey, ez, ew) {
+        //                int x = ex - ox;
+        //                int y = ey - oy;
+        //                int z = ez - oz;
+        //                light_fill(opaque, light, x, y, z, ew, 1);
+        //            } END_MAP_FOR_EACH;
+        //        }
+        //    }
+        //}
 
-        Map *block_map = item->block_maps[1][1];
+        //Map *block_map = item->block_maps[1][1];
 
-        // count exposed faces
-        int miny = 256;
-        int maxy = 0;
-        int faces = 0;
-        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
-            if (ew <= 0) {
-                continue;
-            }
-            int x = ex - ox;
-            int y = ey - oy;
-            int z = ez - oz;
-            int f1 = !opaque[XYZ(x - 1, y, z)];
-            int f2 = !opaque[XYZ(x + 1, y, z)];
-            int f3 = !opaque[XYZ(x, y + 1, z)];
-            int f4 = !opaque[XYZ(x, y - 1, z)] && (ey > 0);
-            int f5 = !opaque[XYZ(x, y, z - 1)];
-            int f6 = !opaque[XYZ(x, y, z + 1)];
-            int total = f1 + f2 + f3 + f4 + f5 + f6;
-            if (total == 0) {
-                continue;
-            }
-            if (is_plant(ew)) {
-                total = 4;
-            }
-            miny = min(miny, ey);
-            maxy = max(maxy, ey);
-            faces += total;
-        } END_MAP_FOR_EACH;
+        //// count exposed faces
+        //int miny = 256;
+        //int maxy = 0;
+        //int faces = 0;
+        //MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
+        //    if (ew <= 0) {
+        //        continue;
+        //    }
+        //    int x = ex - ox;
+        //    int y = ey - oy;
+        //    int z = ez - oz;
+        //    int f1 = !opaque[XYZ(x - 1, y, z)];
+        //    int f2 = !opaque[XYZ(x + 1, y, z)];
+        //    int f3 = !opaque[XYZ(x, y + 1, z)];
+        //    int f4 = !opaque[XYZ(x, y - 1, z)] && (ey > 0);
+        //    int f5 = !opaque[XYZ(x, y, z - 1)];
+        //    int f6 = !opaque[XYZ(x, y, z + 1)];
+        //    int total = f1 + f2 + f3 + f4 + f5 + f6;
+        //    if (total == 0) {
+        //        continue;
+        //    }
+        //    if (is_plant(ew)) {
+        //        total = 4;
+        //    }
+        //    miny = min(miny, ey);
+        //    maxy = max(maxy, ey);
+        //    faces += total;
+        //} END_MAP_FOR_EACH;
 
-        // generate geometry
-        // each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
-        static constexpr int components = 10;
-        float *data = malloc_faces(components, faces);
-        int offset = 0;
-        MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
-            if (ew <= 0) {
-                continue;
-            }
-            int x = ex - ox;
-            int y = ey - oy;
-            int z = ez - oz;
-            int f1 = !opaque[XYZ(x - 1, y, z)];
-            int f2 = !opaque[XYZ(x + 1, y, z)];
-            int f3 = !opaque[XYZ(x, y + 1, z)];
-            int f4 = !opaque[XYZ(x, y - 1, z)] && (ey > 0);
-            int f5 = !opaque[XYZ(x, y, z - 1)];
-            int f6 = !opaque[XYZ(x, y, z + 1)];
-            int total = f1 + f2 + f3 + f4 + f5 + f6;
-            if (total == 0) {
-                continue;
-            }
-            char neighbors[27] = {0};
-            char lights[27] = {0};
-            float shades[27] = {0};
-            int index = 0;
-            for (int dx = -1; dx <= 1; dx++) {
-                for (int dy = -1; dy <= 1; dy++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        neighbors[index] = opaque[XYZ(x + dx, y + dy, z + dz)];
-                        lights[index] = light[XYZ(x + dx, y + dy, z + dz)];
-                        shades[index] = 0;
-                        if (y + dy <= highest[XZ(x + dx, z + dz)]) {
-                            for (int oy = 0; oy < 8; oy++) {
-                                if (opaque[XYZ(x + dx, y + dy + oy, z + dz)]) {
-                                    shades[index] = 1.0f - oy * 0.125f;
-                                    break;
-                                }
-                            }
-                        }
-                        index++;
-                    }
-                }
-            }
-            float ao[6][4];
-            float light[6][4];
-            occlusion(neighbors, lights, shades, ao, light);
-            if (is_plant(ew)) {
-                total = 4;
-                float min_ao = 1;
-                float max_light = 0;
-                for (int a = 0; a < 6; a++) {
-                    for (int b = 0; b < 4; b++) {
-                        min_ao = min(min_ao, ao[a][b]);
-                        max_light = max(max_light, light[a][b]);
-                    }
-                }
-                float rotation = simplex2(static_cast<float>(ex), static_cast<float>(ez), 4, 0.5f, 2.f) * 360.f;
-                /*make_plant(
-                    data + offset, min_ao, max_light,
-                    static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez),
-                    0.5f, ew, rotation);*/
-            }
-            else {
-                //make_cube(
-                //    data + offset, ao, light,
-                //    f1, f2, f3, f4, f5, f6,
-                //    static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez), 0.5f, ew);
-            }
-            offset += total * 60;
-        } END_MAP_FOR_EACH;
+        //// generate geometry
+        //// each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
+        //static constexpr int components = 10;
+        //float *data = malloc_faces(components, faces);
+        //int offset = 0;
+        //MAP_FOR_EACH(block_map, ex, ey, ez, ew) {
+        //    if (ew <= 0) {
+        //        continue;
+        //    }
+        //    int x = ex - ox;
+        //    int y = ey - oy;
+        //    int z = ez - oz;
+        //    int f1 = !opaque[XYZ(x - 1, y, z)];
+        //    int f2 = !opaque[XYZ(x + 1, y, z)];
+        //    int f3 = !opaque[XYZ(x, y + 1, z)];
+        //    int f4 = !opaque[XYZ(x, y - 1, z)] && (ey > 0);
+        //    int f5 = !opaque[XYZ(x, y, z - 1)];
+        //    int f6 = !opaque[XYZ(x, y, z + 1)];
+        //    int total = f1 + f2 + f3 + f4 + f5 + f6;
+        //    if (total == 0) {
+        //        continue;
+        //    }
+        //    char neighbors[27] = {0};
+        //    char lights[27] = {0};
+        //    float shades[27] = {0};
+        //    int index = 0;
+        //    for (int dx = -1; dx <= 1; dx++) {
+        //        for (int dy = -1; dy <= 1; dy++) {
+        //            for (int dz = -1; dz <= 1; dz++) {
+        //                neighbors[index] = opaque[XYZ(x + dx, y + dy, z + dz)];
+        //                lights[index] = light[XYZ(x + dx, y + dy, z + dz)];
+        //                shades[index] = 0;
+        //                if (y + dy <= highest[XZ(x + dx, z + dz)]) {
+        //                    for (int oy = 0; oy < 8; oy++) {
+        //                        if (opaque[XYZ(x + dx, y + dy + oy, z + dz)]) {
+        //                            shades[index] = 1.0f - oy * 0.125f;
+        //                            break;
+        //                        }
+        //                    }
+        //                }
+        //                index++;
+        //            }
+        //        }
+        //    }
+        //    float ao[6][4];
+        //    float light[6][4];
+        //    occlusion(neighbors, lights, shades, ao, light);
+        //    if (is_plant(ew)) {
+        //        total = 4;
+        //        float min_ao = 1;
+        //        float max_light = 0;
+        //        for (int a = 0; a < 6; a++) {
+        //            for (int b = 0; b < 4; b++) {
+        //                min_ao = min(min_ao, ao[a][b]);
+        //                max_light = max(max_light, light[a][b]);
+        //            }
+        //        }
+        //        float rotation = simplex2(static_cast<float>(ex), static_cast<float>(ez), 4, 0.5f, 2.f) * 360.f;
+        //        /*make_plant(
+        //            data + offset, min_ao, max_light,
+        //            static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez),
+        //            0.5f, ew, rotation);*/
+        //    }
+        //    else {
+        //        //make_cube(
+        //        //    data + offset, ao, light,
+        //        //    f1, f2, f3, f4, f5, f6,
+        //        //    static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez), 0.5f, ew);
+        //    }
+        //    offset += total * 60;
+        //} END_MAP_FOR_EACH;
 
-        free(opaque);
-        free(light);
-        free(highest);
+        //free(opaque);
+        //free(light);
+        //free(highest);
 
-        item->miny = miny;
-        item->maxy = maxy;
-        item->faces = faces;
-        item->data = data;
+        //item->miny = miny;
+        //item->maxy = maxy;
+        //item->faces = faces;
+        //item->data = data;
     } // compute_chunk
 
     void generate_chunk(Chunk *chunk, WorkerItem *item) const {
@@ -1556,104 +1231,6 @@ public:
         }
     }
 
-    void toggle_light(int x, int y, int z) const {
-        int p = chunked(static_cast<float>(x));
-        int q = chunked(static_cast<float>(z));
-        Chunk *chunk = find_chunk(p, q);
-        if (chunk) {
-            Map *map = &chunk->lights;
-            int w = map_get(map, x, y, z) ? 0 : 15;
-            map_set(map, x, y, z, w);
-            db_insert_light(p, q, x, y, z, w);
-            dirty_chunk(chunk);
-        }
-    }
-
-    void set_light(int p, int q, int x, int y, int z, int w) const {
-        Chunk *chunk = find_chunk(p, q);
-        if (chunk) {
-            Map *map = &chunk->lights;
-            if (map_set(map, x, y, z, w)) {
-                dirty_chunk(chunk);
-                db_insert_light(p, q, x, y, z, w);
-            }
-        }
-        else {
-            db_insert_light(p, q, x, y, z, w);
-        }
-    }
-
-    void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const {
-        Chunk *chunk = find_chunk(p, q);
-        if (chunk) {
-            Map *map = &chunk->map;
-            if (map_set(map, x, y, z, w)) {
-                if (dirty) {
-                    dirty_chunk(chunk);
-                }
-                db_insert_block(p, q, x, y, z, w);
-            }
-        }
-        else {
-            db_insert_block(p, q, x, y, z, w);
-        }
-        if (w == 0 && chunked(static_cast<float>(x)) == p && chunked(static_cast<float>(z)) == q) {
-            //unset_sign(x, y, z);
-            set_light(p, q, x, y, z, 0);
-        }
-    }
-
-    void set_block(int x, int y, int z, int w) const {
-        int p = chunked(static_cast<float>(x));
-        int q = chunked(static_cast<float>(z));
-        _set_block(p, q, x, y, z, w, 1);
-        for (int dx = -1; dx <= 1; dx++) {
-            for (int dz = -1; dz <= 1; dz++) {
-                if (dx == 0 && dz == 0) {
-                    continue;
-                }
-                if (dx && chunked(static_cast<float>(x + dx)) == p) {
-                    continue;
-                }
-                if (dz && chunked(static_cast<float>(z + dz)) == q) {
-                    continue;
-                }
-                _set_block(p + dx, q + dz, x, y, z, -w, 1);
-            }
-        }
-    }
-
-    void record_block(int x, int y, int z, int w) {
-        memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
-        this->m_model->block0.x = x;
-        this->m_model->block0.y = y;
-        this->m_model->block0.z = z;
-        this->m_model->block0.w = w;
-    }
-
-    int get_block(int x, int y, int z) {
-        int p = chunked(static_cast<float>(x));
-        int q = chunked(static_cast<float>(z));
-        Chunk *chunk = find_chunk(p, q);
-        if (chunk) {
-            Map *map = &chunk->map;
-            return map_get(map, x, y, z);
-        }
-        return 0;
-    }
-
-    void builder_block(int x, int y, int z, int w) {
-        if (y <= 0 || y >= 256) {
-            return;
-        }
-        if (is_destructable(get_block(x, y, z))) {
-            set_block(x, y, z, 0);
-        }
-        if (w) {
-            set_block(x, y, z, w);
-        }
-    }
-
     /**
      * @brief Prepares to render by ensuring the chunks are loaded
      *
@@ -1696,534 +1273,9 @@ public:
         return result;
     }
 
-    void render_signs(Attrib *attrib, Player *player) {
-        //State *s = &player->state;
-        //int p = chunked(s->x);
-        //int q = chunked(s->z);
-        //float matrix[16];
-        //set_matrix_3d(
-        //    matrix, this->m_model->width, this->m_model->height,
-        //    s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        //float planes[6][4];
-        //frustum_planes(planes, this->m_model->render_radius, matrix);
-        //glUseProgram(attrib->program);
-        //glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //glUniform1i(attrib->sampler, 3);
-        //glUniform1i(attrib->extra1, 1);
-        //for (int i = 0; i < this->m_model->chunk_count; i++) {
-        //    Chunk *chunk = this->m_model->chunks + i;
-        //    if (chunk_distance(chunk, p, q) > this->m_model->sign_radius) {
-        //        continue;
-        //    }
-        //    if (!chunk_visible(
-        //        planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
-        //    {
-        //        continue;
-        //    }
-        //    draw_signs(attrib, chunk);
-        //}
-    }
-
-    void render_sign(Attrib *attrib, Player *player) {
-        //if (!this->m_model->typing || this->m_model->typing_buffer[0] != CRAFT_KEY_SIGN) {
-        //    return;
-        //}
-        //int x, y, z, face;
-        //if (!hit_test_face(player, &x, &y, &z, &face)) {
-        //    return;
-        //}
-        //State *s = &player->state;
-        //float matrix[16];
-        //set_matrix_3d(
-        //    matrix, this->m_model->width, this->m_model->height,
-        //    s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        //glUseProgram(attrib->program);
-        //glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //glUniform1i(attrib->sampler, 3);
-        //glUniform1i(attrib->extra1, 1);
-        //char text[MAX_SIGN_LENGTH];
-        //SDL_strlcpy(text, this->m_model->typing_buffer + 1, MAX_SIGN_LENGTH);
-        //text[MAX_SIGN_LENGTH - 1] = '\0';
-        //float *data = malloc_faces(5, strlen(text));
-        //int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face, text);
-        //std::uint32_t buffer = gen_faces(5, length, data);
-        //draw_sign(attrib, buffer, length);
-        //del_buffer(buffer);
-    }
-
-    void render_players(Attrib *attrib, Player *player) {
-        //State *s = &player->state;
-        //float matrix[16];
-        //set_matrix_3d(
-        //    matrix, this->m_model->width, this->m_model->height,
-        //    s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        //glUseProgram(attrib->program);
-        //glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //glUniform3f(attrib->camera, s->x, s->y, s->z);
-        //glUniform1i(attrib->sampler, 0);
-        //glUniform1f(attrib->timer, time_of_day());
-        //for (int i = 0; i < this->m_model->player_count; i++) {
-        //    Player *other = this->m_model->players + i;
-        //    if (other != player) {
-        //        draw_player(attrib, other);
-        //    }
-        //}
-    }
-
-    void render_sky(Attrib *attrib, Player *player, GLuint buffer) {
-        State *s = &player->state;
-
-        Matrix mvp{ MatrixMultiply(rlGetMatrixModelview(), rlGetMatrixProjection()) };
-
-        glUseProgram(attrib->shader.id);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, MatrixToFloat(mvp));
-        glUniform1i(attrib->sampler, 2);
-        glUniform1f(attrib->timer, time_of_day());
-
-        draw_triangles_3d(attrib, buffer, 512 * 3);
-    }
-
-    void render_wireframe(Attrib *attrib, Player *player) {
-        //State *s = &player->state;
-        //float matrix[16];
-        //set_matrix_3d(
-        //    matrix, this->m_model->width, this->m_model->height,
-        //    s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        //int hx, hy, hz;
-        //int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        //if (is_obstacle(hw)) {
-        //    glUseProgram(attrib->program);
-        //    glLineWidth(1);
-        //    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //    std::uint32_t wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy), static_cast<float>(hz), 0.53f);
-        //    draw_lines(attrib, wireframe_buffer, 3, 24);
-        //    del_buffer(wireframe_buffer);
-        //}
-    }
-
-    void render_crosshairs(Attrib *attrib) {
-        //float matrix[16];
-        //set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
-        //glUseProgram(attrib->program);
-        //glLineWidth(static_cast<float>(4 * this->m_model->scale));
-        //glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        //std::uint32_t crosshair_buffer = gen_crosshair_buffer();
-        //draw_lines(attrib, crosshair_buffer, 2, 4);
-        //del_buffer(crosshair_buffer);
-    }
-
-    void render_item(Attrib *attrib) {
-        float matrix[16];
-        set_matrix_item(matrix, this->m_model->width, this->m_model->height, this->m_model->scale);
-        glUseProgram(attrib->program);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform3f(attrib->camera, 0, 0, 5);
-        glUniform1i(attrib->sampler, 0);
-        glUniform1f(attrib->timer, time_of_day());
-        int w = items[this->m_model->item_index];
-        if (is_plant(w)) {
-            GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
-            draw_plant(attrib, buffer);
-            del_buffer(buffer);
-        }
-        else {
-            GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
-            draw_cube(attrib, buffer);
-            del_buffer(buffer);
-        }
-    }
-
-    void render_text(Attrib *attrib, int justify, float x, float y, float n, char *text) {
-        float matrix[16];
-        set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
-        glUseProgram(attrib->program);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 1);
-        glUniform1i(attrib->extra1, 0);
-        GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
-        x -= n * justify * (length - 1) / 2;
-        GLuint buffer = gen_text_buffer(x, y, n, text);
-        draw_text(attrib, buffer, length);
-        del_buffer(buffer);
-    }
-
-    void parse_command(const char *buffer) {
-        int radius, count, xc, yc, zc;
-        if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
-            if (radius >= 1 && radius <= 24) {
-                this->m_model->create_radius = radius;
-                this->m_model->render_radius = radius;
-                this->m_model->delete_radius = radius + 4;
-            }
-            else {
-                // Notify user with view correct parameters
-            }
-        }
-    } // parse command
-
-    void on_light() {
-        State *s = &this->m_model->player.state;
-        int hx, hy, hz;
-        int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        if (hy > 0 && hy < 256 && is_destructable(hw)) {
-            toggle_light(hx, hy, hz);
-        }
-    }
-
-    void on_left_click() {
-        State *s = &this->m_model->player.state;
-        int hx, hy, hz;
-        int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        if (hy > 0 && hy < 256 && is_destructable(hw)) {
-            set_block(hx, hy, hz, 0);
-            record_block(hx, hy, hz, 0);
-#if defined(MAZE_DEBUG)
-            printf("INFO: on_left_click(x: %d, y: %d, z: %d, w: %d, Block Id: %d): \n", hx, hy, hz, hw, items[this->m_model->item_index]);
-#endif
-            if (is_plant(get_block(hx, hy + 1, hz))) {
-                set_block(hx, hy + 1, hz, 0);
-            }
-        }
-    }
-
-    void on_right_click() {
-        State *s = &this->m_model->player.state;
-        int hx, hy, hz;
-        int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        if (hy > 0 && hy < 256 && is_obstacle(hw)) {
-            if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
-                set_block(hx, hy, hz, items[this->m_model->item_index]);
-                record_block(hx, hy, hz, items[this->m_model->item_index]);
-#if defined(MAZE_DEBUG)
-                printf("INFO: on_right_click(%d, %d, %d, %d, Block Id: %d): \n", hx, hy, hz, hw, items[this->m_model->item_index]);
-#endif
-            }
-        }
-    }
-
-    void on_middle_click() {
-        State* s = &this->m_model->player.state;
-        int hx, hy, hz;
-        int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        for (int i = 0; i < item_count; i++) {
-            if (items[i] == hw) {
-                this->m_model->item_index = i;
-                break;
-            }
-        }
-    }
-
-    ///**
-    //* Reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    //* @brief Handle SDL events
-    //* @param dt
-    //* @param running is a reference to game loop invariant
-    //* @return bool return true when events are handled successfully
-    //*/
-    //bool handle_events(double dt, bool& running, const function<mazes::maze_types(const string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
-    //    static float dy = 0;
-    //    State* s = &this->m_model->players->state;
-    //    int sz = 0;
-    //    int sx = 0;
-    //    float mouse_mv = 0.0025f;
-    //    float dir_mv = 0.025f;
-    //    int sc = -1, code = -1;
-
-    //    SDL_Keymod mod_state = SDL_GetModState();
-
-    //    bool imgui_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow);
-
-    //    int control = mod_state;
-    //    SDL_Event e;
-    //    while (SDL_PollEvent(&e)) {
-    //        ImGui_ImplSDL3_ProcessEvent(&e);
-
-    //        switch (e.type) {
-    //        case SDL_EVENT_QUIT: {
-    //            running = false;
-    //            break;
-    //        }
-    //        case SDL_EVENT_KEY_UP: {
-    //            sc = e.key.scancode;
-    //            switch (sc) {
-    //            }
-    //            break;
-    //        }
-    //        case SDL_EVENT_KEY_DOWN: {
-
-    //            sc = e.key.scancode;
-    //            switch (sc) {
-    //            case SDL_SCANCODE_ESCAPE: {
-    //                SDL_SetWindowRelativeMouseMode(this->m_model->window, SDL_FALSE);
-    //                this->m_gui->capture_mouse = false;
-    //                this->m_gui->fullscreen = false;
-    //                this->m_model->typing = 0;
-    //                break;
-    //            }
-    //            case SDL_SCANCODE_RETURN: {
-    //                if (!imgui_focused && this->m_model->typing) {
-    //                    if (mod_state) {
-    //                        if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-    //                            this->m_model->typing_buffer[this->m_model->text_len] = '\n';
-    //                            this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
-    //                        }
-    //                    } else {
-    //                        this->m_model->typing = 0;
-    //                        if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-    //                            Player* player = this->m_model->players;
-    //                            int x, y, z, face;
-    //                            if (hit_test_face(player, &x, &y, &z, &face)) {
-    //                                set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
-    //                            }
-    //                        } else if (this->m_model->typing_buffer[0] == '/') {
-    //                            this->parse_command(this->m_model->typing_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-    //                        }
-    //                    }
-    //                } else {
-    //                    if (control) {
-    //                        this->on_right_click();
-    //                    } else {
-    //                        this->on_left_click();
-    //                    }
-    //                }
-    //                break;
-    //            }
-    //            case SDL_SCANCODE_V: {
-    //                if (control) {
-    //                    auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
-    //                    if (this->m_model->typing) {
-    //                        this->m_model->suppress_char = 1;
-    //                        SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
-    //                            MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-    //                    } else {
-    //                        parse_command(clip_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-    //                    }
-    //                    free(clip_buffer);
-    //                }
-    //                break;
-    //            }
-    //            case SDL_SCANCODE_0:
-    //            case SDL_SCANCODE_1:
-    //            case SDL_SCANCODE_2:
-    //            case SDL_SCANCODE_3:
-    //            case SDL_SCANCODE_4:
-    //            case SDL_SCANCODE_5:
-    //            case SDL_SCANCODE_6:
-    //            case SDL_SCANCODE_7:
-    //            case SDL_SCANCODE_8:
-    //            case SDL_SCANCODE_9: {
-    //                if (!imgui_focused && !this->m_model->typing)
-    //                    this->m_model->item_index = (sc - SDL_SCANCODE_1);
-    //                break;
-    //            }
-    //            case KEY_FLY: {
-    //                if (!imgui_focused && !this->m_model->typing)
-    //                    this->m_model->flying = ~this->m_model->flying;
-    //                break;
-    //            }
-    //            case KEY_ITEM_NEXT: {
-    //                if (!imgui_focused && !this->m_model->typing)
-    //                    this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
-    //                break;
-    //            }
-    //            case KEY_ITEM_PREV: {
-    //                if (!imgui_focused && !this->m_model->typing) {
-    //                    this->m_model->item_index--;
-    //                    if (this->m_model->item_index < 0)
-    //                        this->m_model->item_index = item_count - 1;
-    //                }
-    //                break;
-    //            }
-    //            case KEY_OBSERVE: {
-    //                if (!imgui_focused && !this->m_model->typing)
-    //                    this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
-    //                break;
-    //            }
-    //            case KEY_OBSERVE_INSET: {
-    //                if (!imgui_focused && !this->m_model->typing)
-    //                    this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
-    //                break;
-    //            }
-    //            case KEY_CHAT: {
-    //                if (!imgui_focused && !this->m_model->typing) {
-    //                    this->m_model->typing = 1;
-    //                    this->m_model->typing_buffer[0] = '\0';
-    //                    this->m_model->text_len = 0;
-    //                    SDL_StartTextInput(this->m_model->window);
-    //                }
-    //                break;
-    //            }
-    //            case KEY_COMMAND: {
-    //                if (!imgui_focused && !this->m_model->typing) {
-    //                    this->m_model->typing = 1;
-    //                    this->m_model->typing_buffer[0] = '\0';
-    //                    SDL_StartTextInput(this->m_model->window);
-    //                }
-    //                break;
-    //            }
-    //            case KEY_SIGN: {
-    //                if (!imgui_focused && this->m_gui->capture_mouse) {
-    //                    this->m_model->typing = 1;
-    //                    this->m_model->typing_buffer[0] = '\0';
-    //                    SDL_StartTextInput(this->m_model->window);
-    //                }
-    //                break;
-
-    //            }
-    //            } // switch
-    //            break;
-    //        } // case SDL_EVENT_KEY_DOWN
-    //        case SDL_EVENT_TEXT_INPUT: {
-    //            if (!imgui_focused && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-    //                SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
-    //                this->m_model->text_len += strlen(e.text.text);
-    //            }
-    //            break;
-    //        }
-    //        case SDL_EVENT_MOUSE_MOTION: {
-    //            if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
-    //                s->rx += e.motion.xrel * mouse_mv;
-    //                if (INVERT_MOUSE) {
-    //                    s->ry += e.motion.yrel * mouse_mv;
-    //                } else {
-    //                    s->ry -= e.motion.yrel * mouse_mv;
-    //                }
-    //                if (s->rx < 0) {
-    //                    s->rx += RADIANS(360);
-    //                }
-    //                if (s->rx >= RADIANS(360)) {
-    //                    s->rx -= RADIANS(360);
-    //                }
-    //                s->ry = max(s->ry, -RADIANS(90));
-    //                s->ry = min(s->ry, RADIANS(90));
-    //            }
-    //            break;
-    //        }
-    //        case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-    //            if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
-    //                if (control) {
-    //                    on_right_click();
-    //                } else {
-    //                    on_left_click();
-    //                }
-    //            } else if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
-    //                if (control) {
-    //                    on_light();
-    //                } else {
-    //                    on_right_click();
-    //                }
-    //            } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-    //                if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
-    //                    on_middle_click();
-    //                }
-    //            }
-
-    //            break;
-    //        }
-    //        case SDL_EVENT_MOUSE_WHEEL: {
-    //            if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
-    //                // TODO might have to change this to force 1 step
-    //                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-    //                    this->m_model->item_index += e.wheel.y;
-    //                } else {
-    //                    this->m_model->item_index -= e.wheel.y;
-    //                }
-    //                if (this->m_model->item_index < 0)
-    //                    this->m_model->item_index = item_count - 1;
-    //                else
-    //                    this->m_model->item_index %= item_count;
-    //            }
-    //            break;
-    //        }
-    //        case SDL_EVENT_WINDOW_RESIZED: {
-    //            this->m_model->scale = get_scale_factor();
-    //            SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
-    //            break;
-    //        }
-    //        case SDL_EVENT_WINDOW_SHOWN: {
-    //            this->m_model->scale = get_scale_factor();
-    //            SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
-    //            break;
-    //        }
-    //        } // switch
-    //    } // SDL_Event
-
-    //    // Close the app, events handled successfully
-    //    if (!running) {
-    //        return true;
-    //    }
-
-    //    const Uint8* state = SDL_GetKeyboardState(nullptr);
-
-    //    if (!(imgui_focused || this->m_model->typing)) {
-    //        this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
-    //        this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
-    //        if (state[KEY_FORWARD]) sz--;
-    //        if (state[KEY_BACKWARD]) sz++;
-    //        if (state[KEY_LEFT]) sx--;
-    //        if (state[KEY_RIGHT]) sx++;
-    //        if (state[SDL_SCANCODE_LEFT]) s->rx -= dir_mv;
-    //        if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
-    //        if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
-    //        if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
-    //    }
-
-    //    float vx, vy, vz;
-    //    get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
-    //    if (!this->m_model->typing) {
-    //        if (state[KEY_JUMP] && this->m_gui->capture_mouse) {
-    //            if (this->m_model->flying) {
-    //                vy = 1;
-    //            } else if (dy == 0) {
-    //                dy = 8;
-    //            }
-    //        }
-    //    }
-    //    float speed = this->m_model->flying ? 20 : 5;
-    //    int estimate = roundf(sqrtf(
-    //        powf(vx * speed, 2) +
-    //        powf(vy * speed + SDL_abs(dy) * 2, 2) +
-    //        powf(vz * speed, 2)) * dt * 8);
-    //    int step = max(8, estimate);
-    //    float ut = dt / step;
-    //    vx = vx * ut * speed;
-    //    vy = vy * ut * speed;
-    //    vz = vz * ut * speed;
-    //    for (int i = 0; i < step; i++) {
-    //        if (this->m_model->flying) {
-    //            dy = 0;
-    //        } else {
-    //            dy -= ut * 25;
-    //            dy = max(dy, -250);
-    //        }
-    //        s->x += vx;
-    //        s->y += vy + dy * ut;
-    //        s->z += vz;
-    //        if (collide(2, &s->x, &s->y, &s->z)) {
-    //            dy = 0;
-    //        }
-    //    }
-    //    if (s->y < 0) {
-    //        s->y = highest_block(s->x, s->z) + 2;
-    //    }
-
-        return true;
-    } // handle_events
 
     void reset_model() {
-        memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
-        this->m_model->chunk_count = 0;
-        memset(&this->m_model->player, 0, sizeof(Player));
-        this->m_model->flying = false;
-        this->m_model->item_index = 0;
-        this->m_model->day_length = DAY_LENGTH;
-        this->m_model->start_time = (this->m_model->day_length / 3) * 1000;
-        this->m_model->time_changed = true;
-        this->m_model->scale = 1;
-        this->m_model->create_radius = CREATE_CHUNK_RADIUS;
-        this->m_model->render_radius = RENDER_CHUNK_RADIUS;
-        this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
-        this->m_model->sign_radius = RENDER_SIGN_RADIUS;
+
     }
 
 }; // craft_impl
@@ -2357,8 +1409,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     //uint32_t sky_buffer = gen_sky_buffer();
 
-    craft_impl::Player *me = &m_pimpl->m_model->player;
-    craft_impl::State *p_state = &m_pimpl->m_model->player.state;
+    craft_impl::Player *me = &m_pimpl->m_model->players[0];
+    craft_impl::State *p_state = &m_pimpl->m_model->players[0].state;
     me->id = 0;
     me->name = "me";
     me->buffer = 0;
@@ -2374,7 +1426,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     auto&& maze2 = this->m_pimpl->m_maze;
 
     auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
-        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
+        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, 1);
     };
 
     // Generate a default maze to start the app
@@ -2435,8 +1487,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
     rlViewport(0, 0, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT);
 
-    Mesh my_cube = GenMeshCube(10, 10, 10);
+    Mesh my_cube = GenMeshCube(100, 100, 100);
     Material my_material = LoadMaterialDefault();
+    Model my_model = LoadModelFromMesh(my_cube);
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -2502,11 +1555,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-#if defined(MAZE_DEBUG)
-        DrawMesh(my_cube, my_material, MatrixTranslate(0, 5, -10));
-#endif
-
-        //m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
+        DrawModel(my_model, { 0.0f, 0.0f, 0.0f }, 1.0f, DARKBLUE);
 
         //glClear(GL_DEPTH_BUFFER_BIT);
         rlClearScreenBuffers();

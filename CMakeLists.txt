@@ -46,7 +46,6 @@ set(LIB_SOURCES
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/db.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/map.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp
