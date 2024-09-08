@@ -35,7 +35,7 @@ public:
         return instance;
     }
 private:
-    struct craft_impl;
+    class craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
 };
 

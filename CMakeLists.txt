@@ -19,12 +19,10 @@ else()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 endif()
 
-
 project(maze_builder)
 
-set(MAZE_BUILDER_OUTFILE "maze_builder")
 set(MAZE_BUILDER_TESTS_OUTFILE "maze_builder_tests")
-set(MAZE_BUILDER_LIB "maze_builder_lib")
+set(MAZE_BUILDER_LIB "libmaze_builder")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,31 +30,10 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(BUILD_MAZE_TESTS "Build ${PROJECT_NAME} tests" OFF)
 
-set(DEAR_IMGUI_SRCS
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_demo.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_draw.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_tables.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_widgets.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_sdl3.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.cpp)
-
-set(DEAR_IMGUI_HEADERS
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imconfig.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imgui_internal.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imstb_rectpack.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imstb_textedit.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/imstb_truetype.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_sdl3.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.h
-  ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
-
-set(GLAD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c)
 set(NOISE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
-set(MAZE_BUILDER_LIB_SOURCES
+set(LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/args_builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sidewinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/binary_tree.cpp
@@ -68,14 +45,10 @@ set(MAZE_BUILDER_LIB_SOURCES
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/db.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/map.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/matrix.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp)
 
@@ -84,16 +57,13 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
     add_compile_definitions("MAZE_DEBUG")
 endif()
 
-add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
-target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
+add_library(${MAZE_BUILDER_LIB} STATIC ${LIB_SOURCES})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 
-add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
-target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
-target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
-target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
-target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local)
-target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui)
+add_executable(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local)
 
 include(FetchContent)
 function(fetch_lib_from_git name_of_lib tag git_repo)
@@ -104,11 +74,16 @@ function(fetch_lib_from_git name_of_lib tag git_repo)
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
     )
+
+    if(${name_of_lib} STREQUAL "raylib")
+        set(GRAPHICS GRAPHICS_API_OPENGL_33)
+    endif()
+
     FetchContent_MakeAvailable(${name_of_lib})
 endfunction()
 
 if(EMSCRIPTEN)
-    message(INFO ": Building SDL app for Web!")
+    message(INFO ": Building ${PROJECT_NAME} app for Web!")
 
     # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
     if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -118,7 +93,7 @@ if(EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
-    set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
+    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
     message(INFO ": Getting SDL via FetchContent")
     fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
@@ -126,9 +101,9 @@ if(EMSCRIPTEN)
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
 
     set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
+    target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB} raylib)
     
-    target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
+    target_link_options(${PROJECT_NAME} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=6 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
         "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
@@ -146,57 +121,24 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/sky.png@/textures/sky.png"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures/maze_in_green_32x32.bmp@/textures/maze_in_green_32x32.bmp")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
+        target_link_options(${PROJECT_NAME} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
     endif()
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-O3")
+        target_link_options(${PROJECT_NAME} PRIVATE "SHELL:-O3")
     endif()
-endif()
-
-if(APPLE AND NOT EMSCRIPTEN)
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
-endif()
-
-if(UNIX AND NOT EMSCRIPTEN)
-    message(INFO ": Building SDL app for Desktop UNIX!")
-    
-    find_package(OpenGL REQUIRED)
-
-    # Find/Configure SDL
-    find_package(SDL3 QUIET)
-    if(SDL3_FOUND)
-        message(INFO ": Getting SDL via find_package")
+else()
+    # Download raylib
+    fetch_lib_from_git(raylib "5.0" https://github.com/raysan5/raylib)    
+    set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/raylib-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+    if(UNIX)
+        message(INFO ": Building ${PROJECT_NAME} app for Desktop UNIX!")
+    elseif(APPLE)
+        message(INFO ": Building ${PROJECT_NAME} app for Desktop APPLE!")
+    elseif(WIN32 OR MINGW)
+        message(INFO ": Building ${PROJECT_NAME} app for Desktop WINDOWS!")
     endif()
 
-    # If all else fails, download SDL
-    if(NOT SDL3_FOUND)
-        # Call custom function to fetch from git
-        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
-        set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-    endif()
-
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
-endif()
-
-if(MINGW OR WIN32 AND NOT EMSCRIPTEN)
-    message(INFO ": Building SDL app for Desktop WINDOWS!")
-        
-    find_package(OpenGL REQUIRED)
-
-    # Find/Configure SDL
-    find_package(SDL3 QUIET)
-    if(SDL3_FOUND)
-        message(INFO ": Getting SDL via find_package")
-    endif()
-
-    # If all else fails, download SDL
-    if(NOT SDL3_FOUND)
-        # Call custom function to fetch from git
-        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
-        set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-    endif()
-    
-    target_link_libraries(${MAZE_BUILDER_OUTFILE} ws2_32.lib OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
+    target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB} raylib)
 endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")

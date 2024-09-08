@@ -46,7 +46,7 @@ int db_init(char *path) {
     if (!db_enabled) {
         return 0;
     }
-    static const char *create_query =
+    static const char* create_query =
         "create table if not exists state ("
         "   x float not null,"
         "   y float not null,"
@@ -75,33 +75,15 @@ int db_init(char *path) {
         "    q int not null,"
         "    key int not null"
         ");"
-        "create table if not exists sign ("
-        "    p int not null,"
-        "    q int not null,"
-        "    x int not null,"
-        "    y int not null,"
-        "    z int not null,"
-        "    face int not null,"
-        "    text text not null"
-        ");"
         "create unique index if not exists block_pqxyz_idx on block (p, q, x, y, z);"
         "create unique index if not exists light_pqxyz_idx on light (p, q, x, y, z);"
-        "create unique index if not exists key_pq_idx on key (p, q);"
-        "create unique index if not exists sign_xyzface_idx on sign (x, y, z, face);"
-        "create index if not exists sign_pq_idx on sign (p, q);";
+        "create unique index if not exists key_pq_idx on key (p, q);";
     static const char *insert_block_query =
         "insert or replace into block (p, q, x, y, z, w) "
         "values (?, ?, ?, ?, ?, ?);";
     static const char *insert_light_query =
         "insert or replace into light (p, q, x, y, z, w) "
         "values (?, ?, ?, ?, ?, ?);";
-    static const char *insert_sign_query =
-        "insert or replace into sign (p, q, x, y, z, face, text) "
-        "values (?, ?, ?, ?, ?, ?, ?);";
-    static const char *delete_sign_query =
-        "delete from sign where x = ? and y = ? and z = ? and face = ?;";
-    static const char *delete_signs_query =
-        "delete from sign where x = ? and y = ? and z = ?;";
     static const char *load_blocks_query =
         "select x, y, z, w from block where p = ? and q = ?;";
     static const char *load_lights_query =
@@ -128,20 +110,9 @@ int db_init(char *path) {
     rc = sqlite3_prepare_v2(
         db, insert_light_query, -1, &insert_light_stmt, nullptr);
     if (rc) return rc;
-    rc = sqlite3_prepare_v2(
-        db, insert_sign_query, -1, &insert_sign_stmt, nullptr);
-    if (rc) return rc;
-    rc = sqlite3_prepare_v2(
-        db, delete_sign_query, -1, &delete_sign_stmt, nullptr);
-    if (rc) return rc;
-    rc = sqlite3_prepare_v2(
-        db, delete_signs_query, -1, &delete_signs_stmt, nullptr);
-    if (rc) return rc;
     rc = sqlite3_prepare_v2(db, load_blocks_query, -1, &load_blocks_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(db, load_lights_query, -1, &load_lights_stmt, nullptr);
-    if (rc) return rc;
-    rc = sqlite3_prepare_v2(db, load_signs_query, -1, &load_signs_stmt, nullptr);
     if (rc) return rc;
     rc = sqlite3_prepare_v2(db, get_key_query, -1, &get_key_stmt, nullptr);
     if (rc) return rc;
@@ -376,24 +347,6 @@ void db_load_lights(Map *map, int p, int q) {
         map_set(map, x, y, z, w);
     }
     load_mtx.unlock();
-}
-
-void db_load_signs(SignList *list, int p, int q) {
-    if (!db_enabled) {
-        return;
-    }
-    sqlite3_reset(load_signs_stmt);
-    sqlite3_bind_int(load_signs_stmt, 1, p);
-    sqlite3_bind_int(load_signs_stmt, 2, q);
-    while (sqlite3_step(load_signs_stmt) == SQLITE_ROW) {
-        int x = sqlite3_column_int(load_signs_stmt, 0);
-        int y = sqlite3_column_int(load_signs_stmt, 1);
-        int z = sqlite3_column_int(load_signs_stmt, 2);
-        int face = sqlite3_column_int(load_signs_stmt, 3);
-        const char *text = (const char *)sqlite3_column_text(
-            load_signs_stmt, 4);
-        sign_list_add(list, x, y, z, face, text);
-    }
 }
 
 int db_get_key(int p, int q) {
