@@ -37,6 +37,7 @@ public:
 private:
     struct craft_impl;
     std::unique_ptr<craft_impl> m_pimpl;
+    static constexpr auto ZACHS_GH_REPO = R"gh(https://github.com/zmertens/MazeBuilder)gh";
 };
 
 #endif // CRAFT_H
