@@ -1855,59 +1855,6 @@ struct craft::craft_impl {
         }
     }
 
-    // Helper function to modify signs and lights before setting blocks in DB
- //   void _set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int>>& blocks, int dirty) const {
- //       for (auto&& block : blocks) {
- //           int p = get<0>(block);
- //           int q = get<1>(block);
- //           int x = get<2>(block);
- //           int y = get<3>(block);
- //           int z = get<4>(block);
- //           int w = get<5>(block);
- //           Chunk* chunk = find_chunk(p, q);
- //           if (chunk) {
- //               Map* map = &chunk->map;
- //               if (dirty && map_set(map, x, y, z, w)) {
- //                   dirty_chunk(chunk);
- //               }
- //           } else {
- //               // Pass
-	//		}
- //           if (w == 0 && chunked(static_cast<float>(x)) == p && chunked(static_cast<float>(z)) == q) {
- //               unset_sign(x, y, z);
- //               set_light(p, q, x, y, z, 0);
- //           }
- //       } // for
- //       db_insert_blocks(blocks);
- //   }
-
- //   // Tuple(p, q, x, y, z, w)
- //   void set_blocks_from_vec(const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) const {
- //       std::vector<std::tuple<int, int, int, int, int, int>> adjusted_blocks;
- //       // Adjust blocks to account for chunk boundaries
- //       for (auto& block : blocks) {
- //           int x {get<2>(block)};
- //           int z {get<4>(block)};
- //           int p {chunked(static_cast<float>(x))};
- //           int q {chunked(static_cast<float>(z))};
- //           // Check if block is on the edge of the chunk
- //           bool on_the_edge = false;
- //           for (int dx = -1; dx <= 1; dx++) {
- //               for (int dz = -1; dz <= 1; dz++) {
- //                   if ((dx == 0 && dz == 0) || (dx && this->chunked(static_cast<float>(x + dx)) == p) || (dz && this->chunked(static_cast<float>(z + dz)) == q)) {
- //                       continue;
- //                   }
- //                   on_the_edge = true;
- //                   adjusted_blocks.push_back(make_tuple(p + dx, q + dz, x, get<3>(block), z, -get<5>(block)));
- //               }
- //           }
- //           if (!on_the_edge) {
-	//			adjusted_blocks.push_back(block);
-	//		}
- //       }
- //       _set_blocks_from_vec(cref(adjusted_blocks), 1);
-	//}
-
     void record_block(int x, int y, int z, int w) {
         SDL_memcpy(&this->m_model->block1, &this->m_model->block0, sizeof(Block));
         this->m_model->block0.x = x;
@@ -2387,6 +2334,7 @@ struct craft::craft_impl {
                 }
                 break;
             }
+            case SDL_EVENT_WINDOW_SHOWN:
             case SDL_EVENT_WINDOW_RESIZED: {
                 window_resizes = true;
                 this->m_model->scale = get_scale_factor();
@@ -2396,7 +2344,7 @@ struct craft::craft_impl {
             } // switch
         } // SDL_Event
         // Handle motion updates
-        
+
         const SDL_bool *state = SDL_GetKeyboardState(nullptr);
 
         if (!(imgui_focused || this->m_model->typing)) {
@@ -2568,20 +2516,23 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
     // SDL INITIALIZATION //
-    if (SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed (%s)\n", SDL_GetError());
         return false;
     }
 
-    m_pimpl->create_window_and_context();
-    if (!m_pimpl->m_model->window) {
+    this->m_pimpl->create_window_and_context();
+
+    auto&& sdl_window = this->m_pimpl->m_model->window;
+
+    if (!sdl_window) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Window failed (%s)\n", SDL_GetError());
         SDL_Quit();
         return false;
     }
 
-    SDL_ShowWindow(m_pimpl->m_model->window);
-    SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
+    SDL_ShowWindow(sdl_window);
+    SDL_SetWindowRelativeMouseMode(sdl_window, SDL_FALSE);
 
 #if !defined(__EMSCRIPTEN__)
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
@@ -2740,7 +2691,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     ImGui::GetIO().IniFilename = nullptr;
 
     // Setup ImGui Platform/Renderer backends
-    ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
+    ImGui_ImplSDL3_InitForOpenGL(sdl_window, this->m_pimpl->m_model->context);
     string glsl_version = "";
 #if defined(__EMSCRIPTEN__)
     glsl_version = "#version 100";
@@ -2868,36 +2819,66 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     int triangle_faces = 0;
     bool running = true;
 
-    auto create_fbo = [](auto width, auto height, GLuint& texture)->GLuint {
-        GLuint fbo, depthRenderbuffer;
+    auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
+        GLuint fbo, depthRenderbuffer, texture;
         glGenFramebuffers(1, &fbo);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glGenTextures(1, &texture);
-        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, texture);
+        glActiveTexture(GL_TEXTURE4);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glBindTexture(GL_TEXTURE_2D, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-
         glGenRenderbuffers(1, &depthRenderbuffer);
         glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
-        glBindTexture(GL_TEXTURE_2D, 0);
 
         // Check for FBO initialization errors
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FBO initialization failed\n");
-            return 0;
+        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+        if (status != GL_FRAMEBUFFER_COMPLETE) {
+            switch (status) {
+                case GL_FRAMEBUFFER_UNDEFINED:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNDEFINED\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER\n");
+                    break;
+                case GL_FRAMEBUFFER_UNSUPPORTED:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNSUPPORTED\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE\n");
+                    break;
+                default:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unknown FBO error\n");
+                    break;
+            }
+            return {};
         }
 
+#if defined(MAZE_DEBUG)
+    SDL_Log("Creating FBO with width: %d and height: %d\n", width, height);
+#endif
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return fbo;
+        return {fbo, depthRenderbuffer, texture};
     };
 
-    GLuint fbo_texture = 0;
-    GLuint fbo = 0;
+    tuple<GLuint, GLuint, GLuint> fbo_tuple;
 
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
@@ -2920,7 +2901,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-    glBindVertexArray(quad_vao);
 
     m_pimpl->force_chunks(me);
 
@@ -2973,9 +2953,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         }
 
         // Handle SDL events and motion updates
-        static int window_resizes = true;
+        static int window_resizes = false;
         running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
         
+        // Use ImGui for GUI size calculations
+        ImVec2 display_size = ImGui::GetIO().DisplaySize;
+
         // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
@@ -2984,9 +2967,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
-
-        // Use ImGui for GUI size calculations
-        ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3129,7 +3109,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
                 last_fullscreen = gui->fullscreen;
                 if (update_fullscreen)
-                    SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
+                    SDL_SetWindowFullscreen(sdl_window, gui->fullscreen);
 
                 static bool last_vsync = gui->vsync;
                 ImGui::Checkbox("VSYNC", &gui->vsync);
@@ -3172,18 +3152,21 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        auto img_size = ImGui::GetWindowSize();
-        GLuint voxel_scene_w = static_cast<GLuint>(img_size.x);
-        GLuint voxel_scene_h = static_cast<GLuint>(img_size.y);
-        if (window_resizes) {
+        ImVec2 voxel_scene_size = ImGui::GetWindowSize();
+        GLuint voxel_scene_w = static_cast<GLuint>(voxel_scene_size.x);
+        GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
+
+        // Check if scene size changed
+        if (window_resizes && display_size.x > 0 && display_size.y > 0) {
             window_resizes = false;
-            glDeleteFramebuffers(1, &fbo);
-            glDeleteTextures(1, &fbo_texture);
-            fbo = create_fbo(voxel_scene_w, voxel_scene_h, ref(fbo_texture));
+            glDeleteTextures(1, &get<2>(fbo_tuple));
+            glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
+            glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+            fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
         }
 
         // Bind the FBO that will store the 3D scene
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3211,11 +3194,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         glUseProgram(screen_attrib.program);
         glBindVertexArray(quad_vao);
-        glBindTexture(GL_TEXTURE_2D, fbo_texture);
-        //glUniform1i(attrib->sampler, 2);
-        glDisable(GL_DEPTH_TEST);
+        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
+        glUniform1i(screen_attrib.sampler, 4);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
 #if defined(MAZE_DEBUG)
         check_for_gl_err();
 #endif
@@ -3223,9 +3206,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        glBindTexture(GL_TEXTURE_2D, fbo_texture);
+        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
         glActiveTexture(GL_TEXTURE4);
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), { img_size.x, img_size.y }, uv0, uv1);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
         ImGui::End();
 
@@ -3242,9 +3225,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         ImGui::SetWindowSize(ImVec2(150, 50));
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
-                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
+                SDL_SetWindowRelativeMouseMode(sdl_window, SDL_TRUE);
             } else {
-                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
+                SDL_SetWindowRelativeMouseMode(sdl_window, SDL_FALSE);
             }
         }
         ImGui::End();
@@ -3270,11 +3253,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             
         ImGui::Render();
         glViewport(0, 0, display_size.x, display_size.y);
-        glDisable(GL_DEPTH_TEST);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        SDL_GL_SwapWindow(this->m_pimpl->m_model->window);
+        SDL_GL_SwapWindow(sdl_window);
 
 #if defined(MAZE_DEBUG)
         check_for_gl_err();
@@ -3317,8 +3299,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
-    glDeleteFramebuffers(1, &fbo);
-    glDeleteTextures(1, &fbo_texture);
+    glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
+    glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+    glDeleteTextures(1, &get<2>(fbo_tuple));
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
@@ -3328,7 +3311,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glDeleteProgram(screen_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
-    SDL_DestroyWindow(this->m_pimpl->m_model->window);
+    SDL_DestroyWindow(sdl_window);
     SDL_Quit();
 
     return true;
