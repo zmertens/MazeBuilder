@@ -2396,7 +2396,8 @@ struct craft::craft_impl {
             } // switch
         } // SDL_Event
         // Handle motion updates
-        const Uint8* state = SDL_GetKeyboardState(nullptr);
+        
+        const SDL_bool *state = SDL_GetKeyboardState(nullptr);
 
         if (!(imgui_focused || this->m_model->typing)) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;

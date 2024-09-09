@@ -57,6 +57,11 @@ int main(int argc, char* argv[]) {
           -v, --version      display program version
     )help";
 
+    if (argc == 1) {
+        std::cout << MAZE_BUILDER_HELP << std::endl;
+        return EXIT_SUCCESS;
+    }
+
     vector<string> args_vec{ argv, argv + argc };
 
 #if defined(__EMSCRIPTEN__)
