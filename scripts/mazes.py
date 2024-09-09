@@ -8,6 +8,23 @@ Outputs to terminal or writes a PNG file representing the maze
 from PIL import Image, ImageDraw
 import random
 
+class Distances:
+
+    def __init__(self, root):
+        self.root = root
+        self.cells = {}
+        # Distance from root to itself is 0
+        self.cells[self.root] = 0
+
+    def __index__(self, cell):
+        return self.cells[cell]
+    
+    def __index__(self, cell, distance):
+        self.cells[cell] = distance
+
+    def get_cells(self):
+        return self.cells.keys()
+
 class Cell:
     
     def __init__(self, row, column):
@@ -48,7 +65,19 @@ class Cell:
             neighbors.append(self.east)
         if self.west:
             neighbors.append(self.west)
-            
+    
+    def distances(self):
+        d = Distances(self)
+        frontier = [self]
+        while frontier:
+            new_frontier = []
+            for cell in frontier:
+                for linked in cell.links():
+                    if d[linked]:
+                        d[linked] = d[cell] + 1
+                        new_frontier.append(linked)
+            frontier = new_frontier
+        return d
             
 class Grid:
     
@@ -85,7 +114,7 @@ class Grid:
     def random_cell(self):
         random_row = random.randint(0, self._rows)
         random_col = random.randint(0, len(self._grid[random_row - 1]))
-        return self._grid[random_row][random_col]
+        return random.choice(self._grid)
     
     def size(self):
         return self._rows * self._columns
@@ -147,8 +176,21 @@ class BinaryTree:
                 if neighbor is not None:
                     cell.link(neighbor)
 
-class Sidewinder:
-    pass
+# class DFS:
+#     @staticmethod
+#     def on(grid):
+#         for cell in grid.each_cell():
+#             maze_stack = [cell]
+#             while maze_stack:
+#                 current = maze_stack.pop()
+#                 # Find all unvisited neighbors of current cell
+#                 neighbors = [neighbor for neighbor in current if not neighbor.links()]
+#                 if neighbors:
+#                     # Push unvisited cells with respcet to current
+#                     maze_stack.append(current)
+#                     neighbor = random.choice(neighbors)
+#                     current.link(neighbor)
+#                     maze_stack.append(neighbor)
 
 '''
 Utility function to draw the maze using PIL
@@ -183,9 +225,9 @@ if __name__ == '__main__':
     
     CELL_SIZE = 4
     grid = Grid(10, 10)
-    BinaryTree.on(grid)
+    DFS.on(grid)
     
     # print(str(grid))
     img = draw_maze(grid, cell_size=CELL_SIZE)
-    img.save("maze.png")
+    img.save("dfs.png")
     
