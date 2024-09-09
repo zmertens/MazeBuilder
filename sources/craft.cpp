@@ -2716,28 +2716,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
 
-    auto create_fbo = [](auto width, auto height, GLuint& texture)->GLuint {
-        GLuint fbo;
-        glGenFramebuffers(1, &fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glGenTextures(1, &texture);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        glBindTexture(GL_TEXTURE_2D, 0);
-
-        // Check for FBO initialization errors
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FBO initialization failed\n");
-            return 0;
-        }
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return fbo;
-    };
-
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
 
@@ -2747,11 +2725,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-    io.ConfigWindowsMoveFromTitleBarOnly = true;
-    io.IniFilename = nullptr;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
+    ImGui::GetIO().IniFilename = nullptr;
 
     // Setup ImGui Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
@@ -2763,7 +2740,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 #endif
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     ImGui::StyleColorsLight();
-    ImFont *nunito_sans_font = io.Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
+    ImFont *nunito_sans_font = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
 
 #if defined(MAZE_DEBUG)
     IM_ASSERT(nunito_sans_font != nullptr);
@@ -2786,11 +2763,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         return errorCode;
     };
 #define check_for_gl_err() _check_for_gl_err(__FILE__, __LINE__)
-
-#if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() prior to the db init\n");
-    check_for_gl_err();
-#endif
 
     // DATABASE INITIALIZATION 
     if (USE_CACHE) {
@@ -2887,12 +2859,35 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     int triangle_faces = 0;
     bool running = true;
 
-    auto&& sdl_window_w = this->m_pimpl->m_model->width;
-    auto&& sdl_window_h = this->m_pimpl->m_model->height;
-    auto&& io_display_size = io.DisplaySize;
+    auto create_fbo = [](auto width, auto height, GLuint& texture)->GLuint {
+        GLuint fbo, depthRenderbuffer;
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
 
-    GLuint fbo_texture;
-    GLuint fbo = create_fbo(sdl_window_w, sdl_window_h, ref(fbo_texture));
+        //glGenRenderbuffers(1, &depthRenderbuffer);
+        //glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
+        //glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+        //glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
+        //glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Check for FBO initialization errors
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FBO initialization failed\n");
+            return 0;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return fbo;
+    };
+
+    GLuint fbo_texture = 0;
+    GLuint fbo = 0;
 
     m_pimpl->force_chunks(me);
 
@@ -2957,6 +2952,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
 
+        // Use ImGui for GUI size calculations
+        ImVec2 display_size = ImGui::GetIO().DisplaySize;
+
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplSDL3_NewFrame();
@@ -2967,21 +2965,26 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
 
-        ImGui::SetNextWindowPos({ 0.f, 690.f + (static_cast<float>(sdl_window_h) - 720.f) });
-        ImGui::SetNextWindowSize({ 400, 30 });
-        ImGui::Begin("Framerate Window",
-            nullptr,
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoTitleBar
-        );
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        float tab_window_width = display_size.x * 0.25f;
+        // Tabs
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(display_size.x * 0.25f, display_size.y * 0.1f));
+        ImGui::Begin("Tab Bar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+        if (ImGui::BeginTabBar("Tabs")) {
+            if (ImGui::BeginTabItem("Tab 1")) {
+                ImGui::Text("Content for Tab 1");
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Tab 2")) {
+                ImGui::Text("Content for Tab 2");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        }
         ImGui::End();
 
-        ImGui::SetNextWindowPos({ 400, 0 });
-        ImGui::SetNextWindowSize({ 880 + (static_cast<float>(sdl_window_w) - 1280.f), 720.f + (static_cast<float>(sdl_window_h) - 720.f) });
+        ImGui::SetNextWindowPos(ImVec2(tab_window_width, 0));
+        ImGui::SetNextWindowSize(ImVec2(display_size.x * 0.75f, display_size.y));
         ImGui::Begin("Voxels",
             nullptr,
             ImGuiWindowFlags_NoResize |
@@ -2993,11 +2996,21 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
+        //auto img_size = ImGui::GetWindowSize();
+        auto img_size = ImGui::GetContentRegionAvail();
+        GLuint voxel_scene_w = static_cast<GLuint>(img_size.x);
+        GLuint voxel_scene_h = static_cast<GLuint>(img_size.y);
+        if (window_resizes) {
+            window_resizes = false;
+            glDeleteFramebuffers(1, &fbo);
+            glDeleteTextures(1, &fbo_texture);
+            fbo = create_fbo(voxel_scene_w, voxel_scene_h, ref(fbo_texture));
+        }
+
         // Bind the FBO that will store the 3D scene
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glViewport(0, 0, sdl_window_w, sdl_window_h);
+        glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glClearColor(0.5f, 0.69f, 1.0f, 1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -3005,7 +3018,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
         m_pimpl->render_signs(&text_attrib, me);
         m_pimpl->render_sign(&text_attrib, me);
-        m_pimpl->render_players(&block_attrib, me);
         if (gui->show_wireframes) {
             m_pimpl->render_wireframe(&line_attrib, me);
         }
@@ -3020,18 +3032,9 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        if (window_resizes) {
-            window_resizes = false;
-            glDeleteFramebuffers(1, &fbo);
-            glDeleteTextures(1, &fbo_texture);
-            fbo = create_fbo(sdl_window_w, sdl_window_h, ref(fbo_texture));
-        }
-
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        //auto img_size = ImGui::GetWindowSize();
-        auto img_size = ImGui::GetContentRegionAvail();
         glBindTexture(GL_TEXTURE_2D, fbo_texture);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), { img_size.x, img_size.y }, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -3042,7 +3045,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             ImGuiWindowFlags_NoMove | 
             ImGuiWindowFlags_NoResize | 
             ImGuiWindowFlags_NoTitleBar);
-        ImGui::SetWindowPos(ImVec2(sdl_window_w - 150, sdl_window_h - 50));
+        ImGui::SetWindowPos(ImVec2(display_size.x - 150, display_size.y - 50));
         ImGui::SetWindowSize(ImVec2(150, 50));
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
@@ -3053,9 +3056,26 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         }
         ImGui::End();
 
-        // Maze Builder GUI
-//        if (show_mb_gui) {
-//            // GUI Title Bar
+        ImVec2 fps_window_size = ImVec2(tab_window_width, 50);
+
+#if defined(MAZE_DEBUG)
+        ImGui::SetNextWindowPos(ImVec2(1.75f * tab_window_width - 150, 0));
+        ImGui::SetNextWindowSize(fps_window_size);
+        ImGui::Begin("Framerate Window",
+            nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar
+        );
+        ImGui::SetWindowFontScale(0.85f);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
+#endif
+
+
+
 //            ImGui::Begin(this->m_pimpl->m_version.c_str());
 //
 //            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
@@ -3230,7 +3250,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         ImGui::PopFont();
             
         ImGui::Render();
-        glViewport(0, 0, sdl_window_w, sdl_window_h);
+        glViewport(0, 0, display_size.x, display_size.y);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
