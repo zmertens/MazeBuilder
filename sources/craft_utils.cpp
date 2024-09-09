@@ -1,9 +1,9 @@
 /**
- * Utility functions for handling opengl operations, RNG, and meshes
+ * Utility functions for handling OpenGL operations
  *
 */
 
-#include "util.h"
+#include "craft_utils.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -18,43 +18,6 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
-
-int rand_int(int n) {
-    int result;
-    while (n <= (result = rand() / (RAND_MAX / n)));
-    return result;
-}
-
-double rand_double() {
-    return (double)rand() / (double)RAND_MAX;
-}
-
-void update_fps(FPS *fps) {
-    fps->frames++;
-    double now = SDL_GetTicks();
-    double elapsed = now - fps->since;
-    if (elapsed >= 1) {
-         fps->fps = round(fps->frames / elapsed);
-        fps->fps = SDL_roundf(fps->frames * 1000.0 / elapsed);
-        fps->frames = 0;
-        fps->since = now;
-    }
-}
-
-char *load_file(const char *path) {
-    FILE *file = fopen(path, "rb");
-    if (!file) {
-        fprintf(stderr, "fopen %s failed: %d %s\n", path, errno, strerror(errno));
-        exit(1);
-    }
-    fseek(file, 0, SEEK_END);
-    int length = ftell(file);
-    rewind(file);
-    char *data = (char*) calloc(length + 1, sizeof(char));
-    fread(data, 1, length, file);
-    fclose(file);
-    return data;
-}
 
 /**
  * @brief Private function to load file using SDL-specific functions
@@ -82,12 +45,13 @@ char* load_file_using_sdl(const char* path) {
 	}
 
     // Read file into memory
-    auto nb_read_total = 0, nb_read = SDL_TRUE;
+    // SDL_ReadIO returns the number of bytes read, or 0 on error or end of file
+    int nb_read_total = 0, nb_read_size = 1;
     auto buf = data;
-    while (nb_read_total < data_size && nb_read != SDL_FALSE) {
-        nb_read = SDL_ReadIO(io, buf, (data_size - nb_read_total));
-        nb_read_total += nb_read;
-        buf += nb_read;
+    while (nb_read_total < data_size && nb_read_size != 0) {
+        nb_read_size = SDL_ReadIO(io, buf, (data_size - nb_read_total));
+        nb_read_total += nb_read_size;
+        buf += nb_read_size;
     }
 
     SDL_CloseIO(io);
@@ -109,7 +73,7 @@ GLuint make_shader(GLenum type, const char *source) {
     if (status == GL_FALSE) {
         GLint length;
         glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
-        GLchar *info = (GLchar*) calloc(length, sizeof(GLchar));
+        GLchar *info = (GLchar*) SDL_calloc(length, sizeof(GLchar));
         glGetShaderInfoLog(shader, length, NULL, info);
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "glCompileShader failed:\n%s\n", info);
         SDL_free(info);
@@ -158,24 +122,27 @@ void flip_image_vertical(
 {
     unsigned int size = width * height * 4;
     unsigned int stride = sizeof(char) * width * 4;
-    unsigned char *new_data = (unsigned char*) malloc(sizeof(unsigned char) * size);
+    unsigned char *new_data = (unsigned char*) SDL_malloc(sizeof(unsigned char) * size);
     for (unsigned int i = 0; i < height; i++) {
         unsigned int j = height - i - 1;
-        SDL_memcpy(new_data + j * stride, data + i * stride, stride);
+        if (data != 0 && new_data != 0) {
+            SDL_memcpy(new_data + j * stride, data + i * stride, stride);
+        }
     }
-    SDL_memcpy(data, new_data, size);
-    SDL_free(new_data);
+    if (data != 0 && new_data != 0) {
+        SDL_memcpy(data, new_data, size);
+        SDL_free(new_data);
+    }
 }
 
 void load_png_texture(const char *file_name) {
-    unsigned int error;
     int width, height;
     // n stores bits-per-pixel
     int n;
     unsigned char *data = stbi_load(file_name, &width, &height, &n, 0);
     // ... replace '0' with '1'..'4' to force that many components per pixel
     if (data == nullptr) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "std_load %s failed, error %u\n", file_name, error);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "std_load %s failed!!\n", file_name);
     }
     flip_image_vertical(data, width, height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,

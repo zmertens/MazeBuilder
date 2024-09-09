@@ -75,7 +75,7 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/matrix.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp)
 

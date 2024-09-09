@@ -1,5 +1,5 @@
 #include "item.h"
-#include "util.h"
+#include "craft_utils.h"
 
 const int items[] = {
     // items the user can build
@@ -157,7 +157,7 @@ int is_plant(int w) {
 }
 
 int is_obstacle(int w) {
-    w = ABS(w);
+    w = abs(w);
     if (is_plant(w)) {
         return 0;
     }
@@ -174,7 +174,7 @@ int is_transparent(int w) {
     if (w == EMPTY) {
         return 1;
     }
-    w = ABS(w);
+    w = abs(w);
     if (is_plant(w)) {
         return 1;
     }

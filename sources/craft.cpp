@@ -2,8 +2,8 @@
  * Craft engine builds voxels as chunks and can run maze-generating algorithms
  * Generated mazes are stored in-memory and in an offline database
  * Vertex and indice data is stored in buffers and rendered using OpenGL
- * Supports writing to Wavefront OBJ files
- * Interfaces with Emscripten to provide data in JSON-format to web applications
+ * Supports RESTful APIs for web applications by passing maze data in JSON format
+ * Interfaces with Emscripten to provide web API support
  * 
  * 
  * Originally written in C99, ported to C++17
@@ -46,7 +46,7 @@
 
 #include <noise/noise.h>
 
-#include "util.h"
+#include "craft_utils.h"
 #include "world.h"
 #include "cube.h"
 #include "db.h"
@@ -60,7 +60,7 @@
 #include "cell.h"
 #include "writer.h"
 
-// basic configurations
+// Movement configurations
 #define KEY_FORWARD SDL_SCANCODE_W
 #define KEY_BACKWARD SDL_SCANCODE_S
 #define KEY_LEFT SDL_SCANCODE_A
@@ -77,40 +77,29 @@
 #define KEY_COMMAND SDL_SCANCODE_SLASH
 #define KEY_SIGN SDL_SCANCODE_GRAVE
 
-#define INIT_WINDOW_WIDTH 1024
-#define INIT_WINDOW_HEIGHT 768
-#define SCROLL_THRESHOLD 0.1
-#define MAX_MESSAGES 4
-static constexpr auto DB_PATH = "craft.db";
-static constexpr auto USE_CACHE = true;
-#define DAY_LENGTH 600
-#define INVERT_MOUSE 0
-
-// rendering options
-#define SHOW_INFO_TEXT 1
-#define SHOW_CHAT_TEXT 1
-#define SHOW_PLAYER_NAMES 1
-
+// Typing config
 #define CRAFT_KEY_SIGN '`'
 
-// advanced parameters
+// World configs
+#define INIT_WINDOW_WIDTH 1200
+#define INIT_WINDOW_HEIGHT 800
+#define SCROLL_THRESHOLD 0.1
+#define DB_PATH "craft.db"
+#define MAX_DB_PATH_LEN 64
+#define USE_CACHE true
+#define DAY_LENGTH 600
+#define INVERT_MOUSE 0
+#define MAX_TEXT_LENGTH 256
+
+// Advanced options
 #define CREATE_CHUNK_RADIUS 10
 #define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
 #define COMMIT_INTERVAL 5
-
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
-static constexpr auto MAX_TEXT_LENGTH = 256;
-#define MAX_NAME_LENGTH 32
-#define MAX_PATH_LENGTH 256
-#define MAX_ADDR_LENGTH 256
-
-#define ALIGN_LEFT 0
-#define ALIGN_CENTER 1
-#define ALIGN_RIGHT 2
 
 #define WORKER_IDLE 0
 #define WORKER_BUSY 1
@@ -147,7 +136,7 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-            outfile(".obj"), seed(101), maze_width(100), maze_height(10), maze_length(100),
+            outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json("") {
         
         }
@@ -307,7 +296,7 @@ struct craft::craft_impl {
 
     typedef struct {
         int id;
-        char name[MAX_NAME_LENGTH];
+        std::string name;
         State state;
         State state1;
         State state2;
@@ -341,27 +330,20 @@ struct craft::craft_impl {
         int sign_radius;
         Player players[MAX_PLAYERS];
         int player_count;
-        int typing;
-        char typing_buffer[MAX_TEXT_LENGTH];
-        size_t text_len;
-        int message_index;
-        char messages[MAX_MESSAGES][MAX_TEXT_LENGTH];
         int width;
         int height;
-        int observe1;
-        int observe2;
-        int flying;
+        bool flying;
         int item_index;
         int scale;
         bool is_ortho;
         float fov;
         int suppress_char;
         int mode_changed;
-        char db_path[MAX_PATH_LENGTH];
-        char server_addr[MAX_ADDR_LENGTH];
-        int server_port;
+        char db_path[MAX_DB_PATH_LEN];
+        bool typing;
+        char typing_buffer[MAX_TEXT_LENGTH];
+        size_t text_len;
         int day_length;
-        int time_changed;
         int start_time;
         int start_ticks;
         Block block0;
@@ -383,14 +365,10 @@ struct craft::craft_impl {
         : m_window_name{ window_name }
         , m_version{ version }
         , m_help{help}
-        , m_model{make_unique<Model>()}
-        // Construct maze in run loop
+        , m_model{ make_unique<Model>() }
         , m_maze()
-        , m_gui{make_unique<Gui>()} {
-        m_model->width = INIT_WINDOW_WIDTH;
-        m_model->height = INIT_WINDOW_HEIGHT;
-        m_model->scale = 1;
-        m_model->day_length = DAY_LENGTH;
+        , m_gui{ make_unique<Gui>() } {
+        this->reset_model();
     }
 
     int worker_run(void *arg) {
@@ -756,11 +734,11 @@ struct craft::craft_impl {
             SDL_memcpy(s1, s2, sizeof(State));
             s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
             s2->t = static_cast<float>(get_time());
-            if (s2->rx - s1->rx > static_cast<float>(PI)) {
-                s1->rx += static_cast<float>(2 * PI);
+            if (s2->rx - s1->rx > static_cast<float>(M_PI)) {
+                s1->rx += static_cast<float>(2 * M_PI);
             }
-            if (s1->rx - s2->rx > static_cast<float>(PI)) {
-                s1->rx -= static_cast<float>(2 * PI);
+            if (s1->rx - s2->rx > static_cast<float>(M_PI)) {
+                s1->rx -= static_cast<float>(2 * M_PI);
             }
         }
         else {
@@ -865,8 +843,8 @@ struct craft::craft_impl {
     }
 
     int chunk_distance(Chunk *chunk, int p, int q) {
-        int dp = ABS(chunk->p - p);
-        int dq = ABS(chunk->q - q);
+        int dp = SDL_abs(chunk->p - p);
+        int dq = SDL_abs(chunk->q - q);
         return SDL_max(dp, dq);
     }
 
@@ -1550,20 +1528,14 @@ struct craft::craft_impl {
     void delete_chunks() {
         int count = this->m_model->chunk_count;
         State *s1 = &this->m_model->players->state;
-        State *s2 = &(this->m_model->players + this->m_model->observe1)->state;
-        State *s3 = &(this->m_model->players + this->m_model->observe2)->state;
-        State *states[3] = {s1, s2, s3};
         for (int i = 0; i < count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             int remove_chunk = 1;
-            for (int j = 0; j < 3; j++) {
-                State *s = states[j];
-                int p = chunked(s->x);
-                int q = chunked(s->z);
-                if (chunk_distance(chunk, p, q) < this->m_model->delete_radius) {
-                    remove_chunk = 0;
-                    break;
-                }
+            int p = chunked(s1->x);
+            int q = chunked(s1->z);
+            if (chunk_distance(chunk, p, q) < this->m_model->delete_radius) {
+                remove_chunk = 0;
+                break;
             }
             if (remove_chunk) {
                 map_free(&chunk->map);
@@ -2162,215 +2134,7 @@ struct craft::craft_impl {
         del_buffer(buffer);
     }
 
-    void add_message(const char *text) {
-        SDL_snprintf(this->m_model->messages[this->m_model->message_index], MAX_TEXT_LENGTH, "%s", text);
-        this->m_model->message_index = (this->m_model->message_index + 1) % MAX_MESSAGES;
-    }
-
-    void copy() {
-        SDL_memcpy(&this->m_model->copy0, &this->m_model->block0, sizeof(Block));
-        SDL_memcpy(&this->m_model->copy1, &this->m_model->block1, sizeof(Block));
-    }
-
-    void paste() {
-        Block *c1 = &this->m_model->copy1;
-        Block *c2 = &this->m_model->copy0;
-        Block *p1 = &this->m_model->block1;
-        Block *p2 = &this->m_model->block0;
-        int scx = SIGN(c2->x - c1->x);
-        int scz = SIGN(c2->z - c1->z);
-        int spx = SIGN(p2->x - p1->x);
-        int spz = SIGN(p2->z - p1->z);
-        int oy = p1->y - c1->y;
-        int dx = ABS(c2->x - c1->x);
-        int dz = ABS(c2->z - c1->z);
-        for (int y = 0; y < 256; y++) {
-            for (int x = 0; x <= dx; x++) {
-                for (int z = 0; z <= dz; z++) {
-                    int w = get_block(c1->x + x * scx, y, c1->z + z * scz);
-                    builder_block(p1->x + x * spx, y + oy, p1->z + z * spz, w);
-                }
-            }
-        }
-    }
-
-    void array(Block *b1, Block *b2, int xc, int yc, int zc) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int dx = b2->x - b1->x;
-        int dy = b2->y - b1->y;
-        int dz = b2->z - b1->z;
-        xc = dx ? xc : 1;
-        yc = dy ? yc : 1;
-        zc = dz ? zc : 1;
-        for (int i = 0; i < xc; i++) {
-            int x = b1->x + dx * i;
-            for (int j = 0; j < yc; j++) {
-                int y = b1->y + dy * j;
-                for (int k = 0; k < zc; k++) {
-                    int z = b1->z + dz * k;
-                    builder_block(x, y, z, w);
-                }
-            }
-        }
-    }
-
-    void cube(Block *b1, Block *b2, int fill) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int x1 = SDL_min(b1->x, b2->x);
-        int y1 = SDL_min(b1->y, b2->y);
-        int z1 = SDL_min(b1->z, b2->z);
-        int x2 = SDL_max(b1->x, b2->x);
-        int y2 = SDL_max(b1->y, b2->y);
-        int z2 = SDL_max(b1->z, b2->z);
-        int a = (x1 == x2) + (y1 == y2) + (z1 == z2);
-        for (int x = x1; x <= x2; x++) {
-            for (int y = y1; y <= y2; y++) {
-                for (int z = z1; z <= z2; z++) {
-                    if (!fill) {
-                        int n = 0;
-                        n += x == x1 || x == x2;
-                        n += y == y1 || y == y2;
-                        n += z == z1 || z == z2;
-                        if (n <= a) {
-                            continue;
-                        }
-                    }
-                    builder_block(x, y, z, w);
-                }
-            }
-        }
-    }
-
-    void sphere(Block *center, int radius, int fill, int fx, int fy, int fz) {
-        static const float offsets[8][3] = {
-            {-0.5, -0.5, -0.5},
-            {-0.5, -0.5, 0.5},
-            {-0.5, 0.5, -0.5},
-            {-0.5, 0.5, 0.5},
-            {0.5, -0.5, -0.5},
-            {0.5, -0.5, 0.5},
-            {0.5, 0.5, -0.5},
-            {0.5, 0.5, 0.5}
-        };
-        int cx = center->x;
-        int cy = center->y;
-        int cz = center->z;
-        int w = center->w;
-        for (int x = cx - radius; x <= cx + radius; x++) {
-            if (fx && x != cx) {
-                continue;
-            }
-            for (int y = cy - radius; y <= cy + radius; y++) {
-                if (fy && y != cy) {
-                    continue;
-                }
-                for (int z = cz - radius; z <= cz + radius; z++) {
-                    if (fz && z != cz) {
-                        continue;
-                    }
-                    int inside = 0;
-                    int outside = fill;
-                    for (int i = 0; i < 8; i++) {
-                        float dx = x + offsets[i][0] - cx;
-                        float dy = y + offsets[i][1] - cy;
-                        float dz = z + offsets[i][2] - cz;
-                        float d = SDL_sqrtf(dx * dx + dy * dy + dz * dz);
-                        if (d < radius) {
-                            inside = 1;
-                        }
-                        else {
-                            outside = 1;
-                        }
-                    }
-                    if (inside && outside) {
-                        builder_block(x, y, z, w);
-                    }
-                }
-            }
-        }
-    }
-
-    void cylinder(Block *b1, Block *b2, int radius, int fill) {
-        if (b1->w != b2->w) {
-            return;
-        }
-        int w = b1->w;
-        int x1 = SDL_min(b1->x, b2->x);
-        int y1 = SDL_min(b1->y, b2->y);
-        int z1 = SDL_min(b1->z, b2->z);
-        int x2 = SDL_max(b1->x, b2->x);
-        int y2 = SDL_max(b1->y, b2->y);
-        int z2 = SDL_max(b1->z, b2->z);
-        int fx = x1 != x2;
-        int fy = y1 != y2;
-        int fz = z1 != z2;
-        if (fx + fy + fz != 1) {
-            return;
-        }
-        Block block = {x1, y1, z1, w};
-        if (fx) {
-            for (int x = x1; x <= x2; x++) {
-                block.x = x;
-                sphere(&block, radius, fill, 1, 0, 0);
-            }
-        }
-        if (fy) {
-            for (int y = y1; y <= y2; y++) {
-                block.y = y;
-                sphere(&block, radius, fill, 0, 1, 0);
-            }
-        }
-        if (fz) {
-            for (int z = z1; z <= z2; z++) {
-                block.z = z;
-                sphere(&block, radius, fill, 0, 0, 1);
-            }
-        }
-    }
-
-    void tree(Block *block) {
-        int bx = block->x;
-        int by = block->y;
-        int bz = block->z;
-        for (int y = by + 3; y < by + 8; y++) {
-            for (int dx = -3; dx <= 3; dx++) {
-                for (int dz = -3; dz <= 3; dz++) {
-                    int dy = y - (by + 4);
-                    int d = (dx * dx) + (dy * dy) + (dz * dz);
-                    if (d < 11) {
-                        builder_block(bx + dx, y, bz + dz, 15);
-                    }
-                }
-            }
-        }
-        for (int y = by; y < by + 7; y++) {
-            builder_block(bx, y, bz, 5);
-        }
-    }
-
-    void maze(int w, int l, int h, const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) noexcept {
-        maze_thread_safe mz { get_maze_algo_from_str(this->m_gui->maze_algo), cref(get_int), cref(rng),
-            static_cast<unsigned int>(w), static_cast<unsigned int>(l), static_cast<unsigned int>(h),
-            static_cast<unsigned int>(items[this->m_model->item_index]) };
-        auto&& vertices = mz.get_render_vertices();
-        auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
-            for (auto&& block : vertices) {
-                // Set the block in the DB
-                this->set_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-                // Record the block in craft
-                this->record_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-            }
-        };
-        set_maze_in_craft(cref(vertices));
-    }
-
-    void parse_command(const char *buffer, const function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
+    void parse_command(const char *buffer) {
         int radius, count, xc, yc, zc;
         if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
             if (radius >= 1 && radius <= 24) {
@@ -2379,73 +2143,10 @@ struct craft::craft_impl {
                 this->m_model->delete_radius = radius + 4;
             }
             else {
-                add_message("Viewing distance must be between 1 and 24.");
+                // Notify user with view correct parameters
             }
         }
-        else if (SDL_strcmp(buffer, "/copy") == 0) {
-            copy();
-        }
-        else if (SDL_strcmp(buffer, "/paste") == 0) {
-            paste();
-        }
-        else if (SDL_strcmp(buffer, "/tree") == 0) {
-            tree(&this->m_model->block0);
-        }
-        else if (SDL_sscanf(buffer, "/move %d %d %d", &xc, &yc, &zc) == 3) {
-            auto&& ps = this->m_model->players->state;
-            ps.x = xc;
-            ps.y = yc;
-            ps.z = zc;
-#if defined(MAZE_DEBUG)
-            SDL_Log("/move (%d, %d, %d)", xc, yc, zc);
-#endif
-        }
-        else if (SDL_sscanf(buffer, "/array %d %d %d", &xc, &yc, &zc) == 3) {
-            array(&this->m_model->block1, &this->m_model->block0, xc, yc, zc);
-        }
-        else if (SDL_sscanf(buffer, "/array %d", &count) == 1) {
-            array(&this->m_model->block1, &this->m_model->block0, count, count, count);
-        }
-        else if (SDL_strcmp(buffer, "/fcube") == 0) {
-            cube(&this->m_model->block0, &this->m_model->block1, 1);
-        }
-        else if (SDL_strcmp(buffer, "/cube") == 0) {
-            cube(&this->m_model->block0, &this->m_model->block1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fsphere %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/sphere %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcirclex %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 1, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/circlex %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 1, 0, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcircley %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/circley %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 1, 0);
-        }
-        else if (SDL_sscanf(buffer, "/fcirclez %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 1, 0, 0, 1);
-        }
-        else if (SDL_sscanf(buffer, "/circlez %d", &radius) == 1) {
-            sphere(&this->m_model->block0, radius, 0, 0, 0, 1);
-        }
-        else if (SDL_sscanf(buffer, "/fcylinder %d", &radius) == 1) {
-            cylinder(&this->m_model->block0, &this->m_model->block1, radius, 1);
-        }
-        else if (SDL_sscanf(buffer, "/cylinder %d", &radius) == 1) {
-            cylinder(&this->m_model->block0, &this->m_model->block1, radius, 0);
-        }
-        else if (SDL_sscanf(buffer, "/maze %d %d %d", &xc, &yc, &zc) == 3) {
-            maze(xc, yc, zc, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-        }
-    } // prase command
+    } // parse command
 
     void on_light() {
         State *s = &this->m_model->players->state;
@@ -2501,12 +2202,11 @@ struct craft::craft_impl {
 
     /**
     * Reference: https://github.com/rswinkle/Craft/blob/sdl/src/main.c
-    * @brief Handle SDL events
+    * @brief Handle SDL events and motion
     * @param dt
-    * @param running is a reference to game loop invariant
-    * @return bool return true when events are handled successfully
+    * @return bool return true when events are handled successfully or not
     */
-    bool handle_events(double dt, bool& running, const function<mazes::maze_types(const string& algo)>& get_maze_algo_from_str, const function<int(int, int)>& get_int, const mt19937& rng) {
+    bool handle_events_and_motion(double dt, int& window_resizes) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2525,18 +2225,8 @@ struct craft::craft_impl {
             ImGui_ImplSDL3_ProcessEvent(&e);
 
             switch (e.type) {
-            case SDL_EVENT_QUIT: {
-                running = false;
-                break;
-            }
-            case SDL_EVENT_KEY_UP: {
-                sc = e.key.scancode;
-                switch (sc) {
-                }
-                break;
-            }
+            case SDL_EVENT_QUIT: return false;
             case SDL_EVENT_KEY_DOWN: {
-
                 sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE: {
@@ -2562,7 +2252,7 @@ struct craft::craft_impl {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
                             } else if (this->m_model->typing_buffer[0] == '/') {
-                                this->parse_command(this->m_model->typing_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
+                                this->parse_command(this->m_model->typing_buffer);
                             }
                         }
                     } else {
@@ -2574,20 +2264,7 @@ struct craft::craft_impl {
                     }
                     break;
                 }
-                case SDL_SCANCODE_V: {
-                    if (control) {
-                        auto clip_buffer = const_cast<char*>(SDL_GetClipboardText());
-                        if (this->m_model->typing) {
-                            this->m_model->suppress_char = 1;
-                            SDL_strlcat(this->m_model->typing_buffer, clip_buffer,
-                                MAX_TEXT_LENGTH - this->m_model->text_len - 1);
-                        } else {
-                            parse_command(clip_buffer, cref(get_maze_algo_from_str), cref(get_int), cref(rng));
-                        }
-                        SDL_free(clip_buffer);
-                    }
-                    break;
-                }
+                // Change block type when mouse is captured
                 case SDL_SCANCODE_0:
                 case SDL_SCANCODE_1:
                 case SDL_SCANCODE_2:
@@ -2604,7 +2281,7 @@ struct craft::craft_impl {
                 }
                 case KEY_FLY: {
                     if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->flying = ~this->m_model->flying;
+                        this->m_model->flying = !this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
@@ -2618,16 +2295,6 @@ struct craft::craft_impl {
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
                     }
-                    break;
-                }
-                case KEY_OBSERVE: {
-                    if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->observe1 = (this->m_model->observe1 + 1) % this->m_model->player_count;
-                    break;
-                }
-                case KEY_OBSERVE_INSET: {
-                    if (!imgui_focused && !this->m_model->typing)
-                        this->m_model->observe2 = (this->m_model->observe2 + 1) % this->m_model->player_count;
                     break;
                 }
                 case KEY_CHAT: {
@@ -2654,7 +2321,6 @@ struct craft::craft_impl {
                         SDL_StartTextInput(this->m_model->window);
                     }
                     break;
-
                 }
                 } // switch
                 break;
@@ -2722,23 +2388,14 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_WINDOW_RESIZED: {
-                this->m_model->scale = get_scale_factor();
-                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
-                break;
-            }
-            case SDL_EVENT_WINDOW_SHOWN: {
+                window_resizes = true;
                 this->m_model->scale = get_scale_factor();
                 SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
                 break;
             }
             } // switch
         } // SDL_Event
-
-        // Close the app, events handled successfully
-        if (!running) {
-            return true;
-        }
-
+        // Handle motion updates
         const Uint8* state = SDL_GetKeyboardState(nullptr);
 
         if (!(imgui_focused || this->m_model->typing)) {
@@ -2794,7 +2451,7 @@ struct craft::craft_impl {
         }
 
         return true;
-    } // handle_events
+    } // handle_events_and_motion
 
     /**
      * @brief Check what fullscreen modes are avaialble
@@ -2816,13 +2473,8 @@ struct craft::craft_impl {
      * @brief Create SDL/GL window and context, check display modes
      */
     void create_window_and_context() {
-        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
-        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN | SDL_WINDOW_RESIZABLE;
-        int window_width = INIT_WINDOW_WIDTH;
-        int window_height = INIT_WINDOW_HEIGHT;
-
 #if defined(MAZE_DEBUG)
-        SDL_Log("Settings SDL_GL_CONTEXT_DEBUG_FLAG\n");
+        SDL_Log("Setting SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
 #else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
@@ -2846,7 +2498,9 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
         
-        this->m_model->window = SDL_CreateWindow(m_window_name.data(), window_width, window_height, window_flags);
+        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+
+        this->m_model->window = SDL_CreateWindow(m_window_name.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2868,31 +2522,38 @@ struct craft::craft_impl {
         } else {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Couldn't load icon at %s\n", icon_path);
         }
+
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
     } // create_window_and_context
 
     void reset_model() {
         SDL_memset(this->m_model->chunks, 0, sizeof(Chunk) * MAX_CHUNKS);
         this->m_model->chunk_count = 0;
+        this->m_model->create_radius = CREATE_CHUNK_RADIUS;
+        this->m_model->render_radius = RENDER_CHUNK_RADIUS;
+        this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
+        this->m_model->sign_radius = RENDER_SIGN_RADIUS;
         SDL_memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
         this->m_model->player_count = 0;
-        this->m_model->observe1 = 0;
-        this->m_model->observe2 = 0;
-        this->m_model->flying = 0;
+        this->m_model->flying = false;
         this->m_model->item_index = 0;
-        SDL_memset(this->m_model->typing_buffer, 0, sizeof(char) * MAX_TEXT_LENGTH);
-        this->m_model->typing = 0;
-        SDL_memset(this->m_model->messages, 0, sizeof(char) * MAX_MESSAGES * MAX_TEXT_LENGTH);
-        this->m_model->message_index = 0;
         this->m_model->day_length = DAY_LENGTH;
         this->m_model->start_time = (this->m_model->day_length / 3)*1000;
-        // maybe set start_ticks here?
-        this->m_model->time_changed = 1;
+        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
+        this->m_model->width = INIT_WINDOW_WIDTH;
+        this->m_model->height = INIT_WINDOW_HEIGHT;
+        this->m_model->scale = 1;
+        this->m_model->is_ortho = false;
+        this->m_model->fov = 65.f;
+        SDL_snprintf(this->m_model->db_path, MAX_DB_PATH_LEN, "%s", DB_PATH);
+        this->m_model->typing = false;
+        this->m_model->typing_buffer[0] = '\0';
     }
 
 }; // craft_impl
 
 craft::craft(const std::string& window_name, const std::string& version, const std::string& help)
-    : m_pimpl{std::make_unique<craft_impl>(window_name, version, help)} {
+    : m_pimpl{std::make_unique<craft_impl>(cref(window_name), cref(version), cref(help))} {
 }
 
 craft::~craft() = default;
@@ -2960,10 +2621,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     }
 #endif
 
-    glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    glClearColor(0, 0, 0, 1);
-
     // LOAD TEXTURES
     GLuint texture;
     glGenTextures(1, &texture);
@@ -3004,6 +2661,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     craft_impl::Attrib line_attrib = {0};
     craft_impl::Attrib text_attrib = {0};
     craft_impl::Attrib sky_attrib = {0};
+    craft_impl::Attrib screen_attrib = { 0 };
 
     GLuint program;
 
@@ -3058,13 +2716,16 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     sky_attrib.matrix = glGetUniformLocation(program, "matrix");
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
-    
-    SDL_snprintf(m_pimpl->m_model->db_path, MAX_PATH_LENGTH, "%s", DB_PATH);
 
-    m_pimpl->m_model->create_radius = CREATE_CHUNK_RADIUS;
-    m_pimpl->m_model->render_radius = RENDER_CHUNK_RADIUS;
-    m_pimpl->m_model->delete_radius = DELETE_CHUNK_RADIUS;
-    m_pimpl->m_model->sign_radius = RENDER_SIGN_RADIUS;
+#if defined(__EMSCRIPTEN__)
+    // @TODO : Screen space GLSL ES shader
+#else
+    program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
+#endif
+    screen_attrib.program = program;
+    screen_attrib.position = 0;
+    screen_attrib.uv = 1;
+    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads();
@@ -3072,9 +2733,10 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+    ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+    ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
+    ImGui::GetIO().IniFilename = nullptr;
 
     // Setup ImGui Platform/Renderer backends
     ImGui_ImplSDL3_InitForOpenGL(m_pimpl->m_model->window, m_pimpl->m_model->context);
@@ -3086,7 +2748,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
 #endif
     ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     ImGui::StyleColorsLight();
-    ImFont *nunito_sans_font = io.Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
+    ImFont *nunito_sans_font = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
 
 #if defined(MAZE_DEBUG)
     IM_ASSERT(nunito_sans_font != nullptr);
@@ -3110,43 +2772,33 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     };
 #define check_for_gl_err() _check_for_gl_err(__FILE__, __LINE__)
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() prior to the db init\n");
-    check_for_gl_err();
-#endif
-
     // DATABASE INITIALIZATION 
     if (USE_CACHE) {
         db_enable();
-        if (db_init(m_pimpl->m_model->db_path)) {
+        if (db_init(this->m_pimpl->m_model->db_path)) {
+#if defined(MAZE_DEBUG)
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "db_init failed\n");
+#endif
             return false;
         }
     }
 
-    // LOCAL VARIABLES 
-    m_pimpl->reset_model();
-    FPS fps = {0, 0, 0};
-    uint64_t last_commit = SDL_GetTicks();
+    // LOCAL VARIABLES
+    uint64_t previous = SDL_GetTicks();
 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
     craft_impl::Player *me = m_pimpl->m_model->players;
     craft_impl::State *p_state = &m_pimpl->m_model->players->state;
     me->id = 0;
-    me->name[0] = '\0';
+    me->name = "Player(me)";
     me->buffer = 0;
     m_pimpl->m_model->player_count = 1;
 
-    // magic variables to prevent black screen on load - modified in handle_events()
-    this->m_pimpl->m_model->is_ortho = 0;
-    this->m_pimpl->m_model->fov = 65;
-
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-
-    if (!loaded) {
-        p_state->y = static_cast<float>(m_pimpl->highest_block(p_state->x, p_state->z) + 5);
-    }
+    if (loaded)
+        p_state->y = 75.f;
 
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_algo_from_str(algos.back());
@@ -3187,7 +2839,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // Set key if outfile is specified
         ss << "{\"name\":\"" << outfile << "\", \"data\":[";
         // Wavefront object file header
-        ss << "\"# https://www.github.com/zmertens/MazeBuilder\\n\"";
+        ss << "\"# " << ZACHS_GH_REPO << "\\n\"";
         for (const auto& vertex : vertices) {
             ss << ",\"v " << get<0>(vertex) << " " << get<1>(vertex) << " " << get<2>(vertex) << "\\n\"";
         }
@@ -3215,9 +2867,62 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     int triangle_faces = 0;
     bool running = true;
 
+    auto create_fbo = [](auto width, auto height, GLuint& texture)->GLuint {
+        GLuint fbo, depthRenderbuffer;
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glGenTextures(1, &texture);
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+
+        glGenRenderbuffers(1, &depthRenderbuffer);
+        glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        // Check for FBO initialization errors
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "FBO initialization failed\n");
+            return 0;
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        return fbo;
+    };
+
+    GLuint fbo_texture = 0;
+    GLuint fbo = 0;
+
+    // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
+    static constexpr float quad_vertices[] = {
+        // positions   // texCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+    GLuint quad_vao = 0, quad_vbo = 0;
+    glGenVertexArrays(1, &quad_vao);
+    glGenBuffers(1, &quad_vbo);
+    glBindVertexArray(quad_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(quad_vao);
+
     m_pimpl->force_chunks(me);
 
-    uint64_t previous = SDL_GetTicks();
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -3225,237 +2930,28 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     while (running)
 #endif
     {
-        glViewport(0, 0, this->m_pimpl->m_model->width, this->m_pimpl->m_model->height);
         // FRAME RATE 
-        if (m_pimpl->m_model->time_changed) {
-            m_pimpl->m_model->time_changed = 0;
-            last_commit = SDL_GetTicks();
-            SDL_memset(&fps, 0, sizeof(fps));
-        }
-        update_fps(&fps);
         uint64_t now = SDL_GetTicks();
-        double dt = static_cast<double>(now - previous) / 1000.0;
-        dt = SDL_min(dt, 0.2);
-        dt = SDL_max(dt, 0.0);
-        previous = now;
+        double dt_ms = static_cast<double>(now - previous);
+        dt_ms = SDL_min(dt_ms, 0.2);
+        dt_ms = SDL_max(dt_ms, 0.0);
 
-        // Some state variables
+        // FLUSH DATABASE 
+        if (now - previous > COMMIT_INTERVAL) {
+            db_commit();
+            previous = now;
+        }
+
+        // Some GUI state variables
         static bool show_demo_window = false;
-        static bool show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
         static bool write_maze_now = false;
         static bool first_maze = true;
-        // Handle SDL events
-        bool events_handled_success = m_pimpl->handle_events(dt, ref(running), cref(get_maze_algo_from_str), cref(get_int), cref(rng));
 
-        // Start the Dear ImGui frame
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL3_NewFrame();
-        ImGui::NewFrame();
-        ImGui::PushFont(nunito_sans_font);
-        // Show the big demo window?
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-        show_mb_gui = !SDL_GetWindowRelativeMouseMode(this->m_pimpl->m_model->window);
-        // Maze Builder GUI
-        if (show_mb_gui) {
-            // GUI Title Bar
-            ImGui::Begin(this->m_pimpl->m_version.c_str());
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
-
-            // Set the time
-            int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-            char am_pm = hour < 12 ? 'a' : 'p';
-            hour = hour % 12;
-            hour = hour ? hour : 12;
-            ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-            ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
-            ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-            ImGui::Text("time: %d%cm", hour, am_pm);
-
-            // GUI Tabs
-            ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
-            if (ImGui::BeginTabBar("MyTabBar", tab_bar_flags)) {
-
-                if (ImGui::BeginTabItem("Builder")) {
-                    ImGui::Text("Builder settings");
-
-                    static unsigned int MAX_MAZE_WIDTH = 1000;
-                    if (ImGui::SliderInt("Width", &gui->maze_width, 25, MAX_MAZE_WIDTH)) {
-
-                    }
-                    static unsigned int MAX_MAZE_LENGTH = 1000;
-                    if (ImGui::SliderInt("Length", &gui->maze_length, 25, MAX_MAZE_LENGTH)) {
-
-                    }
-                    static unsigned int MAX_MAZE_HEIGHT = 15;
-                    if (ImGui::SliderInt("Height", &gui->maze_height, 1, MAX_MAZE_HEIGHT)) {
-                      
-                    }
-                    static unsigned int MAX_SEED_VAL = 1'000;
-                    if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
-                        rng.seed(static_cast<unsigned long>(gui->seed));
-                    }
-                    ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
-                    if (ImGui::TreeNode("Maze Generator")) {
-                        auto preview{ gui->maze_algo.c_str() };
-                        ImGui::NewLine();
-                        ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
-                        if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
-                            for (const auto& itr : algos) {
-                                bool is_selected = (itr == gui->maze_algo);
-                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
-                                    gui->maze_algo = itr;
-                                    my_maze_type = get_maze_algo_from_str(itr);
-                                }
-                                // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
-                                if (is_selected)
-                                    ImGui::SetItemDefaultFocus();
-                            }
-                            ImGui::EndCombo();
-                        }
-                        ImGui::NewLine();
-                        ImGui::TreePop();
-                    }
-
-                    // Check if user has added a prefix to the Wavefront object file
-                    if (gui->outfile[0] != '.') {
-                        if (ImGui::Button("Build!")) {
-                            progress_tracker->start();
-                            // Start the maze generation in the background
-                            maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
-                            progress_tracker->stop();
-                            // Hack to force the chunks to load, will reset the player's position next loop
-                            p_state->y = 1000.f;
-                            p_state->x = 1000.f;
-                            p_state->z = 1000.f;
-                        } else {
-                            ImGui::SameLine();
-                            ImGui::Text("Building maze... %s\n", gui->outfile);
-                        }
-                    } else {
-                        // Disable the button
-                        ImGui::BeginDisabled(true);
-                        ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
-
-                        // Render the button - don't need to check if the button is pressed because it's disabled
-                        ImGui::Button("Build!");
-
-                        // Re-enable items and revert style change
-                        ImGui::PopStyleVar();
-                        ImGui::EndDisabled();
-                    }
-
-                    // Let JavaScript handle file downloads in web browser
-#if !defined(__EMSCRIPTEN)  
-                    if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                        // Call the writer future and get the result
-                        bool success = write_success.get();
-                        if (success && gui->outfile[0] != '.') {
-                            // Dont display a message on the web browser, let the web browser handle that
-                            ImGui::NewLine();
-                            ImGui::Text("Maze written to %s\n", gui->outfile);
-                            ImGui::NewLine();
-                        } else {
-                            ImGui::NewLine();
-                            ImGui::Text("Failed to write maze: %s\n", gui->outfile);
-                            ImGui::NewLine();
-                        }
-                        // Reset outfile's first char and that will disable the Build! button
-                        gui->outfile[0] = '.';
-                    }
-#endif
-                    if (progress_tracker) {
-                        // Show progress when writing
-                        ImGui::NewLine();
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                        ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
-                        ImGui::NewLine();
-                        ImGui::PopStyleColor();
-                    }
-
-                    // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                    if (ImGui::Button("Reset")) {
-                        // Clear the GUI
-                    }
-                    ImGui::PopStyleColor();
-                    
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Graphics")) {
-                    ImGui::Text("Graphic settings");
-                    
-                    ImGui::Checkbox("Dark Mode", &gui->color_mode_dark);
-                    if (gui->color_mode_dark)
-                        ImGui::StyleColorsDark();
-                    else
-                        ImGui::StyleColorsLight();
-
-                    ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
-                    
-                    // Prevent setting SDL_Window settings every frame
-                    static bool last_fullscreen = gui->fullscreen;
-                    ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
-                    bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
-                    last_fullscreen = gui->fullscreen;
-                    if (update_fullscreen)
-                        SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
-
-                    static bool last_vsync = gui->vsync;
-                    ImGui::Checkbox("VSYNC", &gui->vsync);
-                    bool update_vsync = (last_vsync != gui->vsync) ? true : false;
-                    last_vsync = gui->vsync;
-                    if (update_vsync)
-                        SDL_GL_SetSwapInterval(gui->vsync);
-
-                    ImGui::Checkbox("Show Lights", &gui->show_lights);
-                    ImGui::Checkbox("Show Items", &gui->show_items);
-                    ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
-                    ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
-                    ImGui::Checkbox("Show Trees", &gui->show_trees);
-                    ImGui::Checkbox("Show Clouds", &gui->show_clouds);
-                    ImGui::Checkbox("Show Plants", &gui->show_plants);
-
-                                    
-                    ImGui::EndTabItem();
-                }
-                if (ImGui::BeginTabItem("Help")) {
-                    ImGui::Text("%s\n", this->m_pimpl->m_help.data());
-                    static constexpr auto github_repo = R"gh(https://github.com/zmertens/MazeBuilder)gh";
-                    ImGui::Text("\n");
-                    ImGui::Text(github_repo);
-                    ImGui::Text("\n");
-                    ImGui::EndTabItem();
-                }
-                ImGui::EndTabBar();
-            } // imgui tab handler
-            ImGui::End();
-            // ImGui::PopFont();
-        } // show_builder_gui
-
-        ImGui::Begin("Mouse Capture", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
-        ImGui::SetWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 150, ImGui::GetIO().DisplaySize.y - 50));
-        ImGui::SetWindowSize(ImVec2(150, 50));
-        if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
-            if (this->m_pimpl->m_gui->capture_mouse) {
-                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
-                this->m_pimpl->m_model->flying = 1;
-            } else {
-                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
-            }
-        }
-        ImGui::End();
-        ImGui::PopFont();
-
+        // Handle Maze events
         // Check if maze is available and then perform two async operations:
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
         // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            // Reset player state to roughly the origin
-            p_state->y = 10.f;
-            p_state->x = 0.f;
-            p_state->z = 0.f;
             // Get the maze and reset the future
             maze_gen_future.get();
             // Don't write the first maze that loads when app starts
@@ -3475,40 +2971,233 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             // Failed to set maze
         }
 
-        // FLUSH DATABASE 
-        if (now - last_commit > COMMIT_INTERVAL) {
-            last_commit = now;
-            db_commit();
-        }
-    
-        craft_impl::Player* player = m_pimpl->m_model->players + m_pimpl->m_model->observe1;
-
+        // Handle SDL events and motion updates
+        static int window_resizes = true;
+        running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
+        
         // PREPARE TO RENDER 
-        m_pimpl->m_model->observe1 = m_pimpl->m_model->observe1 % m_pimpl->m_model->player_count;
-        m_pimpl->m_model->observe2 = m_pimpl->m_model->observe2 % m_pimpl->m_model->player_count;
-    
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
-    
+
         me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
         for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
             m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
         }
 
-        // RENDER 3-D SCENE
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
-        glClear(GL_DEPTH_BUFFER_BIT);
+        // Use ImGui for GUI size calculations
+        ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, player);
-        m_pimpl->render_signs(&text_attrib, player);
-        m_pimpl->render_sign(&text_attrib, player);
-        m_pimpl->render_players(&block_attrib, player);
-        if (gui->show_wireframes) {
-            m_pimpl->render_wireframe(&line_attrib, player);
+        // Start the Dear ImGui frame
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL3_NewFrame();
+        ImGui::NewFrame();
+        ImGui::PushFont(nunito_sans_font);        
+
+        // Show the big demo window?
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
+
+        float tab_window_width = display_size.x * 0.25f;
+        // Tabs
+        ImGui::SetNextWindowPos(ImVec2(0, 0));
+        ImGui::SetNextWindowSize(ImVec2(display_size.x * 0.25f, display_size.y));
+        ImGui::Begin("Tab Bar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
+        if (ImGui::BeginTabBar("Tabs")) {
+            if (ImGui::BeginTabItem("Builder")) {
+                static unsigned int MAX_MAZE_WIDTH = 1'000;
+                if (ImGui::SliderInt("Width", &gui->maze_width, 5, MAX_MAZE_WIDTH)) {
+
+                }
+                static unsigned int MAX_MAZE_LENGTH = 1'000;
+                if (ImGui::SliderInt("Length", &gui->maze_length, 5, MAX_MAZE_LENGTH)) {
+
+                }
+                static unsigned int MAX_MAZE_HEIGHT = 15;
+                if (ImGui::SliderInt("Height", &gui->maze_height, 1, MAX_MAZE_HEIGHT)) {
+
+                }
+                static unsigned int MAX_SEED_VAL = 1'000;
+                if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
+                    rng.seed(static_cast<unsigned long>(gui->seed));
+                }
+                ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
+                if (ImGui::TreeNode("Maze Generator")) {
+                    auto preview{ gui->maze_algo.c_str() };
+                    ImGui::NewLine();
+                    ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
+                    if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
+                        for (const auto& itr : algos) {
+                            bool is_selected = (itr == gui->maze_algo);
+                            if (ImGui::Selectable(itr.c_str(), is_selected)) {
+                                gui->maze_algo = itr;
+                                my_maze_type = get_maze_algo_from_str(itr);
+                            }
+                            // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                            if (is_selected)
+                                ImGui::SetItemDefaultFocus();
+                        }
+                        ImGui::EndCombo();
+                    }
+                    ImGui::NewLine();
+                    ImGui::TreePop();
+                }
+
+                // Check if user has added a prefix to the Wavefront object file
+                if (gui->outfile[0] != '.') {
+                    if (ImGui::Button("Build!")) {
+                        progress_tracker->start();
+                        // Start the maze generation in the background
+                        maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
+                        progress_tracker->stop();
+                    } else {
+                        ImGui::SameLine();
+                        ImGui::Text("Building maze... %s\n", gui->outfile);
+                    }
+                } else {
+                    // Disable the button
+                    ImGui::BeginDisabled(true);
+                    ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
+
+                    // Render the button - don't need to check if the button is pressed because it's disabled
+                    ImGui::Button("Build!");
+
+                    // Re-enable items and revert style change
+                    ImGui::PopStyleVar();
+                    ImGui::EndDisabled();
+                }
+
+                // Let JavaScript handle file downloads in web browser  
+                if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
+                    // Call the writer future and get the result
+                    bool success = write_success.get();
+                    if (success && gui->outfile[0] != '.') {
+                        // Dont display a message on the web browser, let the web browser handle that
+                        ImGui::NewLine();
+                        ImGui::Text("Maze written to %s\n", gui->outfile);
+                        ImGui::NewLine();
+                    } else {
+                        ImGui::NewLine();
+                        ImGui::Text("Failed to write maze: %s\n", gui->outfile);
+                        ImGui::NewLine();
+                    }
+                    // Reset outfile's first char and that will disable the Build! button
+                    gui->outfile[0] = '.';
+                }
+                if (progress_tracker) {
+                    // Show progress when writing
+                    ImGui::NewLine();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+                    ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
+                    ImGui::NewLine();
+                    ImGui::PopStyleColor();
+                }
+
+                // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
+                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
+                if (ImGui::Button("Reset")) {
+                    // Clear the GUI
+                }
+                ImGui::PopStyleColor();
+
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Stats")) {
+                // Check the time
+                int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
+                char am_pm = hour < 12 ? 'a' : 'p';
+                hour = hour % 12;
+                hour = hour ? hour : 12;
+                ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
+                ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
+                ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
+                ImGui::Text("time: %d%cm", hour, am_pm);
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Graphics")) {                    
+                ImGui::Checkbox("Dark Mode", &gui->color_mode_dark);
+                if (gui->color_mode_dark)
+                    ImGui::StyleColorsDark();
+                else
+                    ImGui::StyleColorsLight();
+
+                ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
+                    
+                // Prevent setting SDL_Window settings every frame
+                static bool last_fullscreen = gui->fullscreen;
+                ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
+                bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
+                last_fullscreen = gui->fullscreen;
+                if (update_fullscreen)
+                    SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, gui->fullscreen);
+
+                static bool last_vsync = gui->vsync;
+                ImGui::Checkbox("VSYNC", &gui->vsync);
+                bool update_vsync = (last_vsync != gui->vsync) ? true : false;
+                last_vsync = gui->vsync;
+                if (update_vsync)
+                    SDL_GL_SetSwapInterval(gui->vsync);
+
+                ImGui::Checkbox("Show Lights", &gui->show_lights);
+                ImGui::Checkbox("Show Items", &gui->show_items);
+                ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
+                ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
+                ImGui::Checkbox("Show Trees", &gui->show_trees);
+                ImGui::Checkbox("Show Clouds", &gui->show_clouds);
+                ImGui::Checkbox("Show Plants", &gui->show_plants);
+                    
+                ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Help")) {
+                ImGui::Text("%s\n", this->m_pimpl->m_help.data());
+                ImGui::Text("\n");
+                ImGui::Text(ZACHS_GH_REPO);
+                ImGui::Text("\n");
+                ImGui::EndTabItem();
+            }
+            ImGui::EndTabBar();
+        } // Tabs
+        ImGui::End();
+
+        ImGui::SetNextWindowPos(ImVec2(tab_window_width, 0));
+        ImGui::SetNextWindowSize(ImVec2(display_size.x * 0.75f, display_size.y));
+        ImGui::Begin("Voxels",
+            nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoScrollbar |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar |
+            ImGuiWindowFlags_NoBringToFrontOnFocus
+        );
+
+        auto img_size = ImGui::GetWindowSize();
+        GLuint voxel_scene_w = static_cast<GLuint>(img_size.x);
+        GLuint voxel_scene_h = static_cast<GLuint>(img_size.y);
+        if (window_resizes) {
+            window_resizes = false;
+            glDeleteFramebuffers(1, &fbo);
+            glDeleteTextures(1, &fbo_texture);
+            fbo = create_fbo(voxel_scene_w, voxel_scene_h, ref(fbo_texture));
         }
 
-        // RENDER HUD 
+        // Bind the FBO that will store the 3D scene
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, voxel_scene_w, voxel_scene_h);
+        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
+        m_pimpl->render_signs(&text_attrib, me);
+        m_pimpl->render_sign(&text_attrib, me);
+        if (gui->show_wireframes) {
+            m_pimpl->render_wireframe(&line_attrib, me);
+        }
+
         glClear(GL_DEPTH_BUFFER_BIT);
         if (gui->show_crosshairs) {
             m_pimpl->render_crosshairs(&line_attrib);
@@ -3516,86 +3205,81 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib);
         }
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-        // RENDER TEXT 
-        char text_buffer[1024];
-        float ts = static_cast<float>(12 * m_pimpl->m_model->scale);
-        float tx = ts / 2.f;
-        float ty = m_pimpl->m_model->height - ts;
-        if (SHOW_CHAT_TEXT) {
-            for (int i = 0; i < MAX_MESSAGES; i++) {
-                int index = (m_pimpl->m_model->message_index + i) % MAX_MESSAGES;
-                if (SDL_strlen(m_pimpl->m_model->messages[index])) {
-                    m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts,
-                        m_pimpl->m_model->messages[index]);
-                    ty -= ts * 2;
-                }
-            }
-        }
-        if (m_pimpl->m_model->typing) {
-            SDL_snprintf(text_buffer, 1024, "> %s", m_pimpl->m_model->typing_buffer);
-            m_pimpl->render_text(&text_attrib, ALIGN_LEFT, tx, ty, ts, text_buffer);
-        }
-        if (SHOW_PLAYER_NAMES) {
-            if (player != me) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, ts, ts, player->name);
-            }
-            craft_impl::Player* other = m_pimpl->player_crosshair(player);
-            if (other) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(m_pimpl->m_model->width) / 2.f, static_cast<float>(m_pimpl->m_model->height) / 2.f - ts - 24.f, ts, other->name);
-            }
-        }
-
-        // RENDER PICTURE IN PICTURE 
-        if (m_pimpl->m_model->observe2) {
-            player = m_pimpl->m_model->players + m_pimpl->m_model->observe2;
-
-            int pw = 256 * m_pimpl->m_model->scale;
-            int ph = 256 * m_pimpl->m_model->scale;
-            int offset = 32 * m_pimpl->m_model->scale;
-            int pad = 3 * m_pimpl->m_model->scale;
-            int sw = pw + pad * 2;
-            int sh = ph + pad * 2;
-
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(m_pimpl->m_model->width - sw - offset + pad, offset - pad, sw, sh);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glDisable(GL_SCISSOR_TEST);
-            glClear(GL_DEPTH_BUFFER_BIT);
-            glViewport(m_pimpl->m_model->width - pw - offset, offset, pw, ph);
-
-            m_pimpl->m_model->width = pw;
-            m_pimpl->m_model->height = ph;
-            m_pimpl->m_model->is_ortho = false;
-            m_pimpl->m_model->fov = 65;
-
-            m_pimpl->render_sky(&sky_attrib, player, sky_buffer);
-
-            glClear(GL_DEPTH_BUFFER_BIT);
-            m_pimpl->render_chunks(&block_attrib, player);
-
-            m_pimpl->render_signs(&text_attrib, player);
-
-            m_pimpl->render_players(&block_attrib, player);
-
-            glClear(GL_DEPTH_BUFFER_BIT);
-
-            if (SHOW_PLAYER_NAMES) {
-                m_pimpl->render_text(&text_attrib, ALIGN_CENTER, static_cast<float>(pw) / 2.f, ts, ts, player->name);
-            }
-        } // render picture in picture
-            
-        ImGui::Render();
-
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-        SDL_GL_SwapWindow(m_pimpl->m_model->window);
+        glUseProgram(screen_attrib.program);
+        glBindVertexArray(quad_vao);
+        glBindTexture(GL_TEXTURE_2D, fbo_texture);
+        //glUniform1i(attrib->sampler, 2);
+        glDisable(GL_DEPTH_TEST);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
 #if defined(MAZE_DEBUG)
-            check_for_gl_err();
+        check_for_gl_err();
 #endif
 
-        if (!events_handled_success || !running) {
+        // Flip UV coordinates for the image
+        ImVec2 uv0 = ImVec2(0.0f, 1.0f);
+        ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+        glBindTexture(GL_TEXTURE_2D, fbo_texture);
+        glActiveTexture(GL_TEXTURE4);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(fbo_texture)), { img_size.x, img_size.y }, uv0, uv1);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        ImGui::End();
+
+#if defined(MAZE_DEBUG)
+        check_for_gl_err();
+#endif
+
+        ImGui::Begin("Mouse Capture", 
+            nullptr, 
+            ImGuiWindowFlags_NoMove | 
+            ImGuiWindowFlags_NoResize | 
+            ImGuiWindowFlags_NoTitleBar);
+        ImGui::SetWindowPos(ImVec2(display_size.x - 150, display_size.y - 50));
+        ImGui::SetWindowSize(ImVec2(150, 50));
+        if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
+            if (this->m_pimpl->m_gui->capture_mouse) {
+                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_TRUE);
+            } else {
+                SDL_SetWindowRelativeMouseMode(this->m_pimpl->m_model->window, SDL_FALSE);
+            }
+        }
+        ImGui::End();
+
+#if defined(MAZE_DEBUG)
+        ImVec2 fps_window_size = ImVec2(display_size.x * 0.35f, 50);
+        ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.8f - fps_window_size.x, 0));
+        ImGui::SetNextWindowSize(fps_window_size);
+        ImGui::Begin("Framerate Window",
+            nullptr,
+            ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoMove |
+            ImGuiWindowFlags_NoTitleBar
+        );
+        ImGui::SetWindowFontScale(1.25f);
+        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::End();
+#endif
+
+        ImGui::PopFont();
+            
+        ImGui::Render();
+        glViewport(0, 0, display_size.x, display_size.y);
+        glDisable(GL_DEPTH_TEST);
+        glClear(GL_COLOR_BUFFER_BIT);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+        SDL_GL_SwapWindow(this->m_pimpl->m_model->window);
+
+#if defined(MAZE_DEBUG)
+        check_for_gl_err();
+#endif
+
+        if (!running) {
 #if defined(__EMSCRIPTEN__)
             emscripten_cancel_main_loop();
 #endif
@@ -3606,32 +3290,23 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         EMSCRIPTEN_MAINLOOP_END;
 #endif
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("Cleaning up ImGui objects. . .");
-    SDL_Log("Cleaning up OpenGL objects. . .");
-    SDL_Log("Cleaning up SDL objects. . .");
-#endif
-
     m_pimpl->cleanup_worker_threads();
 
 #if defined(MAZE_DEBUG)
+    check_for_gl_err();
     SDL_Log("Closing DB. . .\n");
+    SDL_Log("Cleaning up ImGui objects. . .");
+    SDL_Log("Cleaning up OpenGL objects. . .");
+    SDL_Log("Cleaning up SDL objects. . .");
 #endif
 
     db_save_state(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
     db_close();
     db_disable();
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("Deleting buffer objects. . .");
-#endif
     m_pimpl->del_buffer(sky_buffer);
     m_pimpl->delete_all_chunks();
     m_pimpl->delete_all_players();
-#if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() at the end of the event loop\n");
-    check_for_gl_err();
-#endif
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -3641,13 +3316,18 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &fbo_texture);
+    glDeleteVertexArrays(1, &quad_vao);
+    glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
+    glDeleteProgram(screen_attrib.program);
 
-    SDL_GL_DestroyContext(m_pimpl->m_model->context);
-    SDL_DestroyWindow(m_pimpl->m_model->window);
+    SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
+    SDL_DestroyWindow(this->m_pimpl->m_model->window);
     SDL_Quit();
 
     return true;
