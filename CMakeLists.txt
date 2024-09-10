@@ -64,7 +64,8 @@ set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/distances.cpp)
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
@@ -85,8 +86,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
 endif()
 
 add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
-target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
+target_include_directories(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
 
 add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)

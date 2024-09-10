@@ -5,6 +5,7 @@ namespace mazes {
     enum class file_types {
         PLAIN_TEXT,
         WAVEFRONT_OBJ_FILE,
+        PNG,
         UNKNOWN
     };
 }

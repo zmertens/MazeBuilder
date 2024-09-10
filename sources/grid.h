@@ -15,10 +15,11 @@
 
 #include "cell.h"
 #include "maze_types_enum.h"
+#include "grid_interface.h"
 
 namespace mazes {
 
-class grid {
+class grid : public grid_interface {
 public:
     grid(unsigned int rows, unsigned int columns, unsigned int height = 0);
 
@@ -32,15 +33,17 @@ public:
     void grow(std::unique_ptr<grid> const& other_grid) noexcept;
     void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
     std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
-    bool is_solveable() const noexcept;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
-private:
 
+    // Get bytewise representation of the grid
+    std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept;
+private:
     bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
-
+    
+    // Grid tostring method
     friend std::ostream& operator<<(std::ostream& os, grid& g) {
         // First sort cells by row then column
         std::vector<std::shared_ptr<cell>> cells;
@@ -93,6 +96,9 @@ private:
     std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
     const unsigned int m_rows, m_columns, m_height;
+
+    virtual std::uint16_t contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 }; // class
 
 } // namespace mazes

@@ -6,6 +6,7 @@
 
 #include "file_types_enum.h"
 #include "writer.h"
+#include "grid.h"
 
 using namespace std;
 using namespace mazes;
@@ -30,6 +31,16 @@ TEST_CASE("Writer can receive program arguments", "[determine output format]") {
 	REQUIRE(my_writer.get_filetype("stdout") == file_types::UNKNOWN);
 }
 
-TEST_CASE("Writer can produce a data format for output", "[reads data]") {
+TEST_CASE("Writer can produce a PNG file", "[does png]") {
+	grid my_grid{ 100, 150 };
+	auto&& my_png = my_grid.to_png();
+
+	REQUIRE(!my_png.empty());
+
+	writer my_writer;
+
+	REQUIRE(my_writer.get_filetype("1.png") == file_types::PNG);
+
+	//REQUIRE(my_writer.write("1.png", my_png, my_grid.get_rows(), my_grid.get_columns()));
 
 }

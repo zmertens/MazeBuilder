@@ -215,13 +215,6 @@ shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, unsigned int i
     }
 }
 
-/**
-* Find Dijkstra's shortest path
-*/
-bool grid::is_solveable() const noexcept {
-    return false;
-}
-
 void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
     if (parent != nullptr) {
         this->sort(parent->get_left(), ref(cells_to_sort));
@@ -237,4 +230,90 @@ void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr
 void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
     // now use STL sort by row, column with custom lambda function
     std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
+}
+
+/**
+ * @brief
+ * @param cell_size = 25
+ */
+vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
+    int png_w = cell_size * this->get_columns();
+    int png_h = cell_size * this->get_rows();
+    // Init png data with white background
+    vector<uint8_t> png_data ((png_w + 1) * (png_h + 1) * 4, 255);
+
+    // Black
+    uint32_t wall_color = 0x000000FF;
+
+    // Helper functions to populate png_data
+    auto draw_rect = [&png_data, &png_w, &png_h](int x1, int y1, int x2, int y2, uint32_t color) {
+        for (int y = y1; y <= y2; ++y) {
+            for (int x = x1; x <= x2; ++x) {
+                int index = (y * (png_w + 1) + x) * 4;
+                png_data[index] = (color >> 24) & 0xFF;
+                png_data[index + 1] = (color >> 16) & 0xFF;
+                png_data[index + 2] = (color >> 8) & 0xFF;
+                png_data[index + 3] = color & 0xFF;
+            }
+        }
+    };
+
+    auto draw_line = [&png_data, &png_w, &png_h](int x1, int y1, int x2, int y2, uint32_t color) {
+        if (x1 == x2) {
+            for (int y = y1; y <= y2; ++y) {
+                int index = (y * (png_w + 1) + x1) * 4;
+                png_data[index] = (color >> 24) & 0xFF;
+                png_data[index + 1] = (color >> 16) & 0xFF;
+                png_data[index + 2] = (color >> 8) & 0xFF;
+                png_data[index + 3] = color & 0xFF;
+            }
+        } else if (y1 == y2) {
+            for (int x = x1; x <= x2; ++x) {
+                int index = (y1 * (png_w + 1) + x) * 4;
+                png_data[index] = (color >> 24) & 0xFF;
+                png_data[index + 1] = (color >> 16) & 0xFF;
+                png_data[index + 2] = (color >> 8) & 0xFF;
+                png_data[index + 3] = color & 0xFF;
+            }
+        }
+    };
+
+    shared_ptr<cell>&& current = this->search(this->get_root(), 0);
+
+    while (current) {
+        int x1 = current->get_column() * cell_size;
+        int y1 = current->get_row() * cell_size;
+        int x2 = (current->get_column() + 1) * cell_size;
+        int y2 = (current->get_row() + 1) * cell_size;
+
+        uint32_t color = this->background_color_for(current);
+
+        draw_rect(x1, y1, x2, y2, color);
+
+        if (!current->is_linked(current->get_north())) {
+			draw_line(x1, y1, x2, y1, wall_color);
+		}
+        if (!current->is_linked(current->get_west())) {
+            draw_line(x1, y1, x1, y2, wall_color);
+        }
+        if (!current->is_linked(current->get_east())) {
+			draw_line(x2, y1, x2, y2, wall_color);
+		}
+        if (!current->is_linked(current->get_south())) {
+			draw_line(x1, y2, x2, y2, wall_color);
+		}
+
+        current = this->search(this->get_root(), current->get_index() + 1);
+    }
+
+	return png_data;
+
+}
+
+std::uint16_t grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+    return ' ';
+}
+
+std::uint32_t grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+    return 0xFFFFFFFF;
 }

@@ -130,9 +130,12 @@ int main(int argc, char* argv[]) {
                     return my_writer.write(maze_args.output, data);
                 };
                 bool is_wavefront_file = (my_writer.get_filetype(maze_args.output) == mazes::file_types::WAVEFRONT_OBJ_FILE);
+                bool is_png = (my_writer.get_filetype(maze_args.output) == mazes::file_types::PNG);
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
-                } else {
+                } else if (is_png) {
+					//success = write_func(my_maze.to_png());
+				} else {
                     success = write_func(maze_str);
                 }
                 
