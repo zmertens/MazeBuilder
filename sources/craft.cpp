@@ -330,8 +330,8 @@ struct craft::craft_impl {
         int sign_radius;
         Player players[MAX_PLAYERS];
         int player_count;
-        int width;
-        int height;
+        int voxel_scene_w;
+        int voxel_scene_h;
         bool flying;
         int item_index;
         int scale;
@@ -535,8 +535,8 @@ struct craft::craft_impl {
     }
 
     GLuint gen_crosshair_buffer() {
-        float x = static_cast<float>(this->m_model->width) / 2.0f;
-        float y = static_cast<float>(this->m_model->height) / 2.0f;
+        float x = static_cast<float>(this->m_model->voxel_scene_w) / 2.0f;
+        float y = static_cast<float>(this->m_model->voxel_scene_h) / 2.0f;
         float p = 10.f * static_cast<float>(this->m_model->scale);
         float data[] = {
             x, y - p, x, y + p,
@@ -1601,7 +1601,7 @@ struct craft::craft_impl {
         }
     }
 
-    // Used to init the terrain (chunks) around the player -- skip empty maze parts
+    // Used to init the terrain (chunks) around the player
     void force_chunks(Player *player) {     
         State *s = &player->state;
         int p = chunked(s->x);
@@ -1636,7 +1636,7 @@ struct craft::craft_impl {
     void ensure_chunks_worker(Player *player, Worker *worker) {
         State *s = &player->state;
         float matrix[16];
-        set_matrix_3d(matrix, this->m_model->width, this->m_model->height, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
+        set_matrix_3d(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h, s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
         int p = chunked(s->x);
@@ -1900,7 +1900,7 @@ struct craft::craft_impl {
         float matrix[16];
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
@@ -1934,7 +1934,7 @@ struct craft::craft_impl {
         int q = chunked(s->z);
         float matrix[16];
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
@@ -1967,7 +1967,7 @@ struct craft::craft_impl {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
@@ -1987,7 +1987,7 @@ struct craft::craft_impl {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
@@ -2006,7 +2006,7 @@ struct craft::craft_impl {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             0, 0, 0, s->rx, s->ry, this->m_model->fov, 0, this->m_model->render_radius);
         
         glUseProgram(attrib->program);
@@ -2021,7 +2021,7 @@ struct craft::craft_impl {
         State *s = &player->state;
         float matrix[16];
         set_matrix_3d(
-            matrix, this->m_model->width, this->m_model->height,
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
@@ -2037,7 +2037,7 @@ struct craft::craft_impl {
 
     void render_crosshairs(Attrib *attrib) {
         float matrix[16];
-        set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
+        set_matrix_2d(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h);
         glUseProgram(attrib->program);
         glLineWidth(static_cast<GLfloat>(4 * this->m_model->scale));
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
@@ -2048,7 +2048,7 @@ struct craft::craft_impl {
 
     void render_item(Attrib *attrib) {
         float matrix[16];
-        set_matrix_item(matrix, this->m_model->width, this->m_model->height, this->m_model->scale);
+        set_matrix_item(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h, this->m_model->scale);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, 0, 0, 5);
@@ -2069,7 +2069,7 @@ struct craft::craft_impl {
 
     void render_text(Attrib *attrib, int justify, float x, float y, float n, char *text) {
         float matrix[16];
-        set_matrix_2d(matrix, this->m_model->width, this->m_model->height);
+        set_matrix_2d(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 1);
@@ -2160,13 +2160,10 @@ struct craft::craft_impl {
         int sx = 0;
         float mouse_mv = 0.0025f;
         float dir_mv = 0.025f;
-        int sc = -1, code = -1;
+        int sc = -1;
 
         SDL_Keymod mod_state = SDL_GetModState();
 
-        bool imgui_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_AnyWindow);
-
-        int control = mod_state;
         SDL_Event e;
         while (SDL_PollEvent(&e)) {
             ImGui_ImplSDL3_ProcessEvent(&e);
@@ -2184,7 +2181,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case SDL_SCANCODE_RETURN: {
-                    if (!imgui_focused && this->m_model->typing) {
+                    if (this->m_model->typing) {
                         if (mod_state) {
                             if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                                 this->m_model->typing_buffer[this->m_model->text_len] = '\n';
@@ -2203,7 +2200,7 @@ struct craft::craft_impl {
                             }
                         }
                     } else {
-                        if (control) {
+                        if (mod_state) {
                             this->on_right_click();
                         } else {
                             this->on_left_click();
@@ -2222,22 +2219,22 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    if (!imgui_focused && !this->m_model->typing)
+                    if (!this->m_model->typing)
                         this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     break;
                 }
                 case KEY_FLY: {
-                    if (!imgui_focused && !this->m_model->typing)
+                    if (!this->m_model->typing)
                         this->m_model->flying = !this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    if (!imgui_focused && !this->m_model->typing)
+                    if (!this->m_model->typing)
                         this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    if (!imgui_focused && !this->m_model->typing) {
+                    if (!this->m_model->typing) {
                         this->m_model->item_index--;
                         if (this->m_model->item_index < 0)
                             this->m_model->item_index = item_count - 1;
@@ -2245,7 +2242,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_CHAT: {
-                    if (!imgui_focused && !this->m_model->typing) {
+                    if (!this->m_model->typing) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         this->m_model->text_len = 0;
@@ -2254,7 +2251,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_COMMAND: {
-                    if (!imgui_focused && !this->m_model->typing) {
+                    if (!this->m_model->typing) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2262,7 +2259,7 @@ struct craft::craft_impl {
                     break;
                 }
                 case KEY_SIGN: {
-                    if (!imgui_focused && this->m_gui->capture_mouse) {
+                    if (this->m_gui->capture_mouse) {
                         this->m_model->typing = 1;
                         this->m_model->typing_buffer[0] = '\0';
                         SDL_StartTextInput(this->m_model->window);
@@ -2273,7 +2270,7 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
-                if (!imgui_focused && this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
+                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
                     SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
                     this->m_model->text_len += SDL_strlen(e.text.text);
                 }
@@ -2299,20 +2296,20 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
-                    if (control) {
+                if (SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
+                    if (mod_state) {
                         on_right_click();
                     } else {
                         on_left_click();
                     }
-                } else if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
-                    if (control) {
+                } else if (SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
+                    if (mod_state) {
                         on_light();
                     } else {
                         on_right_click();
                     }
                 } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                    if (SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                         on_middle_click();
                     }
                 }
@@ -2320,8 +2317,7 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (!imgui_focused && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
-                    // TODO might have to change this to force 1 step
+                if (SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                     if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
                         this->m_model->item_index += e.wheel.y;
                     } else {
@@ -2335,10 +2331,11 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_WINDOW_SHOWN:
+            case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+            case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+            case SDL_EVENT_WINDOW_MAXIMIZED:
             case SDL_EVENT_WINDOW_RESIZED: {
                 window_resizes = true;
-                this->m_model->scale = get_scale_factor();
-                SDL_GetWindowSizeInPixels(this->m_model->window, &this->m_model->width, &this->m_model->height);
                 break;
             }
             } // switch
@@ -2347,7 +2344,7 @@ struct craft::craft_impl {
 
         const SDL_bool *state = SDL_GetKeyboardState(nullptr);
 
-        if (!(imgui_focused || this->m_model->typing)) {
+        if (!(this->m_model->typing)) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
             if (state[KEY_FORWARD]) sz--;
@@ -2489,8 +2486,8 @@ struct craft::craft_impl {
         this->m_model->day_length = DAY_LENGTH;
         this->m_model->start_time = (this->m_model->day_length / 3)*1000;
         this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
-        this->m_model->width = INIT_WINDOW_WIDTH;
-        this->m_model->height = INIT_WINDOW_HEIGHT;
+        this->m_model->voxel_scene_w = INIT_WINDOW_WIDTH;
+        this->m_model->voxel_scene_h = INIT_WINDOW_HEIGHT;
         this->m_model->scale = 1;
         this->m_model->is_ortho = false;
         this->m_model->fov = 65.f;
@@ -2702,9 +2699,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     ImGui::StyleColorsLight();
     ImFont *nunito_sans_font = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
 
-#if defined(MAZE_DEBUG)
     IM_ASSERT(nunito_sans_font != nullptr);
-#endif
     
     auto _check_for_gl_err = [](const char *file, int line) -> GLenum {
         GLenum errorCode;
@@ -2812,7 +2807,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     };
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() prior to event loop\n");
+    SDL_Log("check_for_gl_err() prior to game loop\n");
     check_for_gl_err();
 #endif
 
@@ -2835,8 +2830,8 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
         glGenRenderbuffers(1, &depthRenderbuffer);
         glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
 
         // Check for FBO initialization errors
         GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
@@ -2902,8 +2897,6 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-    m_pimpl->force_chunks(me);
-
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -2913,7 +2906,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
     {
         // FRAME RATE 
         uint64_t now = SDL_GetTicks();
-        double dt_ms = static_cast<double>(now - previous);
+        double dt_ms = static_cast<double>(now - previous) / 1000.0;
         dt_ms = SDL_min(dt_ms, 0.2);
         dt_ms = SDL_max(dt_ms, 0.0);
 
@@ -2944,7 +2937,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             // Writing the maze will run in the background - only do that on Desktop
             write_maze_now = false;
             // Only write the maze when **NOT** on the web browser
-#if !defined(__EMSCRIPTEN__ )
+#if !defined(__EMSCRIPTEN__)
             write_success = maze_writer_fut(gui->outfile);
 #endif
             this->m_pimpl->m_gui->maze_json = json_writer(gui->outfile);
@@ -2955,7 +2948,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         // Handle SDL events and motion updates
         static int window_resizes = false;
         running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
-        
+
         // Use ImGui for GUI size calculations
         ImVec2 display_size = ImGui::GetIO().DisplaySize;
 
@@ -3152,17 +3145,26 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
             ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        ImVec2 voxel_scene_size = ImGui::GetWindowSize();
+        if (ImGui::IsWindowHovered()) {
+        }
+
+        ImVec2 voxel_scene_size = ImGui::GetContentRegionAvail();
         GLuint voxel_scene_w = static_cast<GLuint>(voxel_scene_size.x);
         GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
 
         // Check if scene size changed
         if (window_resizes && display_size.x > 0 && display_size.y > 0) {
             window_resizes = false;
-            glDeleteTextures(1, &get<2>(fbo_tuple));
-            glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
-            glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+            this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
+            this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
+            if (get<0>(fbo_tuple) != 0) {
+                glDeleteTextures(1, &get<2>(fbo_tuple));
+				glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
+				glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+			}
+            
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
+            this->m_pimpl->m_model->scale = this->m_pimpl->get_scale_factor();
         }
 
         // Bind the FBO that will store the 3D scene
