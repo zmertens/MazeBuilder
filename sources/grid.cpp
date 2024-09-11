@@ -179,11 +179,14 @@ void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept {
 }
 
 /**
- * Iterate through the other_grid and insert to the current grid's root
- * Increment other_grid's indices 'i' by this current grid's max + 'i'
-*/
-void grid::grow(std::unique_ptr<grid> const& other_grid) noexcept {
-
+ * @brief Iterate through the other_grid and insert to the current grid's root
+ */
+void grid::append(std::unique_ptr<grid> const& other_grid) noexcept {
+    vector<shared_ptr<cell>> cells_to_sort;
+    other_grid->populate_vec(ref(cells_to_sort));
+    for (auto&& c : cells_to_sort) {
+        this->insert(this->get_root(), c->get_row(), c->get_column(), c->get_index());
+    }
 }
 
 /**
