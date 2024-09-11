@@ -215,11 +215,28 @@ shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, unsigned int i
     }
 }
 
-/**
-* Find Dijkstra's shortest path
-*/
-bool grid::is_solveable() const noexcept {
-    return false;
+void grid::del(std::shared_ptr<cell> parent, unsigned int index) noexcept {
+    if (!parent) 
+        return;
+
+    if (index < parent->get_index()) {
+        del(parent->get_left(), index);
+    } else if (index > parent->get_index()) {
+        del(parent->get_right(), index);
+    } else {
+        // Node to delete has no children
+        if (parent->get_left() == nullptr && parent->get_right() == nullptr) {
+            parent = nullptr;
+        } else if (parent->get_left() == nullptr) {
+            parent = parent->get_right();
+        } else if (parent->get_right() == nullptr) {
+            parent = parent->get_left();
+        } else {
+            auto min = min_index(parent->get_right());
+            parent->set_index(min);
+            del(parent->get_right(), min);
+        }
+    }
 }
 
 void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {

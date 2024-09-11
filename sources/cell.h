@@ -38,13 +38,15 @@ public:
     void set_left(std::shared_ptr<cell> const& other_left);
     void set_right(std::shared_ptr<cell> const& other_right);
 
+    void set_index(unsigned int i) noexcept;
+
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 
     std::unordered_map<std::shared_ptr<cell>, bool> m_links;
 
-    const unsigned int m_row, m_column;
-    const unsigned int m_index;
+    unsigned int m_row, m_column;
+    unsigned int m_index;
 
     std::shared_ptr<cell> m_north;
     std::shared_ptr<cell> m_south;

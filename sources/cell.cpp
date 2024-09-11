@@ -122,3 +122,7 @@ void cell::set_left(std::shared_ptr<cell> const& other_left) {
 void cell::set_right(std::shared_ptr<cell> const& other_right) {
     this->m_right = other_right;
 }
+
+void cell::set_index(unsigned int i) noexcept {
+    this->m_index = i;
+}
