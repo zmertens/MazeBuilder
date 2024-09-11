@@ -21,6 +21,8 @@ build/
 # Script output files
 scripts/*.txt
 scripts/*.png
+!scripts/nopath.png
+!scripts/wilsons_maze.png
 scripts/*.PNG
 scripts/*.jpg
 scripts/*.jpeg

@@ -1,4 +1,7 @@
-# Implementing maze generation algorithms in Ruby
+# Working through different maze algorithms from the book "Mazes for Programmers"
+# https://www.amazon.com/Mazes-Programmers-Twisty-Little-Passages/dp/1680500554?ref_=ast_sto_dp
+
+# Program outputs PNG files to the current directory or ouputs strings to the console
 
 require 'chunky_png'
 
