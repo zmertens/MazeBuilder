@@ -3193,11 +3193,12 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         }
         
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(screen_attrib.program);
         glBindVertexArray(quad_vao);
         glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-        glUniform1i(screen_attrib.sampler, 4);
+        // glUniform1i(screen_attrib.sampler, 4);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
@@ -3254,7 +3255,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
         ImGui::PopFont();
             
         ImGui::Render();
-        glViewport(0, 0, display_size.x, display_size.y);
+        glViewport(0, 0, abs(display_size.x), abs(display_size.y));
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
