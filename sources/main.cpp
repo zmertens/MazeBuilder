@@ -134,7 +134,8 @@ int main(int argc, char* argv[]) {
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else if (is_png) {
-					//success = write_func(my_maze.to_png());
+                    mazes::grid gg { maze_args.width, maze_args.length };
+					success = my_writer.write_png(maze_args.output, gg.to_png(), maze_args.width, maze_args.length);
 				} else {
                     success = write_func(maze_str);
                 }

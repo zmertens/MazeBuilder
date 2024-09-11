@@ -48,11 +48,9 @@ file_types writer::get_filetype(const std::string& filename) const noexcept {
  * @brief writer::write
  * @param filename can be stdout, .txt, or .obj
  * @param data represents a grid in plain text (ASCII) or Wavefront object file (mesh) or PNG (bytes)
- * @param w = 1
- * @param h = 1
  * @return
  */
-bool writer::write(const std::string& filename, const std::string& data, const unsigned int w, const unsigned int h) const {
+bool writer::write(const std::string& filename, const std::string& data) const {
 
     if (filename.compare("stdout") == 0) {
         cout << data << endl;
@@ -73,8 +71,6 @@ bool writer::write(const std::string& filename, const std::string& data, const u
 			this->write_file(filename, data);
 		} else if (ftype == file_types::WAVEFRONT_OBJ_FILE) {
 			this->write_file(filename, data);
-		} else if (ftype == file_types::PNG) {
-			this->write_png(filename, data, w, h);
 		} else {
 			throw new runtime_error("Unknown file type for filename: " + filename);
 		}
@@ -88,22 +84,22 @@ bool writer::write(const std::string& filename, const std::string& data, const u
  * @brief writer::write_file
  * @param filename
  * @param data
+ * @param w = 1
+ * @param h = 1
  */
-void writer::write_file(const std::string& filename, const std::string& data) const {
-    filesystem::path data_path {filename};
-    ofstream out_writer {data_path};
-	out_writer << data;
-	out_writer.close();
+bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data, const unsigned int w, const unsigned int h) const {
+	static constexpr auto CELL_SIZE = 25;
+	return stbi_write_png(filename.c_str(), w * CELL_SIZE + 1, h * CELL_SIZE + 1, 4, data.data(), (w * CELL_SIZE + 1) * 4);
 }
 
 /**
  * @brief writer::write_file
  * @param filename
  * @param data
- * @param w = 1
- * @param h = 1
  */
-void writer::write_png(const std::string& filename, const std::string& data, const unsigned int w, const unsigned int h) const {
-	static constexpr auto CELL_SIZE = 25;
-	stbi_write_png(filename.c_str(), w * CELL_SIZE + 1, h * CELL_SIZE + 1, 4, data.data(), (w * CELL_SIZE + 1) * 4);
+void writer::write_file(const std::string& filename, const std::string& data) const {
+    filesystem::path data_path {filename};
+    ofstream out_writer {data_path};
+	out_writer << data;
+	out_writer.close();
 }
