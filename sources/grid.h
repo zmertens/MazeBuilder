@@ -30,9 +30,10 @@ public:
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
     std::shared_ptr<cell> get_root() const noexcept;
     void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
-    void grow(std::unique_ptr<grid> const& other_grid) noexcept;
+    void append(std::unique_ptr<grid> const& other_grid) noexcept;
     void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
     std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
+    void del(std::shared_ptr<cell> parent, unsigned int index) noexcept;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;

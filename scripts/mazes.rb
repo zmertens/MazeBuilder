@@ -1,4 +1,7 @@
-# Implementing maze generation algorithms in Ruby
+# Working through different maze algorithms from the book "Mazes for Programmers"
+# https://www.amazon.com/Mazes-Programmers-Twisty-Little-Passages/dp/1680500554?ref_=ast_sto_dp
+
+# Program outputs PNG files to the current directory or ouputs strings to the console
 
 require 'chunky_png'
 
@@ -241,6 +244,14 @@ class Grid
         end
         img
     end
+
+    def deadends()
+        deadends = []
+        each_cell do |cell|
+            deadends << cell if cell.links.count == 1
+        end
+        deadends
+    end
 end
 
 class DistanceGrid < Grid
@@ -358,17 +369,65 @@ class Wilsons
     end
 end
 
-6.times do |n|
+class HuntAndKill
+    def self.on(grid)
+        current = grid.random_cell
+        while current
+            unvisited_neighbors = current.neighbors.select { |n| n.links.empty? }
+            # Kill phase
+            if unvisited_neighbors.any?
+                neighbor = unvisited_neighbors.sample
+                current.link(neighbor)
+                current = neighbor
+            else
+                current = nil
+                # Hunt phase
+                grid.each_cell do |cell|
+                    visited_neighbors = cell.neighbors.select{ |n| !n.links.empty? }
+                    if cell.links.empty? && visited_neighbors.any?
+                        current = cell
+                        neighbor = visited_neighbors.sample
+                        current.link(neighbor)
+                        break
+                    end
+                end
+            end
+        end
+        grid
+    end
+end
+
+class RecursiveBacktracker
+    def self.on(grid, start_at: grid.random_cell)
+        s = []
+        s.push(start_at)
+        while s.any?
+            current = s.last
+            neighbors = current.neighbors.select { |n| n.links.empty? }
+            if neighbors.empty?
+                s.pop
+            else
+                neighbor = neighbors.sample
+                current.link(neighbor)
+                s.push(neighbor)
+            end
+        end
+        grid
+    end
+end
+
+2.times do |n|
 
     grid = ColoredGrid.new(35, 25)
-    AldousBroder.on(grid)
+    RecursiveBacktracker.on(grid)
 
     start = grid[0, 0]
     end1 = grid[grid.rows / 2, grid.columns / 2]
 
     grid.distances = start.distances.path_to(end1)
 
-    filename = "ab%02d.png" % n
+    filename = "recbak%02d.png" % n
     grid.to_png.save(filename)
     puts "saved to #{filename}"
+    puts "Deadends: #{grid.deadends.count}"
 end

@@ -1,12 +1,11 @@
 # Maze Builder
 
 Build and download mazes interactively or using the command-line interface (CLI).
-Rapidly prototype and build a random maze and export it straight to a Wavefront object file.
+Rapidly prototype the design process with just an algorithm, width, length, and height.
+Export the maze straight to a Wavefront object or PNG file.
 Exports can then be integrated into game engines and renderers like Unity, Godot, Blender and so forth.
 
-[Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
-
-![Release screenshot 325](textures/maze_builder_releas325.png)
+![Release screenshot](scripts/wilsons_maze.png)
 
 ## Commands and Help Message
 
@@ -20,7 +19,7 @@ Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
   -y, --height       maze height [default=10]
   -l, --length       maze length [default=100]
   -i, --interactive  run program in interactive mode with a GUI
-  -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
+  -o, --output       stdout [default], plain text [.txt], PNG [.png], or Wavefront [.obj]
   -h, --help         display this help message
   -v, --version      display program version
 ```
@@ -37,21 +36,11 @@ maze_builder.exe -i
 
 ## CMake
 
-This project uses `cmake` to build and test the project. It uses `find_package` and `FetchContent` to get SDL and Catch2 if necessary.
+This project uses `cmake` to as the build and test system. It uses `find_package` and `FetchContent` to get SDL and Catch2 if necessary.
 It requires modern hardware supporting pthreads and OpenGL 3.0. The SDL library is used for portability and providing a window to draw on, and Catch2 is used for the tests.
 
 Navigate to the repo, where `${my/mazebuilder/repo}` is the directory containg the Git repo for Maze Builder.
 
-
-```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_MAZE_TESTS=1
-```
-```sh
-cmake --build build/ -j 4
-```
-```sh
-cd build && ctest --verbose
-```
 
 | CMake Option | Default | Description |
 |--------------|---------|-------------
@@ -59,6 +48,9 @@ cd build && ctest --verbose
 | CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for Emscripten builds. |
 | CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRel, Release, RelWithDebInfo, Debug`. |
 
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_MAZE_TESTS=1 && cmake --build build/ -j 4 && cd build && ctest --verbose
+```
 
 Additionally, the Maze Builder can be built for the web using [Emscripten](https://emscripten.org/) and the toolchain file:
 
@@ -68,13 +60,23 @@ cmake -S . -B . -DCMAKE_TOOLCHAIN_FILE=${my/emsdk/repo}/upstream/emscripten/cmak
 
 Where `${my/emsdk/repo}` is the directory containing the Git repo for Emscripten.
 
-In order to run the web app, first run a local server with Python using the included [secure_http_server.py](secure_http_server.py) file.
-
 ## Scripts
 
-The `scripts` directory contains Ruby and Python scripts to build mazes quickly.
-These programs can output to `.png` files or `stdout`.
-## Resources and Dependencies
+There is a Ruby script `ruby mazes.rb` and a Python script `python3 solver.py` to play with
+maze generation and finding paths. It is expected to generate PNG files using the Ruby script first,
+and then find paths using the Python script to load the PNG files and find paths.
+
+**Dependenceis**
+  - `gem install chunky_png`
+  - `pip install numpy pillow networkx`
+
+## Web application
+
+[Check out the web app!](https://jade-semifreddo-f24ef0.netlify.app/)
+
+In order to run the web app locally, first run a local server with the provided [secure_http_server.py](secure_http_server.py) file, and then open the browser.
+
+## Resources
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
  - [Full Stack Dev Book](https://www.packtpub.com/en-us/product/full-stack-development-with-spring-boot-and-react-9781801816786)
  - [Craft](https://github.com/fogleman/Craft)
@@ -82,3 +84,5 @@ These programs can output to `.png` files or `stdout`.
  - [SDL](https://github.com/libsdl-org/SDL)
  - [Catch2](https://github.com/catchorg/Catch2)
  - [Emscripten](https://emscripten.org/)
+ - [stb](https://github.com/nothings/stb)
+  
