@@ -16,6 +16,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     unsigned int width = 1'001u;
     unsigned int height = 11u;
     unsigned int length = 1'002u;
+    unsigned int cell_size = 15u;
     string output = "maze.obj";
     string help_message = "My Maze Builder Program\n";
     string version_message = "0.0.1\n";
@@ -29,7 +30,8 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
         "--output=" + output,
         "--width=" + to_string(width),
         "--length=" + to_string(length),
-        "--height=" + to_string(height)
+        "--height=" + to_string(height),
+        "--cell_size=" + to_string(cell_size)
     };
 
     REQUIRE(LONG_ARGS.empty() == false);
@@ -46,6 +48,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     REQUIRE(maze_args.width == width);
     REQUIRE(maze_args.height == height);
     REQUIRE(maze_args.length == length);
+    REQUIRE(maze_args.cell_size == cell_size);
 
     // Check the ostream operator
     stringstream ss;
@@ -72,6 +75,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
 		"-w", to_string(width),
 		"-l", to_string(length),
 		"-y", to_string(height),
+        "-c", to_string(cell_size),
         "-v", "-h"
 	};
     // First-come-first-serve and grab 'interactive'

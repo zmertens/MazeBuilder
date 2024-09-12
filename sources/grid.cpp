@@ -242,7 +242,7 @@ void grid::del(std::shared_ptr<cell> parent, unsigned int index) noexcept {
     }
 }
 
-void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
+void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     if (parent != nullptr) {
         this->sort(parent->get_left(), ref(cells_to_sort));
         cells_to_sort.emplace_back(parent);
@@ -254,7 +254,7 @@ void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr
 * Sort the grid as if it were 2-dimensional grid and not hidden by a BST
 * Compare rows, then if equal, compare columns
 */
-void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
+void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     // now use STL sort by row, column with custom lambda function
     std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
 }
@@ -264,16 +264,16 @@ void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sor
  * @param cell_size = 25
  */
 vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
-    int png_w = cell_size * this->get_rows();
-    int png_h = cell_size * this->get_columns();
+    int png_w = cell_size * this->get_columns();
+    int png_h = cell_size * this->get_rows();
     // Init png data with white background
-    vector<uint8_t> png_data ((png_w + 1) * (png_h + 1) * 4, 255);
+    vector<uint8_t> png_data((png_w + 1) * (png_h + 1) * 4, 255);
 
     // Black
     uint32_t wall_color = 0x000000FF;
 
     // Helper functions to populate png_data
-    auto draw_rect = [&png_data, &png_w, &png_h](int x1, int y1, int x2, int y2, uint32_t color) {
+    auto draw_rect = [&png_data, &png_w](int x1, int y1, int x2, int y2, uint32_t color) {
         for (int y = y1; y <= y2; ++y) {
             for (int x = x1; x <= x2; ++x) {
                 int index = (y * (png_w + 1) + x) * 4;
@@ -283,9 +283,9 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
                 png_data[index + 3] = color & 0xFF;
             }
         }
-    };
+        };
 
-    auto draw_line = [&png_data, &png_w, &png_h](int x1, int y1, int x2, int y2, uint32_t color) {
+    auto draw_line = [&png_data, &png_w](int x1, int y1, int x2, int y2, uint32_t color) {
         if (x1 == x2) {
             for (int y = y1; y <= y2; ++y) {
                 int index = (y * (png_w + 1) + x1) * 4;
@@ -303,37 +303,37 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
                 png_data[index + 3] = color & 0xFF;
             }
         }
-    };
+        };
 
-    shared_ptr<cell>&& current = this->search(this->get_root(), 0);
+    vector<shared_ptr<cell>> cells;
+    cells.reserve(this->get_rows() * this->get_columns());
+    this->sort(this->get_root(), ref(cells));
 
-    while (current) {
-        int x1 = current->get_column() * cell_size;
-        int y1 = current->get_row() * cell_size;
-        int x2 = (current->get_column() + 1) * cell_size;
-        int y2 = (current->get_row() + 1) * cell_size;
+    for (const auto& c : cells) {
+        int x1 = c->get_column() * cell_size;
+        int y1 = c->get_row() * cell_size;
+        int x2 = (c->get_column() + 1) * cell_size;
+        int y2 = (c->get_row() + 1) * cell_size;
 
-        uint32_t color = this->background_color_for(current);
+        uint32_t color = this->background_color_for(c);
 
         draw_rect(x1, y1, x2, y2, color);
 
-        if (!current->get_north()) {
-			draw_line(x1, y1, x2, y1, wall_color);
-		}
-        if (!current->get_west()) {
+        if (!c->get_north()) {
+            draw_line(x1, y1, x2, y1, wall_color);
+        }
+        if (!c->get_west()) {
             draw_line(x1, y1, x1, y2, wall_color);
         }
-        if (!current->is_linked(current->get_east())) {
-			draw_line(x2, y1, x2, y2, wall_color);
-		}
-        if (!current->is_linked(current->get_south())) {
-			draw_line(x1, y2, x2, y2, wall_color);
-		}
-
-        current = this->search(this->get_root(), current->get_index() + 1);
+        if (!c->is_linked(c->get_east())) {
+            draw_line(x2, y1, x2, y2, wall_color);
+        }
+        if (!c->is_linked(c->get_south())) {
+            draw_line(x1, y2, x2, y2, wall_color);
+        }
     }
 
-	return png_data;
+    return png_data;
 }
 
 std::uint16_t grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {

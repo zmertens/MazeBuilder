@@ -51,6 +51,7 @@ int main(int argc, char* argv[]) {
           -w, --width        maze width [default=100]
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
+          -c, --cell_size    maze cell size [default=25]
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
           -h, --help         display this help message
@@ -134,8 +135,11 @@ int main(int argc, char* argv[]) {
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else if (is_png) {
-                    mazes::grid gg { maze_args.width, maze_args.length };
-					success = my_writer.write_png(maze_args.output, gg.to_png(12), maze_args.width, maze_args.length, 12);
+                    unique_ptr<mazes::grid> gg = make_unique<mazes::grid>(maze_args.width, maze_args.length);
+                    success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
+					success = my_writer.write_png(maze_args.output, 
+                        gg->to_png(maze_args.cell_size), 
+                        maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
 				} else {
                     success = write_func(maze_str);
                 }

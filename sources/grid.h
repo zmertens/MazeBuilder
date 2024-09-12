@@ -35,8 +35,8 @@ public:
     std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
     void del(std::shared_ptr<cell> parent, unsigned int index) noexcept;
     // sort ascending per index-value
-    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
-    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
+    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
 
     // Get bytewise representation of the grid
     std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept;

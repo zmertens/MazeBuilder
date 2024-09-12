@@ -21,6 +21,25 @@ using namespace mazes;
 args_builder::args_builder(const std::vector<std::string>& vv)
 : my_args{} {
     this->parse(cref(vv));
+    // Apply defaults
+    if (this->my_args.algorithm.empty()) {
+        this->my_args.algorithm = "binary_tree";
+    }
+    if (this->my_args.output.empty()) {
+        this->my_args.output = "stdout";
+    }
+	if (this->my_args.width == 0) {
+		this->my_args.width = 100;
+	}
+	if (this->my_args.length == 0) {
+		this->my_args.length = 100;
+	}
+	if (this->my_args.height == 0) {
+		this->my_args.height = 10;
+	}
+    if (this->my_args.cell_size == 0) {
+        this->my_args.cell_size = 25;
+    }
 }
 
 args_builder& args_builder::seed(unsigned int seed) noexcept {
@@ -66,7 +85,11 @@ args_builder& args_builder::length(unsigned int length) noexcept {
 args_builder& args_builder::height(unsigned int height) noexcept {
 	this->my_args.height = height;
 	return *this;
+}
 
+args_builder& args_builder::cell_size(unsigned int cell_size) noexcept {
+    this->my_args.cell_size = cell_size;
+    return *this;
 }
 
 void args_builder::clear() noexcept {
@@ -102,8 +125,8 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
     regex seed_regex ("--seed=[\\d+]+|^-s$", regex_constants::ECMAScript);
     regex width_regex ("--width=[\\d+]+|^-w$", regex_constants::ECMAScript);
     regex length_regex ("--length=[\\d]+|^-l$", regex_constants::ECMAScript);
-    // short option -h is changed because of the --help short option
     regex height_regex ("--height=[\\d]+|^-y$", regex_constants::ECMAScript);
+    regex cell_size_regex("--cell_size=[\\d]+|^-c$", regex_constants::ECMAScript);
     regex help_regex ("--help|^-h$", regex_constants::ECMAScript);
     regex version_regex ("--version|^-v$", regex_constants::ECMAScript);
     regex algo_regex ("--algorithm=[\\w]+|^-a$", regex_constants::ECMAScript);
@@ -171,6 +194,18 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             } else {
                 this->my_args.height = atoi(get_val_from_long_option(current).c_str());
             }
+        } else if (regex_match(current, cell_size_regex)) {
+            // --cell_size=?, -c ?
+            if (current.compare("-c") == 0) {
+                if (itr + 1 != vv.cend()) {
+                    this->my_args.cell_size = atoi((*(itr + 1)).c_str());
+                    itr++;
+                } else {
+                    break;
+                }
+            } else {
+                this->my_args.cell_size = atoi(get_val_from_long_option(current).c_str());
+            }
         } else if (regex_match(current, algo_regex)) {
             // --algorithm=?, -a ?
             if (current.compare("-a") == 0) { 
@@ -201,4 +236,5 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
 #endif
         }
     } // loop
-} // gather_args
+} // parse
+

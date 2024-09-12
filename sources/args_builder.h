@@ -20,6 +20,7 @@ namespace mazes {
         unsigned int width;
         unsigned int length;
         unsigned int height;
+        unsigned int cell_size;
         bool interactive;
         std::string version;
         std::string help;
@@ -38,7 +39,7 @@ public:
     args_builder& width(unsigned int width) noexcept;
     args_builder& length(unsigned int length) noexcept;
     args_builder& height(unsigned int height) noexcept;
-    args_builder& state() noexcept;
+    args_builder& cell_size(unsigned int cell_size) noexcept;
 
     void clear() noexcept;
 
@@ -56,6 +57,7 @@ public:
         ss << "INFO: output=" << a.output << "\n";
         ss << "INFO: width=" << a.width << "\n";
         ss << "INFO: length=" << a.length << "\n";
+        ss << "INFO: cell_size=" << a.cell_size << "\n";
         ss << "INFO: help=" << a.help << "\n";
         ss << "INFO: version=" << a.version << "\n";
 
