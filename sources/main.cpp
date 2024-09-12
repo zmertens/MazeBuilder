@@ -136,10 +136,10 @@ int main(int argc, char* argv[]) {
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else if (is_png) {
-                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::distance_grid>(maze_args.width, maze_args.length);
+                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::grid>(maze_args.width, maze_args.length);
                     success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
 					success = my_writer.write_png(maze_args.output, 
-                        gg->get_grid()->to_png(maze_args.cell_size), 
+                        dynamic_cast<mazes::grid*>(gg.get())->to_png(maze_args.cell_size), 
                         maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
 				} else {
                     unique_ptr<mazes::grid_interface> gg = make_unique<mazes::distance_grid>(maze_args.width, maze_args.length);

@@ -26,7 +26,7 @@ std::vector<std::shared_ptr<cell>> distances::get_cells() const {
  *  Note the different usage of `at` and `[]` in the array accessors below:
  *  '[]' uses the m_cells operator override
  */
-const std::shared_ptr<distances>& distances::path_to(std::shared_ptr<cell> goal) const noexcept {
+std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
     auto&& current = goal;
     auto breadcrumbs = std::make_shared<distances>(m_root);
     breadcrumbs->set(current, m_cells.at(current));

@@ -25,8 +25,9 @@ namespace mazes {
 		
 		void set_distances(std::shared_ptr<distances> d) noexcept;
 		std::shared_ptr<distances> get_distances() const noexcept;
-		virtual const std::unique_ptr<grid>& get_grid() const noexcept override;
-		virtual std::shared_ptr<cell> get_root() const noexcept override;
+        const std::unique_ptr<grid>& get_grid() const noexcept;
+		
+        virtual std::shared_ptr<cell> get_root() const noexcept override;
 		virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
 		virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 

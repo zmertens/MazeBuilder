@@ -135,7 +135,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
     string short_val_option {""};
     // skip program name with +1
     auto&& itr = vv.cbegin() + 1;
-    for (itr; itr != vv.cend(); itr++) {
+    for (; itr != vv.cend(); itr++) {
         string current {*itr};
         if (regex_match(current, help_regex)) {
             this->my_args.help = "REPLACE_WITH_HELP_MESSAGE";

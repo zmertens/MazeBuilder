@@ -40,7 +40,6 @@ public:
     // Get bytewise representation of the grid
     std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept;
 
-    virtual const std::unique_ptr<grid>& get_grid() const noexcept override;
     virtual std::shared_ptr<cell> get_root() const noexcept override;
     virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
     virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;;

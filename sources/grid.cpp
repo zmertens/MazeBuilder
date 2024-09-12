@@ -171,10 +171,6 @@ shared_ptr<cell> grid::get_root() const noexcept {
     return this->m_binary_search_tree_root;
 }
 
-const unique_ptr<grid>& grid::get_grid() const noexcept {
-	return make_unique<grid>(*this);
-}
-
 /**
 * Populate (instantiate a linear vector of cells using the data in the grid)
 */
