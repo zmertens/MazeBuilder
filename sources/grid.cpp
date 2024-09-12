@@ -341,7 +341,7 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
 }
 
 std::string grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
-    return "   ";
+    return " ";
 }
 
 std::uint32_t grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {

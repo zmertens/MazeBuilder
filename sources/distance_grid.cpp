@@ -18,6 +18,14 @@ distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned i
 
 }
 
+void distance_grid::set_distances(std::shared_ptr<distances> d) noexcept {
+	this->m_distances = d;
+}
+
+std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
+	return this->m_distances;
+}
+
 std::shared_ptr<cell> distance_grid::get_root() const noexcept {
 	return m_grid->get_root();
 }

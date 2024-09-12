@@ -12,6 +12,7 @@
 #include <mutex>
 
 #include "maze_algo_interface.h"
+#include "grid_interface.h"
 #include "cell.h"
 #include "grid.h"
 #include "binary_tree.h"
@@ -26,7 +27,7 @@ TEST_CASE("Make a very large grid", "[large grid]") {
         uniform_int_distribution<int> dist{ low, high };
         return dist(rng);
         };
-    unique_ptr<grid> very_large_grid{ make_unique<grid>(1'000, 2) };
+    unique_ptr<grid_interface> very_large_grid{ make_unique<grid>(1'000, 2) };
     binary_tree bt_algo;
     REQUIRE(bt_algo.run(ref(very_large_grid), cref(get_int), cref(rng)));
 }
@@ -53,22 +54,22 @@ TEST_CASE("Searching the grid yields positive results", "[search]") {
 }
 
 TEST_CASE("Compare maze algos", "[compare successes]") {
-    unique_ptr<grid> _grid_from_bt {make_unique<grid>(50, 50)};
-    unique_ptr<grid> _grid_from_sw {make_unique<grid>(49, 49)};
+    unique_ptr<grid_interface> _grid_from_bt {make_unique<grid>(50, 50)};
+    unique_ptr<grid_interface> _grid_from_sw {make_unique<grid>(49, 49)};
 
     mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) ->int {
+    auto get_int = [&rng](int low, int high) ->int {
         uniform_int_distribution<int> dist{ low, high };
         return dist(rng);
-        };
+    };
 
-    auto&& future_grid_from_bt = std::async(std::launch::async, [&] {
+    auto&& future_grid_from_bt = std::async(std::launch::async, [&_grid_from_bt, &get_int, &rng] {
         mazes::binary_tree bt;
-        return bt.run(_grid_from_bt, get_int, rng);
+        return bt.run(ref(_grid_from_bt), get_int, rng);
     });
-    auto&& future_grid_from_sw = std::async(std::launch::async, [&] {
+    auto&& future_grid_from_sw = std::async(std::launch::async, [&_grid_from_sw, &get_int, &rng] {
         mazes::sidewinder sw;
-        return sw.run(_grid_from_sw, get_int, rng);
+        return sw.run(ref(_grid_from_sw), get_int, rng);
     });
 
     SECTION("Check for success", "[assert_section]") {
@@ -80,7 +81,7 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
         auto elapsed1ms {chrono::duration_cast<chrono::milliseconds>(elapsed1).count()};
         REQUIRE(elapsed1ms != 0);
         stringstream ss;
-        ss << *_grid_from_bt.get();
+        ss << *(dynamic_cast<grid*>(_grid_from_bt.get()));
         REQUIRE(ss.str().length() != 0);
         start = chrono::system_clock::now();
         success = future_grid_from_sw.get();
@@ -88,7 +89,7 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
         REQUIRE(success == true);
         auto elapsed2ms {chrono::duration_cast<chrono::milliseconds>(elapsed2).count()};
         ss.clear();
-        ss << *_grid_from_sw.get();
+        ss << *(dynamic_cast<grid*>(_grid_from_sw.get()));
         REQUIRE(ss.str().length() != 0);
         // curious if either algo runs in identical time
         REQUIRE(elapsed1ms != elapsed2ms);
@@ -128,46 +129,3 @@ TEST_CASE("Grids are sortable", "[sort]") {
     }
 }
 
-TEST_CASE("Packaged task grids", "[packaged tasks]") {
-    mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) ->int {
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-    };
-    
-    unique_ptr<grid> _grid1 {make_unique<grid>(250, 250)};
-    unique_ptr<grid> _grid2 {make_unique<grid>(250, 250)};
-    unique_ptr<grid> _grid3 {make_unique<grid>(250, 250)};
-    unique_ptr<grid> _grid4 {make_unique<grid>(250, 250)};
-    
-    auto run_bt = [&](unique_ptr<grid>& g)->bool {
-        binary_tree bt;
-        return bt.run(ref(g), cref(get_int), cref(rng));
-    };
-    
-    packaged_task<bool(unique_ptr<grid>&)> task1 (run_bt);
-    packaged_task<bool(unique_ptr<grid>&)> task2 (run_bt);
-    packaged_task<bool(unique_ptr<grid>&)> task3 (run_bt);
-    packaged_task<bool(unique_ptr<grid>&)> task4 (run_bt);
-
-    auto fut1 = task1.get_future();
-    auto fut2 = task2.get_future();
-    auto fut3 = task3.get_future();
-    auto fut4 = task4.get_future();
-
-    // execute the packaged tasks
-    task1(ref(_grid1));
-    task2(ref(_grid2));
-    task3(ref(_grid3));
-    task4(ref(_grid4));
-
-    // check results
-    REQUIRE(fut1.get() == true);
-    REQUIRE(fut2.get() == true);
-    REQUIRE(fut3.get() == true);
-    REQUIRE(fut4.get() == true);
-} // packaged tasks
-
-TEST_CASE("Calculating distances", "[distances]") {
-    
-}

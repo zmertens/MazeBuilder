@@ -8,7 +8,14 @@
 
 namespace mazes {
 
-class cell {
+    class distances;
+
+/**
+ * @class cell
+ *  enable_shared_from_this allows creation of shared_ptr
+ *  without creating another instance of 'this'
+ */
+class cell : public std::enable_shared_from_this<cell> {
 public:
     cell(unsigned int row, unsigned int column, unsigned int index);
     void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
@@ -40,6 +47,7 @@ public:
 
     void set_index(unsigned int i) noexcept;
 
+    std::shared_ptr<distances> distances() noexcept;
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 

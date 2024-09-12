@@ -80,7 +80,7 @@ private:
                     if (temp == nullptr)
                         temp = { std::make_shared<cell>(-1, -1, next_index) };
                     // 3 spaces in body
-                    std::string body = "   ";
+                    std::string body = " " + g.contents_of(temp) + " ";
                     static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
                     std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
                     top_builder << body << east_boundary;

@@ -142,7 +142,11 @@ int main(int argc, char* argv[]) {
                         gg->get_grid()->to_png(maze_args.cell_size), 
                         maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
 				} else {
-                    success = write_func(maze_str);
+                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::distance_grid>(maze_args.width, maze_args.length);
+                    success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
+                    stringstream ss;
+                    ss << gg.get();
+                    success = write_func(ss.str());
                 }
                 
                 if (success) {

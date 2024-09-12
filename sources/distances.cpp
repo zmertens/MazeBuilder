@@ -5,7 +5,7 @@
 using namespace mazes;
 using namespace std;
 
-distances::distances(std::shared_ptr<cell> root) : m_root(m_root) {
+distances::distances(std::shared_ptr<cell> root) : m_root(root) {
 	m_cells[root] = 0;
 }
 
@@ -15,7 +15,7 @@ void distances::set(std::shared_ptr<cell> cell, int distance) {
 
 std::vector<std::shared_ptr<cell>> distances::get_cells() const {
     std::vector<std::shared_ptr<cell>> keys;
-    for (const auto& pair : m_cells) {
+    for (auto&& pair : m_cells) {
         keys.push_back(pair.first);
     }
     return keys;
@@ -43,13 +43,13 @@ const std::shared_ptr<distances>& distances::path_to(std::shared_ptr<cell> goal)
     return breadcrumbs;
 }
 
-std::pair<std::shared_ptr<cell>, int> distances::max() const {
+std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
     int max_distance = 0;
     std::shared_ptr<cell> max_cell = m_root;
-    for (const auto& pair : m_cells) {
-        if (pair.second > max_distance) {
-            max_cell = pair.first;
-            max_distance = pair.second;
+    for (const auto& [c, d] : m_cells) {
+        if (d > max_distance) {
+            max_cell = c;
+            max_distance = d;
         }
     }
     return { max_cell, max_distance };

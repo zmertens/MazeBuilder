@@ -2,10 +2,14 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include <functional>
+#include <sstream>
+#include <random>
 
+#include "binary_tree.h"
 #include "grid.h"
 #include "grid_interface.h"
 #include "distance_grid.h"
+#include "distances.h"
 
 using namespace mazes;
 using namespace std;
@@ -61,11 +65,37 @@ TEST_CASE( "Test appending grids", "[append]") {
 }
 
 TEST_CASE("Test distance grid", "[distance grid]") {
-	//auto my_distance_grid = make_unique<distance_grid>(10, 10, 10);
-	//auto my_cell = make_shared<cell>(0, 0, 0);
-	//my_distance_grid->insert(my_distance_grid->get_root(),
-	//	my_cell->get_row(), my_cell->get_column(),
-	//	my_cell->get_index());
-	//auto result = my_distance_grid->search(my_distance_grid->get_root(), 0);
-	//REQUIRE(result->get_index() == my_cell->get_index());
+    unique_ptr<grid_interface> my_distance_grid = make_unique<distance_grid>(10, 10, 10);
+
+    my_distance_grid->get_grid()->insert(my_distance_grid->get_root(),
+        0, 0, 0);
+	my_distance_grid->get_grid()->insert(my_distance_grid->get_root(),
+        my_distance_grid->get_grid()->get_rows() / 2,
+        my_distance_grid->get_grid()->get_columns() / 2, 1);
+
+	auto&& start = my_distance_grid->get_grid()->search(my_distance_grid->get_root(), 0);
+    auto&& end = my_distance_grid->get_grid()->search(my_distance_grid->get_root(), 1);
+
+    REQUIRE(start != end);
+
+    mt19937 rng{ 42681ul };
+    auto get_int = [&rng](int low, int high) ->int {
+        uniform_int_distribution<int> dist{ low, high };
+        return dist(rng);
+    };
+	binary_tree bt_algo;
+	REQUIRE(bt_algo.run(ref(my_distance_grid), cref(get_int), cref(rng)));
+
+    auto dists = make_shared<distances>(my_distance_grid->get_grid()->get_root());
+
+	dynamic_cast<distance_grid*>(my_distance_grid.get())->set_distances(dists);
+
+	auto&& path = start->distances()->path_to(end);
+
+	REQUIRE(path);
+	//REQUIRE(path->get_cells().size() >= 2);
+
+    stringstream ss;
+	ss << *(my_distance_grid.get()->get_grid());
+    REQUIRE(!ss.str().empty());
 }

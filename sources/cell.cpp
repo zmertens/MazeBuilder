@@ -2,6 +2,8 @@
 
 #include <iostream>
 
+#include "distances.h"
+
 using namespace mazes;
 using namespace std;
 
@@ -125,4 +127,25 @@ void cell::set_right(std::shared_ptr<cell> const& other_right) {
 
 void cell::set_index(unsigned int i) noexcept {
     this->m_index = i;
+}
+
+std::shared_ptr<distances> cell::distances() noexcept {
+	auto dists = make_shared<mazes::distances>(shared_from_this());
+    vector<shared_ptr<mazes::cell>> frontier = { shared_from_this() };
+
+	// Dijkstra's algorithm
+    while (!frontier.empty()) {
+		vector<shared_ptr<cell>> new_frontier;
+        for (const auto& c : frontier) {
+			for (const auto& [neighbor, _] : c->get_links()) {
+				if (dists->operator[](neighbor) < 0) {
+					dists->set(neighbor, dists->operator[](c) + 1);
+					new_frontier.push_back(neighbor);
+				}
+			}
+        }
+		frontier = new_frontier;
+    }
+
+    return dists;
 }
