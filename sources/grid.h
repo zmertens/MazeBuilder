@@ -93,6 +93,7 @@ private:
         return os;
     } // << operator
     std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
+    // Calculate the flat index from row and column
     std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
     const unsigned int m_rows, m_columns, m_height;

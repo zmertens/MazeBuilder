@@ -71,6 +71,8 @@ bool writer::write(const std::string& filename, const std::string& data) const {
 			this->write_file(filename, data);
 		} else if (ftype == file_types::WAVEFRONT_OBJ_FILE) {
 			this->write_file(filename, data);
+		} else if (ftype == file_types::PNG) {
+			throw new runtime_error("Incorrect arguments for write_png: " + filename);
 		} else {
 			throw new runtime_error("Unknown file type for filename: " + filename);
 		}
@@ -87,9 +89,9 @@ bool writer::write(const std::string& filename, const std::string& data) const {
  * @param w = 1
  * @param h = 1
  */
-bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data, const unsigned int w, const unsigned int h) const {
-	static constexpr auto CELL_SIZE = 25;
-	return stbi_write_png(filename.c_str(), w * CELL_SIZE + 1, h * CELL_SIZE + 1, 4, data.data(), (w * CELL_SIZE + 1) * 4);
+bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data,
+	const unsigned int w, const unsigned int h, const unsigned int cell_size) const {
+	return stbi_write_png(filename.c_str(), w * cell_size + 1, h * cell_size + 1, 4, data.data(), (w * cell_size + 1) * 4);
 }
 
 /**

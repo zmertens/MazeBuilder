@@ -237,8 +237,8 @@ void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sor
  * @param cell_size = 25
  */
 vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
-    int png_w = cell_size * this->get_columns();
-    int png_h = cell_size * this->get_rows();
+    int png_w = cell_size * this->get_rows();
+    int png_h = cell_size * this->get_columns();
     // Init png data with white background
     vector<uint8_t> png_data ((png_w + 1) * (png_h + 1) * 4, 255);
 
@@ -290,10 +290,10 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
 
         draw_rect(x1, y1, x2, y2, color);
 
-        if (!current->is_linked(current->get_north())) {
+        if (!current->get_north()) {
 			draw_line(x1, y1, x2, y1, wall_color);
 		}
-        if (!current->is_linked(current->get_west())) {
+        if (!current->get_west()) {
             draw_line(x1, y1, x1, y2, wall_color);
         }
         if (!current->is_linked(current->get_east())) {
@@ -307,7 +307,6 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
     }
 
 	return png_data;
-
 }
 
 std::uint16_t grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
