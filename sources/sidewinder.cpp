@@ -5,6 +5,8 @@
 
 #include "cell.h"
 #include "grid.h"
+#include "distance_grid.h"
+#include "grid_interface.h"
 
 using namespace mazes;
 using namespace std;
@@ -13,12 +15,22 @@ using namespace std;
  * Generates a perfect maze if done correctly (no loops) by using "runs" to carve east-west
  * "Runs" are row-like passages that are carved by the sidewinder algorithm
  */
-bool sidewinder::run(unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
+bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
     std::vector<shared_ptr<cell>> sorted_cells;
-    _grid->populate_vec(ref(sorted_cells));
-    _grid->sort_by_row_then_col(ref(sorted_cells));
+
+    // Cast grid_interface object to derived class
+	if (auto grid_ptr = dynamic_cast<grid*>(_grid.get())) {
+		grid_ptr->populate_vec(ref(sorted_cells));
+		grid_ptr->sort_by_row_then_col(ref(sorted_cells));
+    } else if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(_grid.get())) {
+		distance_grid_ptr->get_grid()->populate_vec(ref(sorted_cells));
+		distance_grid_ptr->get_grid()->sort_by_row_then_col(ref(sorted_cells));
+	} else {
+		return false;
+	}
+
     for (auto itr{ sorted_cells.cbegin() }; itr != sorted_cells.cend(); itr++) {
         if (itr->get()->get_row() != last_row) {
             last_row++;

@@ -3,6 +3,7 @@
 #include <sstream>
 #include <iostream>
 
+#include "grid_interface.h"
 #include "grid.h"
 #include "maze_factory.h"
 #include "maze_types_enum.h"
@@ -145,7 +146,7 @@ unsigned int maze_thread_safe::get_block_type() const noexcept {
 
 std::string maze_thread_safe::compute_str(maze_types my_maze_type,
     const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
-    auto g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    std::unique_ptr<grid_interface> g = make_unique<mazes::grid>(m_width, m_length, m_height);
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
 
     if (!success) {
@@ -153,7 +154,7 @@ std::string maze_thread_safe::compute_str(maze_types my_maze_type,
     }
 
     stringstream ss;
-    ss << *g.get();
+    ss << *(dynamic_cast<grid*>(g.get()));
     return ss.str();
 } // to_str
 

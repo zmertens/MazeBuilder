@@ -171,6 +171,10 @@ shared_ptr<cell> grid::get_root() const noexcept {
     return this->m_binary_search_tree_root;
 }
 
+const unique_ptr<grid>& grid::get_grid() const noexcept {
+	return make_unique<grid>(*this);
+}
+
 /**
 * Populate (instantiate a linear vector of cells using the data in the grid)
 */
@@ -336,8 +340,8 @@ vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
     return png_data;
 }
 
-std::uint16_t grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
-    return ' ';
+std::string grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+    return "   ";
 }
 
 std::uint32_t grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {

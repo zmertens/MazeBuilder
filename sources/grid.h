@@ -28,7 +28,6 @@ public:
     unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
-    std::shared_ptr<cell> get_root() const noexcept;
     void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
     void append(std::unique_ptr<grid> const& other_grid) noexcept;
     void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
@@ -40,6 +39,11 @@ public:
 
     // Get bytewise representation of the grid
     std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept;
+
+    virtual const std::unique_ptr<grid>& get_grid() const noexcept override;
+    virtual std::shared_ptr<cell> get_root() const noexcept override;
+    virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;;
 private:
     bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
@@ -98,9 +102,6 @@ private:
     std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
     const unsigned int m_rows, m_columns, m_height;
-
-    virtual std::uint16_t contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 }; // class
 
 } // namespace mazes

@@ -10,12 +10,12 @@
 
 namespace mazes {
 
-class grid;
+class grid_interface;
 class cell;
 
 class binary_tree : public maze_algo_interface {
 public:
-    bool run(std::unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    bool run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
 private:
     bool run_on_cell(std::shared_ptr<cell> const& _cell, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept;
 };

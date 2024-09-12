@@ -6,13 +6,14 @@
 #include <random>
 
 #include "cell.h"
+#include "grid_interface.h"
 #include "grid.h"
 
 /**
  * @brief Generate maze in the direction of NORTH and EAST, starting in bottom-left corner of 2D grid
  *
  */
-bool mazes::binary_tree::run(std::unique_ptr<grid> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
+bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
 	return this->run_on_cell(_grid->get_root(), std::cref(get_int), cref(rng));
 }
 

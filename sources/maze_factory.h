@@ -8,11 +8,11 @@
 
 namespace mazes {
 
-class grid;
+class grid_interface;
 
 class maze_factory {
 public:
-	static bool gen_maze(maze_types maze_type, std::unique_ptr<grid>& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng);
+	static bool gen_maze(maze_types maze_type, std::unique_ptr<grid_interface>& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng);
 };
 
 } // namespace mazes

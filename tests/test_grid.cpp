@@ -4,6 +4,8 @@
 #include <functional>
 
 #include "grid.h"
+#include "grid_interface.h"
+#include "distance_grid.h"
 
 using namespace mazes;
 using namespace std;
@@ -56,4 +58,14 @@ TEST_CASE( "Test appending grids", "[append]") {
     REQUIRE(my_grid->search(my_grid->get_root(), 1) != nullptr);
     REQUIRE(my_grid->search(my_grid->get_root(), 2) != nullptr);
     REQUIRE(my_grid->search(my_grid->get_root(), 3) != nullptr);
+}
+
+TEST_CASE("Test distance grid", "[distance grid]") {
+	//auto my_distance_grid = make_unique<distance_grid>(10, 10, 10);
+	//auto my_cell = make_shared<cell>(0, 0, 0);
+	//my_distance_grid->insert(my_distance_grid->get_root(),
+	//	my_cell->get_row(), my_cell->get_column(),
+	//	my_cell->get_index());
+	//auto result = my_distance_grid->search(my_distance_grid->get_root(), 0);
+	//REQUIRE(result->get_index() == my_cell->get_index());
 }
