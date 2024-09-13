@@ -144,8 +144,8 @@ int main(int argc, char* argv[]) {
                     // Get start, goal, and distances
 					auto start = gg->get_root();
 					auto goal = gg->search(gg->get_root(), gg->get_rows() / 2 * gg->get_columns() + gg->get_columns() / 2);
-					auto distances = start->distances();
-                    auto path = start->distances()->path_to(goal);
+					auto distances = start->get_distances();
+                    auto path = start->get_distances()->path_to(goal);
                     distances->set(goal, path->max().second);
 					success = my_writer.write_png(maze_args.output, gg->to_png(maze_args.cell_size), 
                         maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
