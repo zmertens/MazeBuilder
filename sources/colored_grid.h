@@ -14,7 +14,7 @@ namespace mazes {
 	class colored_grid : public grid_interface
 	{
     public:
-        explicit colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int height = 0);
+        explicit colored_grid(unsigned int width, unsigned int length, unsigned int height = 0);
 
         virtual unsigned int get_rows() const noexcept override;
         virtual unsigned int get_columns() const noexcept override;
