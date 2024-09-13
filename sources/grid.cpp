@@ -72,7 +72,14 @@ bool grid::create_binary_search_tree(const std::vector<unsigned int>& shuffled_i
         if (this->m_binary_search_tree_root == nullptr) {
             this->m_binary_search_tree_root = {make_shared<cell>(row, column, index)};
         } else {
-            this->insert(ref(this->m_binary_search_tree_root), row, column, index);
+            this->insert(ref(this->m_binary_search_tree_root), index);
+			auto&& found = this->search(this->m_binary_search_tree_root, index);
+			if (found) {
+				found->set_row(row);
+				found->set_column(column);
+            } else {
+                return false;
+            }
         }
 
         column = ++column % this->m_columns;
@@ -185,25 +192,25 @@ void grid::append(std::unique_ptr<grid> const& other_grid) noexcept {
     vector<shared_ptr<cell>> cells_to_sort;
     other_grid->populate_vec(ref(cells_to_sort));
     for (auto&& c : cells_to_sort) {
-        this->insert(this->get_root(), c->get_row(), c->get_column(), c->get_index());
+        this->insert(this->get_root(), c->get_index());
     }
 }
 
 /**
  * Keep calling insert recursively until we hit null (a leaf)
 */
-void grid::insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index) {
+void grid::insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept {
     if (parent->get_index() > index) {
         if (parent->get_left() == nullptr) {
-            parent->set_left({make_shared<cell>(row, col, index)});
+            parent->set_left({make_shared<cell>(index)});
         } else {
-            this->insert(parent->get_left(), row, col, index);
+            this->insert(parent->get_left(), index);
         }
     } else if (parent->get_index() < index) {
         if (parent->get_right() == nullptr) {
-            parent->set_right({make_shared<cell>(row, col, index)});
+            parent->set_right({make_shared<cell>(index)});
         } else {
-            this->insert(parent->get_right(), row, col, index);
+            this->insert(parent->get_right(), index);
         }
     }
 }

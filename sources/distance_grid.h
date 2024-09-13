@@ -1,5 +1,5 @@
 /**
- *	@brief Utility class to compute distance between cells in a maze
+ *	@brief Derived class that computes distance between cells in a maze
  *
  */
 
@@ -27,9 +27,18 @@ namespace mazes {
 		std::shared_ptr<distances> get_distances() const noexcept;
         const std::unique_ptr<grid>& get_grid() const noexcept;
 		
+        virtual unsigned int get_rows() const noexcept override;
+        virtual unsigned int get_columns() const noexcept override;
+        virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
+
+        virtual void append(std::unique_ptr<grid> const& other_grid) noexcept override;
+        virtual void insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept override;
+        virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept override;
+        virtual void del(std::shared_ptr<cell> parent, unsigned int index) noexcept override;
+
         virtual std::shared_ptr<cell> get_root() const noexcept override;
-		virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-		virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
         // Grid tostring method
         friend std::ostream& operator<<(std::ostream& os, distance_grid& g) {
@@ -63,7 +72,6 @@ namespace mazes {
                         // bottom left cell needs boundaries
                         if (temp == nullptr)
                             temp = { std::make_shared<cell>(-1, -1, next_index) };
-                        // 3 spaces in body
                         std::string body = " " + g.contents_of(temp) + " ";
                         static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
                         std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;

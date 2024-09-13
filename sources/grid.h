@@ -23,26 +23,28 @@ class grid : public grid_interface {
 public:
     grid(unsigned int rows, unsigned int columns, unsigned int height = 0);
 
-    unsigned int get_rows() const noexcept;
-    unsigned int get_columns() const noexcept;
+    virtual unsigned int get_rows() const noexcept override;
+    virtual unsigned int get_columns() const noexcept override;
     unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
     void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
-    void append(std::unique_ptr<grid> const& other_grid) noexcept;
-    void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
-    std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
-    void del(std::shared_ptr<cell> parent, unsigned int index) noexcept;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
 
     // Get bytewise representation of the grid
-    std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept;
+    virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
+    
+    virtual void append(std::unique_ptr<grid> const& other_grid) noexcept override;
+    virtual void insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept override;
+    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept override;
+    virtual void del(std::shared_ptr<cell> parent, unsigned int index) noexcept override;
 
     virtual std::shared_ptr<cell> get_root() const noexcept override;
+    
     virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;;
+    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 private:
     bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;

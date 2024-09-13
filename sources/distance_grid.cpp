@@ -26,6 +26,35 @@ std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
 	return this->m_distances;
 }
 
+unsigned int distance_grid::get_rows() const noexcept {
+	return this->m_grid->get_rows();
+}
+
+unsigned int distance_grid::get_columns() const noexcept {
+	return this->m_grid->get_columns();
+}
+
+/**
+ *
+ * @param cell_size 25
+ */
+std::vector<std::uint8_t> distance_grid::to_png(const unsigned int cell_size) const noexcept {
+	return this->m_grid->to_png(cell_size);
+}
+
+void distance_grid::append(std::unique_ptr<grid> const& other_grid) noexcept {
+	this->m_grid->append(other_grid);
+}
+void distance_grid::insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept {
+	this->m_grid->insert(parent, index);
+}
+std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept {
+	return this->m_grid->search(start, index);
+}
+void distance_grid::del(std::shared_ptr<cell> parent, unsigned int index) noexcept {
+	this->m_grid->del(parent, index);
+}
+
 std::shared_ptr<cell> distance_grid::get_root() const noexcept {
 	return m_grid->get_root();
 }

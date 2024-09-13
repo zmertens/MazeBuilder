@@ -17,7 +17,8 @@ namespace mazes {
  */
 class cell : public std::enable_shared_from_this<cell> {
 public:
-    cell(unsigned int row, unsigned int column, unsigned int index);
+    explicit cell(unsigned int index);
+    explicit cell(unsigned int row, unsigned int column, unsigned int index);
     void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     void unlink(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     std::unordered_map<std::shared_ptr<cell>, bool> get_links() const;
@@ -46,6 +47,8 @@ public:
     void set_right(std::shared_ptr<cell> const& other_right);
 
     void set_index(unsigned int i) noexcept;
+	void set_row(unsigned int r) noexcept;
+	void set_column(unsigned int c) noexcept;   
 
     std::shared_ptr<distances> distances() noexcept;
 private:

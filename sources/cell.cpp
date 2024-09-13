@@ -7,6 +7,18 @@
 using namespace mazes;
 using namespace std;
 
+cell::cell(unsigned int index)
+: m_row{ 0 }
+, m_column{ 0 }
+, m_index{ index }
+, m_links{}
+, m_north{ nullptr }
+, m_south{ nullptr }
+, m_east{ nullptr }
+, m_west{ nullptr } {
+
+}
+
 cell::cell(unsigned int row, unsigned int column, unsigned int index) 
 : m_row{row}
 , m_column{column}
@@ -127,6 +139,14 @@ void cell::set_right(std::shared_ptr<cell> const& other_right) {
 
 void cell::set_index(unsigned int i) noexcept {
     this->m_index = i;
+}
+
+void cell::set_row(unsigned int r) noexcept {
+    this->m_row = r;
+}
+
+void cell::set_column(unsigned int c) noexcept {
+    this->m_column = c;
 }
 
 std::shared_ptr<distances> cell::distances() noexcept {

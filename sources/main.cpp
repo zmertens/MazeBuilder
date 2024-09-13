@@ -10,6 +10,8 @@
 #include <vector>
 #include <list>
 
+#include "distances.h"
+#include "colored_grid.h"
 #include "distance_grid.h"
 #include "grid.h"
 #include "args_builder.h"
@@ -136,17 +138,25 @@ int main(int argc, char* argv[]) {
                 if (is_wavefront_file) {
                     success = write_func(my_maze.to_wavefront_obj_str());
                 } else if (is_png) {
-                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::grid>(maze_args.width, maze_args.length);
+                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::colored_grid>(maze_args.width, maze_args.length);
                     success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
-					success = my_writer.write_png(maze_args.output, 
-                        dynamic_cast<mazes::grid*>(gg.get())->to_png(maze_args.cell_size), 
+
+                    // Get start, goal, and distances
+					auto start = gg->get_root();
+					auto goal = gg->search(gg->get_root(), gg->get_rows() / 2 * gg->get_columns() + gg->get_columns() / 2);
+					auto distances = start->distances();
+                    auto path = start->distances()->path_to(goal);
+                    distances->set(goal, path->max().second);
+					success = my_writer.write_png(maze_args.output, gg->to_png(maze_args.cell_size), 
                         maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
 				} else {
                     unique_ptr<mazes::grid_interface> gg = make_unique<mazes::distance_grid>(maze_args.width, maze_args.length);
                     success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
-                    stringstream ss;
-                    ss << gg.get();
-                    success = write_func(ss.str());
+					if (auto dg = dynamic_cast<mazes::distance_grid*>(gg.get()); dg != nullptr) {
+                        stringstream ss;
+                        ss << *dg;
+                        success = write_func(ss.str());
+					}
                 }
                 
                 if (success) {
