@@ -23,18 +23,14 @@ TEST_CASE( "Test grid init", "[init]" ) {
 
 TEST_CASE( "Test grid insertion and search", "[insert and search]" ) {
     auto my_cell = make_shared<cell>(0, 0, 0);
-    my_grid->insert(my_grid->get_root(), 
-        my_cell->get_row(), my_cell->get_column(), 
-        my_cell->get_index());
+    my_grid->insert(my_grid->get_root(), my_cell->get_index());
     auto result = my_grid->search(my_grid->get_root(), 0);
     REQUIRE(result->get_index() == my_cell->get_index());
 }
 
 TEST_CASE( "Test grid deletion ", "[delete]" ) {
     auto my_cell = make_shared<cell>(0, 0, 0);
-    my_grid->insert(my_grid->get_root(), 
-        my_cell->get_row(), my_cell->get_column(), 
-        my_cell->get_index());
+    my_grid->insert(my_grid->get_root(), my_cell->get_index());
     my_grid->del(my_grid->get_root(), 0);
     auto result = my_grid->search(my_grid->get_root(), 0);
     REQUIRE(result != my_cell);
@@ -42,9 +38,7 @@ TEST_CASE( "Test grid deletion ", "[delete]" ) {
 
 TEST_CASE( "Test grid update ", "[update]" ) {
     auto my_cell = make_shared<cell>(0, 0, 0);
-    my_grid->insert(my_grid->get_root(), 
-        my_cell->get_row(), my_cell->get_column(), 
-        my_cell->get_index());
+    my_grid->insert(my_grid->get_root(), my_cell->get_index());
     my_cell->set_index(1);
     auto result = my_grid->search(my_grid->get_root(), 1);
     REQUIRE(result->get_index() == 1);
@@ -53,9 +47,9 @@ TEST_CASE( "Test grid update ", "[update]" ) {
 
 TEST_CASE( "Test appending grids", "[append]") {
     auto my_grid2 = make_unique<grid>(10, 10, 10);
-    my_grid2->insert(my_grid2->get_root(), 0, 0, 0);
-    my_grid2->insert(my_grid2->get_root(), 1, 1, 1);
-    my_grid2->insert(my_grid2->get_root(), 2, 2, 2);
+    my_grid2->insert(my_grid2->get_root(), 0);
+    my_grid2->insert(my_grid2->get_root(), 1);
+    my_grid2->insert(my_grid2->get_root(), 2);
     my_grid->append(my_grid2);
 
     REQUIRE(my_grid->search(my_grid->get_root(), 0) != nullptr);
@@ -65,16 +59,14 @@ TEST_CASE( "Test appending grids", "[append]") {
 }
 
 TEST_CASE("Test distance grid", "[distance grid]") {
-    unique_ptr<grid_interface> my_distance_grid = make_unique<distance_grid>(10, 10, 10);
+    static constexpr auto ROW = 10, COL = 10, HEIGHT = 10;
+    unique_ptr<grid_interface> my_distance_grid = make_unique<distance_grid>(ROW, COL, HEIGHT);
 
-    my_distance_grid->get_grid()->insert(my_distance_grid->get_root(),
-        0, 0, 0);
-	my_distance_grid->get_grid()->insert(my_distance_grid->get_root(),
-        my_distance_grid->get_grid()->get_rows() / 2,
-        my_distance_grid->get_grid()->get_columns() / 2, 1);
+    my_distance_grid->insert(my_distance_grid->get_root(), 0);
+	my_distance_grid->insert(my_distance_grid->get_root(), ROW + COL * (ROW - 1));
 
-	auto&& start = my_distance_grid->get_grid()->search(my_distance_grid->get_root(), 0);
-    auto&& end = my_distance_grid->get_grid()->search(my_distance_grid->get_root(), 1);
+	auto&& start = my_distance_grid->search(my_distance_grid->get_root(), 0);
+    auto&& end = my_distance_grid->search(my_distance_grid->get_root(), 1);
 
     REQUIRE(start != end);
 
@@ -86,7 +78,7 @@ TEST_CASE("Test distance grid", "[distance grid]") {
 	binary_tree bt_algo;
 	REQUIRE(bt_algo.run(ref(my_distance_grid), cref(get_int), cref(rng)));
 
-    auto dists = make_shared<distances>(my_distance_grid->get_grid()->get_root());
+    auto dists = make_shared<distances>(my_distance_grid->get_root());
 
 	dynamic_cast<distance_grid*>(my_distance_grid.get())->set_distances(dists);
 
@@ -95,7 +87,11 @@ TEST_CASE("Test distance grid", "[distance grid]") {
 	REQUIRE(path);
 	//REQUIRE(path->get_cells().size() >= 2);
 
-    stringstream ss;
-	ss << *(my_distance_grid.get()->get_grid());
-    REQUIRE(!ss.str().empty());
+	if (auto db = dynamic_cast<distance_grid*>(my_distance_grid.get()); db != nullptr) {
+		auto&& dg = db->get_distances();
+		REQUIRE(dg->operator[](end) == 1);
+        stringstream ss;
+		ss << db;
+        REQUIRE(!ss.str().empty());
+	}
 }

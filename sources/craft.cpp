@@ -2846,9 +2846,11 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
                     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT\n");
                     break;
+#if !defined(__EMSCRIPTEN__)
                 case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
                     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER\n");
                     break;
+#endif
                 case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
                     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER\n");
                     break;
