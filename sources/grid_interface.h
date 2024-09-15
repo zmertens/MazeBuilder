@@ -8,12 +8,11 @@
 
 namespace mazes {
 	class cell;
-	class grid;
 	class grid_interface {
 	public:
 		virtual unsigned int get_rows() const noexcept = 0;
 		virtual unsigned int get_columns() const noexcept = 0;
-		virtual void append(std::unique_ptr<grid> const& other_grid) noexcept = 0;
+		virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept = 0;
 		virtual void insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept = 0;
 		virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept = 0;
 		virtual void del(std::shared_ptr<cell> parent, unsigned int index) noexcept = 0;

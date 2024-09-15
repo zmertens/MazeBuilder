@@ -188,9 +188,12 @@ void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept {
 /**
  * @brief Iterate through the other_grid and insert to the current grid's root
  */
-void grid::append(std::unique_ptr<grid> const& other_grid) noexcept {
+void grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
     vector<shared_ptr<cell>> cells_to_sort;
-    other_grid->populate_vec(ref(cells_to_sort));
+	if (auto ptr = dynamic_cast<grid*>(other_grid.get())) {
+        ptr->populate_vec(ref(cells_to_sort));
+	}
+    
     for (auto&& c : cells_to_sort) {
         this->insert(this->get_root(), c->get_index());
     }

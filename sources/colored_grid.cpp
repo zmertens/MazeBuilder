@@ -103,7 +103,7 @@ std::vector<std::uint8_t> colored_grid::to_png(const unsigned int cell_size) con
     return png_data;
 }
 
-void colored_grid::append(std::unique_ptr<grid> const& other_grid) noexcept {
+void colored_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
 	this->m_distance_grid->append(other_grid);
 }
 void colored_grid::insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept {

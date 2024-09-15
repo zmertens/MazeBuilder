@@ -31,7 +31,7 @@ namespace mazes {
         virtual unsigned int get_columns() const noexcept override;
         virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
 
-        virtual void append(std::unique_ptr<grid> const& other_grid) noexcept override;
+        virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
         virtual void insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept override;
         virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept override;
         virtual void del(std::shared_ptr<cell> parent, unsigned int index) noexcept override;

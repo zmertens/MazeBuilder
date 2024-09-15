@@ -24,7 +24,7 @@ public:
     craft& operator=(craft&&) = default;
 
     bool run(const std::list<std::string>& algos, 
-        const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
+        const std::function<mazes::maze_types(const std::string& algo)>& get_maze_type_from_str,
         const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
     
     void set_json(const std::string& s) noexcept;

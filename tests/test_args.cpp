@@ -37,7 +37,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     REQUIRE(LONG_ARGS.empty() == false);
 
     mazes::args_builder builder{ cref(LONG_ARGS) };
-    auto&& maze_args = builder.build();
+    mazes::args maze_args = builder.build();
 
     REQUIRE(maze_args.help.empty() == true);
     REQUIRE(maze_args.version.empty() == true);
@@ -52,7 +52,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
 
     // Check the ostream operator
     stringstream ss;
-    ss << builder;
+    ss << maze_args;
     REQUIRE(!ss.str().empty());
 ;
     // Check help message

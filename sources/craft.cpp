@@ -2506,7 +2506,7 @@ craft::~craft() = default;
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
 bool craft::run(const std::list<std::string>& algos, 
-    const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
+    const std::function<mazes::maze_types(const std::string& algo)>& get_maze_type_from_str,
     const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
     // SDL INITIALIZATION //

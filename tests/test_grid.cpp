@@ -4,6 +4,11 @@
 #include <functional>
 #include <sstream>
 #include <random>
+#include <memory>
+#include <thread>
+#include <vector>
+#include <mutex>
+#include <condition_variable>
 
 #include "binary_tree.h"
 #include "grid.h"
@@ -13,6 +18,25 @@
 
 using namespace mazes;
 using namespace std;
+
+enum class WorkerState {
+	IDLE,
+	WORKING,
+	DONE
+}; 
+
+struct WorkerItem {
+    bool load = false;
+    unique_ptr<grid_interface> grid;
+};
+
+struct Worker {
+    mutex mtx;
+    condition_variable cnd;
+    WorkerItem item;
+    WorkerState state = WorkerState::IDLE;
+    bool should_stop = false;
+};
 
 static shared_ptr<grid> my_grid = make_shared<grid>(10, 10, 10);
 
@@ -46,7 +70,7 @@ TEST_CASE( "Test grid update ", "[update]" ) {
 }
 
 TEST_CASE( "Test appending grids", "[append]") {
-    auto my_grid2 = make_unique<grid>(10, 10, 10);
+    unique_ptr<grid_interface> my_grid2 = make_unique<grid>(10, 10, 10);
     my_grid2->insert(my_grid2->get_root(), 0);
     my_grid2->insert(my_grid2->get_root(), 1);
     my_grid2->insert(my_grid2->get_root(), 2);
@@ -94,4 +118,73 @@ TEST_CASE("Test distance grid", "[distance grid]") {
 	//	ss << db;
  //       REQUIRE(!ss.str().empty());
 	//}
+}
+
+TEST_CASE("Test multiple grids", "[multiple grids]") {
+    mt19937 rng{ 42681ul };
+    auto get_int = [&rng](int low, int high) ->int {
+        uniform_int_distribution<int> dist{ low, high };
+        return dist(rng);
+        };
+    binary_tree bt_algo;
+
+    auto worker_run = [&rng, &get_int, &bt_algo](auto&& worker) {
+        while (1) {
+            while (worker->state != WorkerState::WORKING && !worker->should_stop) {
+                std::unique_lock<std::mutex> u_lck(worker->mtx);
+                worker->cnd.wait(u_lck);
+            }
+            if (worker->should_stop) {
+                worker->state = WorkerState::DONE;
+                break;
+            }
+
+            WorkerItem* worker_item = &worker->item;
+            if (worker_item->load) {
+                // generate respective portion of maze with indices (p, q)
+				bool success = bt_algo.run(ref(worker_item->grid), cref(get_int), cref(rng));
+            }
+            // This line would compute any OpenGL components of the maze
+            // this->compute_maze(worker_item); // Assuming this is a member function
+
+            worker->mtx.lock();
+            worker->state = WorkerState::DONE;
+            worker->mtx.unlock();
+        }
+        return 0;
+        };
+
+    const int grid_size = 100;
+    const int num_workers = 4;
+	const int subgrid_size = grid_size / num_workers;
+
+    vector<thread> threads;
+	vector<Worker> workers(num_workers);
+	for (int i = 0; i < num_workers; ++i) {
+        workers.at(i).state = WorkerState::WORKING;
+		workers.at(i).should_stop = false;
+        workers.at(i).item.load = true;
+		workers.at(i).item.grid = make_unique<grid>(subgrid_size, subgrid_size, subgrid_size);
+		threads.push_back(thread(worker_run, &workers[i]));
+	}
+
+	for (int i = 0; i < num_workers; ++i) {
+		workers[i].mtx.lock();
+        // Do work
+        workers[i].state = WorkerState::WORKING;
+        workers[i].should_stop = true;
+		workers[i].mtx.unlock();
+		workers[i].cnd.notify_one();
+	}
+
+	for (int i = 0; i < num_workers; ++i) {
+		threads[i].join();
+	}
+
+	for (int i = 0; i < num_workers; ++i) {
+		REQUIRE(workers[i].state == WorkerState::DONE);
+		my_grid->append(cref(workers[i].item.grid));
+	}
+
+	REQUIRE(my_grid->get_rows() * my_grid->get_columns() > grid_size * grid_size);
 }
