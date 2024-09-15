@@ -47,7 +47,7 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
 EMSCRIPTEN_BINDINGS(maze_builder_module) {
     emscripten::class_<craft>("craft")
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
-        .constructor<const std::string&, const std::string&, const std::string&>()
+        .constructor<const std::string&, const std::string&, int w, int h>()
         .function("set_json", &craft::set_json)
         .function("get_json", &craft::get_json)
         .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
         // Run the SDL app
         if (maze_args.interactive) {
             static constexpr int window_w = 800, window_h = 600;
-            auto&& maze_builder_3D = craft::get_instance(ref(maze_args), window_w, window_h);
+            auto&& maze_builder_3D = craft::get_instance(cref(maze_args.version), cref(maze_args.help), window_w, window_h);
             success = maze_builder_3D->run(std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;

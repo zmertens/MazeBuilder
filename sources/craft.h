@@ -12,7 +12,7 @@
 
 class craft {
 public:
-    craft(mazes::args& a, const int w, const int h);
+    craft(const std::string& version, const std::string& help, int w, int h);
     ~craft();
 
     // Delete copy constructor and copy assignment operator
@@ -31,8 +31,8 @@ public:
     std::string get_json() const noexcept;
     
     // Singleton pattern
-    static std::shared_ptr<craft> get_instance(mazes::args& a, const int w, const int h) {
-        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::ref(a), w, h);
+    static std::shared_ptr<craft> get_instance(const std::string& version, const std::string& help, int w, int h) {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::cref(version), std::cref(help), w, h);
         return instance;
     }
 private:

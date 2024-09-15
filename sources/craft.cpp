@@ -354,14 +354,16 @@ struct craft::craft_impl {
     } Model;
 
     // Note: These are public members
-	mazes::args m_args;
+    const std::string& m_version;
+    const std::string& m_help;
 
     unique_ptr<Model> m_model;
     unique_ptr<maze_thread_safe> m_maze;
     unique_ptr<Gui> m_gui;
 
-    craft_impl(mazes::args& a, const int w, const int h)
-        : m_args(a)
+    craft_impl(const std::string& version, const std::string& help, int w, int h)
+        : m_version(version)
+        , m_help(help)
         , m_model{ make_unique<Model>() }
         , m_maze()
         , m_gui{ make_unique<Gui>() } {
@@ -2443,7 +2445,7 @@ struct craft::craft_impl {
         
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
 
-        this->m_model->window = SDL_CreateWindow(this->m_args.version.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        this->m_model->window = SDL_CreateWindow(this->m_version.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2495,8 +2497,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(args& a, const int w, const int h)
-    : m_pimpl{std::make_unique<craft_impl>(ref(a), w, h)} {
+craft::craft(const std::string& version, const std::string& help, const int w, const int h)
+    : m_pimpl{std::make_unique<craft_impl>(cref(version), cref(help), w, h)} {
 }
 
 craft::~craft() = default;
@@ -2745,7 +2747,7 @@ bool craft::run(const std::list<std::string>& algos,
         p_state->y = 75.f;
 
     // Init some local vars for handling maze duties
-    auto my_maze_type = get_maze_algo_from_str(algos.back());
+    auto my_maze_type = get_maze_type_from_str(algos.back());
     auto&& gui = this->m_pimpl->m_gui;
     auto&& maze2 = this->m_pimpl->m_maze;
 
@@ -3003,7 +3005,7 @@ bool craft::run(const std::list<std::string>& algos,
                             bool is_selected = (itr == gui->maze_algo);
                             if (ImGui::Selectable(itr.c_str(), is_selected)) {
                                 gui->maze_algo = itr;
-                                my_maze_type = get_maze_algo_from_str(itr);
+                                my_maze_type = get_maze_type_from_str(itr);
                             }
                             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                             if (is_selected)
@@ -3121,7 +3123,7 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Help")) {
-                ImGui::Text("%s\n", this->m_pimpl->m_args.help.data());
+                ImGui::Text("%s\n", this->m_pimpl->m_help.data());
                 ImGui::Text("\n");
                 ImGui::Text(ZACHS_GH_REPO);
                 ImGui::Text("\n");
