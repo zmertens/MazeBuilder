@@ -10,7 +10,7 @@ namespace mazes {
 
     class args_builder_interface {
     public:
-        virtual const args& build() const noexcept = 0;
+        virtual args build() const noexcept = 0;
     private:
         virtual void parse(const std::vector<std::string>& vv) noexcept = 0;
     };

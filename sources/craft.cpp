@@ -53,6 +53,7 @@
 #include "item.h"
 #include "matrix.h"
 
+#include "args_builder.h"
 #include "maze_types_enum.h"
 #include "maze_factory.h"
 #include "maze_thread_safe.h"
@@ -353,18 +354,14 @@ struct craft::craft_impl {
     } Model;
 
     // Note: These are public members
-    const std::string& m_window_name;
-    const std::string& m_version;
-    const std::string& m_help;
+	mazes::args m_args;
 
     unique_ptr<Model> m_model;
     unique_ptr<maze_thread_safe> m_maze;
     unique_ptr<Gui> m_gui;
 
-    craft_impl(const std::string& window_name, const std::string& version, const std::string& help)
-        : m_window_name{ window_name }
-        , m_version{ version }
-        , m_help{help}
+    craft_impl(mazes::args& a, const int w, const int h)
+        : m_args(a)
         , m_model{ make_unique<Model>() }
         , m_maze()
         , m_gui{ make_unique<Gui>() } {
@@ -2446,7 +2443,7 @@ struct craft::craft_impl {
         
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
 
-        this->m_model->window = SDL_CreateWindow(m_window_name.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        this->m_model->window = SDL_CreateWindow(this->m_args.version.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2498,8 +2495,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string& window_name, const std::string& version, const std::string& help)
-    : m_pimpl{std::make_unique<craft_impl>(cref(window_name), cref(version), cref(help))} {
+craft::craft(args& a, const int w, const int h)
+    : m_pimpl{std::make_unique<craft_impl>(ref(a), w, h)} {
 }
 
 craft::~craft() = default;
@@ -2508,7 +2505,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(unsigned long seed, const std::list<std::string>& algos, 
+bool craft::run(const std::list<std::string>& algos, 
     const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
     const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
@@ -3124,7 +3121,7 @@ bool craft::run(unsigned long seed, const std::list<std::string>& algos,
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Help")) {
-                ImGui::Text("%s\n", this->m_pimpl->m_help.data());
+                ImGui::Text("%s\n", this->m_pimpl->m_args.help.data());
                 ImGui::Text("\n");
                 ImGui::Text(ZACHS_GH_REPO);
                 ImGui::Text("\n");

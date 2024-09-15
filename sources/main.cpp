@@ -7,6 +7,7 @@
 #include <thread>
 #include <shared_mutex>
 #include <algorithm>
+#include <string>
 #include <vector>
 #include <list>
 
@@ -20,6 +21,24 @@
 #include "maze_thread_safe.h"
 #include "writer.h"
 #include "craft.h"
+
+std::string maze_builder_version = "maze_builder=[4.0.1]";
+
+static constexpr auto MAZE_BUILDER_HELP = R"help(
+        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
+        Generates mazes and exports to different formats
+        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
+          -a, --algorithm    binary_tree [default], sidewinder
+          -s, --seed         seed for the mt19937 generator [default=0]
+          -w, --width        maze width [default=100]
+          -y, --height       maze height [default=10]
+          -l, --length       maze length [default=100]
+          -c, --cell_size    maze cell size [default=25]
+          -i, --interactive  run program in interactive mode with a GUI
+          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
+          -h, --help         display this help message
+          -v, --version      display program version
+    )help";
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
@@ -40,31 +59,8 @@ int main(int argc, char* argv[]) {
     using namespace std;
 
 #if defined(MAZE_DEBUG)
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[4.0.1] - DEBUG";
-#else
-    static constexpr auto MAZE_BUILDER_VERSION = "maze_builder=[4.0.1]";
+    maze_builder_version += " - DEBUG";
 #endif
-
-    static constexpr auto MAZE_BUILDER_HELP = R"help(
-        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
-        Generates mazes and exports to ASCII-format or Wavefront object format
-        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
-          -a, --algorithm    binary_tree [default], sidewinder
-          -s, --seed         seed for the random number generator [mt19937]
-          -w, --width        maze width [default=100]
-          -y, --height       maze height [default=10]
-          -l, --length       maze length [default=100]
-          -c, --cell_size    maze cell size [default=25]
-          -i, --interactive  run program in interactive mode with a GUI
-          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
-          -h, --help         display this help message
-          -v, --version      display program version
-    )help";
-
-    if (argc == 1) {
-        std::cout << MAZE_BUILDER_HELP << std::endl;
-        return EXIT_SUCCESS;
-    }
 
     vector<string> args_vec{ argv, argv + argc };
 
@@ -77,29 +73,30 @@ int main(int argc, char* argv[]) {
     }
 #endif
 
-    mazes::args_builder args{ args_vec };
-    auto&& maze_args {args.build()};
+    mazes::args_builder builder{ args_vec };
+	mazes::args maze_args = builder.build();
     
     if (!maze_args.help.empty()) {
         std::cout << MAZE_BUILDER_HELP << std::endl;
         return EXIT_SUCCESS;
     } else if (!maze_args.version.empty()) {
-        std::cout << MAZE_BUILDER_VERSION << std::endl;
+        std::cout << maze_builder_version << std::endl;
         return EXIT_SUCCESS;
     }
+	// Set the version and help strings
+	builder.version(maze_builder_version);
+	builder.help(MAZE_BUILDER_HELP);
 
-    auto user_seed_or_not = static_cast<unsigned long>(maze_args.seed);
-    auto seed_as_ul = user_seed_or_not;
-    std::mt19937 rng_engine{ seed_as_ul };
+    maze_args = builder.build();
+
+    std::mt19937 rng_engine{ static_cast<unsigned long>(maze_args.seed) };
     auto get_int = [&rng_engine](int low, int high) -> int {
-        using namespace std;
         uniform_int_distribution<int> dist {low, high};
         return dist(rng_engine);
     };
 
     std::list<std::string> algos = { "binary_tree", "sidewinder" };
     auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
-        using namespace std;
         if (algo.compare("binary_tree") == 0) {
             return mazes::maze_types::BINARY_TREE;
         } else if (algo.compare("sidewinder") == 0) {
@@ -113,10 +110,9 @@ int main(int argc, char* argv[]) {
         bool success = false;
         // Run the SDL app
         if (maze_args.interactive) {
-            std::string version { MAZE_BUILDER_VERSION };
-            std::string help { MAZE_BUILDER_HELP };
-            auto&& maze_builder_3D = craft::get_instance(std::cref(version), std::cref(version), std::cref(help));
-            success = maze_builder_3D->run(seed_as_ul, std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
+            static constexpr int window_w = 800, window_h = 600;
+            auto&& maze_builder_3D = craft::get_instance(ref(maze_args), window_w, window_h);
+            success = maze_builder_3D->run(std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
                 std::cout << "ERROR: Running SDL app failed." << std::endl;
             }

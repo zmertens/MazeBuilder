@@ -96,7 +96,7 @@ void args_builder::clear() noexcept {
     this->my_args = args{};
 }
 
-const args& args_builder::build() const noexcept {
+args args_builder::build() const noexcept {
     return this->my_args;
 }
 

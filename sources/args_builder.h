@@ -12,19 +12,35 @@
 
 namespace mazes {
 
-    class args {
-    public:
-        std::string output;
-        std::string algorithm;
-        unsigned int seed;
-        unsigned int width;
-        unsigned int length;
-        unsigned int height;
-        unsigned int cell_size;
-        bool interactive;
-        std::string version;
-        std::string help;
-    }; // class args
+class args {
+public:
+    std::string output;
+    std::string algorithm;
+    unsigned int seed;
+    unsigned int width;
+    unsigned int length;
+    unsigned int height;
+    unsigned int cell_size;
+    bool interactive;
+    std::string version;
+    std::string help;
+
+    friend std::ostream& operator<<(std::ostream& os, args& a) {
+        std::stringstream ss;
+        ss << "seed=" << a.seed << "\n";
+        ss << "interactive=" << a.interactive << "\n";
+        ss << "algorithm=" << a.algorithm << "\n";
+        ss << "output=" << a.output << "\n";
+        ss << "width=" << a.width << "\n";
+        ss << "length=" << a.length << "\n";
+        ss << "height=" << a.height << "\n";
+        ss << "cell_size=" << a.cell_size << "\n";
+        ss << "help=" << a.help << "\n";
+        ss << "version=" << a.version << "\n";
+
+        return os << ss.str() << "\n";
+    }
+}; // class args
 
 class args_builder : public args_builder_interface {
 public:
@@ -43,26 +59,7 @@ public:
 
     void clear() noexcept;
 
-    const args& build() const noexcept override;
-
-
-    friend std::ostream& operator<<(std::ostream& os, args_builder& args_builder) {
-        std::stringstream ss;
-
-        auto&& a = args_builder.build();
-
-        ss << "INFO: seed=" << a.seed << "\n";
-        ss << "INFO: interactive=" << a.interactive << "\n";
-        ss << "INFO: algorithm=" << a.algorithm << "\n";
-        ss << "INFO: output=" << a.output << "\n";
-        ss << "INFO: width=" << a.width << "\n";
-        ss << "INFO: length=" << a.length << "\n";
-        ss << "INFO: cell_size=" << a.cell_size << "\n";
-        ss << "INFO: help=" << a.help << "\n";
-        ss << "INFO: version=" << a.version << "\n";
-
-        return os << ss.str() << "\n";
-    }
+    args build() const noexcept override;
 
 private:
     void parse(const std::vector<std::string>& vv) noexcept override;

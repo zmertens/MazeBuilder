@@ -8,10 +8,11 @@
 #include <random>
 
 #include "maze_types_enum.h"
+#include "args_builder.h"
 
 class craft {
 public:
-    craft(const std::string& window_name, const std::string& version, const std::string& help);
+    craft(mazes::args& a, const int w, const int h);
     ~craft();
 
     // Delete copy constructor and copy assignment operator
@@ -22,7 +23,7 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run(unsigned long seed, const std::list<std::string>& algos, 
+    bool run(const std::list<std::string>& algos, 
         const std::function<mazes::maze_types(const std::string& algo)>& get_maze_algo_from_str,
         const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
     
@@ -30,8 +31,8 @@ public:
     std::string get_json() const noexcept;
     
     // Singleton pattern
-    static std::shared_ptr<craft> get_instance(const std::string& w, const std::string& v, const std::string& h) {
-        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::cref(w), std::cref(v), std::cref(h));
+    static std::shared_ptr<craft> get_instance(mazes::args& a, const int w, const int h) {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::ref(a), w, h);
         return instance;
     }
 private:
