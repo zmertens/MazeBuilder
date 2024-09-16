@@ -112,6 +112,20 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
     return ss.str();
 } // to_wavefront_obj_str
 
+std::vector<std::uint8_t> maze_thread_safe::to_png(mazes::maze_types my_maze_type,
+    const std::function<int(int, int)>& get_int,
+    const std::mt19937& rng, const unsigned int cell_size) const noexcept {
+
+    std::unique_ptr<grid_interface> g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
+
+    if (!success) {
+        // Handle error
+    }
+
+    return g->to_png(cell_size);
+}
+
 void  maze_thread_safe::set_height(unsigned int height) noexcept {
     this->m_height = height;
 }

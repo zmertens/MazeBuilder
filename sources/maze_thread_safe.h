@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 #include <unordered_map>
+#include <cstdlib>
 
 #include "maze_interface.h"
 #include "maze_types_enum.h"
@@ -38,6 +39,10 @@ public:
     std::string compute_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
     void compute_geometry(unsigned int block_type = 1) noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
+    std::vector<std::uint8_t> to_png(mazes::maze_types my_maze_type,
+        const std::function<int(int, int)>& get_int,
+        const std::mt19937& rng,
+        const unsigned int cell_size = 25) const noexcept;
 
     void set_height(unsigned int height) noexcept;
     unsigned int get_height() const noexcept;

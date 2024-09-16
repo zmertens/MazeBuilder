@@ -32,7 +32,6 @@
 #include <cstring>
 #include <ctime>
 #include <string>
-#include <string_view>
 #include <algorithm>
 #include <iostream>
 #include <thread>
@@ -132,13 +131,14 @@ struct craft::craft_impl {
         int maze_length;
         std::string maze_algo;
         std::string maze_json;
+        int view;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8), show_trees(true),
             show_plants(true), show_clouds(true), show_lights(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
-            maze_algo("binary_tree"), maze_json("") {
+            maze_algo("binary_tree"), maze_json(""), view(20) {
         
         }
 
@@ -215,6 +215,11 @@ struct craft::craft_impl {
             gui.show_crosshairs = value;
             return *this;
         }
+
+		GuiBuilder& view(int value) {
+			gui.view = value;
+			return *this;
+		}   
 
         Gui build() const {
             return gui;
@@ -766,69 +771,12 @@ struct craft::craft_impl {
             0);
     }
 
-    void delete_player(int id) {
-        Player *player = this->find_player(id);
-        if (!player) {
-            return;
-        }
-        int count = this->m_model->player_count;
-        this->del_buffer(player->buffer);
-        Player *other = this->m_model->players + (--count);
-        SDL_memcpy(player, other, sizeof(Player));
-        this->m_model->player_count = count;
-    }
-
     void delete_all_players() {
         for (int i = 0; i < this->m_model->player_count; i++) {
             Player *player = this->m_model->players + i;
             this->del_buffer(player->buffer);
         }
         this->m_model->player_count = 0;
-    }
-
-    float player_player_distance(Player *p1, Player *p2) {
-        State *s1 = &p1->state;
-        State *s2 = &p2->state;
-        float x = s2->x - s1->x;
-        float y = s2->y - s1->y;
-        float z = s2->z - s1->z;
-        return SDL_sqrtf(x * x + y * y + z * z);
-    }
-
-    float player_crosshair_distance(Player *p1, Player *p2) {
-        State *s1 = &p1->state;
-        State *s2 = &p2->state;
-        float d = this->player_player_distance(p1, p2);
-        float vx, vy, vz;
-        this->get_sight_vector(s1->rx, s1->ry, &vx, &vy, &vz);
-        vx *= d; vy *= d; vz *= d;
-        float px, py, pz;
-        px = s1->x + vx; py = s1->y + vy; pz = s1->z + vz;
-        float x = s2->x - px;
-        float y = s2->y - py;
-        float z = s2->z - pz;
-        return SDL_sqrtf(x * x + y * y + z * z);
-    }
-
-    Player *player_crosshair(Player *player) {
-        Player *result = 0;
-        float threshold = static_cast<float>(RADIANS(5));
-        float best = 0;
-        for (int i = 0; i < this->m_model->player_count; i++) {
-            Player *other = this->m_model->players + i;
-            if (other == player) {
-                continue;
-            }
-            float p = player_crosshair_distance(player, other);
-            float d = player_player_distance(player, other);
-            if (d < 96 && p / d < threshold) {
-                if (best == 0 || d < best) {
-                    best = d;
-                    result = other;
-                }
-            }
-        }
-        return result;
     }
 
     Chunk *find_chunk(int p, int q) const {
@@ -2080,20 +2028,6 @@ struct craft::craft_impl {
         del_buffer(buffer);
     }
 
-    void parse_command(const char *buffer) {
-        int radius, count, xc, yc, zc;
-        if (SDL_sscanf(buffer, "/view %d", &radius) == 1) {
-            if (radius >= 1 && radius <= 24) {
-                this->m_model->create_radius = radius;
-                this->m_model->render_radius = radius;
-                this->m_model->delete_radius = radius + 4;
-            }
-            else {
-                // Notify user with view correct parameters
-            }
-        }
-    } // parse command
-
     void on_light() {
         State *s = &this->m_model->players->state;
         int hx, hy, hz;
@@ -2194,8 +2128,6 @@ struct craft::craft_impl {
                                 if (hit_test_face(player, &x, &y, &z, &face)) {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
                                 }
-                            } else if (this->m_model->typing_buffer[0] == '/') {
-                                this->parse_command(this->m_model->typing_buffer);
                             }
                         }
                     } else {
@@ -2750,6 +2682,7 @@ bool craft::run(const std::list<std::string>& algos,
     auto my_maze_type = get_maze_type_from_str(algos.back());
     auto&& gui = this->m_pimpl->m_gui;
     auto&& maze2 = this->m_pimpl->m_maze;
+    auto&& model = this->m_pimpl->m_model;
 
     auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
         maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
@@ -2898,6 +2831,8 @@ bool craft::run(const std::list<std::string>& algos,
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
+    GLuint minimap_texture = -1;
+
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -2932,6 +2867,16 @@ bool craft::run(const std::list<std::string>& algos,
             // Don't write the first maze that loads when app starts
             write_maze_now = first_maze ? false : true;
             first_maze = false;
+            glGenTextures(1, &minimap_texture);
+            glBindTexture(GL_TEXTURE_2D, minimap_texture);
+            glActiveTexture(GL_TEXTURE4);
+            auto&& pixels = maze2->to_png(my_maze_type, cref(get_int), cref(rng));
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 150, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         if (write_maze_now) {
@@ -3074,6 +3019,14 @@ bool craft::run(const std::list<std::string>& algos,
                 }
                 ImGui::PopStyleColor();
 
+                // Flip UV coordinates for the image
+                ImVec2 uv0 = ImVec2(0.0f, 1.0f);
+                ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+                glBindTexture(GL_TEXTURE_2D, minimap_texture);
+                glActiveTexture(GL_TEXTURE4);
+                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), {200, 150}, uv0, uv1);
+                glBindTexture(GL_TEXTURE_2D, 0);
+
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Stats")) {
@@ -3096,6 +3049,13 @@ bool craft::run(const std::list<std::string>& algos,
                     ImGui::StyleColorsLight();
 
                 ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
+
+                ImGui::SliderInt("View", &gui->view, 1, 24);
+                if (model->create_radius != gui->view) {
+					model->create_radius = gui->view;
+                    model->render_radius = gui->view;
+                    model->delete_radius = gui->view;
+                }
                     
                 // Prevent setting SDL_Window settings every frame
                 static bool last_fullscreen = gui->fullscreen;
@@ -3196,11 +3156,11 @@ bool craft::run(const std::list<std::string>& algos,
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        glUseProgram(screen_attrib.program);
-        glBindVertexArray(quad_vao);
-        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
+        //glUseProgram(screen_attrib.program);
+        //glBindVertexArray(quad_vao);
+        //glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
         // glUniform1i(screen_attrib.sampler, 4);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
+        //glDrawArrays(GL_TRIANGLES, 0, 6);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
 #if defined(MAZE_DEBUG)
