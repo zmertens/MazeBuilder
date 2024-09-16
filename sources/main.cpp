@@ -47,7 +47,7 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
 EMSCRIPTEN_BINDINGS(maze_builder_module) {
     emscripten::class_<craft>("craft")
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
-        .constructor<const std::string&, const std::string&, int w, int h>()
+        .constructor<const std::string&, const std::string&, int, int>()
         .function("set_json", &craft::set_json)
         .function("get_json", &craft::get_json)
         .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
