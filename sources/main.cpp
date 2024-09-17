@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
     };
 
     // Convert algorithm string into an enum type
-    std::list<std::string> algos = { "binary_tree", "sidewinder" };
+    std::list<std::string> algos = { "binary_tree", "sidewinder", "dfs" };
     auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
         if (algo.compare("binary_tree") == 0) {
             return mazes::maze_types::BINARY_TREE;
