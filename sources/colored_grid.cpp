@@ -108,16 +108,25 @@ std::vector<std::uint8_t> colored_grid::to_png(const unsigned int cell_size) con
     return png_data;
 }
 
+std::vector<std::shared_ptr<cell>> colored_grid::to_vec() const noexcept {
+    return this->m_distance_grid->to_vec();
+}
+
 void colored_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
 	this->m_distance_grid->append(other_grid);
 }
-void colored_grid::insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept {
+void colored_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
 	this->m_distance_grid->insert(parent, index);
 }
-std::shared_ptr<cell> colored_grid::search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept {
+
+bool colored_grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
+	return this->m_distance_grid->update(ref(parent), old_index, new_index);
+}
+
+std::shared_ptr<cell> colored_grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
 	return this->m_distance_grid->search(start, index);
 }
-void colored_grid::del(std::shared_ptr<cell> parent, unsigned int index) noexcept {
+void colored_grid::del(std::shared_ptr<cell> parent, int index) noexcept {
 	this->m_distance_grid->del(parent, index);
 }
 

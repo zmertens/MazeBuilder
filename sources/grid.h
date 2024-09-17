@@ -28,25 +28,27 @@ public:
     unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
-    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
+    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
 
     // Get bytewise representation of the grid
     virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
-    
+    virtual std::vector<std::shared_ptr<cell>> to_vec() const noexcept override;
+
     virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
-    virtual void insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept override;
-    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept override;
-    virtual void del(std::shared_ptr<cell> parent, unsigned int index) noexcept override;
+    virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;
+    virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept override;
+    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept override;
+    virtual void del(std::shared_ptr<cell> parent, int index) noexcept override;
 
     virtual std::shared_ptr<cell> get_root() const noexcept override;
     
     virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
     virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 private:
-    bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
+    bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
     
     // Grid tostring method
@@ -100,7 +102,7 @@ private:
     } // << operator
     std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column
-    std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
+    std::function<int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
     const unsigned int m_rows, m_columns, m_height;
 }; // class
