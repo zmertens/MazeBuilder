@@ -11,6 +11,7 @@ namespace mazes {
 
     class distance_grid;
     class cell;
+    class grid;
 	class colored_grid : public grid_interface
 	{
     public:
@@ -18,6 +19,7 @@ namespace mazes {
 
         virtual unsigned int get_rows() const noexcept override;
         virtual unsigned int get_columns() const noexcept override;
+        const std::unique_ptr<grid>& get_grid() const noexcept;
 
         // Get bytewise representation of the grid
         virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;

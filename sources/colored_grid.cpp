@@ -3,6 +3,7 @@
 #include "distance_grid.h"
 #include "distances.h"
 #include "cell.h"
+#include "grid.h"
 
 using namespace mazes;
 using namespace std;
@@ -24,6 +25,10 @@ unsigned int colored_grid::get_rows() const noexcept {
 
 unsigned int colored_grid::get_columns() const noexcept {
 	return this->m_distance_grid->get_columns();
+}
+
+const std::unique_ptr<grid>& colored_grid::get_grid() const noexcept {
+    return this->m_distance_grid->get_grid();
 }
 
 /**

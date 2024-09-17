@@ -4,6 +4,7 @@
 
 #include "binary_tree.h"
 #include "sidewinder.h"
+#include "dfs.h"
 #include "grid_interface.h"
 
 using namespace mazes;
@@ -17,6 +18,10 @@ bool maze_factory::gen_maze(maze_types maze_type, std::unique_ptr<grid_interface
     case maze_types::SIDEWINDER: {
         static sidewinder sw;
         return sw.run(std::ref(_grid), std::cref(get_int), std::cref(rng));
+    }
+    case maze_types::DFS: {
+        static dfs d;
+        return d.run(std::ref(_grid), std::cref(get_int), std::cref(rng));
     }
     default:
         // Fail on unknown maze type

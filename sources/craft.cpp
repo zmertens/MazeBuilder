@@ -2444,7 +2444,7 @@ bool craft::run(const std::list<std::string>& algos,
     const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
     // SDL INITIALIZATION //
-    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_TIMER)) {
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed (%s)\n", SDL_GetError());
         return false;
     }

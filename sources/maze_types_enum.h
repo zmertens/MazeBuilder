@@ -9,6 +9,7 @@ namespace mazes {
     enum class maze_types {
         BINARY_TREE,
         SIDEWINDER,
+        DFS,
         WILSONS,
         ALDOUS_BRODER,
         INVALID_ALGO
