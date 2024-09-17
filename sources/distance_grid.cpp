@@ -42,16 +42,25 @@ std::vector<std::uint8_t> distance_grid::to_png(const unsigned int cell_size) co
 	return this->m_grid->to_png(cell_size);
 }
 
+std::vector<std::shared_ptr<cell>> distance_grid::to_vec() const noexcept {
+	return this->m_grid->to_vec();
+}
+
 void distance_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
 	this->m_grid->append(other_grid);
 }
-void distance_grid::insert(std::shared_ptr<cell> const& parent, unsigned int index) noexcept {
+void distance_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
 	this->m_grid->insert(parent, index);
 }
-std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept {
+
+bool distance_grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
+	return this->m_grid->update(ref(parent), old_index, new_index);
+}
+
+std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
 	return this->m_grid->search(start, index);
 }
-void distance_grid::del(std::shared_ptr<cell> parent, unsigned int index) noexcept {
+void distance_grid::del(std::shared_ptr<cell> parent, int index) noexcept {
 	this->m_grid->del(parent, index);
 }
 

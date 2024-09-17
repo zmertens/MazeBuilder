@@ -61,11 +61,14 @@ TEST_CASE( "Test grid deletion ", "[delete]" ) {
 }
 
 TEST_CASE( "Test grid update ", "[update]" ) {
-    auto my_cell = make_shared<cell>(0, 0, 0);
-    my_grid->insert(my_grid->get_root(), my_cell->get_index());
-    my_cell->set_index(1);
-    auto result = my_grid->search(my_grid->get_root(), 1);
-    REQUIRE(result->get_index() == 1);
+	auto my_cell = my_grid->search(my_grid->get_root(), 0);
+    REQUIRE(my_cell);
+    auto&& modify_this_index = my_cell->get_index();
+    modify_this_index = my_grid->get_columns() - 1;
+	bool success = my_grid->update(my_cell, my_cell->get_index(), modify_this_index);
+	REQUIRE(success);
+	auto result = my_grid->search(my_grid->get_root(), modify_this_index);
+    REQUIRE(result != nullptr);
     REQUIRE(result->get_index() == my_cell->get_index());
 }
 

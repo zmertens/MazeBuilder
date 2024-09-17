@@ -19,27 +19,14 @@ using namespace std;
 bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
-    std::vector<shared_ptr<cell>> sorted_cells;
+    std::vector<shared_ptr<cell>> cells = _grid->to_vec();
 
-    // Cast grid_interface object to derived class
-	if (auto grid_ptr = dynamic_cast<grid*>(_grid.get())) {
-		grid_ptr->populate_vec(ref(sorted_cells));
-		grid_ptr->sort_by_row_then_col(ref(sorted_cells));
-    } else if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(_grid.get())) {
-		distance_grid_ptr->get_grid()->populate_vec(ref(sorted_cells));
-		distance_grid_ptr->get_grid()->sort_by_row_then_col(ref(sorted_cells));
-	} else if (auto colored_grid_ptr = dynamic_cast<colored_grid*>(_grid.get())) {
-		colored_grid_ptr->get_grid()->populate_vec(ref(sorted_cells));
-		colored_grid_ptr->get_grid()->sort_by_row_then_col(ref(sorted_cells));
-	} 
-    else {
-		return false;
-	}
-
-    for (auto itr{ sorted_cells.cbegin() }; itr != sorted_cells.cend(); itr++) {
-        if (itr->get()->get_row() != last_row) {
+    for (auto itr{ cells.cbegin() }; itr != cells.cend(); itr++) {
+        if (*itr && itr->get()->get_row() != last_row) {
             last_row++;
             store.clear();
+        } else {
+            continue;
         }
         store.emplace_back(*itr);
 

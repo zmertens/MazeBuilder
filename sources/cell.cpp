@@ -7,7 +7,7 @@
 using namespace mazes;
 using namespace std;
 
-cell::cell(unsigned int index)
+cell::cell(int index)
 : m_row{ 0 }
 , m_column{ 0 }
 , m_index{ index }
@@ -15,11 +15,13 @@ cell::cell(unsigned int index)
 , m_north{ nullptr }
 , m_south{ nullptr }
 , m_east{ nullptr }
-, m_west{ nullptr } {
+, m_west{ nullptr }
+, m_left{ nullptr }
+, m_right{}  {
 
 }
 
-cell::cell(unsigned int row, unsigned int column, unsigned int index) 
+cell::cell(unsigned int row, unsigned int column, int index) 
 : m_row{row}
 , m_column{column}
 , m_index{index}
@@ -27,7 +29,9 @@ cell::cell(unsigned int row, unsigned int column, unsigned int index)
 , m_north{nullptr}
 , m_south{nullptr}
 , m_east{nullptr}
-, m_west{nullptr} {
+, m_west{nullptr}
+, m_left{ nullptr }
+, m_right{} {
 
 }
 
@@ -85,8 +89,12 @@ unsigned int cell::get_column() const {
     return this->m_column;
 }
 
-unsigned int cell::get_index() const {
+int cell::get_index() const {
     return this->m_index;
+}
+
+void cell::set_index(int next_index) noexcept {
+    this->m_index = next_index;
 }
 
 shared_ptr<cell> cell::get_north() const {
@@ -135,10 +143,6 @@ void cell::set_left(std::shared_ptr<cell> const& other_left) {
 
 void cell::set_right(std::shared_ptr<cell> const& other_right) {
     this->m_right = other_right;
-}
-
-void cell::set_index(unsigned int i) noexcept {
-    this->m_index = i;
 }
 
 void cell::set_row(unsigned int r) noexcept {
