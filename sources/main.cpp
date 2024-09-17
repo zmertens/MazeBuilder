@@ -28,14 +28,14 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
         Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
-          -a, --algorithm    binary_tree [default], sidewinder
+          -a, --algorithm    DFS, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
           -w, --width        maze width [default=100]
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -c, --cell_size    maze cell size [default=25]
           -i, --interactive  run program in interactive mode with a GUI
-          -o, --output       stdout [default], plain text [.txt], or Wavefront object format [.obj]
+          -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message
           -v, --version      display program version
     )help";
@@ -95,12 +95,15 @@ int main(int argc, char* argv[]) {
         return dist(rng_engine);
     };
 
-    std::list<std::string> algos = { "binary_tree", "sidewinder" };
+    // Convert algorithm string into an enum type
+    std::list<std::string> algos = { "binary_tree", "sidewinder", "dfs" };
     auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
         if (algo.compare("binary_tree") == 0) {
             return mazes::maze_types::BINARY_TREE;
         } else if (algo.compare("sidewinder") == 0) {
             return mazes::maze_types::SIDEWINDER;
+        } else if (algo.compare("dfs") == 0) {
+            return mazes::maze_types::DFS;
         } else {
             return mazes::maze_types::INVALID_ALGO;
         }
@@ -119,41 +122,41 @@ int main(int argc, char* argv[]) {
         } else {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
-            unsigned int block_type = 1;
-            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
-                maze_args.width, maze_args.length, maze_args.height,
-                block_type };
-            auto&& maze_str = my_maze.get_maze();
-            if (!maze_str.empty()) {
+            //unsigned int block_type = 1;
+            //maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
+            //    maze_args.width, maze_args.length, maze_args.height,
+            //    block_type };
+            //auto&& maze_str = my_maze.get_maze();
+            //if (!maze_str.empty()) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &maze_args](auto data)->bool {
                     return my_writer.write(maze_args.output, data);
                 };
-                bool is_wavefront_file = (my_writer.get_filetype(maze_args.output) == mazes::file_types::WAVEFRONT_OBJ_FILE);
-                bool is_png = (my_writer.get_filetype(maze_args.output) == mazes::file_types::PNG);
-                if (is_wavefront_file) {
-                    success = write_func(my_maze.to_wavefront_obj_str());
-                } else if (is_png) {
-                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::colored_grid>(maze_args.width, maze_args.length);
-                    success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
+                // bool is_wavefront_file = (my_writer.get_filetype(maze_args.output) == mazes::file_types::WAVEFRONT_OBJ_FILE);
+                // bool is_png = (my_writer.get_filetype(maze_args.output) == mazes::file_types::PNG);
+                // if (is_wavefront_file) {
+                //     success = write_func(my_maze.to_wavefront_obj_str());
+                // } else if (is_png) {
+                //     unique_ptr<mazes::grid_interface> gg = make_unique<mazes::colored_grid>(maze_args.width, maze_args.length);
+                //     success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
 
-                    // Get start, goal, and distances
-					auto start = gg->get_root();
-					auto goal = gg->search(gg->get_root(), gg->get_rows() / 2 * gg->get_columns() + gg->get_columns() / 2);
-					auto distances = start->get_distances();
-                    auto path = start->get_distances()->path_to(goal);
-                    distances->set(goal, path->max().second);
-					success = my_writer.write_png(maze_args.output, gg->to_png(maze_args.cell_size), 
-                        maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
-				} else {
-                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::distance_grid>(maze_args.width, maze_args.length);
+                //     // Get start, goal, and distances
+				// 	auto start = gg->get_root();
+				// 	auto goal = gg->search(gg->get_root(), gg->get_rows() / 2 * gg->get_columns() + gg->get_columns() / 2);
+				// 	auto distances = start->get_distances();
+                //     auto path = start->get_distances()->path_to(goal);
+                //     distances->set(goal, path->max().second);
+				// 	success = my_writer.write_png(maze_args.output, gg->to_png(maze_args.cell_size), 
+                //         maze_args.cell_size * maze_args.width, maze_args.cell_size * maze_args.length);
+				// } else {
+                    unique_ptr<mazes::grid_interface> gg = make_unique<mazes::grid>(maze_args.width, maze_args.length);
                     success = mazes::maze_factory::gen_maze(my_maze_type, ref(gg), cref(get_int), cref(rng_engine));
-					if (auto dg = dynamic_cast<mazes::distance_grid*>(gg.get()); dg != nullptr) {
+					if (auto dg = dynamic_cast<mazes::grid*>(gg.get()); dg != nullptr) {
                         stringstream ss;
                         ss << *dg;
                         success = write_func(ss.str());
 					}
-                }
+                // }
                 
                 if (success) {
 #if defined(MAZE_DEBUG)
@@ -164,10 +167,10 @@ int main(int argc, char* argv[]) {
                     std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
                 }
             }
-            else {
-                std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
-            }
-        }
+            //else {
+            //    std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
+            //}
+        //}
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }

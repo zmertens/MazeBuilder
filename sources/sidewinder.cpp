@@ -6,6 +6,7 @@
 #include "cell.h"
 #include "grid.h"
 #include "distance_grid.h"
+#include "colored_grid.h"
 #include "grid_interface.h"
 
 using namespace mazes;
@@ -27,7 +28,11 @@ bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::functio
     } else if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(_grid.get())) {
 		distance_grid_ptr->get_grid()->populate_vec(ref(sorted_cells));
 		distance_grid_ptr->get_grid()->sort_by_row_then_col(ref(sorted_cells));
-	} else {
+	} else if (auto colored_grid_ptr = dynamic_cast<colored_grid*>(_grid.get())) {
+		colored_grid_ptr->get_grid()->populate_vec(ref(sorted_cells));
+		colored_grid_ptr->get_grid()->sort_by_row_then_col(ref(sorted_cells));
+	} 
+    else {
 		return false;
 	}
 

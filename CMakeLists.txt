@@ -67,7 +67,8 @@ set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/distances.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/distance_grid.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/colored_grid.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/colored_grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/dfs.cpp)
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
@@ -213,11 +214,12 @@ if(BUILD_MAZE_TESTS)
     endif()
     if(NOT CATCH2_FOUND)
         message(INFO ": Getting Catch2 via FetchContent")
-        fetch_lib_from_git(Catch2 v3.4.0 https://github.com/catchorg/Catch2.git)
+        fetch_lib_from_git(Catch2 v3.7.0 https://github.com/catchorg/Catch2.git)
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
     enable_testing()
+    message(INFO ": Building ${PROJECT_NAME} tests")
 
     file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
 

@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include <cstdlib>
+#include <cstdint>
 
 namespace mazes {
 	class cell;

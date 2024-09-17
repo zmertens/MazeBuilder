@@ -17,6 +17,7 @@
 #include "grid.h"
 #include "binary_tree.h"
 #include "sidewinder.h"
+#include "dfs.h"
 
 using namespace std;
 using namespace mazes;
@@ -54,8 +55,9 @@ TEST_CASE("Searching the grid yields positive results", "[search]") {
 }
 
 TEST_CASE("Compare maze algos", "[compare successes]") {
-    unique_ptr<grid_interface> _grid_from_bt {make_unique<grid>(50, 50)};
-    unique_ptr<grid_interface> _grid_from_sw {make_unique<grid>(49, 49)};
+    unique_ptr<grid_interface> _grid_from_bt {make_unique<grid>(50, 150)};
+    unique_ptr<grid_interface> _grid_from_sw {make_unique<grid>(49, 29)};
+    unique_ptr<grid_interface> _grid_from_dfs {make_unique<grid>(50, 75)};
 
     mt19937 rng{ 42681ul };
     auto get_int = [&rng](int low, int high) ->int {
@@ -70,6 +72,10 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
     auto&& future_grid_from_sw = std::async(std::launch::async, [&_grid_from_sw, &get_int, &rng] {
         mazes::sidewinder sw;
         return sw.run(ref(_grid_from_sw), get_int, rng);
+    });
+    auto&& future_grid_from_dfs = std::async(std::launch::async, [&_grid_from_dfs, &get_int, &rng] {
+        mazes::dfs dfs;
+        return dfs.run(ref(_grid_from_dfs), get_int, rng);
     });
 
     SECTION("Check for success", "[assert_section]") {
@@ -93,6 +99,14 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
         REQUIRE(ss.str().length() != 0);
         // curious if either algo runs in identical time
         REQUIRE(elapsed1ms != elapsed2ms);
+    }
+    SECTION("dfs success", "[assert dfs]") {
+        auto start = chrono::system_clock::now();
+        stringstream ss;
+        ss << *(dynamic_cast<grid*>(_grid_from_dfs.get()));
+        REQUIRE(ss.str().length() != 0);
+        // curious if either algo runs in identical time
+        REQUIRE(start != chrono::system_clock::now());
     }
 }
 
