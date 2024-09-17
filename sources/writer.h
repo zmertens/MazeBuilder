@@ -2,7 +2,7 @@
 #define WRITER_H
 
 #include <vector>
-#include <cstdlib>
+#include <cstdint>
 #include <string>
 
 #include "file_types_enum.h"

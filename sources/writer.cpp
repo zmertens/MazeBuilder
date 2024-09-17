@@ -88,7 +88,6 @@ bool writer::write(const std::string& filename, const std::string& data) const {
  * @param data
  * @param w = 1
  * @param h = 1
- * @param cell_size = 25
  */
 bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data,
 	const unsigned int w, const unsigned int h) const {
