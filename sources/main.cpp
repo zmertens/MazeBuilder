@@ -122,12 +122,12 @@ int main(int argc, char* argv[]) {
         } else {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
-            unsigned int block_type = 1;
-            maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
-                maze_args.width, maze_args.length, maze_args.height,
-                block_type };
-            auto&& maze_str = my_maze.get_maze();
-            if (!maze_str.empty()) {
+            //unsigned int block_type = 1;
+            //maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
+            //    maze_args.width, maze_args.length, maze_args.height,
+            //    block_type };
+            //auto&& maze_str = my_maze.get_maze();
+            //if (!maze_str.empty()) {
                 mazes::writer my_writer;
                 auto write_func = [&my_writer, &maze_args](auto data)->bool {
                     return my_writer.write(maze_args.output, data);
@@ -167,10 +167,10 @@ int main(int argc, char* argv[]) {
                     std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
                 }
             }
-            else {
-                std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
-            }
-        }
+            //else {
+            //    std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
+            //}
+        //}
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }
