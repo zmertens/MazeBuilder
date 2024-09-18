@@ -7,7 +7,7 @@
 #include <memory>
 #include <utility>
 #include <unordered_map>
-#include <cstdlib>
+#include <cstdint>
 
 #include "maze_interface.h"
 #include "maze_types_enum.h"
@@ -29,17 +29,15 @@ private:
     using pqmap = std::unordered_map<std::pair<int, int>, bool, pair_hash>;
 
 public:
-    maze_thread_safe(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng,
-        unsigned int width, unsigned int length, unsigned int height, unsigned int block_type);
-	virtual void set_maze(const std::string& maze) noexcept override;
-	virtual std::string get_maze() noexcept override;
+    explicit maze_thread_safe(unsigned int width, unsigned int length, unsigned int height);
+	
 	virtual void clear() noexcept override;
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
     const pqmap& get_p_q() const noexcept;
-    std::string compute_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
-    void compute_geometry(unsigned int block_type = 1) noexcept override;
+    std::string to_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
     std::vector<std::uint8_t> to_png(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
@@ -55,7 +53,50 @@ public:
     void set_block_type(unsigned int block_type) noexcept;
     unsigned int get_block_type() const noexcept;
 
+    // Expose progress_tracker methods
+    void start_progress() noexcept;
+    void stop_progress() noexcept;
+    double get_progress_in_seconds() const noexcept;
+    double get_progress_in_ms() const noexcept;
+    std::size_t get_vertices_size() const noexcept;
+
 private:
+    class progress_tracker {
+        mutable std::mutex m_mtx;
+        std::chrono::steady_clock::time_point start_time;
+        std::chrono::steady_clock::time_point end_time;
+    public:
+        explicit progress_tracker() : start_time(std::chrono::steady_clock::now())
+            , end_time(std::chrono::steady_clock::now()) {
+
+        }
+        void start() noexcept {
+            this->m_mtx.lock();
+            start_time = std::chrono::steady_clock::now();
+            this->m_mtx.unlock();
+        }
+
+        void stop() noexcept {
+            this->m_mtx.lock();
+            end_time = std::chrono::steady_clock::now();
+            this->m_mtx.unlock();
+        }
+
+        double get_duration_in_seconds() const noexcept {
+            std::lock_guard<std::mutex> lock(this->m_mtx);
+            return std::chrono::duration<double>(end_time - start_time).count();
+        }
+
+        double get_duration_in_ms() const noexcept {
+            return this->get_duration_in_seconds() * 1000.0;
+        }
+
+        void reset() noexcept {
+            this->start_time = std::chrono::steady_clock::now();
+            this->end_time = start_time;
+        }
+    };
+
 
     void add_block(int x, int y, int z, int w, int block_size) noexcept override;
 
@@ -70,6 +111,11 @@ private:
     std::vector<std::tuple<int, int, int, int>> m_vertices;
     std::vector<std::vector<std::uint32_t>> m_faces;
     pqmap m_p_q;
+
+    progress_tracker m_tracker;
+
+    // Allow the maze_thread_safe_impl class to access private members like progress_tracker
+    friend class maze_thread_safe_impl;
 }; // class
 
 } // namespace

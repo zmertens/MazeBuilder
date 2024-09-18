@@ -226,27 +226,6 @@ struct craft::craft_impl {
         }
     }; // class
 
-    struct ProgressTracker {
-        std::atomic<std::chrono::steady_clock::time_point> start_time;
-        std::atomic<std::chrono::steady_clock::time_point> end_time;
-        
-        void start() {
-            start_time.store(std::chrono::steady_clock::now());
-        }
-
-        void stop() {
-            end_time.store(std::chrono::steady_clock::now());
-        }
-
-        double get_duration_in_seconds() {
-            return std::chrono::duration<double>(end_time.load() - start_time.load()).count();
-        }
-
-        double get_duration_in_ms() {
-            return std::chrono::duration<double>(end_time.load() - start_time.load()).count() * 1000.0;
-        }
-    };
-
     typedef struct {
         Map map;
         Map lights;
@@ -2685,13 +2664,11 @@ bool craft::run(const std::list<std::string>& algos,
     auto&& model = this->m_pimpl->m_model;
 
     auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
-        maze2 = std::make_unique<mazes::maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
+        maze2 = std::make_unique<mazes::maze_thread_safe>(w, l, h);
     };
 
     // Generate a default maze to start the app
     future<void> maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
-
-    auto progress_tracker = std::make_shared<craft::craft_impl::ProgressTracker>();
     
     future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
@@ -2864,6 +2841,7 @@ bool craft::run(const std::list<std::string>& algos,
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
             // Get the maze and reset the future
             maze_gen_future.get();
+            maze2->stop_progress();
             // Don't write the first maze that loads when app starts
             write_maze_now = first_maze ? false : true;
             first_maze = false;
@@ -2965,10 +2943,9 @@ bool craft::run(const std::list<std::string>& algos,
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Build!")) {
-                        progress_tracker->start();
                         // Start the maze generation in the background
+                        maze2->start_progress();
                         maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
-                        progress_tracker->stop();
                     } else {
                         ImGui::SameLine();
                         ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -3003,14 +2980,14 @@ bool craft::run(const std::list<std::string>& algos,
                     // Reset outfile's first char and that will disable the Build! button
                     gui->outfile[0] = '.';
                 }
-                if (progress_tracker) {
-                    // Show progress when writing
-                    ImGui::NewLine();
-                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                    ImGui::Text("Finished building maze in %f ms", progress_tracker->get_duration_in_ms());
-                    ImGui::NewLine();
-                    ImGui::PopStyleColor();
-                }
+                
+                // Show progress when writing
+                ImGui::NewLine();
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
+                ImGui::Text("Finished building maze in %f ms", maze2->get_progress_in_ms());
+                ImGui::NewLine();
+                ImGui::PopStyleColor();
+            
 
                 // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));

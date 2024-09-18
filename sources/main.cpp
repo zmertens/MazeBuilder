@@ -117,16 +117,16 @@ int main(int argc, char* argv[]) {
             auto&& maze_builder_3D = craft::get_instance(cref(maze_args.version), cref(maze_args.help), window_w, window_h);
             success = maze_builder_3D->run(std::cref(algos), std::cref(get_maze_type_from_algo), std::cref(get_int), std::ref(rng_engine));
             if (!success) {
-                std::cout << "ERROR: Running SDL app failed." << std::endl;
+                std::cerr << "ERROR: Running SDL app failed." << std::endl;
             }
         } else {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
-            unsigned int block_type = 1;
-            mazes::maze_thread_safe my_maze{ my_maze_type, std::cref(get_int), std::cref(rng_engine),
-                maze_args.width, maze_args.length, maze_args.height,
-                block_type };
-			string maze_str = my_maze.compute_str(my_maze_type, std::cref(get_int), std::cref(rng_engine));
+            
+            static constexpr auto block_type = -1;
+            mazes::maze_thread_safe my_maze{ maze_args.width, maze_args.length, maze_args.height };
+            my_maze.start_progress();
+			string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine));
             if (!maze_str.empty()) {
                 mazes::writer my_writer;
 				mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
@@ -143,10 +143,15 @@ int main(int argc, char* argv[]) {
 				case mazes::output_types::STDOUT:
 					success = my_writer.write(cref(maze_args.output), cref(maze_str));
                     break;
-			    }                
+                case mazes::output_types::UNKNOWN:
+                    success = false;
+                    break;
+                }                
                 if (success) {
+                    my_maze.stop_progress();
 #if defined(MAZE_DEBUG)
                     std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
+                    std::cout << "INFO: Progress: " << my_maze.get_progress_in_seconds() << " seconds" << std::endl;
 #endif
                 }
                 else {

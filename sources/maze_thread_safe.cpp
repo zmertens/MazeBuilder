@@ -15,23 +15,9 @@ using namespace std;
 /**
  * @brief Represent a maze with a thread-safe interface in a 3D grid
  */
-maze_thread_safe::maze_thread_safe(mazes::maze_types my_maze_type,
-    const std::function<int(int, int)>& get_int, const std::mt19937& rng,
-    unsigned int width, unsigned int length, unsigned int height, unsigned int block_type)
-    : m_maze(), m_width(width), m_length(length), m_height(height), m_block_type(block_type)
+maze_thread_safe::maze_thread_safe(unsigned int width, unsigned int length, unsigned int height)
+    : m_maze(), m_width(width), m_length(length), m_height(height)
     , m_vertices(), m_faces(), m_p_q() {
-    this->m_maze = this->compute_str(my_maze_type, get_int, rng);
-    this->compute_geometry(this->m_block_type);
-}
-
-void maze_thread_safe::set_maze(const std::string& maze) noexcept {
-    std::lock_guard<std::mutex> lock(m_maze_mutx);
-    this->m_maze = maze;
-}
-
-std::string maze_thread_safe::get_maze() noexcept {
-    std::lock_guard<std::mutex> lock(m_maze_mutx);
-    return this->m_maze;
 }
 
 /**
@@ -47,6 +33,7 @@ void maze_thread_safe::clear() noexcept {
     m_width = 0;
     m_length = 0;
     m_height = 0;
+    m_tracker.reset();
 }
 
 std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertices() const noexcept {
@@ -106,10 +93,6 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
         c++;
     }
 
-#if defined(MAZE_DEBUG)
-    cout << "INFO: Writing maze progress: " << c << "/" << t << "\n";
-#endif
-
     return ss.str();
 } // to_wavefront_obj_str
 
@@ -166,7 +149,28 @@ unsigned int maze_thread_safe::get_block_type() const noexcept {
     return this->m_block_type;
 }
 
-std::string maze_thread_safe::compute_str(maze_types my_maze_type,
+void maze_thread_safe::start_progress() noexcept {
+    this->m_tracker.start();
+}
+
+void maze_thread_safe::stop_progress() noexcept {
+    this->m_tracker.stop();
+}
+
+double maze_thread_safe::get_progress_in_seconds() const noexcept {
+    return this->m_tracker.get_duration_in_seconds();
+}
+
+double maze_thread_safe::get_progress_in_ms() const noexcept {
+    return this->m_tracker.get_duration_in_ms();
+}
+
+std::size_t maze_thread_safe::get_vertices_size() const noexcept {
+    std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
+    return this->m_vertices.size();
+}
+
+std::string maze_thread_safe::to_str(maze_types my_maze_type,
     const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     std::unique_ptr<grid_interface> g = make_unique<mazes::grid>(m_width, m_length, m_height);
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
@@ -185,9 +189,12 @@ std::string maze_thread_safe::compute_str(maze_types my_maze_type,
  * @param block_type = 1
  * @return
 */
-void maze_thread_safe::compute_geometry(unsigned int block_type) noexcept {
+void maze_thread_safe::compute_geometry(maze_types my_maze_type,
+    const std::function<int(int, int)>& get_int, const std::mt19937& rng,
+    int block_type) noexcept {
+    
     lock_guard<mutex> lock(m_maze_mutx);
-    istringstream iss{ m_maze.data() };
+    istringstream iss{ this->to_str(my_maze_type, cref(get_int), cref(rng)) };
     string line;
     unsigned int row_x = 0;
     while (getline(iss, line, '\n')) {
@@ -197,6 +204,7 @@ void maze_thread_safe::compute_geometry(unsigned int block_type) noexcept {
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
                 static constexpr unsigned int starting_height = 5u;
                 static constexpr unsigned int block_size = 1;
+                block_type = (block_type == -1) ? get_int(1, 20) : block_type;
                 for (auto h{ starting_height }; h < starting_height + m_height; h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
