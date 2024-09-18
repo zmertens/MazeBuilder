@@ -27,13 +27,9 @@ unsigned int colored_grid::get_columns() const noexcept {
 	return this->m_distance_grid->get_columns();
 }
 
-const std::unique_ptr<grid>& colored_grid::get_grid() const noexcept {
-    return this->m_distance_grid->get_grid();
-}
-
 /**
  *
- * @param cell_size 25
+ * @param cell_size 3
  */
 std::vector<std::uint8_t> colored_grid::to_png(const unsigned int cell_size) const noexcept {
     int png_w = cell_size * this->m_distance_grid->get_columns();
@@ -139,10 +135,11 @@ std::string colored_grid::contents_of(const std::shared_ptr<cell>& c) const noex
 }
 
 std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-    auto distance = this->m_distance_grid->get_distances()->operator[](c);
-	auto max = this->m_distance_grid->get_distances()->max().second;
-	float intensity = static_cast<float>(max - distance) / max;
-	int dark = static_cast<int>(255 * intensity);
-	int bright = 128 + static_cast<int>(127 * intensity);
-	return (dark << 16) | (bright << 8) | dark;
+    // auto distance = this->m_distance_grid->get_distances()->operator[](c);
+	// auto max = this->m_distance_grid->get_distances()->max().second;
+	// float intensity = static_cast<float>(max - distance) / max;
+	// int dark = static_cast<int>(255 * intensity);
+	// int bright = 128 + static_cast<int>(127 * intensity);
+	// return (dark << 16) | (bright << 8) | dark;
+    return 0xFFFFFF;
 }

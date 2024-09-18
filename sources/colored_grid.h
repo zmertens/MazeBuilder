@@ -4,12 +4,11 @@
 #include "grid_interface.h"
 
 #include <memory>
-#include <cstdlib>
+#include <cstdint>
 #include <vector>
 
 namespace mazes {
 
-    class distance_grid;
     class cell;
     class grid;
 	class colored_grid : public grid_interface
@@ -19,10 +18,9 @@ namespace mazes {
 
         virtual unsigned int get_rows() const noexcept override;
         virtual unsigned int get_columns() const noexcept override;
-        const std::unique_ptr<grid>& get_grid() const noexcept;
 
         // Get bytewise representation of the grid
-        virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
+        virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 3) const noexcept override;
         virtual std::vector<std::shared_ptr<cell>> to_vec() const noexcept override;
 
         virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
@@ -36,7 +34,7 @@ namespace mazes {
         virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
         virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 	private:
-        std::unique_ptr<distance_grid> m_distance_grid;
+        std::unique_ptr<grid_interface> m_distance_grid;
 	};
 
 }

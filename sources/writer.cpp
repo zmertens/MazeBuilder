@@ -71,6 +71,9 @@ bool writer::write(const std::string& filename, const std::string& data) const n
 		} else if (otype == output_types::PNG) {
 			cerr << "ERROR: Incorrect arguments for write_png with output: " << filename << "\n";
 			return false;
+		} else if (otype == output_types::UNKNOWN) {
+			cerr << "ERROR: Unknown output type!!\n";
+			return false;
 		} else {
 			cerr << "ERROR: Unknown output type!!\n";
 			return false;

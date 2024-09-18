@@ -2107,7 +2107,7 @@ struct craft::craft_impl {
                 sc = e.key.scancode;
                 switch (sc) {
                 case SDL_SCANCODE_ESCAPE: {
-                    SDL_SetWindowRelativeMouseMode(this->m_model->window, SDL_FALSE);
+                    SDL_SetWindowRelativeMouseMode(this->m_model->window, false);
                     this->m_gui->capture_mouse = false;
                     this->m_gui->fullscreen = false;
                     this->m_model->typing = 0;
@@ -2273,7 +2273,7 @@ struct craft::craft_impl {
         } // SDL_Event
         // Handle motion updates
 
-        const SDL_bool *state = SDL_GetKeyboardState(nullptr);
+        const bool *state = SDL_GetKeyboardState(nullptr);
 
         if (!(this->m_model->typing)) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
@@ -2392,7 +2392,7 @@ struct craft::craft_impl {
         SDL_GL_SetSwapInterval(this->m_gui->vsync);
 
         auto icon_path{ "textures/maze_in_green_32x32.bmp" };
-        SDL_Surface *icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path, "rb"), SDL_TRUE);
+        SDL_Surface *icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path, "rb"), true);
         if (icon_surface) {
             SDL_SetWindowIcon(this->m_model->window, icon_surface);
             SDL_DestroySurface(icon_surface);
@@ -2460,7 +2460,7 @@ bool craft::run(const std::list<std::string>& algos,
     }
 
     SDL_ShowWindow(sdl_window);
-    SDL_SetWindowRelativeMouseMode(sdl_window, SDL_FALSE);
+    SDL_SetWindowRelativeMouseMode(sdl_window, false);
 
 #if !defined(__EMSCRIPTEN__)
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
@@ -3189,9 +3189,9 @@ bool craft::run(const std::list<std::string>& algos,
         ImGui::SetWindowSize(ImVec2(150, 50));
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
-                SDL_SetWindowRelativeMouseMode(sdl_window, SDL_TRUE);
+                SDL_SetWindowRelativeMouseMode(sdl_window, true);
             } else {
-                SDL_SetWindowRelativeMouseMode(sdl_window, SDL_FALSE);
+                SDL_SetWindowRelativeMouseMode(sdl_window, false);
             }
         }
         ImGui::End();
