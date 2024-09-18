@@ -8,11 +8,11 @@
 
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
-class maze_thread_safe;
+#include "maze_thread_safe.h"
 
 class world {
 public:
-    void create_world(int p, int q, const std::unique_ptr<maze_thread_safe>& maze, world_func func, Map *m,
+    void create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_safe>& maze, world_func func, Map *m,
         int chunk_size, bool show_trees, bool show_plants, bool show_clouds) const noexcept;
 private:
 };

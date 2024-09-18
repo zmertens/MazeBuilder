@@ -363,7 +363,7 @@ struct craft::craft_impl {
     const std::string& m_help;
 
     unique_ptr<Model> m_model;
-    unique_ptr<maze_thread_safe> m_maze;
+    unique_ptr<mazes::maze_thread_safe> m_maze;
     unique_ptr<Gui> m_gui;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
@@ -2685,7 +2685,7 @@ bool craft::run(const std::list<std::string>& algos,
     auto&& model = this->m_pimpl->m_model;
 
     auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
-        maze2 = std::make_unique<maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
+        maze2 = std::make_unique<mazes::maze_thread_safe>(my_maze_type, get_int, rng, w, l, h, items[this->m_pimpl->m_model->item_index]);
     };
 
     // Generate a default maze to start the app

@@ -12,6 +12,8 @@
 #include "maze_interface.h"
 #include "maze_types_enum.h"
 
+namespace mazes {
+
 class maze_thread_safe : public mazes::maze_interface
 {
 private:
@@ -69,6 +71,8 @@ private:
     std::vector<std::vector<std::uint32_t>> m_faces;
     pqmap m_p_q;
 }; // class
+
+} // namespace
 
 #endif // MAZE_THREAD_SAFE_H
 
