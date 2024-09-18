@@ -5,15 +5,15 @@
 #include <cstdint>
 #include <string>
 
-#include "file_types_enum.h"
+#include "output_types_enum.h"
 
 namespace mazes {
 
 class writer {
 public:
 	writer();
-	file_types get_filetype(const std::string& filename) const noexcept;
-	bool write(const std::string& filename, const std::string& data) const;
+	output_types get_output_type(const std::string& filename) const noexcept;
+	bool write(const std::string& filename, const std::string& data) const noexcept;
 	bool write_png(const std::string& filename, const std::vector<std::uint8_t>& data, 
 		const unsigned int w = 1, const unsigned int h = 1) const;
 private:

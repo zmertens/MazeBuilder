@@ -38,7 +38,7 @@ args_builder::args_builder(const std::vector<std::string>& vv)
 		this->my_args.height = 10;
 	}
     if (this->my_args.cell_size == 0) {
-        this->my_args.cell_size = 25;
+        this->my_args.cell_size = 3;
     }
 }
 

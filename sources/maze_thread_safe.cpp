@@ -5,6 +5,7 @@
 
 #include "grid_interface.h"
 #include "grid.h"
+#include "colored_grid.h"
 #include "maze_factory.h"
 #include "maze_types_enum.h"
 
@@ -112,11 +113,18 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
     return ss.str();
 } // to_wavefront_obj_str
 
+/**
+ * @brief Generate a PNG image of the maze
+ * @param my_maze_type
+ * @param get_int
+ * @param rng
+ * @param cell_size 3
+ */
 std::vector<std::uint8_t> maze_thread_safe::to_png(mazes::maze_types my_maze_type,
     const std::function<int(int, int)>& get_int,
     const std::mt19937& rng, const unsigned int cell_size) const noexcept {
 
-    std::unique_ptr<grid_interface> g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    std::unique_ptr<grid_interface> g = make_unique<colored_grid>(m_width, m_length, m_height);
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
 
     if (!success) {

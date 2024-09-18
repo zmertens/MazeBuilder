@@ -85,7 +85,7 @@ std::vector<std::uint8_t> colored_grid::to_png(const unsigned int cell_size) con
         int x2 = (current->get_column() + 1) * cell_size;
         int y2 = (current->get_row() + 1) * cell_size;
 
-        uint32_t color = this->background_color_for(current);
+        uint32_t color = 0xFFFFFF;// this->background_color_for(current);
 
         draw_rect(x1, y1, x2, y2, color);
 

@@ -13,12 +13,12 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
         Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
-          -a, --algorithm    DFS, sidewinder, binary_tree [default]
+          -a, --algorithm    dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
           -w, --width        maze width [default=100]
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
-          -c, --cell_size    maze cell size [default=25]
+          -c, --cell_size    maze cell size [default=3]
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message

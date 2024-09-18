@@ -44,7 +44,7 @@ public:
     std::vector<std::uint8_t> to_png(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
-        const unsigned int cell_size = 25) const noexcept;
+        const unsigned int cell_size = 3) const noexcept;
 
     void set_height(unsigned int height) noexcept;
     unsigned int get_height() const noexcept;
