@@ -357,7 +357,6 @@ vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
     for (const auto& mode : {"backgrounds", "walls"}) {
         auto current = this->search(this->get_root(), 0);
         while (current) {
-            cout << "Cell: " << current->get_index() << endl;
             int x1 = current->get_column() * cell_size;
             int y1 = current->get_row() * cell_size;
             int x2 = (current->get_column() + 1) * cell_size;
@@ -369,15 +368,15 @@ vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
             } else {
                 if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
                 if (!current->get_west()) draw_line(x1, y1, x1, y2, wall);
-                if (!current->is_linked(current->get_east())) draw_line(x2, y1, x2, y2, wall);
-                if (!current->is_linked(current->get_south())) draw_line(x1, y2, x2, y2, wall);
+                if (auto east = current->get_east(); east && !current->is_linked(cref(east))) draw_line(x2, y1, x2, y2, wall);
+                if (auto south = current->get_south(); south && !current->is_linked(cref(south))) draw_line(x1, y2, x2, y2, wall);
             }
             current = this->search(this->get_root(), current->get_index() + 1);
         }
     }
 
     return img_data;
-}
+} // to_pixels
 
 std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {
 	vector<shared_ptr<cell>> cells;
