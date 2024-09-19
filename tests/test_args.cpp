@@ -31,7 +31,8 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
         "--width=" + to_string(width),
         "--length=" + to_string(length),
         "--height=" + to_string(height),
-        "--cell_size=" + to_string(cell_size)
+		"--cell_size=" + to_string(cell_size),
+        "--distances"
     };
 
     REQUIRE(LONG_ARGS.empty() == false);
@@ -49,6 +50,7 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     REQUIRE(maze_args.height == height);
     REQUIRE(maze_args.length == length);
     REQUIRE(maze_args.cell_size == cell_size);
+	REQUIRE(maze_args.distances == true);
 
     // Check the ostream operator
     stringstream ss;
@@ -64,8 +66,6 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     auto&& maze_args_plus_version = builder.version(version_message).build();
     REQUIRE(maze_args_plus_version.version.compare(version_message) == 0);
 
-    // What happens if there's an interactive switch, version and a help switch?
-    // @example 'maze_builder.exe -i -v -h'
     static const vector<string> SHORT_ARGS = {
 		"maze_builder.exe",
 		"-s", to_string(seed),
@@ -75,16 +75,16 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
 		"-w", to_string(width),
 		"-l", to_string(length),
 		"-y", to_string(height),
-        "-c", to_string(cell_size),
-        "-v", "-h"
+        "-c", to_string(cell_size), "-d"
 	};
     // First-come-first-serve and grab 'interactive'
     mazes::args_builder builder2{ cref(SHORT_ARGS) };
     auto&& maze_args2 = builder2.build();
     REQUIRE(maze_args2.interactive == true);
-    // Since 'interactive' is true and placed in order before, '-h' or '-v', which are empty
-    REQUIRE(maze_args2.help.empty() == true);
-    REQUIRE(maze_args2.version.empty() == true);
+	// Parsing help switch will break the loop
+    REQUIRE(maze_args2.help.empty());
+    REQUIRE(maze_args2.version.empty());
+    REQUIRE(maze_args2.distances == true);
 }
 
 TEST_CASE("Args are bad and cannot be built", "[args]") {
@@ -98,4 +98,17 @@ TEST_CASE("Args are bad and cannot be built", "[args]") {
     mazes::args_builder builder2{ cref(BAD_SHORT_ARGS) };
     auto&& maze_args2 = builder2.build();
     REQUIRE_NOTHROW(maze_args2);
+}
+
+TEST_CASE("Args has help and version", "[help, version]") {
+    static const vector<string> SHORT_ARGS = {
+    "maze_builder.exe",
+    "-h", "-v",
+    };
+    // First-come-first-serve and grab 'interactive'
+    mazes::args_builder builder2{ cref(SHORT_ARGS) };
+    auto&& maze_args2 = builder2.build();
+    // Parsing help switch will break the loop
+    REQUIRE(!maze_args2.help.empty());
+    REQUIRE(maze_args2.version.empty());
 }

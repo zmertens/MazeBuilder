@@ -363,7 +363,7 @@ vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
             int y2 = (current->get_row() + 1) * cell_size;
 
             if (mode == "backgrounds"s) {
-                uint32_t color = background_color_for(current);
+                uint32_t color = background_color_for(current).value_or(0xFFFFFFFF);
                 draw_rect(x1, y1, x2, y2, color);
             } else {
                 if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
@@ -385,10 +385,10 @@ std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {
     return cells;
 }
 
-std::string grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
-    return " ";
+optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+    return { " " };
 }
 
-std::uint32_t grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-    return 0xFFFFFFFF;
+optional<std::uint32_t> grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+    return { 0xFFFFFFFF };
 }

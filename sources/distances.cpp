@@ -15,9 +15,12 @@ void distances::set(std::shared_ptr<cell> cell, int distance) {
 
 std::vector<std::shared_ptr<cell>> distances::get_cells() const {
     std::vector<std::shared_ptr<cell>> keys;
-    for (auto&& pair : m_cells) {
-        keys.push_back(pair.first);
-    }
+	keys.reserve(m_cells.size());
+    
+	for (const auto& [cell, distance] : m_cells) {
+		keys.push_back(cell);
+	}
+
     return keys;
 }
 
@@ -32,8 +35,8 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
     breadcrumbs->set(current, m_cells.at(current));
 
     while (current != m_root) {
-        for (auto&& [neighbor, count] : current->get_links()) {
-            if (m_cells.at(neighbor) < m_cells.at(current)) {
+        for (auto&& [neighbor, _] : current->get_links()) {
+            if (neighbor && m_cells.at(neighbor) < m_cells.at(current)) {
                 breadcrumbs->set(neighbor, m_cells.at(neighbor));
                 current = neighbor;
                 break;

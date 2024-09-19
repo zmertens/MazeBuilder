@@ -92,6 +92,11 @@ args_builder& args_builder::cell_size(unsigned int cell_size) noexcept {
     return *this;
 }
 
+args_builder& args_builder::distances(bool distances) noexcept {
+	this->my_args.distances = distances;
+    return *this;
+}
+
 void args_builder::clear() noexcept {
     this->my_args = args{};
 }
@@ -131,6 +136,7 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
     regex version_regex ("--version|^-v$", regex_constants::ECMAScript);
     regex algo_regex ("--algorithm=[\\w]+|^-a$", regex_constants::ECMAScript);
     regex output_regex ("(^--output=[\\w\\\\.]+|^-o$)", regex_constants::ECMAScript);
+    regex distances_regex("(^--distances$|^-d$)", regex_constants::ECMAScript);
 
     string short_val_option {""};
     // skip program name with +1
@@ -145,7 +151,6 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             break;
         } else if (regex_match(current, interactive_regex)) {
             this->my_args.interactive = true;
-            break;
         } else if (regex_match(current, seed_regex)) {
             // seed follows an '=' for long option, -s for short option
             if (current.compare("-s") == 0) { 
@@ -158,7 +163,10 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
             } else {
                 this->my_args.seed = atoi(get_val_from_long_option(current).c_str());
             }
-        } else if (regex_match(current, width_regex)) {
+		} else if (regex_match(current, distances_regex)) {
+			// --distances, -d
+            this->my_args.distances = true;
+		} else if (regex_match(current, width_regex)) {
             // --width=?, -w ?
             if (current.compare("-w") == 0) { 
                 if (itr + 1 != vv.cend()) {

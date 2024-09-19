@@ -18,7 +18,7 @@ namespace mazes {
 	class distances;
 	class cell;
 
-	class distance_grid : public grid_interface {
+	class distance_grid : public grid {
 
 	public:
 		explicit distance_grid(unsigned int width, unsigned int length, unsigned int height = 0);
@@ -41,38 +41,37 @@ namespace mazes {
         virtual std::shared_ptr<cell> get_root() const noexcept override;
 
         // Grid tostring method
-        friend std::ostream& operator<<(std::ostream& os, distance_grid& g) {
+        friend std::ostream& operator<<(std::ostream& os, distance_grid& dg) {
             // First sort cells by row then column
-			const auto& gg = g.get_grid();
             std::vector<std::shared_ptr<cell>> cells;
-            cells.reserve(gg->get_rows() * gg->get_columns());
+            cells.reserve(dg.get_rows() * dg.get_columns());
             // populate the cells with the BST
-            gg->sort(gg->get_root(), ref(cells));
-            gg->sort_by_row_then_col(ref(cells));
+            dg.sort(dg.get_root(), ref(cells));
+            dg.sort_by_row_then_col(ref(cells));
 
             // ---+
             static constexpr auto barrier = { MAZE_BARRIER2, MAZE_BARRIER2, MAZE_BARRIER2, MAZE_CORNER };
             static const std::string wall_plus_corner{ barrier };
             std::stringstream output;
             output << MAZE_CORNER;
-            for (auto i{ 0u }; i < gg->get_columns(); i++) {
+            for (auto i{ 0u }; i < dg.get_columns(); i++) {
                 output << wall_plus_corner;
             }
             output << "\n";
 
             auto rowCounter{ 0u }, columnCounter{ 0u };
-            while (rowCounter < gg->get_rows()) {
+            while (rowCounter < dg.get_rows()) {
                 std::stringstream top_builder, bottom_builder;
                 top_builder << MAZE_BARRIER1;
                 bottom_builder << MAZE_CORNER;
-                while (columnCounter < gg->get_columns()) {
-                    auto next_index{ rowCounter * gg->get_columns() + columnCounter };
+                while (columnCounter < dg.get_columns()) {
+                    auto next_index{ rowCounter * dg.get_columns() + columnCounter };
                     if (next_index < cells.size()) {
                         auto&& temp = cells.at(next_index);
                         // bottom left cell needs boundaries
                         if (temp == nullptr)
                             temp = { std::make_shared<cell>(-1, -1, next_index) };
-                        std::string body = " " + g.contents_of(temp) + " ";
+                        std::string body = " " + dg.contents_of(temp).value_or(" ") + " ";
                         static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
                         std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
                         top_builder << body << east_boundary;
@@ -90,14 +89,13 @@ namespace mazes {
             return os;
         } // << operator
     protected:
-        virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-        virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
 	private:
 		std::shared_ptr<distances> m_distances;
-		std::unique_ptr<grid> m_grid;
 
-		std::string to_base64(int value) const;
+		std::optional<std::string> to_base64(int value) const;
 	};
 }
 

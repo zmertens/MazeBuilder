@@ -3,7 +3,7 @@
 #include <sstream>
 #include <iostream>
 
-#include "grid_interface.h"
+#include "distance_grid.h"
 #include "grid.h"
 #include "colored_grid.h"
 #include "maze_factory.h"
@@ -170,9 +170,16 @@ std::size_t maze_thread_safe::get_vertices_size() const noexcept {
     return this->m_vertices.size();
 }
 
+/**
+ * @brief
+ * @param distances false
+ */
 std::string maze_thread_safe::to_str(maze_types my_maze_type,
-    const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
-    std::unique_ptr<grid_interface> g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    const std::function<int(int, int)>& get_int, const std::mt19937& rng,
+    bool distances) const noexcept {
+    
+    std::unique_ptr<grid_interface> g = (distances) ? make_unique<mazes::distance_grid>(m_width, m_length, m_height) 
+        : make_unique<mazes::grid>(m_width, m_length, m_height);
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
 
     if (!success) {

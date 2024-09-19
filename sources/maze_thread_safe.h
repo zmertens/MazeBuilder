@@ -36,7 +36,10 @@ public:
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
     const pqmap& get_p_q() const noexcept;
-    std::string to_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    std::string to_str(mazes::maze_types my_maze_type, 
+        const std::function<int(int, int)>& get_int, 
+        const std::mt19937& rng,
+        bool distances = false) const noexcept override;
     void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
     std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,

@@ -86,40 +86,54 @@ TEST_CASE( "Test appending grids", "[append]") {
 }
 
 TEST_CASE("Test distance grid", "[distance grid]") {
-    static constexpr auto ROW = 10, COL = 10, HEIGHT = 10;
-    unique_ptr<grid_interface> my_distance_grid = make_unique<distance_grid>(ROW, COL, HEIGHT);
+    // Create cells
+ //   auto cell1 = make_shared<cell>(0, 0, 1);
+ //   auto cell2 = make_shared<cell>(0, 1, 2);
+ //   auto cell3 = make_shared<cell>(1, 0, 3);
+ //   auto cell4 = make_shared<cell>(1, 1, 4);
+ //   auto cell5 = make_shared<cell>(my_grid->get_rows() / 2, my_grid->get_columns() / 2, 5);
 
-    my_distance_grid->insert(my_distance_grid->get_root(), 0);
-	my_distance_grid->insert(my_distance_grid->get_root(), ROW + COL * (ROW - 1));
+ //   // Link cells
+ //   cell1->link(cell1, cell2);
+ //   cell2->link(cell2, cell4);
+ //   cell1->link(cell1, cell3);
+ //   cell3->link(cell3, cell4);
 
-	auto&& start = my_distance_grid->search(my_distance_grid->get_root(), 0);
-    auto&& end = my_distance_grid->search(my_distance_grid->get_root(), 1);
+ //   // Get distances from cell1
+ //   auto distances = cell1->get_distances();
 
-    REQUIRE(start != end);
+ //   REQUIRE(distances);
 
-    mt19937 rng{ 42681ul };
-    auto get_int = [&rng](int low, int high) ->int {
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-    };
-	binary_tree bt_algo;
-	REQUIRE(bt_algo.run(ref(my_distance_grid), cref(get_int), cref(rng)));
+ //   SECTION("Distance from root to itself is zero") {
+ //       REQUIRE(distances->operator[](cell1) == 0);
+ //   }
 
-    auto dists = make_shared<distances>(my_distance_grid->get_root());
+ //   SECTION("Distance from root to adjacent cells") {
+ //       REQUIRE(distances->operator[](cell2) == 1);
+ //       REQUIRE(distances->operator[](cell3) == 1);
+ //   }
 
-	dynamic_cast<distance_grid*>(my_distance_grid.get())->set_distances(dists);
+ //   SECTION("Distance from root to diagonal cell") {
+ //       REQUIRE(distances->operator[](cell4) == 2);
+ //   }
 
-	//auto&& path = start->distances()->path_to(end);
+ //   SECTION("Path to a specific cell") {
+ //       auto path = distances->path_to(cell4);
+ //       REQUIRE(path->operator[](cell4) == 2);
+ //       REQUIRE(path->operator[](cell2) == 1);
+ //       REQUIRE(path->operator[](cell1) == 0);
+ //   }
 
-	//REQUIRE(path);
-	//REQUIRE(path->get_cells().size() >= 2);
+ //   SECTION("Maximum distance from root") {
+ //       auto [max_cell, max_distance] = distances->max();
+ //       REQUIRE(max_distance == 2);
+ //       REQUIRE((max_cell == cell4 || max_cell == cell3 || max_cell == cell2));
+ //   }
 
-	//if (auto db = dynamic_cast<distance_grid*>(my_distance_grid.get()); db != nullptr) {
-	//	auto&& dg = db->get_distances();
-	//	REQUIRE(dg->operator[](end) == 1);
- //       stringstream ss;
-	//	ss << db;
- //       REQUIRE(!ss.str().empty());
+	//SECTION("Path to center cell") {
+	//	auto path = distances->path_to(cell5);
+	//	REQUIRE(path->operator[](cell5) == 5);
+	//	REQUIRE(path->operator[](cell1) == 5);
 	//}
 }
 

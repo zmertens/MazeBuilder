@@ -12,6 +12,7 @@
 #include <string>
 #include <functional>
 #include <algorithm>
+#include <optional>
 
 #include "cell.h"
 #include "maze_types_enum.h"
@@ -44,9 +45,9 @@ public:
     virtual void del(std::shared_ptr<cell> parent, int index) noexcept override;
 
     virtual std::shared_ptr<cell> get_root() const noexcept override;
-    
-    virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+protected:
+    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 private:
     bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
@@ -54,7 +55,7 @@ private:
     // Grid tostring method
     friend std::ostream& operator<<(std::ostream& os, grid& g) {
         // First sort cells by row then column
-        std::vector<std::shared_ptr<cell>> cells;
+        std::vector<std::shared_ptr<cell>> cells;// = g.to_vec();
         cells.reserve(g.get_rows() * g.get_columns());
         // populate the cells with the BST
         g.sort(g.get_root(), ref(cells));
@@ -83,7 +84,7 @@ private:
                     if (temp == nullptr)
                         temp = { std::make_shared<cell>(-1, -1, next_index) };
                     // 3 spaces in body
-                    std::string body = " " + g.contents_of(temp) + " ";
+                    std::string body = " " + g.contents_of(std::cref(temp)).value_or(" ") + " ";
                     static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
                     std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
                     top_builder << body << east_boundary;

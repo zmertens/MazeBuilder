@@ -1,6 +1,7 @@
 #include "colored_grid.h"
 
 #include <iostream>
+#include <optional>
 
 #include "distance_grid.h"
 #include "distances.h"
@@ -63,16 +64,19 @@ std::shared_ptr<cell> colored_grid::get_root() const noexcept {
 	return grid::get_root();
 }
 
-std::string colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
-	return " ";
+std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+	return { " " };
 }
 
-std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-    // auto distance = this->m_distance_grid->get_distances()->operator[](c);
-	// auto max = this->m_distance_grid->get_distances()->max().second;
-	// float intensity = static_cast<float>(max - distance) / max;
-	// int dark = static_cast<int>(255 * intensity);
-	// int bright = 128 + static_cast<int>(127 * intensity);
-	// return (dark << 16) | (bright << 8) | dark;
-    return 0xFFFFFFFF;
+optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+	auto distance = c->get_distances();
+	if (!distance) {
+		return nullopt;
+	}
+	auto max = distance->max().second;
+	auto d = distance->operator[](c);
+	float intensity = static_cast<float>(max - d) / max;
+	int dark = static_cast<int>(255 * intensity);
+	int bright = 128 + static_cast<int>(127 * intensity);
+	return { (dark << 16) | (bright << 8) | dark };
 }

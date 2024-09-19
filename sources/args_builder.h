@@ -24,10 +24,11 @@ public:
     bool interactive;
     std::string version;
     std::string help;
+    bool distances;
 
     friend std::ostream& operator<<(std::ostream& os, args& a) {
         std::stringstream ss;
-        ss << "seed=" << a.seed << "\n";
+        ss << "\nseed=" << a.seed << "\n";
         ss << "interactive=" << a.interactive << "\n";
         ss << "algorithm=" << a.algorithm << "\n";
         ss << "output=" << a.output << "\n";
@@ -37,6 +38,7 @@ public:
         ss << "cell_size=" << a.cell_size << "\n";
         ss << "help=" << a.help << "\n";
         ss << "version=" << a.version << "\n";
+        ss << "distances=" << a.distances << "\n";
 
         return os << ss.str() << "\n";
     }
@@ -56,7 +58,7 @@ public:
     args_builder& length(unsigned int length) noexcept;
     args_builder& height(unsigned int height) noexcept;
     args_builder& cell_size(unsigned int cell_size) noexcept;
-
+	args_builder& distances(bool distances) noexcept;
     void clear() noexcept;
 
     args build() const noexcept override;

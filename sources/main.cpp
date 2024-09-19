@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
             static constexpr auto block_type = -1;
             mazes::maze_thread_safe my_maze{ maze_args.width, maze_args.length, maze_args.height };
             my_maze.start_progress();
-			string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine));
+			string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine), maze_args.distances);
             if (!maze_str.empty()) {
                 mazes::writer my_writer;
 				mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);

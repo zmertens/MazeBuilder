@@ -6,11 +6,14 @@
 #include <memory>
 #include <cstdint>
 #include <vector>
+#include <optional>
+
+#include "grid_interface.h"
 
 namespace mazes {
 
     class cell;
-
+    class distances;
 	class colored_grid : public grid
 	{
     public:
@@ -31,10 +34,10 @@ namespace mazes {
 
         virtual std::shared_ptr<cell> get_root() const noexcept override;
     protected:
-        virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-        virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+        virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 	private:
-        
+        std::unique_ptr<distances> m_distances;
 	};
 
 }

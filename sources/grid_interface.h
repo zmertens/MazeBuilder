@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <optional>
 
 namespace mazes {
 	class cell;
@@ -22,8 +23,8 @@ namespace mazes {
 		virtual std::vector<std::shared_ptr<cell>> to_vec() const noexcept = 0;
 		virtual ~grid_interface() = default;
 	protected:
-		virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
-		virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
+		virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
+		virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
 	};
 }
 
