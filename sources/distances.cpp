@@ -32,15 +32,30 @@ std::vector<std::shared_ptr<cell>> distances::get_cells() const {
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
     auto&& current = goal;
     auto breadcrumbs = std::make_shared<distances>(m_root);
+    // Check if the current/goal is available
+    auto it = m_cells.find(current);
+	if (it == m_cells.cend()) {
+		return breadcrumbs;
+	}
+
     breadcrumbs->set(current, m_cells.at(current));
 
     while (current != m_root) {
-        for (auto&& [neighbor, _] : current->get_links()) {
-            if (neighbor && m_cells.at(neighbor) < m_cells.at(current)) {
-                breadcrumbs->set(neighbor, m_cells.at(neighbor));
-                current = neighbor;
-                break;
+        bool found = false;
+        for (const auto& [neighbor, _] : current->get_links()) {
+            if (neighbor) {
+				// Assign a neighbor iterator, check if the neighbor is present and less than the current cell's distance
+                if (auto neighbor_it = m_cells.find(neighbor); neighbor_it != m_cells.cend() && neighbor_it->second < it->second) {
+                    breadcrumbs->set(neighbor, neighbor_it->second);
+                    current = neighbor;
+                    it = neighbor_it;
+                    found = true;
+                    break;
+                }
             }
+        }
+        if (!found) {
+            break;
         }
     }
     return breadcrumbs;

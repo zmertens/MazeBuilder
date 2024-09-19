@@ -15,6 +15,7 @@
 #include "grid_interface.h"
 #include "distance_grid.h"
 #include "distances.h"
+#include "maze_factory.h"
 
 using namespace mazes;
 using namespace std;
@@ -38,7 +39,7 @@ struct Worker {
     bool should_stop = false;
 };
 
-static shared_ptr<grid> my_grid = make_shared<grid>(10, 10, 10);
+static unique_ptr<grid_interface> my_grid = make_unique<grid>(10, 10, 10);
 
 TEST_CASE( "Test grid init", "[init]" ) {
     REQUIRE(my_grid->get_rows() == 10);
@@ -85,56 +86,67 @@ TEST_CASE( "Test appending grids", "[append]") {
     REQUIRE(my_grid->search(my_grid->get_root(), 3) != nullptr);
 }
 
-TEST_CASE("Test distance grid", "[distance grid]") {
+TEST_CASE("Test cells", "[distance cells]") {
     // Create cells
- //   auto cell1 = make_shared<cell>(0, 0, 1);
- //   auto cell2 = make_shared<cell>(0, 1, 2);
- //   auto cell3 = make_shared<cell>(1, 0, 3);
- //   auto cell4 = make_shared<cell>(1, 1, 4);
- //   auto cell5 = make_shared<cell>(my_grid->get_rows() / 2, my_grid->get_columns() / 2, 5);
+    auto cell1 = make_shared<cell>(0, 0, 1);
+    auto cell2 = make_shared<cell>(0, 1, 2);
+    auto cell3 = make_shared<cell>(1, 0, 3);
+    auto cell4 = make_shared<cell>(1, 1, 4);
 
- //   // Link cells
- //   cell1->link(cell1, cell2);
- //   cell2->link(cell2, cell4);
- //   cell1->link(cell1, cell3);
- //   cell3->link(cell3, cell4);
+    // Link cells
+    cell1->link(cell1, cell2);
+    cell2->link(cell2, cell4);
+    cell1->link(cell1, cell3);
+    cell3->link(cell3, cell4);
 
- //   // Get distances from cell1
- //   auto distances = cell1->get_distances();
+    // Get distances from cell1
+    auto distances = cell1->get_distances();
 
- //   REQUIRE(distances);
+    REQUIRE(distances);
 
- //   SECTION("Distance from root to itself is zero") {
- //       REQUIRE(distances->operator[](cell1) == 0);
- //   }
+    SECTION("Distance from root to itself is zero") {
+        REQUIRE(distances->operator[](cell1) == 0);
+    }
+    
+    SECTION("Distance from root to adjacent cells") {
+        REQUIRE(distances->operator[](cell2) == 1);
+        REQUIRE(distances->operator[](cell3) == 1);
+    }
+    
+    SECTION("Distance from root to diagonal cell") {
+        REQUIRE(distances->operator[](cell4) == 2);
+    }
+    
+    SECTION("Path to a specific cell") {
+        auto path = distances->path_to(cell4);
+        REQUIRE(path->operator[](cell4) == 2);
+        REQUIRE(path->operator[](cell2) == 1);
+        REQUIRE(path->operator[](cell1) == 0);
+    }
+    
+    SECTION("Maximum distance from root") {
+        auto [max_cell, max_distance] = distances->max();
+        REQUIRE(max_distance == 2);
+        REQUIRE((max_cell == cell4 || max_cell == cell3 || max_cell == cell2));
+    }
+}
 
- //   SECTION("Distance from root to adjacent cells") {
- //       REQUIRE(distances->operator[](cell2) == 1);
- //       REQUIRE(distances->operator[](cell3) == 1);
- //   }
-
- //   SECTION("Distance from root to diagonal cell") {
- //       REQUIRE(distances->operator[](cell4) == 2);
- //   }
-
- //   SECTION("Path to a specific cell") {
- //       auto path = distances->path_to(cell4);
- //       REQUIRE(path->operator[](cell4) == 2);
- //       REQUIRE(path->operator[](cell2) == 1);
- //       REQUIRE(path->operator[](cell1) == 0);
- //   }
-
- //   SECTION("Maximum distance from root") {
- //       auto [max_cell, max_distance] = distances->max();
- //       REQUIRE(max_distance == 2);
- //       REQUIRE((max_cell == cell4 || max_cell == cell3 || max_cell == cell2));
- //   }
-
-	//SECTION("Path to center cell") {
-	//	auto path = distances->path_to(cell5);
-	//	REQUIRE(path->operator[](cell5) == 5);
-	//	REQUIRE(path->operator[](cell1) == 5);
-	//}
+TEST_CASE("Test paths", "[distances and paths]") {
+    random_device rd;
+    std::mt19937 rng{ rd() };
+    auto get_int = [&rng](auto low, auto high)->auto {
+		uniform_int_distribution<int> dist{ low, high };
+		return dist(rng);
+		};
+    bool success = mazes::maze_factory::gen_maze(maze_types::BINARY_TREE, ref(my_grid), cref(get_int), cref(rng));
+    REQUIRE(success);
+	auto distances = my_grid->get_root()->get_distances();
+	REQUIRE(distances);
+    auto center = my_grid->search(my_grid->get_root(), my_grid->get_columns() / 2);
+    REQUIRE(center);
+	auto path_to_center = distances->path_to(center);
+    REQUIRE(path_to_center);
+    REQUIRE(path_to_center->max().second > 0);
 }
 
 TEST_CASE("Test multiple grids", "[multiple grids]") {

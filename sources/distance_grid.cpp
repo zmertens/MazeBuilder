@@ -14,16 +14,7 @@ using namespace std;
  * @param height 
  */
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int height)
-	: grid(width, length, height) {
-
-}
-
-void distance_grid::set_distances(std::shared_ptr<distances> d) noexcept {
-	this->m_distances = d;
-}
-
-std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
-	return this->m_distances;
+	: grid(width, length, height), m_distances(make_shared<distances>(this->get_root())) {
 }
 
 unsigned int distance_grid::get_rows() const noexcept {
@@ -36,7 +27,7 @@ unsigned int distance_grid::get_columns() const noexcept {
 
 /**
  *
- * @param cell_size 25
+ * @param cell_size 3
  */
 std::vector<std::uint8_t> distance_grid::to_pixels(const unsigned int cell_size) const noexcept {
 	return this->grid::to_pixels(cell_size);
@@ -76,9 +67,8 @@ std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell
 	return grid::contents_of(c);
 }
 
-
 std::optional<std::uint32_t> distance_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-	return 0;
+	return grid::background_color_for(cref(c));
 }
 
 optional<std::string> distance_grid::to_base64(int value) const {
