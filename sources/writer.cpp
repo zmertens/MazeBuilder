@@ -92,7 +92,7 @@ bool writer::write(const std::string& filename, const std::string& data) const n
  */
 bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data,
 	const unsigned int w, const unsigned int h) const {
-	return stbi_write_png(filename.c_str(), w + 1, h + 1, 4, data.data(), (w + 1) * 4);
+	return stbi_write_png(filename.c_str(), w, h, 4, data.data(), w * 4);
 }
 
 /**

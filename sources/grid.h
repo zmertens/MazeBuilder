@@ -34,7 +34,7 @@ public:
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
 
     // Get bytewise representation of the grid
-    virtual std::vector<std::uint8_t> to_png(const unsigned int cell_size = 25) const noexcept override;
+    virtual std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept override;
     virtual std::vector<std::shared_ptr<cell>> to_vec() const noexcept override;
 
     virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;

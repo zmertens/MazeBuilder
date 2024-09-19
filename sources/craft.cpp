@@ -2848,7 +2848,7 @@ bool craft::run(const std::list<std::string>& algos,
             glGenTextures(1, &minimap_texture);
             glBindTexture(GL_TEXTURE_2D, minimap_texture);
             glActiveTexture(GL_TEXTURE4);
-            auto&& pixels = maze2->to_png(my_maze_type, cref(get_int), cref(rng));
+            auto&& pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng));
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 150, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

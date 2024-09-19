@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <random>
+#include <iostream>
 
 #include "cell.h"
 
@@ -308,79 +309,74 @@ void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sor
 
 /**
  * @brief
- * @param cell_size = 25
+ * @param cell_size = 3
  */
-vector<uint8_t> grid::to_png(const unsigned int cell_size) const noexcept {
-    int png_w = cell_size * this->get_columns();
-    int png_h = cell_size * this->get_rows();
-    // Init png data with white background
-    vector<uint8_t> png_data((png_w + 1) * (png_h + 1) * 4, 255);
+vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
+    unsigned int img_width = cell_size * get_columns();
+    unsigned int img_height = cell_size * get_rows();
+    
+    uint32_t wall = 0x000000FF;
 
-    // Black
-    uint32_t wall_color = 0x000000FF;
+    // Create an image with a white background
+    std::vector<uint8_t> img_data(img_width * img_height * 4, 255);
 
-    // Helper functions to populate png_data
-    auto draw_rect = [&png_data, &png_w](int x1, int y1, int x2, int y2, uint32_t color) {
-        for (int y = y1; y <= y2; ++y) {
-            for (int x = x1; x <= x2; ++x) {
-                int index = (y * (png_w + 1) + x) * 4;
-                png_data[index] = (color >> 24) & 0xFF;
-                png_data[index + 1] = (color >> 16) & 0xFF;
-                png_data[index + 2] = (color >> 8) & 0xFF;
-                png_data[index + 3] = color & 0xFF;
+    // Helper functions to draw on the image
+    auto draw_rect = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
+        for (int y = y1; y < y2; ++y) {
+            for (int x = x1; x < x2; ++x) {
+                int index = (y * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
             }
         }
-        };
+    };
 
-    auto draw_line = [&png_data, &png_w](int x1, int y1, int x2, int y2, uint32_t color) {
+    auto draw_line = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
         if (x1 == x2) {
-            for (int y = y1; y <= y2; ++y) {
-                int index = (y * (png_w + 1) + x1) * 4;
-                png_data[index] = (color >> 24) & 0xFF;
-                png_data[index + 1] = (color >> 16) & 0xFF;
-                png_data[index + 2] = (color >> 8) & 0xFF;
-                png_data[index + 3] = color & 0xFF;
+            for (int y = y1; y < y2; ++y) {
+                int index = (y * img_width + x1) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
             }
         } else if (y1 == y2) {
-            for (int x = x1; x <= x2; ++x) {
-                int index = (y1 * (png_w + 1) + x) * 4;
-                png_data[index] = (color >> 24) & 0xFF;
-                png_data[index + 1] = (color >> 16) & 0xFF;
-                png_data[index + 2] = (color >> 8) & 0xFF;
-                png_data[index + 3] = color & 0xFF;
+            for (int x = x1; x < x2; ++x) {
+                int index = (y1 * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
             }
         }
-        };
+    };
 
-    vector<shared_ptr<cell>> cells;
-    cells.reserve(this->get_rows() * this->get_columns());
-    this->sort(this->get_root(), ref(cells));
+    // Draw backgrounds and walls
+    for (const auto& mode : {"backgrounds", "walls"}) {
+        auto current = this->search(this->get_root(), 0);
+        while (current) {
+            cout << "Cell: " << current->get_index() << endl;
+            int x1 = current->get_column() * cell_size;
+            int y1 = current->get_row() * cell_size;
+            int x2 = (current->get_column() + 1) * cell_size;
+            int y2 = (current->get_row() + 1) * cell_size;
 
-    for (const auto& c : cells) {
-        int x1 = c->get_column() * cell_size;
-        int y1 = c->get_row() * cell_size;
-        int x2 = (c->get_column() + 1) * cell_size;
-        int y2 = (c->get_row() + 1) * cell_size;
-
-        uint32_t color = this->background_color_for(c);
-
-        draw_rect(x1, y1, x2, y2, color);
-
-        if (!c->get_north()) {
-            draw_line(x1, y1, x2, y1, wall_color);
-        }
-        if (!c->get_west()) {
-            draw_line(x1, y1, x1, y2, wall_color);
-        }
-        if (!c->is_linked(c->get_east())) {
-            draw_line(x2, y1, x2, y2, wall_color);
-        }
-        if (!c->is_linked(c->get_south())) {
-            draw_line(x1, y2, x2, y2, wall_color);
+            if (mode == "backgrounds"s) {
+                uint32_t color = background_color_for(current);
+                draw_rect(x1, y1, x2, y2, color);
+            } else {
+                if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
+                if (!current->get_west()) draw_line(x1, y1, x1, y2, wall);
+                if (!current->is_linked(current->get_east())) draw_line(x2, y1, x2, y2, wall);
+                if (!current->is_linked(current->get_south())) draw_line(x1, y2, x2, y2, wall);
+            }
+            current = this->search(this->get_root(), current->get_index() + 1);
         }
     }
 
-    return png_data;
+    return img_data;
 }
 
 std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {

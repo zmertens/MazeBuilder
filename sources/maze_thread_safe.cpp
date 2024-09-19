@@ -33,7 +33,7 @@ void maze_thread_safe::clear() noexcept {
     m_width = 0;
     m_length = 0;
     m_height = 0;
-    m_tracker.reset();
+    m_tracker.stop();
 }
 
 std::vector<std::tuple<int, int, int, int>> maze_thread_safe::get_render_vertices() const noexcept {
@@ -103,7 +103,7 @@ std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
  * @param rng
  * @param cell_size 3
  */
-std::vector<std::uint8_t> maze_thread_safe::to_png(mazes::maze_types my_maze_type,
+std::vector<std::uint8_t> maze_thread_safe::to_pixels(mazes::maze_types my_maze_type,
     const std::function<int(int, int)>& get_int,
     const std::mt19937& rng, const unsigned int cell_size) const noexcept {
 
@@ -114,7 +114,7 @@ std::vector<std::uint8_t> maze_thread_safe::to_png(mazes::maze_types my_maze_typ
         // Handle error
     }
 
-    return g->to_png(cell_size);
+    return g->to_pixels(cell_size);
 }
 
 void  maze_thread_safe::set_height(unsigned int height) noexcept {

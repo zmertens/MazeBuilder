@@ -33,7 +33,7 @@ TEST_CASE("Writer can receive program arguments", "[determine output format]") {
 
 TEST_CASE("Writer can produce a PNG file", "[does png]") {
 	grid my_grid{ 100, 150 };
-	auto&& my_png = my_grid.to_png();
+	auto&& my_png = my_grid.to_pixels();
 
 	REQUIRE(!my_png.empty());
 

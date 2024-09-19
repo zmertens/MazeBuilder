@@ -38,8 +38,8 @@ unsigned int distance_grid::get_columns() const noexcept {
  *
  * @param cell_size 25
  */
-std::vector<std::uint8_t> distance_grid::to_png(const unsigned int cell_size) const noexcept {
-	return this->m_grid->to_png(cell_size);
+std::vector<std::uint8_t> distance_grid::to_pixels(const unsigned int cell_size) const noexcept {
+	return this->m_grid->to_pixels(cell_size);
 }
 
 std::vector<std::shared_ptr<cell>> distance_grid::to_vec() const noexcept {

@@ -39,7 +39,7 @@ public:
     std::string to_str(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
     void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
     std::string to_wavefront_obj_str() const noexcept;
-    std::vector<std::uint8_t> to_png(mazes::maze_types my_maze_type,
+    std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
         const unsigned int cell_size = 3) const noexcept;
@@ -90,11 +90,6 @@ private:
         double get_duration_in_ms() const noexcept {
             return this->get_duration_in_seconds() * 1000.0;
         }
-
-        void reset() noexcept {
-            this->start_time = std::chrono::steady_clock::now();
-            this->end_time = start_time;
-        }
     };
 
 
@@ -113,9 +108,6 @@ private:
     pqmap m_p_q;
 
     progress_tracker m_tracker;
-
-    // Allow the maze_thread_safe_impl class to access private members like progress_tracker
-    friend class maze_thread_safe_impl;
 }; // class
 
 } // namespace

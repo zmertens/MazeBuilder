@@ -132,14 +132,17 @@ int main(int argc, char* argv[]) {
 				mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
                 switch (my_output_type) {
                 case mazes::output_types::WAVEFRONT_OBJ_FILE:
+                    my_maze.compute_geometry(my_maze_type, std::cref(get_int), std::cref(rng_engine), block_type);
                     success = my_writer.write(cref(maze_args.output), my_maze.to_wavefront_obj_str());
                     break;
                 case mazes::output_types::PNG:
-                    success = my_writer.write_png(cref(maze_args.output), my_maze.to_png(my_maze_type, std::cref(get_int), std::cref(rng_engine)), maze_args.width, maze_args.length);
+                    success = my_writer.write_png(cref(maze_args.output), 
+                        my_maze.to_pixels(my_maze_type, std::cref(get_int), 
+                            std::cref(rng_engine), maze_args.cell_size), 
+                            maze_args.width * maze_args.cell_size, 
+                            maze_args.length * maze_args.cell_size);
                     break;
-                case mazes::output_types::PLAIN_TEXT:
-                    success = my_writer.write(cref(maze_args.output), cref(maze_str));
-                    break;
+                case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
 				case mazes::output_types::STDOUT:
 					success = my_writer.write(cref(maze_args.output), cref(maze_str));
                     break;
