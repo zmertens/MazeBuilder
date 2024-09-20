@@ -155,7 +155,7 @@ void cell::set_column(unsigned int c) noexcept {
 
 std::shared_ptr<distances> cell::get_distances() noexcept {
 	auto dists = make_shared<mazes::distances>(shared_from_this());
-    vector<shared_ptr<mazes::cell>> frontier = { shared_from_this() };
+    vector<shared_ptr<cell>> frontier = { shared_from_this() };
 
 	// Dijkstra's algorithm
     while (!frontier.empty()) {

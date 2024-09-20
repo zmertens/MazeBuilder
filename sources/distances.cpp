@@ -5,19 +5,22 @@
 using namespace mazes;
 using namespace std;
 
-distances::distances(std::shared_ptr<cell> root) : m_root(root) {
+distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
 	m_cells[root] = 0;
 }
 
 void distances::set(std::shared_ptr<cell> cell, int distance) {
-    m_cells[cell] = distance;
+    m_cells.insert_or_assign(cell, distance);
 }
 
+/**
+ * @brief Get the keys from the cells map
+ */
 std::vector<std::shared_ptr<cell>> distances::get_cells() const {
     std::vector<std::shared_ptr<cell>> keys;
 	keys.reserve(m_cells.size());
     
-	for (const auto& [cell, distance] : m_cells) {
+	for (const auto& [cell, _] : m_cells) {
 		keys.push_back(cell);
 	}
 

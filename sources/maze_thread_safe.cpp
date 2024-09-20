@@ -172,13 +172,13 @@ std::size_t maze_thread_safe::get_vertices_size() const noexcept {
 
 /**
  * @brief
- * @param distances false
+ * @param calc_distances false
  */
 std::string maze_thread_safe::to_str(maze_types my_maze_type,
     const std::function<int(int, int)>& get_int, const std::mt19937& rng,
-    bool distances) const noexcept {
+    bool calc_distances) const noexcept {
     
-    std::unique_ptr<grid_interface> g = (distances) ? make_unique<mazes::distance_grid>(m_width, m_length, m_height) 
+    std::unique_ptr<grid_interface> g = (calc_distances) ? make_unique<mazes::distance_grid>(m_width, m_length, m_height) 
         : make_unique<mazes::grid>(m_width, m_length, m_height);
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
 
@@ -187,7 +187,7 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     }
 
     stringstream ss;
-    if (distances; auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
+    if (calc_distances; auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
         ss << *distance_ptr;
         return ss.str();
 	} else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
