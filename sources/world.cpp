@@ -8,7 +8,7 @@ using namespace std;
 using namespace mazes;
 
 void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_safe>& maze, world_func func, Map* m,
-    int chunk_size, bool show_trees, bool show_plants, bool show_clouds) const noexcept {
+    int chunk_size, bool show_clouds) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -33,28 +33,22 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
             }
             // sand and grass terrain
             static constexpr auto PLANT_STARTING_Y = 2;
-            for (int y = 0; y < PLANT_STARTING_Y; y++) {
+            for (int y = 0; y < PLANT_STARTING_Y + 2; y++) {
                 func(x, y, z, w * flag, m);
             }
             
             if (w == 1) {
-                if (show_plants) {
-                    // grass
-                    if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
-                        func(x, PLANT_STARTING_Y, z, 17 * flag, m);
-                    }
-                    // flowers
-                    if (simplex2(x * 0.05, -z * 0.05, 4, 0.8, 2) > 0.7) {
-                        int w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
-                        func(x, PLANT_STARTING_Y, z, w * flag, m);
-                    }
+                // grass
+                if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
+                    func(x, PLANT_STARTING_Y + 1, z, 17 * flag, m);
+                }
+                // flowers
+                if (simplex2(x * 0.05, -z * 0.05, 4, 0.8, 2) > 0.7) {
+                    w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
+                    func(x, PLANT_STARTING_Y + 1, z, w * flag, m);
                 }
                 // trees
-                int ok = show_trees;
-                //if (dx - 4 < 0 || dz - 4 < 0 || dx + 4 >= chunk_size || dz + 4 >= chunk_size) {
-                //    ok = 0;
-                //}
-                if (ok && simplex2(x, z, 6, 0.5, 2) > 0.84) {
+                if (simplex2(x, z, 6, 0.5, 2) > 0.84) {
                     for (int y = PLANT_STARTING_Y + 3; y < PLANT_STARTING_Y + 8; y++) {
                         for (int ox = -3; ox <= 3; ox++) {
                             for (int oz = -3; oz <= 3; oz++) {
@@ -78,16 +72,16 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
                     }
                 }
             }
-            if (maze == nullptr)
-                return;
-            const auto& pq = maze->get_p_q();
-            bool is_part_of_maze = pq.find({ p, q }) != pq.end();
-            // Build the maze
-            if (is_part_of_maze) {
-                static const unsigned int starting_height = PLANT_STARTING_Y;
-                for (auto y = starting_height; y < starting_height + maze->get_height(); y++)
-                    func(x, y, z, maze->get_block_type(), m);
-            }
+            //if (maze == nullptr)
+            //    return;
+            //const auto& pq = maze->get_p_q();
+            //bool is_part_of_maze = pq.find({ p, q }) != pq.end();
+            //// Build the maze
+            //if (is_part_of_maze) {
+            //    static const unsigned int starting_height = PLANT_STARTING_Y;
+            //    for (auto y = starting_height; y < starting_height + maze->get_height(); y++)
+            //        func(x, y, z, maze->get_block_type(), m);
+            //}
         }
     }
 } // create_world

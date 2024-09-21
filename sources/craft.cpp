@@ -96,7 +96,7 @@
 #define RENDER_CHUNK_RADIUS 20
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
-#define COMMIT_INTERVAL 5
+#define COMMIT_INTERVAL 7
 #define MAX_CHUNKS 8192
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
@@ -117,10 +117,7 @@ struct craft::craft_impl {
         bool color_mode_dark;
         bool capture_mouse;
         int chunk_size;
-        bool show_trees;
-        bool show_plants;
         bool show_clouds;
-        bool show_lights;
         bool show_items;
         bool show_wireframes;
         bool show_crosshairs;
@@ -134,8 +131,7 @@ struct craft::craft_impl {
         int view;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
-            capture_mouse(false), chunk_size(8), show_trees(true),
-            show_plants(true), show_clouds(true), show_lights(true),
+            capture_mouse(false), chunk_size(8), show_clouds(true),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json(""), view(20) {
@@ -181,23 +177,8 @@ struct craft::craft_impl {
             return *this;
         }
 
-        GuiBuilder& show_trees(bool value) {
-            gui.show_trees = value;
-            return *this;
-        }
-
-        GuiBuilder& show_plants(bool value) {
-            gui.show_plants = value;
-            return *this;
-        }
-
         GuiBuilder& show_clouds(bool value) {
             gui.show_clouds = value;
-            return *this;
-        }
-
-        GuiBuilder& show_lights(bool value) {
-            gui.show_lights = value;
             return *this;
         }
 
@@ -1067,9 +1048,6 @@ struct craft::craft_impl {
     }
 
     int has_lights(Chunk *chunk) const {
-        if (!this->m_gui->show_lights) {
-            return 0;
-        }
         for (int dp = -1; dp <= 1; dp++) {
             for (int dq = -1; dq <= 1; dq++) {
                 Chunk *other = chunk;
@@ -1186,13 +1164,11 @@ struct craft::craft_impl {
 
         // check for lights
         int has_light = 0;
-        if (this->m_gui->show_lights) {
-            for (int a = 0; a < 3; a++) {
-                for (int b = 0; b < 3; b++) {
-                    Map *map = item->light_maps[a][b];
-                    if (map && map->size) {
-                        has_light = 1;
-                    }
+        for (int a = 0; a < 3; a++) {
+            for (int b = 0; b < 3; b++) {
+                Map *map = item->light_maps[a][b];
+                if (map && map->size) {
+                    has_light = 1;
                 }
             }
         }
@@ -1407,9 +1383,7 @@ struct craft::craft_impl {
         static world my_world;
         auto&& gui = this->m_gui;
         my_world.create_world(p, q, cref(this->m_maze),
-            map_set_func, block_map,
-            gui->chunk_size, gui->show_trees, 
-            gui->show_plants, gui->show_clouds);
+            map_set_func, block_map, gui->chunk_size, gui->show_clouds);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -2066,7 +2040,7 @@ struct craft::craft_impl {
     * @param dt
     * @return bool return true when events are handled successfully or not
     */
-    bool handle_events_and_motion(double dt, bool& window_resizes) {
+    bool handle_events_and_motion(double dt, double time_step, bool& window_resizes) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2235,10 +2209,7 @@ struct craft::craft_impl {
                 else this->m_model->item_index %= item_count;
                 break;
             }
-            case SDL_EVENT_WINDOW_FIRST: break;
-            case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
-            case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
-            case SDL_EVENT_WINDOW_MAXIMIZED:
+            case SDL_EVENT_WINDOW_EXPOSED:
             case SDL_EVENT_WINDOW_RESIZED: {
                 window_resizes = true;
                 break;
@@ -2277,8 +2248,8 @@ struct craft::craft_impl {
         int estimate = SDL_roundf(SDL_sqrtf(
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
-            SDL_powf(vz * speed, 2)) * dt * 8);
-        int step = SDL_max(8, estimate);
+            SDL_powf(vz * speed, 2)) * 8);
+        int step = SDL_max(8, time_step);
         float ut = dt / step;
         vx = vx * ut * speed;
         vy = vy * ut * speed;
@@ -2846,11 +2817,19 @@ bool craft::run(const std::list<std::string>& algos,
         time_accum += dt_ms;
         while (time_accum >= fixed_time_step) {
             // Handle SDL events and motion (keyboard, mouse, etc.)
-            running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
+            running = this->m_pimpl->handle_events_and_motion(dt_ms, time_step, ref(window_resizes));
+
+            if (!running) {
+#if defined(__EMSCRIPTEN__)
+                emscripten_cancel_main_loop();
+#endif
+                break;
+            }
+
 			time_accum -= fixed_time_step;
             time_step += fixed_time_step;
         }
-        
+
         // FLUSH DATABASE 
         if (now - previous > COMMIT_INTERVAL) {
             db_commit();
@@ -3035,13 +3014,10 @@ bool craft::run(const std::list<std::string>& algos,
                 if (update_vsync)
                     SDL_GL_SetSwapInterval(gui->vsync);
 
-                ImGui::Checkbox("Show Lights", &gui->show_lights);
                 ImGui::Checkbox("Show Items", &gui->show_items);
                 ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
-                ImGui::Checkbox("Show Trees", &gui->show_trees);
                 ImGui::Checkbox("Show Clouds", &gui->show_clouds);
-                ImGui::Checkbox("Show Plants", &gui->show_plants);
                     
                 ImGui::EndTabItem();
             }
@@ -3196,11 +3172,6 @@ bool craft::run(const std::list<std::string>& algos,
         CHECK_GL_ERR();
 #endif
 
-        if (!running) {
-#if defined(__EMSCRIPTEN__)
-            emscripten_cancel_main_loop();
-#endif
-        }
     } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)
