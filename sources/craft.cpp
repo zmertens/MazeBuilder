@@ -28,7 +28,7 @@
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
 #include <cstdio>
-#include <cstdlib>
+#include <cstdint>
 #include <cstring>
 #include <ctime>
 #include <string>
@@ -2228,17 +2228,11 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
-                    if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) {
-                        this->m_model->item_index += e.wheel.y;
-                    } else {
-                        this->m_model->item_index -= e.wheel.y;
-                    }
-                    if (this->m_model->item_index < 0)
-                        this->m_model->item_index = item_count - 1;
-                    else
-                        this->m_model->item_index %= item_count;
-                }
+                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) this->m_model->item_index += e.wheel.y;
+                else this->m_model->item_index -= e.wheel.y;
+                
+                if (this->m_model->item_index < 0) this->m_model->item_index = item_count - 1;
+                else this->m_model->item_index %= item_count;
                 break;
             }
             case SDL_EVENT_WINDOW_FIRST: break;
@@ -2623,9 +2617,6 @@ bool craft::run(const std::list<std::string>& algos,
         }
     }
 
-    // LOCAL VARIABLES
-    uint64_t previous = SDL_GetTicks();
-
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
     // Init some local vars for handling maze duties
@@ -2779,6 +2770,10 @@ bool craft::run(const std::list<std::string>& algos,
 
     int triangle_faces = 0;
     bool running = true;
+    // LOCAL VARIABLES
+    uint64_t previous = SDL_GetTicks();
+    double time_step = 0;
+	double time_accum = 0;
 
     craft_impl::Player* me = m_pimpl->m_model->players;
     craft_impl::State* p_state = &m_pimpl->m_model->players->state;
@@ -2804,12 +2799,6 @@ bool craft::run(const std::list<std::string>& algos,
         double dt_ms = static_cast<double>(now - previous) / 1000.0;
         dt_ms = SDL_min(dt_ms, 0.2);
         dt_ms = SDL_max(dt_ms, 0.0);
-
-        // FLUSH DATABASE 
-        if (now - previous > COMMIT_INTERVAL) {
-            db_commit();
-            previous = now;
-        }
 
         // Some GUI state variables
         static bool show_demo_window = false;
@@ -2853,7 +2842,20 @@ bool craft::run(const std::list<std::string>& algos,
 
         // Handle SDL events and motion updates
         static bool window_resizes = false;
-        running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
+        static constexpr double fixed_time_step = 0.01;
+        time_accum += dt_ms;
+        while (time_accum >= fixed_time_step) {
+            // Handle SDL events and motion (keyboard, mouse, etc.)
+            running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
+			time_accum -= fixed_time_step;
+            time_step += fixed_time_step;
+        }
+        
+        // FLUSH DATABASE 
+        if (now - previous > COMMIT_INTERVAL) {
+            db_commit();
+            previous = now;
+        }
 
         // Use ImGui for GUI size calculations
 		int display_w, display_h;
