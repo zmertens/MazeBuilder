@@ -475,9 +475,8 @@ struct craft::craft_impl {
         SDL_GetWindowSize(this->m_model->window, &window_width, &window_height);
         SDL_GetWindowSizeInPixels(this->m_model->window, &buffer_width, &buffer_height);
         int result = buffer_width / window_width;
-        result = SDL_max(1, result);
-        result = SDL_min(2, result);
-        return result;
+        float min_aspect, max_aspect;
+        return SDL_GetWindowAspectRatio(this->m_model->window, &min_aspect, &max_aspect);
     }
 
     void get_sight_vector(float rx, float ry, float *vx, float *vy, float *vz) const {
@@ -2629,18 +2628,6 @@ bool craft::run(const std::list<std::string>& algos,
 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
-    craft_impl::Player *me = m_pimpl->m_model->players;
-    craft_impl::State *p_state = &m_pimpl->m_model->players->state;
-    me->id = 0;
-    me->name = "Player(me)";
-    me->buffer = 0;
-    m_pimpl->m_model->player_count = 1;
-
-    // LOAD STATE FROM DATABASE 
-    int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-    if (!loaded)
-        p_state->y = 75.f;
-
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_type_from_str(algos.back());
     auto&& gui = this->m_pimpl->m_gui;
@@ -2793,6 +2780,18 @@ bool craft::run(const std::list<std::string>& algos,
     int triangle_faces = 0;
     bool running = true;
 
+    craft_impl::Player* me = m_pimpl->m_model->players;
+    craft_impl::State* p_state = &m_pimpl->m_model->players->state;
+    me->id = 0;
+    me->name = "Wade Watts";
+    me->buffer = 0;
+    m_pimpl->m_model->player_count = 1;
+
+    // LOAD STATE FROM DATABASE 
+    int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
+    if (!loaded)
+        p_state->y = 75.f;
+
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -2857,7 +2856,9 @@ bool craft::run(const std::list<std::string>& algos,
         running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
 
         // Use ImGui for GUI size calculations
-        ImVec2 display_size = ImGui::GetIO().DisplaySize;
+		int display_w, display_h;
+		SDL_GetWindowSize(sdl_window, &display_w, &display_h);
+		ImVec2 display_size = { static_cast<float>(display_w), static_cast<float>(display_h) };
 
         // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
@@ -3072,12 +3073,13 @@ bool craft::run(const std::list<std::string>& algos,
         ImVec2 voxel_scene_size = ImGui::GetContentRegionAvail();
         GLuint voxel_scene_w = static_cast<GLuint>(voxel_scene_size.x);
         GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
+        this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
+        this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
+        this->m_pimpl->m_model->scale = this->m_pimpl->get_scale_factor();
 
         // Check if scene size changed
         if (window_resizes) {
             window_resizes = false;
-            this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
-            this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
             // Delete existing FBO objects
             CHECK_GL_ERR();
             if (glIsTexture(get<2>(fbo_tuple))) {
@@ -3088,7 +3090,6 @@ bool craft::run(const std::list<std::string>& algos,
             CHECK_GL_ERR();
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
             CHECK_GL_ERR();
-            this->m_pimpl->m_model->scale = this->m_pimpl->get_scale_factor();
         }
 
         // Bind the FBO that will store the 3D scene
@@ -3183,7 +3184,7 @@ bool craft::run(const std::list<std::string>& algos,
         ImGui::PopFont();
             
         ImGui::Render();
-        glViewport(0, 0, abs(display_size.x), abs(display_size.y));
+        glViewport(0, 0, SDL_abs(display_size.x), SDL_abs(display_size.y));
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
