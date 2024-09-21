@@ -9,6 +9,7 @@
 
 #include <string>
 #include <vector>
+#include <functional>
 #include <cmath>
 
 #ifndef M_PI
@@ -18,6 +19,9 @@
 #define DEGREES(radians) ((radians) * 180 / M_PI)
 #define RADIANS(degrees) ((degrees) * M_PI / 180)
 #define SIGN(x) (((x) > 0) - ((x) < 0))
+
+GLenum _check_for_gl_err(const char* file, int line) noexcept;
+#define CHECK_GL_ERR() _check_for_gl_err(__FILE__, __LINE__)
 
 GLuint make_shader(GLenum type, const char *source);
 GLuint load_shader(GLenum type, const char *path);

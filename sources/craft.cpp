@@ -1864,10 +1864,12 @@ struct craft::craft_impl {
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         frustum_planes(planes, this->m_model->render_radius, matrix);
+
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 1);
+
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             if (chunk_distance(chunk, p, q) > this->m_model->sign_radius) {
@@ -2065,7 +2067,7 @@ struct craft::craft_impl {
     * @param dt
     * @return bool return true when events are handled successfully or not
     */
-    bool handle_events_and_motion(double dt, int& window_resizes) {
+    bool handle_events_and_motion(double dt, bool& window_resizes) {
         static float dy = 0;
         State* s = &this->m_model->players->state;
         int sz = 0;
@@ -2240,7 +2242,7 @@ struct craft::craft_impl {
                 }
                 break;
             }
-            case SDL_EVENT_WINDOW_SHOWN:
+            case SDL_EVENT_WINDOW_FIRST: break;
             case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
             case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
             case SDL_EVENT_WINDOW_MAXIMIZED:
@@ -2520,7 +2522,7 @@ bool craft::run(const std::list<std::string>& algos,
     craft_impl::Attrib line_attrib = {0};
     craft_impl::Attrib text_attrib = {0};
     craft_impl::Attrib sky_attrib = {0};
-    craft_impl::Attrib screen_attrib = { 0 };
+    //craft_impl::Attrib screen_attrib = { 0 };
 
     GLuint program;
 
@@ -2576,15 +2578,15 @@ bool craft::run(const std::list<std::string>& algos,
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
 
-#if defined(__EMSCRIPTEN__)
-    // @TODO : Screen space GLSL ES shader
-#else
-    program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
-#endif
-    screen_attrib.program = program;
-    screen_attrib.position = 0;
-    screen_attrib.uv = 1;
-    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
+//#if defined(__EMSCRIPTEN__)
+//    // @TODO : Screen space GLSL ES shader
+//#else
+//    program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
+//#endif
+//    screen_attrib.program = program;
+//    screen_attrib.position = 0;
+//    screen_attrib.uv = 1;
+//    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads();
@@ -2610,24 +2612,6 @@ bool craft::run(const std::list<std::string>& algos,
     ImFont *nunito_sans_font = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(NunitoSans_compressed_data, NunitoSans_compressed_size, 18.f);
 
     IM_ASSERT(nunito_sans_font != nullptr);
-    
-    auto _check_for_gl_err = [](const char *file, int line) -> GLenum {
-        GLenum errorCode;
-        while ((errorCode = glGetError()) != GL_NO_ERROR) {
-            std::string error = "";
-            switch (errorCode) {
-                case GL_INVALID_ENUM: error = "INVALID_ENUM"; break;
-                case GL_INVALID_VALUE: error = "INVALID_VALUE"; break;
-                case GL_INVALID_OPERATION: error = "INVALID_OPERATION"; break;
-                case GL_OUT_OF_MEMORY: error = "OUT_OF_MEMORY"; break;
-                case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
-            }
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-                "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error.c_str(), file, line);
-        }
-        return errorCode;
-    };
-#define check_for_gl_err() _check_for_gl_err(__FILE__, __LINE__)
 
     // DATABASE INITIALIZATION 
     if (USE_CACHE) {
@@ -2654,7 +2638,7 @@ bool craft::run(const std::list<std::string>& algos,
 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-    if (loaded)
+    if (!loaded)
         p_state->y = 75.f;
 
     // Init some local vars for handling maze duties
@@ -2716,20 +2700,42 @@ bool craft::run(const std::list<std::string>& algos,
     };
 
 #if defined(MAZE_DEBUG)
-    SDL_Log("check_for_gl_err() prior to game loop\n");
-    check_for_gl_err();
+    SDL_Log("CHECK_GL_ERR() prior to game loop\n");
+    CHECK_GL_ERR();
 #endif
 
-    int triangle_faces = 0;
-    bool running = true;
+    tuple<GLuint, GLuint, GLuint> fbo_tuple;
 
+    // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
+    static constexpr float quad_vertices[] = {
+        // positions   // texCoords
+        -1.0f,  1.0f,  0.0f, 1.0f,
+        -1.0f, -1.0f,  0.0f, 0.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+
+        -1.0f,  1.0f,  0.0f, 1.0f,
+         1.0f, -1.0f,  1.0f, 0.0f,
+         1.0f,  1.0f,  1.0f, 1.0f
+    };
+    //GLuint quad_vao = 0, quad_vbo = 0;
+    //glGenVertexArrays(1, &quad_vao);
+    //glGenBuffers(1, &quad_vbo);
+    //glBindVertexArray(quad_vao);
+    //glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
+    //glEnableVertexAttribArray(0);
+    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    //glEnableVertexAttribArray(1);
+    //glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+
+    //GLuint minimap_texture = -1;
     auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
         GLuint fbo, depthRenderbuffer, texture;
         glGenFramebuffers(1, &fbo);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glGenTextures(1, &texture);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE5);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2784,31 +2790,8 @@ bool craft::run(const std::list<std::string>& algos,
         return {fbo, depthRenderbuffer, texture};
     };
 
-    tuple<GLuint, GLuint, GLuint> fbo_tuple;
-
-    // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
-    static constexpr float quad_vertices[] = {
-        // positions   // texCoords
-        -1.0f,  1.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f,  0.0f, 0.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-
-        -1.0f,  1.0f,  0.0f, 1.0f,
-         1.0f, -1.0f,  1.0f, 0.0f,
-         1.0f,  1.0f,  1.0f, 1.0f
-    };
-    GLuint quad_vao = 0, quad_vbo = 0;
-    glGenVertexArrays(1, &quad_vao);
-    glGenBuffers(1, &quad_vbo);
-    glBindVertexArray(quad_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
-
-    GLuint minimap_texture = -1;
+    int triangle_faces = 0;
+    bool running = true;
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -2845,16 +2828,16 @@ bool craft::run(const std::list<std::string>& algos,
             // Don't write the first maze that loads when app starts
             write_maze_now = first_maze ? false : true;
             first_maze = false;
-            glGenTextures(1, &minimap_texture);
-            glBindTexture(GL_TEXTURE_2D, minimap_texture);
-            glActiveTexture(GL_TEXTURE4);
+            //glGenTextures(1, &minimap_texture);
+            //glBindTexture(GL_TEXTURE_2D, minimap_texture);
+            //glActiveTexture(GL_TEXTURE4);
             auto&& pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng));
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 150, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 150, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            //glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         if (write_maze_now) {
@@ -2870,7 +2853,7 @@ bool craft::run(const std::list<std::string>& algos,
         }
 
         // Handle SDL events and motion updates
-        static int window_resizes = false;
+        static bool window_resizes = false;
         running = this->m_pimpl->handle_events_and_motion(dt_ms, ref(window_resizes));
 
         // Use ImGui for GUI size calculations
@@ -2999,10 +2982,10 @@ bool craft::run(const std::list<std::string>& algos,
                 // Flip UV coordinates for the image
                 ImVec2 uv0 = ImVec2(0.0f, 1.0f);
                 ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-                glBindTexture(GL_TEXTURE_2D, minimap_texture);
-                glActiveTexture(GL_TEXTURE4);
-                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), {200, 150}, uv0, uv1);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                //glBindTexture(GL_TEXTURE_2D, minimap_texture);
+                //glActiveTexture(GL_TEXTURE4);
+                //ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), {200, 150}, uv0, uv1);
+                //glBindTexture(GL_TEXTURE_2D, 0);
 
                 ImGui::EndTabItem();
             }
@@ -3091,36 +3074,47 @@ bool craft::run(const std::list<std::string>& algos,
         GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
 
         // Check if scene size changed
-        if (window_resizes && display_size.x > 0 && display_size.y > 0) {
+        if (window_resizes) {
             window_resizes = false;
             this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
             this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
-            if (get<0>(fbo_tuple) != 0) {
+            // Delete existing FBO objects
+            CHECK_GL_ERR();
+            if (glIsTexture(get<2>(fbo_tuple))) {
                 glDeleteTextures(1, &get<2>(fbo_tuple));
 				glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
 				glDeleteFramebuffers(1, &get<0>(fbo_tuple));
 			}
-            
+            CHECK_GL_ERR();
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
+            CHECK_GL_ERR();
             this->m_pimpl->m_model->scale = this->m_pimpl->get_scale_factor();
         }
 
         // Bind the FBO that will store the 3D scene
-        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
+        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
+        CHECK_GL_ERR();
+
         m_pimpl->render_signs(&text_attrib, me);
+        CHECK_GL_ERR();
+
         m_pimpl->render_sign(&text_attrib, me);
+        CHECK_GL_ERR();
+
         if (gui->show_wireframes) {
             m_pimpl->render_wireframe(&line_attrib, me);
         }
+        CHECK_GL_ERR();
 
         glClear(GL_DEPTH_BUFFER_BIT);
         if (gui->show_crosshairs) {
@@ -3129,34 +3123,29 @@ bool craft::run(const std::list<std::string>& algos,
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib);
         }
-        
+
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        //glUseProgram(screen_attrib.program);
-        //glBindVertexArray(quad_vao);
-        //glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-        // glUniform1i(screen_attrib.sampler, 4);
-        //glDrawArrays(GL_TRIANGLES, 0, 6);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
-#if defined(MAZE_DEBUG)
-        check_for_gl_err();
-#endif
+  //      glUseProgram(screen_attrib.program);
+  //      glBindVertexArray(quad_vao);
+		//glActiveTexture(GL_TEXTURE4);
+  //      glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
+  //      glUniform1i(screen_attrib.sampler, 4);
+  //      glDrawArrays(GL_TRIANGLES, 0, 6);
+  //      glDisable(GL_DEPTH_TEST);
+  //      glDisable(GL_CULL_FACE);
 
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
         glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE5);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
         ImGui::End();
 
-#if defined(MAZE_DEBUG)
-        check_for_gl_err();
-#endif
-
+#if !defined(__EMSCRIPTEN__)
         ImGui::Begin("Mouse Capture", 
             nullptr, 
             ImGuiWindowFlags_NoMove | 
@@ -3172,6 +3161,7 @@ bool craft::run(const std::list<std::string>& algos,
             }
         }
         ImGui::End();
+#endif
 
 #if defined(MAZE_DEBUG)
         ImVec2 fps_window_size = ImVec2(display_size.x * 0.35f, 50);
@@ -3200,7 +3190,7 @@ bool craft::run(const std::list<std::string>& algos,
         SDL_GL_SwapWindow(sdl_window);
 
 #if defined(MAZE_DEBUG)
-        check_for_gl_err();
+        CHECK_GL_ERR();
 #endif
 
         if (!running) {
@@ -3217,7 +3207,7 @@ bool craft::run(const std::list<std::string>& algos,
     m_pimpl->cleanup_worker_threads();
 
 #if defined(MAZE_DEBUG)
-    check_for_gl_err();
+    CHECK_GL_ERR();
     SDL_Log("Closing DB. . .\n");
     SDL_Log("Cleaning up ImGui objects. . .");
     SDL_Log("Cleaning up OpenGL objects. . .");
@@ -3243,13 +3233,13 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
     glDeleteFramebuffers(1, &get<0>(fbo_tuple));
     glDeleteTextures(1, &get<2>(fbo_tuple));
-    glDeleteVertexArrays(1, &quad_vao);
-    glDeleteBuffers(1, &quad_vbo);
+    //glDeleteVertexArrays(1, &quad_vao);
+    //glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
-    glDeleteProgram(screen_attrib.program);
+    //glDeleteProgram(screen_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
     SDL_DestroyWindow(sdl_window);
