@@ -137,7 +137,7 @@ struct craft::craft_impl {
         
         }
 
-        void reset_outfile() {
+        void reset() {
             for (auto i = 0; i < IM_ARRAYSIZE(outfile); ++i) {
                 outfile[i] = '\0';
             }
@@ -145,6 +145,13 @@ struct craft::craft_impl {
             outfile[1] = 'o';
             outfile[2] = 'b';
             outfile[3] = 'j';
+            maze_width = 25;
+            maze_height = 5;
+            maze_length = 28;
+            view = 20;
+			maze_algo = "binary_tree";
+            seed = 101;
+            chunk_size = 8;
         }
     }; // class
     
@@ -2609,6 +2616,8 @@ bool craft::run(const std::list<std::string>& algos,
         return ss.str();
     };
 
+    GLuint minimap_texture = 0;
+
     tuple<GLuint, GLuint, GLuint> fbo_tuple;
 
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
@@ -2633,15 +2642,14 @@ bool craft::run(const std::list<std::string>& algos,
     //glEnableVertexAttribArray(1);
     //glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-    //GLuint minimap_texture = -1;
     auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
         GLuint fbo, depthRenderbuffer, texture;
         glGenFramebuffers(1, &fbo);
         glGenRenderbuffers(1, &depthRenderbuffer);
         glGenTextures(1, &texture);
         glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glActiveTexture(GL_TEXTURE6);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2720,6 +2728,8 @@ bool craft::run(const std::list<std::string>& algos,
     me->name = "Wade Watts";
     me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
 
+    vector<uint8_t> current_maze_pixels;
+
 #if defined(MAZE_DEBUG)
     SDL_Log("CHECK_GL_ERR() prior to main loop\n");
     CHECK_GL_ERR();
@@ -2752,29 +2762,6 @@ bool craft::run(const std::list<std::string>& algos,
         static bool show_demo_window = false;
         static bool write_maze_now = false;
         static bool first_maze = true;
-
-        // Handle Maze events
-        // Check if maze is available and then perform two async operations:
-        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
-        // 2. Write the maze to a Wavefront object file using the computed data (except the default maze)
-        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            // Get the maze and reset the future
-            maze_gen_future.get();
-            maze2->stop_progress();
-            // Don't write the first maze that loads when app starts
-            write_maze_now = first_maze ? false : true;
-            first_maze = false;
-            //glGenTextures(1, &minimap_texture);
-            //glBindTexture(GL_TEXTURE_2D, minimap_texture);
-            //glActiveTexture(GL_TEXTURE4);
-            auto&& pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng));
-            //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 200, 150, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-            //glBindTexture(GL_TEXTURE_2D, 0);
-        }
 
         if (write_maze_now) {
             // Writing the maze will run in the background - only do that on Desktop
@@ -2921,21 +2908,36 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::NewLine();
                 ImGui::PopStyleColor();
             
-
                 // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                 if (ImGui::Button("Reset")) {
-                    // Clear the GUI
+                    gui->reset();
                 }
                 ImGui::PopStyleColor();
+                ImGui::NewLine();
 
+                ImVec2 sidebar_xy = ImGui::GetContentRegionAvail();
+
+                if (glIsTexture(minimap_texture)) {
+                    glDeleteTextures(1, &minimap_texture);
+                }
+                glGenTextures(1, &minimap_texture);
+                glActiveTexture(GL_TEXTURE4);
+                glBindTexture(GL_TEXTURE_2D, minimap_texture);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
+                    static_cast<GLuint>(25 * 25), static_cast<GLuint>(28 * 25), 
+                    0, GL_RGBA, GL_UNSIGNED_BYTE, current_maze_pixels.data());
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glBindTexture(GL_TEXTURE_2D, 0);
                 // Flip UV coordinates for the image
                 ImVec2 uv0 = ImVec2(0.0f, 1.0f);
                 ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-                //glBindTexture(GL_TEXTURE_2D, minimap_texture);
-                //glActiveTexture(GL_TEXTURE4);
-                //ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), {200, 150}, uv0, uv1);
-                //glBindTexture(GL_TEXTURE_2D, 0);
+                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), 
+                    sidebar_xy, uv0, uv1);
+                glBindTexture(GL_TEXTURE_2D, 0);
 
                 ImGui::EndTabItem();
             }
@@ -3030,6 +3032,20 @@ bool craft::run(const std::list<std::string>& algos,
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
         }
 
+        // Handle Maze events
+        // Check if maze is available and then perform two async operations:
+        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
+        // 2. Notify writer that the maze can be sent to a Wavefront object file
+        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            // Get the maze and reset the future
+            maze_gen_future.get();
+            maze2->stop_progress();
+            // Don't write the first maze that loads when app starts
+            write_maze_now = first_maze ? false : true;
+            first_maze = false;
+            current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
+        }
+
         // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
@@ -3079,8 +3095,8 @@ bool craft::run(const std::list<std::string>& algos,
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-        glActiveTexture(GL_TEXTURE6);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
         ImGui::End();
@@ -3168,6 +3184,7 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
     glDeleteFramebuffers(1, &get<0>(fbo_tuple));
     glDeleteTextures(1, &get<2>(fbo_tuple));
+	glDeleteTextures(1, &minimap_texture);
     //glDeleteVertexArrays(1, &quad_vao);
     //glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
