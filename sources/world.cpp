@@ -32,34 +32,34 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
                 w = 2;
             }
             // sand and grass terrain
-            static constexpr auto PLANT_STARTING_Y = 2;
-            for (int y = 0; y < PLANT_STARTING_Y + 2; y++) {
+            static constexpr auto PLANT_MAX_Y = 2;
+            for (int y = 0; y < h; y++) {
                 func(x, y, z, w * flag, m);
             }
             
             if (w == 1) {
                 // grass
                 if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
-                    func(x, PLANT_STARTING_Y + 1, z, 17 * flag, m);
+                    func(x, h, z, 17 * flag, m);
                 }
                 // flowers
                 if (simplex2(x * 0.05, -z * 0.05, 4, 0.8, 2) > 0.7) {
                     w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
-                    func(x, PLANT_STARTING_Y + 1, z, w * flag, m);
+                    func(x, h, z, w * flag, m);
                 }
                 // trees
                 if (simplex2(x, z, 6, 0.5, 2) > 0.84) {
-                    for (int y = PLANT_STARTING_Y + 3; y < PLANT_STARTING_Y + 8; y++) {
+                    for (int y = h + 3; y < h + 8; y++) {
                         for (int ox = -3; ox <= 3; ox++) {
                             for (int oz = -3; oz <= 3; oz++) {
-                                int d = (ox * ox) + (oz * oz) + (y - (PLANT_STARTING_Y + 4)) * (y - (PLANT_STARTING_Y + 4));
+                                int d = (ox * ox) + (oz * oz) + (y - (h + 4)) * (y - (h + 4));
                                 if (d < 11) {
                                     func(x + ox, y, z + oz, 15, m);
                                 }
                             }
                         }
                     }
-                    for (int y = PLANT_STARTING_Y; y < PLANT_STARTING_Y + 7; y++) {
+                    for (int y = h; y < h + 7; y++) {
                         func(x, y, z, 5, m);
                     }
                 }

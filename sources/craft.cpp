@@ -2045,7 +2045,7 @@ struct craft::craft_impl {
         State* s = &this->m_model->players->state;
         int sz = 0;
         int sx = 0;
-        float mouse_mv = 0.0025f;
+        float mouse_mv = 0.0055f;
         float dir_mv = 0.025f;
         int sc = -1;
 
@@ -2161,6 +2161,7 @@ struct craft::craft_impl {
                 }
                 break;
             }
+            case SDL_EVENT_FINGER_MOTION:
             case SDL_EVENT_MOUSE_MOTION: {
                 if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
                     s->rx += e.motion.xrel * mouse_mv;
@@ -2249,7 +2250,7 @@ struct craft::craft_impl {
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
             SDL_powf(vz * speed, 2)) * 8);
-        int step = SDL_max(8, time_step);
+        int step = SDL_max(8, estimate);
         float ut = dt / step;
         vx = vx * ut * speed;
         vy = vy * ut * speed;
@@ -2745,6 +2746,7 @@ bool craft::run(const std::list<std::string>& algos,
     uint64_t previous = SDL_GetTicks();
     double time_step = 0;
 	double time_accum = 0;
+    double last_commit = SDL_GetTicks();
 
     craft_impl::Player* me = m_pimpl->m_model->players;
     craft_impl::State* p_state = &m_pimpl->m_model->players->state;
@@ -2770,6 +2772,12 @@ bool craft::run(const std::list<std::string>& algos,
         double dt_ms = static_cast<double>(now - previous) / 1000.0;
         dt_ms = SDL_min(dt_ms, 0.2);
         dt_ms = SDL_max(dt_ms, 0.0);
+        previous = now;
+        // FLUSH DATABASE
+		if (now - last_commit > COMMIT_INTERVAL) {
+			db_commit();
+			last_commit = now;
+		}
 
         // Some GUI state variables
         static bool show_demo_window = false;
@@ -2830,10 +2838,10 @@ bool craft::run(const std::list<std::string>& algos,
             time_step += fixed_time_step;
         }
 
-        // FLUSH DATABASE 
-        if (now - previous > COMMIT_INTERVAL) {
-            db_commit();
-            previous = now;
+        if (model->create_radius != gui->view) {
+            model->create_radius = gui->view;
+            model->render_radius = gui->view;
+            model->delete_radius = gui->view;
         }
 
         // Use ImGui for GUI size calculations
@@ -2993,11 +3001,6 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
 
                 ImGui::SliderInt("View", &gui->view, 1, 24);
-                if (model->create_radius != gui->view) {
-					model->create_radius = gui->view;
-                    model->render_radius = gui->view;
-                    model->delete_radius = gui->view;
-                }
                     
                 // Prevent setting SDL_Window settings every frame
                 static bool last_fullscreen = gui->fullscreen;
@@ -3077,6 +3080,7 @@ bool craft::run(const std::list<std::string>& algos,
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
+		glCullFace(GL_BACK);
 
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
@@ -3112,8 +3116,8 @@ bool craft::run(const std::list<std::string>& algos,
   //      glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
   //      glUniform1i(screen_attrib.sampler, 4);
   //      glDrawArrays(GL_TRIANGLES, 0, 6);
-  //      glDisable(GL_DEPTH_TEST);
-  //      glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
 
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
