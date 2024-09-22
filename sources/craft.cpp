@@ -117,7 +117,6 @@ struct craft::craft_impl {
         bool color_mode_dark;
         bool capture_mouse;
         int chunk_size;
-        bool show_clouds;
         bool show_items;
         bool show_wireframes;
         bool show_crosshairs;
@@ -131,7 +130,7 @@ struct craft::craft_impl {
         int view;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
-            capture_mouse(false), chunk_size(8), show_clouds(true),
+            capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json(""), view(20) {
@@ -174,11 +173,6 @@ struct craft::craft_impl {
 
         GuiBuilder& chunk_size(int size) {
             gui.chunk_size = size;
-            return *this;
-        }
-
-        GuiBuilder& show_clouds(bool value) {
-            gui.show_clouds = value;
             return *this;
         }
 
@@ -905,6 +899,10 @@ struct craft::craft_impl {
         return 0;
     }
 
+    /**
+	 * @brief Check if the player is colliding with the map
+     *
+     */
     int collide(int height, float *x, float *y, float *z) const {
         int result = 0;
         int p = this->chunked(*x);
@@ -1382,8 +1380,7 @@ struct craft::craft_impl {
         // world.h
         static world my_world;
         auto&& gui = this->m_gui;
-        my_world.create_world(p, q, cref(this->m_maze),
-            map_set_func, block_map, gui->chunk_size, gui->show_clouds);
+        my_world.create_world(p, q, cref(this->m_maze), map_set_func, block_map, gui->chunk_size);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -2245,7 +2242,7 @@ struct craft::craft_impl {
                 }
             }
         }
-        float speed = this->m_model->flying ? 20 : 5;
+        float speed = this->m_model->flying ? 10 : 5;
         int estimate = SDL_roundf(SDL_sqrtf(
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
@@ -2259,8 +2256,8 @@ struct craft::craft_impl {
             if (this->m_model->flying) {
                 dy = 0;
             } else {
-                dy -= ut * 25;
-                dy = SDL_max(dy, -250);
+                dy -= ut * 10;
+                dy = SDL_max(dy, -150);
             }
             s->x += vx;
             s->y += vy + dy * ut;
@@ -2407,6 +2404,7 @@ bool craft::run(const std::list<std::string>& algos,
 
     SDL_ShowWindow(sdl_window);
     SDL_SetWindowRelativeMouseMode(sdl_window, false);
+	SDL_SetWindowPosition(sdl_window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
 #if !defined(__EMSCRIPTEN__)
     if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
@@ -2649,11 +2647,6 @@ bool craft::run(const std::list<std::string>& algos,
         return ss.str();
     };
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("CHECK_GL_ERR() prior to game loop\n");
-    CHECK_GL_ERR();
-#endif
-
     tuple<GLuint, GLuint, GLuint> fbo_tuple;
 
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
@@ -2682,18 +2675,17 @@ bool craft::run(const std::list<std::string>& algos,
     auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
         GLuint fbo, depthRenderbuffer, texture;
         glGenFramebuffers(1, &fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glGenRenderbuffers(1, &depthRenderbuffer);
         glGenTextures(1, &texture);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glActiveTexture(GL_TEXTURE5);
+        glActiveTexture(GL_TEXTURE6);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glBindTexture(GL_TEXTURE_2D, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        glGenRenderbuffers(1, &depthRenderbuffer);
         glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
         glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
@@ -2757,8 +2749,17 @@ bool craft::run(const std::list<std::string>& algos,
 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
-    if (!loaded)
-        p_state->y = 75.f;
+    if (!loaded) {
+        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 2;
+    }
+
+    this->m_pimpl->force_chunks(me);
+	db_commit();
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("CHECK_GL_ERR() prior to main loop\n");
+    CHECK_GL_ERR();
+#endif
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -2985,10 +2986,10 @@ bool craft::run(const std::list<std::string>& algos,
                 char am_pm = hour < 12 ? 'a' : 'p';
                 hour = hour % 12;
                 hour = hour ? hour : 12;
-                ImGui::Text("chunk.p: %d, chunk.q: %d", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-                ImGui::Text("player.x: %.2f, player.y: %.2f, player.z: %.2f", p_state->x, p_state->y, p_state->z);
-                ImGui::Text("#chunks: %d, #triangles: %d", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-                ImGui::Text("time: %d%cm", hour, am_pm);
+                ImGui::Text("chunk.p: %d\nchunk.q: %d\n", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
+                ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
+                ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
+                ImGui::Text("time: %d%cm\n", hour, am_pm);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Graphics")) {                    
@@ -3020,7 +3021,6 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::Checkbox("Show Items", &gui->show_items);
                 ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
-                ImGui::Checkbox("Show Clouds", &gui->show_clouds);
                     
                 ImGui::EndTabItem();
             }
@@ -3062,15 +3062,12 @@ bool craft::run(const std::list<std::string>& algos,
         if (window_resizes) {
             window_resizes = false;
             // Delete existing FBO objects
-            CHECK_GL_ERR();
             if (glIsTexture(get<2>(fbo_tuple))) {
                 glDeleteTextures(1, &get<2>(fbo_tuple));
-				glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
-				glDeleteFramebuffers(1, &get<0>(fbo_tuple));
-			}
-            CHECK_GL_ERR();
+                glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
+                glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+            }
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
-            CHECK_GL_ERR();
         }
 
         // Bind the FBO that will store the 3D scene
@@ -3079,25 +3076,21 @@ bool craft::run(const std::list<std::string>& algos,
         glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
+		glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
 
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
         glClear(GL_DEPTH_BUFFER_BIT);
 
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
-        CHECK_GL_ERR();
 
         m_pimpl->render_signs(&text_attrib, me);
-        CHECK_GL_ERR();
 
         m_pimpl->render_sign(&text_attrib, me);
-        CHECK_GL_ERR();
 
         if (gui->show_wireframes) {
             m_pimpl->render_wireframe(&line_attrib, me);
         }
-        CHECK_GL_ERR();
 
         glClear(GL_DEPTH_BUFFER_BIT);
         if (gui->show_crosshairs) {
@@ -3123,7 +3116,7 @@ bool craft::run(const std::list<std::string>& algos,
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
         glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-        glActiveTexture(GL_TEXTURE5);
+        glActiveTexture(GL_TEXTURE6);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
         glBindTexture(GL_TEXTURE_2D, 0);
         ImGui::End();
