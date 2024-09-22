@@ -25,7 +25,7 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
             int mh = g * 32 + 16;
             int h = f * mh;
             int w = 1;
-            int t = 2;
+            int t = 12;
             if (h <= t) {
                 h = t;
                 w = 2;

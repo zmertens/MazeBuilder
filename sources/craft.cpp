@@ -288,7 +288,7 @@ struct craft::craft_impl {
         int render_radius;
         int delete_radius;
         int sign_radius;
-        Player players[MAX_PLAYERS];
+        Player player;
         int player_count;
         int voxel_scene_w;
         int voxel_scene_h;
@@ -675,7 +675,7 @@ struct craft::craft_impl {
 
     Player *find_player(int id) {
         for (int i = 0; i < this->m_model->player_count; i++) {
-            Player *player = this->m_model->players + i;
+            Player* player = &this->m_model->player;
             if (player->id == id) {
                 return player;
             }
@@ -685,7 +685,7 @@ struct craft::craft_impl {
 
     void delete_all_players() {
         for (int i = 0; i < this->m_model->player_count; i++) {
-            Player *player = this->m_model->players + i;
+            Player *player = &this->m_model->player;
             this->del_buffer(player->buffer);
         }
         this->m_model->player_count = 0;
@@ -1383,7 +1383,7 @@ struct craft::craft_impl {
 
     void delete_chunks() {
         int count = this->m_model->chunk_count;
-        State *s1 = &this->m_model->players->state;
+        State *s1 = &this->m_model->player.state;
         for (int i = 0; i < count; i++) {
             Chunk *chunk = this->m_model->chunks + i;
             int remove_chunk = 1;
@@ -1853,7 +1853,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 0);
         glUniform1f(attrib->timer, time_of_day());
         for (int i = 0; i < this->m_model->player_count; i++) {
-            Player *other = this->m_model->players + i;
+            Player *other = &this->m_model->player;
             if (other != player) {
                 draw_player(attrib, other);
             }
@@ -1940,7 +1940,7 @@ struct craft::craft_impl {
     }
 
     void on_light() {
-        State *s = &this->m_model->players->state;
+        State *s = &this->m_model->player.state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
@@ -1949,7 +1949,7 @@ struct craft::craft_impl {
     }
 
     void on_left_click() {
-        State *s = &this->m_model->players->state;
+        State *s = &this->m_model->player.state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
@@ -1965,7 +1965,7 @@ struct craft::craft_impl {
     }
 
     void on_right_click() {
-        State *s = &this->m_model->players->state;
+        State *s = &this->m_model->player.state;
         int hx, hy, hz;
         int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (hy > 0 && hy < 256 && is_obstacle(hw)) {
@@ -1980,7 +1980,7 @@ struct craft::craft_impl {
     }
 
     void on_middle_click() {
-        State *s = &this->m_model->players->state;
+        State *s = &this->m_model->player.state;
         int hx, hy, hz;
         int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         for (int i = 0; i < item_count; i++) {
@@ -1999,10 +1999,10 @@ struct craft::craft_impl {
     */
     bool handle_events_and_motion(double dt, double time_step, bool& window_resizes) {
         static float dy = 0;
-        State* s = &this->m_model->players->state;
+        State* s = &this->m_model->player.state;
         int sz = 0;
         int sx = 0;
-        float mouse_mv = 0.0055f;
+        float mouse_mv = SDL_min(0.0025, dt);
         float dir_mv = 0.025f;
         int sc = -1;
 
@@ -2034,7 +2034,7 @@ struct craft::craft_impl {
                         } else {
                             this->m_model->typing = 0;
                             if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-                                Player* player = this->m_model->players;
+                                Player* player = &this->m_model->player;
                                 int x, y, z, face;
                                 if (hit_test_face(player, &x, &y, &z, &face)) {
                                     set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
@@ -2203,7 +2203,7 @@ struct craft::craft_impl {
             }
         }
         
-        float speed = this->m_model->flying ? 20 : 5;
+        float speed = this->m_model->flying ? 16 : 5;
         int estimate = SDL_roundf(SDL_sqrtf(
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
@@ -2315,8 +2315,8 @@ struct craft::craft_impl {
         this->m_model->render_radius = RENDER_CHUNK_RADIUS;
         this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
         this->m_model->sign_radius = RENDER_SIGN_RADIUS;
-        SDL_memset(this->m_model->players, 0, sizeof(Player) * MAX_PLAYERS);
-        this->m_model->player_count = 0;
+        SDL_memset(&this->m_model->player, 0, sizeof(Player) * MAX_PLAYERS);
+        this->m_model->player_count = 1;
         this->m_model->flying = false;
         this->m_model->item_index = 0;
         this->m_model->day_length = DAY_LENGTH;
@@ -2702,18 +2702,23 @@ bool craft::run(const std::list<std::string>& algos,
 	double time_accum = 0;
     double last_commit = SDL_GetTicks();
 
-    craft_impl::Player* me = m_pimpl->m_model->players;
-    craft_impl::State* p_state = &m_pimpl->m_model->players->state;
-    me->id = 0;
-    me->name = "Wade Watts";
-    me->buffer = 0;
-    m_pimpl->m_model->player_count = 1;
+    craft_impl::Player* me = &m_pimpl->m_model->player;
+    craft_impl::State* p_state = &m_pimpl->m_model->player.state;
 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 25.f;
+        p_state->x = 125.f;
+        p_state->z = 125.f;
+        p_state->y = SDL_abs(this->m_pimpl->highest_block(p_state->x, p_state->z)) + 55.f;
+#if defined(MAZE_DEBUG)        
+		SDL_Log("initial player state: x: %f, y: %f, z: %f\n", p_state->x, p_state->y, p_state->z);
+#endif
     }
+
+    me->id = 0;
+    me->name = "Wade Watts";
+    me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
 
 #if defined(MAZE_DEBUG)
     SDL_Log("CHECK_GL_ERR() prior to main loop\n");
@@ -2733,11 +2738,15 @@ bool craft::run(const std::list<std::string>& algos,
         dt_ms = SDL_min(dt_ms, 0.2);
         dt_ms = SDL_max(dt_ms, 0.0);
         previous = now;
+
         // FLUSH DATABASE
-		if (now - last_commit > COMMIT_INTERVAL) {
-			db_commit();
-			last_commit = now;
-		}
+        if (now - last_commit > COMMIT_INTERVAL) {
+            db_commit();
+            last_commit = now;
+        }
+
+        // Update player state
+        p_state->t = static_cast<float>(dt_ms);
 
         // Some GUI state variables
         static bool show_demo_window = false;
@@ -2808,10 +2817,6 @@ bool craft::run(const std::list<std::string>& algos,
 		int display_w, display_h;
 		SDL_GetWindowSize(sdl_window, &display_w, &display_h);
 		ImVec2 display_size = { static_cast<float>(display_w), static_cast<float>(display_h) };
-
-        // PREPARE TO RENDER 
-        m_pimpl->delete_chunks();
-        m_pimpl->del_buffer(me->buffer);
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3025,6 +3030,10 @@ bool craft::run(const std::list<std::string>& algos,
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
         }
 
+        // PREPARE TO RENDER 
+        m_pimpl->delete_chunks();
+        m_pimpl->del_buffer(me->buffer);
+        me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
         // Bind the FBO that will store the 3D scene
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
