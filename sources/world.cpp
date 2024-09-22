@@ -25,13 +25,13 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
             int mh = g * 32 + 16;
             int h = f * mh;
             int w = 1;
-            int t = 12;
+            int t = 2;
             if (h <= t) {
                 h = t;
                 w = 2;
             }
             // sand and grass terrain
-            static constexpr auto PLANT_MAX_Y = 2;
+            // static constexpr auto PLANT_MAX_Y = 2;
             for (int y = 0; y < h; y++) {
                 func(x, y, z, w * flag, m);
             }

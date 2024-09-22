@@ -683,47 +683,6 @@ struct craft::craft_impl {
         return 0;
     }
 
-    void update_player(Player *player, float x, float y, float z, float rx, float ry, int interpolate)
-    {
-        if (interpolate) {
-            State *s1 = &player->state1;
-            State *s2 = &player->state2;
-            SDL_memcpy(s1, s2, sizeof(State));
-            s2->x = x; s2->y = y; s2->z = z; s2->rx = rx; s2->ry = ry;
-            s2->t = static_cast<float>(get_time());
-            if (s2->rx - s1->rx > static_cast<float>(M_PI)) {
-                s1->rx += static_cast<float>(2 * M_PI);
-            }
-            if (s1->rx - s2->rx > static_cast<float>(M_PI)) {
-                s1->rx -= static_cast<float>(2 * M_PI);
-            }
-        }
-        else {
-            State *s = &player->state;
-            s->x = x; s->y = y; s->z = z; s->rx = rx; s->ry = ry;
-            del_buffer(player->buffer);
-            player->buffer = gen_player_buffer(s->x, s->y, s->z, s->rx, s->ry);
-        }
-    }
-
-    void interpolate_player(Player *player) {
-        State *s1 = &player->state1;
-        State *s2 = &player->state2;
-        float t1 = static_cast<float>(s2->t - s1->t);
-        float t2 = static_cast<float>(this->get_time()) - s2->t;
-        t1 = SDL_min(t1, 1.f);
-        t1 = SDL_max(t1, 0.1f);
-        float p = SDL_min(t2 / t1, 1.f);
-        this->update_player(
-            player,
-            s1->x + (s2->x - s1->x) * p,
-            s1->y + (s2->y - s1->y) * p,
-            s1->z + (s2->z - s1->z) * p,
-            s1->rx + (s2->rx - s1->rx) * p,
-            s1->ry + (s2->ry - s1->ry) * p,
-            0);
-    }
-
     void delete_all_players() {
         for (int i = 0; i < this->m_model->player_count; i++) {
             Player *player = this->m_model->players + i;
@@ -1280,7 +1239,8 @@ struct craft::craft_impl {
                         neighbors[index] = opaque[XYZ(x + dx, y + dy, z + dz)];
                         lights[index] = light[XYZ(x + dx, y + dy, z + dz)];
                         shades[index] = 0;
-                        if (y + dy <= highest[XZ(x + dx, z + dz)]) {
+                        int highest_index = XZ(x + dx, z + dz);
+                        if (highest_index < XZ_SIZE * XZ_SIZE && y + dy <= highest[highest_index]) {
                             for (int oy = 0; oy < 8; oy++) {
                                 if (opaque[XYZ(x + dx, y + dy + oy, z + dz)]) {
                                     shades[index] = 1.0f - oy * 0.125f;
@@ -2234,7 +2194,7 @@ struct craft::craft_impl {
         float vx, vy, vz;
         get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
         if (!this->m_model->typing) {
-            if (state[KEY_JUMP] && this->m_gui->capture_mouse) {
+            if (state[KEY_JUMP]) {
                 if (this->m_model->flying) {
                     vy = 1;
                 } else if (dy == 0) {
@@ -2242,12 +2202,13 @@ struct craft::craft_impl {
                 }
             }
         }
-        float speed = this->m_model->flying ? 10 : 5;
+        
+        float speed = this->m_model->flying ? 20 : 5;
         int estimate = SDL_roundf(SDL_sqrtf(
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
-            SDL_powf(vz * speed, 2)) * 8);
-        int step = SDL_max(8, estimate);
+            SDL_powf(vz * speed, 2)) * dt * 8);
+        int step = SDL_max(time_step, estimate);
         float ut = dt / step;
         vx = vx * ut * speed;
         vy = vy * ut * speed;
@@ -2255,9 +2216,10 @@ struct craft::craft_impl {
         for (int i = 0; i < step; i++) {
             if (this->m_model->flying) {
                 dy = 0;
-            } else {
-                dy -= ut * 10;
-                dy = SDL_max(dy, -150);
+            }
+            else {
+                dy -= ut * 25;
+                dy = SDL_max(dy, -250);
             }
             s->x += vx;
             s->y += vy + dy * ut;
@@ -2541,6 +2503,8 @@ bool craft::run(const std::list<std::string>& algos,
     sky_attrib.sampler = glGetUniformLocation(program, "sampler");
     sky_attrib.timer = glGetUniformLocation(program, "timer");
 
+    GLuint sky_buffer = m_pimpl->gen_sky_buffer();
+
 //#if defined(__EMSCRIPTEN__)
 //    // @TODO : Screen space GLSL ES shader
 //#else
@@ -2550,9 +2514,6 @@ bool craft::run(const std::list<std::string>& algos,
 //    screen_attrib.position = 0;
 //    screen_attrib.uv = 1;
 //    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
-
-    // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads();
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2587,7 +2548,8 @@ bool craft::run(const std::list<std::string>& algos,
         }
     }
 
-    GLuint sky_buffer = m_pimpl->gen_sky_buffer();
+    // INITIALIZE WORKER THREADS
+    m_pimpl->init_worker_threads();
 
     // Init some local vars for handling maze duties
     auto my_maze_type = get_maze_type_from_str(algos.back());
@@ -2750,11 +2712,8 @@ bool craft::run(const std::list<std::string>& algos,
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 2;
+        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 25.f;
     }
-
-    this->m_pimpl->force_chunks(me);
-	db_commit();
 
 #if defined(MAZE_DEBUG)
     SDL_Log("CHECK_GL_ERR() prior to main loop\n");
@@ -2853,11 +2812,6 @@ bool craft::run(const std::list<std::string>& algos,
         // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
-
-        me->buffer = m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
-        for (int i = 1; i < m_pimpl->m_model->player_count; i++) {
-            m_pimpl->interpolate_player(m_pimpl->m_model->players + i);
-        }
 
         // Start the Dear ImGui frame
         ImGui_ImplOpenGL3_NewFrame();
@@ -3061,6 +3015,7 @@ bool craft::run(const std::list<std::string>& algos,
         // Check if scene size changed
         if (window_resizes) {
             window_resizes = false;
+            this->m_pimpl->force_chunks(me);
             // Delete existing FBO objects
             if (glIsTexture(get<2>(fbo_tuple))) {
                 glDeleteTextures(1, &get<2>(fbo_tuple));
