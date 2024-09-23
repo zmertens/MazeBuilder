@@ -128,12 +128,13 @@ struct craft::craft_impl {
         std::string maze_algo;
         std::string maze_json;
         int view;
+        bool moonjump;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
-            maze_algo("binary_tree"), maze_json(""), view(20) {
+            maze_algo("binary_tree"), maze_json(""), view(20), moonjump(false) {
         
         }
 
@@ -152,6 +153,7 @@ struct craft::craft_impl {
 			maze_algo = "binary_tree";
             seed = 101;
             chunk_size = 8;
+            moonjump = false;
         }
     }; // class
     
@@ -201,8 +203,13 @@ struct craft::craft_impl {
 		GuiBuilder& view(int value) {
 			gui.view = value;
 			return *this;
-		}   
+		}
 
+		GuiBuilder& moonjump(bool value) {
+			gui.moonjump = value;
+			return *this;
+		}
+        
         Gui build() const {
             return gui;
         }
@@ -421,11 +428,11 @@ struct craft::craft_impl {
     }
 
     int chunked(float x) const {
-        return static_cast<int>((SDL_roundf(x) / this->m_gui->chunk_size));
+        return static_cast<int>((SDL_roundf(x) / static_cast<float>(this->m_gui->chunk_size)));
     }
 
     double get_time() const {
-    	return (SDL_GetTicks() + (double) this->m_model->start_time - (double) this->m_model->start_ticks) / 1000.0;
+    	return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(this->m_model->start_time) - static_cast<double>(this->m_model->start_ticks)) / 1000.0;
     }
 
     float time_of_day() const {
@@ -1341,7 +1348,7 @@ struct craft::craft_impl {
     void load_chunk(WorkerItem *item) {        
         int p = item->p;
         int q = item->q;
-        
+
         Map *block_map = item->block_maps[1][1];
         Map *light_map = item->light_maps[1][1];
         // world.h
@@ -2204,7 +2211,7 @@ struct craft::craft_impl {
                 if (this->m_model->flying) {
                     vy = 1;
                 } else if (dy == 0) {
-                    dy = 8;
+                    dy = (this->m_gui->moonjump) ? time_step : 8;
                 }
             }
         }
@@ -2310,8 +2317,6 @@ struct craft::craft_impl {
         } else {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Couldn't load icon at %s\n", icon_path);
         }
-
-        this->m_model->start_ticks = static_cast<int>(SDL_GetTicks());
     } // create_window_and_context
 
     void reset_model() {
@@ -2966,7 +2971,7 @@ bool craft::run(const std::list<std::string>& algos,
                     ImGui::StyleColorsLight();
 
                 ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
-
+                ImGui::Checkbox("Moonjump", &gui->moonjump);
                 ImGui::SliderInt("View", &gui->view, 1, 24);
                     
                 // Prevent setting SDL_Window settings every frame
