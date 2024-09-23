@@ -61,6 +61,11 @@ const maze_thread_safe::pqmap& maze_thread_safe::get_p_q() const noexcept {
 	return this->m_p_q;
 }
 
+bool maze_thread_safe::find_pq(int p, int q) noexcept {
+    std::lock_guard<std::mutex> lock(m_maze_mutx);
+    return this->m_p_q.find({ p, q }) != this->m_p_q.end();
+}
+
 // Return a future for when maze has been written
 std::string maze_thread_safe::to_wavefront_obj_str() const noexcept {
     using namespace std;

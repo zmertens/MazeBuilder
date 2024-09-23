@@ -1346,8 +1346,7 @@ struct craft::craft_impl {
         Map *light_map = item->light_maps[1][1];
         // world.h
         static world my_world;
-        auto&& gui = this->m_gui;
-        my_world.create_world(p, q, cref(this->m_maze), map_set_func, block_map, gui->chunk_size);
+        my_world.create_world(p, q, cref(this->m_maze), map_set_func, block_map, this->m_gui->chunk_size);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -2564,12 +2563,18 @@ bool craft::run(const std::list<std::string>& algos,
     auto&& maze2 = this->m_pimpl->m_maze;
     auto&& model = this->m_pimpl->m_model;
 
-    auto make_maze_ptr = [this, &my_maze_type, &get_int, &rng, &maze2](unsigned int w, unsigned int l, unsigned int h) {
-        maze2 = std::make_unique<mazes::maze_thread_safe>(w, l, h);
+	maze2 = make_unique<maze_thread_safe>(gui->maze_width, gui->maze_length, gui->maze_height);
+
+    auto maze_func = [&my_maze_type, &get_int, &rng, &maze2](auto w, auto l, auto h) {
+		maze2->set_width(w);
+		maze2->set_length(l);
+        maze2->set_height(h);
+        maze2->set_block_type(-1);
+		maze2->compute_geometry(my_maze_type, get_int, rng);
     };
 
     // Generate a default maze to start the app
-    future<void> maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
+    future<void> maze_gen_future = async(launch::async, maze_func, gui->maze_width, gui->maze_length, gui->maze_height);
     
     future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
@@ -2716,8 +2721,8 @@ bool craft::run(const std::list<std::string>& algos,
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->x = 125.f;
-        p_state->z = 125.f;
+        p_state->x = 15.f;
+        p_state->z = 15.f;
         p_state->y = SDL_abs(this->m_pimpl->highest_block(p_state->x, p_state->z)) + 55.f;
 #if defined(MAZE_DEBUG)        
 		SDL_Log("initial player state: x: %f, y: %f, z: %f\n", p_state->x, p_state->y, p_state->z);
@@ -2865,7 +2870,7 @@ bool craft::run(const std::list<std::string>& algos,
                     if (ImGui::Button("Build!")) {
                         // Start the maze generation in the background
                         maze2->start_progress();
-                        maze_gen_future = async(launch::async, make_maze_ptr, gui->maze_width, gui->maze_length, gui->maze_height);
+                        maze_gen_future = async(launch::async, maze_func, gui->maze_width, gui->maze_length, gui->maze_height);
                     } else {
                         ImGui::SameLine();
                         ImGui::Text("Building maze... %s\n", gui->outfile);

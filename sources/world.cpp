@@ -69,16 +69,15 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
                     func(x, y, z, 16 * flag, m);
                 }
             }
-            //if (maze == nullptr)
-            //    return;
-            //const auto& pq = maze->get_p_q();
-            //bool is_part_of_maze = pq.find({ p, q }) != pq.end();
-            //// Build the maze
-            //if (is_part_of_maze) {
-            //    static const unsigned int starting_height = PLANT_STARTING_Y;
-            //    for (auto y = starting_height; y < starting_height + maze->get_height(); y++)
-            //        func(x, y, z, maze->get_block_type(), m);
-            //}
+            if (maze == nullptr)
+                return;
+			bool is_part_of_maze = maze->find_pq(x, z);
+            // Build the maze
+            if (is_part_of_maze) {
+                static constexpr unsigned int starting_height = 2;
+                for (auto y = starting_height; y < starting_height + maze->get_height(); y++)
+                    func(x, y, z, maze->get_block_type() * flag, m);
+            }
         }
     }
 } // create_world

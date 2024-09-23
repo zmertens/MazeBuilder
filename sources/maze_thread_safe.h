@@ -36,6 +36,7 @@ public:
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
     const pqmap& get_p_q() const noexcept;
+    bool find_pq(int p, int q) noexcept;
     std::string to_str(mazes::maze_types my_maze_type, 
         const std::function<int(int, int)>& get_int, 
         const std::mt19937& rng,
