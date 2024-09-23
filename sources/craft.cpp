@@ -2996,10 +2996,17 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Help")) {
+                // Begin a child window with horizontal scrolling enabled
+                ImGui::BeginChild("ScrollableText", 
+                    ImGui::GetContentRegionAvail(), 
+                    false, ImGuiWindowFlags_HorizontalScrollbar);
+    
                 ImGui::Text("%s\n", this->m_pimpl->m_help.data());
                 ImGui::Text("\n");
                 ImGui::Text(ZACHS_GH_REPO);
                 ImGui::Text("\n");
+    
+                ImGui::EndChild();            
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
