@@ -2815,6 +2815,7 @@ bool craft::run(const std::list<std::string>& algos,
         // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
         // 2. Notify writer that the maze can be sent to a Wavefront object file
         if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            this->m_pimpl->reset_model();
             // Get the maze and reset the future
             maze2->start_progress();
             maze_gen_future.get();
