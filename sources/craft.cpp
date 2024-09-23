@@ -2570,12 +2570,12 @@ bool craft::run(const std::list<std::string>& algos,
 
 	maze2 = make_unique<maze_thread_safe>(gui->maze_width, gui->maze_length, gui->maze_height);
 
-    auto maze_func = [&my_maze_type, &get_int, &rng, &maze2](auto w, auto l, auto h) {
+    auto maze_func = [&model, &my_maze_type, &get_int, &rng, &maze2](auto w, auto l, auto h) {
+        maze2->clear();
 		maze2->set_width(w);
 		maze2->set_length(l);
         maze2->set_height(h);
-        maze2->set_block_type(-1);
-		maze2->compute_geometry(my_maze_type, get_int, rng, -1);
+		maze2->compute_geometry(my_maze_type, get_int, rng, items[model->item_index]);
     };
 
     // Generate a default maze to start the app

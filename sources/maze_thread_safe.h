@@ -8,6 +8,7 @@
 #include <utility>
 #include <unordered_map>
 #include <cstdint>
+#include <optional>
 
 #include "maze_interface.h"
 #include "maze_types_enum.h"
@@ -17,16 +18,17 @@ namespace mazes {
 class maze_thread_safe : public mazes::maze_interface
 {
 private:
+    // Store maze block's relative position in a grid / chunk-based world
     struct pair_hash {
         template <class T1, class T2>
-        std::size_t operator()(const std::pair<T1, T2>& pair) const {
-            auto hash1 = std::hash<T1>{}(pair.first);
-            auto hash2 = std::hash<T2>{}(pair.second);
+        std::size_t operator()(const std::pair<T1, T2>& p) const {
+            auto hash1 = std::hash<T1>{}(std::get<0>(p));
+            auto hash2 = std::hash<T1>{}(std::get<1>(p));
             return hash1 ^ hash2;
         }
     };
 
-    using pqmap = std::unordered_map<std::pair<int, int>, bool, pair_hash>;
+    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
 public:
     explicit maze_thread_safe(unsigned int width, unsigned int length, unsigned int height);
@@ -35,8 +37,9 @@ public:
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
-    const pqmap& get_p_q() const noexcept;
-    bool find_pq(int p, int q) noexcept;
+
+    std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) noexcept;
+
     std::string to_str(mazes::maze_types my_maze_type, 
         const std::function<int(int, int)>& get_int, 
         const std::mt19937& rng,
@@ -54,8 +57,6 @@ public:
     unsigned int get_length() const noexcept;
     void set_width(unsigned int width) noexcept;
     unsigned int get_width() const noexcept;
-    void set_block_type(unsigned int block_type) noexcept;
-    unsigned int get_block_type() const noexcept;
 
     // Expose progress_tracker methods
     void start_progress() noexcept;
@@ -99,7 +100,6 @@ private:
 
     void add_block(int x, int y, int z, int w, int block_size) noexcept override;
 
-    std::string m_maze;
     unsigned int m_width, m_length, m_height;
     unsigned int m_block_type;
     // Mutable allows for const methods to modify the object

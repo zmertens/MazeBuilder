@@ -1,5 +1,8 @@
 #include "world.h"
 
+#include <optional>
+#include <iostream>
+
 #include <noise/noise.h>
 
 #include "maze_thread_safe.h"
@@ -30,12 +33,22 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
                 h = t;
                 w = 2;
             }
+
             // sand and grass terrain
             // static constexpr auto PLANT_MAX_Y = 2;
             for (int y = 0; y < h; y++) {
                 func(x, y, z, w * flag, m);
             }
-            
+
+            // Build the maze
+            for (auto y = 1; y < t + maze->get_height(); y++) {
+                const auto& itr = maze->find_block(p, q);
+                if (itr.has_value()) {
+                    auto [px, py, pz, block] = itr.value();
+                    func(x, y, z, block, m);
+                }
+            }
+
             if (w == 1) {
                 // grass
                 if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
@@ -68,15 +81,6 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
                 if (simplex3(x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75) {
                     func(x, y, z, 16 * flag, m);
                 }
-            }
-            if (maze == nullptr)
-                return;
-			bool is_part_of_maze = maze->find_pq(x, z);
-            // Build the maze
-            if (is_part_of_maze) {
-                static constexpr unsigned int starting_height = 2;
-                for (auto y = starting_height; y < starting_height + maze->get_height(); y++)
-                    func(x, y, z, maze->get_block_type() * flag, m);
             }
         }
     }
