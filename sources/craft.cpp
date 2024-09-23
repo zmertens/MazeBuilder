@@ -464,8 +464,7 @@ struct craft::craft_impl {
         SDL_GetWindowSize(this->m_model->window, &window_width, &window_height);
         SDL_GetWindowSizeInPixels(this->m_model->window, &buffer_width, &buffer_height);
         int result = buffer_width / window_width;
-        float min_aspect, max_aspect;
-        return SDL_GetWindowAspectRatio(this->m_model->window, &min_aspect, &max_aspect);
+        return result;
     }
 
     void get_sight_vector(float rx, float ry, float *vx, float *vy, float *vz) const {
@@ -2183,6 +2182,7 @@ struct craft::craft_impl {
             case SDL_EVENT_WINDOW_EXPOSED:
             case SDL_EVENT_WINDOW_RESIZED: {
                 window_resizes = true;
+                this->m_model->scale = get_scale_factor();
                 break;
             }
             } // switch
@@ -2728,7 +2728,7 @@ bool craft::run(const std::list<std::string>& algos,
     if (!loaded) {
         p_state->x = 15.f;
         p_state->z = 15.f;
-        p_state->y = SDL_abs(this->m_pimpl->highest_block(p_state->x, p_state->z)) + 55.f;
+        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 55.f;
 #if defined(MAZE_DEBUG)        
 		SDL_Log("initial player state: x: %f, y: %f, z: %f\n", p_state->x, p_state->y, p_state->z);
 #endif
@@ -3048,7 +3048,6 @@ bool craft::run(const std::list<std::string>& algos,
         GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
         this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
         this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
-        this->m_pimpl->m_model->scale = this->m_pimpl->get_scale_factor();
 
         // Check if scene size changed
         if (window_resizes) {
