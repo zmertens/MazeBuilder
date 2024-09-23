@@ -428,7 +428,7 @@ struct craft::craft_impl {
     }
 
     int chunked(float x) const {
-        return static_cast<int>((SDL_roundf(x) / static_cast<float>(this->m_gui->chunk_size)));
+        return static_cast<int>(SDL_floorf(SDL_roundf(x) / static_cast<float>(this->m_gui->chunk_size)));
     }
 
     double get_time() const {
@@ -881,6 +881,7 @@ struct craft::craft_impl {
         int q = this->chunked(*z);
         Chunk *chunk = this->find_chunk(p, q);
         if (!chunk) {
+            SDL_Log("Could find chunk: %d %d", p, q);
             return result;
         }
         Map *map = &chunk->map;
@@ -2243,6 +2244,7 @@ struct craft::craft_impl {
         }
         if (s->y < 0) {
             s->y = highest_block(s->x, s->z) + 2;
+            SDL_Log("s->y: %f\n", s->y);
         }
 
         return true;
