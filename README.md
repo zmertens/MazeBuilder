@@ -19,6 +19,7 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
           -y, --height       maze height [default=10]
           -l, --length       maze length [default=100]
           -c, --cell_size    maze cell size [default=3]
+          -d, --distances    show distances in the maze
           -i, --interactive  run program in interactive mode with a GUI
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message
