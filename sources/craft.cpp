@@ -2575,7 +2575,7 @@ bool craft::run(const std::list<std::string>& algos,
 		maze2->set_length(l);
         maze2->set_height(h);
         maze2->set_block_type(-1);
-		maze2->compute_geometry(my_maze_type, get_int, rng);
+		maze2->compute_geometry(my_maze_type, get_int, rng, -1);
     };
 
     // Generate a default maze to start the app
@@ -2810,6 +2810,21 @@ bool craft::run(const std::list<std::string>& algos,
             model->delete_radius = gui->view;
         }
 
+                // Handle Maze events
+        // Check if maze is available and then perform two async operations:
+        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
+        // 2. Notify writer that the maze can be sent to a Wavefront object file
+        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
+            // Get the maze and reset the future
+            maze2->start_progress();
+            maze_gen_future.get();
+            maze2->stop_progress();
+            // Don't write the first maze that loads when app starts
+            write_maze_now = first_maze ? false : true;
+            first_maze = false;
+            current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
+        }
+
         // Use ImGui for GUI size calculations
 		int display_w, display_h;
 		SDL_GetWindowSize(sdl_window, &display_w, &display_h);
@@ -2874,7 +2889,6 @@ bool craft::run(const std::list<std::string>& algos,
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Build!")) {
                         // Start the maze generation in the background
-                        maze2->start_progress();
                         maze_gen_future = async(launch::async, maze_func, gui->maze_width, gui->maze_length, gui->maze_height);
                     } else {
                         ImGui::SameLine();
@@ -2907,8 +2921,7 @@ bool craft::run(const std::list<std::string>& algos,
                         ImGui::Text("Failed to write maze: %s\n", gui->outfile);
                         ImGui::NewLine();
                     }
-                    // Reset outfile's first char and that will disable the Build! button
-                    gui->outfile[0] = '.';
+                    gui->reset();
                 }
                 
                 // Show progress when writing
@@ -3047,20 +3060,6 @@ bool craft::run(const std::list<std::string>& algos,
                 glDeleteFramebuffers(1, &get<0>(fbo_tuple));
             }
             fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
-        }
-
-        // Handle Maze events
-        // Check if maze is available and then perform two async operations:
-        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
-        // 2. Notify writer that the maze can be sent to a Wavefront object file
-        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            // Get the maze and reset the future
-            maze_gen_future.get();
-            maze2->stop_progress();
-            // Don't write the first maze that loads when app starts
-            write_maze_now = first_maze ? false : true;
-            first_maze = false;
-            current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
         }
 
         // PREPARE TO RENDER 
