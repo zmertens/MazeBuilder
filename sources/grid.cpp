@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <random>
+#include <iostream>
 
 #include "cell.h"
 
@@ -33,10 +34,10 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
             return (c1->get_column() < c2->get_column()) ? true : false;
         }
         return (c1->get_row() < c2->get_row()) ? true : false; }}
-, m_calc_index{[this](unsigned int row, unsigned int col)->unsigned int 
+, m_calc_index{[this](unsigned int row, unsigned int col)->int 
     {return row * this->m_columns + col;}} {
     
-    vector<unsigned int> shuffled_indices;
+    vector<int> shuffled_indices;
     shuffled_indices.resize(rows * columns);
     fill(shuffled_indices.begin(), shuffled_indices.end(), 0);
     unsigned int next_index {0};
@@ -48,7 +49,7 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     auto rng = std::default_random_engine { rd() };
     shuffle(begin(shuffled_indices), end(shuffled_indices), rng);    
 
-    bool success = this->create_binary_search_tree(ref(shuffled_indices));
+    bool success = this->create_binary_search_tree(cref(shuffled_indices));
     if (success) {
         // Use a lambda function for sorting by row, column
         // First sort cells by row then column
@@ -61,9 +62,9 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     }
 }
 
-bool grid::create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices) {
+bool grid::create_binary_search_tree(const std::vector<int>& shuffled_indices) {
     unsigned int row { 0 }, column { 0 };
-    unsigned int index { 0 };
+    int index { 0 };
 
     while (row < this->m_rows && column < this->m_columns && index < this->m_rows * this->m_columns) {
         index = this->m_calc_index(row, column);
@@ -72,7 +73,14 @@ bool grid::create_binary_search_tree(const std::vector<unsigned int>& shuffled_i
         if (this->m_binary_search_tree_root == nullptr) {
             this->m_binary_search_tree_root = {make_shared<cell>(row, column, index)};
         } else {
-            this->insert(ref(this->m_binary_search_tree_root), row, column, index);
+            this->insert(ref(this->m_binary_search_tree_root), index);
+			auto&& found = this->search(cref(this->m_binary_search_tree_root), index);
+			if (found) {
+				found->set_row(row);
+				found->set_column(column);
+            } else {
+                return false;
+            }
         }
 
         column = ++column % this->m_columns;
@@ -174,38 +182,81 @@ shared_ptr<cell> grid::get_root() const noexcept {
 /**
 * Populate (instantiate a linear vector of cells using the data in the grid)
 */
-void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept {
+void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept {
     this->sort(this->get_root(), ref(_cells));
 }
 
 /**
- * Iterate through the other_grid and insert to the current grid's root
- * Increment other_grid's indices 'i' by this current grid's max + 'i'
-*/
-void grid::grow(std::unique_ptr<grid> const& other_grid) noexcept {
-
+ * @brief Iterate through the other_grid and insert to the current grid's root
+ */
+void grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
+    vector<shared_ptr<cell>> cells_to_sort;
+	if (auto ptr = dynamic_cast<grid*>(other_grid.get())) {
+        ptr->populate_vec(ref(cells_to_sort));
+	}
+    
+    for (auto&& c : cells_to_sort) {
+        this->insert(this->get_root(), c->get_index());
+    }
 }
 
 /**
  * Keep calling insert recursively until we hit null (a leaf)
 */
-void grid::insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index) {
+void grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
     if (parent->get_index() > index) {
         if (parent->get_left() == nullptr) {
-            parent->set_left({make_shared<cell>(row, col, index)});
+            parent->set_left({make_shared<cell>(index)});
         } else {
-            this->insert(parent->get_left(), row, col, index);
+            this->insert(parent->get_left(), index);
         }
     } else if (parent->get_index() < index) {
         if (parent->get_right() == nullptr) {
-            parent->set_right({make_shared<cell>(row, col, index)});
+            parent->set_right({make_shared<cell>(index)});
         } else {
-            this->insert(parent->get_right(), row, col, index);
+            this->insert(parent->get_right(), index);
         }
     }
 }
 
-shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept {
+/**
+ * @brief Updating should also update row, col of the cell
+ */
+bool grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
+    if (parent == nullptr) {
+        return false;
+    }
+
+    auto found = search(parent, old_index);
+
+	// Need to update indices, row, col, and update BST
+    if (found) {
+		found->set_index(new_index);
+        unsigned int new_row = new_index / this->m_columns;
+        unsigned int new_column = new_index % this->m_columns;
+        found->set_row(new_row);
+        found->set_column(new_column);
+
+        auto cells = this->to_vec();
+        vector<int> indices;
+        indices.reserve(cells.size());
+        transform(cells.cbegin(), cells.cend(), back_inserter(indices), 
+            [](const shared_ptr<cell>& c) { return c->get_index(); });
+        this->m_binary_search_tree_root.reset();
+        indices.emplace_back(new_index);
+		bool success = this->create_binary_search_tree(cref(indices));
+        if (success) {
+            this->populate_vec(ref(cells));
+            this->sort_by_row_then_col(ref(cells));
+            configure_cells(ref(cells));
+        }
+        return success;
+	} else {
+        return false;
+    }
+}
+
+shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
     if (start == nullptr || start->get_index() == index) {
         return start;
     } else if (start->get_index() > index) {
@@ -215,14 +266,31 @@ shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, unsigned int i
     }
 }
 
-/**
-* Find Dijkstra's shortest path
-*/
-bool grid::is_solveable() const noexcept {
-    return false;
+void grid::del(std::shared_ptr<cell> parent, int index) noexcept {
+    if (!parent) 
+        return;
+
+    if (index < parent->get_index()) {
+        del(parent->get_left(), index);
+    } else if (index > parent->get_index()) {
+        del(parent->get_right(), index);
+    } else {
+        // Node to delete has no children
+        if (parent->get_left() == nullptr && parent->get_right() == nullptr) {
+            parent = nullptr;
+        } else if (parent->get_left() == nullptr) {
+            parent = parent->get_right();
+        } else if (parent->get_right() == nullptr) {
+            parent = parent->get_left();
+        } else {
+            auto min = min_index(parent->get_right());
+			this->update(parent, parent->get_index(), min);
+            del(parent->get_right(), min);
+        }
+    }
 }
 
-void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
+void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     if (parent != nullptr) {
         this->sort(parent->get_left(), ref(cells_to_sort));
         cells_to_sort.emplace_back(parent);
@@ -234,7 +302,96 @@ void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr
 * Sort the grid as if it were 2-dimensional grid and not hidden by a BST
 * Compare rows, then if equal, compare columns
 */
-void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept {
+void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     // now use STL sort by row, column with custom lambda function
     std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
+}
+
+/**
+ * @brief
+ * @param cell_size = 3
+ */
+vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
+    unsigned int img_width = cell_size * get_columns();
+    unsigned int img_height = cell_size * get_rows();
+    
+    uint32_t wall = 0x000000FF;
+
+    // Create an image, RGBA channels, with a white background
+    std::vector<uint8_t> img_data(img_width * img_height * 4, 255);
+
+    // Helper functions to draw on the image
+    auto draw_rect = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
+        for (int y = y1; y < y2; ++y) {
+            for (int x = x1; x < x2; ++x) {
+                int index = (y * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        }
+    };
+
+    auto draw_line = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
+        if (x1 == x2) {
+            for (int y = y1; y < y2; ++y) {
+                int index = (y * img_width + x1) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        } else if (y1 == y2) {
+            for (int x = x1; x < x2; ++x) {
+                int index = (y1 * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        }
+    };
+
+    vector<shared_ptr<cell>> cells;
+    cells.reserve(this->get_rows() * this->get_columns());
+    this->populate_vec(ref(cells));
+    this->sort_by_row_then_col(ref(cells));
+
+    // Draw backgrounds and walls
+    for (const auto& mode : {"backgrounds", "walls"}) {
+        for (const auto& current : cells) {
+            int x1 = current->get_column() * cell_size;
+            int y1 = current->get_row() * cell_size;
+            int x2 = (current->get_column() + 1) * cell_size;
+            int y2 = (current->get_row() + 1) * cell_size;
+
+            if (mode == "backgrounds"s) {
+                uint32_t color = background_color_for(current).value_or(0xFFFFFFFF);
+                draw_rect(x1, y1, x2, y2, color);
+            } else {
+                if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
+                if (!current->get_west()) draw_line(x1, y1, x1, y2, wall);
+                if (auto east = current->get_east(); east && !current->is_linked(cref(east))) draw_line(x2, y1, x2, y2, wall);
+                if (auto south = current->get_south(); south && !current->is_linked(cref(south))) draw_line(x1, y2, x2, y2, wall);
+            }
+        }
+    }
+
+    return img_data;
+} // to_pixels
+
+std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {
+	vector<shared_ptr<cell>> cells;
+	cells.reserve(this->get_rows() * this->get_columns());
+	this->populate_vec(ref(cells));
+    return cells;
+}
+
+optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+    return { " " };
+}
+
+optional<std::uint32_t> grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+    return { 0xFFFFFFFF };
 }

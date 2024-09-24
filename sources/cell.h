@@ -1,3 +1,8 @@
+/**
+ * @brief Data class representing a cell in the maze
+ *
+ */
+
 #ifndef CELL_H
 #define CELL_H
 
@@ -8,9 +13,17 @@
 
 namespace mazes {
 
-class cell {
+    class distances;
+
+/**
+ * @class cell
+ *  enable_shared_from_this allows creation of shared_ptr
+ *  without creating another instance of 'this'
+ */
+class cell : public std::enable_shared_from_this<cell> {
 public:
-    cell(unsigned int row, unsigned int column, unsigned int index);
+    explicit cell(int index);
+    explicit cell(unsigned int row, unsigned int column, int index);
     void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     void unlink(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     std::unordered_map<std::shared_ptr<cell>, bool> get_links() const;
@@ -20,7 +33,8 @@ public:
 
     unsigned int get_row() const;
     unsigned int get_column() const;
-    unsigned int get_index() const;
+    int get_index() const;
+	void set_index(int next_index) noexcept;
 
     std::shared_ptr<cell> get_north() const;
     std::shared_ptr<cell> get_south() const;
@@ -38,13 +52,17 @@ public:
     void set_left(std::shared_ptr<cell> const& other_left);
     void set_right(std::shared_ptr<cell> const& other_right);
 
+	void set_row(unsigned int r) noexcept;
+	void set_column(unsigned int c) noexcept;   
+
+    std::shared_ptr<distances> get_distances() noexcept;
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 
     std::unordered_map<std::shared_ptr<cell>, bool> m_links;
 
-    const unsigned int m_row, m_column;
-    const unsigned int m_index;
+    unsigned int m_row, m_column;
+    int m_index;
 
     std::shared_ptr<cell> m_north;
     std::shared_ptr<cell> m_south;

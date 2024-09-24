@@ -64,7 +64,12 @@ set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/distances.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/distance_grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/colored_grid.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/dfs.cpp)
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft.cpp
@@ -75,9 +80,8 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/matrix.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/sign.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/util.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/craft_utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/world.cpp)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
@@ -85,8 +89,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
 endif()
 
 add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
-target_link_libraries(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_THREAD_LIBS_INIT})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
+target_include_directories(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
 
 add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
@@ -130,7 +134,7 @@ if(EMSCRIPTEN)
     
     target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=6 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
-        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
+        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ASYNCIFY"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"
@@ -201,7 +205,7 @@ endif()
 
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
 file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
 
 if(BUILD_MAZE_TESTS)
     find_package(Catch2 3 QUIET)
@@ -210,11 +214,12 @@ if(BUILD_MAZE_TESTS)
     endif()
     if(NOT CATCH2_FOUND)
         message(INFO ": Getting Catch2 via FetchContent")
-        fetch_lib_from_git(Catch2 v3.4.0 https://github.com/catchorg/Catch2.git)
+        fetch_lib_from_git(Catch2 v3.7.0 https://github.com/catchorg/Catch2.git)
         list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
     endif()
 
     enable_testing()
+    message(INFO ": Building ${PROJECT_NAME} tests")
 
     file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp)
 

@@ -12,42 +12,60 @@
 
 namespace mazes {
 
-enum class args_state {
-    JUST_NEEDS_HELP, JUST_NEEDS_VERSION, READY_TO_ROCK
-};
-
-class args_builder : public args_builder_interface {
+class args {
 public:
-    args_builder(const std::string& v, const std::string& h, const std::vector<std::string>& args_vec);
-    args_builder(const std::unordered_map<std::string, std::string>& args);
+    std::string output;
+    std::string algorithm;
+    unsigned int seed;
+    unsigned int width;
+    unsigned int length;
+    unsigned int height;
+    unsigned int cell_size;
+    bool interactive;
+    std::string version;
+    std::string help;
+    bool distances;
 
-    unsigned int get_seed() const noexcept;
-    bool is_interactive() const noexcept;
-    const std::string& get_version() const noexcept;
-    const std::string& get_help() const noexcept;
-    std::string get_algorithm() const noexcept;
-    std::string get_output() const noexcept;
-    unsigned int get_width() const noexcept;
-    unsigned int get_length() const noexcept;
-    unsigned int get_height() const noexcept;
-    
-    args_state get_state() const noexcept;
-
-    const std::unordered_map<std::string, std::string>& build() override;
-
-    friend std::ostream& operator<<(std::ostream& os, args_builder& args) {
+    friend std::ostream& operator<<(std::ostream& os, args& a) {
         std::stringstream ss;
-        for (auto&& [k, v] : args.build()) {
-            ss << "INFO: " << k << ", " << v << "\n";
-        }
+        ss << "\nseed=" << a.seed << "\n";
+        ss << "interactive=" << a.interactive << "\n";
+        ss << "algorithm=" << a.algorithm << "\n";
+        ss << "output=" << a.output << "\n";
+        ss << "width=" << a.width << "\n";
+        ss << "length=" << a.length << "\n";
+        ss << "height=" << a.height << "\n";
+        ss << "cell_size=" << a.cell_size << "\n";
+        ss << "help=" << a.help << "\n";
+        ss << "version=" << a.version << "\n";
+        ss << "distances=" << a.distances << "\n";
 
         return os << ss.str() << "\n";
     }
+}; // class args
+
+class args_builder : public args_builder_interface {
+public:
+    explicit args_builder(const std::vector<std::string>& vv);
+
+    args_builder& seed(unsigned int seed) noexcept;
+    args_builder& interactive(bool interactive) noexcept;
+    args_builder& version(const std::string& version) noexcept;
+    args_builder& help(const std::string& help) noexcept;
+    args_builder& algorithm(const std::string& algorithm) noexcept;
+    args_builder& output(const std::string& output) noexcept;
+    args_builder& width(unsigned int width) noexcept;
+    args_builder& length(unsigned int length) noexcept;
+    args_builder& height(unsigned int height) noexcept;
+    args_builder& cell_size(unsigned int cell_size) noexcept;
+	args_builder& distances(bool distances) noexcept;
+    void clear() noexcept;
+
+    args build() const noexcept override;
 
 private:
-    void gather_args();
-    std::unordered_map<std::string, std::string> args_map;
-    std::vector<std::string> args_vec;
+    void parse(const std::vector<std::string>& vv) noexcept override;
+    args my_args;
 };
 
 }

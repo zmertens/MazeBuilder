@@ -2,10 +2,26 @@
 
 #include <iostream>
 
+#include "distances.h"
+
 using namespace mazes;
 using namespace std;
 
-cell::cell(unsigned int row, unsigned int column, unsigned int index) 
+cell::cell(int index)
+: m_row{ 0 }
+, m_column{ 0 }
+, m_index{ index }
+, m_links{}
+, m_north{ nullptr }
+, m_south{ nullptr }
+, m_east{ nullptr }
+, m_west{ nullptr }
+, m_left{ nullptr }
+, m_right{}  {
+
+}
+
+cell::cell(unsigned int row, unsigned int column, int index) 
 : m_row{row}
 , m_column{column}
 , m_index{index}
@@ -13,7 +29,9 @@ cell::cell(unsigned int row, unsigned int column, unsigned int index)
 , m_north{nullptr}
 , m_south{nullptr}
 , m_east{nullptr}
-, m_west{nullptr} {
+, m_west{nullptr}
+, m_left{ nullptr }
+, m_right{} {
 
 }
 
@@ -71,8 +89,12 @@ unsigned int cell::get_column() const {
     return this->m_column;
 }
 
-unsigned int cell::get_index() const {
+int cell::get_index() const {
     return this->m_index;
+}
+
+void cell::set_index(int next_index) noexcept {
+    this->m_index = next_index;
 }
 
 shared_ptr<cell> cell::get_north() const {
@@ -121,4 +143,33 @@ void cell::set_left(std::shared_ptr<cell> const& other_left) {
 
 void cell::set_right(std::shared_ptr<cell> const& other_right) {
     this->m_right = other_right;
+}
+
+void cell::set_row(unsigned int r) noexcept {
+    this->m_row = r;
+}
+
+void cell::set_column(unsigned int c) noexcept {
+    this->m_column = c;
+}
+
+std::shared_ptr<distances> cell::get_distances() noexcept {
+	auto dists = make_shared<mazes::distances>(shared_from_this());
+    vector<shared_ptr<cell>> frontier = { shared_from_this() };
+
+	// Dijkstra's algorithm
+    while (!frontier.empty()) {
+		vector<shared_ptr<cell>> new_frontier;
+        for (const auto& c : frontier) {
+			for (const auto& [neighbor, _] : c->get_links()) {
+				if (dists->operator[](neighbor) < 0) {
+					dists->set(neighbor, dists->operator[](c) + 1);
+					new_frontier.push_back(neighbor);
+				}
+			}
+        }
+		frontier = new_frontier;
+    }
+
+    return dists;
 }

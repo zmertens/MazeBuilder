@@ -12,38 +12,50 @@
 #include <string>
 #include <functional>
 #include <algorithm>
+#include <optional>
 
 #include "cell.h"
 #include "maze_types_enum.h"
+#include "grid_interface.h"
 
 namespace mazes {
 
-class grid {
+class grid : public grid_interface {
 public:
     grid(unsigned int rows, unsigned int columns, unsigned int height = 0);
 
-    unsigned int get_rows() const noexcept;
-    unsigned int get_columns() const noexcept;
+    virtual unsigned int get_rows() const noexcept override;
+    virtual unsigned int get_columns() const noexcept override;
     unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
-    std::shared_ptr<cell> get_root() const noexcept;
-    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) noexcept;
-    void grow(std::unique_ptr<grid> const& other_grid) noexcept;
-    void insert(std::shared_ptr<cell> const& parent, unsigned int row, unsigned int col, unsigned int index);
-    std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, unsigned int index) const noexcept;
-    bool is_solveable() const noexcept;
+    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept;
     // sort ascending per index-value
-    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
-    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) noexcept;
+    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+
+    // Get bytewise representation of the grid
+    virtual std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept override;
+    virtual std::vector<std::shared_ptr<cell>> to_vec() const noexcept override;
+
+    virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
+    virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;
+    virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept override;
+    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept override;
+    virtual void del(std::shared_ptr<cell> parent, int index) noexcept override;
+
+    virtual std::shared_ptr<cell> get_root() const noexcept override;
+protected:
+    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 private:
-
-    bool create_binary_search_tree(const std::vector<unsigned int>& shuffled_indices);
+    bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
-
+    
+    // Grid tostring method
     friend std::ostream& operator<<(std::ostream& os, grid& g) {
         // First sort cells by row then column
-        std::vector<std::shared_ptr<cell>> cells;
+        std::vector<std::shared_ptr<cell>> cells;// = g.to_vec();
         cells.reserve(g.get_rows() * g.get_columns());
         // populate the cells with the BST
         g.sort(g.get_root(), ref(cells));
@@ -72,7 +84,7 @@ private:
                     if (temp == nullptr)
                         temp = { std::make_shared<cell>(-1, -1, next_index) };
                     // 3 spaces in body
-                    std::string body = "   ";
+                    std::string body = " " + g.contents_of(std::cref(temp)).value_or(" ") + " ";
                     static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
                     std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
                     top_builder << body << east_boundary;
@@ -90,7 +102,8 @@ private:
         return os;
     } // << operator
     std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
-    std::function<unsigned int(unsigned int, unsigned int)> m_calc_index;
+    // Calculate the flat index from row and column
+    std::function<int(unsigned int, unsigned int)> m_calc_index;
     std::shared_ptr<cell> m_binary_search_tree_root;
     const unsigned int m_rows, m_columns, m_height;
 }; // class

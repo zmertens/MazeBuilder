@@ -1,4 +1,3 @@
-#include <unordered_map>
 #include <string>
 #include <sstream>
 #include <iostream>
@@ -12,91 +11,104 @@
 using namespace std;
 using namespace mazes;
 
-TEST_CASE( "Args are computed", "[args]" ) {
-    // it is up to the caller to provide a full list of args
-    std::unordered_map<std::string, std::string> args = {
-        {"algorithm", "sidewinder"},
-        {"seed", "0"},
-        {"interactive", "0"},
-        {"output", "stdout"},
-        {"width", "100"},
-        {"length", "100"},
-        {"height", "10"},
-        {"help", ""},
-        {"version", ""},
-        { "state", "2" }
+TEST_CASE( "Args are built by vector", "[args]" ) {
+    unsigned int seed = 32u;
+    unsigned int width = 1'001u;
+    unsigned int height = 11u;
+    unsigned int length = 1'002u;
+    unsigned int cell_size = 15u;
+    string output = "maze.obj";
+    string help_message = "My Maze Builder Program\n";
+    string version_message = "0.0.1\n";
+    bool interactive = true;
+    string algorithm = "sidewinder";
+
+    static const vector<string> LONG_ARGS = {
+        "maze_builder.exe",
+        "--seed=" + to_string(seed),
+        "--algorithm=" + algorithm,
+        "--output=" + output,
+        "--width=" + to_string(width),
+        "--length=" + to_string(length),
+        "--height=" + to_string(height),
+		"--cell_size=" + to_string(cell_size),
+        "--distances"
     };
 
-    mazes::args_builder _args_builder {args};
-    auto&& args_built {_args_builder.build()};
+    REQUIRE(LONG_ARGS.empty() == false);
 
-    REQUIRE(args == args_built);
+    mazes::args_builder builder{ cref(LONG_ARGS) };
+    mazes::args maze_args = builder.build();
 
-    auto&& state = _args_builder.get_state();
-    REQUIRE(state == args_state::READY_TO_ROCK);
-    REQUIRE(args.at("algorithm").compare(args_built.at("algorithm")) == 0);
-    REQUIRE(_args_builder.get_seed() == 0);
-    REQUIRE(_args_builder.is_interactive() == false);
-    REQUIRE(_args_builder.get_algorithm().compare("sidewinder") == 0);
-    REQUIRE(_args_builder.get_output().compare("stdout") == 0);
-    REQUIRE(_args_builder.get_width() == 100);
-    REQUIRE(_args_builder.get_height() == 10);
-    REQUIRE(_args_builder.get_length() == 100);
+    REQUIRE(maze_args.help.empty() == true);
+    REQUIRE(maze_args.version.empty() == true);
+    REQUIRE(maze_args.interactive == false);
+    REQUIRE(maze_args.algorithm.compare(algorithm) == 0);
+    REQUIRE(maze_args.seed == seed);
+    REQUIRE(maze_args.output.compare(output) == 0);
+    REQUIRE(maze_args.width == width);
+    REQUIRE(maze_args.height == height);
+    REQUIRE(maze_args.length == length);
+    REQUIRE(maze_args.cell_size == cell_size);
+	REQUIRE(maze_args.distances == true);
 
+    // Check the ostream operator
     stringstream ss;
-    ss << _args_builder;
+    ss << maze_args;
     REQUIRE(!ss.str().empty());
+;
+    // Check help message
+    auto&& maze_args_plus_help = builder.help(help_message).build();
+    REQUIRE(maze_args_plus_help.help.compare(help_message) == 0);
+
+    // Check version message
+    builder.clear();
+    auto&& maze_args_plus_version = builder.version(version_message).build();
+    REQUIRE(maze_args_plus_version.version.compare(version_message) == 0);
+
+    static const vector<string> SHORT_ARGS = {
+		"maze_builder.exe",
+		"-s", to_string(seed),
+		"-i",
+		"-a", algorithm,
+		"-o", output,
+		"-w", to_string(width),
+		"-l", to_string(length),
+		"-y", to_string(height),
+        "-c", to_string(cell_size), "-d"
+	};
+    // First-come-first-serve and grab 'interactive'
+    mazes::args_builder builder2{ cref(SHORT_ARGS) };
+    auto&& maze_args2 = builder2.build();
+    REQUIRE(maze_args2.interactive == true);
+	// Parsing help switch will break the loop
+    REQUIRE(maze_args2.help.empty());
+    REQUIRE(maze_args2.version.empty());
+    REQUIRE(maze_args2.distances == true);
 }
 
-TEST_CASE("Just needs help", "[help]" ) {
-    // it is up to the caller to provide program name with arguments
-    vector<string> args_vec {"maze_builder"};
-    static constexpr auto version {"1.0.0"};
-    static constexpr auto help {"TESTING HELP MESSAGE!!"};
-
-    SECTION("Testing short args") {
-        args_vec.emplace_back("-h");
-        mazes::args_builder _args_builder {version, help, args_vec};
-        // build with parse the arguments
-        auto&& args = _args_builder.build();
-        auto&& state = _args_builder.get_state();
-        REQUIRE(state == args_state::JUST_NEEDS_HELP);
-        REQUIRE(!args.empty());
-    }
-    SECTION("Testing long args") {
-        args_vec.emplace_back("--help");
-        mazes::args_builder _args_builder {version, help, args_vec};
-        // build with parse the arguments
-        auto&& args = _args_builder.build();
-        auto&& state = _args_builder.get_state();
-        REQUIRE(state == args_state::JUST_NEEDS_HELP);
-        REQUIRE(!args.empty());
-    }
+TEST_CASE("Args are bad and cannot be built", "[args]") {
+    static const vector<string> BAD_SHORT_ARGS = {
+    "maze_builder.exe",
+    "-x",
+    "-y",
+    "-z"
+    };
+    // First-come-first-serve and grab 'interactive'
+    mazes::args_builder builder2{ cref(BAD_SHORT_ARGS) };
+    auto&& maze_args2 = builder2.build();
+    REQUIRE_NOTHROW(maze_args2);
 }
 
-TEST_CASE("Args can be parsed", "[parsing args]" ) {
-    vector<string> args_vec {"maze_builder", "--algorithm=sidewinder", "-s", "42", "-w", "101", "-l", "50", "-y", "8", "--output=maze.obj"};
-    static constexpr auto version {"1.0.0"};
-    static constexpr auto help {"TESTING HELP MESSAGE!!"};
-
-    // build will parse the arguments
-    SECTION("Business as usual args") {
-        mazes::args_builder _args_builder {version, help, args_vec};
-        auto&& args = _args_builder.build();
-        REQUIRE(!args.empty());
-        REQUIRE(_args_builder.get_seed() == 42);
-        REQUIRE(_args_builder.get_width() == 101);
-        REQUIRE(_args_builder.get_length() == 50);
-        REQUIRE(_args_builder.get_height() == 8);
-        REQUIRE(_args_builder.get_algorithm().compare("sidewinder") == 0);
-        REQUIRE(_args_builder.get_output().compare("maze.obj") == 0);
-    }
-    SECTION("Throwing exception") {
-        args_vec.clear();
-        args_vec.emplace_back("maze_builder2");
-        args_vec.emplace_back("--blah=binary_blah");
-        args_builder args_builder {version, help, args_vec};
-        REQUIRE_THROWS(args_builder.build());
-    }
+TEST_CASE("Args has help and version", "[help, version]") {
+    static const vector<string> SHORT_ARGS = {
+    "maze_builder.exe",
+    "-h", "-v",
+    };
+    // First-come-first-serve and grab 'interactive'
+    mazes::args_builder builder2{ cref(SHORT_ARGS) };
+    auto&& maze_args2 = builder2.build();
+    // Parsing help switch will break the loop
+    REQUIRE(!maze_args2.help.empty());
+    REQUIRE(maze_args2.version.empty());
 }
-
