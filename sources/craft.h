@@ -27,7 +27,8 @@ public:
         const std::function<mazes::maze_types(const std::string& algo)>& get_maze_type_from_str,
         const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
     
-    void set_json(const std::string& s) noexcept;
+    void mouse(bool mouse) noexcept;
+    void fullscreen(bool fullscreen) noexcept;
     std::string get_json() const noexcept;
     
     // Singleton pattern

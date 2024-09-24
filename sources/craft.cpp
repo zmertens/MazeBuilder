@@ -2244,7 +2244,6 @@ struct craft::craft_impl {
         }
         if (s->y < 0) {
             s->y = highest_block(s->x, s->z) + 2;
-            SDL_Log("s->y: %f\n", s->y);
         }
 
         return true;
@@ -2992,7 +2991,9 @@ bool craft::run(const std::list<std::string>& algos,
                     
                 // Prevent setting SDL_Window settings every frame
                 static bool last_fullscreen = gui->fullscreen;
+#if !defined(__EMSCRIPTEN__)                
                 ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
+#endif
                 bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
                 last_fullscreen = gui->fullscreen;
                 if (update_fullscreen)
@@ -3218,8 +3219,15 @@ bool craft::run(const std::list<std::string>& algos,
     return true;
 }  // run
 
-void craft::set_json(const string& s) noexcept {
-    this->m_pimpl->m_gui->maze_json = s;
+/**
+ * @brief helper functions for use with EMSDK bindings
+ */
+void craft::mouse(bool mouse) noexcept {
+    this->m_pimpl->m_gui->capture_mouse = mouse;
+}
+
+void craft::fullscreen(bool fullscreen) noexcept {
+    this->m_pimpl->m_gui->fullscreen = fullscreen;
 }
 
 /**

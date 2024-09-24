@@ -67,7 +67,8 @@
       canvas.emscripten {
         border: 0px none;
         background: black;
-        width: 100%;
+        width: inherit;
+        height: inherit;
       }
 
       .spinner {
@@ -128,14 +129,12 @@
         margin-right: 20px;
       }
 
-      #output {
+      #download {
         border-left: 0px none;
         border-right: 0px none;
         border-bottom: 0px none;
         padding-left: 0;
         padding-right: 0;
-        width: 100%;
-        height: 140px;
         margin: 0 auto;
         margin-top: 10px;
         display: block;
@@ -185,20 +184,21 @@
     </div>
     
     <hr/>
-      <textarea class="emscripten" id="output" rows="8"></textarea>
+      <button id="download" onclick="download()">Download Maze</button>
     <hr>
     <script type='text/javascript'>
       var statusElement = document.querySelector('#status');
       var progressElement = document.querySelector('#progress');
       var spinnerElement = document.querySelector('#spinner');
+      let craft = null;
       var Module = {
           preRun: [],
           postRun: [],
+          onRuntimeInitialized: function() {
+            Module.setStatus('Downloading...');
+            craft = Module.craft.get_instance("", "", 800, 600);
+          },
           print: (function() {
-              var element = document.querySelector('#output');
-
-              if (element) element.value = '';    // Clear browser cache
-
               return function(text) {
                   if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
                   // These replacements are necessary if you render to raw HTML
@@ -264,18 +264,13 @@
           //noInitialRun: true
         };
 
-        Module.setStatus('Downloading...');
-
         window.onerror = function() {
           Module.setStatus('Exception thrown, see JavaScript console');
           spinnerElement.style.display = 'none';
           Module.setStatus = function(text) { if (text) Module.printErr('[post-exception status] ' + text); };
         };
-      </script>
-      <!-- REF: https://developers.google.com/web/updates/2018/11/web-audio-autoplay -->
-      <script type='text/javascript'>
-        var audioBtn = document.querySelector('#btn-audio');
 
+        var audioBtn = document.querySelector('#btn-audio');
         // An array of all contexts to resume on the page
         const audioContexList = [];
         (function() {
@@ -305,14 +300,23 @@
         var mouseBtn = document.querySelector('#btn-mouse');
         mouseBtn.onclick = function() {
             isMouseCaptured = !isMouseCaptured;
+            craft.mouse(isMouseCaptured);
             if (isMouseCaptured) mouseBtn.value = "🐁 MOUSE";
             else mouseBtn.value = "🔒 MOUSE";
         };
 
         function requestFullscreen() {
+          craft.fullscreen(true);
           Module.requestFullscreen(isMouseCaptured, true);
         }
-    </script>
+
+        function download() {
+          document.getElementById('download').disabled = true;
+          console.log("Download clicked");
+        }
+
+      </script>
+      <!-- REF: https://developers.google.com/web/updates/2018/11/web-audio-autoplay -->
     {{{ SCRIPT }}}
   </body>
 </html>
