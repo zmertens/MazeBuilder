@@ -2996,8 +2996,12 @@ bool craft::run(const std::list<std::string>& algos,
 #endif
                 bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
                 last_fullscreen = gui->fullscreen;
-                if (update_fullscreen)
+                if (update_fullscreen) {
                     SDL_SetWindowFullscreen(sdl_window, gui->fullscreen);
+#if defined(MAZE_DEBUG)
+                    SDL_Log("Setting fullscreen to %d\n", gui->fullscreen);
+#endif
+                }
 
                 static bool last_vsync = gui->vsync;
                 ImGui::Checkbox("VSYNC", &gui->vsync);
@@ -3228,6 +3232,7 @@ void craft::mouse(bool mouse) noexcept {
 
 void craft::fullscreen(bool fullscreen) noexcept {
     this->m_pimpl->m_gui->fullscreen = fullscreen;
+    SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, fullscreen);
 }
 
 /**
@@ -3236,6 +3241,6 @@ void craft::fullscreen(bool fullscreen) noexcept {
  * @brief Used by Emscripten mostly to produce a JSON string containing the vertex data
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
-std::string craft::get_json() const noexcept {
+std::string craft::mazes() const noexcept {
     return this->m_pimpl->m_gui->maze_json;
 }

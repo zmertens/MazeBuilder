@@ -51,7 +51,7 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
         .constructor<const std::string&, const std::string&, int, int>()
         .function("fullscreen", &craft::fullscreen)
         .function("mouse", &craft::mouse)
-        .function("get_json", &craft::get_json)
+        .function("mazes", &craft::mazes)
         .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
 }
 #endif

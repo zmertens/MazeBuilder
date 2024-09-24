@@ -1,3 +1,8 @@
+/**
+ * Monolithic class to handle running craft and encapsulating it's features
+ * Supports Web interaction via mouse, fullscreen, and mazes APIs
+ */
+
 #ifndef CRAFT_H
 #define CRAFT_H
 
@@ -29,7 +34,7 @@ public:
     
     void mouse(bool mouse) noexcept;
     void fullscreen(bool fullscreen) noexcept;
-    std::string get_json() const noexcept;
+    std::string mazes() const noexcept;
     
     // Singleton pattern
     static std::shared_ptr<craft> get_instance(const std::string& version, const std::string& help, int w, int h) {

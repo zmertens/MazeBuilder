@@ -182,10 +182,12 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     }
 
     stringstream ss;
-    if (calc_distances; auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
-        ss << *distance_ptr;
-        return ss.str();
-	} else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
+    if (calc_distances) {
+        if (auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
+            ss << *distance_ptr;
+            return ss.str();
+        } 
+    } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
         ss << *grid_ptr;
         return ss.str();
     } else {

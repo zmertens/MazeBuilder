@@ -1,74 +1,36 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en-us">
   <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Maze Builder (local) HTML</title>
-    <meta name="title" content="Maze Builder web app">
-    <meta name="description" content="Build mazes and download, save for later">
-    <meta name="keywords" content="mazes, programming, examples, html5, C, C++, library, learn, prototype, videogames">
-    <meta name="viewport" content="width=device-width">
-    <link rel="shortcut icon" href="textures/favicon.ico">
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Maze Builder - LOCAL</title>
+    <meta name="title" content="Maze Builder web app" />
+    <meta
+      name="description"
+      content="Build mazes and download, save for later"
+    />
+    <meta
+      name="keywords"
+      content="mazes, programming, examples, html5, C, C++, library, learn, prototype, videogames"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="shortcut icon" href="textures/favicon.ico" />
     <style>
-      body {
-        font-family: arial;
-        margin: 0;
-        padding: none;
+      html, body {
+        height: 100%;
       }
 
       #header {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background-color: #333;
+        color: rgb(157, 238, 141);
+        padding: 0px;
         width: 100%;
-        height: 80px;
-        background-color: hsl(115, 15%, 84%);
-      }
-
-      /* NOTE: raylib logo is embedded in the page as base64 png image */
-      #logo {
-        width:64px;
-        height:64px;
-        float:left;
-        position:relative;
-        margin:10px;
-        background-image:url('data:image/png;base64,\
-          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');
-      }
-
-      .emscripten { padding-right: 0; margin-left: auto; margin-right: auto; display: block; }
-      div.emscripten { text-align: center; }
-      div.emscripten_border { border: 1px solid black; }
-
-      /* NOTE: Canvas *must not* have any border or padding, or mouse coords will be wrong */
-      canvas.emscripten {
-        border: 0px none;
-        background: black;
-        width: inherit;
-        height: inherit;
+        height: 10%; /* Adjust this value to 10-15% as needed */
+        min-height: 50px; /* Optional: Set a minimum height */
+        max-height: 15%; /* Optional: Set a maximum height */
       }
 
       .spinner {
@@ -122,29 +84,47 @@
       }
 
       #controls {
-        display: inline-block;
-        float: right;
-        vertical-align: top;
-        margin-top: 15px;
-        margin-right: 20px;
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
+
+      .emscripten_border {
+        flex: 1;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: #222;
+      }
+
+      canvas.emscripten {
+        width: 100%;
+        height: auto;
+        display: block;
       }
 
       #download {
-        border-left: 0px none;
-        border-right: 0px none;
-        border-bottom: 0px none;
-        padding-left: 0;
-        padding-right: 0;
-        margin: 0 auto;
-        margin-top: 10px;
-        display: block;
-        background-color: black;
-        color: rgb(37, 174, 38);
-        font-family: 'Lucida Console', Monaco, monospace;
-        outline: none;
+        margin: 10px;
+        padding: 10px 20px;
+        background-color: #444;
+        color: white;
+        border: none;
+        cursor: pointer;
       }
 
-      input[type=button] {
+      #download:hover {
+        background-color: #555;
+      }
+
+      @media (max-width: 600px) {
+        #controls {
+          flex-direction: column;
+          gap: 5px;
+        }
+      }
+
+      input[type="button"] {
         background-color: lightgray;
         border: 4px solid darkgray;
         color: black;
@@ -155,168 +135,268 @@
         margin-left: 10px;
       }
 
-      input[type=button]:hover {
+      input[type="button"]:hover {
         background-color: #f5f5f5ff;
         border-color: black;
+      }
+
+       /* NOTE: raylib logo is embedded in the page as base64 png image */
+       #logo {
+        width: 64px;
+        height: 64px;
+        float: left;
+        position: relative;
+        margin: 10px;
+        background-image: url("data:image/png;base64,\
+          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");
       }
     </style>
   </head>
   <body>
+    <canvas id="emCanvas" class="emscripten"></canvas>
     <div id="header">
       <a id="logo" href="https://www.github.com/zmertens/MazeBuilder"></a>
 
-      <div class="spinner" id='spinner'></div>
+      <div class="spinner" id="spinner"></div>
       <div class="emscripten" id="status">Downloading...</div>
 
-      <span id='controls'>
-        <span><input type="button" id="btn-mouse" value="🐁 MOUSE"/></span>
-        <span><input type="button" value="🖵 FULLSCREEN" onclick="requestFullscreen()"></span>
-        <span><input type="button" id="btn-audio" value="🔇 MUTE" onclick="toggleAudio()"></span>
+      <span id="controls">
+        <span>
+          <input id="download" type="button" onclick="download()" value="🚀 DOWNLOAD"></input>
+        </span>
+        <span><input type="button" id="btn-mouse" value="🐁 MOUSE" /></span>
+        <span
+          ><input
+            type="button"
+            value="🖵 FULLSCREEN"
+            onclick="requestFullscreen()"
+        /></span>
+        <span
+          ><input
+            type="button"
+            id="btn-audio"
+            value="🔇 MUTE"
+            onclick="toggleAudio()"
+        /></span>
       </span>
 
       <div class="emscripten">
-        <progress value="0" max="100" id="progress" hidden=1></progress>
+        <progress value="0" max="100" id="progress" hidden="1"></progress>
       </div>
     </div>
 
     <div class="emscripten_border">
-      <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex=-1></canvas>
+      <canvas
+        class="emscripten"
+        id="canvas"
+        oncontextmenu="event.preventDefault()"
+        tabindex="-1"
+      ></canvas>
     </div>
-    
-    <hr/>
-      <button id="download" onclick="download()">Download Maze</button>
-    <hr>
-    <script type='text/javascript'>
-      var statusElement = document.querySelector('#status');
-      var progressElement = document.querySelector('#progress');
-      var spinnerElement = document.querySelector('#spinner');
+    <script type="text/javascript">
+      document.getElementById("download").disabled = true;
+      var statusElement = document.querySelector("#status");
+      var progressElement = document.querySelector("#progress");
+      var spinnerElement = document.querySelector("#spinner");
       let craft = null;
       var Module = {
-          preRun: [],
-          postRun: [],
-          onRuntimeInitialized: function() {
-            Module.setStatus('Downloading...');
-            craft = Module.craft.get_instance("", "", 800, 600);
-          },
-          print: (function() {
-              return function(text) {
-                  if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
-                  // These replacements are necessary if you render to raw HTML
-                  //text = text.replace(/&/g, "&amp;");
-                  //text = text.replace(/</g, "&lt;");
-                  //text = text.replace(/>/g, "&gt;");
-                  //text = text.replace('\n', '<br>', 'g');
-                  console.log(text);
+        preRun: [],
+        postRun: [],
+        onRuntimeInitialized: function () {
+          Module.setStatus("Downloading...");
+          craft = Module.craft.get_instance("", "", 800, 600);
+          startPolling();
+        },
+        print: (function () {
+          return function (text) {
+            if (arguments.length > 1)
+              text = Array.prototype.slice.call(arguments).join(" ");
+            // These replacements are necessary if you render to raw HTML
+            //text = text.replace(/&/g, "&amp;");
+            //text = text.replace(/</g, "&lt;");
+            //text = text.replace(/>/g, "&gt;");
+            //text = text.replace('\n', '<br>', 'g');
+            console.log(text);
 
-                  if (element) {
-                      element.value += text + "\n";
-                      element.scrollTop = element.scrollHeight; // focus on bottom
-                  }
-              };
-          })(),
-          printErr: function(text) {
-              if (arguments.length > 1) text = Array.prototype.slice.call(arguments).join(' ');
+            if (element) {
+              element.value += text + "\n";
+              element.scrollTop = element.scrollHeight; // focus on bottom
+            }
+          };
+        })(),
+        printErr: function (text) {
+          if (arguments.length > 1)
+            text = Array.prototype.slice.call(arguments).join(" ");
 
-              console.error(text);
-          },
-          canvas: (function() {
-              var canvas = document.querySelector('#canvas');
+          console.error(text);
+        },
+        canvas: (function () {
+          const canvas = document.querySelector("#canvas");
+          const observer = new ResizeObserver((entries) => {
+            width = canvas.clientWidth;
+            height = canvas.clientHeight;
+          });
 
-              // As a default initial behavior, pop up an alert when webgl context is lost.
-              // To make your application robust, you may want to override this behavior before shipping!
-              // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
-              canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+          observer.observe(canvas)
 
-              return canvas;
-          })(),
-          setStatus: function(text) {
-              if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
-              if (text === Module.setStatus.last.text) return;
+          // As a default initial behavior, pop up an alert when webgl context is lost.
+          // To make your application robust, you may want to override this behavior before shipping!
+          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+          canvas.addEventListener(
+            "webglcontextlost",
+            function (e) {
+              alert("WebGL context lost. You will need to reload the page.");
+              e.preventDefault();
+            },
+            false
+          );
 
-              var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-              var now = Date.now();
+          return canvas;
+        })(),
+        setStatus: function (text) {
+          if (!Module.setStatus.last)
+            Module.setStatus.last = { time: Date.now(), text: "" };
+          if (text === Module.setStatus.last.text) return;
 
-              if (m && now - Module.setStatus.last.time < 30) return; // If this is a progress update, skip it if too soon
+          var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+          var now = Date.now();
 
-              Module.setStatus.last.time = now;
-              Module.setStatus.last.text = text;
+          if (m && now - Module.setStatus.last.time < 30) return; // If this is a progress update, skip it if too soon
 
-              if (m) {
-                  text = m[1];
-                  progressElement.value = parseInt(m[2])*100;
-                  progressElement.max = parseInt(m[4])*100;
-                  progressElement.hidden = true;
-                  spinnerElement.hidden = false;
-              } else {
-                  progressElement.value = null;
-                  progressElement.max = null;
-                  progressElement.hidden = true;
-                  if (!text) spinnerElement.style.display = 'none';
-              }
+          Module.setStatus.last.time = now;
+          Module.setStatus.last.text = text;
 
-              statusElement.innerHTML = text;
-          },
-          totalDependencies: 0,
-          monitorRunDependencies: function(left) {
-              this.totalDependencies = Math.max(this.totalDependencies, left);
-              Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
-          },
-          //noInitialRun: true
+          if (m) {
+            text = m[1];
+            progressElement.value = parseInt(m[2]) * 100;
+            progressElement.max = parseInt(m[4]) * 100;
+            progressElement.hidden = true;
+            spinnerElement.hidden = false;
+          } else {
+            progressElement.value = null;
+            progressElement.max = null;
+            progressElement.hidden = true;
+            if (!text) spinnerElement.style.display = "none";
+          }
+
+          statusElement.innerHTML = text;
+        },
+        totalDependencies: 0,
+        monitorRunDependencies: function (left) {
+          this.totalDependencies = Math.max(this.totalDependencies, left);
+          Module.setStatus(
+            left
+              ? "Preparing... (" +
+                  (this.totalDependencies - left) +
+                  "/" +
+                  this.totalDependencies +
+                  ")"
+              : "All downloads complete."
+          );
+        },
+        //noInitialRun: true
+      };
+
+      window.onerror = function () {
+        Module.setStatus("Exception thrown, see JavaScript console");
+        spinnerElement.style.display = "none";
+        Module.setStatus = function (text) {
+          if (text) Module.printErr("[post-exception status] " + text);
         };
+      };
 
-        window.onerror = function() {
-          Module.setStatus('Exception thrown, see JavaScript console');
-          spinnerElement.style.display = 'none';
-          Module.setStatus = function(text) { if (text) Module.printErr('[post-exception status] ' + text); };
-        };
+      var audioBtn = document.querySelector("#btn-audio");
+      // An array of all contexts to resume on the page
+      const audioContexList = [];
+      (function () {
+        // A proxy object to intercept AudioContexts and
+        // add them to the array for tracking and resuming later
+        self.AudioContext = new Proxy(self.AudioContext, {
+          construct(target, args) {
+            const result = new target(...args);
+            audioContexList.push(result);
+            if (result.state == "suspended") audioBtn.value = "🔈 RESUME";
+            return result;
+          },
+        });
+      })();
 
-        var audioBtn = document.querySelector('#btn-audio');
-        // An array of all contexts to resume on the page
-        const audioContexList = [];
-        (function() {
-            // A proxy object to intercept AudioContexts and
-            // add them to the array for tracking and resuming later
-            self.AudioContext = new Proxy(self.AudioContext, {
-                construct(target, args) {
-                    const result = new target(...args);
-                    audioContexList.push(result);
-                    if (result.state == "suspended") audioBtn.value = "🔈 RESUME";
-                    return result;
-                }
-            });
-        })();
-
-        function toggleAudio() {
-            var resumed = false;
-            audioContexList.forEach(ctx => {
-                if (ctx.state == "suspended") { ctx.resume(); resumed = true; }
-                else if (ctx.state == "running") ctx.suspend();
-            });
-
-            if (resumed) audioBtn.value = "🔇 MUTE";
-            else audioBtn.value = "🔈 RESUME";
-        }
-        let isMouseCaptured = false;
-        var mouseBtn = document.querySelector('#btn-mouse');
-        mouseBtn.onclick = function() {
-            isMouseCaptured = !isMouseCaptured;
-            craft.mouse(isMouseCaptured);
-            if (isMouseCaptured) mouseBtn.value = "🐁 MOUSE";
-            else mouseBtn.value = "🔒 MOUSE";
-        };
-
-        function requestFullscreen() {
-          craft.fullscreen(true);
-          Module.requestFullscreen(isMouseCaptured, true);
-        }
-
-        function download() {
-          document.getElementById('download').disabled = true;
-          console.log("Download clicked");
-        }
-
-      </script>
       <!-- REF: https://developers.google.com/web/updates/2018/11/web-audio-autoplay -->
+      function toggleAudio() {
+        var resumed = false;
+        audioContexList.forEach((ctx) => {
+          if (ctx.state == "suspended") {
+            ctx.resume();
+            resumed = true;
+          } else if (ctx.state == "running") ctx.suspend();
+        });
+
+        if (resumed) audioBtn.value = "🔇 MUTE";
+        else audioBtn.value = "🔈 RESUME";
+      }
+      let isMouseCaptured = false;
+      var mouseBtn = document.querySelector("#btn-mouse");
+      mouseBtn.onclick = function () {
+        isMouseCaptured = !isMouseCaptured;
+        craft.mouse(isMouseCaptured);
+        if (isMouseCaptured) mouseBtn.value = "🐁 MOUSE";
+        else mouseBtn.value = "🔒 MOUSE";
+      };
+
+      function requestFullscreen() {
+        craft.fullscreen(true);
+        isMouseCapture = true;
+        craft.mouse(isMouseCaptured);
+        /* Module.requestFullscreen(isMouseCaptured, true); */
+      }
+
+      function download() {
+        document.getElementById("download").disabled = true;
+        console.log("Download clicked");
+        startPolling();
+      }
+
+      function startPolling() {
+        const intervalId = setInterval(function () {
+          if (craft) {
+            const jsonStr = craft.mazes();
+            clearInterval(intervalId);
+            if (jsonStr) {
+              document.getElementById("download").disabled = false;
+              console.log("JSON: ", jsonStr);
+            } else {
+              console.log("No JSON"); 
+            }
+          }
+        }, 1000);
+      }
+    </script>
     {{{ SCRIPT }}}
   </body>
 </html>
