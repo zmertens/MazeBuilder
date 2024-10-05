@@ -22,7 +22,7 @@
 #include "writer.h"
 #include "craft.h"
 
-std::string maze_builder_version = "maze_builder=[4.0.1]";
+std::string maze_builder_version = "maze_builder=[4.1.5]";
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]

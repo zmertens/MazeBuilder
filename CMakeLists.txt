@@ -125,7 +125,7 @@ if(EMSCRIPTEN)
     set_target_properties(${MAZE_BUILDER_OUTFILE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
     # SDL3 isn't available as an Emscripten port (yet), so fetch it
     message(INFO ": Getting SDL via FetchContent")
-    fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
+    fetch_lib_from_git(SDL preview-3.1.3 https://github.com/libsdl-org/SDL.git)
     set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
 
@@ -155,13 +155,9 @@ if(EMSCRIPTEN)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         target_link_options(${MAZE_BUILDER_OUTFILE} PRIVATE "SHELL:-O3")
     endif()
-endif()
-
-if(APPLE AND NOT EMSCRIPTEN)
+elseif(APPLE)
     target_link_libraries(${MAZE_BUILDER_OUTFILE} OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
-endif()
-
-if(UNIX AND NOT EMSCRIPTEN)
+elseif(UNIX)
     message(INFO ": Building SDL app for Desktop UNIX!")
     
     find_package(OpenGL REQUIRED)
@@ -175,14 +171,12 @@ if(UNIX AND NOT EMSCRIPTEN)
     # If all else fails, download SDL
     if(NOT SDL3_FOUND)
         # Call custom function to fetch from git
-        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
+        fetch_lib_from_git(SDL preview-3.1.3 https://github.com/libsdl-org/SDL.git)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
     target_link_libraries(${MAZE_BUILDER_OUTFILE} dl OpenGL::GL SDL3::SDL3 ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB})
-endif()
-
-if(MINGW OR WIN32 AND NOT EMSCRIPTEN)
+elseif(MINGW OR WIN32)
     message(INFO ": Building SDL app for Desktop WINDOWS!")
         
     find_package(OpenGL REQUIRED)
@@ -196,7 +190,7 @@ if(MINGW OR WIN32 AND NOT EMSCRIPTEN)
     # If all else fails, download SDL
     if(NOT SDL3_FOUND)
         # Call custom function to fetch from git
-        fetch_lib_from_git(SDL main https://github.com/libsdl-org/SDL.git)
+        fetch_lib_from_git(SDL preview-3.1.3 https://github.com/libsdl-org/SDL.git)
         set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
     
