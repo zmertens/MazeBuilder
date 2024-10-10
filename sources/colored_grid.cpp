@@ -38,8 +38,8 @@ std::vector<std::uint8_t> colored_grid::to_pixels(const unsigned int cell_size) 
     return grid::to_pixels(cell_size);
 }
 
-std::vector<std::shared_ptr<cell>> colored_grid::to_vec() const noexcept {
-    return grid::to_vec();
+void colored_grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    return grid::make_vec(ref(cells));
 }
 
 void colored_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
@@ -69,15 +69,20 @@ std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>
 }
 
 optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-	//auto distance = c->get_distances();
-	//if (!distance) {
-	//	return nullopt;
-	//}
-	//auto max = distance->max().second;
-	//auto d = distance->operator[](c);
-	//float intensity = static_cast<float>(max - d) / max;
-	//int dark = static_cast<int>(255 * intensity);
-	//int bright = 128 + static_cast<int>(127 * intensity);
-	//return { (dark << 16) | (bright << 8) | dark };
-	return grid::background_color_for(cref(c));
+	const auto& dists = c->get_distances_from(this->get_root());
+	if (!dists) {
+		return nullopt;
+	}
+
+	auto max = dists->max();
+	//auto max = 10;
+
+	int distance1 = dists->operator[](c);
+	//int distance1 = 5;
+	float intensity = static_cast<float>(10 - distance1) / 10;
+	int dark = static_cast<int>(255 * intensity);
+	int bright = 128 + static_cast<int>(127 * intensity);
+
+	return (dark << 16) | (bright << 8) | dark;
+	//return grid::background_color_for(c);
 }

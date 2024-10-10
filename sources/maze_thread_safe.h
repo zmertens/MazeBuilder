@@ -12,11 +12,13 @@
 
 #include "maze_interface.h"
 #include "maze_types_enum.h"
+#include "grid_interface.h"
 
 namespace mazes {
 
 class maze_thread_safe : public mazes::maze_interface
 {
+    class cell;
 private:
     // Store maze block's relative position in a grid / chunk-based world
     struct pair_hash {
@@ -33,6 +35,10 @@ private:
 public:
     explicit maze_thread_safe(unsigned int width, unsigned int length, unsigned int height);
 	
+    void gen(mazes::maze_types my_maze_type,
+        const std::function<int(int, int)>& get_int,
+        const std::mt19937& rng) noexcept;
+
 	virtual void clear() noexcept override;
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
@@ -64,6 +70,8 @@ public:
     double get_progress_in_seconds() const noexcept;
     double get_progress_in_ms() const noexcept;
     std::size_t get_vertices_size() const noexcept;
+
+    std::optional<std::uint32_t> background_color_for(const std::shared_ptr<mazes::cell>& c) noexcept;
 
 private:
     class progress_tracker {
@@ -112,6 +120,8 @@ private:
     pqmap m_p_q;
 
     progress_tracker m_tracker;
+
+    std::unique_ptr<mazes::grid_interface> m_grid;
 }; // class
 
 } // namespace

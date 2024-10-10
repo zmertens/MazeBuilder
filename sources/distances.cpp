@@ -6,62 +6,35 @@ using namespace mazes;
 using namespace std;
 
 distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
-	m_cells[root] = 0;
+	m_cells.insert_or_assign(root, 0);
 }
 
-void distances::set(std::shared_ptr<cell> cell, int distance) {
+void distances::set(std::shared_ptr<cell> cell, int distance) noexcept {
     m_cells.insert_or_assign(cell, distance);
 }
 
-/**
- * @brief Get the keys from the cells map
- */
-std::vector<std::shared_ptr<cell>> distances::get_cells() const {
-    std::vector<std::shared_ptr<cell>> keys;
-	keys.reserve(m_cells.size());
-    
-	for (const auto& [cell, _] : m_cells) {
-		keys.push_back(cell);
-	}
-
-    return keys;
+bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
+	return m_cells.find(cell) != m_cells.cend();
 }
 
 /**
  * @brief Compute the path to a goal cell
- *  Note the different usage of `at` and `[]` in the array accessors below:
- *  '[]' uses the m_cells operator override
  */
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
-    auto&& current = goal;
-    auto breadcrumbs = std::make_shared<distances>(m_root);
-    // Check if the current/goal is available
-    auto it = m_cells.find(current);
-	if (it == m_cells.cend()) {
-		return breadcrumbs;
-	}
-
-    breadcrumbs->set(current, m_cells.at(current));
+    auto path = std::make_shared<distances>(m_root);
+    auto current = goal;
 
     while (current != m_root) {
-        bool found = false;
-        for (const auto& [neighbor, _] : current->get_links()) {
-            if (neighbor) {
-				// Assign a neighbor iterator, check if the neighbor is present and less than the current cell's distance
-                if (auto neighbor_it = m_cells.find(neighbor); neighbor_it != m_cells.cend() && neighbor_it->second < it->second) {
-                    breadcrumbs->set(neighbor, neighbor_it->second);
-                    current = neighbor;
-                    it = neighbor_it;
-                    found = true;
-                    break;
-                }
-            }
-        }
-        if (!found) {
-            break;
-        }
+        path->m_cells[current] = m_cells.at(current);
+        auto neighbors = current->get_neighbors();
+        current = *std::min_element(neighbors.begin(), neighbors.end(),
+            [this](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b) {
+                return m_cells.at(a) < m_cells.at(b);
+            });
     }
-    return breadcrumbs;
+
+    path->m_cells[m_root] = 0;
+    return path;
 }
 
 std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
@@ -74,4 +47,19 @@ std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
         }
     }
     return { max_cell, max_distance };
+}
+
+const vector<std::shared_ptr<cell>>& distances::get_keys() const noexcept {
+	vector<shared_ptr<cell>> keys;
+	keys.reserve(m_cells.size());
+	for (const auto& [c, _] : m_cells) {
+		keys.push_back(c);
+	}
+	return keys;
+}
+
+void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    for (const auto& [c, _] : m_cells) {
+        cells.push_back(c);
+    }
 }

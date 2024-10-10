@@ -1,6 +1,6 @@
 #include "cell.h"
 
-#include <iostream>
+#include <queue>
 
 #include "distances.h"
 
@@ -97,6 +97,14 @@ void cell::set_index(int next_index) noexcept {
     this->m_index = next_index;
 }
 
+void cell::set_color(std::uint32_t c) noexcept {
+	this->m_color = c;
+}
+
+std::uint32_t cell::get_color() const noexcept {
+	return this->m_color;
+}
+
 shared_ptr<cell> cell::get_north() const {
     return this->m_north;
 }
@@ -153,22 +161,24 @@ void cell::set_column(unsigned int c) noexcept {
     this->m_column = c;
 }
 
-std::shared_ptr<distances> cell::get_distances() noexcept {
-	auto dists = make_shared<mazes::distances>(shared_from_this());
-    vector<shared_ptr<cell>> frontier = { shared_from_this() };
+std::shared_ptr<distances> cell::get_distances_from(const shared_ptr<cell>& root) noexcept {
+    shared_ptr<distances> dists = make_shared<distances>( root );
 
-	// Dijkstra's algorithm
+    std::priority_queue<std::pair<int, std::shared_ptr<cell>>, std::vector<std::pair<int, std::shared_ptr<cell>>>, std::greater<>> frontier;
+    frontier.push({ 0, root });
+
     while (!frontier.empty()) {
-		vector<shared_ptr<cell>> new_frontier;
-        for (const auto& c : frontier) {
-			for (const auto& [neighbor, _] : c->get_links()) {
-				if (dists->operator[](neighbor) < 0) {
-					dists->set(neighbor, dists->operator[](c) + 1);
-					new_frontier.push_back(neighbor);
-				}
-			}
+        auto [current_distance, current_cell] = frontier.top();
+        frontier.pop();
+
+        for (const auto& neighbor : current_cell->get_neighbors()) {
+            // Assuming each edge has a weight of 1
+            int new_distance = current_distance + 1;
+            if (!dists->contains(neighbor) || new_distance < (*dists)[neighbor]) {
+                (*dists)[neighbor] = new_distance;
+                frontier.push({ new_distance, neighbor });
+            }
         }
-		frontier = new_frontier;
     }
 
     return dists;

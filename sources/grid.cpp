@@ -237,7 +237,9 @@ bool grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) n
         found->set_row(new_row);
         found->set_column(new_column);
 
-        auto cells = this->to_vec();
+        vector<shared_ptr<cell>> cells;
+		cells.reserve(this->m_rows * this->m_columns);
+        this->make_vec(ref(cells));
         vector<int> indices;
         indices.reserve(cells.size());
         transform(cells.cbegin(), cells.cend(), back_inserter(indices), 
@@ -381,11 +383,9 @@ vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
     return img_data;
 } // to_pixels
 
-std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {
-	vector<shared_ptr<cell>> cells;
-	cells.reserve(this->get_rows() * this->get_columns());
+void grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 	this->populate_vec(ref(cells));
-    return cells;
+    this->sort_by_row_then_col(ref(cells));
 }
 
 optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {

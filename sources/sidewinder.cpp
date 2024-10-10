@@ -19,7 +19,8 @@ using namespace std;
 bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
-    std::vector<shared_ptr<cell>> cells = _grid->to_vec();
+    std::vector<shared_ptr<cell>> cells;
+	_grid->make_vec(ref(cells));
 
     for (auto itr{ cells.cbegin() }; itr != cells.cend(); itr++) {
         if (*itr && itr->get()->get_row() != last_row) {

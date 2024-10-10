@@ -21,16 +21,19 @@ namespace mazes {
     public:
         explicit distances(std::shared_ptr<cell> root);
 
-        int operator[](std::shared_ptr<cell> cell) const {
-            const auto it = m_cells.find(cell);
-            return it != m_cells.cend() ? it->second : -1;
-        }
+		int& operator[](const std::shared_ptr<cell>& cell) noexcept {
+			return m_cells[cell];
+		}
 
-        void set(std::shared_ptr<cell> cell, int distance);
+        void set(std::shared_ptr<cell> cell, int distance) noexcept;
 
-        std::vector<std::shared_ptr<cell>> get_cells() const;
+        bool contains(const std::shared_ptr<cell>& cell) const noexcept;
+
         std::shared_ptr<distances> path_to(std::shared_ptr<cell> goal) const noexcept;
         std::pair<std::shared_ptr<cell>, int> max() const noexcept;
+
+        const std::vector<std::shared_ptr<cell>>& get_keys() const noexcept;
+        void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     private:
         std::shared_ptr<cell> m_root;

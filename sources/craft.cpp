@@ -1,5 +1,5 @@
 /*
- * Craft engine builds voxels as chunks and can run maze-generating algorithms
+ * Craft engine builds voxels as chunks and renders on-screen using OpenGL
  * Generated mazes are stored in-memory and in an offline database
  * Vertex and indice data is stored in buffers and rendered using OpenGL
  * Supports RESTful APIs for web applications by passing maze data in JSON format
@@ -128,13 +128,12 @@ struct craft::craft_impl {
         std::string maze_algo;
         std::string maze_json;
         int view;
-        bool moonjump;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
-            maze_algo("binary_tree"), maze_json(""), view(20), moonjump(false) {
+            maze_algo("binary_tree"), maze_json(""), view(20) {
         
         }
 
@@ -153,7 +152,6 @@ struct craft::craft_impl {
 			maze_algo = "binary_tree";
             seed = 101;
             chunk_size = 8;
-            moonjump = false;
         }
     }; // class
     
@@ -202,11 +200,6 @@ struct craft::craft_impl {
 
 		GuiBuilder& view(int value) {
 			gui.view = value;
-			return *this;
-		}
-
-		GuiBuilder& moonjump(bool value) {
-			gui.moonjump = value;
 			return *this;
 		}
         
@@ -2010,7 +2003,7 @@ struct craft::craft_impl {
     * @param dt
     * @return bool return true when events are handled successfully or not
     */
-    bool handle_events_and_motion(double dt, double time_step, bool& window_resizes) {
+    bool handle_events_and_motion(double dt, bool& window_resizes) {
         static float dy = 0;
         State* s = &this->m_model->player.state;
         int sz = 0;
@@ -2134,6 +2127,10 @@ struct craft::craft_impl {
             case SDL_EVENT_FINGER_MOTION:
             case SDL_EVENT_MOUSE_MOTION: {
                 if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                    // Adjust mouse motion based on relative center of voxel_scene_size
+					float adjusted_xrel = e.motion.xrel - static_cast<float>(m_model->voxel_scene_w) / 2.f;
+                    float adjusted_yrel = e.motion.yrel - static_cast<float>(m_model->voxel_scene_h) / 2.f;
+
                     s->rx += e.motion.xrel * mouse_mv;
                     if (INVERT_MOUSE) {
                         s->ry += e.motion.yrel * mouse_mv;
@@ -2212,7 +2209,7 @@ struct craft::craft_impl {
                 if (this->m_model->flying) {
                     vy = 1;
                 } else if (dy == 0) {
-                    dy = (this->m_gui->moonjump) ? time_step : 8;
+                    dy = 8;
                 }
             }
         }
@@ -2222,7 +2219,7 @@ struct craft::craft_impl {
             SDL_powf(vx * speed, 2) +
             SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
             SDL_powf(vz * speed, 2)) * dt * 8);
-        int step = SDL_max(time_step, estimate);
+        int step = SDL_max(dt, estimate);
         float ut = dt / step;
         vx = vx * ut * speed;
         vy = vy * ut * speed;
@@ -2713,13 +2710,11 @@ bool craft::run(const std::list<std::string>& algos,
         return {fbo, depthRenderbuffer, texture};
     };
 
-    int triangle_faces = 0;
-    bool running = true;
     // LOCAL VARIABLES
     uint64_t previous = SDL_GetTicks();
-    double time_step = 0;
-	double time_accum = 0;
     double last_commit = SDL_GetTicks();
+    int triangle_faces = 0;
+    bool running = true;
 
     craft_impl::Player* me = &m_pimpl->m_model->player;
     craft_impl::State* p_state = &m_pimpl->m_model->player.state;
@@ -2755,9 +2750,9 @@ bool craft::run(const std::list<std::string>& algos,
     {
         // FRAME RATE 
         uint64_t now = SDL_GetTicks();
-        double dt_ms = static_cast<double>(now - previous) / 1000.0;
-        dt_ms = SDL_min(dt_ms, 0.2);
-        dt_ms = SDL_max(dt_ms, 0.0);
+        double elapsed = static_cast<double>(now - previous) / 1000.0;
+        elapsed = SDL_min(elapsed, 0.2);
+        elapsed = SDL_max(elapsed, 0.0);
         previous = now;
 
         // FLUSH DATABASE
@@ -2767,7 +2762,7 @@ bool craft::run(const std::list<std::string>& algos,
         }
 
         // Update player state
-        p_state->t = static_cast<float>(dt_ms);
+        p_state->t = static_cast<float>(elapsed);
 
         // Some GUI state variables
         static bool show_demo_window = false;
@@ -2788,21 +2783,14 @@ bool craft::run(const std::list<std::string>& algos,
 
         // Handle SDL events and motion updates
         static bool window_resizes = false;
-        static constexpr double fixed_time_step = 0.01;
-        time_accum += dt_ms;
-        while (time_accum >= fixed_time_step) {
-            // Handle SDL events and motion (keyboard, mouse, etc.)
-            running = this->m_pimpl->handle_events_and_motion(dt_ms, time_step, ref(window_resizes));
+        // Handle SDL events and motion (keyboard, mouse, etc.)
+        running = this->m_pimpl->handle_events_and_motion(elapsed, ref(window_resizes));
 
-            if (!running) {
+        if (!running) {
 #if defined(__EMSCRIPTEN__)
-                emscripten_cancel_main_loop();
+            emscripten_cancel_main_loop();
 #endif
-                break;
-            }
-
-			time_accum -= fixed_time_step;
-            time_step += fixed_time_step;
+            break;
         }
 
         if (model->create_radius != gui->view) {
@@ -2986,7 +2974,6 @@ bool craft::run(const std::list<std::string>& algos,
                     ImGui::StyleColorsLight();
 
                 ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
-                ImGui::Checkbox("Moonjump", &gui->moonjump);
                 ImGui::SliderInt("View", &gui->view, 1, 24);
                     
                 // Prevent setting SDL_Window settings every frame
@@ -3047,12 +3034,9 @@ bool craft::run(const std::list<std::string>& algos,
             ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
-        if (ImGui::IsWindowHovered()) {
-        }
-
         ImVec2 voxel_scene_size = ImGui::GetContentRegionAvail();
-        GLuint voxel_scene_w = static_cast<GLuint>(voxel_scene_size.x);
-        GLuint voxel_scene_h = static_cast<GLuint>(voxel_scene_size.y);
+        int voxel_scene_w = static_cast<int>(voxel_scene_size.x);
+        int voxel_scene_h = static_cast<int>(voxel_scene_size.y);
         this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
         this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
 
@@ -3232,7 +3216,6 @@ void craft::mouse(bool mouse) noexcept {
 
 void craft::fullscreen(bool fullscreen) noexcept {
     this->m_pimpl->m_gui->fullscreen = fullscreen;
-    SDL_SetWindowFullscreen(this->m_pimpl->m_model->window, fullscreen);
 }
 
 /**

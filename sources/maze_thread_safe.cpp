@@ -3,9 +3,11 @@
 #include <sstream>
 #include <iostream>
 #include <algorithm>
+#include <functional>
 
 #include "distance_grid.h"
 #include "grid.h"
+#include "cell.h"
 #include "colored_grid.h"
 #include "maze_factory.h"
 #include "maze_types_enum.h"
@@ -18,7 +20,19 @@ using namespace std;
  */
 maze_thread_safe::maze_thread_safe(unsigned int width, unsigned int length, unsigned int height)
     : m_width(width), m_length(length), m_height(height)
-    , m_vertices(), m_faces(), m_p_q() {
+    , m_vertices(), m_faces(), m_p_q(), m_block_type(1)
+    , m_grid(make_unique<colored_grid>(width, length, height)){
+}
+
+void maze_thread_safe::gen(mazes::maze_types my_maze_type,
+    const std::function<int(int, int)>& get_int,
+    const std::mt19937& rng) noexcept {
+
+    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(m_grid), cref(get_int), cref(rng));
+
+    if (!success) {
+        // Handle error
+    }
 }
 
 /**
@@ -163,6 +177,10 @@ double maze_thread_safe::get_progress_in_ms() const noexcept {
 std::size_t maze_thread_safe::get_vertices_size() const noexcept {
     std::shared_lock<std::shared_mutex> lock(m_verts_mtx);
     return this->m_vertices.size();
+}
+
+std::optional<std::uint32_t> maze_thread_safe::background_color_for(const std::shared_ptr<mazes::cell>& c) noexcept {
+    return this->m_grid->background_color_for(cref(c));
 }
 
 /**

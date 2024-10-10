@@ -6,10 +6,10 @@
 #ifndef CELL_H
 #define CELL_H
 
-#include <iostream>
 #include <memory>
 #include <vector>
 #include <unordered_map>
+#include <cstdint>
 
 namespace mazes {
 
@@ -20,7 +20,7 @@ namespace mazes {
  *  enable_shared_from_this allows creation of shared_ptr
  *  without creating another instance of 'this'
  */
-class cell : public std::enable_shared_from_this<cell> {
+class cell {
 public:
     explicit cell(int index);
     explicit cell(unsigned int row, unsigned int column, int index);
@@ -35,6 +35,9 @@ public:
     unsigned int get_column() const;
     int get_index() const;
 	void set_index(int next_index) noexcept;
+
+	void set_color(std::uint32_t c) noexcept;
+    std::uint32_t get_color() const noexcept;
 
     std::shared_ptr<cell> get_north() const;
     std::shared_ptr<cell> get_south() const;
@@ -55,7 +58,7 @@ public:
 	void set_row(unsigned int r) noexcept;
 	void set_column(unsigned int c) noexcept;   
 
-    std::shared_ptr<distances> get_distances() noexcept;
+    std::shared_ptr<distances> get_distances_from(const std::shared_ptr<cell>& root) noexcept;
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 
@@ -63,6 +66,7 @@ private:
 
     unsigned int m_row, m_column;
     int m_index;
+    std::uint32_t m_color;
 
     std::shared_ptr<cell> m_north;
     std::shared_ptr<cell> m_south;

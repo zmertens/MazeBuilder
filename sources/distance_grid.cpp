@@ -33,8 +33,8 @@ std::vector<std::uint8_t> distance_grid::to_pixels(const unsigned int cell_size)
 	return this->grid::to_pixels(cell_size);
 }
 
-std::vector<std::shared_ptr<cell>> distance_grid::to_vec() const noexcept {
-	return this->grid::to_vec();
+void distance_grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+	return this->grid::make_vec(ref(cells));
 }
 
 void distance_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
