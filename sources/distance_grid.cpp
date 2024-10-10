@@ -4,6 +4,9 @@
 #include "grid.h"
 #include "cell.h"
 
+#include <queue>
+#include <cpp-base64/base64.h>
+
 using namespace mazes;
 using namespace std;
 
@@ -15,6 +18,7 @@ using namespace std;
  */
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int height)
 	: grid(width, length, height), m_distances(make_shared<distances>(this->get_root())) {
+
 }
 
 unsigned int distance_grid::get_rows() const noexcept {
@@ -62,7 +66,9 @@ std::shared_ptr<cell> distance_grid::get_root() const noexcept {
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
 	if (m_distances) {
 		const auto d = m_distances->operator[](c);
-		return d >= 0 ? to_base64(d) : grid::contents_of(c);
+		if (d >= 0) {
+			return to_base64(d);
+		}
 	}
 	return grid::contents_of(c);
 }
@@ -72,13 +78,33 @@ std::optional<std::uint32_t> distance_grid::background_color_for(const std::shar
 }
 
 optional<std::string> distance_grid::to_base64(int value) const {
-	static const std::string base64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	//string value_str = to_string(value);
+	//return base64_encode(reinterpret_cast<const unsigned char*>(value_str.c_str()), value_str.size());
+	static constexpr auto base36_chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	std::string result;
-	result.reserve(4);
+	do {
+		result.push_back(base36_chars[value % 36]);
+		value /= 36;
+	} while (value > 0);
+	std::reverse(result.begin(), result.end());
+	return result;
+}
 
-	for (int i = 0; i < 4; ++i) {
-		result.push_back(base64[value & 0x3f]);
-		value >>= 6;
+void distance_grid::calc_distances() noexcept {
+	auto&& root = this->get_root();
+	queue<shared_ptr<cell>> frontier;
+	frontier.push(root);
+	m_distances->set(root, 0);
+	// apply shortest path algorithm
+	while (!frontier.empty()) {
+		auto current = frontier.front();
+		frontier.pop();
+		auto current_distance = m_distances->operator[](current);
+		for (const auto& neighbor : current->get_neighbors()) {
+			if (!m_distances->contains(neighbor)) {
+				m_distances->set(neighbor, m_distances->operator[](current) + 1);
+				frontier.push(neighbor);
+			}
+		}
 	}
-	return { result };
 }

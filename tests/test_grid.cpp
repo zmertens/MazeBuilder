@@ -86,6 +86,17 @@ TEST_CASE( "Test appending grids", "[append]") {
     REQUIRE(my_grid->search(my_grid->get_root(), 3) != nullptr);
 }
 
+TEST_CASE("Test distance grid", "[distance grid output]") {
+	auto my_distance_grid = make_unique<distance_grid>(10, 10, 10);
+	auto my_cell = make_shared<cell>(0, 0, 0);
+	my_distance_grid->insert(my_distance_grid->get_root(), my_cell->get_index());
+	auto result = my_distance_grid->search(my_distance_grid->get_root(), 0);
+	REQUIRE(result->get_index() == my_cell->get_index());
+	stringstream ss;
+	ss << *my_distance_grid;
+	REQUIRE(ss.str().size() > 0);
+}
+
 TEST_CASE("Test cells", "[distance cells]") {
     // Create cells
     auto cell1 = make_shared<cell>(0, 0, 1);

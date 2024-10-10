@@ -160,26 +160,3 @@ void cell::set_row(unsigned int r) noexcept {
 void cell::set_column(unsigned int c) noexcept {
     this->m_column = c;
 }
-
-std::shared_ptr<distances> cell::get_distances_from(const shared_ptr<cell>& root) noexcept {
-    shared_ptr<distances> dists = make_shared<distances>( root );
-
-    std::priority_queue<std::pair<int, std::shared_ptr<cell>>, std::vector<std::pair<int, std::shared_ptr<cell>>>, std::greater<>> frontier;
-    frontier.push({ 0, root });
-
-    while (!frontier.empty()) {
-        auto [current_distance, current_cell] = frontier.top();
-        frontier.pop();
-
-        for (const auto& neighbor : current_cell->get_neighbors()) {
-            // Assuming each edge has a weight of 1
-            int new_distance = current_distance + 1;
-            if (!dists->contains(neighbor) || new_distance < (*dists)[neighbor]) {
-                (*dists)[neighbor] = new_distance;
-                frontier.push({ new_distance, neighbor });
-            }
-        }
-    }
-
-    return dists;
-}

@@ -52,6 +52,8 @@ set(DEAR_IMGUI_HEADERS
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.h
   ${CMAKE_CURRENT_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
+set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
+
 set(GLAD_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/src/glad_3_0.c)
 set(NOISE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/deps/sqlite/sqlite3.c)
@@ -92,7 +94,7 @@ add_library(${MAZE_BUILDER_LIB} STATIC ${MAZE_BUILDER_LIB_SOURCES})
 target_compile_features(${MAZE_BUILDER_LIB} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_LIB} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)
 
-add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
+add_executable(${MAZE_BUILDER_OUTFILE} ${CMAKE_CURRENT_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SRCS} ${CPP_BASE64_SRCS} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
 target_compile_features(${MAZE_BUILDER_OUTFILE} PUBLIC cxx_std_17)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${MAZE_BUILDER_OUTFILE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/deps)

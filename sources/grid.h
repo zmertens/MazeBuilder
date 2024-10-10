@@ -55,11 +55,10 @@ private:
     // Grid tostring method
     friend std::ostream& operator<<(std::ostream& os, grid& g) {
         // First sort cells by row then column
-        std::vector<std::shared_ptr<cell>> cells;// = g.to_vec();
+        std::vector<std::shared_ptr<cell>> cells;
         cells.reserve(g.get_rows() * g.get_columns());
         // populate the cells with the BST
-        g.sort(g.get_root(), ref(cells));
-        g.sort_by_row_then_col(ref(cells));
+		g.make_vec(cells);
 
         // ---+
         static constexpr auto barrier = { MAZE_BARRIER2, MAZE_BARRIER2, MAZE_BARRIER2, MAZE_CORNER };
@@ -83,13 +82,43 @@ private:
                     // bottom left cell needs boundaries
                     if (temp == nullptr)
                         temp = { std::make_shared<cell>(-1, -1, next_index) };
-                    // 3 spaces in body
-                    std::string body = " " + g.contents_of(std::cref(temp)).value_or(" ") + " ";
+					// 3 spaces in body for single-digit number, 2 for double-digit number (base36)
                     static const std::string vertical_barrier_str{ MAZE_BARRIER1 };
-                    std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
-                    top_builder << body << east_boundary;
-                    std::string south_boundary = temp->is_linked(temp->get_south()) ? "   " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
-                    bottom_builder << south_boundary << "+";
+                    auto has_contents_val = g.contents_of(std::cref(temp)).has_value();
+                    if (has_contents_val) {
+						auto val = g.contents_of(std::cref(temp)).value();
+                        std::string body, east_boundary, south_boundary;
+                        switch (val.size()) {
+                        case 1: {
+							body = " " + val + " ";
+							east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
+                            south_boundary = temp->is_linked(temp->get_south()) ? "   " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+                            break;
+                        }
+                        case 2: {
+                            body = " " + val + "  ";
+                            east_boundary = temp->is_linked(temp->get_east()) ? "  " : vertical_barrier_str;
+                            south_boundary = temp->is_linked(temp->get_south()) ? "    " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+                            break;
+                        }
+                        default: {
+							body = " " + val + " ";
+							east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
+                            south_boundary = temp->is_linked(temp->get_south()) ? "   " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+							break;
+                        }
+                        }
+						top_builder << body << east_boundary;
+                        bottom_builder << south_boundary << "+";
+                    } else {
+						os << "No contents for cell at index " << next_index << std::endl;
+                    }
+                    //std::string body = " " + g.contents_of(std::cref(temp)).value_or(" ") + " ";
+
+                    //std::string east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
+                    //top_builder << body << east_boundary;
+                    //std::string south_boundary = temp->is_linked(temp->get_south()) ? "   " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+                    //bottom_builder << south_boundary << "+";
                     columnCounter++;
                 }
             }

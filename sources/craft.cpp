@@ -2786,13 +2786,6 @@ bool craft::run(const std::list<std::string>& algos,
         // Handle SDL events and motion (keyboard, mouse, etc.)
         running = this->m_pimpl->handle_events_and_motion(elapsed, ref(window_resizes));
 
-        if (!running) {
-#if defined(__EMSCRIPTEN__)
-            emscripten_cancel_main_loop();
-#endif
-            break;
-        }
-
         if (model->create_radius != gui->view) {
             model->create_radius = gui->view;
             model->render_radius = gui->view;
@@ -3161,6 +3154,7 @@ bool craft::run(const std::list<std::string>& algos,
 
 #if defined(__EMSCRIPTEN__)
         EMSCRIPTEN_MAINLOOP_END;
+        emscripten_cancel_main_loop();
 #endif
 
     m_pimpl->cleanup_worker_threads();

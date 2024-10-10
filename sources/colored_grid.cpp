@@ -18,7 +18,7 @@ using namespace std;
  * @param height 0
  */
 colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int height)
-    : grid(width, length, height) {
+    : grid(width, length, height), m_distance_grid(make_unique<distance_grid>(width, length, height)) {
 
 }
 
@@ -68,21 +68,26 @@ std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>
 	return grid::contents_of(cref(c));
 }
 
-optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-	const auto& dists = c->get_distances_from(this->get_root());
-	if (!dists) {
-		return nullopt;
-	}
+optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {	
+	//static auto has_calculated = false;
+	//if (!has_calculated) {
+	//	m_distance_grid->calc_distances();
+	//	has_calculated = true;
+	//}
+	//
+	//auto d = make_shared<distances>(m_distance_grid->get_root());
+	//const auto& dists = d->path_to(c);
+	//if (!dists) {
+	//	return nullopt;
+	//}
 
-	auto max = dists->max();
-	//auto max = 10;
+	//auto max = dists->max();
 
-	int distance1 = dists->operator[](c);
-	//int distance1 = 5;
-	float intensity = static_cast<float>(10 - distance1) / 10;
-	int dark = static_cast<int>(255 * intensity);
-	int bright = 128 + static_cast<int>(127 * intensity);
+	//int distance1 = dists->operator[](c);
+	//float intensity = static_cast<float>(10 - distance1) / 10;
+	//int dark = static_cast<int>(255 * intensity);
+	//int bright = 128 + static_cast<int>(127 * intensity);
 
-	return (dark << 16) | (bright << 8) | dark;
-	//return grid::background_color_for(c);
+	//return (dark << 16) | (bright << 8) | dark;
+	return grid::background_color_for(cref(c));
 }

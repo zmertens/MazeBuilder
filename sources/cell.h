@@ -58,7 +58,6 @@ public:
 	void set_row(unsigned int r) noexcept;
 	void set_column(unsigned int c) noexcept;   
 
-    std::shared_ptr<distances> get_distances_from(const std::shared_ptr<cell>& root) noexcept;
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 

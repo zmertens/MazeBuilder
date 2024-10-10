@@ -8,12 +8,13 @@
 #include <vector>
 #include <optional>
 
+#include "distance_grid.h"
 #include "grid_interface.h"
 
 namespace mazes {
 
     class cell;
-    class distances;
+    class distance_grid;
 	class colored_grid : public grid
 	{
     public:
@@ -36,7 +37,7 @@ namespace mazes {
         virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
         virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 	private:
-        
+        std::unique_ptr<distance_grid> m_distance_grid;
 	};
 
 }
