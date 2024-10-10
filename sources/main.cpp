@@ -127,45 +127,43 @@ int main(int argc, char* argv[]) {
             static constexpr auto block_type = -1;
             mazes::maze_thread_safe my_maze{ maze_args.width, maze_args.length, maze_args.height };
             my_maze.start_progress();
-			string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine), maze_args.distances);
-            if (!maze_str.empty()) {
-                mazes::writer my_writer;
-				mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
-                switch (my_output_type) {
-                case mazes::output_types::WAVEFRONT_OBJ_FILE:
-                    my_maze.compute_geometry(my_maze_type, std::cref(get_int), std::cref(rng_engine), block_type);
-                    success = my_writer.write(cref(maze_args.output), my_maze.to_wavefront_obj_str());
-                    break;
-                case mazes::output_types::PNG:
-                    success = my_writer.write_png(cref(maze_args.output), 
-                        my_maze.to_pixels(my_maze_type, std::cref(get_int), 
-                            std::cref(rng_engine), maze_args.cell_size), 
-                            maze_args.width * maze_args.cell_size, 
-                            maze_args.length * maze_args.cell_size);
-                    break;
-                case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
-				case mazes::output_types::STDOUT:
-					success = my_writer.write(cref(maze_args.output), cref(maze_str));
-                    break;
-                case mazes::output_types::UNKNOWN:
-                    success = false;
-                    break;
-                }                
-                if (success) {
-                    my_maze.stop_progress();
+            mazes::writer my_writer;
+			mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
+            switch (my_output_type) {
+            case mazes::output_types::WAVEFRONT_OBJ_FILE:
+                my_maze.compute_geometry(my_maze_type, std::cref(get_int), std::cref(rng_engine), block_type);
+                success = my_writer.write(cref(maze_args.output), my_maze.to_wavefront_obj_str());
+                break;
+            case mazes::output_types::PNG:
+                success = my_writer.write_png(cref(maze_args.output), 
+                    my_maze.to_pixels(my_maze_type, std::cref(get_int), 
+                        std::cref(rng_engine), maze_args.cell_size), 
+                        maze_args.width * maze_args.cell_size, 
+                        maze_args.length * maze_args.cell_size);
+                break;
+            case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
+            case mazes::output_types::STDOUT: {
+                string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine), maze_args.distances);
+                success = my_writer.write(cref(maze_args.output), cref(maze_str));
+                break;
+            }
+            case mazes::output_types::UNKNOWN:
+                success = false;
+                break;
+            }
+
+            if (success) {
+                my_maze.stop_progress();
 #if defined(MAZE_DEBUG)
-                    std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
-                    std::cout << "INFO: Progress: " << my_maze.get_progress_in_seconds() << " seconds" << std::endl;
+                std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
+                std::cout << "INFO: Progress: " << my_maze.get_progress_in_seconds() << " seconds" << std::endl;
 #endif
-                }
-                else {
-                    std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
-                }
             }
             else {
                 std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
+                std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
             }
-        }
+        } // interactive
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }
