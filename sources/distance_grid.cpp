@@ -5,6 +5,7 @@
 #include "cell.h"
 
 #include <queue>
+#include <iostream>
 
 using namespace mazes;
 using namespace std;
@@ -16,16 +17,15 @@ using namespace std;
  * @param height 
  */
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int height)
-	: grid(width, length, height), m_distances(make_shared<distances>(this->get_root())) {
-
+	: m_grid(make_unique<grid>(width, length, height)) {
 }
 
 unsigned int distance_grid::get_rows() const noexcept {
-	return this->grid::get_rows();
+	return this->m_grid->get_rows();
 }
 
 unsigned int distance_grid::get_columns() const noexcept {
-	return this->grid::get_columns();
+	return this->m_grid->get_columns();
 }
 
 /**
@@ -33,33 +33,33 @@ unsigned int distance_grid::get_columns() const noexcept {
  * @param cell_size 3
  */
 std::vector<std::uint8_t> distance_grid::to_pixels(const unsigned int cell_size) const noexcept {
-	return this->grid::to_pixels(cell_size);
+	return this->m_grid->to_pixels(cell_size);
 }
 
 void distance_grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	return this->grid::make_vec(ref(cells));
+	return this->m_grid->make_vec(ref(cells));
 }
 
 void distance_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
-	this->grid::append(other_grid);
+	this->m_grid->append(other_grid);
 }
 void distance_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
-	this->grid::insert(parent, index);
+	this->m_grid->insert(parent, index);
 }
 
 bool distance_grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
-	return this->grid::update(ref(parent), old_index, new_index);
+	return this->m_grid->update(ref(parent), old_index, new_index);
 }
 
 std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
-	return this->grid::search(start, index);
+	return this->m_grid->search(start, index);
 }
 void distance_grid::del(std::shared_ptr<cell> parent, int index) noexcept {
-	this->grid::del(parent, index);
+	this->m_grid->del(parent, index);
 }
 
 std::shared_ptr<cell> distance_grid::get_root() const noexcept {
-	return grid::get_root();
+	return this->m_grid->get_root();
 }
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
@@ -69,11 +69,11 @@ std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell
 			return to_base36(d);
 		}
 	}
-	return grid::contents_of(c);
+	return this->m_grid->contents_of(c);
 }
 
 std::optional<std::uint32_t> distance_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-	return grid::background_color_for(cref(c));
+	return this->m_grid->background_color_for(cref(c));
 }
 
 optional<std::string> distance_grid::to_base36(int value) const {
@@ -87,6 +87,10 @@ optional<std::string> distance_grid::to_base36(int value) const {
 	return result;
 }
 
+/**
+ * @brief Compute the distances between cells using 
+ * 	Djikstra's shortest-path algorithm
+ */
 void distance_grid::calc_distances() noexcept {
 	auto&& root = this->get_root();
 	queue<shared_ptr<cell>> frontier;

@@ -1,21 +1,18 @@
 #ifndef COLORED_GRID_H
 #define COLORED_GRID_H
 
-#include "grid.h"
-
 #include <memory>
 #include <cstdint>
 #include <vector>
 #include <optional>
 
-#include "distance_grid.h"
 #include "grid_interface.h"
 
 namespace mazes {
 
     class cell;
     class distance_grid;
-	class colored_grid : public grid
+	class colored_grid : public grid_interface
 	{
     public:
         explicit colored_grid(unsigned int width, unsigned int length, unsigned int height = 0);
@@ -36,6 +33,8 @@ namespace mazes {
         virtual std::shared_ptr<cell> get_root() const noexcept override;
         virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
         virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+
+        void calc_distances() noexcept;
 	private:
         std::unique_ptr<distance_grid> m_distance_grid;
 	};

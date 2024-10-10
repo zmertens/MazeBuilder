@@ -93,7 +93,7 @@ TEST_CASE("Test distance grid", "[distance grid output]") {
 	auto result = my_distance_grid->search(my_distance_grid->get_root(), 0);
 	REQUIRE(result->get_index() == my_cell->get_index());
 	stringstream ss;
-	ss << *my_distance_grid;
+	ss << my_distance_grid.get();
 	REQUIRE(ss.str().size() > 0);
 }
 

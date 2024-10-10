@@ -357,8 +357,7 @@ vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
 
     vector<shared_ptr<cell>> cells;
     cells.reserve(this->get_rows() * this->get_columns());
-    this->populate_vec(ref(cells));
-    this->sort_by_row_then_col(ref(cells));
+    this->make_vec(ref(cells));
 
     // Draw backgrounds and walls
     for (const auto& mode : {"backgrounds", "walls"}) {

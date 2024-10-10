@@ -11,14 +11,13 @@
 #include <memory>
 
 #include "cell.h"
-#include "grid.h"
 #include "grid_interface.h"
 
 namespace mazes {
 	class distances;
 	class cell;
 
-	class distance_grid : public grid {
+	class distance_grid : public grid_interface {
 
 	public:
 		explicit distance_grid(unsigned int width, unsigned int length, unsigned int height = 0);
@@ -41,7 +40,7 @@ namespace mazes {
         void calc_distances() noexcept;
 	private:
 		std::shared_ptr<distances> m_distances;
-
+        std::unique_ptr<grid_interface> m_grid;
 		std::optional<std::string> to_base36(int value) const;
 	};
 }

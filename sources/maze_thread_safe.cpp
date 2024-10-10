@@ -20,19 +20,8 @@ using namespace std;
  */
 maze_thread_safe::maze_thread_safe(unsigned int width, unsigned int length, unsigned int height)
     : m_width(width), m_length(length), m_height(height)
-    , m_vertices(), m_faces(), m_p_q(), m_block_type(1)
-    , m_grid(make_unique<colored_grid>(width, length, height)){
-}
+    , m_vertices(), m_faces(), m_p_q(), m_block_type(1) {
 
-void maze_thread_safe::gen(mazes::maze_types my_maze_type,
-    const std::function<int(int, int)>& get_int,
-    const std::mt19937& rng) noexcept {
-
-    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(m_grid), cref(get_int), cref(rng));
-
-    if (!success) {
-        // Handle error
-    }
 }
 
 /**
@@ -131,6 +120,14 @@ std::vector<std::uint8_t> maze_thread_safe::to_pixels(mazes::maze_types my_maze_
         // Handle error
     }
 
+    if (auto ptr = dynamic_cast<colored_grid*>(g.get())) {
+        ptr->calc_distances();
+#if defined(MAZE_DEBUG)
+        cout << "Calc distances for colored grid" << endl;
+#endif
+        return ptr->to_pixels(cell_size);
+    }
+
     return g->to_pixels(cell_size);
 }
 
@@ -179,10 +176,6 @@ std::size_t maze_thread_safe::get_vertices_size() const noexcept {
     return this->m_vertices.size();
 }
 
-std::optional<std::uint32_t> maze_thread_safe::background_color_for(const std::shared_ptr<mazes::cell>& c) noexcept {
-    return this->m_grid->background_color_for(cref(c));
-}
-
 /**
  * @brief
  * @param calc_distances false
@@ -191,10 +184,15 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     const std::function<int(int, int)>& get_int, const std::mt19937& rng,
     bool calc_distances) const noexcept {
     
-    std::unique_ptr<grid_interface> g = (calc_distances) ? make_unique<mazes::distance_grid>(m_width, m_length, m_height) 
-        : make_unique<mazes::grid>(m_width, m_length, m_height);
+    std::unique_ptr<grid_interface> g = nullptr;
+    if (calc_distances) {
+        g = make_unique<mazes::distance_grid>(m_width, m_length, m_height);
+    } else {
+        g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    }
+    cout << "BEfore maze gen" << endl;
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
-
+    cout << "After maze gen" << endl;
     if (!success) {
         return "";
     }
@@ -202,8 +200,11 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     stringstream ss;
     if (calc_distances) {
         if (auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
+#if defined(MAZE_DEBUG)
+            cout << "Calculating distances" << endl;
+#endif
             distance_ptr->calc_distances();
-            ss << *distance_ptr;
+            ss << distance_ptr;
             return ss.str();
         } 
     } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {

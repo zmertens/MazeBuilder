@@ -124,7 +124,6 @@ int main(int argc, char* argv[]) {
         } else {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
-            
             static constexpr auto block_type = -1;
             mazes::maze_thread_safe my_maze{ maze_args.width, maze_args.length, maze_args.height };
             my_maze.start_progress();
