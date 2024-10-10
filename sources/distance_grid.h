@@ -38,6 +38,7 @@ namespace mazes {
         virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
         void calc_distances() noexcept;
+        std::shared_ptr<distances> get_distances() const noexcept;
 	private:
         std::unique_ptr<grid_interface> m_grid;
 		std::shared_ptr<distances> m_distances;

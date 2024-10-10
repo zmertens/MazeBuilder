@@ -110,3 +110,11 @@ void distance_grid::calc_distances() noexcept {
 		}
 	}
 }
+
+/**
+ * @brief Get the distances object
+ * @return shared_ptr<distances>
+ */
+std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
+	return this->m_distances;
+}

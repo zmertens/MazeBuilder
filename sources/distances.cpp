@@ -25,6 +25,9 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
     auto current = goal;
 
     while (current != m_root) {
+		if (!contains(current)) {
+			return nullptr;
+		}
         path->m_cells[current] = m_cells.at(current);
         auto neighbors = current->get_neighbors();
         current = *std::min_element(neighbors.begin(), neighbors.end(),

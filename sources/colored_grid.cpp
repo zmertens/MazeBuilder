@@ -34,7 +34,72 @@ unsigned int colored_grid::get_columns() const noexcept {
  * @param cell_size 3
  */
 std::vector<std::uint8_t> colored_grid::to_pixels(const unsigned int cell_size) const noexcept {
-    return m_distance_grid->to_pixels(cell_size);
+    unsigned int img_width = cell_size * m_distance_grid->get_columns();
+    unsigned int img_height = cell_size * m_distance_grid->get_rows();
+
+    uint32_t wall = 0x000000FF;
+
+    // Create an image, RGBA channels, with a white background
+    std::vector<uint8_t> img_data(img_width * img_height * 4, 255);
+
+    // Helper functions to draw on the image
+    auto draw_rect = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
+        for (int y = y1; y < y2; ++y) {
+            for (int x = x1; x < x2; ++x) {
+                int index = (y * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        }
+        };
+
+    auto draw_line = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
+        if (x1 == x2) {
+            for (int y = y1; y < y2; ++y) {
+                int index = (y * img_width + x1) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        } else if (y1 == y2) {
+            for (int x = x1; x < x2; ++x) {
+                int index = (y1 * img_width + x) * 4;
+                img_data[index] = (color >> 24) & 0xFF;
+                img_data[index + 1] = (color >> 16) & 0xFF;
+                img_data[index + 2] = (color >> 8) & 0xFF;
+                img_data[index + 3] = color & 0xFF;
+            }
+        }
+        };
+
+    vector<shared_ptr<cell>> cells;
+    cells.reserve(this->get_rows() * this->get_columns());
+    this->make_vec(ref(cells));
+
+    // Draw backgrounds and walls
+    for (const auto& mode : { "backgrounds", "walls" }) {
+        for (const auto& current : cells) {
+            int x1 = current->get_column() * cell_size;
+            int y1 = current->get_row() * cell_size;
+            int x2 = (current->get_column() + 1) * cell_size;
+            int y2 = (current->get_row() + 1) * cell_size;
+
+            if (mode == "backgrounds"s) {
+                uint32_t color = background_color_for(current).value_or(0xFFFFFFFF);
+                draw_rect(x1, y1, x2, y2, color);
+            } else {
+                if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
+                if (!current->get_west()) draw_line(x1, y1, x1, y2, wall);
+                if (auto east = current->get_east(); east && !current->is_linked(cref(east))) draw_line(x2, y1, x2, y2, wall);
+                if (auto south = current->get_south(); south && !current->is_linked(cref(south))) draw_line(x1, y2, x2, y2, wall);
+            }
+        }
+    }
+
+    return img_data;
 }
 
 void colored_grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
@@ -68,21 +133,19 @@ std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>
 }
 
 optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {	
-	// auto d = make_shared<distances>(m_distance_grid->get_root());
-	// const auto& dists = d->path_to(c);
-	// if (!dists) {
-	// 	return nullopt;
-	// }
+	const auto& dists = m_distance_grid->get_distances()->path_to(c);
+	if (!dists) {
+		return nullopt;
+	}
 
-	// auto max = dists->max();
+	auto max = dists->max();
 
-	// int distance1 = dists->operator[](c);
-	// float intensity = static_cast<float>(10 - distance1) / 10;
-	// int dark = static_cast<int>(255 * intensity);
-	// int bright = 128 + static_cast<int>(127 * intensity);
-	cout << "colored_grid::background_color_for" << endl;
-	// return (dark << 16) | (bright << 8) | dark;
-	return m_distance_grid->background_color_for(cref(c));
+	int distance1 = dists->operator[](c);
+	float intensity = static_cast<float>(10 - distance1) / 10;
+	int dark = static_cast<int>(255 * intensity);
+	int bright = 128 + static_cast<int>(127 * intensity);
+	return (dark << 16) | (bright << 8) | dark;
+	//return m_distance_grid->background_color_for(cref(c));
 }
 
 void colored_grid::calc_distances() noexcept {
