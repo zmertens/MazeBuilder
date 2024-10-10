@@ -3119,6 +3119,7 @@ bool craft::run(const std::list<std::string>& algos,
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
                 SDL_SetWindowRelativeMouseMode(sdl_window, true);
+                ImGui::SetWindowFocus("Voxels");
             } else {
                 SDL_SetWindowRelativeMouseMode(sdl_window, false);
             }

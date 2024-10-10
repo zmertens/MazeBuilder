@@ -100,7 +100,7 @@ TEST_CASE("Test cells", "[distance cells]") {
     cell3->link(cell3, cell4);
 
     // Get distances from cell1
-    auto distances = cell1->get_distances();
+    auto distances = cell1->get_distances_from(cell1);
 
     REQUIRE(distances);
 
@@ -140,7 +140,7 @@ TEST_CASE("Test paths", "[distances and paths]") {
 		};
     bool success = mazes::maze_factory::gen_maze(maze_types::BINARY_TREE, ref(my_grid), cref(get_int), cref(rng));
     REQUIRE(success);
-	auto distances = my_grid->get_root()->get_distances();
+	auto distances = my_grid->get_root()->get_distances_from(my_grid->get_root());
 	REQUIRE(distances);
     auto center = my_grid->search(my_grid->get_root(), my_grid->get_columns() / 2);
     REQUIRE(center);
