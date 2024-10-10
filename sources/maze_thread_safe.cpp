@@ -209,9 +209,8 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
         ss << *grid_ptr;
         return ss.str();
-    } else {
-        return "";
-    }
+    } 
+    return "";
 } // to_str
 
 /**

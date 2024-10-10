@@ -5,7 +5,6 @@
 #include "cell.h"
 
 #include <queue>
-#include <cpp-base64/base64.h>
 
 using namespace mazes;
 using namespace std;
@@ -67,7 +66,7 @@ std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell
 	if (m_distances) {
 		const auto d = m_distances->operator[](c);
 		if (d >= 0) {
-			return to_base64(d);
+			return to_base36(d);
 		}
 	}
 	return grid::contents_of(c);
@@ -77,9 +76,7 @@ std::optional<std::uint32_t> distance_grid::background_color_for(const std::shar
 	return grid::background_color_for(cref(c));
 }
 
-optional<std::string> distance_grid::to_base64(int value) const {
-	//string value_str = to_string(value);
-	//return base64_encode(reinterpret_cast<const unsigned char*>(value_str.c_str()), value_str.size());
+optional<std::string> distance_grid::to_base36(int value) const {
 	static constexpr auto base36_chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	std::string result;
 	do {

@@ -32,7 +32,6 @@ namespace mazes {
         std::shared_ptr<distances> path_to(std::shared_ptr<cell> goal) const noexcept;
         std::pair<std::shared_ptr<cell>, int> max() const noexcept;
 
-        const std::vector<std::shared_ptr<cell>>& get_keys() const noexcept;
         void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     private:

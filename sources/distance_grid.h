@@ -42,7 +42,7 @@ namespace mazes {
 	private:
 		std::shared_ptr<distances> m_distances;
 
-		std::optional<std::string> to_base64(int value) const;
+		std::optional<std::string> to_base36(int value) const;
 	};
 }
 

@@ -49,15 +49,6 @@ std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
     return { max_cell, max_distance };
 }
 
-const vector<std::shared_ptr<cell>>& distances::get_keys() const noexcept {
-	vector<shared_ptr<cell>> keys;
-	keys.reserve(m_cells.size());
-	for (const auto& [c, _] : m_cells) {
-		keys.push_back(c);
-	}
-	return keys;
-}
-
 void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
     for (const auto& [c, _] : m_cells) {
         cells.push_back(c);
