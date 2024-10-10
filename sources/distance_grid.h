@@ -39,8 +39,8 @@ namespace mazes {
 
         void calc_distances() noexcept;
 	private:
-		std::shared_ptr<distances> m_distances;
         std::unique_ptr<grid_interface> m_grid;
+		std::shared_ptr<distances> m_distances;
 		std::optional<std::string> to_base36(int value) const;
 	};
 }

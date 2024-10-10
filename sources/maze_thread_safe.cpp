@@ -123,7 +123,7 @@ std::vector<std::uint8_t> maze_thread_safe::to_pixels(mazes::maze_types my_maze_
     if (auto ptr = dynamic_cast<colored_grid*>(g.get())) {
         ptr->calc_distances();
 #if defined(MAZE_DEBUG)
-        cout << "Calc distances for colored grid" << endl;
+        cout << "INFO: Calculating distances for colored grid" << endl;
 #endif
         return ptr->to_pixels(cell_size);
     }
@@ -190,9 +190,9 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     } else {
         g = make_unique<mazes::grid>(m_width, m_length, m_height);
     }
-    cout << "BEfore maze gen" << endl;
+
     bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
-    cout << "After maze gen" << endl;
+
     if (!success) {
         return "";
     }
@@ -201,10 +201,10 @@ std::string maze_thread_safe::to_str(maze_types my_maze_type,
     if (calc_distances) {
         if (auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
 #if defined(MAZE_DEBUG)
-            cout << "Calculating distances" << endl;
+            cout << "INFO: Calculating distances" << endl;
 #endif
             distance_ptr->calc_distances();
-            ss << distance_ptr;
+            ss << *distance_ptr;
             return ss.str();
         } 
     } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {

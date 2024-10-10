@@ -17,7 +17,8 @@ using namespace std;
  * @param height 
  */
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int height)
-	: m_grid(make_unique<grid>(width, length, height)) {
+	: m_grid(make_unique<grid>(width, length, height))
+	, m_distances(make_shared<distances>(this->m_grid->get_root())) {
 }
 
 unsigned int distance_grid::get_rows() const noexcept {
