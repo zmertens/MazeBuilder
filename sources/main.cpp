@@ -18,7 +18,7 @@
 #include "args_builder.h"
 #include "output_types_enum.h"
 #include "maze_factory.h"
-#include "maze_thread_safe.h"
+#include "maze_builder.h"
 #include "writer.h"
 #include "craft.h"
 
@@ -125,7 +125,7 @@ int main(int argc, char* argv[]) {
             // Run the command-line program
             mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
             static constexpr auto block_type = -1;
-            mazes::maze_thread_safe my_maze{ maze_args.width, maze_args.length, maze_args.height };
+            mazes::maze_builder my_maze{ maze_args.width, maze_args.length, maze_args.height };
             my_maze.start_progress();
             mazes::writer my_writer;
 			mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);

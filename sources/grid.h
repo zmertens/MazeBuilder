@@ -34,9 +34,7 @@ public:
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
 
-    // Get bytewise representation of the grid
-    virtual std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept override;
-    virtual void make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
+    virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
 
     virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
     virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;

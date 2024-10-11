@@ -5,12 +5,12 @@
 
 #include <noise/noise.h>
 
-#include "maze_thread_safe.h"
+#include "maze_builder.h"
 
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_safe>& maze, world_func func, Map* m, int chunk_size) const noexcept {
+void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_builder>& maze, world_func func, Map* m, int chunk_size) noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -35,17 +35,19 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_thread_
             }
 
             // sand and grass terrain
-            // static constexpr auto PLANT_MAX_Y = 2;
             for (int y = 0; y < h; y++) {
                 func(x, y, z, w * flag, m);
             }
 
             // Build the maze
-            for (auto y = 1; y < t + maze->get_height(); y++) {
-                const auto& itr = maze->find_block(p, q);
-                if (itr.has_value()) {
-                    auto [px, py, pz, block] = itr.value();
-                    func(x, y, z, block, m);
+            {
+				lock_guard<mutex> lock(maze_mutex);
+                for (auto y = 1; y < t + maze->get_height(); y++) {
+                    const auto& itr = maze->find_block(p, q);
+                    if (itr.has_value()) {
+                        auto [px, py, pz, block] = itr.value();
+                        func(x, y, z, block, m);
+                    }
                 }
             }
 

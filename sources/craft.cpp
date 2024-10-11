@@ -37,7 +37,6 @@
 #include <thread>
 #include <future>
 #include <mutex>
-#include <shared_mutex>
 #include <chrono>
 #include <random>
 #include <utility>
@@ -55,7 +54,7 @@
 #include "args_builder.h"
 #include "maze_types_enum.h"
 #include "maze_factory.h"
-#include "maze_thread_safe.h"
+#include "maze_builder.h"
 #include "grid.h"
 #include "cell.h"
 #include "writer.h"
@@ -324,7 +323,7 @@ struct craft::craft_impl {
     const std::string& m_help;
 
     unique_ptr<Model> m_model;
-    unique_ptr<mazes::maze_thread_safe> m_maze;
+    unique_ptr<mazes::maze_builder> m_maze;
     unique_ptr<Gui> m_gui;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
@@ -2566,19 +2565,19 @@ bool craft::run(const std::list<std::string>& algos,
     auto&& maze2 = this->m_pimpl->m_maze;
     auto&& model = this->m_pimpl->m_model;
 
-	maze2 = make_unique<maze_thread_safe>(gui->maze_width, gui->maze_length, gui->maze_height);
+	maze2 = make_unique<maze_builder>(gui->maze_width, gui->maze_length, gui->maze_height);
 
     auto maze_func = [&model, &my_maze_type, &get_int, &rng, &maze2](auto w, auto l, auto h) {
-        maze2->clear();
 		maze2->set_width(w);
 		maze2->set_length(l);
         maze2->set_height(h);
 		maze2->compute_geometry(my_maze_type, get_int, rng, items[model->item_index]);
     };
 
-    // Generate a default maze to start the app
-    future<void> maze_gen_future = async(launch::async, maze_func, gui->maze_width, gui->maze_length, gui->maze_height);
-    
+    maze2->start_progress();
+    maze_func(25, 25, 3);
+    maze2->stop_progress();
+
     future<bool> write_success;
     auto maze_writer_fut = [&maze2](const string& filename) {
         if (!filename.empty()) {
@@ -2767,7 +2766,6 @@ bool craft::run(const std::list<std::string>& algos,
         // Some GUI state variables
         static bool show_demo_window = false;
         static bool write_maze_now = false;
-        static bool first_maze = true;
 
         if (write_maze_now) {
             // Writing the maze will run in the background - only do that on Desktop
@@ -2790,22 +2788,6 @@ bool craft::run(const std::list<std::string>& algos,
             model->create_radius = gui->view;
             model->render_radius = gui->view;
             model->delete_radius = gui->view;
-        }
-
-                // Handle Maze events
-        // Check if maze is available and then perform two async operations:
-        // 1. Set maze string and compute maze geometry for 3D coordinates (includes a height value)
-        // 2. Notify writer that the maze can be sent to a Wavefront object file
-        if (maze_gen_future.valid() && maze_gen_future.wait_for(chrono::seconds(0)) == future_status::ready) {
-            this->m_pimpl->reset_model();
-            // Get the maze and reset the future
-            maze2->start_progress();
-            maze_gen_future.get();
-            maze2->stop_progress();
-            // Don't write the first maze that loads when app starts
-            write_maze_now = first_maze ? false : true;
-            first_maze = false;
-            current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
         }
 
         // Use ImGui for GUI size calculations
@@ -2871,8 +2853,12 @@ bool craft::run(const std::list<std::string>& algos,
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Build!")) {
-                        // Start the maze generation in the background
-                        maze_gen_future = async(launch::async, maze_func, gui->maze_width, gui->maze_length, gui->maze_height);
+                        this->m_pimpl->reset_model();
+                        maze2->start_progress();
+                        maze_func(gui->maze_width, gui->maze_length, gui->maze_height);
+						maze2->stop_progress();
+                        current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
+                        write_maze_now = true;
                     } else {
                         ImGui::SameLine();
                         ImGui::Text("Building maze... %s\n", gui->outfile);

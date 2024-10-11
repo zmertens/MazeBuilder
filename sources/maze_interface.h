@@ -10,7 +10,8 @@
 
 #include <vector>
 #include <tuple>
-#include <cstdlib>
+#include <optional>
+#include <cstdint>
 #include <random>
 #include <functional>
 
@@ -26,8 +27,13 @@ public:
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept = 0;
 	// Get a 2D maze as a string
 	virtual std::string to_str(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, bool distances = false) const noexcept = 0;
+	virtual std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
+		const std::function<int(int, int)>& get_int,
+		const std::mt19937& rng,
+		const unsigned int cell_size = 3) const noexcept = 0;
 	// Compute the 3D geometry of the maze (includes height for 3D mazes)
 	virtual void compute_geometry(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept = 0;
+	virtual std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept = 0;
 private:
 	virtual void add_block(int x, int y, int z, int w, int block_size) noexcept = 0;
 };

@@ -15,6 +15,7 @@ namespace mazes {
 
 	class grid_interface {
 	public:
+        virtual ~grid_interface() = default;
 		virtual unsigned int get_rows() const noexcept = 0;
 		virtual unsigned int get_columns() const noexcept = 0;
 		virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept = 0;
@@ -23,9 +24,7 @@ namespace mazes {
 		virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept = 0;
 		virtual void del(std::shared_ptr<cell> parent, int index) noexcept = 0;
 		virtual std::shared_ptr<cell> get_root() const noexcept = 0;
-		virtual std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept = 0;
-		virtual void make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;
-		virtual ~grid_interface() = default;
+		virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;
 		virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
 		virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
 		friend std::ostream& operator<<(std::ostream& os, grid_interface& g) {
@@ -33,7 +32,7 @@ namespace mazes {
             std::vector<std::shared_ptr<cell>> cells;
             cells.reserve(g.get_rows() * g.get_columns());
             // populate the cells with the BST
-            g.make_vec(cells);
+            g.make_sorted_vec(cells);
 
             // ---+
             static constexpr auto barrier = { MAZE_BARRIER2, MAZE_BARRIER2, MAZE_BARRIER2, MAZE_BARRIER2, MAZE_BARRIER2, MAZE_CORNER };

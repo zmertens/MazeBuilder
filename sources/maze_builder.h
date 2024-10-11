@@ -1,21 +1,20 @@
-#ifndef MAZE_THREAD_SAFE_H
-#define MAZE_THREAD_SAFE_H
+#ifndef MAZE_BUILDER_H
+#define MAZE_BUILDER_H
 
 #include <string>
-#include <shared_mutex>
-#include <mutex>
 #include <memory>
 #include <utility>
 #include <unordered_map>
 #include <cstdint>
 #include <optional>
+#include <mutex>
 
 #include "maze_interface.h"
 #include "maze_types_enum.h"
 
 namespace mazes {
 
-class maze_thread_safe : public mazes::maze_interface
+class maze_builder : public mazes::maze_interface
 {
     class cell;
 private:
@@ -32,26 +31,29 @@ private:
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
 public:
-    explicit maze_thread_safe(unsigned int width, unsigned int length, unsigned int height);
+    explicit maze_builder(unsigned int width, unsigned int length, unsigned int height);
 
 	virtual void clear() noexcept override;
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
     virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
 
-    std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) noexcept;
+    virtual std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept override;
 
-    std::string to_str(mazes::maze_types my_maze_type, 
+    virtual std::string to_str(mazes::maze_types my_maze_type, 
         const std::function<int(int, int)>& get_int, 
         const std::mt19937& rng,
         bool calc_distances = false) const noexcept override;
-    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
-    std::string to_wavefront_obj_str() const noexcept;
-    std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
+    
+    virtual std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
-        const unsigned int cell_size = 3) const noexcept;
+        const unsigned int cell_size = 3) const noexcept override;
 
+    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
+    
+    std::string to_wavefront_obj_str() const noexcept;
+    
     void set_height(unsigned int height) noexcept;
     unsigned int get_height() const noexcept;
     void set_length(unsigned int length) noexcept;
@@ -103,11 +105,8 @@ private:
 
     unsigned int m_width, m_length, m_height;
     unsigned int m_block_type;
-    // Mutable allows for const methods to modify the object
-    mutable std::shared_mutex m_verts_mtx;
-    std::mutex m_maze_mutx;
-    // Tuple (x, y, z, w)
-    // Write vertices compute block sizes and are designed for Wavefront OBJ file writing
+
+    // Tuple (x, y, z, block_type)
     std::vector<std::tuple<int, int, int, int>> m_vertices;
     std::vector<std::vector<std::uint32_t>> m_faces;
     pqmap m_p_q;
@@ -117,5 +116,5 @@ private:
 
 } // namespace
 
-#endif // MAZE_THREAD_SAFE_H
+#endif // MAZE_BUILDER_H
 

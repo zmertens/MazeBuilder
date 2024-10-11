@@ -29,16 +29,8 @@ unsigned int distance_grid::get_columns() const noexcept {
 	return this->m_grid->get_columns();
 }
 
-/**
- *
- * @param cell_size 3
- */
-std::vector<std::uint8_t> distance_grid::to_pixels(const unsigned int cell_size) const noexcept {
-	return this->m_grid->to_pixels(cell_size);
-}
-
-void distance_grid::make_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	return this->m_grid->make_vec(ref(cells));
+void distance_grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+	return this->m_grid->make_sorted_vec(ref(cells));
 }
 
 void distance_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
