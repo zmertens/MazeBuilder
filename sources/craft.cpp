@@ -2455,7 +2455,7 @@ bool craft::run(const std::list<std::string>& algos,
     craft_impl::Attrib line_attrib = {0};
     craft_impl::Attrib text_attrib = {0};
     craft_impl::Attrib sky_attrib = {0};
-    //craft_impl::Attrib screen_attrib = { 0 };
+    craft_impl::Attrib screen_attrib = { 0 };
 
     GLuint program;
 
@@ -2513,15 +2513,15 @@ bool craft::run(const std::list<std::string>& algos,
 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
-//#if defined(__EMSCRIPTEN__)
-//    // @TODO : Screen space GLSL ES shader
-//#else
-//    program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
-//#endif
-//    screen_attrib.program = program;
-//    screen_attrib.position = 0;
-//    screen_attrib.uv = 1;
-//    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
+#if defined(__EMSCRIPTEN__)
+    // @TODO : Screen space GLSL ES shader
+#else
+    program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
+#endif
+    screen_attrib.program = program;
+    screen_attrib.position = 0;
+    screen_attrib.uv = 1;
+    screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2623,6 +2623,7 @@ bool craft::run(const std::list<std::string>& algos,
         return ss.str();
     };
 
+	// Init OpenGL fields
     GLuint minimap_texture = 0;
 
     tuple<GLuint, GLuint, GLuint> fbo_tuple;
@@ -2638,28 +2639,29 @@ bool craft::run(const std::list<std::string>& algos,
          1.0f, -1.0f,  1.0f, 0.0f,
          1.0f,  1.0f,  1.0f, 1.0f
     };
-    //GLuint quad_vao = 0, quad_vbo = 0;
-    //glGenVertexArrays(1, &quad_vao);
-    //glGenBuffers(1, &quad_vbo);
-    //glBindVertexArray(quad_vao);
-    //glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
-    //glEnableVertexAttribArray(0);
-    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
-    //glEnableVertexAttribArray(1);
-    //glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    GLuint quad_vao = 0, quad_vbo = 0;
+    glGenVertexArrays(1, &quad_vao);
+    glGenBuffers(1, &quad_vbo);
+    glBindVertexArray(quad_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), &quad_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glBindVertexArray(0);
 
     auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
         GLuint fbo, depthRenderbuffer, texture;
         glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
         glGenRenderbuffers(1, &depthRenderbuffer);
         glGenTextures(1, &texture);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glActiveTexture(GL_TEXTURE4);
+        glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, texture);
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
@@ -2917,7 +2919,7 @@ bool craft::run(const std::list<std::string>& algos,
                 glActiveTexture(GL_TEXTURE4);
                 glBindTexture(GL_TEXTURE_2D, minimap_texture);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
-                    static_cast<GLuint>(25 * 25), static_cast<GLuint>(28 * 25), 
+                    static_cast<GLuint>(100), static_cast<GLuint>(250), 
                     0, GL_RGBA, GL_UNSIGNED_BYTE, current_maze_pixels.data());
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -3036,16 +3038,18 @@ bool craft::run(const std::list<std::string>& algos,
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
         me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
+
         // Bind the FBO that will store the 3D scene
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
-        glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
         m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
+        
         glClear(GL_DEPTH_BUFFER_BIT);
 
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
@@ -3057,8 +3061,7 @@ bool craft::run(const std::list<std::string>& algos,
         if (gui->show_wireframes) {
             m_pimpl->render_wireframe(&line_attrib, me);
         }
-
-        glClear(GL_DEPTH_BUFFER_BIT);
+        
         if (gui->show_crosshairs) {
             m_pimpl->render_crosshairs(&line_attrib);
         }
@@ -3066,25 +3069,26 @@ bool craft::run(const std::list<std::string>& algos,
             m_pimpl->render_item(&block_attrib);
         }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // Post-processing
         glClear(GL_COLOR_BUFFER_BIT);
-
-  //      glUseProgram(screen_attrib.program);
-  //      glBindVertexArray(quad_vao);
-		//glActiveTexture(GL_TEXTURE4);
-  //      glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
-  //      glUniform1i(screen_attrib.sampler, 4);
-  //      glDrawArrays(GL_TRIANGLES, 0, 6);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
+        glUseProgram(screen_attrib.program);
+        glBindVertexArray(quad_vao);
+		glActiveTexture(GL_TEXTURE5);
+        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
+        glUniform1i(screen_attrib.sampler, 5);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glBindVertexArray(0);
 
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
-        glBindTexture(GL_TEXTURE_2D, 0);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
         ImGui::End();
 
 #if !defined(__EMSCRIPTEN__)
@@ -3124,10 +3128,9 @@ bool craft::run(const std::list<std::string>& algos,
 #endif
 
         ImGui::PopFont();
-            
+
         ImGui::Render();
-        glViewport(0, 0, SDL_abs(display_size.x), SDL_abs(display_size.y));
-        glClear(GL_COLOR_BUFFER_BIT);
+        glViewport(0, 0, display_w, display_h);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         SDL_GL_SwapWindow(sdl_window);
@@ -3146,7 +3149,6 @@ bool craft::run(const std::list<std::string>& algos,
     m_pimpl->cleanup_worker_threads();
 
 #if defined(MAZE_DEBUG)
-    CHECK_GL_ERR();
     SDL_Log("Closing DB. . .\n");
     SDL_Log("Cleaning up ImGui objects. . .");
     SDL_Log("Cleaning up OpenGL objects. . .");
@@ -3173,13 +3175,13 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteFramebuffers(1, &get<0>(fbo_tuple));
     glDeleteTextures(1, &get<2>(fbo_tuple));
 	glDeleteTextures(1, &minimap_texture);
-    //glDeleteVertexArrays(1, &quad_vao);
-    //glDeleteBuffers(1, &quad_vbo);
+    glDeleteVertexArrays(1, &quad_vao);
+    glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
-    //glDeleteProgram(screen_attrib.program);
+    glDeleteProgram(screen_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
     SDL_DestroyWindow(sdl_window);

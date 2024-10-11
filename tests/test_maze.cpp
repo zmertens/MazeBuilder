@@ -4,7 +4,7 @@
 #include <memory>
 #include <random>
 
-#include "maze_thread_safe.h"
+#include "maze_builder.h"
 
 using namespace mazes;
 using namespace std;
@@ -16,7 +16,7 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
         return dist(rng);
     };
 
-    shared_ptr<maze_thread_safe> maze1 = make_shared<maze_thread_safe>(10, 10, 10);
+    shared_ptr<maze_builder> maze1 = make_shared<maze_builder>(10, 10, 10);
 
 
     REQUIRE(maze1->get_length() == 10);
@@ -30,7 +30,7 @@ TEST_CASE( "Test maze progress", "[maze progress]") {
         return dist(rng);
     };
 
-    shared_ptr<maze_thread_safe> maze1 = make_shared<maze_thread_safe>(10, 10, 10);
+    shared_ptr<maze_builder> maze1 = make_shared<maze_builder>(10, 10, 10);
 
     SECTION("Check no compute progress") {
         maze1->start_progress();
@@ -54,7 +54,7 @@ TEST_CASE( "Test maze compute geometry", "[maze geometry]") {
         return dist(rng);
     };
 
-    shared_ptr<maze_thread_safe> maze1 = make_shared<maze_thread_safe>(10, 10, 10);
+    shared_ptr<maze_builder> maze1 = make_shared<maze_builder>(10, 10, 10);
     // Random block types
     auto block_type = -1;
     maze1->compute_geometry(maze_types::DFS, cref(get_int), cref(rng), block_type);

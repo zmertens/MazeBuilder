@@ -66,7 +66,7 @@ set(MAZE_BUILDER_LIB_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/grid.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/cell.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/writer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_thread_safe.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_builder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/maze_factory.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/distances.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sources/distance_grid.cpp
