@@ -13,7 +13,8 @@ in float fog_factor;
 in float fog_height;
 in float diffuse;
 
-out vec4 fragColor;
+layout (location = 0) out vec4 fragColor;
+layout (location = 1) out vec4 brightColor;
 
 const float pi = 3.14159265;
 
@@ -38,4 +39,11 @@ void main() {
     vec3 sky_color = texture(sky_sampler, vec2(timer, fog_height)).rgb;
     color = mix(color, sky_color, fog_factor);
     fragColor = vec4(color, 1.0);
+	
+	float brightness = dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+	if (brightness > 1.0) {
+		brightColor = vec4(fragColor.rgb, 1.0);
+	} else {
+		brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+	}
 }

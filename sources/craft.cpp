@@ -119,6 +119,7 @@ struct craft::craft_impl {
         bool show_items;
         bool show_wireframes;
         bool show_crosshairs;
+        bool apply_bloom_effect;
         char outfile[64];
         int seed;
         int maze_width;
@@ -131,6 +132,7 @@ struct craft::craft_impl {
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
+			apply_bloom_effect(true),
             outfile(".obj"), seed(101), maze_width(25), maze_height(5), maze_length(28),
             maze_algo("binary_tree"), maze_json(""), view(20) {
         
@@ -197,6 +199,11 @@ struct craft::craft_impl {
             return *this;
         }
 
+        GuiBuilder& apply_bloom_effect(bool value) {
+            gui.apply_bloom_effect = value;
+            return *this;
+        }
+
 		GuiBuilder& view(int value) {
 			gui.view = value;
 			return *this;
@@ -206,6 +213,117 @@ struct craft::craft_impl {
             return gui;
         }
     }; // class
+
+    class BloomTools {
+    public:
+        GLuint fbo_hdr, fbo_pingpong[2];
+        GLuint rbo_bloom_depth;
+        // Hold 2 floating point color buffers (1 for normal rendering, 
+        //  the other one for brightness treshold values)
+        GLuint color_buffers[2], color_buffers_pingpong[2];
+
+        // State variables
+        bool first_iteration, horizontal_blur;
+        static constexpr unsigned int NUM_FBO_ITERATIONS = 10;
+
+        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0),
+            color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 },
+            first_iteration(true), horizontal_blur(true) {
+		}
+
+		void reset() {
+            fbo_hdr = 0;
+            rbo_bloom_depth = 0;
+			fbo_pingpong[0] = 0;
+			fbo_pingpong[1] = 0;
+			color_buffers[0] = 0;
+			color_buffers[1] = 0;
+			color_buffers_pingpong[0] = 0;
+			color_buffers_pingpong[1] = 0;
+		}
+
+        void gen_framebuffers(int w, int h) {
+            glGenFramebuffers(1, &fbo_hdr);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_hdr);
+
+            glGenTextures(2, color_buffers);
+            for (auto i = 0; i < 2; ++i) {
+                glActiveTexture(GL_TEXTURE4 + i);
+                glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, color_buffers[i], 0);
+            }
+
+            glGenRenderbuffers(1, &rbo_bloom_depth);
+            glBindRenderbuffer(GL_RENDERBUFFER, rbo_bloom_depth);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_bloom_depth);
+            // Split color attachments to use for rendering (for this specific framebuffer)
+            GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+            glDrawBuffers(2, attachments);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            // Setup the ping-pong framebuffers for blurring
+            glGenFramebuffers(2, fbo_pingpong);
+            glGenTextures(2, color_buffers_pingpong);
+            for (auto i = 0; i < 2; i++) {
+                glActiveTexture(GL_TEXTURE6 + i);
+                glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffers_pingpong[i], 0);
+            }
+
+#if defined(MAZE_DEBUG)
+            SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
+#endif
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        } // gen
+
+        void check_framebuffer() {
+            // Check for FBO initialization errors
+            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+            if (status != GL_FRAMEBUFFER_COMPLETE) {
+                switch (status) {
+                case GL_FRAMEBUFFER_UNDEFINED:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNDEFINED\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT\n");
+                    break;
+                case GL_FRAMEBUFFER_UNSUPPORTED:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNSUPPORTED\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE\n");
+                    break;
+#if !defined(__EMSCRIPTEN__)
+                case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER\n");
+                    break;
+                case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER\n");
+                    break;
+#endif
+                default:
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unknown FBO error\n");
+                    break;
+                }
+            }
+		} // check_framebuffer
+	}; // class
 
     typedef struct {
         Map map;
@@ -2456,6 +2574,7 @@ bool craft::run(const std::list<std::string>& algos,
     craft_impl::Attrib text_attrib = {0};
     craft_impl::Attrib sky_attrib = {0};
     craft_impl::Attrib screen_attrib = { 0 };
+    craft_impl::Attrib blur_attrib = { 0 };
 
     GLuint program;
 
@@ -2522,6 +2641,21 @@ bool craft::run(const std::list<std::string>& algos,
     screen_attrib.position = 0;
     screen_attrib.uv = 1;
     screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
+    screen_attrib.extra1 = glGetUniformLocation(program, "bloom");
+    screen_attrib.extra2 = glGetUniformLocation(program, "exposure");
+	screen_attrib.extra3 = glGetUniformLocation(program, "bloomBlur");
+
+#if defined(__EMSCRIPTEN__)
+    // @TODO : Blur space GLSL ES shader
+#else
+    program = load_program("shaders/blur_vertex.glsl", "shaders/blur_fragment.glsl");
+#endif
+    blur_attrib.program = program;
+    blur_attrib.position = 0;
+    blur_attrib.uv = 1;
+    blur_attrib.sampler = glGetUniformLocation(program, "image");
+	blur_attrib.extra1 = glGetUniformLocation(program, "horizontal");
+	blur_attrib.extra2 = glGetUniformLocation(program, "weight");
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2626,8 +2760,6 @@ bool craft::run(const std::list<std::string>& algos,
 	// Init OpenGL fields
     GLuint minimap_texture = 0;
 
-    tuple<GLuint, GLuint, GLuint> fbo_voxels, fbo_screen;
-
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
         // positions   // texCoords
@@ -2651,65 +2783,7 @@ bool craft::run(const std::list<std::string>& algos,
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
 
-    auto create_fbo = [](GLuint width, GLuint height)->tuple<GLuint, GLuint, GLuint> {
-        GLuint fbo, depthRenderbuffer, texture;
-        glGenFramebuffers(1, &fbo);
-        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-        glGenRenderbuffers(1, &depthRenderbuffer);
-        glGenTextures(1, &texture);
-        glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
-        glBindRenderbuffer(GL_RENDERBUFFER, depthRenderbuffer);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthRenderbuffer);
-
-        // Check for FBO initialization errors
-        GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-        if (status != GL_FRAMEBUFFER_COMPLETE) {
-            switch (status) {
-                case GL_FRAMEBUFFER_UNDEFINED:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNDEFINED\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT\n");
-                    break;
-                case GL_FRAMEBUFFER_UNSUPPORTED:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNSUPPORTED\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE\n");
-                    break;
-#if !defined(__EMSCRIPTEN__)
-                case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER\n");
-                    break;
-#endif
-                default:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unknown FBO error\n");
-                    break;
-            }
-            return {};
-        }
-
-#if defined(MAZE_DEBUG)
-    SDL_Log("Creating FBO with width: %d and height: %d\n", width, height);
-#endif
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        return {fbo, depthRenderbuffer, texture};
-    };
+    craft_impl::BloomTools bloom_tools{};
 
     // LOCAL VARIABLES
     uint64_t previous = SDL_GetTicks();
@@ -2981,6 +3055,7 @@ bool craft::run(const std::list<std::string>& algos,
                 ImGui::Checkbox("Show Items", &gui->show_items);
                 ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
+                ImGui::Checkbox("Apply Bloom Effect", &gui->apply_bloom_effect);
                     
                 ImGui::EndTabItem();
             }
@@ -3026,18 +3101,14 @@ bool craft::run(const std::list<std::string>& algos,
             window_resizes = false;
             this->m_pimpl->force_chunks(me);
             // Delete existing FBO objects
-            if (glIsTexture(get<2>(fbo_voxels))) {
-                glDeleteTextures(1, &get<2>(fbo_voxels));
-                glDeleteRenderbuffers(1, &get<1>(fbo_voxels));
-                glDeleteFramebuffers(1, &get<0>(fbo_voxels));
-            }
-            if (glIsTexture(get<2>(fbo_screen))) {
-                glDeleteTextures(1, &get<2>(fbo_screen));
-                glDeleteRenderbuffers(1, &get<1>(fbo_screen));
-                glDeleteFramebuffers(1, &get<0>(fbo_screen));
-            }
-            fbo_voxels = create_fbo(voxel_scene_w, voxel_scene_h);
-            fbo_screen = create_fbo(voxel_scene_w, voxel_scene_h);
+			if (glIsTexture(bloom_tools.color_buffers[0]) && glIsTexture(bloom_tools.color_buffers[1])) {
+				glDeleteTextures(2, bloom_tools.color_buffers);
+				glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
+				glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
+				glDeleteFramebuffers(2, bloom_tools.color_buffers_pingpong);
+				glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+			}
+			bloom_tools.gen_framebuffers(voxel_scene_w, voxel_scene_h);
         }
 
         // PREPARE TO RENDER 
@@ -3048,7 +3119,7 @@ bool craft::run(const std::list<std::string>& algos,
         // Bind the FBO that will store the 3D scene
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
-        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_voxels));
+		glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_hdr);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LEQUAL);
@@ -3075,25 +3146,53 @@ bool craft::run(const std::list<std::string>& algos,
             m_pimpl->render_item(&block_attrib);
         }
 
-		glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_screen));
+		// Complete the pingpong buffer for the bloom effect
+        glUseProgram(blur_attrib.program);
+		for (auto i = 0; i < bloom_tools.NUM_FBO_ITERATIONS; i++) {
+			glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
+			glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
+            glUniform1i(blur_attrib.sampler, 5);
+            if (bloom_tools.first_iteration) {
+				glActiveTexture(GL_TEXTURE5);
+				glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
+				bloom_tools.first_iteration = false;
+            } else {
+                glActiveTexture(GL_TEXTURE6);
+                glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+            bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
+            glBindVertexArray(quad_vao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+		}
+        bloom_tools.first_iteration = true;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Post-processing
+		// Render HDR buffer to 2D quad and apply tone-mapping
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
+        glUniform1i(screen_attrib.sampler, 0);
+        glUniform1i(screen_attrib.extra3, 1);
+        glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
+        glUniform1f(screen_attrib.extra2, 0.215f);
         glBindVertexArray(quad_vao);
-		glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_voxels));
-        glUniform1i(screen_attrib.sampler, 5);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
+        glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindTexture(GL_TEXTURE_2D, 0);
+        
         glBindVertexArray(0);
 
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_screen))), voxel_scene_size, uv0, uv1);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_buffers[1])), 
+            voxel_scene_size, uv0, uv1);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -3179,9 +3278,11 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
-    glDeleteRenderbuffers(1, &get<1>(fbo_voxels));
-    glDeleteFramebuffers(1, &get<0>(fbo_voxels));
-    glDeleteTextures(1, &get<2>(fbo_voxels));
+    glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
+    glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
+    glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
+    glDeleteTextures(2, bloom_tools.color_buffers);
+    glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
 	glDeleteTextures(1, &minimap_texture);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
@@ -3190,6 +3291,7 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
     glDeleteProgram(screen_attrib.program);
+	glDeleteProgram(blur_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
     SDL_DestroyWindow(sdl_window);
