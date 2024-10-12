@@ -2626,7 +2626,7 @@ bool craft::run(const std::list<std::string>& algos,
 	// Init OpenGL fields
     GLuint minimap_texture = 0;
 
-    tuple<GLuint, GLuint, GLuint> fbo_tuple;
+    tuple<GLuint, GLuint, GLuint> fbo_voxels, fbo_screen;
 
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
@@ -3026,12 +3026,18 @@ bool craft::run(const std::list<std::string>& algos,
             window_resizes = false;
             this->m_pimpl->force_chunks(me);
             // Delete existing FBO objects
-            if (glIsTexture(get<2>(fbo_tuple))) {
-                glDeleteTextures(1, &get<2>(fbo_tuple));
-                glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
-                glDeleteFramebuffers(1, &get<0>(fbo_tuple));
+            if (glIsTexture(get<2>(fbo_voxels))) {
+                glDeleteTextures(1, &get<2>(fbo_voxels));
+                glDeleteRenderbuffers(1, &get<1>(fbo_voxels));
+                glDeleteFramebuffers(1, &get<0>(fbo_voxels));
             }
-            fbo_tuple = create_fbo(voxel_scene_w, voxel_scene_h);
+            if (glIsTexture(get<2>(fbo_screen))) {
+                glDeleteTextures(1, &get<2>(fbo_screen));
+                glDeleteRenderbuffers(1, &get<1>(fbo_screen));
+                glDeleteFramebuffers(1, &get<0>(fbo_screen));
+            }
+            fbo_voxels = create_fbo(voxel_scene_w, voxel_scene_h);
+            fbo_screen = create_fbo(voxel_scene_w, voxel_scene_h);
         }
 
         // PREPARE TO RENDER 
@@ -3042,7 +3048,7 @@ bool craft::run(const std::list<std::string>& algos,
         // Bind the FBO that will store the 3D scene
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
-        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_tuple));
+        glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_voxels));
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LEQUAL);
@@ -3069,6 +3075,8 @@ bool craft::run(const std::list<std::string>& algos,
             m_pimpl->render_item(&block_attrib);
         }
 
+		glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_screen));
+
         // Post-processing
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
@@ -3076,7 +3084,7 @@ bool craft::run(const std::list<std::string>& algos,
         glUseProgram(screen_attrib.program);
         glBindVertexArray(quad_vao);
 		glActiveTexture(GL_TEXTURE5);
-        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_tuple));
+        glBindTexture(GL_TEXTURE_2D, get<2>(fbo_voxels));
         glUniform1i(screen_attrib.sampler, 5);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindTexture(GL_TEXTURE_2D, 0);
@@ -3085,7 +3093,7 @@ bool craft::run(const std::list<std::string>& algos,
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_tuple))), voxel_scene_size, uv0, uv1);
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(get<2>(fbo_screen))), voxel_scene_size, uv0, uv1);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -3171,9 +3179,9 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
-    glDeleteRenderbuffers(1, &get<1>(fbo_tuple));
-    glDeleteFramebuffers(1, &get<0>(fbo_tuple));
-    glDeleteTextures(1, &get<2>(fbo_tuple));
+    glDeleteRenderbuffers(1, &get<1>(fbo_voxels));
+    glDeleteFramebuffers(1, &get<0>(fbo_voxels));
+    glDeleteTextures(1, &get<2>(fbo_voxels));
 	glDeleteTextures(1, &minimap_texture);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
