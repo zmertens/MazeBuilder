@@ -8,5 +8,5 @@ out vec3 our_color;
 
 void main() {
     gl_Position = matrix * position;
-    our_color = vec3(0.0);
+    our_color = vec3(1.0, 0.0, 0.0);
 }
