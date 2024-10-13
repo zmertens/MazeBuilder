@@ -2624,9 +2624,7 @@ bool craft::run(const std::list<std::string>& algos,
     };
 
 	// Init OpenGL fields
-    GLuint minimap_texture = 0;
-
-    tuple<GLuint, GLuint, GLuint> fbo_voxels, fbo_screen;
+    //GLuint minimap_texture = 0;
 
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
@@ -2912,26 +2910,26 @@ bool craft::run(const std::list<std::string>& algos,
 
                 ImVec2 sidebar_xy = ImGui::GetContentRegionAvail();
 
-                if (glIsTexture(minimap_texture)) {
-                    glDeleteTextures(1, &minimap_texture);
-                }
-                glGenTextures(1, &minimap_texture);
-                glActiveTexture(GL_TEXTURE4);
-                glBindTexture(GL_TEXTURE_2D, minimap_texture);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
-                    static_cast<GLuint>(100), static_cast<GLuint>(250), 
-                    0, GL_RGBA, GL_UNSIGNED_BYTE, current_maze_pixels.data());
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                glBindTexture(GL_TEXTURE_2D, 0);
-                // Flip UV coordinates for the image
-                ImVec2 uv0 = ImVec2(0.0f, 1.0f);
-                ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-                ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), 
-                    sidebar_xy, uv0, uv1);
-                glBindTexture(GL_TEXTURE_2D, 0);
+                //if (glIsTexture(minimap_texture)) {
+                //    glDeleteTextures(1, &minimap_texture);
+                //}
+                //glGenTextures(1, &minimap_texture);
+                //glActiveTexture(GL_TEXTURE4);
+                //glBindTexture(GL_TEXTURE_2D, minimap_texture);
+                //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 
+                //    static_cast<GLuint>(100), static_cast<GLuint>(250), 
+                //    0, GL_RGBA, GL_UNSIGNED_BYTE, current_maze_pixels.data());
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                //glBindTexture(GL_TEXTURE_2D, 0);
+                //// Flip UV coordinates for the image
+                //ImVec2 uv0 = ImVec2(0.0f, 1.0f);
+                //ImVec2 uv1 = ImVec2(1.0f, 0.0f);
+                //ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)), 
+                //    sidebar_xy, uv0, uv1);
+                //glBindTexture(GL_TEXTURE_2D, 0);
 
                 ImGui::EndTabItem();
             }
@@ -3075,6 +3073,28 @@ bool craft::run(const std::list<std::string>& algos,
             m_pimpl->render_item(&block_attrib);
         }
 
+		// Complete the pingpong buffer for the bloom effect
+        glUseProgram(blur_attrib.program);
+		for (auto i = 0; i < bloom_tools.NUM_FBO_ITERATIONS; i++) {
+			glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
+			glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
+            if (bloom_tools.first_iteration) {
+                glUniform1i(blur_attrib.sampler, 5);
+				glActiveTexture(GL_TEXTURE5);
+				glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
+				bloom_tools.first_iteration = false;
+            } else {
+                glUniform1i(blur_attrib.sampler, 6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
+                glActiveTexture(GL_TEXTURE6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
+                glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
+                glDrawArrays(GL_TRIANGLES, 0, 6);
+            }
+            bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
+            glBindVertexArray(quad_vao);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+		}
+        bloom_tools.first_iteration = true;
+
 		glBindFramebuffer(GL_FRAMEBUFFER, get<0>(fbo_screen));
 
         // Post-processing
@@ -3082,7 +3102,15 @@ bool craft::run(const std::list<std::string>& algos,
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
+        glUniform1i(screen_attrib.sampler, 5);
+        glUniform1i(screen_attrib.extra3, 6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
+        glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
+        glUniform1f(screen_attrib.extra2, 100.f);
         glBindVertexArray(quad_vao);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
+        glActiveTexture(GL_TEXTURE6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
+		glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
 		glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, get<2>(fbo_voxels));
         glUniform1i(screen_attrib.sampler, 5);
@@ -3179,10 +3207,12 @@ bool craft::run(const std::list<std::string>& algos,
     glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky);
     glDeleteTextures(1, &sign);
-    glDeleteRenderbuffers(1, &get<1>(fbo_voxels));
-    glDeleteFramebuffers(1, &get<0>(fbo_voxels));
-    glDeleteTextures(1, &get<2>(fbo_voxels));
-	glDeleteTextures(1, &minimap_texture);
+    glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
+    glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
+    glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
+    glDeleteTextures(2, bloom_tools.color_buffers);
+    glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+	//glDeleteTextures(1, &minimap_texture);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
