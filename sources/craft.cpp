@@ -229,117 +229,6 @@ struct craft::craft_impl {
         BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0),
             color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 },
             first_iteration(true), horizontal_blur(true) {
-		}
-
-		void reset() {
-            fbo_hdr = 0;
-            rbo_bloom_depth = 0;
-			fbo_pingpong[0] = 0;
-			fbo_pingpong[1] = 0;
-			color_buffers[0] = 0;
-			color_buffers[1] = 0;
-			color_buffers_pingpong[0] = 0;
-			color_buffers_pingpong[1] = 0;
-		}
-
-        void gen_framebuffers(int w, int h) {
-            glGenFramebuffers(1, &fbo_hdr);
-            glBindFramebuffer(GL_FRAMEBUFFER, fbo_hdr);
-
-            glGenTextures(2, color_buffers);
-            for (auto i = 0; i < 2; ++i) {
-                glActiveTexture(GL_TEXTURE4 + i);
-                glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, color_buffers[i], 0);
-            }
-
-            glGenRenderbuffers(1, &rbo_bloom_depth);
-            glBindRenderbuffer(GL_RENDERBUFFER, rbo_bloom_depth);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
-            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_bloom_depth);
-            // Split color attachments to use for rendering (for this specific framebuffer)
-            GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
-            glDrawBuffers(2, attachments);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-            // Setup the ping-pong framebuffers for blurring
-            glGenFramebuffers(2, fbo_pingpong);
-            glGenTextures(2, color_buffers_pingpong);
-            for (auto i = 0; i < 2; i++) {
-                glActiveTexture(GL_TEXTURE6 + i);
-                glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
-                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffers_pingpong[i], 0);
-            }
-
-#if defined(MAZE_DEBUG)
-            SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
-#endif
-
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        } // gen
-
-        void check_framebuffer() {
-            // Check for FBO initialization errors
-            GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-            if (status != GL_FRAMEBUFFER_COMPLETE) {
-                switch (status) {
-                case GL_FRAMEBUFFER_UNDEFINED:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNDEFINED\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT\n");
-                    break;
-                case GL_FRAMEBUFFER_UNSUPPORTED:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_UNSUPPORTED\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE\n");
-                    break;
-#if !defined(__EMSCRIPTEN__)
-                case GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER\n");
-                    break;
-                case GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER\n");
-                    break;
-#endif
-                default:
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unknown FBO error\n");
-                    break;
-                }
-            }
-		} // check_framebuffer
-	}; // class
-
-    class BloomTools {
-    public:
-        GLuint fbo_hdr, fbo_pingpong[2];
-        GLuint rbo_bloom_depth;
-        // Hold 2 floating point color buffers (1 for normal rendering, 
-        //  the other one for brightness treshold values)
-        GLuint color_buffers[2], color_buffers_pingpong[2];
-
-        // State variables
-        bool first_iteration, horizontal_blur;
-        static constexpr unsigned int NUM_FBO_ITERATIONS = 10;
-
-        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0),
-            color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 },
-            first_iteration(true), horizontal_blur(true) {
         }
 
         void reset() {
@@ -819,7 +708,7 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    // Sky Attrib doesn't use normals and the GLSL compiler may optimize it out
+    // sky_texture_id Attrib doesn't use normals and the GLSL compiler may optimize it out
     void draw_triangles_3d(Attrib* attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -1967,7 +1856,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture_id) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player);
@@ -1999,6 +1888,8 @@ struct craft::craft_impl {
             if (!this->chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy)) {
                 continue;
             }
+            glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, texture_id);
             this->draw_chunk(attrib, chunk);
             result += chunk->faces;
         }
@@ -2081,7 +1972,7 @@ struct craft::craft_impl {
         }
     }
 
-    void render_sky(Attrib* attrib, Player* player, GLuint buffer) {
+    void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky_texture_id) {
         State* s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -2092,6 +1983,9 @@ struct craft::craft_impl {
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 2);
         glUniform1f(attrib->timer, time_of_day());
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, sky_texture_id);
 
         draw_triangles_3d(attrib, buffer, 512 * 3);
     }
@@ -2646,10 +2540,10 @@ bool craft::run(const std::list<std::string>& algos,
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     load_png_texture("textures/font.png");
 
-    GLuint sky;
-    glGenTextures(1, &sky);
+    GLuint sky_texture_id;
+    glGenTextures(1, &sky_texture_id);
     glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, sky);
+    glBindTexture(GL_TEXTURE_2D, sky_texture_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -3220,11 +3114,11 @@ bool craft::run(const std::list<std::string>& algos,
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
-        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer, sky_texture_id);
 
         glClear(GL_DEPTH_BUFFER_BIT);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me);
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture);
 
         m_pimpl->render_signs(&text_attrib, me);
 
@@ -3247,9 +3141,14 @@ bool craft::run(const std::list<std::string>& algos,
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
+				glUniform1i(blur_attrib.sampler, 4);
+                glActiveTexture(GL_TEXTURE4);
+                // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
+                glUniform1i(blur_attrib.sampler, 6);
+                glActiveTexture(GL_TEXTURE6);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
@@ -3259,23 +3158,24 @@ bool craft::run(const std::list<std::string>& algos,
         }
         bloom_tools.first_iteration = true;
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);   
 
-        // Post-processing
+        // Post-processing the default frame buffer
         // Render HDR buffer to 2D quad and apply bloom filter
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
-        glUniform1i(screen_attrib.sampler, 6);
-        glUniform1i(screen_attrib.extra3, 7);
-        glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
-        glUniform1f(screen_attrib.extra2, 1.0f);
+        glUniform1i(screen_attrib.sampler, 4);
+        glUniform1i(screen_attrib.extra3, 6);
         glBindVertexArray(quad_vao);
-        glActiveTexture(GL_TEXTURE6);
+        glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
-        glActiveTexture(GL_TEXTURE7);
+        glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
+        glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
+        // Exposure
+        glUniform1f(screen_attrib.extra2, 1.0f);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glBindVertexArray(0);
@@ -3285,8 +3185,6 @@ bool craft::run(const std::list<std::string>& algos,
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
         ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_buffers[0])),
             voxel_scene_size, uv0, uv1);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         ImGui::End();
 
@@ -3368,7 +3266,7 @@ bool craft::run(const std::list<std::string>& algos,
 
     glDeleteTextures(1, &texture);
     glDeleteTextures(1, &font);
-    glDeleteTextures(1, &sky);
+    glDeleteTextures(1, &sky_texture_id);
     glDeleteTextures(1, &sign);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
     glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
