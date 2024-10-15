@@ -1,8 +1,4 @@
-#include "cell.h"
-
-#include <queue>
-
-#include "distances.h"
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;

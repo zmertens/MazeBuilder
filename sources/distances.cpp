@@ -1,6 +1,6 @@
-#include "distances.h"
+#include <MazeBuilder/distances.h>
 
-#include "cell.h"
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;

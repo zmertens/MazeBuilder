@@ -6,7 +6,7 @@ The getters throw exceptions if the arg is not found, generally if a map is prov
 It is preferred to parse program arguments but the map is useful for testing
 */
 
-#include "args_builder.h"
+#include <MazeBuilder/args_builder.h>
 
 #include <iostream>
 #include <string>

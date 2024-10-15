@@ -1,8 +1,8 @@
-#include "distance_grid.h"
+#include <MazeBuilder/distance_grid.h>
 
-#include "distances.h"
-#include "grid.h"
-#include "cell.h"
+#include <MazeBuilder/distances.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/cell.h>
 
 #include <queue>
 #include <iostream>

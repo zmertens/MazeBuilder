@@ -1,16 +1,16 @@
-#include "maze_builder.h"
+#include <MazeBuilder/maze_builder.h>
 
 #include <sstream>
 #include <iostream>
 #include <algorithm>
 #include <functional>
 
-#include "distance_grid.h"
-#include "grid.h"
-#include "cell.h"
-#include "colored_grid.h"
-#include "maze_factory.h"
-#include "maze_types_enum.h"
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/maze_factory.h>
+#include <MazeBuilder/maze_types_enum.h>
 
 using namespace mazes;
 using namespace std;

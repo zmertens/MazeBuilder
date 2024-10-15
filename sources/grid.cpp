@@ -1,4 +1,4 @@
-#include "grid.h"
+#include <MazeBuilder/grid.h>
 
 #include <vector>
 #include <string>
@@ -7,7 +7,7 @@
 #include <random>
 #include <iostream>
 
-#include "cell.h"
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;

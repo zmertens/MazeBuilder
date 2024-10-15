@@ -1,11 +1,11 @@
-#include "maze_factory.h"
+#include <MazeBuilder/maze_factory.h>
 
 #include <random>
 
-#include "binary_tree.h"
-#include "sidewinder.h"
-#include "dfs.h"
-#include "grid_interface.h"
+#include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/sidewinder.h>
+#include <MazeBuilder/dfs.h>
+#include <MazeBuilder/grid_interface.h>
 
 using namespace mazes;
 

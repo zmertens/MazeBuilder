@@ -1,13 +1,13 @@
-#include "sidewinder.h"
+#include <MazeBuilder/sidewinder.h>
 
 #include <vector>
 #include <functional>
 
-#include "cell.h"
-#include "grid.h"
-#include "distance_grid.h"
-#include "colored_grid.h"
-#include "grid_interface.h"
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/grid_interface.h>
 
 using namespace mazes;
 using namespace std;

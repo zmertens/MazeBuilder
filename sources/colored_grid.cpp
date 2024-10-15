@@ -1,11 +1,11 @@
-#include "colored_grid.h"
+#include <MazeBuilder/colored_grid.h>
 
 #include <iostream>
 #include <optional>
 
-#include "distance_grid.h"
-#include "distances.h"
-#include "cell.h"
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/distances.h>
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;
