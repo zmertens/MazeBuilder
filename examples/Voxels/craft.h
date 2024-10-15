@@ -12,8 +12,7 @@
 #include <list>
 #include <random>
 
-#include "maze_types_enum.h"
-#include "args_builder.h"
+#include <MazeBuilder/maze_types_enum.h>
 
 class craft {
 public:

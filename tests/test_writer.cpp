@@ -4,10 +4,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "output_types_enum.h"
-#include "writer.h"
-#include "maze_types_enum.h"
-#include "maze_builder.h"
+#include <MazeBuilder/output_types_enum.h>
+#include <MazeBuilder/writer.h>
+#include <MazeBuilder/maze_types_enum.h>
+#include <MazeBuilder/maze_builder.h>
 
 using namespace std;
 using namespace mazes;

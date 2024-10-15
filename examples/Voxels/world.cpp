@@ -5,8 +5,6 @@
 
 #include <noise/noise.h>
 
-#include "maze_builder.h"
-
 using namespace std;
 using namespace mazes;
 

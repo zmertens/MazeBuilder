@@ -25,16 +25,16 @@ set(NOISE_SOURCES ${CMAKE_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
 set(CRAFT_SOURCES
-    ${CMAKE_SOURCE_DIR}/sources/craft.cpp
-    ${CMAKE_SOURCE_DIR}/sources/cube.cpp
-    ${CMAKE_SOURCE_DIR}/sources/db.cpp
-    ${CMAKE_SOURCE_DIR}/sources/item.cpp
-    ${CMAKE_SOURCE_DIR}/sources/map.cpp
-    ${CMAKE_SOURCE_DIR}/sources/matrix.cpp
-    ${CMAKE_SOURCE_DIR}/sources/ring.cpp
-    ${CMAKE_SOURCE_DIR}/sources/sign.cpp
-    ${CMAKE_SOURCE_DIR}/sources/craft_utils.cpp
-    ${CMAKE_SOURCE_DIR}/sources/world.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/map.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/craft_utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
 
 message(INFO ": Getting SDL via FetchContent")
 include(FetchContent)
@@ -42,19 +42,20 @@ FetchContent_Declare(SDL GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GI
 FetchContent_MakeAvailable(SDL)
 set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
 set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-set_property(DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
 
-set(VOXELS_EXE "voxels_and_mazes")
-add_executable(${VOXELS_EXE} ${CMAKE_SOURCE_DIR}/sources/main.cpp ${DEAR_IMGUI_SOURCES} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
-target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB} SDL3::SDL3)
+set(VOXELS_EXE "voxels")
+add_executable(${VOXELS_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${DEAR_IMGUI_SOURCES} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
+target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3)
 target_compile_features(${VOXELS_EXE} PUBLIC cxx_std_17)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/emscripten_local)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
+target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
 # Note that the latest SDL might not be available as an EMSDK port yet
-if(EMSCRIPTEN)
+if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     message(INFO ": Building SDL app for Web!")
 
     # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
@@ -91,8 +92,17 @@ if(EMSCRIPTEN)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
-endif(EMSCRIPTEN)
+endif(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
 
-file(COPY "${CMAKE_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}")
-file(COPY "${CMAKE_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}")
-file(COPY "${CMAKE_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}")
+file(COPY "${CMAKE_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+file(COPY "${CMAKE_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+file(COPY "${CMAKE_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+
+# Copy over the freshly build SDL dll file to the binary directory
+# if(WIN32)
+#     add_custom_command(
+#         TARGET ${VOXELS_EXE}
+#         COMMENT "Copy SDL DLL"
+#         POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/_deps/sdl-build/${CMAKE_BUILD_TYPE}/SDL3.dll $<TARGET_FILE_DIR:${VOXELS_EXE}>
+#         VERBATIM)
+# endif()

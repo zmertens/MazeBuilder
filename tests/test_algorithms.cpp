@@ -11,13 +11,13 @@
 #include <thread>
 #include <mutex>
 
-#include "maze_algo_interface.h"
-#include "grid_interface.h"
-#include "cell.h"
-#include "grid.h"
-#include "binary_tree.h"
-#include "sidewinder.h"
-#include "dfs.h"
+#include <MazeBuilder/maze_algo_interface.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/sidewinder.h>
+#include <MazeBuilder/dfs.h>
 
 using namespace std;
 using namespace mazes;

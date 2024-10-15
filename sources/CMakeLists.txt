@@ -6,8 +6,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
     add_compile_definitions("MAZE_DEBUG")
 endif()
 
-set(MAZE_BUILDER_LIB "maze_builder_lib")
-
 set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
 
 set(MAZE_BUILDER_LIB_SOURCES

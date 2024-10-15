@@ -6,7 +6,7 @@
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include "../sources/args_builder.h"
+#include <MazeBuilder/args_builder.h>
 
 using namespace std;
 using namespace mazes;

@@ -10,12 +10,12 @@
 #include <mutex>
 #include <condition_variable>
 
-#include "binary_tree.h"
-#include "grid.h"
-#include "grid_interface.h"
-#include "distance_grid.h"
-#include "distances.h"
-#include "maze_factory.h"
+#include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/distances.h>
+#include <MazeBuilder/maze_factory.h>
 
 using namespace mazes;
 using namespace std;

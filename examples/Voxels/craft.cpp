@@ -51,13 +51,12 @@
 #include "item.h"
 #include "matrix.h"
 
-#include "args_builder.h"
-#include "maze_types_enum.h"
-#include "maze_factory.h"
-#include "maze_builder.h"
-#include "grid.h"
-#include "cell.h"
-#include "writer.h"
+#include <MazeBuilder/maze_types_enum.h>
+#include <MazeBuilder/maze_factory.h>
+#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/writer.h>
 
 // Movement configurations
 #define KEY_FORWARD SDL_SCANCODE_W
@@ -282,9 +281,7 @@ struct craft::craft_impl {
 
 			check_framebuffer();
 
-#if defined(MAZE_DEBUG)
             SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
-#endif
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         } // gen
@@ -504,9 +501,8 @@ struct craft::craft_impl {
         for (auto&& w : this->m_model->workers) {
             // Wait for the thread to complete its execution
             w->thrd.join();
-#if defined(MAZE_DEBUG)
+
             SDL_Log("Worker thread %d finished!", w->index);
-#endif
         }
         // Clear the vector after all threads have been joined
         this->m_model->workers.clear();
@@ -2069,9 +2065,7 @@ struct craft::craft_impl {
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
             set_block(hx, hy, hz, 0);
             record_block(hx, hy, hz, 0);
-#if defined(MAZE_DEBUG)
             SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
-#endif
             if (is_plant(get_block(hx, hy + 1, hz))) {
                 set_block(hx, hy + 1, hz, 0);
             }
@@ -2086,9 +2080,7 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
-#if defined(MAZE_DEBUG)
                 SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
-#endif
             }
         }
     }
@@ -2373,22 +2365,15 @@ struct craft::craft_impl {
      * @brief Create SDL/GL window and context, check display modes
      */
     void create_window_and_context() {
-#if defined(MAZE_DEBUG)
         SDL_Log("Setting SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
-#else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-#endif
 
 #if defined(__EMSCRIPTEN__)
-#if defined(MAZE_DEBUG)
         SDL_Log("Setting SDL_GL_CONTEXT_PROFILE_ES\n");
-#endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
 #else
-#if defined(MAZE_DEBUG)
         SDL_Log("Setting SDL_GL_CONTEXT_PROFILE_CORE\n");
-#endif
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 #endif
 
@@ -2400,7 +2385,7 @@ struct craft::craft_impl {
 
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
 
-        this->m_model->window = SDL_CreateWindow(this->m_version.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        this->m_model->window = SDL_CreateWindow("SDL app", INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2492,11 +2477,8 @@ bool craft::run(const std::list<std::string>& algos,
     }
 #endif
 
-    //#if defined(MAZE_DEBUG)
     //    this->m_pimpl->check_fullscreen_modes();
-    //#endif
 
-#if defined(MAZE_DEBUG)
     const GLubyte* renderer = glGetString(GL_RENDERER);
     const GLubyte* vendor = glGetString(GL_VENDOR);
     const GLubyte* version = glGetString(GL_VERSION);
@@ -2521,7 +2503,6 @@ bool craft::run(const std::list<std::string>& algos,
             SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
         }
     }
-#endif
 
     // LOAD TEXTURES
     GLuint texture;
@@ -2673,9 +2654,7 @@ bool craft::run(const std::list<std::string>& algos,
     if (USE_CACHE) {
         db_enable();
         if (db_init(this->m_pimpl->m_model->db_path)) {
-#if defined(MAZE_DEBUG)
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "db_init failed\n");
-#endif
             return false;
         }
     }
@@ -2775,12 +2754,6 @@ bool craft::run(const std::list<std::string>& algos,
 
     craft_impl::BloomTools bloom_tools{};
 
-    // LOCAL VARIABLES
-    uint64_t previous = SDL_GetTicks();
-    double last_commit = SDL_GetTicks();
-    int triangle_faces = 0;
-    bool running = true;
-
     craft_impl::Player* me = &m_pimpl->m_model->player;
     craft_impl::State* p_state = &m_pimpl->m_model->player.state;
 
@@ -2790,9 +2763,6 @@ bool craft::run(const std::list<std::string>& algos,
         p_state->x = 15.f;
         p_state->z = 15.f;
         p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 55.f;
-#if defined(MAZE_DEBUG)        
-        SDL_Log("initial player state: x: %f, y: %f, z: %f\n", p_state->x, p_state->y, p_state->z);
-#endif
     }
 
     me->id = 0;
@@ -2801,10 +2771,16 @@ bool craft::run(const std::list<std::string>& algos,
 
     vector<uint8_t> current_maze_pixels;
 
-#if defined(MAZE_DEBUG)
     SDL_Log("CHECK_GL_ERR() prior to main loop\n");
     CHECK_GL_ERR();
-#endif
+
+    // LOCAL VARIABLES
+    uint64_t previous = SDL_GetTicks();
+    double last_commit = SDL_GetTicks();
+    int triangle_faces = 0;
+    bool running = true;
+    double time_step = 0;
+    double time_accum = 0;
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -2847,9 +2823,14 @@ bool craft::run(const std::list<std::string>& algos,
 
         // Handle SDL events and motion updates
         static bool window_resizes = false;
-        // Handle SDL events and motion (keyboard, mouse, etc.)
-        running = this->m_pimpl->handle_events_and_motion(elapsed, ref(window_resizes));
-
+        static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
+        time_accum += elapsed;
+        while (time_accum >= FIXED_TIME_STEP) {
+            // Handle SDL events and motion (keyboard, mouse, etc.)
+            running = this->m_pimpl->handle_events_and_motion(FIXED_TIME_STEP, ref(window_resizes));
+            time_accum -= FIXED_TIME_STEP;
+            time_step += FIXED_TIME_STEP;
+        }
         if (model->create_radius != gui->view) {
             model->create_radius = gui->view;
             model->render_radius = gui->view;
@@ -3030,9 +3011,7 @@ bool craft::run(const std::list<std::string>& algos,
                 last_fullscreen = gui->fullscreen;
                 if (update_fullscreen) {
                     SDL_SetWindowFullscreen(sdl_window, gui->fullscreen);
-#if defined(MAZE_DEBUG)
                     SDL_Log("Setting fullscreen to %d\n", gui->fullscreen);
-#endif
                 }
 
                 static bool last_vsync = gui->vsync;
@@ -3207,7 +3186,6 @@ bool craft::run(const std::list<std::string>& algos,
         ImGui::End();
 #endif
 
-#if defined(MAZE_DEBUG)
         ImVec2 fps_window_size = ImVec2(display_size.x * 0.35f, 50);
         ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.8f - fps_window_size.x, 0));
         ImGui::SetNextWindowSize(fps_window_size);
@@ -3222,7 +3200,6 @@ bool craft::run(const std::list<std::string>& algos,
         ImGui::SetWindowFontScale(1.25f);
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
-#endif
 
         ImGui::PopFont();
 
@@ -3232,9 +3209,7 @@ bool craft::run(const std::list<std::string>& algos,
 
         SDL_GL_SwapWindow(sdl_window);
 
-#if defined(MAZE_DEBUG)
         CHECK_GL_ERR();
-#endif
 
     } // EVENT LOOP
 
@@ -3245,12 +3220,10 @@ bool craft::run(const std::list<std::string>& algos,
 
     m_pimpl->cleanup_worker_threads();
 
-#if defined(MAZE_DEBUG)
     SDL_Log("Closing DB. . .\n");
     SDL_Log("Cleaning up ImGui objects. . .");
     SDL_Log("Cleaning up OpenGL objects. . .");
     SDL_Log("Cleaning up SDL objects. . .");
-#endif
 
     db_save_state(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
     db_close();

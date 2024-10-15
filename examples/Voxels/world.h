@@ -9,7 +9,7 @@
 
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
-#include "maze_builder.h"
+#include <MazeBuilder/maze_builder.h>
 
 class world {
 public:

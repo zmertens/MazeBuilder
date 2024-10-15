@@ -30,6 +30,8 @@ include(NoInSourceBuilds)
 include(CTest)
 include(Packaging)
 
+set(MAZE_BUILDER_LIB "maze_builder_lib")
+
 add_subdirectory(sources)
 add_subdirectory(tests)
 add_subdirectory(examples bin)

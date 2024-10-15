@@ -4,7 +4,7 @@
 #include <memory>
 #include <random>
 
-#include "maze_builder.h"
+#include <MazeBuilder/maze_builder.h>
 
 using namespace mazes;
 using namespace std;
