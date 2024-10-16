@@ -1,19 +1,30 @@
 // Example script performing sanity-checks on C++ => JS transpilation
 
-import Module from "./sparks.js";
+import Module from "./maze_builder_js.js";
+
+class Maze {
+	constructor(rows, cols, depth, seed, algorithm, output) {
+		this.rows = rows;
+		this.cols = cols;
+		this.depth = depth;
+		this.seed = seed;
+		this.algorithm = algorithm;
+		this.output = output;
+	}
+}
 
 let libptr = null;
 
 const run = async () => {
 	const activeModule = await Module();
 	if (activeModule) {
-		libptr = activeModule.Lib.get_instance("Calling from JS", 1.2);
+		libptr = activeModule.maze.get_instance(10, 10, 1, 0, "binary_tree", "Maze");
 		if (libptr) {
-			console.log(`libptr: ${libptr}`);
-			console.log(`libptr.to_str(): ${libptr.to_str()}`);
-			libptr.description = "Updated from JS";
-			libptr.version = 2.2;
-			console.log(`libptr.description: ${libptr.description}\nlibptr.version: ${libptr.version}`);
+			const my_maze = new Maze(libptr.rows, libptr.cols, libptr.depth,
+				libptr.seed, libptr.algorithm, libptr.output);
+			console.log(my_maze);
+			const s = JSON.stringify(my_maze);
+			console.log(s);
 			libptr.delete();
 		} else {
 			console.error("No lib ptr");

@@ -18,7 +18,7 @@ using namespace std;
 /**
  * @brief Represent a maze with a thread-safe interface in a 3D grid
  */
-maze_builder::maze_builder(unsigned int width, unsigned int length, unsigned int height)
+maze_builder::maze_builder(int width,  int length,  int height)
     : m_width(width), m_length(length), m_height(height)
     , m_vertices(), m_faces(), m_p_q(), m_block_type(1) {
 
@@ -111,8 +111,8 @@ std::vector<std::uint8_t> maze_builder::to_pixels(mazes::maze_types my_maze_type
     }
 
     auto get_pixels = [&cell_size, &g]() {
-        unsigned int img_width = cell_size * g->get_columns();
-        unsigned int img_height = cell_size * g->get_rows();
+         int img_width = cell_size * g->get_columns();
+         int img_height = cell_size * g->get_rows();
 
         uint32_t wall = 0x000000FF;
 
@@ -190,27 +190,27 @@ std::vector<std::uint8_t> maze_builder::to_pixels(mazes::maze_types my_maze_type
     return get_pixels();
 }
 
-void  maze_builder::set_height(unsigned int height) noexcept {
+void maze_builder::set_height(int height) noexcept {
     this->m_height = height;
 }
 
-unsigned int  maze_builder::get_height() const noexcept {
+int maze_builder::get_height() const noexcept {
     return this->m_height;
 }
 
-void  maze_builder::set_length(unsigned int length) noexcept {
+void maze_builder::set_length(int length) noexcept {
     this->m_length = length;
 }
 
-unsigned int  maze_builder::get_length() const noexcept {
+int maze_builder::get_length() const noexcept {
     return this->m_length;
 }
 
-void  maze_builder::set_width(unsigned int width) noexcept {
+void maze_builder::set_width(int width) noexcept {
     this->m_width = width;
 }
 
-unsigned int  maze_builder::get_width() const noexcept {
+int maze_builder::get_width() const noexcept {
     return this->m_width;
 }
 
@@ -283,13 +283,13 @@ void maze_builder::compute_geometry(maze_types my_maze_type,
     
     istringstream iss{ this->to_str(my_maze_type, cref(get_int), cref(rng)) };
     string line;
-    unsigned int row_x = 0;
+     int row_x = 0;
     while (getline(iss, line, '\n')) {
-        unsigned int col_z = 0;
+         int col_z = 0;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
-                static constexpr unsigned int block_size = 1;
+                static constexpr  int block_size = 1;
                 for (auto h{ 0 }; h < m_height; h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing

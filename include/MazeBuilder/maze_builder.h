@@ -31,7 +31,7 @@ private:
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
 public:
-    explicit maze_builder(unsigned int width, unsigned int length, unsigned int height);
+    explicit maze_builder(int width, int length, int height);
 
 	virtual void clear() noexcept override;
 	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
@@ -54,12 +54,12 @@ public:
     
     std::string to_wavefront_obj_str() const noexcept;
     
-    void set_height(unsigned int height) noexcept;
-    unsigned int get_height() const noexcept;
-    void set_length(unsigned int length) noexcept;
-    unsigned int get_length() const noexcept;
-    void set_width(unsigned int width) noexcept;
-    unsigned int get_width() const noexcept;
+    void set_height(int height) noexcept;
+    int get_height() const noexcept;
+    void set_length(int length) noexcept;
+    int get_length() const noexcept;
+    void set_width(int width) noexcept;
+    int get_width() const noexcept;
 
     // Expose progress_tracker methods
     void start_progress() noexcept;
@@ -103,8 +103,8 @@ private:
 
     void add_block(int x, int y, int z, int w, int block_size) noexcept override;
 
-    unsigned int m_width, m_length, m_height;
-    unsigned int m_block_type;
+    int m_width, m_length, m_height;
+    int m_block_type;
 
     // Tuple (x, y, z, block_type)
     std::vector<std::tuple<int, int, int, int>> m_vertices;

@@ -32,7 +32,7 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
         auto neighbors = current->get_neighbors();
         current = *std::min_element(neighbors.begin(), neighbors.end(),
             [this](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b) {
-                return m_cells.at(a) < m_cells.at(b);
+                return m_cells.at(a) < m_cells.at(b) && a->is_linked(b);
             });
     }
 

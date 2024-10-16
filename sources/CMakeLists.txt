@@ -23,12 +23,19 @@ set(MAZE_BUILDER_LIB_SOURCES
     colored_grid.cpp
     dfs.cpp)
 
+# Use these features on the Web only
+if(EMSCRIPTEN)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
+endif()
+
 # Setup object library
 add_library(${MAZE_BUILDER_LIB}_obj OBJECT ${MAZE_BUILDER_LIB_SOURCES} ${CPP_BASE64_SRCS})
 target_include_directories(${MAZE_BUILDER_LIB}_obj PRIVATE ${CMAKE_SOURCE_DIR}/deps)
 target_compile_features(${MAZE_BUILDER_LIB}_obj PUBLIC cxx_std_17)
-file(GLOB MAZE_BUILDER_HEADERS ${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h)
-target_sources(${MAZE_BUILDER_LIB}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
+# file(GLOB MAZE_BUILDER_HEADERS ${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h)
+# target_sources(${MAZE_BUILDER_LIB}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
+target_include_directories(${MAZE_BUILDER_LIB}_obj PRIVATE ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(${MAZE_BUILDER_LIB}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
 
 # Setup shared library
@@ -47,7 +54,7 @@ install(TARGETS ${MAZE_BUILDER_LIB}_obj ${MAZE_BUILDER_LIB}_shared ${MAZE_BUILDE
   EXPORT MazeBuilderLibrary
   ARCHIVE COMPONENT development
   LIBRARY COMPONENT runtime
-  FILE_SET HEADERS COMPONENT runtime
+  #FILE_SET HEADERS COMPONENT runtime
 )
 
 if (UNIX)
