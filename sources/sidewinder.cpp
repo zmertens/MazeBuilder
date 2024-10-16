@@ -20,7 +20,7 @@ bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::functio
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
     std::vector<shared_ptr<cell>> cells;
-	_grid->make_sorted_vec(ref(cells));
+	_grid->populate_vec(ref(cells));
 
     for (auto itr{ cells.cbegin() }; itr != cells.cend(); itr++) {
         if (*itr && itr->get()->get_row() != last_row) {

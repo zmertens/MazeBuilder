@@ -29,11 +29,10 @@ public:
     unsigned int get_height() const noexcept;
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
-    void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept;
+    virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept override;
     // sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
-
     virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
 
     virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;

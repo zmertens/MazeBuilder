@@ -24,6 +24,8 @@ namespace mazes {
 		
         virtual unsigned int get_rows() const noexcept override;
         virtual unsigned int get_columns() const noexcept override;
+        
+        virtual void populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
         virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
 
         virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;

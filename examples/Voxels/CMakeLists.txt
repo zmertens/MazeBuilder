@@ -25,6 +25,7 @@ set(NOISE_SOURCES ${CMAKE_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
 set(CRAFT_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
@@ -36,21 +37,24 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/craft_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
 
-message(INFO ": Getting SDL via FetchContent")
-include(FetchContent)
-FetchContent_Declare(SDL GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG preview-3.1.3)
-FetchContent_MakeAvailable(SDL)
+find_package(SDL3 QUIET)
+if(NOT SDL3_FOUND)
+    message(INFO ": Getting SDL via FetchContent")
+    include(FetchContent)
+    FetchContent_Declare(SDL GIT_REPOSITORY https://github.com/libsdl-org/SDL.git GIT_TAG preview-3.1.3)
+    FetchContent_MakeAvailable(SDL)
+    set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+endif()
+
 set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
 set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
 
 set(VOXELS_EXE "voxels")
-add_executable(${VOXELS_EXE} ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${DEAR_IMGUI_SOURCES} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${CRAFT_SOURCES})
+add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
 target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3)
 target_compile_features(${VOXELS_EXE} PUBLIC cxx_std_17)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/glad/include)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
-target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/emscripten_local)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
 target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
@@ -66,6 +70,7 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/emscripten_local)
     set_target_properties(${VOXELS_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
     
     target_link_options(${VOXELS_EXE} PRIVATE
