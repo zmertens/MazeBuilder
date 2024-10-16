@@ -16,10 +16,10 @@ class args {
 public:
     std::string output;
     std::string algorithm;
-    unsigned int seed;
-    unsigned int width;
-    unsigned int length;
-    unsigned int height;
+    int seed;
+    int width;
+    int length;
+    int height;
     unsigned int cell_size;
     bool interactive;
     std::string version;
@@ -48,15 +48,15 @@ class args_builder : public args_builder_interface {
 public:
     explicit args_builder(const std::vector<std::string>& vv);
 
-    args_builder& seed(unsigned int seed) noexcept;
+    args_builder& seed(int seed) noexcept;
     args_builder& interactive(bool interactive) noexcept;
     args_builder& version(const std::string& version) noexcept;
     args_builder& help(const std::string& help) noexcept;
     args_builder& algorithm(const std::string& algorithm) noexcept;
     args_builder& output(const std::string& output) noexcept;
-    args_builder& width(unsigned int width) noexcept;
-    args_builder& length(unsigned int length) noexcept;
-    args_builder& height(unsigned int height) noexcept;
+    args_builder& width(int width) noexcept;
+    args_builder& length(int length) noexcept;
+    args_builder& height(int height) noexcept;
     args_builder& cell_size(unsigned int cell_size) noexcept;
 	args_builder& distances(bool distances) noexcept;
     void clear() noexcept;

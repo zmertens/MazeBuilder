@@ -8,8 +8,8 @@
 #include <vector>
 #include <list>
 
-#include <MazeBuilder/distances.h>
 #include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/distances.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/args_builder.h>

@@ -2365,9 +2365,12 @@ struct craft::craft_impl {
      * @brief Create SDL/GL window and context, check display modes
      */
     void create_window_and_context() {
+#if defined(MAZE_DEBUG)
         SDL_Log("Setting SDL_GL_CONTEXT_DEBUG_FLAG\n");
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);
+#else
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+#endif
 
 #if defined(__EMSCRIPTEN__)
         SDL_Log("Setting SDL_GL_CONTEXT_PROFILE_ES\n");

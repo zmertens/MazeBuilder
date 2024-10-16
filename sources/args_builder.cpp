@@ -42,7 +42,7 @@ args_builder::args_builder(const std::vector<std::string>& vv)
     }
 }
 
-args_builder& args_builder::seed(unsigned int seed) noexcept {
+args_builder& args_builder::seed(int seed) noexcept {
     this->my_args.seed = seed;
 	return *this;
 }
@@ -72,17 +72,17 @@ args_builder& args_builder::output(const std::string& output) noexcept {
 	return *this;
 }
 
-args_builder& args_builder::width(unsigned int width) noexcept {
+args_builder& args_builder::width(int width) noexcept {
     this->my_args.width = width;
     return *this;
 }
 
-args_builder& args_builder::length(unsigned int length) noexcept {
+args_builder& args_builder::length(int length) noexcept {
     this->my_args.length = length;
     return *this;
 }
 
-args_builder& args_builder::height(unsigned int height) noexcept {
+args_builder& args_builder::height(int height) noexcept {
 	this->my_args.height = height;
 	return *this;
 }
