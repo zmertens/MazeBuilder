@@ -44,6 +44,11 @@ public:
         const std::function<int(int, int)>& get_int, 
         const std::mt19937& rng,
         bool calc_distances = false) const noexcept override;
+
+    virtual std::string to_str64(mazes::maze_types my_maze_type,
+        const std::function<int(int, int)>& get_int,
+        const std::mt19937& rng,
+        bool calc_distances = false) const noexcept override;
     
     virtual std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,

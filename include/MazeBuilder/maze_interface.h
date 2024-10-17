@@ -26,7 +26,8 @@ public:
 	virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept = 0;
 	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept = 0;
 	// Get a 2D maze as a string
-	virtual std::string to_str(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, bool distances = false) const noexcept = 0;
+	virtual std::string to_str(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, bool calc_distances = false) const noexcept = 0;
+    virtual std::string to_str64(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, bool calc_distances = false) const noexcept = 0;
 	virtual std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
 		const std::function<int(int, int)>& get_int,
 		const std::mt19937& rng,

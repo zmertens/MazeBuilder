@@ -1,11 +1,6 @@
 include(CppCheck)
 include(Doxygen)
 
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
-    add_compile_definitions("MAZE_DEBUG")
-endif()
-
 set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
 
 set(MAZE_BUILDER_LIB_SOURCES
@@ -37,6 +32,11 @@ target_compile_features(${MAZE_BUILDER_LIB}_obj PUBLIC cxx_std_17)
 # target_sources(${MAZE_BUILDER_LIB}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
 target_include_directories(${MAZE_BUILDER_LIB}_obj PRIVATE ${CMAKE_SOURCE_DIR}/include)
 set_target_properties(${MAZE_BUILDER_LIB}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
+    target_compile_definitions(${MAZE_BUILDER_LIB}_obj PRIVATE "MAZE_DEBUG")
+endif()
 
 # Setup shared library
 add_library(${MAZE_BUILDER_LIB}_shared SHARED)

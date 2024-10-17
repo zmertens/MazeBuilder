@@ -12,6 +12,8 @@
 #include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_types_enum.h>
 
+#include <cpp-base64/base64.h>
+
 using namespace mazes;
 using namespace std;
 
@@ -271,6 +273,36 @@ std::string maze_builder::to_str(maze_types my_maze_type,
     } 
     return "";
 } // to_str
+
+std::string maze_builder::to_str64(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, bool calc_distances) const noexcept {
+    std::unique_ptr<grid_interface> g = nullptr;
+    if (calc_distances) {
+        g = make_unique<mazes::distance_grid>(m_width, m_length, m_height);
+    } else {
+        g = make_unique<mazes::grid>(m_width, m_length, m_height);
+    }
+
+    bool success = mazes::maze_factory::gen_maze(my_maze_type, ref(g), cref(get_int), cref(rng));
+
+    if (!success) {
+        return "";
+    }
+
+    stringstream ss64;
+    if (calc_distances) {
+        if (auto distance_ptr = dynamic_cast<distance_grid*>(g.get())) {
+#if defined(MAZE_DEBUG)
+            cout << "INFO: Calculating distances" << endl;
+#endif
+            distance_ptr->calc_distances();
+            ss64 << *distance_ptr;
+        }
+    } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
+        ss64 << *grid_ptr;
+    }
+    auto s64{ ss64.str() };
+    return base64_encode(cref(s64));
+}
 
 /**
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)

@@ -15,6 +15,8 @@
 
 #include <SFML/Network.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <MazeBuilder/maze_builder.h>
 
 static std::shared_ptr<mazes::maze_builder> my_maze_builder = std::make_shared<mazes::maze_builder>(1, 1, 1);
@@ -29,11 +31,16 @@ static constexpr auto MB_MENU_MSG = R"help(
     [version: 0.1.0]
     )help";
 
-static constexpr auto WORKER_URL = "hello-wrangler.zach-mm035.workers.dev";
+static constexpr auto WORKER_URL = "http://mb-worker.zach-mm035.workers.dev";
+static constexpr auto LOCAL_URL = "http://localhost:8787";
 
 void print_menu() {
     std::cout << MB_MENU_MSG;
+#if defined(MAZE_DEBUG)
+    std::cout << "\nHttp URL: " << LOCAL_URL << std::endl;
+#else
     std::cout << "\nHttp URL: " << WORKER_URL << std::endl;
+#endif
 }
 
 void process_commands(std::deque<char>& commands,
@@ -49,11 +56,15 @@ void process_commands(std::deque<char>& commands,
     };
 
     auto process_char = [&mb, &is_running, &get_int, &rng](char ch) {
-        sf::Http::Request sf_post_request {WORKER_URL, sf::Http::Request::Post};
+        sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
         sf_post_request.setHttpVersion(1, 1);
-        sf::Http::Request sf_get_request {WORKER_URL, sf::Http::Request::Get};
+        sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
         sf_get_request.setHttpVersion(1, 1);
+#if defined(MAZE_DEBUG)
+        sf::Http http{ LOCAL_URL };
+#else
         sf::Http http{ WORKER_URL };
+#endif
         sf::Http::Response response;
 
         string users_maze_output{};
@@ -80,13 +91,22 @@ void process_commands(std::deque<char>& commands,
             my_maze_builder->clear();
             my_maze_builder = std::make_shared<mazes::maze_builder>(rows, columns, depth);
             rng.seed(seed);
-            users_maze_output = my_maze_builder->to_str(mt, cref(get_int), cref(rng), true);
-            // @TODO send URL params or JSON body
-            sf_post_request.setBody(users_maze_output);
-            sf_post_request.setField("Content-Type", "text/plain");
-            sf_post_request.setField("Content-Length", to_string(users_maze_output.size()));
+            auto users_maze_output64 = my_maze_builder->to_str64(mt, cref(get_int), cref(rng), true);
+            // Create the JSON
+            nlohmann::json my_json;
+            my_json["num_rows"] = rows;
+            my_json["num_cols"] = columns;
+            my_json["depth"] = depth;
+            my_json["seed"] = seed;
+            my_json["algo"] = algorithm;
+            my_json["str"] = users_maze_output64;
+            auto dump = my_json.dump(4);
+            sf_post_request.setBody(dump);
+            sf_post_request.setField("Content-Type", "application/json");
+            sf_post_request.setField("Content-Length", to_string(my_json.size()));
 
-            cout << "Sent new maze:{\n\trows=" << rows << ";columns=" << columns << ";depth=" << depth << ";seed=" << seed << ";algorithm='" << algorithm << "';str=\n'" << users_maze_output << "';\n}\n";
+            // Note the base64 encoded string is very long
+            //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
 
             response = http.sendRequest(sf_post_request);
             if (response.getStatus() != sf::Http::Response::Ok) {
@@ -115,10 +135,10 @@ void process_commands(std::deque<char>& commands,
             ostringstream option_1;
             option_1 << "-- Enter rows, columns, depth, seed, and algorithm with a single space between. --\n";
             ostringstream example_user_input;
-            example_user_input << "Example (ignore [] brackets):\t[1 2 3 1 dfs]\nSent new maze using sf::Http:\n{\trows=1;\n\tcolumns=2;\n\tdepth=3;\n\tseed=1;\n\talgorithm='dfs';}\n";
-            ostringstream example_1;
-            example_1 << option_1.str() << example_user_input.str();
-            cout << example_1.str();
+            example_user_input << "Example (ignore [] brackets):\t[1 2 3 1 dfs]\n";
+            
+            cout << option_1.str() << example_user_input.str();
+            
             break;
             }
             case '5':
@@ -139,6 +159,8 @@ void process_commands(std::deque<char>& commands,
         //commands.clear();
         if (is_running) {
             print_menu();
+        } else {
+            break;
         }
     }
 }
@@ -175,6 +197,8 @@ int main()
         }
         accumulator = min(accumulator, FIXED_TIMESTEP);
     }
+
+    return 0;
 } // main
 
 
