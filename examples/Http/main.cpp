@@ -109,11 +109,7 @@ void process_commands(std::deque<char>& commands,
             //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
 
             response = http.sendRequest(sf_post_request);
-            if (response.getStatus() != sf::Http::Response::Ok) {
-                cerr << "Error: " << response.getStatus() << endl;
-                break;
-            }
-            cout << "Response from server: " << response.getBody() << endl;
+            cout << "Response status: " << response.getStatus() << " \nbody: " << response.getBody() << endl;
             break;
             } // case '1'
             case '2': {
