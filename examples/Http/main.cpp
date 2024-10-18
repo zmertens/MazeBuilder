@@ -32,7 +32,7 @@ static constexpr auto MB_MENU_MSG = R"help(
     )help";
 
 static constexpr auto WORKER_URL = "http://mb-worker.zach-mm035.workers.dev";
-static constexpr auto LOCAL_URL = "http://localhost:8787";
+static constexpr auto LOCAL_URL = "http://127.0.0.1";
 
 void print_menu() {
     std::cout << MB_MENU_MSG;
@@ -61,7 +61,7 @@ void process_commands(std::deque<char>& commands,
         sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
         sf_get_request.setHttpVersion(1, 1);
 #if defined(MAZE_DEBUG)
-        sf::Http http{ LOCAL_URL };
+        sf::Http http{ LOCAL_URL, 8787 };
 #else
         sf::Http http{ WORKER_URL };
 #endif
@@ -103,7 +103,7 @@ void process_commands(std::deque<char>& commands,
             auto dump = my_json.dump(4);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
-            sf_post_request.setField("Content-Length", to_string(my_json.size()));
+            sf_post_request.setField("Content-Length", to_string(dump.size()));
 
             // Note the base64 encoded string is very long
             //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
@@ -127,7 +127,7 @@ void process_commands(std::deque<char>& commands,
             break;
             } // case '2'
             case '3':
-            cout << MB_MENU_MSG << endl;
+            print_menu();
             break;
             case '4': {
             // Show example
@@ -156,12 +156,6 @@ void process_commands(std::deque<char>& commands,
             commands.pop_front();
             process_char(ch);
         }
-        //commands.clear();
-        if (is_running) {
-            print_menu();
-        } else {
-            break;
-        }
     }
 }
 
@@ -184,18 +178,13 @@ int main()
     // Main game loop
     while (is_running) {
         // Input / Update
-        accumulator += clock.restart().asSeconds();
-        while (accumulator >= FIXED_TIMESTEP) {
-            cin.clear();
-            if (auto ch = cin.get(); ch != '\n' && ch != EOF) {
-                commands.push_back(ch);
-            }
-            accumulator -= FIXED_TIMESTEP;
-
-            // Process commands
-            process_commands(commands, ref(is_running), cref(my_maze_builder));
+        cin.clear();
+        if (auto ch = cin.get(); ch != '\n' && ch != EOF) {
+            commands.push_back(ch);
         }
-        accumulator = min(accumulator, FIXED_TIMESTEP);
+
+        // Process commands
+        process_commands(commands, ref(is_running), cref(my_maze_builder));
     }
 
     return 0;
