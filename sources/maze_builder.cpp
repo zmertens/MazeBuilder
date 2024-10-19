@@ -13,6 +13,7 @@
 #include <MazeBuilder/maze_types_enum.h>
 
 #include <cpp-base64/base64.h>
+#include <nlohmann/json.hpp>
 
 using namespace mazes;
 using namespace std;
@@ -190,6 +191,33 @@ std::vector<std::uint8_t> maze_builder::to_pixels(mazes::maze_types my_maze_type
     }
 
     return get_pixels();
+}
+
+/**
+ * @brief Construct maze in-place and return a JSON string
+ * @param calc_distances = false
+ */
+std::string maze_builder::to_json_str(mazes::maze_types my_maze_type,
+    const std::function<int(int, int)>& get_int,
+    const std::mt19937& rng,
+    bool calc_distances) const noexcept {
+
+    const auto maze_str64 = this->to_str64(my_maze_type, cref(get_int), cref(rng), calc_distances);
+
+    if (maze_str64.empty()) {
+        // Maze gen failed
+        return "";
+    }
+
+    nlohmann::json my_json;
+    my_json["output"] = maze_str64;
+    my_json["num_rows"] = this->get_length();
+    my_json["num_cols"] = this->get_width();
+    my_json["depth"] = this->get_height();
+    my_json["algorithm"] = mazes::to_string(my_maze_type);
+    my_json["seed"] = rng.default_seed;
+
+    return my_json.dump(4);
 }
 
 void maze_builder::set_height(int height) noexcept {

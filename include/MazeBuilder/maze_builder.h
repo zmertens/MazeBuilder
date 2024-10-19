@@ -4,17 +4,21 @@
 #include <string>
 #include <memory>
 #include <utility>
+#include <tuple>
 #include <unordered_map>
 #include <cstdint>
 #include <optional>
 #include <mutex>
+#include <chrono>
+#include <functional>
+#include <vector>
+#include <random>
 
-#include "maze_interface.h"
 #include "maze_types_enum.h"
 
 namespace mazes {
 
-class maze_builder : public mazes::maze_interface
+class maze_builder
 {
     class cell;
 private:
@@ -31,31 +35,39 @@ private:
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
 public:
+    using maze = std::tuple<int, int, int, int, std::string, std::string>;
+
+    // Constructor
     explicit maze_builder(int width, int length, int height);
 
-	virtual void clear() noexcept override;
-	virtual std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept override;
-    virtual std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept override;
-	virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept override;
+	void clear() noexcept;
+	std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
+    std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept;
+	std::vector<std::vector<std::uint32_t>> get_faces() const noexcept;
 
-    virtual std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept override;
+    std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept;
 
-    virtual std::string to_str(mazes::maze_types my_maze_type, 
+    std::string to_str(mazes::maze_types my_maze_type, 
         const std::function<int(int, int)>& get_int, 
         const std::mt19937& rng,
-        bool calc_distances = false) const noexcept override;
+        bool calc_distances = false) const noexcept;
 
-    virtual std::string to_str64(mazes::maze_types my_maze_type,
+    std::string to_str64(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
-        bool calc_distances = false) const noexcept override;
+        bool calc_distances = false) const noexcept;
     
-    virtual std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
+    std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
-        const unsigned int cell_size = 3) const noexcept override;
+        const unsigned int cell_size = 3) const noexcept;
 
-    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept override;
+    std::string to_json_str(mazes::maze_types my_maze_type,
+        const std::function<int(int, int)>& get_int,
+        const std::mt19937& rng,
+        bool calc_distances = false) const noexcept;
+
+    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept;
     
     std::string to_wavefront_obj_str() const noexcept;
     
@@ -106,7 +118,7 @@ private:
     };
 
 
-    void add_block(int x, int y, int z, int w, int block_size) noexcept override;
+    void add_block(int x, int y, int z, int w, int block_size) noexcept;
 
     int m_width, m_length, m_height;
     int m_block_type;
