@@ -75,3 +75,15 @@ TEST_CASE("Test distance grid", "[distance grid output]") {
 	REQUIRE(ss.str().size() > 0);
 }
 
+TEST_CASE("Grids are sortable", "[sort]") {
+    unique_ptr<grid> g1{ make_unique<grid>(100, 100) };
+    vector<shared_ptr<cell>> sorted_cells;
+    g1->make_sorted_vec(ref(sorted_cells));
+    // each sorted cell should increase in index value up until the max in the grid
+    unsigned int max{ 0 };
+    for (auto&& cell : sorted_cells) {
+        max = cell->get_index();
+        REQUIRE(cell->get_index() >= max);
+    }
+}
+

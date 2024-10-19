@@ -13,10 +13,10 @@ using namespace mazes;
 
 TEST_CASE( "Args are built by vector", "[args]" ) {
     unsigned int seed = 32u;
-    unsigned int width = 1'001u;
+    unsigned int columns = 1'001u;
     unsigned int height = 11u;
-    unsigned int length = 1'002u;
-    unsigned int cell_size = 15u;
+    unsigned int rows = 1'002u;
+
     string output = "maze.obj";
     string help_message = "My Maze Builder Program\n";
     string version_message = "0.0.1\n";
@@ -28,10 +28,9 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
         "--seed=" + to_string(seed),
         "--algorithm=" + algorithm,
         "--output=" + output,
-        "--width=" + to_string(width),
-        "--length=" + to_string(length),
+        "--columns=" + to_string(columns),
+        "--rows=" + to_string(rows),
         "--height=" + to_string(height),
-		"--cell_size=" + to_string(cell_size),
         "--distances"
     };
 
@@ -46,10 +45,9 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
     REQUIRE(maze_args.algorithm.compare(algorithm) == 0);
     REQUIRE(maze_args.seed == seed);
     REQUIRE(maze_args.output.compare(output) == 0);
-    REQUIRE(maze_args.width == width);
+    REQUIRE(maze_args.columns == columns);
     REQUIRE(maze_args.height == height);
-    REQUIRE(maze_args.length == length);
-    REQUIRE(maze_args.cell_size == cell_size);
+    REQUIRE(maze_args.rows == rows);
 	REQUIRE(maze_args.distances == true);
 
     // Check the ostream operator
@@ -72,11 +70,9 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
 		"-i",
 		"-a", algorithm,
 		"-o", output,
-		"-w", to_string(width),
-		"-l", to_string(length),
-		"-y", to_string(height),
-        "-c", to_string(cell_size), "-d"
-	};
+		"-c", to_string(columns),
+		"-r", to_string(rows),
+		"-y", to_string(height), "-d"};
     // First-come-first-serve and grab 'interactive'
     mazes::args_builder builder2{ cref(SHORT_ARGS) };
     auto&& maze_args2 = builder2.build();

@@ -17,10 +17,9 @@ public:
     std::string output;
     std::string algorithm;
     int seed;
-    int width;
-    int length;
+    int columns;
+    int rows;
     int height;
-    unsigned int cell_size;
     bool interactive;
     std::string version;
     std::string help;
@@ -28,14 +27,13 @@ public:
 
     friend std::ostream& operator<<(std::ostream& os, args& a) {
         std::stringstream ss;
-        ss << "\nseed=" << a.seed << "\n";
+        ss << "\nINFO: seed=" << a.seed << "\n";
         ss << "interactive=" << a.interactive << "\n";
         ss << "algorithm=" << a.algorithm << "\n";
         ss << "output=" << a.output << "\n";
-        ss << "width=" << a.width << "\n";
-        ss << "length=" << a.length << "\n";
+        ss << "columns=" << a.columns << "\n";
+        ss << "rows=" << a.rows << "\n";
         ss << "height=" << a.height << "\n";
-        ss << "cell_size=" << a.cell_size << "\n";
         ss << "help=" << a.help << "\n";
         ss << "version=" << a.version << "\n";
         ss << "distances=" << a.distances << "\n";
@@ -54,10 +52,9 @@ public:
     args_builder& help(const std::string& help) noexcept;
     args_builder& algorithm(const std::string& algorithm) noexcept;
     args_builder& output(const std::string& output) noexcept;
-    args_builder& width(int width) noexcept;
-    args_builder& length(int length) noexcept;
+    args_builder& columns(int columns) noexcept;
+    args_builder& rows(int rows) noexcept;
     args_builder& height(int height) noexcept;
-    args_builder& cell_size(unsigned int cell_size) noexcept;
 	args_builder& distances(bool distances) noexcept;
     void clear() noexcept;
 

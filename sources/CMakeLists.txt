@@ -46,7 +46,7 @@ target_link_libraries(${MAZE_BUILDER_LIB}_shared ${MAZE_BUILDER_LIB}_obj)
 add_library(${MAZE_BUILDER_LIB}_static STATIC)
 target_link_libraries(${MAZE_BUILDER_LIB}_static ${MAZE_BUILDER_LIB}_obj)
 
-Doxygen(maze_builder sources)
+#Doxygen(maze_builder sources)
 
 # Installation
 include(GNUInstallDirs)

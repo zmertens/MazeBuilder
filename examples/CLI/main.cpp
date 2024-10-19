@@ -23,15 +23,14 @@ std::string maze_builder_version = "maze_builder=[5.1.5]";
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
-        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
+        Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
           -a, --algorithm    dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
-          -w, --width        maze width [default=100]
+          -r, --rows         maze rows [default=100]
           -y, --height       maze height [default=10]
-          -l, --length       maze length [default=100]
-          -c, --cell_size    maze cell size [default=3]
+          -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
-          -i, --interactive  run program in interactive mode with a GUI
+          -i, --interactive  No effect
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message
           -v, --version      display program version
@@ -70,11 +69,12 @@ int main(int argc, char* argv[]) {
     };
 
     try {
+        static constexpr auto CELL_SIZE = 10;
         bool success = false;
         // Run the command-line program
         mazes::maze_types my_maze_type = mazes::to_maze_type(maze_args.algorithm);
         static constexpr auto block_type = -1;
-        mazes::maze_builder my_maze{ maze_args.width, maze_args.length, maze_args.height, my_maze_type,
+        mazes::maze_builder my_maze{ maze_args.rows, maze_args.columns, maze_args.height, my_maze_type,
             cref(get_int), cref(rng_engine), maze_args.distances, block_type};
         my_maze.start_progress();
         mazes::writer my_writer;
@@ -85,9 +85,7 @@ int main(int argc, char* argv[]) {
             break;
         case mazes::output_types::PNG:
             success = my_writer.write_png(cref(maze_args.output), 
-                my_maze.to_pixels(maze_args.cell_size), 
-                    maze_args.width * maze_args.cell_size, 
-                    maze_args.length * maze_args.cell_size);
+            my_maze.to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
             break;
         case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
         case mazes::output_types::STDOUT: {

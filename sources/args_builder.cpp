@@ -28,18 +28,15 @@ args_builder::args_builder(const std::vector<std::string>& vv)
     if (this->my_args.output.empty()) {
         this->my_args.output = "stdout";
     }
-	if (this->my_args.width == 0) {
-		this->my_args.width = 100;
+	if (this->my_args.rows == 0) {
+		this->my_args.rows = 100;
 	}
-	if (this->my_args.length == 0) {
-		this->my_args.length = 100;
+	if (this->my_args.columns == 0) {
+		this->my_args.columns = 100;
 	}
 	if (this->my_args.height == 0) {
 		this->my_args.height = 10;
 	}
-    if (this->my_args.cell_size == 0) {
-        this->my_args.cell_size = 3;
-    }
 }
 
 args_builder& args_builder::seed(int seed) noexcept {
@@ -72,24 +69,19 @@ args_builder& args_builder::output(const std::string& output) noexcept {
 	return *this;
 }
 
-args_builder& args_builder::width(int width) noexcept {
-    this->my_args.width = width;
+args_builder& args_builder::rows(int rows) noexcept {
+    this->my_args.rows = rows;
     return *this;
 }
 
-args_builder& args_builder::length(int length) noexcept {
-    this->my_args.length = length;
+args_builder& args_builder::columns(int columns) noexcept {
+    this->my_args.columns = columns;
     return *this;
 }
 
 args_builder& args_builder::height(int height) noexcept {
 	this->my_args.height = height;
 	return *this;
-}
-
-args_builder& args_builder::cell_size(unsigned int cell_size) noexcept {
-    this->my_args.cell_size = cell_size;
-    return *this;
 }
 
 args_builder& args_builder::distances(bool distances) noexcept {
@@ -128,10 +120,9 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
 
     regex interactive_regex ("^--interactive$|^-i$", regex_constants::ECMAScript);
     regex seed_regex ("--seed=[\\d+]+|^-s$", regex_constants::ECMAScript);
-    regex width_regex ("--width=[\\d+]+|^-w$", regex_constants::ECMAScript);
-    regex length_regex ("--length=[\\d]+|^-l$", regex_constants::ECMAScript);
+    regex rows_regex ("--rows=[\\d+]+|^-r$", regex_constants::ECMAScript);
+    regex columns_regex("--columns=[\\d]+|^-c$", regex_constants::ECMAScript);
     regex height_regex ("--height=[\\d]+|^-y$", regex_constants::ECMAScript);
-    regex cell_size_regex("--cell_size=[\\d]+|^-c$", regex_constants::ECMAScript);
     regex help_regex ("--help|^-h$", regex_constants::ECMAScript);
     regex version_regex ("--version|^-v$", regex_constants::ECMAScript);
     regex algo_regex ("--algorithm=[\\w]+|^-a$", regex_constants::ECMAScript);
@@ -166,29 +157,29 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
 		} else if (regex_match(current, distances_regex)) {
 			// --distances, -d
             this->my_args.distances = true;
-		} else if (regex_match(current, width_regex)) {
-            // --width=?, -w ?
-            if (current.compare("-w") == 0) { 
+        } else if (regex_match(current, rows_regex)) {
+            // --rows=?, -r ?
+            if (current.compare("-r") == 0) {
                 if (itr + 1 != vv.cend()) {
-                    this->my_args.width = atoi((*(itr + 1)).c_str());
+                    this->my_args.rows = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.width = atoi(get_val_from_long_option(current).c_str());
+                this->my_args.rows = atoi(get_val_from_long_option(current).c_str());
             }
-        } else if (regex_match(current, length_regex)) {
-            // --length=?, -l ?
-            if (current.compare("-l") == 0) { 
+        } else if (regex_match(current, columns_regex)) {
+            // --columns=?, -c ?
+            if (current.compare("-c") == 0) { 
                 if (itr + 1 != vv.cend()) {
-                    this->my_args.length = atoi((*(itr + 1)).c_str());
+                    this->my_args.columns = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.length = atoi(get_val_from_long_option(current).c_str());
+                this->my_args.columns = atoi(get_val_from_long_option(current).c_str());
             }
         } else if (regex_match(current, height_regex)) {
             // --height=?, -y ?
@@ -201,18 +192,6 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
                 }
             } else {
                 this->my_args.height = atoi(get_val_from_long_option(current).c_str());
-            }
-        } else if (regex_match(current, cell_size_regex)) {
-            // --cell_size=?, -c ?
-            if (current.compare("-c") == 0) {
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.cell_size = atoi((*(itr + 1)).c_str());
-                    itr++;
-                } else {
-                    break;
-                }
-            } else {
-                this->my_args.cell_size = atoi(get_val_from_long_option(current).c_str());
             }
         } else if (regex_match(current, algo_regex)) {
             // --algorithm=?, -a ?
