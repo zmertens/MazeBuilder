@@ -11,14 +11,13 @@ using namespace mazes;
 using namespace std;
 
 /**
- * @brief Construct a new distance grid object
- * @param width
- * @param length
- * @param height 
+ * @brief Construct a new distance grid object with a generated maze
+ * @param height 1
  */
-distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int height)
-	: m_grid(make_unique<grid>(width, length, height))
+distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int height)
+	: m_grid(make_shared<grid>(rows, cols, height))
 	, m_distances(make_shared<distances>(this->m_grid->get_root())) {
+    this->calc_distances();
 }
 
 unsigned int distance_grid::get_rows() const noexcept {
@@ -29,6 +28,10 @@ unsigned int distance_grid::get_columns() const noexcept {
 	return this->m_grid->get_columns();
 }
 
+unsigned int distance_grid::get_height() const noexcept {
+    return this->m_grid->get_height();
+}
+
 void distance_grid::populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 	this->m_grid->populate_vec(ref(cells));
 }
@@ -37,7 +40,7 @@ void distance_grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) c
 	return this->m_grid->make_sorted_vec(ref(cells));
 }
 
-void distance_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
+void distance_grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
 	this->m_grid->append(other_grid);
 }
 void distance_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {

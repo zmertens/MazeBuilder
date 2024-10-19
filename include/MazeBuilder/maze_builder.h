@@ -14,7 +14,8 @@
 #include <vector>
 #include <random>
 
-#include "maze_types_enum.h"
+#include <MazeBuilder/maze_types_enum.h>
+#include <MazeBuilder/grid_interface.h>
 
 namespace mazes {
 
@@ -38,7 +39,13 @@ public:
     using maze = std::tuple<int, int, int, int, std::string, std::string>;
 
     // Constructor
-    explicit maze_builder(int width, int length, int height);
+    explicit maze_builder(int rows, int cols, int height, int block_type = 1);
+    explicit maze_builder(int rows, int cols, int height,
+        mazes::maze_types my_maze_type,
+        const std::function<int(int, int)>& get_int,
+        const std::mt19937& rng,
+        bool calc_distances = false,
+        int block_type = 1);
 
 	void clear() noexcept;
 	std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
@@ -47,36 +54,19 @@ public:
 
     std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept;
 
-    std::string to_str(mazes::maze_types my_maze_type, 
-        const std::function<int(int, int)>& get_int, 
-        const std::mt19937& rng,
-        bool calc_distances = false) const noexcept;
+    std::string to_str() const noexcept;
 
-    std::string to_str64(mazes::maze_types my_maze_type,
-        const std::function<int(int, int)>& get_int,
-        const std::mt19937& rng,
-        bool calc_distances = false) const noexcept;
+    std::string to_str64() const noexcept;
     
-    std::vector<std::uint8_t> to_pixels(mazes::maze_types my_maze_type,
-        const std::function<int(int, int)>& get_int,
-        const std::mt19937& rng,
-        const unsigned int cell_size = 3) const noexcept;
+    std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept;
 
-    std::string to_json_str(mazes::maze_types my_maze_type,
-        const std::function<int(int, int)>& get_int,
-        const std::mt19937& rng,
-        bool calc_distances = false) const noexcept;
+    std::string to_json_str(unsigned int pretty_spaces = 4) const noexcept;
 
-    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng, int block_type = 1) noexcept;
-    
     std::string to_wavefront_obj_str() const noexcept;
     
-    void set_height(int height) noexcept;
     int get_height() const noexcept;
-    void set_length(int length) noexcept;
-    int get_length() const noexcept;
-    void set_width(int width) noexcept;
-    int get_width() const noexcept;
+    int get_columns() const noexcept;
+    int get_rows() const noexcept;
 
     // Expose progress_tracker methods
     void start_progress() noexcept;
@@ -117,10 +107,12 @@ private:
         }
     };
 
-
+    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
     void add_block(int x, int y, int z, int w, int block_size) noexcept;
 
-    int m_width, m_length, m_height;
+    std::unique_ptr<grid_interface> m_grid;
+    maze_types m_maze_type;
+    int m_seed;
     int m_block_type;
 
     // Tuple (x, y, z, block_type)

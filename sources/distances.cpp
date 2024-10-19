@@ -1,5 +1,7 @@
 #include <MazeBuilder/distances.h>
 
+#include <iostream>
+
 #include <MazeBuilder/cell.h>
 
 using namespace mazes;
@@ -25,15 +27,40 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
     auto current = goal;
 
     while (current != m_root) {
-		if (!contains(current)) {
-			return nullptr;
-		}
+        if (!contains(current)) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "ERROR: Current cell not found in distances.\n";
+#endif
+            return nullptr;
+        }
         path->m_cells[current] = m_cells.at(current);
         auto neighbors = current->get_neighbors();
-        current = *std::min_element(neighbors.begin(), neighbors.end(),
+
+        // Filter neighbors to only those that are linked and contained in distances
+        std::vector<std::shared_ptr<cell>> valid_neighbors;
+        for (const auto& neighbor : neighbors) {
+            if (contains(neighbor) && current->is_linked(neighbor)) {
+                valid_neighbors.push_back(neighbor);
+            }
+        }
+
+        if (valid_neighbors.empty()) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "ERROR: No valid neighbors found for current cell.\n";
+#endif
+            return nullptr;
+        }
+
+        // Find the neighbor with the minimum distance
+        current = *std::min_element(valid_neighbors.begin(), valid_neighbors.end(),
             [this](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b) {
-                return m_cells.at(a) < m_cells.at(b) && a->is_linked(b);
+                return m_cells.at(a) < m_cells.at(b);
             });
+
+        // Logging for debugging
+#if defined(MAZE_DEBUG)
+        std::cerr << "INFO: Current cell updated to: " << current->get_index() << "\n";
+#endif
     }
 
     path->m_cells[m_root] = 0;

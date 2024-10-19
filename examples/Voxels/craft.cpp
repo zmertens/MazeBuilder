@@ -2671,13 +2671,10 @@ bool craft::run(const std::list<std::string>& algos,
     auto&& maze2 = this->m_pimpl->m_maze;
     auto&& model = this->m_pimpl->m_model;
 
-    maze2 = make_unique<maze_builder>(gui->maze_width, gui->maze_length, gui->maze_height);
+    maze2 = make_unique<maze_builder>(25, 25, 10, my_maze_type, cref(get_int), cref(rng));
 
     auto maze_func = [&model, &my_maze_type, &get_int, &rng, &maze2](auto w, auto l, auto h) {
-        maze2->set_width(w);
-        maze2->set_length(l);
-        maze2->set_height(h);
-        maze2->compute_geometry(my_maze_type, get_int, rng, items[model->item_index]);
+        maze2 = make_unique<maze_builder>(w, l, h, my_maze_type, cref(get_int), cref(rng));
         };
 
     maze2->start_progress();
@@ -2907,7 +2904,7 @@ bool craft::run(const std::list<std::string>& algos,
                         maze2->start_progress();
                         maze_func(gui->maze_width, gui->maze_length, gui->maze_height);
                         maze2->stop_progress();
-                        current_maze_pixels = maze2->to_pixels(my_maze_type, cref(get_int), cref(rng), 25);
+                        current_maze_pixels = maze2->to_pixels(25);
                         write_maze_now = true;
                     } else {
                         ImGui::SameLine();

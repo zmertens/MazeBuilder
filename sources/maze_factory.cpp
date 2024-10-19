@@ -6,10 +6,11 @@
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/maze_types_enum.h>
 
 using namespace mazes;
 
-bool maze_factory::gen_maze(maze_types maze_type, std::unique_ptr<grid_interface>& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) {
+bool maze_factory::gen(maze_types maze_type, std::unique_ptr<grid_interface>& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) {
     switch (maze_type) {
     case maze_types::BINARY_TREE: {
         static binary_tree bt;

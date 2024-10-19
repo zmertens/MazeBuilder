@@ -19,7 +19,7 @@ using namespace std;
  * @brief grid::grid
  * @param rows
  * @param columns
- * @param height = 0
+ * @param height = 1
  */
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 : m_rows{rows}
@@ -189,7 +189,7 @@ void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexce
 /**
  * @brief Iterate through the other_grid and insert to the current grid's root
  */
-void grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
+void grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
     vector<shared_ptr<cell>> cells_to_sort;
 	if (auto ptr = dynamic_cast<grid*>(other_grid.get())) {
         ptr->populate_vec(ref(cells_to_sort));

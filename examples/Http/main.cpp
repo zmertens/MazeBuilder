@@ -91,7 +91,7 @@ void process_commands(std::deque<char>& commands,
             my_maze_builder->clear();
             my_maze_builder = std::make_shared<mazes::maze_builder>(rows, columns, depth);
             rng.seed(seed);
-            auto users_maze_output64 = my_maze_builder->to_str64(mt, cref(get_int), cref(rng), true);
+            auto users_maze_output64 = my_maze_builder->to_str64();
             // Create the JSON
             nlohmann::json my_json;
             my_json["num_rows"] = rows;

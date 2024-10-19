@@ -18,7 +18,8 @@ namespace mazes {
         virtual ~grid_interface() = default;
 		virtual unsigned int get_rows() const noexcept = 0;
 		virtual unsigned int get_columns() const noexcept = 0;
-		virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept = 0;
+        virtual unsigned int get_height() const noexcept = 0;
+		virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept = 0;
 		virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept = 0;
 		virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept = 0;
 		virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept = 0;
@@ -28,6 +29,7 @@ namespace mazes {
         virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;
 		virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
 		virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
+    protected:
 		friend std::ostream& operator<<(std::ostream& os, grid_interface& g) {
             // First sort cells by row then column
             std::vector<std::shared_ptr<cell>> cells;

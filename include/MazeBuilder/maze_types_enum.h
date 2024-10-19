@@ -33,6 +33,22 @@ namespace mazes {
             return "ERROR: maze type unknown";
         }
     };
+
+    static maze_types to_maze_type(const std::string& algo) {
+        if (algo.compare("binary_tree") == 0) {
+            return maze_types::BINARY_TREE;
+        } else if (algo.compare("sidewinder") == 0) {
+            return maze_types::SIDEWINDER;
+        } else if (algo.compare("dfs") == 0) {
+            return maze_types::DFS;
+        } else if (algo.compare("wilsons") == 0) {
+            return maze_types::WILSONS;
+        } else if (algo.compare("aldous_broder") == 0) {
+            return maze_types::ALDOUS_BRODER;
+        } else {
+            return maze_types::INVALID_ALGO;
+        }
+    };
 }
 
 #endif // MAZE_FACTORY_ENUM_H

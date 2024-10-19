@@ -22,20 +22,22 @@ namespace mazes {
 
 class grid : public grid_interface {
 public:
-    grid(unsigned int rows, unsigned int columns, unsigned int height = 0);
+    explicit grid(unsigned int rows, unsigned int columns, unsigned int height = 1u);
 
     virtual unsigned int get_rows() const noexcept override;
     virtual unsigned int get_columns() const noexcept override;
-    unsigned int get_height() const noexcept;
+    virtual unsigned int get_height() const noexcept override;
+
+    // Statistical queries
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
     virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept override;
-    // sort ascending per index-value
+    // Sort ascending per index-value
     void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
     virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
 
-    virtual void append(std::unique_ptr<grid_interface> const& other_grid) noexcept override;
+    virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept override;
     virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;
     virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept override;
     virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept override;

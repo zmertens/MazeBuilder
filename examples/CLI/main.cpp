@@ -69,44 +69,29 @@ int main(int argc, char* argv[]) {
         return dist(rng_engine);
     };
 
-    // Convert algorithm string into an enum type
-    std::list<std::string> algos = { "binary_tree", "sidewinder", "dfs" };
-    auto get_maze_type_from_algo = [](const std::string& algo)->mazes::maze_types {
-        if (algo.compare("binary_tree") == 0) {
-            return mazes::maze_types::BINARY_TREE;
-        } else if (algo.compare("sidewinder") == 0) {
-            return mazes::maze_types::SIDEWINDER;
-        } else if (algo.compare("dfs") == 0) {
-            return mazes::maze_types::DFS;
-        } else {
-            return mazes::maze_types::INVALID_ALGO;
-        }
-    };
-
     try {
         bool success = false;
         // Run the command-line program
-        mazes::maze_types my_maze_type = get_maze_type_from_algo(maze_args.algorithm);
+        mazes::maze_types my_maze_type = mazes::to_maze_type(maze_args.algorithm);
         static constexpr auto block_type = -1;
-        mazes::maze_builder my_maze{ maze_args.width, maze_args.length, maze_args.height };
+        mazes::maze_builder my_maze{ maze_args.width, maze_args.length, maze_args.height, my_maze_type,
+            cref(get_int), cref(rng_engine)};
         my_maze.start_progress();
         mazes::writer my_writer;
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {
         case mazes::output_types::WAVEFRONT_OBJ_FILE:
-            my_maze.compute_geometry(my_maze_type, std::cref(get_int), std::cref(rng_engine), block_type);
             success = my_writer.write(cref(maze_args.output), my_maze.to_wavefront_obj_str());
             break;
         case mazes::output_types::PNG:
             success = my_writer.write_png(cref(maze_args.output), 
-                my_maze.to_pixels(my_maze_type, std::cref(get_int), 
-                    std::cref(rng_engine), maze_args.cell_size), 
+                my_maze.to_pixels(maze_args.cell_size), 
                     maze_args.width * maze_args.cell_size, 
                     maze_args.length * maze_args.cell_size);
             break;
         case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
         case mazes::output_types::STDOUT: {
-            string maze_str = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine), maze_args.distances);
+            string maze_str = my_maze.to_str();
             success = my_writer.write(cref(maze_args.output), cref(maze_str));
             break;
         }

@@ -39,7 +39,7 @@ TEST_CASE("Writer can produce a PNG file", "[does png]") {
 		};
 
 	maze_builder my_maze{ 10, 10, 1 };
-	auto&& my_png = my_maze.to_pixels(maze_types::BINARY_TREE, cref(get_int), cref(rng), 3);
+	auto&& my_png = my_maze.to_pixels(15);
 
 	REQUIRE(!my_png.empty());
 
@@ -47,5 +47,5 @@ TEST_CASE("Writer can produce a PNG file", "[does png]") {
 
 	REQUIRE(my_writer.get_output_type("1.png") == output_types::PNG);
 
-	REQUIRE(my_writer.write_png("1.png", my_png, my_maze.get_length(), my_maze.get_width()));
+	REQUIRE(my_writer.write_png("1.png", my_png, my_maze.get_rows() * 4, my_maze.get_columns() * 4));
 }

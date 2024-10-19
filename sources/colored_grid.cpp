@@ -12,12 +12,10 @@ using namespace std;
 
 /**
  * @brief Construct a new distance grid object
- * @param width
- * @param length
- * @param height 0
+ * @param height 1
  */
-colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int height)
-    : m_distance_grid(make_unique<distance_grid>(width, length, height)) {
+colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int height)
+    : m_distance_grid(make_shared<distance_grid>(rows, cols, height)) {
 
 }
 
@@ -29,6 +27,10 @@ unsigned int colored_grid::get_columns() const noexcept {
 	return m_distance_grid->get_columns();
 }
 
+unsigned int colored_grid::get_height() const noexcept {
+    return m_distance_grid->get_height();
+}
+
 void colored_grid::populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 	this->m_distance_grid->populate_vec(ref(cells));
 }
@@ -37,7 +39,7 @@ void colored_grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) co
 	this->m_distance_grid->make_sorted_vec(ref(cells));
 }
 
-void colored_grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
+void colored_grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
 	m_distance_grid->append(other_grid);
 }
 void colored_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
@@ -77,8 +79,4 @@ optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell
 	int bright = 128 + static_cast<int>(127 * intensity);
 	return (dark << 16) | (bright << 8) | dark;
 	//return m_distance_grid->background_color_for(cref(c));
-}
-
-void colored_grid::calc_distances() noexcept {
-	m_distance_grid->calc_distances();
 }
