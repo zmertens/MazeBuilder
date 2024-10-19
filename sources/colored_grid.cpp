@@ -61,6 +61,9 @@ std::shared_ptr<cell> colored_grid::get_root() const noexcept {
 	return m_distance_grid->get_root();
 }
 
+/**
+ * @brief Get the contents of a cell with color
+ */
 std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
 	return m_distance_grid->contents_of(cref(c));
 }

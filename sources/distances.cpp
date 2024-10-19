@@ -8,6 +8,9 @@ using namespace mazes;
 using namespace std;
 
 distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
+    const auto& links = root->get_links();
+    copy(links.cbegin(), links.cend(), inserter(m_cells, m_cells.end()));
+    // Distance from root to root is 0
 	m_cells.insert_or_assign(root, 0);
 }
 
@@ -26,7 +29,7 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
     auto path = std::make_shared<distances>(m_root);
     auto current = goal;
 
-    while (current != m_root) {
+    while (current != goal) {
         if (!contains(current)) {
 #if defined(MAZE_DEBUG)
             std::cerr << "ERROR: Current cell not found in distances.\n";

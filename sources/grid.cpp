@@ -317,6 +317,10 @@ void grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noex
     this->sort_by_row_then_col(ref(cells));
 }
 
+/**
+ * @brief Return the contents of the cell as a string
+ * @param c
+ */
 optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
     return { " " };
 }

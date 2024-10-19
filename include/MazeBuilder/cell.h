@@ -13,8 +13,6 @@
 
 namespace mazes {
 
-    class distances;
-
 /**
  * @class cell
  *  enable_shared_from_this allows creation of shared_ptr

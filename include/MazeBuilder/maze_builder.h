@@ -39,12 +39,12 @@ public:
     using maze = std::tuple<int, int, int, int, std::string, std::string>;
 
     // Constructor
-    explicit maze_builder(int rows, int cols, int height, int block_type = 1);
+    explicit maze_builder(int rows, int cols, int height, bool show_distances = false, int block_type = 1);
     explicit maze_builder(int rows, int cols, int height,
         mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
-        bool calc_distances = false,
+        bool show_distances = false,
         int block_type = 1);
 
 	void clear() noexcept;
@@ -113,6 +113,7 @@ private:
     std::unique_ptr<grid_interface> m_grid;
     maze_types m_maze_type;
     int m_seed;
+    bool m_show_distances;
     int m_block_type;
 
     // Tuple (x, y, z, block_type)

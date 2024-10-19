@@ -21,36 +21,51 @@ using namespace std;
 
 /**
  * @brief Represent a maze with a thread-safe interface in a 3D grid
+ * @param show_distances = false
  * @param block_type = 1
  */
-maze_builder::maze_builder(int rows,  int columns,  int height, int block_type)
-    : m_grid(make_unique<colored_grid>(rows, columns, height))
+maze_builder::maze_builder(int rows,  int columns,  int height, bool show_distances, int block_type)
+    : m_grid{}
     , m_maze_type(maze_types::BINARY_TREE), m_seed(m_block_type)
-    , m_vertices(), m_faces(), m_p_q(), m_block_type(block_type) {
+    , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
+
+    if (m_show_distances) {
+        m_grid = make_unique<colored_grid>(rows, columns, height);
+    } else {
+        m_grid = make_unique<grid>(rows, columns, height);
+    }
+
     mt19937 rng(random_device{}());
-    bool success = mazes::maze_factory::gen(maze_types::BINARY_TREE,
-        ref(m_grid), [&rng](auto low, auto high)->auto {
-            uniform_int_distribution<int> dist(low, high); return dist(rng); }, cref(rng));
+    auto get_int = [&rng](int low, int high)->int {
+        uniform_int_distribution<int> dist(low, high); return dist(rng); };
+
+    bool success = mazes::maze_factory::gen(m_maze_type, ref(m_grid), cref(get_int), cref(rng));
     if (!success) {
     }
 
-    this->compute_geometry(maze_types::BINARY_TREE, [&rng](auto low, auto high)->auto {
-        uniform_int_distribution<int> dist(low, high); return dist(rng); }, cref(rng));
+    // Compute 3D geometries (includes height)
+    this->compute_geometry(m_maze_type, cref(get_int), cref(rng));
 }
 
 /**
  * @brief Constructor with all the bells and whistles
  * @param block_type = 1
- * @param calc_distances = false
+ * @param show_distances = false
  */
 maze_builder::maze_builder(int rows, int cols, int height,
     mazes::maze_types my_maze_type,
     const std::function<int(int, int)>& get_int,
     const std::mt19937& rng,
-    bool calc_distances,
-    int block_type) : m_grid(make_unique<colored_grid>(rows, cols, height))
+    bool show_distances,
+    int block_type) : m_grid{}
     , m_maze_type(my_maze_type), m_seed(m_block_type)
-    , m_vertices(), m_faces(), m_p_q(), m_block_type(block_type) {
+    , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
+
+    if (m_show_distances) {
+        m_grid = make_unique<colored_grid>(rows, cols, height);
+    } else {
+        m_grid = make_unique<grid>(rows, cols, height);
+    }
 
     bool success = mazes::maze_factory::gen(my_maze_type, ref(m_grid), cref(get_int), cref(rng));
 
@@ -69,6 +84,8 @@ void maze_builder::clear() noexcept {
     m_p_q.clear();
     m_tracker.stop();
     m_grid.reset();
+    m_show_distances = false;
+    m_maze_type = maze_types::BINARY_TREE;
     m_block_type = 1;
 }
 
@@ -267,7 +284,7 @@ std::size_t maze_builder::get_vertices_size() const noexcept {
 
 /**
  * @brief
- * @param calc_distances false
+ * @param show_distances false
  */
 std::string maze_builder::to_str() const noexcept {
     stringstream ss;
