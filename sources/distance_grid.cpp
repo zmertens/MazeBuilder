@@ -32,6 +32,10 @@ unsigned int distance_grid::get_height() const noexcept {
     return this->m_grid->get_height();
 }
 
+void distance_grid::preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    this->m_grid->preorder(ref(cells));
+}
+
 void distance_grid::populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 	this->m_grid->populate_vec(ref(cells));
 }

@@ -25,7 +25,8 @@ namespace mazes {
 		virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept = 0;
 		virtual void del(std::shared_ptr<cell> parent, int index) noexcept = 0;
 		virtual std::shared_ptr<cell> get_root() const noexcept = 0;
-        virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept = 0;	
+        virtual void preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;    
+        virtual void populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;	
         virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;
 		virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
 		virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;

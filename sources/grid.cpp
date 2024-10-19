@@ -180,13 +180,6 @@ shared_ptr<cell> grid::get_root() const noexcept {
 }
 
 /**
-* Populate (instantiate a linear vector of cells using the data in the grid)
-*/
-void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept {
-    this->sort(this->get_root(), ref(_cells));
-}
-
-/**
  * @brief Iterate through the other_grid and insert to the current grid's root
  */
 void grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
@@ -292,11 +285,32 @@ void grid::del(std::shared_ptr<cell> parent, int index) noexcept {
     }
 }
 
+void grid::preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    if (this->m_binary_search_tree_root != nullptr) {
+        this->presort(this->m_binary_search_tree_root, ref(cells));
+    }
+}
+
+/**
+* Populate (instantiate a linear vector of cells using the data in the grid)
+*/
+void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept {
+    this->sort(this->get_root(), ref(_cells));
+}
+
 void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     if (parent != nullptr) {
         this->sort(parent->get_left(), ref(cells_to_sort));
         cells_to_sort.emplace_back(parent);
         this->sort(parent->get_right(), ref(cells_to_sort));
+    }
+}
+
+void grid::presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    if (parent != nullptr) {
+        cells.emplace_back(parent);
+        this->presort(parent->get_left(), ref(cells));
+        this->presort(parent->get_right(), ref(cells));
     }
 }
 

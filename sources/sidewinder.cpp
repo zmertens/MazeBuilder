@@ -20,22 +20,24 @@ bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::functio
     static vector<shared_ptr<cell>> store;
     static unsigned int last_row = 0;
     std::vector<shared_ptr<cell>> cells;
-	_grid->populate_vec(ref(cells));
+    // Populate and presort cells
 
-    for (auto itr{ cells.cbegin() }; itr != cells.cend(); itr++) {
-        if (*itr && itr->get()->get_row() != last_row) {
-            last_row++;
+    if (!_grid) {
+        return false;
+    }
+
+    _grid->preorder(ref(cells));
+
+    for (auto& itr : cells) {
+        if (itr->get_row() != last_row) {
+            last_row = itr->get_row();
             store.clear();
-        } else {
-            continue;
         }
-        store.emplace_back(*itr);
+        store.push_back(itr);
 
-        bool at_eastern_boundary{ false }, at_northern_boundary{ false };
-        if (itr->get()->get_east() == nullptr)
-            at_eastern_boundary = true;
-        if (itr->get()->get_north() == nullptr)
-            at_northern_boundary = true;
+        bool at_eastern_boundary{ itr->get_east() == nullptr };
+        bool at_northern_boundary{ itr->get_north() == nullptr };
+
         // verify the sidewinder is reaching eastern wall and then flip a coin to go north or not
         bool should_close_out = at_eastern_boundary || (!at_northern_boundary && get_int(0, 1) == 0);
         if (should_close_out) {
@@ -43,12 +45,10 @@ bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::functio
             auto&& random_cell = store.at(random_index);
             if (random_cell->get_north() != nullptr) {
                 random_cell->link(random_cell, random_cell->get_north(), true);
-                store.clear();
             }
-            // ensure last row is updated correctly
-            last_row = itr->get()->get_row();
+            store.clear();
         } else if (!at_eastern_boundary) {
-            itr->get()->link(*itr, itr->get()->get_east(), true);
+            itr->link(itr, itr->get_east(), true);
         }
     }
     return true;

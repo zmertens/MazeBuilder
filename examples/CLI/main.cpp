@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
         mazes::maze_types my_maze_type = mazes::to_maze_type(maze_args.algorithm);
         static constexpr auto block_type = -1;
         mazes::maze_builder my_maze{ maze_args.width, maze_args.length, maze_args.height, my_maze_type,
-            cref(get_int), cref(rng_engine), maze_args.distances};
+            cref(get_int), cref(rng_engine), maze_args.distances, block_type};
         my_maze.start_progress();
         mazes::writer my_writer;
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);

@@ -31,10 +31,9 @@ public:
     // Statistical queries
     unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
     unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
+
     virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept override;
-    // Sort ascending per index-value
-    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
-    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+    virtual void preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
     virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
 
     virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept override;
@@ -50,7 +49,13 @@ public:
 private:
     bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
-    
+
+    // Sort by youngest child cell -> oldest child
+    void presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+    // Sort ascending per index-value
+    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+
     std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column
     std::function<int(unsigned int, unsigned int)> m_calc_index;
