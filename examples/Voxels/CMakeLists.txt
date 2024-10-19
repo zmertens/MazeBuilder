@@ -76,19 +76,8 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     	"SHELL:-s PTHREAD_POOL_SIZE=4 -s PTHREAD_POOL_SIZE_STRICT=2 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
         "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ASYNCIFY"
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/block_vertex.es.glsl@/shaders/es/block_vertex.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/block_fragment.es.glsl@/shaders/es/block_fragment.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/line_vertex.es.glsl@/shaders/es/line_vertex.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/line_fragment.es.glsl@/shaders/es/line_fragment.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/sky_vertex.es.glsl@/shaders/es/sky_vertex.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/sky_fragment.es.glsl@/shaders/es/sky_fragment.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/text_vertex.es.glsl@/shaders/es/text_vertex.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/shaders/es/text_fragment.es.glsl@/shaders/es/text_fragment.es.glsl"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/textures/texture.png@/textures/texture.png"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/textures/font.png@/textures/font.png"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/textures/sign.png@/textures/sign.png"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/textures/sky.png@/textures/sky.png"
-        "SHELL:--preload-file ${CMAKE_SOURCE_DIR}/textures/maze_in_green_32x32.bmp@/textures/maze_in_green_32x32.bmp")
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
+        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
     
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
@@ -117,8 +106,8 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
 
 endif(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
 
-file(COPY "${CMAKE_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
-file(COPY "${CMAKE_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 file(COPY "${CMAKE_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 
 # Copy over the freshly build SDL dll file to the binary directory
