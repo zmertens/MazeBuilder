@@ -43,7 +43,7 @@ bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::functio
         if (should_close_out) {
             auto random_index{ get_int(0, store.size() - 1) };
             auto&& random_cell = store.at(random_index);
-            if (random_cell->get_north() != nullptr) {
+            if (!at_northern_boundary) {
                 random_cell->link(random_cell, random_cell->get_north(), true);
             }
             store.clear();
