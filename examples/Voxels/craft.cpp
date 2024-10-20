@@ -125,7 +125,7 @@ struct craft::craft_impl {
         std::string maze_algo;
         std::string maze_json;
         int view;
-        std::string tag;
+        char tag[MAX_SIGN_LENGTH];
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
@@ -151,70 +151,8 @@ struct craft::craft_impl {
             maze_algo = "binary_tree";
             seed = 101;
             chunk_size = 8;
-            tag = "Here I am";
-        }
-    }; // class
-
-    class GuiBuilder {
-        Gui gui;
-    public:
-        GuiBuilder& fullscreen(bool fullscreen) {
-            gui.fullscreen = fullscreen;
-            return *this;
-        }
-
-        GuiBuilder& vsync(bool vsync) {
-            gui.vsync = vsync;
-            return *this;
-        }
-
-        GuiBuilder& color_mode_dark(bool value) {
-            gui.color_mode_dark = value;
-            return *this;
-        }
-
-        GuiBuilder& capture_mouse(bool value) {
-            gui.capture_mouse = value;
-            return *this;
-        }
-
-        GuiBuilder& chunk_size(int size) {
-            gui.chunk_size = size;
-            return *this;
-        }
-
-        GuiBuilder& show_items(bool value) {
-            gui.show_items = value;
-            return *this;
-        }
-
-        GuiBuilder& show_wireframes(bool value) {
-            gui.show_wireframes = value;
-            return *this;
-        }
-
-        GuiBuilder& show_crosshairs(bool value) {
-            gui.show_crosshairs = value;
-            return *this;
-        }
-
-        GuiBuilder& apply_bloom_effect(bool value) {
-            gui.apply_bloom_effect = value;
-            return *this;
-        }
-
-		GuiBuilder& view(int value) {
-			gui.view = value;
-			return *this;
-		}
-
-        GuiBuilder& tag(const std::string& s) {
-            gui.tag = s;
-            return *this;
-        }
-
-        Gui build() const {
-            return gui;
+            tag[0] = 'H';
+            tag[1] = 'i';
         }
     }; // class
 
@@ -1948,7 +1886,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 1);
         char text[MAX_SIGN_LENGTH];
-        SDL_strlcpy(text, this->m_gui->tag.c_str(), MAX_SIGN_LENGTH);
+        SDL_strlcpy(text, this->m_gui->tag, MAX_SIGN_LENGTH);
         text[MAX_SIGN_LENGTH - 1] = '\0';
         GLfloat* data = malloc_faces(5, SDL_strlen(text));
         int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face, text);
@@ -2139,10 +2077,12 @@ struct craft::craft_impl {
                     break;
                 }
                 case SDL_SCANCODE_RETURN: {
-                    if (mod_state) {
-                        this->on_right_click();
-                    } else {
-                        this->on_left_click();
+                    if (!this->m_model->typing) {
+                        if (mod_state) {
+                            this->on_right_click();
+                        } else {
+                            this->on_left_click();
+                        }
                     }
                     break;
                 }
@@ -2176,11 +2116,13 @@ struct craft::craft_impl {
                 }
                 case KEY_TAG: {
 #if defined(MAZE_DEBUG)
-                    SDL_Log("Tag: %s\n", this->m_gui->tag.c_str());
+                    SDL_Log("Tag: %s\n", this->m_gui->tag);
 #endif
                     int x, y, z, face;
-                    if (hit_test_face(&this->m_model->player, &x, &y, &z, &face)) {
-                        set_sign(x, y, z, face, this->m_gui->tag.c_str());
+                    if (!this->m_model->typing && hit_test_face(&this->m_model->player, &x, &y, &z, &face)) {
+                        set_sign(x, y, z, face, this->m_gui->tag);
+                    } else if (this->m_model->typing) {
+                        SDL_StartTextInput(this->m_model->window);
                     }
                     break;
                 }
@@ -2188,6 +2130,11 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
+                if (this->m_model->typing) {
+                    if (SDL_strlen(this->m_gui->tag) < MAX_SIGN_LENGTH) {
+                        SDL_strlcat(this->m_gui->tag, e.text.text, MAX_SIGN_LENGTH);
+                    }
+                }
                 break;
             }
             case SDL_EVENT_FINGER_MOTION:
@@ -2275,7 +2222,7 @@ struct craft::craft_impl {
                 if (this->m_model->flying) {
                     vy = 1;
                 } else if (dy == 0) {
-                    dy = 8.5;
+                    dy = 8;
                 }
             }
         }
@@ -2788,7 +2735,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
                     rng.seed(static_cast<unsigned long>(gui->seed));
                 }
-                ImGui::InputText("Tag", &gui->tag[0], gui->tag.size());
+                ImGui::InputText("Tag", &gui->tag[0], MAX_SIGN_LENGTH);
+                if (ImGui::IsItemActive()) {
+                    model->typing = true;
+                } else {
+                    model->typing = false;
+                }
                 ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                 if (ImGui::TreeNode("Maze Generator")) {
                     auto preview{ gui->maze_algo.c_str() };

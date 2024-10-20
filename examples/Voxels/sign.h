@@ -3,7 +3,7 @@
 
 #include <cstdlib>
 
-#define MAX_SIGN_LENGTH 64
+#define MAX_SIGN_LENGTH 16
 
 typedef struct {
     int x;
