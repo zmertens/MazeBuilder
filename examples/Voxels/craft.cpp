@@ -71,7 +71,7 @@
 #define KEY_ITEM_PREV SDL_SCANCODE_R
 #define KEY_ZOOM SDL_SCANCODE_LSHIFT
 #define KEY_ORTHO SDL_SCANCODE_F
-#define KEY_CHAT SDL_SCANCODE_T
+#define KEY_TAG SDL_SCANCODE_T
 #define KEY_COMMAND SDL_SCANCODE_SLASH
 #define KEY_SIGN SDL_SCANCODE_GRAVE
 
@@ -125,13 +125,14 @@ struct craft::craft_impl {
         std::string maze_algo;
         std::string maze_json;
         int view;
+        std::string tag;
 
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
 			apply_bloom_effect(true),
             outfile(".obj"), seed(0), rows(25), height(5), columns(28),
-            maze_algo("binary_tree"), maze_json(""), view(20) {
+            maze_algo("binary_tree"), maze_json(""), view(20), tag("Here I am") {
 
         }
 
@@ -150,6 +151,7 @@ struct craft::craft_impl {
             maze_algo = "binary_tree";
             seed = 101;
             chunk_size = 8;
+            tag = "Here I am";
         }
     }; // class
 
@@ -205,7 +207,12 @@ struct craft::craft_impl {
 			gui.view = value;
 			return *this;
 		}
-        
+
+        GuiBuilder& tag(const std::string& s) {
+            gui.tag = s;
+            return *this;
+        }
+
         Gui build() const {
             return gui;
         }
@@ -420,7 +427,6 @@ struct craft::craft_impl {
         int mode_changed;
         char db_path[MAX_DB_PATH_LEN];
         bool typing;
-        char typing_buffer[MAX_TEXT_LENGTH];
         size_t text_len;
         int day_length;
         int start_time;
@@ -1927,13 +1933,11 @@ struct craft::craft_impl {
     }
 
     void render_sign(Attrib* attrib, Player* player) {
-        if (!this->m_model->typing || this->m_model->typing_buffer[0] != CRAFT_KEY_SIGN) {
-            return;
-        }
         int x, y, z, face;
         if (!hit_test_face(player, &x, &y, &z, &face)) {
             return;
         }
+
         State* s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1944,7 +1948,7 @@ struct craft::craft_impl {
         glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 1);
         char text[MAX_SIGN_LENGTH];
-        SDL_strlcpy(text, this->m_model->typing_buffer + 1, MAX_SIGN_LENGTH);
+        SDL_strlcpy(text, this->m_gui->tag.c_str(), MAX_SIGN_LENGTH);
         text[MAX_SIGN_LENGTH - 1] = '\0';
         GLfloat* data = malloc_faces(5, SDL_strlen(text));
         int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face, text);
@@ -2131,36 +2135,18 @@ struct craft::craft_impl {
                     SDL_SetWindowRelativeMouseMode(this->m_model->window, false);
                     this->m_gui->capture_mouse = false;
                     this->m_gui->fullscreen = false;
-                    this->m_model->typing = 0;
+                    this->m_model->typing = false;
                     break;
                 }
                 case SDL_SCANCODE_RETURN: {
-                    if (this->m_model->typing) {
-                        if (mod_state) {
-                            if (this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                                this->m_model->typing_buffer[this->m_model->text_len] = '\n';
-                                this->m_model->typing_buffer[this->m_model->text_len + 1] = '\0';
-                            }
-                        } else {
-                            this->m_model->typing = 0;
-                            if (this->m_model->typing_buffer[0] == CRAFT_KEY_SIGN) {
-                                Player* player = &this->m_model->player;
-                                int x, y, z, face;
-                                if (hit_test_face(player, &x, &y, &z, &face)) {
-                                    set_sign(x, y, z, face, this->m_model->typing_buffer + 1);
-                                }
-                            }
-                        }
+                    if (mod_state) {
+                        this->on_right_click();
                     } else {
-                        if (mod_state) {
-                            this->on_right_click();
-                        } else {
-                            this->on_left_click();
-                        }
+                        this->on_left_click();
                     }
                     break;
                 }
-                                        // Change block type when mouse is captured
+                // Change block type when mouse is captured
                 case SDL_SCANCODE_0:
                 case SDL_SCANCODE_1:
                 case SDL_SCANCODE_2:
@@ -2171,50 +2157,30 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    if (!this->m_model->typing)
-                        this->m_model->item_index = (sc - SDL_SCANCODE_1);
+                    this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     break;
                 }
                 case KEY_FLY: {
-                    if (!this->m_model->typing)
-                        this->m_model->flying = !this->m_model->flying;
+                    this->m_model->flying = !this->m_model->flying;
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    if (!this->m_model->typing)
-                        this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
+                    this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    if (!this->m_model->typing) {
-                        this->m_model->item_index--;
-                        if (this->m_model->item_index < 0)
-                            this->m_model->item_index = item_count - 1;
-                    }
+                    this->m_model->item_index--;
+                    if (this->m_model->item_index < 0)
+                        this->m_model->item_index = item_count - 1;
                     break;
                 }
-                case KEY_CHAT: {
-                    if (!this->m_model->typing) {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        this->m_model->text_len = 0;
-                        SDL_StartTextInput(this->m_model->window);
-                    }
-                    break;
-                }
-                case KEY_COMMAND: {
-                    if (!this->m_model->typing) {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
-                    }
-                    break;
-                }
-                case KEY_SIGN: {
-                    if (this->m_gui->capture_mouse) {
-                        this->m_model->typing = 1;
-                        this->m_model->typing_buffer[0] = '\0';
-                        SDL_StartTextInput(this->m_model->window);
+                case KEY_TAG: {
+#if defined(MAZE_DEBUG)
+                    SDL_Log("Tag: %s\n", this->m_gui->tag.c_str());
+#endif
+                    int x, y, z, face;
+                    if (hit_test_face(&this->m_model->player, &x, &y, &z, &face)) {
+                        set_sign(x, y, z, face, this->m_gui->tag.c_str());
                     }
                     break;
                 }
@@ -2222,10 +2188,6 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
-                if (this->m_model->typing && this->m_model->text_len < MAX_TEXT_LENGTH - 1) {
-                    SDL_strlcat(this->m_model->typing_buffer, e.text.text, this->m_model->text_len);
-                    this->m_model->text_len += SDL_strlen(e.text.text);
-                }
                 break;
             }
             case SDL_EVENT_FINGER_MOTION:
@@ -2293,7 +2255,7 @@ struct craft::craft_impl {
 
         const bool* state = SDL_GetKeyboardState(nullptr);
 
-        if (!(this->m_model->typing)) {
+        if (!this->m_model->typing) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
             if (state[KEY_FORWARD]) sz--;
@@ -2437,7 +2399,6 @@ struct craft::craft_impl {
         this->m_model->fov = 65.f;
         SDL_snprintf(this->m_model->db_path, MAX_DB_PATH_LEN, "%s", DB_PATH);
         this->m_model->typing = false;
-        this->m_model->typing_buffer[0] = '\0';
     }
 
 }; // craft_impl
@@ -2827,6 +2788,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
                     rng.seed(static_cast<unsigned long>(gui->seed));
                 }
+                ImGui::InputText("Tag", &gui->tag[0], gui->tag.size());
                 ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                 if (ImGui::TreeNode("Maze Generator")) {
                     auto preview{ gui->maze_algo.c_str() };
@@ -3119,7 +3081,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
         ImGui::End();
 
-#if !defined(__EMSCRIPTEN__)
         ImGui::Begin("Mouse Capture",
             nullptr,
             ImGuiWindowFlags_NoMove |
@@ -3136,7 +3097,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             }
         }
         ImGui::End();
-#endif
 
         ImVec2 fps_window_size = ImVec2(display_size.x * 0.50f, 50);
         ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.8f - fps_window_size.x, 0));
