@@ -17,15 +17,14 @@ using namespace std;
  * "Runs" are row-like passages that are carved by the sidewinder algorithm
  */
 bool sidewinder::run(unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
-    static vector<shared_ptr<cell>> store;
-    static unsigned int last_row = 0;
-    std::vector<shared_ptr<cell>> cells;
-    // Populate and presort cells
 
     if (!_grid) {
         return false;
     }
-
+    vector<shared_ptr<cell>> store;
+    static unsigned int last_row = 0;
+    std::vector<shared_ptr<cell>> cells;
+    // Populate and presort cells
     _grid->preorder(ref(cells));
 
     for (auto& itr : cells) {
