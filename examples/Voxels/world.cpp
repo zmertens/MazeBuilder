@@ -1,14 +1,15 @@
 #include "world.h"
 
 #include <optional>
-#include <iostream>
 
 #include <noise/noise.h>
+
+#include <MazeBuilder/maze_builder.h>
 
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_builder>& maze, world_func func, Map* m, int chunk_size) noexcept {
+void world::create_world(int p, int q, const mazes::maze_builder& maze, world_func func, Map* m, int chunk_size) noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -35,18 +36,6 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_builder
             // sand and grass terrain
             for (int y = 0; y < h; y++) {
                 func(x, y, z, w * flag, m);
-            }
-
-            // Build the maze
-            {
-				lock_guard<mutex> lock(maze_mutex);
-                for (auto y = 1; y < t + maze->get_height(); y++) {
-                    const auto& itr = maze->find_block(p, q);
-                    if (itr.has_value()) {
-                        auto [px, py, pz, block] = itr.value();
-                        func(x, y, z, block, m);
-                    }
-                }
             }
 
             if (w == 1) {
@@ -80,6 +69,15 @@ void world::create_world(int p, int q, const std::unique_ptr<mazes::maze_builder
             for (int y = 64; y < 72; y++) {
                 if (simplex3(x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75) {
                     func(x, y, z, 16 * flag, m);
+                }
+            }
+
+            // Build the maze
+            const auto& itr = maze.find_block(p, q);
+            if (itr.has_value()) {
+                auto [px, pz, py, block] = itr.value();
+                for (auto y = h; y < h + maze.get_height(); y++) {
+                    func(x - 1, y, z - 1, block, m);
                 }
             }
         }

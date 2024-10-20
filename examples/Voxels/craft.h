@@ -27,12 +27,9 @@ public:
     craft(craft&&) = default;
     craft& operator=(craft&&) = default;
 
-    bool run(const std::list<std::string>& algos, 
-        const std::function<mazes::maze_types(const std::string& algo)>& get_maze_type_from_str,
-        const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
+    bool run(const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept;
     
-    void mouse(bool mouse) noexcept;
-    void fullscreen(bool fullscreen) noexcept;
+    // Web interaction
     std::string mazes() const noexcept;
     
     // Singleton pattern

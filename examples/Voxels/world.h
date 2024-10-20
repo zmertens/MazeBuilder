@@ -7,15 +7,13 @@
 
 #include "map.h"
 
-using world_func = std::function<void(int, int, int, int, Map*)>;
-
 #include <MazeBuilder/maze_builder.h>
+
+using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_world(int p, int q, const std::unique_ptr<mazes::maze_builder>& maze, world_func func, Map *m, int chunk_size) noexcept;
-private:
-    std::mutex maze_mutex;
+    void create_world(int p, int q, const mazes::maze_builder& maze, world_func func, Map *m, int chunk_size) noexcept;
 };
 
 #endif
