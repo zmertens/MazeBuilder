@@ -43,7 +43,7 @@ public:
                 return dist(rng_engine);
             };
 
-            m_output = my_maze.to_str(my_maze_type, std::cref(get_int), std::cref(rng_engine), true);
+            m_output = my_maze.to_str();
     }
 
     std::string get_output() const {
