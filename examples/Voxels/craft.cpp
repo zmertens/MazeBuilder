@@ -200,12 +200,13 @@ struct craft::craft_impl {
 
             glGenRenderbuffers(1, &rbo_bloom_depth);
             glBindRenderbuffer(GL_RENDERBUFFER, rbo_bloom_depth);
-            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, w, h);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT16, w, h);
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo_bloom_depth);
             // Split color attachments to use for rendering (for this specific framebuffer)
             GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
             glDrawBuffers(2, attachments);
-            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            check_framebuffer();
 
             // Setup the ping-pong framebuffers for blurring
             glGenFramebuffers(2, fbo_pingpong);
@@ -2528,7 +2529,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
 #if defined(__EMSCRIPTEN__)
-    // @TODO : Screen space GLSL ES shader
+    program = load_program("shaders/es/screen_vertex.es.glsl", "shaders/es/screen_fragment.es.glsl");
 #else
     program = load_program("shaders/screen_vertex.glsl", "shaders/screen_fragment.glsl");
 #endif
@@ -2541,7 +2542,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     screen_attrib.extra3 = glGetUniformLocation(program, "bloomBlur");
 
 #if defined(__EMSCRIPTEN__)
-    // @TODO : Blur space GLSL ES shader
+    program = load_program("shaders/es/blur_vertex.es.glsl", "shaders/es/blur_fragment.es.glsl");
 #else
     program = load_program("shaders/blur_vertex.glsl", "shaders/blur_fragment.glsl");
 #endif
@@ -2551,6 +2552,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     blur_attrib.sampler = glGetUniformLocation(program, "image");
     blur_attrib.extra1 = glGetUniformLocation(program, "horizontal");
     blur_attrib.extra2 = glGetUniformLocation(program, "weight");
+    const std::vector<float> WEIGHTS_IN_BLUR = {0.2270270270f, 0.1945945946f, 0.1216216216f, 0.0540540541f, 0.0162162162f};
+    glUseProgram(program);
+    glUniform1fv(blur_attrib.extra2, WEIGHTS_IN_BLUR.size(), WEIGHTS_IN_BLUR.data());
+    glUseProgram(0);
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2978,14 +2983,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
-				glUniform1i(blur_attrib.sampler, 4);
-                glActiveTexture(GL_TEXTURE4);
+				// glUniform1i(blur_attrib.sampler, 4);
+                // glActiveTexture(GL_TEXTURE4);
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
-                glUniform1i(blur_attrib.sampler, 6);
-                glActiveTexture(GL_TEXTURE6);
+                // glUniform1i(blur_attrib.sampler, 6);
+                // glActiveTexture(GL_TEXTURE6);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
@@ -3003,16 +3008,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
-        glUniform1i(screen_attrib.sampler, 4);
-        glUniform1i(screen_attrib.extra3, 6);
+        // glUniform1i(screen_attrib.sampler, 4);
+        // glUniform1i(screen_attrib.extra3, 6);
         glBindVertexArray(quad_vao);
-        glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
-        glActiveTexture(GL_TEXTURE6);
+        // glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
+        // glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
-        glUniform1f(screen_attrib.extra2, 1.0f);
+        glUniform1f(screen_attrib.extra2, 0.35f);
         glDrawArrays(GL_TRIANGLES, 0, 6);
 
         glBindVertexArray(0);

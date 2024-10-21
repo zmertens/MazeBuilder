@@ -297,7 +297,6 @@ std::string maze_builder::to_str64() const noexcept {
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
 void maze_builder::compute_geometry(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
-    cout << "height: " << m_grid->get_height() << endl;
     istringstream iss{ this->to_str() };
     string line;
     int row_x = 0;

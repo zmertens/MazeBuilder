@@ -20,38 +20,6 @@
         height: 100%;
       }
 
-      #header {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background-color: #333;
-        color: rgb(157, 238, 141);
-        padding: 0px;
-        width: 100%;
-        height: 10%; /* Adjust this value to 10-15% as needed */
-        min-height: 50px; /* Optional: Set a minimum height */
-        max-height: 15%; /* Optional: Set a maximum height */
-      }
-
-      .spinner {
-        height: 30px;
-        width: 30px;
-        margin: 0;
-        margin-top: 20px;
-        margin-left: 20px;
-        display: inline-block;
-        vertical-align: top;
-        -webkit-animation: rotation .8s linear infinite;
-        -moz-animation: rotation .8s linear infinite;
-        -o-animation: rotation .8s linear infinite;
-        animation: rotation 0.8s linear infinite;
-        border-left: 5px solid black;
-        border-right: 5px solid black;
-        border-bottom: 5px solid black;
-        border-top: 5px solid red;
-        border-radius: 100%;
-        background-color: rgb(245, 245, 245);
-      }
       @-webkit-keyframes rotation {
         from {-webkit-transform: rotate(0deg);}
         to {-webkit-transform: rotate(360deg);}
@@ -67,27 +35,6 @@
       @keyframes rotation {
         from {transform: rotate(0deg);}
         to {transform: rotate(360deg);}
-      }
-
-      #status {
-        display: inline-block;
-        vertical-align: top;
-        margin-top: 30px;
-        margin-left: 20px;
-        font-weight: bold;
-        color: rgb(40, 40, 40);
-      }
-
-      #progress {
-        height: 0px;
-        width: 0px;
-      }
-
-      #controls {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-bottom: 10px;
       }
 
       .emscripten_border {
@@ -107,18 +54,6 @@
    </style>
   </head>
   <body>
-    <canvas id="emCanvas" class="emscripten"></canvas>
-    <div id="header">
-      <a id="logo" href="https://www.github.com/zmertens/MazeBuilder"></a>
-
-      <div class="spinner" id="spinner"></div>
-      <div class="emscripten" id="status">Downloading...</div>
-
-      <div class="emscripten">
-        <progress value="0" max="100" id="progress" hidden="1"></progress>
-      </div>
-    </div>
-
     <div class="emscripten_border">
       <canvas
         class="emscripten"
@@ -128,10 +63,6 @@
       ></canvas>
     </div>
     <script type="text/javascript">
-      document.getElementById("download").disabled = true;
-      var statusElement = document.querySelector("#status");
-      var progressElement = document.querySelector("#progress");
-      var spinnerElement = document.querySelector("#spinner");
       let craft = null;
       var Module = {
         preRun: [],
@@ -199,21 +130,6 @@
 
           Module.setStatus.last.time = now;
           Module.setStatus.last.text = text;
-
-          if (m) {
-            text = m[1];
-            progressElement.value = parseInt(m[2]) * 100;
-            progressElement.max = parseInt(m[4]) * 100;
-            progressElement.hidden = true;
-            spinnerElement.hidden = false;
-          } else {
-            progressElement.value = null;
-            progressElement.max = null;
-            progressElement.hidden = true;
-            if (!text) spinnerElement.style.display = "none";
-          }
-
-          statusElement.innerHTML = text;
         },
         totalDependencies: 0,
         monitorRunDependencies: function (left) {
@@ -233,14 +149,12 @@
 
       window.onerror = function () {
         Module.setStatus("Exception thrown, see JavaScript console");
-        spinnerElement.style.display = "none";
         Module.setStatus = function (text) {
           if (text) Module.printErr("[post-exception status] " + text);
         };
       };
 
       function download() {
-        document.getElementById("download").disabled = true;
         console.log("Download clicked");
         startPolling();
       }
