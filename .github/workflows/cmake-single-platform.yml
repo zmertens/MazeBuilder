@@ -25,7 +25,8 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y mesa-common-dev mesa-utils libglu1-mesa-dev libvulkan-dev libxinerama-dev libxcursor-dev libxi-dev
+        sudo apt-get install -y mesa-common-dev mesa-utils libgl1-mesa-dev libx11-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev doxygen
+        sudo apt-get install -y libfreetype6-dev libudev-dev libopenal-dev libflac-dev libogg-dev libvorbis-dev
 
     # Step to download Emsdk
     - name: Download Emsdk
@@ -44,7 +45,7 @@ jobs:
 
     # Configure CMake with Emscripten toolchain
     - name: Configure CMake for Emscripten
-      run: cmake -B ${{github.workspace}}/build-emscripten -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+      run: cmake -B ${{github.workspace}}/build-emscripten -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DMAZE_BUILD_WEB_EXAMPLES=ON
 
     # Build with Emscripten
     - name: Build with Emscripten
@@ -52,7 +53,7 @@ jobs:
 
 # Configure CMake for default build (without Emscripten)
     - name: Configure CMake for Default Build
-      run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+      run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMAZE_BUILD_DESKTOP_EXAMPLES=ON
 
     - name: Build Default
       run: cmake --build ${{github.workspace}}/build-default --config ${{env.BUILD_TYPE}}

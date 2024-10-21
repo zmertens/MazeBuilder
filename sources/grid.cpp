@@ -1,4 +1,4 @@
-#include "grid.h"
+#include <MazeBuilder/grid.h>
 
 #include <vector>
 #include <string>
@@ -7,7 +7,7 @@
 #include <random>
 #include <iostream>
 
-#include "cell.h"
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;
@@ -19,7 +19,7 @@ using namespace std;
  * @brief grid::grid
  * @param rows
  * @param columns
- * @param height = 0
+ * @param height = 1
  */
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 : m_rows{rows}
@@ -180,16 +180,9 @@ shared_ptr<cell> grid::get_root() const noexcept {
 }
 
 /**
-* Populate (instantiate a linear vector of cells using the data in the grid)
-*/
-void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept {
-    this->sort(this->get_root(), ref(_cells));
-}
-
-/**
  * @brief Iterate through the other_grid and insert to the current grid's root
  */
-void grid::append(std::unique_ptr<grid_interface> const& other_grid) noexcept {
+void grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
     vector<shared_ptr<cell>> cells_to_sort;
 	if (auto ptr = dynamic_cast<grid*>(other_grid.get())) {
         ptr->populate_vec(ref(cells_to_sort));
@@ -237,7 +230,9 @@ bool grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) n
         found->set_row(new_row);
         found->set_column(new_column);
 
-        auto cells = this->to_vec();
+        vector<shared_ptr<cell>> cells;
+		cells.reserve(this->m_rows * this->m_columns);
+        this->make_sorted_vec(ref(cells));
         vector<int> indices;
         indices.reserve(cells.size());
         transform(cells.cbegin(), cells.cend(), back_inserter(indices), 
@@ -290,11 +285,32 @@ void grid::del(std::shared_ptr<cell> parent, int index) noexcept {
     }
 }
 
+void grid::preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    if (this->m_binary_search_tree_root != nullptr) {
+        this->presort(this->m_binary_search_tree_root, ref(cells));
+    }
+}
+
+/**
+* Populate (instantiate a linear vector of cells using the data in the grid)
+*/
+void grid::populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept {
+    this->sort(this->get_root(), ref(_cells));
+}
+
 void grid::sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     if (parent != nullptr) {
         this->sort(parent->get_left(), ref(cells_to_sort));
         cells_to_sort.emplace_back(parent);
         this->sort(parent->get_right(), ref(cells_to_sort));
+    }
+}
+
+void grid::presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    if (parent != nullptr) {
+        cells.emplace_back(parent);
+        this->presort(parent->get_left(), ref(cells));
+        this->presort(parent->get_right(), ref(cells));
     }
 }
 
@@ -308,86 +324,17 @@ void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sor
 }
 
 /**
- * @brief
- * @param cell_size = 3
+ * @brief Populate the vector of cells with the BST
  */
-vector<uint8_t> grid::to_pixels(const unsigned int cell_size) const noexcept {
-    unsigned int img_width = cell_size * get_columns();
-    unsigned int img_height = cell_size * get_rows();
-    
-    uint32_t wall = 0x000000FF;
-
-    // Create an image, RGBA channels, with a white background
-    std::vector<uint8_t> img_data(img_width * img_height * 4, 255);
-
-    // Helper functions to draw on the image
-    auto draw_rect = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
-        for (int y = y1; y < y2; ++y) {
-            for (int x = x1; x < x2; ++x) {
-                int index = (y * img_width + x) * 4;
-                img_data[index] = (color >> 24) & 0xFF;
-                img_data[index + 1] = (color >> 16) & 0xFF;
-                img_data[index + 2] = (color >> 8) & 0xFF;
-                img_data[index + 3] = color & 0xFF;
-            }
-        }
-    };
-
-    auto draw_line = [&img_data, img_width](int x1, int y1, int x2, int y2, uint32_t color) {
-        if (x1 == x2) {
-            for (int y = y1; y < y2; ++y) {
-                int index = (y * img_width + x1) * 4;
-                img_data[index] = (color >> 24) & 0xFF;
-                img_data[index + 1] = (color >> 16) & 0xFF;
-                img_data[index + 2] = (color >> 8) & 0xFF;
-                img_data[index + 3] = color & 0xFF;
-            }
-        } else if (y1 == y2) {
-            for (int x = x1; x < x2; ++x) {
-                int index = (y1 * img_width + x) * 4;
-                img_data[index] = (color >> 24) & 0xFF;
-                img_data[index + 1] = (color >> 16) & 0xFF;
-                img_data[index + 2] = (color >> 8) & 0xFF;
-                img_data[index + 3] = color & 0xFF;
-            }
-        }
-    };
-
-    vector<shared_ptr<cell>> cells;
-    cells.reserve(this->get_rows() * this->get_columns());
-    this->populate_vec(ref(cells));
-    this->sort_by_row_then_col(ref(cells));
-
-    // Draw backgrounds and walls
-    for (const auto& mode : {"backgrounds", "walls"}) {
-        for (const auto& current : cells) {
-            int x1 = current->get_column() * cell_size;
-            int y1 = current->get_row() * cell_size;
-            int x2 = (current->get_column() + 1) * cell_size;
-            int y2 = (current->get_row() + 1) * cell_size;
-
-            if (mode == "backgrounds"s) {
-                uint32_t color = background_color_for(current).value_or(0xFFFFFFFF);
-                draw_rect(x1, y1, x2, y2, color);
-            } else {
-                if (!current->get_north()) draw_line(x1, y1, x2, y1, wall);
-                if (!current->get_west()) draw_line(x1, y1, x1, y2, wall);
-                if (auto east = current->get_east(); east && !current->is_linked(cref(east))) draw_line(x2, y1, x2, y2, wall);
-                if (auto south = current->get_south(); south && !current->is_linked(cref(south))) draw_line(x1, y2, x2, y2, wall);
-            }
-        }
-    }
-
-    return img_data;
-} // to_pixels
-
-std::vector<std::shared_ptr<cell>> grid::to_vec() const noexcept {
-	vector<shared_ptr<cell>> cells;
-	cells.reserve(this->get_rows() * this->get_columns());
+void grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 	this->populate_vec(ref(cells));
-    return cells;
+    this->sort_by_row_then_col(ref(cells));
 }
 
+/**
+ * @brief Return the contents of the cell as a string
+ * @param c
+ */
 optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
     return { " " };
 }

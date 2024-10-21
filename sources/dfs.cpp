@@ -1,11 +1,11 @@
-#include "dfs.h"
+#include <MazeBuilder/dfs.h>
 
 #include <stack>
 #include <algorithm>
 #include <iterator>
 
-#include "grid_interface.h"
-#include "cell.h"
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;

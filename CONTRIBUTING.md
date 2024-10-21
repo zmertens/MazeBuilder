@@ -2,14 +2,17 @@
 
 Maze Builder is open source under the MIT License.
 
-Issues are disabled on the GitHub repo. Please make a pull request summarizing the changes and improvements. For example, visit the the [PRs](https://github.com/zmertens/MazeBuilder/pulls) page. In the PR summary, add two sections, one for **Summary** and another for **Problems Solved** detailing the changes to the code.
+Issues are disabled on the GitHub repo. Please make a pull request summarizing the changes and improvements.
+For example, visit the the [PRs](https://github.com/zmertens/MazeBuilder/pulls) page.
+In the PR summary, add two sections, one for **Summary** where the maze-generating algorithm is explained.
+Adding a picture of the output is encouraged. The second section is **Changes** where the changes (can use a checklist) are listed.
 
 ## Getting Started
 
 Adding a new maze algorithm as a script is a good place to start...
 
-  1. **Add the Algorithm Script**: Add a script implementing the algorithm.
-  2. **Write a Test**: Add a Catch2 test to the "maze builder lib" tests replicating the script's functionality
+  1. **Add the Algorithm Script**: Add a script implementing the algorithm under `scripts`.
+  2. **Write a Test**: Add a Catch2 test to the "maze builder lib" tests under `tests`.
   3. **Ensure Consistency**: Ensure that the script's output and the test's output match the exepcted values.
 
 ## CPP Code
@@ -18,9 +21,7 @@ The codebase tries to follow modern C++ coding styles and conventions:
 
   * **Smart Pointers**: Include `<memory>` and use `std::unique_ptr<T>` or `std::shared_ptr<T>` over `malloc`, `free`, `new`, and `delete`. 
     * It is okay to do `MyClass* class_ptr = &MyClass::obj;`.
-  * **Minimal Templates**: Rarely use templates to avoid complex debugging messages.
-  * **Inline Functions**: Never use `inline` on functions, let the compiler handle those optimizations.
-  * **Task-Based Programming**: Prefer task-based programming instead of threads. Use futures that return void, `future<void> foo = std::async(std::launch::async, _bar, _param1, _param2);`.
+  * **Inline Functions**: No use of `inline` on functions.
 
 ## Shaders
 

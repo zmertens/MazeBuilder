@@ -12,15 +12,14 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
 ```sh
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
-        Example: maze_builder.exe -w 10 -l 10 -a binary_tree > out_maze.txt
+        Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
           -a, --algorithm    dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
-          -w, --width        maze width [default=100]
+          -r, --rows         maze rows [default=100]
           -y, --height       maze height [default=10]
-          -l, --length       maze length [default=100]
-          -c, --cell_size    maze cell size [default=3]
+          -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
-          -i, --interactive  run program in interactive mode with a GUI
+          -i, --interactive  No effect
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message
           -v, --version      display program version
@@ -47,16 +46,18 @@ The following are the CMake options I use for this project:
 
 
 | CMake Option | Default | Description |
-|--------------|---------|-------------
-| BUILD_MAZE_TESTS | OFF | Build with testing `maze_builder_lib` via Catch2. |
-| CMAKE_CXX_COMPILER | `cmake` | Building with a specific compiler: `clang++`, `g++`, or `em++`. |
+|--------------|---------|------------ |
+| MAZE_BUILD_DESKTOP_EXAMPLES | OFF | Build with desktop examples enabled (CLI, Voxels, Http). |
+| MAZE_BUILD_WEB_EXAMPLES | OFF | Build with web examples enabled (Voxels, MazeBuilderJS). |
+| MAZE_BUILD_TESTS | OFF | Build with testing `maze_builder_lib` via Catch2. |
+| CMAKE_CXX_COMPILER | `cmake` | Building with a specific compiler. |
 | CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for Emscripten builds. |
 | CMAKE_BUILD_TYPE | RelWithDebInfo | The build type is case-sensitive. It can determine compiler optimizations and performance. `MinSizeRel, Release, RelWithDebInfo, Debug`. |
 
 Configure the CMake files:
 
 ```sh
-cmake -S . -B build -DCMAKE_CXX_COMPILER:STRING=clang++ -DCMAKE_BUILD_TYPE:STRING=Release -DBUILD_MAZE_TESTS:BOOLEAN=1
+cmake -S . -B build -DCMAKE_CXX_COMPILER:STRING=clang++ -DCMAKE_BUILD_TYPE:STRING=Release -DMAZE_BUILD__DESKTOP_EXAMPLES_:BOOLEAN=1
 ```
 
 Build:
@@ -98,4 +99,3 @@ The web app can be run locally with the provided [secure_http_server.py](secure_
  - [Catch2](https://github.com/catchorg/Catch2)
  - [Emscripten](https://emscripten.org/)
  - [stb](https://github.com/nothings/stb)
-  

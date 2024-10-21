@@ -1,8 +1,4 @@
-#include "cell.h"
-
-#include <iostream>
-
-#include "distances.h"
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;
@@ -97,6 +93,14 @@ void cell::set_index(int next_index) noexcept {
     this->m_index = next_index;
 }
 
+void cell::set_color(std::uint32_t c) noexcept {
+	this->m_color = c;
+}
+
+std::uint32_t cell::get_color() const noexcept {
+	return this->m_color;
+}
+
 shared_ptr<cell> cell::get_north() const {
     return this->m_north;
 }
@@ -151,25 +155,4 @@ void cell::set_row(unsigned int r) noexcept {
 
 void cell::set_column(unsigned int c) noexcept {
     this->m_column = c;
-}
-
-std::shared_ptr<distances> cell::get_distances() noexcept {
-	auto dists = make_shared<mazes::distances>(shared_from_this());
-    vector<shared_ptr<cell>> frontier = { shared_from_this() };
-
-	// Dijkstra's algorithm
-    while (!frontier.empty()) {
-		vector<shared_ptr<cell>> new_frontier;
-        for (const auto& c : frontier) {
-			for (const auto& [neighbor, _] : c->get_links()) {
-				if (dists->operator[](neighbor) < 0) {
-					dists->set(neighbor, dists->operator[](c) + 1);
-					new_frontier.push_back(neighbor);
-				}
-			}
-        }
-		frontier = new_frontier;
-    }
-
-    return dists;
 }

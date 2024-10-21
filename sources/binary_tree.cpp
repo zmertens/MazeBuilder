@@ -1,13 +1,13 @@
-#include "binary_tree.h"
+#include <MazeBuilder/binary_tree.h>
 
 #include <memory>
 #include <vector>
 #include <functional>
 #include <random>
 
-#include "cell.h"
-#include "grid_interface.h"
-#include "grid.h"
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid.h>
 
 /**
  * @brief Generate maze in the direction of NORTH and EAST, starting in bottom-left corner of 2D grid

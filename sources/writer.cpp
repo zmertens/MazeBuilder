@@ -2,7 +2,7 @@
  * Writer class handles stdout, and basic file writing to text or Wavefront obj file
  */
 
-#include "writer.h"
+#include <MazeBuilder/writer.h>
 
 #include <iostream>
 #include <filesystem>
@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <cassert>
 
-#include "output_types_enum.h"
+#include <MazeBuilder/output_types_enum.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
