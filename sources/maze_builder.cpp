@@ -232,15 +232,8 @@ std::vector<std::uint8_t> maze_builder::to_pixels(unsigned int cell_size) const 
  */
 std::string maze_builder::to_json_str(unsigned int pretty_spaces) const noexcept {
 
-    const auto maze_str64 = this->to_str64();
-
-    if (maze_str64.empty()) {
-        // Maze gen failed
-        return "";
-    }
-
     nlohmann::json my_json;
-    my_json["output"] = maze_str64;
+    my_json["output"] = this->to_str64();
     my_json["num_cols"] = this->get_columns();
     my_json["num_rows"] = this->get_rows();
     my_json["depth"] = this->get_height();
@@ -307,14 +300,14 @@ void maze_builder::compute_geometry(maze_types my_maze_type, const std::function
     
     istringstream iss{ this->to_str() };
     string line;
-     int row_x = 0;
+    int row_x = 0;
     while (getline(iss, line, '\n')) {
-         int col_z = 0;
+        int col_z = 0;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
                 static constexpr  int block_size = 1;
-                for (auto h{ 0 }; h < m_grid->get_height(); h++) {
+                for (auto h{ 0 }; h < m_grid->get_height() + 15; h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
                     m_block_type = (m_block_type == -1) ? get_int(1, 10) : m_block_type;

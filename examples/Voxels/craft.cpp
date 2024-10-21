@@ -122,8 +122,7 @@ struct craft::craft_impl {
         int rows;
         int height;
         int columns;
-        std::string maze_algo;
-        std::string maze_json;
+        std::string algo;
         int view;
         char tag[MAX_SIGN_LENGTH];
 
@@ -131,8 +130,8 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
 			apply_bloom_effect(true),
-            outfile(".obj"), seed(0), rows(25), height(5), columns(28),
-            maze_algo("binary_tree"), maze_json(""), view(20), tag("Here I am") {
+            outfile(".obj"), seed(0), rows(5), height(5), columns(18),
+            algo("binary_tree"), view(20), tag("Here I am") {
 
         }
 
@@ -144,11 +143,11 @@ struct craft::craft_impl {
             outfile[1] = 'o';
             outfile[2] = 'b';
             outfile[3] = 'j';
-            rows = 25;
+            rows = 15;
             height = 5;
             columns = 28;
             view = 20;
-            maze_algo = "binary_tree";
+            algo = "binary_tree";
             seed = 101;
             chunk_size = 8;
             tag[0] = 'H';
@@ -382,6 +381,7 @@ struct craft::craft_impl {
 
     unique_ptr<Model> m_model;
     unique_ptr<Gui> m_gui;
+    unique_ptr<maze_builder> my_maze;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
         : m_version(version)
@@ -389,7 +389,8 @@ struct craft::craft_impl {
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
-        , m_gui{ make_unique<Gui>() } {
+        , m_gui{ make_unique<Gui>() }
+        , my_maze{ make_unique<maze_builder>(m_gui->rows, m_gui->columns, m_gui->height) } {
         this->reset_model();
     }
 
@@ -405,10 +406,7 @@ struct craft::craft_impl {
             }
             WorkerItem* worker_item = &worker->item;
             if (worker_item->load) {
-                maze_builder mb{ this->m_gui->rows / NUM_WORKERS,
-                    this->m_gui->columns / NUM_WORKERS,
-                    this->m_gui->height, false, -1 };
-                this->load_chunk(worker_item, cref(mb));
+                this->load_chunk(worker_item);
             }
 
             this->compute_chunk(worker_item);
@@ -1390,7 +1388,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const mazes::maze_builder& mb) {
+    void load_chunk(WorkerItem* item) {
         int p = item->p;
         int q = item->q;
 
@@ -1398,7 +1396,7 @@ struct craft::craft_impl {
         Map* light_map = item->light_maps[1][1];
         // world.h
         static world my_world;
-        my_world.create_world(p, q, cref(mb), map_set_func, block_map, this->m_gui->chunk_size);
+        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size);
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1437,9 +1435,7 @@ struct craft::craft_impl {
         item->block_maps[1][1] = &chunk->map;
         item->light_maps[1][1] = &chunk->lights;
 
-        maze_builder mb{ gui->rows / NUM_WORKERS, gui->columns / NUM_WORKERS, gui->height };
-
-        load_chunk(item, cref(mb));
+        load_chunk(item);
     }
 
     void delete_chunks() {
@@ -1993,6 +1989,20 @@ struct craft::craft_impl {
         GLuint buffer = gen_text_buffer(x, y, n, text);
         draw_text(attrib, buffer, length);
         del_buffer(buffer);
+    }
+
+    void build_maze(maze_types my_maze_type, const function<int(int, int)>& get_int, const mt19937& rng) {
+        my_maze.reset();
+        my_maze = make_unique<maze_builder>(this->m_gui->rows, this->m_gui->columns, this->m_gui->height,
+            my_maze_type, cref(get_int), cref(rng), false, items[this->m_model->item_index]);
+        const auto& vertices = my_maze->get_render_vertices();
+        auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
+            for (auto&& block : vertices) {
+                // Set the block in the DB
+                this->builder_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
+            }
+            };
+        set_maze_in_craft(cref(vertices));
     }
 
     void on_light() {
@@ -2575,16 +2585,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads();
 
-    // Init some local vars for handling maze duties
-    list<string> algo_list;
-    for (auto i{ static_cast<int>(maze_types::BINARY_TREE) }; i < static_cast<int>(maze_types::INVALID_ALGO); ++i) {
-        algo_list.push_back(to_string(static_cast<maze_types>(i)));
-    }
-
-    auto my_maze_type = to_maze_type(algo_list.front());
-    auto&& gui = this->m_pimpl->m_gui;
-    auto&& model = this->m_pimpl->m_model;
-
     // Init OpenGL fields
     //GLuint minimap_texture = 0;
 
@@ -2623,6 +2623,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         p_state->z = 15.f;
         p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 55.f;
     }
+
+    // Init some local vars for handling maze duties
+    list<string> algo_list;
+    for (auto i{ static_cast<int>(maze_types::BINARY_TREE) }; i < static_cast<int>(maze_types::INVALID_ALGO); ++i) {
+        algo_list.push_back(to_string(static_cast<maze_types>(i)));
+    }
+
+    auto my_maze_type = to_maze_type(algo_list.front());
+    auto&& gui = this->m_pimpl->m_gui;
+    auto&& model = this->m_pimpl->m_model;
+    auto&& my_maze = this->m_pimpl->my_maze;
 
     me->id = 0;
     me->name = "Wade Watts";
@@ -2666,20 +2677,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
         // Some GUI state variables
         static bool show_demo_window = false;
-        static bool write_maze_now = false;
-
-        if (write_maze_now) {
-            // Writing the maze will run in the background - only do that on Desktop
-            write_maze_now = false;
-            // Only write the maze when **NOT** on the web browser
-#if !defined(__EMSCRIPTEN__)
-            // Write to desktop
-#endif
-            // Write JSON for the Web
-            //this->m_pimpl->m_gui->maze_json = json_writer(gui->outfile);
-        } else {
-            // Failed to set maze
-        }
 
         // Handle SDL events and motion updates
         static bool window_resizes = false;
@@ -2719,15 +2716,15 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         ImGui::Begin("Tab Bar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
         if (ImGui::BeginTabBar("Tabs")) {
             if (ImGui::BeginTabItem("Builder")) {
-                static unsigned int MAX_ROWS = 1'000;
+                static unsigned int MAX_ROWS = 25;
                 if (ImGui::SliderInt("Width", &gui->rows, 5, MAX_ROWS)) {
 
                 }
-                static unsigned int MAX_COLUMNS = 1'000;
+                static unsigned int MAX_COLUMNS = 25;
                 if (ImGui::SliderInt("Length", &gui->columns, 5, MAX_COLUMNS)) {
 
                 }
-                static unsigned int MAX_HEIGHT = 35;
+                static unsigned int MAX_HEIGHT = 10;
                 if (ImGui::SliderInt("Height", &gui->height, 3, MAX_HEIGHT)) {
 
                 }
@@ -2736,21 +2733,21 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     rng.seed(static_cast<unsigned long>(gui->seed));
                 }
                 ImGui::InputText("Tag", &gui->tag[0], MAX_SIGN_LENGTH);
+                ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                 if (ImGui::IsItemActive()) {
                     model->typing = true;
                 } else {
                     model->typing = false;
                 }
-                ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                 if (ImGui::TreeNode("Maze Generator")) {
-                    auto preview{ gui->maze_algo.c_str() };
+                    auto preview{ gui->algo.c_str() };
                     ImGui::NewLine();
                     ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
                     if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
                         for (const auto& itr : algo_list) {
-                            bool is_selected = (itr == gui->maze_algo);
+                            bool is_selected = (itr == gui->algo);
                             if (ImGui::Selectable(itr.c_str(), is_selected)) {
-                                gui->maze_algo = itr;
+                                gui->algo = itr;
                                 my_maze_type = to_maze_type(itr);
                             }
                             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
@@ -2766,12 +2763,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Build!")) {
-                        //this->m_pimpl->reset_model();
-                        //maze2->start_progress();
-                        //maze_func(gui->rows, gui->columns, gui->height);
-                        //maze2->stop_progress();
+                        my_maze->start_progress();
+                        this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
+                        my_maze->stop_progress();
                         //current_maze_pixels = maze2->to_pixels(25);
-                        //write_maze_now = true;
+                        // Write the maze to a file on Desktop immediately
+                        // The maze has a to_str method which the Web API calls /mazes/
+#if !defined(__EMSCRIPTEN__)
+                        mazes::writer writer{};
+                        writer.write(gui->outfile, my_maze->to_wavefront_obj_str());
+#endif
                     } else {
                         ImGui::SameLine();
                         ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -2809,13 +2810,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Show progress when writing
                 ImGui::NewLine();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                //ImGui::Text("Finished building maze in %f ms", maze2->get_progress_in_ms());
+                ImGui::Text("Finished building maze in %f ms", my_maze->get_progress_in_ms());
                 ImGui::NewLine();
                 ImGui::PopStyleColor();
 
                 // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
                 ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
                 if (ImGui::Button("Reset")) {
+                    this->m_pimpl->reset_model();
                     gui->reset();
                 }
                 ImGui::PopStyleColor();
@@ -2865,7 +2867,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 else
                     ImGui::StyleColorsLight();
 
-                ImGui::SliderInt("Chunk Size", &gui->chunk_size, 8, 32);
                 ImGui::SliderInt("View", &gui->view, 1, 24);
 
                 // Prevent setting SDL_Window settings every frame
@@ -2892,20 +2893,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
                 ImGui::Checkbox("Apply Bloom Effect", &gui->apply_bloom_effect);
 
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Help")) {
-                // Begin a child window with horizontal scrolling enabled
-                ImGui::BeginChild("ScrollableText",
-                    ImGui::GetContentRegionAvail(),
-                    false, ImGuiWindowFlags_HorizontalScrollbar);
-
-                ImGui::Text("%s\n", this->m_pimpl->m_help.data());
-                ImGui::Text("\n");
-                ImGui::Text(ZACHS_GH_REPO);
-                ImGui::Text("\n");
-
-                ImGui::EndChild();
                 ImGui::EndTabItem();
             }
             ImGui::EndTabBar();
@@ -3134,5 +3121,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::mazes() const noexcept {
-    return this->m_pimpl->m_gui->maze_json;
+    if (this->m_pimpl->my_maze) {
+        return this->m_pimpl->my_maze->to_json_str();
+    } else {
+        return "";
+    }
 }
