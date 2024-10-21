@@ -2343,6 +2343,7 @@ struct craft::craft_impl {
         this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
         this->m_model->sign_radius = RENDER_SIGN_RADIUS;
         SDL_memset(&this->m_model->player, 0, sizeof(Player) * MAX_PLAYERS);
+        this->m_model->player.state.y = 64;
         this->m_model->player_count = 1;
         this->m_model->flying = false;
         this->m_model->item_index = 0;
@@ -2634,6 +2635,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
     auto&& my_maze = this->m_pimpl->my_maze;
+
+    if (my_maze) {
+        this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
+    }
 
     me->id = 0;
     me->name = "Wade Watts";

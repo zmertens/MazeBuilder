@@ -26,7 +26,7 @@ using namespace std;
  */
 maze_builder::maze_builder(int rows,  int columns,  int height, bool show_distances, int block_type)
     : m_grid{}
-    , m_maze_type(maze_types::BINARY_TREE), m_seed(m_block_type)
+    , m_maze_type(maze_types::BINARY_TREE), m_seed(0)
     , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
 
     if (m_show_distances) {
@@ -58,7 +58,7 @@ maze_builder::maze_builder(int rows, int cols, int height,
     const std::mt19937& rng,
     bool show_distances,
     int block_type) : m_grid{}
-    , m_maze_type(my_maze_type), m_seed(m_block_type)
+    , m_maze_type(my_maze_type), m_seed(static_cast<int>(rng.default_seed))
     , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
 
     if (m_show_distances) {
@@ -297,7 +297,7 @@ std::string maze_builder::to_str64() const noexcept {
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
 void maze_builder::compute_geometry(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
-    
+    cout << "height: " << m_grid->get_height() << endl;
     istringstream iss{ this->to_str() };
     string line;
     int row_x = 0;
@@ -307,7 +307,7 @@ void maze_builder::compute_geometry(maze_types my_maze_type, const std::function
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
                 static constexpr  int block_size = 1;
-                for (auto h{ 0 }; h < m_grid->get_height() + 15; h++) {
+                for (auto h{ 0 }; h < 12 + m_grid->get_height(); h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
                     m_block_type = (m_block_type == -1) ? get_int(1, 10) : m_block_type;
