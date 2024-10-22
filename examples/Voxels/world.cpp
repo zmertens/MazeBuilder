@@ -48,10 +48,11 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                     func(x, PLANT_HEIGHT_MAX, z, w * flag, m);
                 }
                 // trees
-                //if (dx - 4 < 0 || dz - 4 < 0 || dx + 4 >= chunk_size || dz + 4 >= chunk_size) {
-                //    ok = 0;
-                //}
-                if (simplex2(x, z, 6, 0.5, 2) > 0.84) {
+                bool ok = true;
+                if (dx - 3 < 0 || dz - 3 < 0 || dx + 4 > chunk_size || dz + 4 > chunk_size) {
+                   ok = false;
+                }
+                if (ok && simplex2(x, z, 6, 0.5, 2) > 0.84) {
                     for (int y = PLANT_HEIGHT_MAX + 3; y < PLANT_HEIGHT_MAX + 8; y++) {
                         for (int ox = -3; ox <= 3; ox++) {
                             for (int oz = -3; oz <= 3; oz++) {
