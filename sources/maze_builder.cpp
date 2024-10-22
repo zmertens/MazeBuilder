@@ -255,6 +255,10 @@ int maze_builder::get_rows() const noexcept {
     return this->m_grid->get_rows();
 }
 
+int maze_builder::get_block_type() const noexcept {
+    return this->m_block_type;
+}
+
 void maze_builder::start_progress() noexcept {
     this->m_tracker.start();
 }

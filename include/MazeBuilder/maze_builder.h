@@ -67,6 +67,7 @@ public:
     int get_height() const noexcept;
     int get_columns() const noexcept;
     int get_rows() const noexcept;
+    int get_block_type() const noexcept;
 
     // Expose progress_tracker methods
     void start_progress() noexcept;

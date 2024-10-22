@@ -2108,21 +2108,30 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    this->m_model->item_index = (sc - SDL_SCANCODE_1);
+                    if (!this->m_model->typing) {
+                        this->m_model->item_index = (sc - SDL_SCANCODE_1);
+                    }
                     break;
                 }
                 case KEY_FLY: {
-                    this->m_model->flying = !this->m_model->flying;
+                    if (!this->m_model->typing) {
+                        this->m_model->flying = !this->m_model->flying;
+                    }
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
+                    if (!this->m_model->typing) {
+                        this->m_model->item_index = (this->m_model->item_index + 1) % item_count; 
+                    }
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    this->m_model->item_index--;
-                    if (this->m_model->item_index < 0)
-                        this->m_model->item_index = item_count - 1;
+                    if (!this->m_model->typing) {
+                        this->m_model->item_index--;
+                        if (this->m_model->item_index < 0) {
+                            this->m_model->item_index = item_count - 1;
+                        }
+                    }
                     break;
                 }
                 case KEY_TAG: {
@@ -2642,7 +2651,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& my_maze = this->m_pimpl->my_maze;
 
     if (my_maze) {
-        this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
+        // this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
     }
 
     me->id = 0;
@@ -2743,11 +2752,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     rng.seed(static_cast<unsigned long>(gui->seed));
                 }
                 ImGui::InputText("Tag", &gui->tag[0], MAX_SIGN_LENGTH);
+                if (ImGui::IsItemActive()) {
+                    model->typing = true;
+                }
                 ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
                 if (ImGui::IsItemActive()) {
                     model->typing = true;
-                } else {
-                    model->typing = false;
                 }
                 if (ImGui::TreeNode("Maze Generator")) {
                     auto preview{ gui->algo.c_str() };
@@ -2951,6 +2961,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_hdr);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);

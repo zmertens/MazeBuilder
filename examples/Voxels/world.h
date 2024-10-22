@@ -11,7 +11,7 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
+    void create_world(int p, int q, world_func func, Map *m, int chunk_size) const noexcept;
 };
 
 #endif

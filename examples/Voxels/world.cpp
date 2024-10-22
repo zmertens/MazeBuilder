@@ -1,7 +1,5 @@
 #include "world.h"
 
-#include <optional>
-
 #include <noise/noise.h>
 
 #include <MazeBuilder/maze_builder.h>
@@ -9,7 +7,7 @@
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) noexcept {
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -32,35 +30,39 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                 h = t;
                 w = 2;
             }
-
             // sand and grass terrain
-            for (int y = 0; y < h; y++) {
+            static constexpr auto PLANT_HEIGHT_MAX = 2;
+            for (int y = 0; y < PLANT_HEIGHT_MAX; y++) {
                 func(x, y, z, w * flag, m);
             }
-
+            
             if (w == 1) {
+
                 // grass
                 if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
-                    func(x, h, z, 17 * flag, m);
+                    func(x, PLANT_HEIGHT_MAX, z, 17 * flag, m);
                 }
                 // flowers
                 if (simplex2(x * 0.05, -z * 0.05, 4, 0.8, 2) > 0.7) {
-                    w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
-                    func(x, h, z, w * flag, m);
+                    int w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
+                    func(x, PLANT_HEIGHT_MAX, z, w * flag, m);
                 }
                 // trees
+                //if (dx - 4 < 0 || dz - 4 < 0 || dx + 4 >= chunk_size || dz + 4 >= chunk_size) {
+                //    ok = 0;
+                //}
                 if (simplex2(x, z, 6, 0.5, 2) > 0.84) {
-                    for (int y = h + 3; y < h + 8; y++) {
+                    for (int y = PLANT_HEIGHT_MAX + 3; y < PLANT_HEIGHT_MAX + 8; y++) {
                         for (int ox = -3; ox <= 3; ox++) {
                             for (int oz = -3; oz <= 3; oz++) {
-                                int d = (ox * ox) + (oz * oz) + (y - (h + 4)) * (y - (h + 4));
+                                int d = (ox * ox) + (oz * oz) + (y - (PLANT_HEIGHT_MAX + 4)) * (y - (PLANT_HEIGHT_MAX + 4));
                                 if (d < 11) {
                                     func(x + ox, y, z + oz, 15, m);
                                 }
                             }
                         }
                     }
-                    for (int y = h; y < h + 7; y++) {
+                    for (int y = PLANT_HEIGHT_MAX; y < PLANT_HEIGHT_MAX + 7; y++) {
                         func(x, y, z, 5, m);
                     }
                 }
@@ -71,6 +73,9 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                     func(x, y, z, 16 * flag, m);
                 }
             }
+
+            // Maze
+            
         }
     }
 } // create_world
