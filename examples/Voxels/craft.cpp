@@ -1797,7 +1797,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture_id, const unique_ptr<craft_impl::Gui>& gui) {
+    int render_chunks(Attrib* attrib, Player* player, const unique_ptr<craft_impl::Gui>& gui) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(gui));
@@ -1829,8 +1829,6 @@ struct craft::craft_impl {
             if (!this->chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy)) {
                 continue;
             }
-            glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, texture_id);
             this->draw_chunk(attrib, chunk);
             result += chunk->faces;
         }
@@ -1911,7 +1909,7 @@ struct craft::craft_impl {
         }
     }
 
-    void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky_texture_id) {
+    void render_sky(Attrib* attrib, Player* player, GLuint buffer) {
         State* s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1922,9 +1920,6 @@ struct craft::craft_impl {
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform1i(attrib->sampler, 2);
         glUniform1f(attrib->timer, time_of_day());
-
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, sky_texture_id);
 
         draw_triangles_3d(attrib, buffer, 512 * 3);
     }
@@ -2961,20 +2956,23 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glViewport(0, 0, voxel_scene_w, voxel_scene_h);
         glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_hdr);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
-        m_pimpl->render_sky(&sky_attrib, me, sky_buffer, sky_texture_id);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, sky_texture_id);
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
 
         glClear(GL_DEPTH_BUFFER_BIT);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, cref(gui));
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(gui));
-
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, sign);
         m_pimpl->render_signs(&text_attrib, me);
-
         m_pimpl->render_sign(&text_attrib, me);
 
         if (gui->show_wireframes) {
