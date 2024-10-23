@@ -19,8 +19,6 @@
 
 #include <MazeBuilder/maze_builder.h>
 
-static std::shared_ptr<mazes::maze_builder> my_maze_builder = std::make_shared<mazes::maze_builder>(1, 1, 1);
-
 static constexpr auto MB_MENU_MSG = R"help(
     -- Maze Builder Menu --
     1. Create New Maze
@@ -45,7 +43,7 @@ void print_menu() {
 
 void process_commands(std::deque<char>& commands,
     bool& is_running,
-    const std::shared_ptr<mazes::maze_builder>& mb) {
+    const std::unique_ptr<mazes::maze_builder::maze>& mb) {
     
     using namespace std;
 
@@ -88,10 +86,13 @@ void process_commands(std::deque<char>& commands,
                 cerr << "Invalid algorithm. Please try again.\n";
                 break;
             }
-            my_maze_builder->clear();
-            my_maze_builder = std::make_shared<mazes::maze_builder>(rows, columns, depth);
+            // Create the maze
+            mb->rows = rows;
+            mb->columns = columns;
+            mb->height = depth;
+
             rng.seed(seed);
-            auto users_maze_output64 = my_maze_builder->to_str64();
+            auto users_maze_output64 = mb->to_str64();
             // Create the JSON
             nlohmann::json my_json;
             my_json["num_rows"] = rows;
@@ -162,6 +163,9 @@ int main()
 {
     using namespace std;
 
+    mazes::maze_builder builder;
+    auto my_maze = builder.block_type(-1).rows(10).columns(10).height(1).seed(1).maze_type(mazes::maze_types::DFS).build();
+
     float accumulator = 0.0;
     static constexpr auto FIXED_TIMESTEP = 1.0f / 60.0f;
 
@@ -180,7 +184,7 @@ int main()
         }
 
         // Process commands
-        process_commands(commands, ref(is_running), cref(my_maze_builder));
+        process_commands(commands, ref(is_running), cref(my_maze));
     }
 
     return 0;

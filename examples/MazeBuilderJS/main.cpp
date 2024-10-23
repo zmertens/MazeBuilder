@@ -34,7 +34,6 @@ private:
 public:
     maze(int r, int c, int d, int s, const std::string& algorithm, const std::string& str)
         : m_rows(r), m_cols(c), m_depth(d), m_seed(s), m_algorithm(algorithm), m_output(str) {
-            mazes::maze_builder my_maze { m_rows, m_cols, m_depth };
             mazes::maze_types my_maze_type = mazes::maze_types::BINARY_TREE;
             
             std::mt19937 rng_engine{ static_cast<unsigned long>(m_seed) };
@@ -42,6 +41,12 @@ public:
                 std::uniform_int_distribution<int> dist {low, high};
                 return dist(rng_engine);
             };
+
+            mazes::maze_builder builder;
+            auto my_maze = builder.rows(r).columns(c).height(d)
+                .seed(s).rng(rng_engine).get_int(get_int)
+                .block_type(-1).show_distances(true)
+                .maze_type(my_maze_type).build();
 
             m_output = my_maze.to_str();
     }

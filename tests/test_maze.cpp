@@ -23,11 +23,11 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
         return dist(rng);
     };
 
-    shared_ptr<maze_builder> maze1 = make_shared<maze_builder>(10, 10, 10);
+    maze_builder builder;
+    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
 
-
-    REQUIRE(maze1->get_columns() == 10);
-    REQUIRE(maze1->get_rows() == 10);
+    REQUIRE(maze1->columns == 10);
+    REQUIRE(maze1->rows == 10);
 }
 
 TEST_CASE( "Test maze progress", "[maze progress]") {
@@ -36,8 +36,8 @@ TEST_CASE( "Test maze progress", "[maze progress]") {
         uniform_int_distribution<int> dist {low, high};
         return dist(rng);
     };
-
-    shared_ptr<maze_builder> maze1 = make_shared<maze_builder>(10, 10, 10);
+    maze_builder builder;
+    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
 
     SECTION("Check no compute progress") {
         maze1->start_progress();
@@ -61,7 +61,8 @@ TEST_CASE( "Test maze compute geometry", "[maze geometry]") {
         return dist(rng);
     };
 
-    unique_ptr<maze_builder> maze1 = make_unique<maze_builder>(10, 10, 10, maze_types::DFS, cref(get_int), cref(rng));
+    maze_builder builder;
+    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).maze_type(maze_types::DFS).build();
     REQUIRE(!maze1->to_wavefront_obj_str().empty());
     REQUIRE(maze1->get_vertices_size() > 0);
 }

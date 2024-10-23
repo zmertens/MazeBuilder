@@ -236,6 +236,9 @@ void maze_builder::maze::compute_geometry() noexcept {
         this->m_grid = make_unique<grid>(rows, columns, height);
     }
 
+    this->m_vertices.clear();
+    this->m_faces.clear();
+
     bool success = mazes::maze_factory::gen(this->maze_type, ref(this->m_grid), cref(this->get_int), cref(this->rng));
     if (!success) {
     }

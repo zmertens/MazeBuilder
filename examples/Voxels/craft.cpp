@@ -27,6 +27,7 @@
 
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
+#include <string_view>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -167,9 +168,9 @@ struct craft::craft_impl {
         bool first_iteration, horizontal_blur;
         static constexpr unsigned int NUM_FBO_ITERATIONS = 10;
 
-        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0),
-            color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 },
-            first_iteration(true), horizontal_blur(true) {
+        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0)
+            , color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 }
+            , first_iteration(true), horizontal_blur(true) {
         }
 
         void reset() {
@@ -189,10 +190,11 @@ struct craft::craft_impl {
 
             glGenTextures(2, color_buffers);
             for (auto i = 0; i < 2; ++i) {
+                glActiveTexture(GL_TEXTURE4 + i);
                 glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, color_buffers[i], 0);
@@ -212,11 +214,12 @@ struct craft::craft_impl {
             glGenFramebuffers(2, fbo_pingpong);
             glGenTextures(2, color_buffers_pingpong);
             for (auto i = 0; i < 2; i++) {
+                glActiveTexture(GL_TEXTURE6 + i);
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
                 glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffers_pingpong[i], 0);
@@ -383,6 +386,8 @@ struct craft::craft_impl {
 
     unique_ptr<Model> m_model;
     unique_ptr<Gui> m_gui;
+
+    std::string_view m_json_data;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
         : m_version(version)
@@ -1792,11 +1797,20 @@ struct craft::craft_impl {
         }
     }
 
+    //glClear(GL_DEPTH_BUFFER_BIT);
+    /*void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky) {
+        set_matrix_3d(
+            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
+            0, 0, 0, s->rx, s->ry, this->m_model->fov, 0, this->m_model->render_radius);
+
+        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    }*/
+
     /**
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder::maze>& mb) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint buffer, GLuint texture, GLuint sky, const unique_ptr<maze_builder::maze>& mb) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(mb));
@@ -1804,24 +1818,34 @@ struct craft::craft_impl {
         int q = this->chunked(s->z);
         float light = this->get_daylight();
         float matrix[16];
+        float sky_matrix[16];
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
             matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
+        set_matrix_3d(
+            sky_matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
+            0.f, 0.f, 0.f, s->rx, s->ry, this->m_model->fov,
+            static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
         glUseProgram(attrib->program);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, texture);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
         glUniform1i(attrib->sampler, 0);
-        glUniform1i(attrib->extra1, 2);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, sky);
+        glUniform1i(attrib->extra1, 1);
         glUniform1f(attrib->extra2, light);
         glUniform1f(attrib->extra3, static_cast<GLfloat>(this->m_model->render_radius * this->m_gui->chunk_size));
         glUniform1i(attrib->extra4, static_cast<int>(this->m_model->is_ortho));
         glUniform1f(attrib->timer, this->time_of_day());
+        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, sky_matrix);
+        draw_triangles_3d(attrib, buffer, 512 * 3);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk* chunk = this->m_model->chunks + i;
             if (this->chunk_distance(chunk, p, q) > this->m_model->render_radius) {
@@ -1912,23 +1936,6 @@ struct craft::craft_impl {
                 draw_player(attrib, other);
             }
         }
-    }
-
-    void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky) {
-        State* s = &player->state;
-        float matrix[16];
-        set_matrix_3d(
-            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
-            0, 0, 0, s->rx, s->ry, this->m_model->fov, 0, this->m_model->render_radius);
-
-        glUseProgram(attrib->program);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, sky);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 1);
-        glUniform1f(attrib->timer, time_of_day());
-
-        draw_triangles_3d(attrib, buffer, 512 * 3);
     }
 
     void render_wireframe(Attrib* attrib, Player* player) {
@@ -2467,7 +2474,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     craft_impl::Attrib block_attrib = { 0 };
     craft_impl::Attrib line_attrib = { 0 };
     craft_impl::Attrib text_attrib = { 0 };
-    craft_impl::Attrib sky_attrib = { 0 };
     craft_impl::Attrib screen_attrib = { 0 };
     craft_impl::Attrib blur_attrib = { 0 };
 
@@ -2490,6 +2496,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     block_attrib.extra4 = glGetUniformLocation(program, "is_ortho");
     block_attrib.camera = glGetUniformLocation(program, "camera");
     block_attrib.timer = glGetUniformLocation(program, "timer");
+    glBindFragDataLocation(program, 0, "fragColor");
+    glBindFragDataLocation(program, 1, "brightColor");
 
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/line_vertex.es.glsl", "shaders/es/line_fragment.es.glsl");
@@ -2512,19 +2520,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
 
-#if defined(__EMSCRIPTEN__)
-    program = load_program("shaders/es/sky_vertex.es.glsl", "shaders/es/sky_fragment.es.glsl");
-#else
-    program = load_program("shaders/sky_vertex.glsl", "shaders/sky_fragment.glsl");
-#endif
-    sky_attrib.program = program;
-    sky_attrib.position = 0;
-    sky_attrib.normal = 1;
-    sky_attrib.uv = 2;
-    sky_attrib.matrix = glGetUniformLocation(program, "matrix");
-    sky_attrib.sampler = glGetUniformLocation(program, "sampler");
-    sky_attrib.timer = glGetUniformLocation(program, "timer");
-
     GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
 #if defined(__EMSCRIPTEN__)
@@ -2536,7 +2531,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     screen_attrib.position = 0;
     screen_attrib.uv = 1;
     screen_attrib.sampler = glGetUniformLocation(program, "screenTexture");
-    screen_attrib.extra1 = glGetUniformLocation(program, "bloom");
+    screen_attrib.extra1 = glGetUniformLocation(program, "do_bloom");
     screen_attrib.extra2 = glGetUniformLocation(program, "exposure");
     screen_attrib.extra3 = glGetUniformLocation(program, "bloomBlur");
 
@@ -2727,11 +2722,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         ImGui::Begin("Tab Bar", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove);
         if (ImGui::BeginTabBar("Tabs")) {
             if (ImGui::BeginTabItem("Builder")) {
-                static unsigned int MAX_ROWS = 25;
+                static unsigned int MAX_ROWS = 50;
                 if (ImGui::SliderInt("Width", &gui->rows, 5, MAX_ROWS)) {
 
                 }
-                static unsigned int MAX_COLUMNS = 25;
+                static unsigned int MAX_COLUMNS = 50;
                 if (ImGui::SliderInt("Length", &gui->columns, 5, MAX_COLUMNS)) {
 
                 }
@@ -2774,17 +2769,30 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
-                    if (ImGui::Button("Build!")) {
+                    if (ImGui::Button("Export!")) {
                         my_maze->start_progress();
-                        // this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
+                        my_maze->block_type = items[model->item_index];
+                        my_maze->seed = gui->seed;
+                        my_maze->show_distances = false;
+                        my_maze->shift_x = static_cast<int>(p_state->x);
+                        my_maze->shift_y = static_cast<int>(p_state->y);
+                        my_maze->rows = gui->rows;
+                        my_maze->columns = gui->columns;
+                        my_maze->height = gui->height;
+                        my_maze->maze_type = my_maze_type;
+                        my_maze->compute_geometry();
                         my_maze->stop_progress();
                         //current_maze_pixels = maze2->to_pixels(25);
                         // Write the maze to a file on Desktop immediately
                         // The maze has a to_str method which the Web API calls /mazes/
+                        this->m_pimpl->m_json_data = my_maze->to_json_str();
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
                         writer.write(gui->outfile, my_maze->to_wavefront_obj_str());
 #endif
+                        ImGui::NewLine();
+                        ImGui::Text("Maze written to %s\n", gui->outfile);
+                        ImGui::NewLine();
                     } else {
                         ImGui::SameLine();
                         ImGui::Text("Building maze... %s\n", gui->outfile);
@@ -2808,9 +2816,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 //    bool success = write_success.get();
                 //    if (success && gui->outfile[0] != '.') {
                 //        // Dont display a message on the web browser, let the web browser handle that
-                //        ImGui::NewLine();
-                //        ImGui::Text("Maze written to %s\n", gui->outfile);
-                //        ImGui::NewLine();
+                //     
                 //    } else {
                 //        ImGui::NewLine();
                 //        ImGui::Text("Failed to write maze: %s\n", gui->outfile);
@@ -2835,8 +2841,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::PopStyleColor();
                 ImGui::NewLine();
 
-                ImVec2 sidebar_xy = ImGui::GetContentRegionAvail();
+                // Check the time
+                int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
+                char am_pm = hour < 12 ? 'a' : 'p';
+                hour = hour % 12;
+                hour = hour ? hour : 12;
+                ImGui::Text("chunk.p: %d\nchunk.q: %d\n", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
+                ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
+                ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
+                ImGui::Text("time: %d%cm\n", hour, am_pm);
 
+                //ImVec2 sidebar_xy = ImGui::GetContentRegionAvail();
                 //if (glIsTexture(minimap_texture)) {
                 //    glDeleteTextures(1, &minimap_texture);
                 //}
@@ -2858,18 +2873,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 //    sidebar_xy, uv0, uv1);
                 //glBindTexture(GL_TEXTURE_2D, 0);
 
-                ImGui::EndTabItem();
-            }
-            if (ImGui::BeginTabItem("Stats")) {
-                // Check the time
-                int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-                char am_pm = hour < 12 ? 'a' : 'p';
-                hour = hour % 12;
-                hour = hour ? hour : 12;
-                ImGui::Text("chunk.p: %d\nchunk.q: %d\n", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-                ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
-                ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-                ImGui::Text("time: %d%cm\n", hour, am_pm);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Graphics")) {
@@ -2958,10 +2961,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
-        m_pimpl->render_sky(&sky_attrib, me, sky_buffer, sky_texture_id);
-        glClear(GL_DEPTH_BUFFER_BIT);
-
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_maze));
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, sky_buffer, texture, sky_texture_id, cref(my_maze));
 
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib, texture);
@@ -2987,13 +2987,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
-                glUniform1i(blur_attrib.sampler, 1);
-                glActiveTexture(GL_TEXTURE1);
+                glUniform1i(blur_attrib.sampler, 5);
+                glActiveTexture(GL_TEXTURE5);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
-                glUniform1i(blur_attrib.sampler, 0);
-                glActiveTexture(GL_TEXTURE0);
+                glUniform1i(blur_attrib.sampler, 6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
+                glActiveTexture(GL_TEXTURE6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
@@ -3011,13 +3011,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
-        glUniform1i(screen_attrib.sampler, 0);
-        glUniform1i(screen_attrib.extra3, 1);
+        //glUniform1i(screen_attrib.sampler, 4);
+        //glUniform1i(screen_attrib.extra3, 6);
         glBindVertexArray(quad_vao);
-        glActiveTexture(GL_TEXTURE0);
+        //glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
+        //glActiveTexture(GL_TEXTURE6);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
         glUniform1f(screen_attrib.extra2, 0.35f);
@@ -3115,7 +3115,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
-    glDeleteProgram(sky_attrib.program);
     glDeleteProgram(line_attrib.program);
     glDeleteProgram(screen_attrib.program);
     glDeleteProgram(blur_attrib.program);
@@ -3134,9 +3133,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::mazes() const noexcept {
-    //if (this->m_pimpl->my_maze) {
-    //    return this->m_pimpl->my_maze->to_json_str();
-    //} else {
+    if (this->m_pimpl->m_json_data.data()) {
+        return this->m_pimpl->m_json_data.data();
+    } else {
         return "";
-    //}
+    }
 }

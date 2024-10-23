@@ -7,14 +7,14 @@ uniform sampler2D screenTexture;
 uniform sampler2D bloomBlur;
 uniform float exposure;
 
-uniform bool bloom;
+uniform bool do_bloom;
 
 void main()
 {             
     const float gamma = 2.2;
     vec3 hdrColor = texture(screenTexture, TexCoords).rgb;      
 
-	if (bloom) {
+	if (do_bloom) {
 		vec3 bloomColor = texture(bloomBlur, TexCoords).rgb;
 		// Additive blending
     	hdrColor += bloomColor;

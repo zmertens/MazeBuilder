@@ -74,22 +74,30 @@ int main(int argc, char* argv[]) {
         // Run the command-line program
         mazes::maze_types my_maze_type = mazes::to_maze_type(maze_args.algorithm);
         static constexpr auto block_type = -1;
-        mazes::maze_builder my_maze{ maze_args.rows, maze_args.columns, maze_args.height, my_maze_type,
-            cref(get_int), cref(rng_engine), maze_args.distances, block_type};
-        my_maze.start_progress();
+        mazes::maze_builder builder;
+        auto my_maze = builder.rows(maze_args.rows)
+            .columns(maze_args.columns)
+            .height(maze_args.height)
+            .maze_type(my_maze_type)
+            .get_int(get_int)
+            .rng(rng_engine)
+            .block_type(block_type)
+            .show_distances(maze_args.distances)
+            .build();
+        my_maze->start_progress();
         mazes::writer my_writer;
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {
         case mazes::output_types::WAVEFRONT_OBJ_FILE:
-            success = my_writer.write(cref(maze_args.output), my_maze.to_wavefront_obj_str());
+            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
             break;
         case mazes::output_types::PNG:
             success = my_writer.write_png(cref(maze_args.output), 
-            my_maze.to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
+            my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
             break;
         case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
         case mazes::output_types::STDOUT: {
-            string maze_str = my_maze.to_str();
+            string maze_str = my_maze->to_str();
             success = my_writer.write(cref(maze_args.output), cref(maze_str));
             break;
         }
@@ -99,7 +107,7 @@ int main(int argc, char* argv[]) {
         }
 
         if (success) {
-            my_maze.stop_progress();
+            my_maze->stop_progress();
 #if defined(MAZE_DEBUG)
             std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
             std::cout << "INFO: Progress: " << my_maze.get_progress_in_seconds() << " seconds" << std::endl;

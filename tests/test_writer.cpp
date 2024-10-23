@@ -38,8 +38,10 @@ TEST_CASE("Writer can produce a PNG file", "[does png]") {
 		return uniform_int_distribution<int>{x, y}(rng);
 		};
 
-	maze_builder my_maze{ 10, 10, 1 };
-	auto&& my_png = my_maze.to_pixels(15);
+    maze_builder builder;
+    auto my_maze = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
+	
+	auto&& my_png = my_maze->to_pixels(15);
 
 	REQUIRE(!my_png.empty());
 
@@ -47,5 +49,5 @@ TEST_CASE("Writer can produce a PNG file", "[does png]") {
 
 	REQUIRE(my_writer.get_output_type("1.png") == output_types::PNG);
 
-	REQUIRE(my_writer.write_png("1.png", my_png, my_maze.get_rows() * 4, my_maze.get_columns() * 4));
+	REQUIRE(my_writer.write_png("1.png", my_png, my_maze->rows * 4, my_maze->columns * 4));
 }
