@@ -130,8 +130,8 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
 			apply_bloom_effect(true),
-            outfile(".obj"), seed(0), rows(5), height(5), columns(18),
-            algo("binary_tree"), view(20), tag("Here I am") {
+            outfile(".obj"), seed(0), rows(25), height(5), columns(18),
+            algo("binary_tree"), view(20), tag("maze here") {
 
         }
 
@@ -383,7 +383,6 @@ struct craft::craft_impl {
 
     unique_ptr<Model> m_model;
     unique_ptr<Gui> m_gui;
-    unique_ptr<maze_builder> my_maze;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
         : m_version(version)
@@ -391,12 +390,11 @@ struct craft::craft_impl {
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
-        , m_gui{ make_unique<Gui>() }
-        , my_maze{ make_unique<maze_builder>(m_gui->rows, m_gui->columns, m_gui->height) } {
+        , m_gui{ make_unique<Gui>() } {
         this->reset_model();
     }
 
-    int worker_run(void* arg) {
+    int worker_run(void* arg, const unique_ptr<maze_builder::maze>& my_maze) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
@@ -408,7 +406,7 @@ struct craft::craft_impl {
             }
             WorkerItem* worker_item = &worker->item;
             if (worker_item->load) {
-                this->load_chunk(worker_item, cref(this->my_maze));
+                this->load_chunk(worker_item, cref(my_maze));
             }
 
             this->compute_chunk(worker_item);
@@ -420,13 +418,13 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-    void init_worker_threads() {
+    void init_worker_threads(const unique_ptr<maze_builder::maze>& mb) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            worker->thrd = thread([this](void* arg) { this->worker_run(arg); }, worker.get());
+            worker->thrd = thread([this, &mb](void* arg) { this->worker_run(arg, cref(mb)); }, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -1390,7 +1388,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const unique_ptr<maze_builder>& mb) {
+    void load_chunk(WorkerItem* item, const unique_ptr<maze_builder::maze>& mb) {
         int p = item->p;
         int q = item->q;
 
@@ -1427,7 +1425,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<maze_builder>& mb) {
+    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<maze_builder::maze>& mb) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1517,7 +1515,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const unique_ptr<maze_builder>& mb) {
+    void force_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1634,7 +1632,7 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const unique_ptr<maze_builder>& mb) {
+    void ensure_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
         check_workers();
         force_chunks(player, cref(mb));
         for (auto&& worker : this->m_model->workers) {
@@ -1798,7 +1796,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder>& mb) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder::maze>& mb) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(mb));
@@ -1996,20 +1994,6 @@ struct craft::craft_impl {
         GLuint buffer = gen_text_buffer(x, y, n, text);
         draw_text(attrib, buffer, length);
         del_buffer(buffer);
-    }
-
-    void build_maze(maze_types my_maze_type, const function<int(int, int)>& get_int, const mt19937& rng) {
-        my_maze.reset();
-        my_maze = make_unique<maze_builder>(this->m_gui->rows, this->m_gui->columns, this->m_gui->height,
-            my_maze_type, cref(get_int), cref(rng), false, items[this->m_model->item_index]);
-        const auto& vertices = my_maze->get_render_vertices();
-        auto set_maze_in_craft = [this](const vector<tuple<int, int, int, int>>& vertices) {
-            for (auto&& block : vertices) {
-                // Set the block in the DB
-                this->builder_block(get<0>(block), get<1>(block), get<2>(block), get<3>(block));
-            }
-            };
-        set_maze_in_craft(cref(vertices));
     }
 
     void on_light() {
@@ -2603,9 +2587,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         }
     }
 
-    // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads();
-
     // Init OpenGL fields
     //GLuint minimap_texture = 0;
 
@@ -2651,10 +2632,19 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         algo_list.push_back(to_string(static_cast<maze_types>(i)));
     }
 
+    // Make some references
     auto my_maze_type = to_maze_type(algo_list.front());
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
-    auto&& my_maze = this->m_pimpl->my_maze;
+
+    maze_builder builder;
+    auto my_maze = builder.maze_type(my_maze_type).get_int(get_int)
+        .rng(rng).rows(gui->rows).columns(gui->columns).height(gui->height)
+        .shift_x(static_cast<int>(p_state->x)).shift_y(static_cast<int>(p_state->y))
+        .show_distances(false).seed(0).block_type(-1).build();
+
+    // INITIALIZE WORKER THREADS
+    m_pimpl->init_worker_threads(cref(my_maze));
 
     me->id = 0;
     me->name = "Wade Watts";
@@ -3144,9 +3134,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::mazes() const noexcept {
-    if (this->m_pimpl->my_maze) {
-        return this->m_pimpl->my_maze->to_json_str();
-    } else {
+    //if (this->m_pimpl->my_maze) {
+    //    return this->m_pimpl->my_maze->to_json_str();
+    //} else {
         return "";
-    }
+    //}
 }

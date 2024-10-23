@@ -19,8 +19,7 @@
 
 namespace mazes {
 
-class maze_builder
-{
+class maze_builder {
     class cell;
 private:
     // Store maze block's relative position in a grid / chunk-based world
@@ -36,93 +35,155 @@ private:
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
 public:
-    using maze = std::tuple<int, int, int, int, std::string, std::string>;
+    // Data class to represent a maze
+    struct maze {
+        int rows, columns, height;
+        mazes::maze_types maze_type;
+        std::function<int(int, int)> get_int;
+        std::mt19937 rng;
+        int seed;
+        bool show_distances;
+        int block_type;
+        int shift_x, shift_y;
 
-    // Constructor
-    explicit maze_builder(int rows, int cols, int height, bool show_distances = false, int block_type = -1);
-    explicit maze_builder(int rows, int cols, int height,
-        mazes::maze_types my_maze_type,
-        const std::function<int(int, int)>& get_int,
-        const std::mt19937& rng,
-        bool show_distances = false,
-        int block_type = -1);
+        explicit maze() : rows(0), columns(0), height(0)
+            , maze_type(mazes::maze_types::BINARY_TREE), get_int(nullptr)
+            , rng(std::mt19937(std::random_device()())), seed(0)
+            , show_distances(false), block_type(0)
+            , shift_x(0), shift_y(0) {
 
-	void clear() noexcept;
-	std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
-    std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept;
-	std::vector<std::vector<std::uint32_t>> get_faces() const noexcept;
+        }
 
-    std::optional<std::tuple<int, int, int, int>> find_block(int p, int q) const noexcept;
+        std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
+        std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept;
+        std::vector<std::vector<std::uint32_t>> get_faces() const noexcept;
 
-    std::string to_str() const noexcept;
+        std::optional<std::tuple<int, int, int, int>> find_block(int x, int z) const noexcept;
 
-    std::string to_str64() const noexcept;
-    
-    std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept;
+        std::string to_str() const noexcept;
 
-    std::string to_json_str(unsigned int pretty_spaces = 4) const noexcept;
+        std::string to_str64() const noexcept;
 
-    std::string to_wavefront_obj_str() const noexcept;
-    
-    int get_height() const noexcept;
-    int get_columns() const noexcept;
-    int get_rows() const noexcept;
-    int get_block_type() const noexcept;
+        std::vector<std::uint8_t> to_pixels(const unsigned int cell_size = 3) const noexcept;
 
-    // Expose progress_tracker methods
-    void start_progress() noexcept;
-    void stop_progress() noexcept;
-    double get_progress_in_seconds() const noexcept;
-    double get_progress_in_ms() const noexcept;
-    std::size_t get_vertices_size() const noexcept;
+        std::string to_json_str(unsigned int pretty_spaces = 4) const noexcept;
+
+        std::string to_wavefront_obj_str() const noexcept;
+
+        // Expose progress_tracker methods
+        void start_progress() noexcept;
+        void stop_progress() noexcept;
+        double get_progress_in_seconds() const noexcept;
+        double get_progress_in_ms() const noexcept;
+        std::size_t get_vertices_size() const noexcept;
+
+        void compute_geometry() noexcept;
+
+    private:
+        class progress_tracker {
+            mutable std::mutex m_mtx;
+            std::chrono::steady_clock::time_point start_time;
+            std::chrono::steady_clock::time_point end_time;
+        public:
+            explicit progress_tracker() : start_time(std::chrono::steady_clock::now())
+                , end_time(std::chrono::steady_clock::now()) {
+
+            }
+            void start() noexcept {
+                this->m_mtx.lock();
+                start_time = std::chrono::steady_clock::now();
+                this->m_mtx.unlock();
+            }
+
+            void stop() noexcept {
+                this->m_mtx.lock();
+                end_time = std::chrono::steady_clock::now();
+                this->m_mtx.unlock();
+            }
+
+            double get_duration_in_seconds() const noexcept {
+                std::lock_guard<std::mutex> lock(this->m_mtx);
+                return std::chrono::duration<double>(end_time - start_time).count();
+            }
+
+            double get_duration_in_ms() const noexcept {
+                return this->get_duration_in_seconds() * 1000.0;
+            }
+        }; // progress_tracker
+        
+        void add_block(int x, int y, int z, int w, int block_size) noexcept;
+
+        // Tuple (x, y, z, block_type)
+        std::vector<std::tuple<int, int, int, int>> m_vertices;
+        std::vector<std::vector<std::uint32_t>> m_faces;
+        pqmap m_p_q;
+        progress_tracker m_tracker;
+        std::unique_ptr<grid_interface> m_grid;
+    }; // maze struct
 
 private:
-    class progress_tracker {
-        mutable std::mutex m_mtx;
-        std::chrono::steady_clock::time_point start_time;
-        std::chrono::steady_clock::time_point end_time;
-    public:
-        explicit progress_tracker() : start_time(std::chrono::steady_clock::now())
-            , end_time(std::chrono::steady_clock::now()) {
+    std::unique_ptr<maze> my_maze;
+public:
+    explicit maze_builder() : my_maze(std::make_unique<maze>()) {
 
-        }
-        void start() noexcept {
-            this->m_mtx.lock();
-            start_time = std::chrono::steady_clock::now();
-            this->m_mtx.unlock();
-        }
+    }
 
-        void stop() noexcept {
-            this->m_mtx.lock();
-            end_time = std::chrono::steady_clock::now();
-            this->m_mtx.unlock();
-        }
+    maze_builder& rows(int rows) {
+        my_maze->rows = rows;
+        return *this;
+    }
 
-        double get_duration_in_seconds() const noexcept {
-            std::lock_guard<std::mutex> lock(this->m_mtx);
-            return std::chrono::duration<double>(end_time - start_time).count();
-        }
+    maze_builder& columns(int columns) {
+        my_maze->columns = columns;
+        return *this;
+    }
 
-        double get_duration_in_ms() const noexcept {
-            return this->get_duration_in_seconds() * 1000.0;
-        }
-    };
+    maze_builder& height(int height) {
+        my_maze->height = height;
+        return *this;
+    }
 
-    void compute_geometry(mazes::maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
-    void add_block(int x, int y, int z, int w, int block_size) noexcept;
+    maze_builder& rng(std::mt19937 rng) {
+        my_maze->rng = rng;
+        return *this;
+    }
 
-    std::unique_ptr<grid_interface> m_grid;
-    maze_types m_maze_type;
-    int m_seed;
-    bool m_show_distances;
-    int m_block_type;
+    maze_builder& get_int(std::function<int(int, int)> get_int) {
+        my_maze->get_int = get_int;
+        return *this;
+    }
 
-    // Tuple (x, y, z, block_type)
-    std::vector<std::tuple<int, int, int, int>> m_vertices;
-    std::vector<std::vector<std::uint32_t>> m_faces;
-    pqmap m_p_q;
+    maze_builder& seed(int seed) {
+        my_maze->seed = seed;
+        return *this;
+    }
 
-    progress_tracker m_tracker;
+    maze_builder& block_type(int block_type) {
+        my_maze->block_type = block_type;
+        return *this;
+    }
+
+    maze_builder& maze_type(mazes::maze_types maze_type) {
+        my_maze->maze_type = maze_type;
+        return *this;
+    }
+
+    maze_builder& show_distances(bool show_distances) {
+        my_maze->show_distances = show_distances;
+        return *this;
+    }
+
+    maze_builder& shift_x(int s_x) {
+        my_maze->shift_x = s_x;
+        return *this;
+    }
+
+    maze_builder& shift_y(int s_y) {
+        my_maze->shift_y = s_y;
+        return *this;
+    }
+
+    std::unique_ptr<maze> build() noexcept;
 }; // class
 
 } // namespace

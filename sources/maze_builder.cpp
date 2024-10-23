@@ -19,77 +19,22 @@
 using namespace mazes;
 using namespace std;
 
-/**
- * @brief Represent a maze with a thread-safe interface in a 3D grid
- * @param show_distances = false
- * @param block_type = -1
- */
-maze_builder::maze_builder(int rows,  int columns,  int height, bool show_distances, int block_type)
-    : m_grid{}
-    , m_maze_type(maze_types::BINARY_TREE), m_seed(0)
-    , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
-
-    if (m_show_distances) {
-        m_grid = make_unique<colored_grid>(rows, columns, height);
-    } else {
-        m_grid = make_unique<grid>(rows, columns, height);
-    }
-
-    mt19937 rng(random_device{}());
-    auto get_int = [&rng](int low, int high)->int {
-        uniform_int_distribution<int> dist(low, high); return dist(rng); };
-
-    bool success = mazes::maze_factory::gen(m_maze_type, ref(m_grid), cref(get_int), cref(rng));
-    if (!success) {
+unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
+    if (!my_maze->get_int) {
+        mt19937 rng(random_device{}());
+        auto get_int = [&rng](int low, int high)->int {
+            uniform_int_distribution<int> dist(low, high); return dist(rng); };
+        my_maze->get_int = get_int;
+        my_maze->rng = rng;
     }
 
     // Compute 3D geometries (includes height)
-    this->compute_geometry(m_maze_type, cref(get_int), cref(rng));
+    my_maze->compute_geometry();
+    // Transfer ownership, nullify the ptr for this object
+    return std::move(my_maze);
 }
 
-/**
- * @brief Constructor with all the bells and whistles
- * @param block_type = -1
- * @param show_distances = false
- */
-maze_builder::maze_builder(int rows, int cols, int height,
-    mazes::maze_types my_maze_type,
-    const std::function<int(int, int)>& get_int,
-    const std::mt19937& rng,
-    bool show_distances,
-    int block_type) : m_grid{}
-    , m_maze_type(my_maze_type), m_seed(static_cast<int>(rng.default_seed))
-    , m_vertices(), m_faces(), m_p_q(), m_show_distances(show_distances), m_block_type(block_type) {
-
-    if (m_show_distances) {
-        m_grid = make_unique<colored_grid>(rows, cols, height);
-    } else {
-        m_grid = make_unique<grid>(rows, cols, height);
-    }
-
-    bool success = mazes::maze_factory::gen(my_maze_type, ref(m_grid), cref(get_int), cref(rng));
-
-    if (!success) {
-    }
-
-    this->compute_geometry(my_maze_type, cref(get_int), cref(rng));
-}
-
-/**
- * @brief Clear maze objects and parameters
- */
-void maze_builder::clear() noexcept {
-    m_vertices.clear();
-    m_faces.clear();
-    m_p_q.clear();
-    m_tracker.stop();
-    m_grid.reset();
-    m_show_distances = false;
-    m_maze_type = maze_types::BINARY_TREE;
-    m_block_type = 1;
-}
-
-std::vector<std::tuple<int, int, int, int>> maze_builder::get_render_vertices() const noexcept {
+std::vector<std::tuple<int, int, int, int>> maze_builder::maze::get_render_vertices() const noexcept {
     vector<tuple<int, int, int, int>> render_vertices (this->m_vertices.size() / 8);
     for (size_t i = 0; i < this->m_vertices.size(); i += 8) {
 		render_vertices.push_back(this->m_vertices[i]);
@@ -98,21 +43,21 @@ std::vector<std::tuple<int, int, int, int>> maze_builder::get_render_vertices() 
     return render_vertices;
 }
 
-std::vector<std::tuple<int, int, int, int>> maze_builder::get_writable_vertices() const noexcept {
+std::vector<std::tuple<int, int, int, int>> maze_builder::maze::get_writable_vertices() const noexcept {
     return this->m_vertices;
 }
 
-std::vector<std::vector<std::uint32_t>> maze_builder::get_faces() const noexcept {
+std::vector<std::vector<std::uint32_t>> maze_builder::maze::get_faces() const noexcept {
     return this->m_faces;
 }
 
-optional<tuple<int, int, int, int>> maze_builder::find_block(int p, int q) const noexcept {
+optional<tuple<int, int, int, int>> maze_builder::maze::find_block(int p, int q) const noexcept {
     auto itr = m_p_q.find({ p, q });
     return (itr != m_p_q.cend()) ? make_optional(itr->second) : nullopt;
 }
 
 // Return a future for when maze has been written
-std::string maze_builder::to_wavefront_obj_str() const noexcept {
+std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
     stringstream ss;
     ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
@@ -148,11 +93,11 @@ std::string maze_builder::to_wavefront_obj_str() const noexcept {
  * @brief Generate a PNG image of the maze
  * @param cell_size 3
  */
-std::vector<std::uint8_t> maze_builder::to_pixels(unsigned int cell_size) const noexcept {
+std::vector<std::uint8_t> maze_builder::maze::to_pixels(unsigned int cell_size) const noexcept {
 
     auto get_pixels = [this, &cell_size]() {
-         int img_width = cell_size * this->get_columns();
-         int img_height = cell_size * this->get_rows();
+         int img_width = cell_size * this->columns;
+         int img_height = cell_size * this->rows;
 
         uint32_t wall = 0x000000FF;
 
@@ -193,8 +138,8 @@ std::vector<std::uint8_t> maze_builder::to_pixels(unsigned int cell_size) const 
             };
 
         vector<shared_ptr<mazes::cell>> cells;
-        cells.reserve(this->get_rows() * this->get_columns());
-        m_grid->populate_vec(ref(cells));
+        cells.reserve(this->rows * this->columns);
+        this->m_grid->populate_vec(ref(cells));
 
         // Draw backgrounds and walls
         for (const auto& mode : { "backgrounds", "walls" }) {
@@ -230,52 +175,36 @@ std::vector<std::uint8_t> maze_builder::to_pixels(unsigned int cell_size) const 
  * @brief Return a JSON string with base64 representation of the maze
  * @param pretty_spaces = 4
  */
-std::string maze_builder::to_json_str(unsigned int pretty_spaces) const noexcept {
+std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const noexcept {
 
     nlohmann::json my_json;
     my_json["output"] = this->to_str64();
-    my_json["num_cols"] = this->get_columns();
-    my_json["num_rows"] = this->get_rows();
-    my_json["depth"] = this->get_height();
-    my_json["algorithm"] = mazes::to_string(m_maze_type);
-    my_json["seed"] = m_seed;
+    my_json["num_cols"] = this->columns;
+    my_json["num_rows"] = this->rows;
+    my_json["depth"] = this->height;
+    my_json["algorithm"] = mazes::to_string(this->maze_type);
+    my_json["seed"] = this->seed;
 
     return my_json.dump(4);
 }
 
-int maze_builder::get_height() const noexcept {
-    return this->m_grid->get_height();
-}
-
-int maze_builder::get_columns() const noexcept {
-    return this->m_grid->get_columns();
-}
-
-int maze_builder::get_rows() const noexcept {
-    return this->m_grid->get_rows();
-}
-
-int maze_builder::get_block_type() const noexcept {
-    return this->m_block_type;
-}
-
-void maze_builder::start_progress() noexcept {
+void maze_builder::maze::start_progress() noexcept {
     this->m_tracker.start();
 }
 
-void maze_builder::stop_progress() noexcept {
+void maze_builder::maze::stop_progress() noexcept {
     this->m_tracker.stop();
 }
 
-double maze_builder::get_progress_in_seconds() const noexcept {
+double maze_builder::maze::get_progress_in_seconds() const noexcept {
     return this->m_tracker.get_duration_in_seconds();
 }
 
-double maze_builder::get_progress_in_ms() const noexcept {
+double maze_builder::maze::get_progress_in_ms() const noexcept {
     return this->m_tracker.get_duration_in_ms();
 }
 
-std::size_t maze_builder::get_vertices_size() const noexcept {
+std::size_t maze_builder::maze::get_vertices_size() const noexcept {
     return this->m_vertices.size();
 }
 
@@ -283,13 +212,13 @@ std::size_t maze_builder::get_vertices_size() const noexcept {
  * @brief
  * @param show_distances false
  */
-std::string maze_builder::to_str() const noexcept {
+std::string maze_builder::maze::to_str() const noexcept {
     stringstream ss;
     ss << *m_grid;
     return ss.str();
 } // to_str
 
-std::string maze_builder::to_str64() const noexcept {
+std::string maze_builder::maze::to_str64() const noexcept {
 
     stringstream ss64;
     ss64 << *m_grid;
@@ -300,21 +229,31 @@ std::string maze_builder::to_str64() const noexcept {
 /**
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
-void maze_builder::compute_geometry(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
-    bool use_get_int = (m_block_type == -1) ? true : false;
+void maze_builder::maze::compute_geometry() noexcept {
+    if (this->show_distances) {
+        this->m_grid = make_unique<colored_grid>(rows, columns, height);
+    } else {
+        this->m_grid = make_unique<grid>(rows, columns, height);
+    }
+
+    bool success = mazes::maze_factory::gen(this->maze_type, ref(this->m_grid), cref(this->get_int), cref(this->rng));
+    if (!success) {
+    }
+
+    bool use_get_int = (this->block_type == -1) ? true : false;
     istringstream iss{ this->to_str() };
     string line;
-    int row_x = 0;
+    int row_x = shift_x;
     while (getline(iss, line, '\n')) {
-        int col_z = 0;
+        int col_z = shift_y;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
-                static constexpr  int block_size = 1;
-                for (auto h{ 0 }; h < m_grid->get_height(); h++) {
+                static constexpr int block_size = 1;
+                for (auto h{ 0 }; h < this->height; h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
-                    int block_type = (use_get_int) ? get_int(0, 12) : m_block_type;
+                    int block_type = (use_get_int) ? get_int(3, 14) : this->block_type;
                     this->add_block(row_x, h, col_z, block_type, block_size);
                     m_p_q[{row_x, col_z}] = make_tuple(row_x, h, col_z, block_type);
                 }
@@ -330,7 +269,7 @@ void maze_builder::compute_geometry(maze_types my_maze_type, const std::function
  *  Write vertices are used for Wavefront OBJ file writing
  *  Render vertices are used for rendering in Craft
  */
-void maze_builder::add_block(int x, int y, int z, int w, int block_size) noexcept {
+void maze_builder::maze::maze::add_block(int x, int y, int z, int w, int block_size) noexcept {
     // Calculate the base index for the new vertices
     // OBJ format is 1-based indexing
     std::uint32_t baseIndex = static_cast<std::uint32_t>(this->m_vertices.size() + 1);
