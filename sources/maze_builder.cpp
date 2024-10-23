@@ -301,6 +301,7 @@ std::string maze_builder::to_str64() const noexcept {
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
 void maze_builder::compute_geometry(maze_types my_maze_type, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
+    bool use_get_int = (m_block_type == -1) ? true : false;
     istringstream iss{ this->to_str() };
     string line;
     int row_x = 0;
@@ -313,9 +314,9 @@ void maze_builder::compute_geometry(maze_types my_maze_type, const std::function
                 for (auto h{ 0 }; h < m_grid->get_height(); h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
-                    m_block_type = (m_block_type == -1) ? get_int(1, 10) : m_block_type;
-                    this->add_block(row_x, h, col_z, m_block_type, block_size);
-                    m_p_q[{row_x, col_z}] = make_tuple(row_x, h, col_z, m_block_type);
+                    int block_type = (use_get_int) ? get_int(0, 12) : m_block_type;
+                    this->add_block(row_x, h, col_z, block_type, block_size);
+                    m_p_q[{row_x, col_z}] = make_tuple(row_x, h, col_z, block_type);
                 }
             }
             col_z++;
