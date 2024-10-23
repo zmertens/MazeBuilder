@@ -22,7 +22,7 @@ using namespace std;
 /**
  * @brief Represent a maze with a thread-safe interface in a 3D grid
  * @param show_distances = false
- * @param block_type = 1
+ * @param block_type = -1
  */
 maze_builder::maze_builder(int rows,  int columns,  int height, bool show_distances, int block_type)
     : m_grid{}
@@ -49,7 +49,7 @@ maze_builder::maze_builder(int rows,  int columns,  int height, bool show_distan
 
 /**
  * @brief Constructor with all the bells and whistles
- * @param block_type = 1
+ * @param block_type = -1
  * @param show_distances = false
  */
 maze_builder::maze_builder(int rows, int cols, int height,
@@ -310,7 +310,7 @@ void maze_builder::compute_geometry(maze_types my_maze_type, const std::function
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
                 static constexpr  int block_size = 1;
-                for (auto h{ 0 }; h < 12 + m_grid->get_height(); h++) {
+                for (auto h{ 0 }; h < m_grid->get_height(); h++) {
                     // Update the data source that stores the maze geometry
                     // There are 2 data sources, one for rendering and one for writing
                     m_block_type = (m_block_type == -1) ? get_int(1, 10) : m_block_type;

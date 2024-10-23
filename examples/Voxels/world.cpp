@@ -1,13 +1,13 @@
 #include "world.h"
 
-#include <noise/noise.h>
+#include <iostream>
 
-#include <MazeBuilder/maze_builder.h>
+#include <noise/noise.h>
 
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) const noexcept {
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const unique_ptr<maze_builder>& mb) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -30,14 +30,25 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                 h = t;
                 w = 2;
             }
-            // sand and grass terrain
+
             static constexpr auto PLANT_HEIGHT_MAX = 2;
+
+            // Maze
+            const auto& block = mb->find_block(x, z);
+            if (block.has_value()) {
+                const auto& [r, height, c, t] = block.value();
+                for (auto y = -PLANT_HEIGHT_MAX; y < mb->get_height() + PLANT_HEIGHT_MAX; y++) {
+                    func(r, y, c, t * flag, m);
+                }
+                continue;
+            }
+
+            // sand and grass terrain            
             for (int y = 0; y < PLANT_HEIGHT_MAX; y++) {
                 func(x, y, z, w * flag, m);
             }
             
             if (w == 1) {
-
                 // grass
                 if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
                     func(x, PLANT_HEIGHT_MAX, z, 17 * flag, m);
@@ -48,11 +59,13 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                     func(x, PLANT_HEIGHT_MAX, z, w * flag, m);
                 }
                 // trees
+                // Check that the tree fits in the chunk
                 bool ok = true;
                 if (dx - 3 < 0 || dz - 3 < 0 || dx + 4 > chunk_size || dz + 4 > chunk_size) {
                    ok = false;
                 }
                 if (ok && simplex2(x, z, 6, 0.5, 2) > 0.84) {
+                    // Generate canopy for tree (leaves)
                     for (int y = PLANT_HEIGHT_MAX + 3; y < PLANT_HEIGHT_MAX + 8; y++) {
                         for (int ox = -3; ox <= 3; ox++) {
                             for (int oz = -3; oz <= 3; oz++) {
@@ -63,6 +76,7 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                             }
                         }
                     }
+                    // Generate the tree trunk
                     for (int y = PLANT_HEIGHT_MAX; y < PLANT_HEIGHT_MAX + 7; y++) {
                         func(x, y, z, 5, m);
                     }
@@ -74,9 +88,6 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                     func(x, y, z, 16 * flag, m);
                 }
             }
-
-            // Maze
-            
         }
     }
 } // create_world

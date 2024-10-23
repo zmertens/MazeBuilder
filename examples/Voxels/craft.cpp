@@ -223,8 +223,9 @@ struct craft::craft_impl {
             }
 
 			check_framebuffer();
-
+#if defined(MAZE_DEBUG)
             SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
+#endif
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         } // gen
@@ -407,7 +408,7 @@ struct craft::craft_impl {
             }
             WorkerItem* worker_item = &worker->item;
             if (worker_item->load) {
-                this->load_chunk(worker_item);
+                this->load_chunk(worker_item, cref(this->my_maze));
             }
 
             this->compute_chunk(worker_item);
@@ -1389,7 +1390,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item) {
+    void load_chunk(WorkerItem* item, const unique_ptr<maze_builder>& mb) {
         int p = item->p;
         int q = item->q;
 
@@ -1397,7 +1398,7 @@ struct craft::craft_impl {
         Map* light_map = item->light_maps[1][1];
         // world.h
         static world my_world;
-        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size);
+        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size, cref(mb));
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1426,7 +1427,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<craft_impl::Gui>& gui) {
+    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<maze_builder>& mb) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1436,7 +1437,7 @@ struct craft::craft_impl {
         item->block_maps[1][1] = &chunk->map;
         item->light_maps[1][1] = &chunk->lights;
 
-        load_chunk(item);
+        load_chunk(item, cref(mb));
     }
 
     void delete_chunks() {
@@ -1516,7 +1517,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const unique_ptr<craft_impl::Gui>& gui) {
+    void force_chunks(Player* player, const unique_ptr<maze_builder>& mb) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1533,7 +1534,7 @@ struct craft::craft_impl {
                     }
                 } else if (this->m_model->chunk_count < MAX_CHUNKS) {
                     chunk = this->m_model->chunks + this->m_model->chunk_count++;
-                    create_chunk(chunk, a, b, cref(gui));
+                    create_chunk(chunk, a, b, cref(mb));
                     gen_chunk_buffer(chunk);
                 }
             }
@@ -1633,9 +1634,9 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const unique_ptr<craft_impl::Gui>& gui) {
+    void ensure_chunks(Player* player, const unique_ptr<maze_builder>& mb) {
         check_workers();
-        force_chunks(player, cref(gui));
+        force_chunks(player, cref(mb));
         for (auto&& worker : this->m_model->workers) {
             worker->mtx.lock();
             if (worker->state == WORKER_IDLE) {
@@ -1797,10 +1798,10 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, const unique_ptr<craft_impl::Gui>& gui) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder>& mb) {
         int result = 0;
         State* s = &player->state;
-        this->ensure_chunks(player, cref(gui));
+        this->ensure_chunks(player, cref(mb));
         int p = this->chunked(s->x);
         int q = this->chunked(s->z);
         float light = this->get_daylight();
@@ -1813,6 +1814,8 @@ struct craft::craft_impl {
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
         glUseProgram(attrib->program);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
         glUniform1i(attrib->sampler, 0);
@@ -1835,7 +1838,7 @@ struct craft::craft_impl {
         return result;
     }
 
-    void render_signs(Attrib* attrib, Player* player) {
+    void render_signs(Attrib* attrib, Player* player, GLuint sign) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1847,8 +1850,10 @@ struct craft::craft_impl {
         frustum_planes(planes, this->m_model->render_radius, matrix);
 
         glUseProgram(attrib->program);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, sign);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 3);
+        glUniform1i(attrib->sampler, 2);
         glUniform1i(attrib->extra1, 1);
 
         for (int i = 0; i < this->m_model->chunk_count; i++) {
@@ -1865,7 +1870,7 @@ struct craft::craft_impl {
         }
     }
 
-    void render_sign(Attrib* attrib, Player* player) {
+    void render_sign(Attrib* attrib, Player* player, GLuint sign) {
         int x, y, z, face;
         if (!hit_test_face(player, &x, &y, &z, &face)) {
             return;
@@ -1877,8 +1882,10 @@ struct craft::craft_impl {
             matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         glUseProgram(attrib->program);
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, sign);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 3);
+        glUniform1i(attrib->sampler, 2);
         glUniform1i(attrib->extra1, 1);
         char text[MAX_SIGN_LENGTH];
         SDL_strlcpy(text, this->m_gui->tag, MAX_SIGN_LENGTH);
@@ -1909,7 +1916,7 @@ struct craft::craft_impl {
         }
     }
 
-    void render_sky(Attrib* attrib, Player* player, GLuint buffer) {
+    void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky) {
         State* s = &player->state;
         float matrix[16];
         set_matrix_3d(
@@ -1917,8 +1924,10 @@ struct craft::craft_impl {
             0, 0, 0, s->rx, s->ry, this->m_model->fov, 0, this->m_model->render_radius);
 
         glUseProgram(attrib->program);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, sky);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 2);
+        glUniform1i(attrib->sampler, 1);
         glUniform1f(attrib->timer, time_of_day());
 
         draw_triangles_3d(attrib, buffer, 512 * 3);
@@ -1953,10 +1962,12 @@ struct craft::craft_impl {
         del_buffer(crosshair_buffer);
     }
 
-    void render_item(Attrib* attrib) {
+    void render_item(Attrib* attrib, GLuint texture) {
         float matrix[16];
         set_matrix_item(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h, this->m_model->scale);
         glUseProgram(attrib->program);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texture);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         glUniform3f(attrib->camera, 0, 0, 5);
         glUniform1i(attrib->sampler, 0);
@@ -2442,17 +2453,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/texture.png");
 
-    GLuint font;
-    glGenTextures(1, &font);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, font);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    load_png_texture("textures/font.png");
+    // GLuint font;
+    // glGenTextures(1, &font);
+    // glActiveTexture(GL_TEXTURE1);
+    // glBindTexture(GL_TEXTURE_2D, font);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // load_png_texture("textures/font.png");
 
     GLuint sky_texture_id;
     glGenTextures(1, &sky_texture_id);
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, sky_texture_id);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -2462,7 +2473,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
     GLuint sign;
     glGenTextures(1, &sign);
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, sign);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -2556,7 +2567,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     blur_attrib.sampler = glGetUniformLocation(program, "image");
     blur_attrib.extra1 = glGetUniformLocation(program, "horizontal");
     blur_attrib.extra2 = glGetUniformLocation(program, "weight");
-    const std::vector<float> WEIGHTS_IN_BLUR = {0.2270270270f, 0.1945945946f, 0.1216216216f, 0.0540540541f, 0.0162162162f};
+    const std::vector<GLfloat> WEIGHTS_IN_BLUR = {0.2270270270f, 0.1945945946f, 0.1216216216f, 0.0540540541f, 0.0162162162f};
     glUseProgram(program);
     glUniform1fv(blur_attrib.extra2, WEIGHTS_IN_BLUR.size(), WEIGHTS_IN_BLUR.data());
     glUseProgram(0);
@@ -2644,10 +2655,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
     auto&& my_maze = this->m_pimpl->my_maze;
-
-    if (my_maze) {
-        // this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
-    }
 
     me->id = 0;
     me->name = "Wade Watts";
@@ -2779,7 +2786,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Build!")) {
                         my_maze->start_progress();
-                        this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
+                        // this->m_pimpl->build_maze(my_maze_type, cref(get_int), cref(rng));
                         my_maze->stop_progress();
                         //current_maze_pixels = maze2->to_pixels(25);
                         // Write the maze to a file on Desktop immediately
@@ -2961,19 +2968,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
-        glActiveTexture(GL_TEXTURE2);
-        glBindTexture(GL_TEXTURE_2D, sky_texture_id);
-        m_pimpl->render_sky(&sky_attrib, me, sky_buffer);
-
+        m_pimpl->render_sky(&sky_attrib, me, sky_buffer, sky_texture_id);
         glClear(GL_DEPTH_BUFFER_BIT);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texture);
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, cref(gui));
 
-        glActiveTexture(GL_TEXTURE3);
-        glBindTexture(GL_TEXTURE_2D, sign);
-        m_pimpl->render_signs(&text_attrib, me);
-        m_pimpl->render_sign(&text_attrib, me);
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_maze));
+
+        if (gui->show_items) {
+            m_pimpl->render_item(&block_attrib, texture);
+        }
+
+        m_pimpl->render_signs(&text_attrib, me, sign);
+        m_pimpl->render_sign(&text_attrib, me, sign);
 
         if (gui->show_wireframes) {
             m_pimpl->render_wireframe(&line_attrib, me);
@@ -2982,9 +2987,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         if (gui->show_crosshairs) {
             m_pimpl->render_crosshairs(&line_attrib);
         }
-        if (gui->show_items) {
-            m_pimpl->render_item(&block_attrib);
-        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Complete the pingpong buffer for the bloom effect
         glUseProgram(blur_attrib.program);
@@ -2992,14 +2996,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
-				// glUniform1i(blur_attrib.sampler, 4);
-                // glActiveTexture(GL_TEXTURE4);
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
+                glUniform1i(blur_attrib.sampler, 1);
+                glActiveTexture(GL_TEXTURE1);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
-                // glUniform1i(blur_attrib.sampler, 6);
-                // glActiveTexture(GL_TEXTURE6);
+                glUniform1i(blur_attrib.sampler, 0);
+                glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
@@ -3017,12 +3021,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
-        // glUniform1i(screen_attrib.sampler, 4);
-        // glUniform1i(screen_attrib.extra3, 6);
+        glUniform1i(screen_attrib.sampler, 0);
+        glUniform1i(screen_attrib.extra3, 1);
         glBindVertexArray(quad_vao);
-        // glActiveTexture(GL_TEXTURE4);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
-        // glActiveTexture(GL_TEXTURE6);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
+        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
@@ -3108,7 +3112,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     ImGui::DestroyContext();
 
     glDeleteTextures(1, &texture);
-    glDeleteTextures(1, &font);
+    // glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky_texture_id);
     glDeleteTextures(1, &sign);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);

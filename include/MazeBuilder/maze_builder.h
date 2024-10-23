@@ -39,13 +39,13 @@ public:
     using maze = std::tuple<int, int, int, int, std::string, std::string>;
 
     // Constructor
-    explicit maze_builder(int rows, int cols, int height, bool show_distances = false, int block_type = 1);
+    explicit maze_builder(int rows, int cols, int height, bool show_distances = false, int block_type = -1);
     explicit maze_builder(int rows, int cols, int height,
         mazes::maze_types my_maze_type,
         const std::function<int(int, int)>& get_int,
         const std::mt19937& rng,
         bool show_distances = false,
-        int block_type = 1);
+        int block_type = -1);
 
 	void clear() noexcept;
 	std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
