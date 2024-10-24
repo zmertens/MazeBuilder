@@ -1,67 +1,73 @@
-#include "distances.h"
+#include <MazeBuilder/distances.h>
 
-#include "cell.h"
+#include <iostream>
+
+#include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;
 
 distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
-	m_cells[root] = 0;
+    const auto& links = root->get_links();
+    copy(links.cbegin(), links.cend(), inserter(m_cells, m_cells.end()));
+    // Distance from root to root is 0
+	m_cells.insert_or_assign(root, 0);
 }
 
-void distances::set(std::shared_ptr<cell> cell, int distance) {
+void distances::set(std::shared_ptr<cell> cell, int distance) noexcept {
     m_cells.insert_or_assign(cell, distance);
 }
 
-/**
- * @brief Get the keys from the cells map
- */
-std::vector<std::shared_ptr<cell>> distances::get_cells() const {
-    std::vector<std::shared_ptr<cell>> keys;
-	keys.reserve(m_cells.size());
-    
-	for (const auto& [cell, _] : m_cells) {
-		keys.push_back(cell);
-	}
-
-    return keys;
+bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
+	return m_cells.find(cell) != m_cells.cend();
 }
 
 /**
  * @brief Compute the path to a goal cell
- *  Note the different usage of `at` and `[]` in the array accessors below:
- *  '[]' uses the m_cells operator override
  */
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
-    auto&& current = goal;
-    auto breadcrumbs = std::make_shared<distances>(m_root);
-    // Check if the current/goal is available
-    auto it = m_cells.find(current);
-	if (it == m_cells.cend()) {
-		return breadcrumbs;
-	}
+    auto path = std::make_shared<distances>(m_root);
+    auto current = goal;
 
-    breadcrumbs->set(current, m_cells.at(current));
+    while (current != goal) {
+        if (!contains(current)) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "ERROR: Current cell not found in distances.\n";
+#endif
+            return nullptr;
+        }
+        path->m_cells[current] = m_cells.at(current);
+        auto neighbors = current->get_neighbors();
 
-    while (current != m_root) {
-        bool found = false;
-        for (const auto& [neighbor, _] : current->get_links()) {
-            if (neighbor) {
-				// Assign a neighbor iterator, check if the neighbor is present and less than the current cell's distance
-                if (auto neighbor_it = m_cells.find(neighbor); neighbor_it != m_cells.cend() && neighbor_it->second < it->second) {
-                    breadcrumbs->set(neighbor, neighbor_it->second);
-                    current = neighbor;
-                    it = neighbor_it;
-                    found = true;
-                    break;
-                }
+        // Filter neighbors to only those that are linked and contained in distances
+        std::vector<std::shared_ptr<cell>> valid_neighbors;
+        for (const auto& neighbor : neighbors) {
+            if (contains(neighbor) && current->is_linked(neighbor)) {
+                valid_neighbors.push_back(neighbor);
             }
         }
-        if (!found) {
-            break;
+
+        if (valid_neighbors.empty()) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "ERROR: No valid neighbors found for current cell.\n";
+#endif
+            return nullptr;
         }
+
+        // Find the neighbor with the minimum distance
+        current = *std::min_element(valid_neighbors.begin(), valid_neighbors.end(),
+            [this](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b) {
+                return m_cells.at(a) < m_cells.at(b);
+            });
+
+        // Logging for debugging
+#if defined(MAZE_DEBUG)
+        std::cerr << "INFO: Current cell updated to: " << current->get_index() << "\n";
+#endif
     }
-    return breadcrumbs;
+
+    path->m_cells[m_root] = 0;
+    return path;
 }
 
 std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
@@ -74,4 +80,10 @@ std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
         }
     }
     return { max_cell, max_distance };
+}
+
+void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+    for (const auto& [c, _] : m_cells) {
+        cells.push_back(c);
+    }
 }
