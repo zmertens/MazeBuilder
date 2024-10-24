@@ -48,7 +48,7 @@ public:
                 .block_type(-1).show_distances(true)
                 .maze_type(my_maze_type).build();
 
-            m_output = my_maze.to_str();
+            m_output = my_maze->to_str();
     }
 
     std::string get_output() const {

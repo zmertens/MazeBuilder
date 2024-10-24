@@ -16,10 +16,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="shortcut icon" href="textures/favicon.ico" />
     <style>
-      html, body {
-        height: 100%;
-      }
-
       @-webkit-keyframes rotation {
         from {-webkit-transform: rotate(0deg);}
         to {-webkit-transform: rotate(360deg);}
@@ -46,6 +42,7 @@
       }
 
       canvas.emscripten {
+        height: 100%;
         width: 100%;
         height: auto;
         display: block;
@@ -154,23 +151,19 @@
         };
       };
 
-      function download() {
-        console.log("Download clicked");
-        startPolling();
-      }
-
       function startPolling() {
         const intervalId = setInterval(function () {
           if (craft) {
             const jsonStr = craft.mazes();
-            clearInterval(intervalId);
             if (jsonStr) {
+              clearInterval(intervalId);
+              startPolling();
               console.log("JSON: ", jsonStr);
             } else {
               console.log("No JSON"); 
             }
           }
-        }, 1000);
+        }, 3000);
       }
     </script>
     {{{ SCRIPT }}}

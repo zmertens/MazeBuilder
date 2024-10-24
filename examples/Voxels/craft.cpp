@@ -387,7 +387,7 @@ struct craft::craft_impl {
     unique_ptr<Model> m_model;
     unique_ptr<Gui> m_gui;
 
-    std::string_view m_json_data;
+    std::string m_json_data;
 
     craft_impl(const std::string& version, const std::string& help, int w, int h)
         : m_version(version)
@@ -2496,8 +2496,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     block_attrib.extra4 = glGetUniformLocation(program, "is_ortho");
     block_attrib.camera = glGetUniformLocation(program, "camera");
     block_attrib.timer = glGetUniformLocation(program, "timer");
-    glBindFragDataLocation(program, 0, "fragColor");
-    glBindFragDataLocation(program, 1, "brightColor");
+    // glBindFragDataLocation(program, 0, "fragColor");
+    // glBindFragDataLocation(program, 1, "brightColor");
 
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/line_vertex.es.glsl", "shaders/es/line_fragment.es.glsl");
@@ -2583,8 +2583,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     }
 
     // Init OpenGL fields
-    //GLuint minimap_texture = 0;
-
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
         // positions   // texCoords
@@ -2851,28 +2849,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
                 ImGui::Text("time: %d%cm\n", hour, am_pm);
 
-                //ImVec2 sidebar_xy = ImGui::GetContentRegionAvail();
-                //if (glIsTexture(minimap_texture)) {
-                //    glDeleteTextures(1, &minimap_texture);
-                //}
-                //glGenTextures(1, &minimap_texture);
-                //glActiveTexture(GL_TEXTURE4);
-                //glBindTexture(GL_TEXTURE_2D, minimap_texture);
-                //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-                //    static_cast<GLuint>(100), static_cast<GLuint>(250),
-                //    0, GL_RGBA, GL_UNSIGNED_BYTE, current_maze_pixels.data());
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                //glBindTexture(GL_TEXTURE_2D, 0);
-                //// Flip UV coordinates for the image
-                //ImVec2 uv0 = ImVec2(0.0f, 1.0f);
-                //ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-                //ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(minimap_texture)),
-                //    sidebar_xy, uv0, uv1);
-                //glBindTexture(GL_TEXTURE_2D, 0);
-
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Graphics")) {
@@ -2886,9 +2862,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                 // Prevent setting SDL_Window settings every frame
                 static bool last_fullscreen = gui->fullscreen;
-#if !defined(__EMSCRIPTEN__)                
                 ImGui::Checkbox("Fullscreen (ESC to Exit)", &gui->fullscreen);
-#endif
                 bool update_fullscreen = (last_fullscreen != gui->fullscreen) ? true : false;
                 last_fullscreen = gui->fullscreen;
                 if (update_fullscreen) {
@@ -3110,7 +3084,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
     glDeleteTextures(2, bloom_tools.color_buffers);
     glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
-    //glDeleteTextures(1, &minimap_texture);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
     glDeleteProgram(block_attrib.program);
@@ -3133,9 +3106,5 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::mazes() const noexcept {
-    if (this->m_pimpl->m_json_data.data()) {
-        return this->m_pimpl->m_json_data.data();
-    } else {
-        return "";
-    }
+    return this->m_pimpl->m_json_data;
 }
