@@ -2683,7 +2683,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         static bool show_demo_window = false;
 
         // Handle SDL events and motion updates
-        static bool window_resizes = false;
+        static bool window_resizes = true;
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         time_accum += elapsed;
         while (time_accum >= FIXED_TIME_STEP) {
