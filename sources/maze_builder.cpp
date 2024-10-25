@@ -177,10 +177,10 @@ std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const no
     my_json["obj64"] = this->to_wavefront_obj_str64();
     my_json["num_cols"] = this->columns;
     my_json["num_rows"] = this->rows;
-    my_json["depth"] = this->height;
-    my_json["algorithm"] = mazes::to_string(this->maze_type);
+    my_json["height"] = this->height;
+    my_json["algo"] = mazes::to_string(this->maze_type);
     my_json["seed"] = this->seed;
-    my_json["version"] = maze_builder::MAZE_BUILDER_VERSION_STR;
+    my_json["v"] = maze_builder::MAZE_BUILDER_VERSION_STR;
 
     return my_json.dump(4);
 }

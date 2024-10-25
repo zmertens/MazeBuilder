@@ -18,15 +18,16 @@
 #include <nlohmann/json.hpp>
 
 #include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/buildinfo.h>
 
 static constexpr auto MB_MENU_MSG = R"help(
     -- Maze Builder Menu --
-    1. Create New Maze
-    2. Get a Maze from the Network
-    3. Print Menu Options
-    4. Show Example
-    5. Exit
-    [version: 0.1.0]
+    1. Create a new maze
+    2. Get all mazes from the DB
+    3. Delete a maze by id
+    4. Print Menu Options
+    5. Show Example
+    6. Exit
     )help";
 
 static constexpr auto WORKER_URL = "http://mb-worker.zach-mm035.workers.dev";
@@ -39,6 +40,7 @@ void print_menu() {
 #else
     std::cout << "\nHttp URL: " << WORKER_URL << std::endl;
 #endif
+    std::cout << "version: " << mazes::BuildInfo::Version + "-" + mazes::BuildInfo::CommitSHA << std::endl << std::endl;
 }
 
 void process_commands(std::deque<char>& commands, bool& is_running) {
@@ -52,10 +54,6 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
     };
 
     auto process_char = [&is_running, &get_int, &rng](char ch) {
-        sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
-        sf_post_request.setHttpVersion(1, 1);
-        sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
-        sf_get_request.setHttpVersion(1, 1);
 #if defined(MAZE_DEBUG)
         sf::Http http{ LOCAL_URL, 8787 };
 #else
@@ -68,26 +66,25 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
         switch (ch) {
             case '1': {
             cout << "Creating new maze...\n";
-            cout << "Enter rows, columns, depth, seed, and algorithm with a single space between: ";
-            int rows, columns, depth, seed;
+            cout << "Enter rows, columns, height, seed, and algorithm with a single space between: ";
+            int rows, columns, height, seed;
             string algorithm;
             // Get user input
-            cin >> rows >> columns >> depth >> seed >> algorithm;
-            mazes::maze_types mt = mazes::maze_types::DFS;
-            if (algorithm.compare("dfs") == 0) {
-                mt = mazes::maze_types::DFS;
-            } else if (algorithm.compare("sidewinder") == 0) {
-                mt = mazes::maze_types::SIDEWINDER;
-            } else if (algorithm.compare("binary_tree") == 0) {
-                mt = mazes::maze_types::BINARY_TREE;
-            } else {
-                cerr << "Invalid algorithm. Please try again.\n";
+            cin >> rows >> columns >> height >> seed >> algorithm;
+            mazes::maze_types mt = mazes::to_maze_type(algorithm);
+
+            if (mt == mazes::maze_types::INVALID_ALGO) {
+                cerr << "Unknown algorithm: " << algorithm << endl;
                 break;
             }
+
             // Create the maze
             mazes::maze_builder builder;
-            auto temp_maze = builder.rows(rows).columns(columns).height(depth).seed(seed).maze_type(mt).build();
+            auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
             auto dump = temp_maze->to_json_str(4);
+
+            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
+            sf_post_request.setHttpVersion(1, 1);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
             sf_post_request.setField("Content-Length", to_string(dump.size()));
@@ -100,7 +97,9 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             break;
             } // case '1'
             case '2': {
-            cout << "Getting maze from the network...\n";
+            cout << "Getting all mazes from the DB...\n";
+            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
+            sf_get_request.setHttpVersion(1, 1);
             response = http.sendRequest(sf_get_request);
             if (response.getStatus() != sf::Http::Response::Ok) {
                 cerr << "Error: " << response.getStatus() << endl;
@@ -109,14 +108,28 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             cout << "Response from server: " << response.getBody() << endl;
             break;
             } // case '2'
-            case '3':
+            case '3': {
+            cout << "Enter id for maze to delete...\n";
+            int id = 0;
+            cin >> id;
+            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Delete};
+            sf_del_request.setHttpVersion(1, 1);
+            response = http.sendRequest(sf_del_request);
+            if (response.getStatus() != sf::Http::Response::Ok) {
+                cerr << "Error: " << response.getStatus() << endl;
+                break;
+            }
+            cout << "Response from server: " << response.getBody() << endl;
+            break;
+            }
+            case '4':
             print_menu();
             break;
-            case '4': {
+            case '5': {
             // Show example
-            cout << "Showing example maze builder...\n";
+            cout << "Showing example maze builder...\n\n";
             ostringstream option_1;
-            option_1 << "-- Enter rows, columns, depth, seed, and algorithm with a single space between. --\n";
+            option_1 << "-- Enter rows, columns, height, seed, and algorithm with a single space between. --\n\n";
             ostringstream example_user_input;
             example_user_input << "Example (ignore [] brackets):\t[1 2 3 1 dfs]\n";
             
@@ -124,15 +137,16 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             
             break;
             }
-            case '5':
+            case '6':
             cout << "Exiting Maze Builder...\n";
             is_running = false;
             break;
             default:
             cout << "Invalid option. Please try again.\n";
             break;
-        }
-    };
+        } // switch
+        print_menu();
+    }; // lambda
 
     while (!commands.empty()) {
         if (auto ch = commands.front()) {

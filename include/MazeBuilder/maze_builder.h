@@ -51,7 +51,7 @@ public:
         explicit maze() : rows(100), columns(100), height(0)
             , maze_type(mazes::maze_types::BINARY_TREE)
             , seed(0)
-            , rng(std::mt19937(static_cast<unsigned long>(seed)))
+            , rng(std::mt19937(0))
             , show_distances(false), block_type(-1)
             , offset_x(0), offset_z(0) {
             this->get_int = { [this](int low, int high) {
