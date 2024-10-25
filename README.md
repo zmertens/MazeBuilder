@@ -25,20 +25,20 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
           -v, --version      display program version
 ```
 
-Specify a seed with the `binary_tree` maze-generating algorithm:
+Run the `binary_tree` maze-generating algorithm with long arguments:
 ```sh
-maze_builder.exe --seed=1337 --algorithm=binary_tree -o bt.obj
+maze_builder.exe --seed=1337 --algorithm=binary_tree --output=bt.obj
 ```
 
-Run Maze Builder in an `interactive` mode using the [SDL](https://github.com/libsdl-org/SDL) app:
+Run the `dfs` maze-generating algorithm with short arguments:
 ```sh
-maze_builder.exe -i
+maze_builder.exe -s 1337 -a binary_tree -o dfs.obj
 ```
 
 ## CMake
 
 This project uses [CMake](https://cmake.org) 3.2 or greater as the build and test system. CMake can use `FetchContent` to get [SDL](https://github.com/libsdl-org/SDL) and [Catch2](https://github.com/catchorg/Catch2) from the web.
-The SDL app requires modern hardware supporting OpenGL 3.0 or greater.
+The [SDL](https://github.com/libsdl-org/sdl) app requires modern hardware supporting OpenGL 3.0 or greater.
 
 The first build step is to navigate to this local repo where it was cloned.
 

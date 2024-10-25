@@ -90,18 +90,9 @@ void process_commands(std::deque<char>& commands,
             mb->rows = rows;
             mb->columns = columns;
             mb->height = depth;
-
             rng.seed(seed);
-            auto users_maze_output64 = mb->to_str64();
-            // Create the JSON
-            nlohmann::json my_json;
-            my_json["num_rows"] = rows;
-            my_json["num_cols"] = columns;
-            my_json["depth"] = depth;
-            my_json["seed"] = seed;
-            my_json["algo"] = algorithm;
-            my_json["str"] = users_maze_output64;
-            auto dump = my_json.dump(4);
+            mb->rng = rng;
+            auto dump = mb->to_json_str(4);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
             sf_post_request.setField("Content-Length", to_string(dump.size()));

@@ -1,6 +1,7 @@
 #include <random>
 #include <vector>
 #include <string>
+#include <memory>
 
 #include <catch2/catch_test_macros.hpp>
 

@@ -34,24 +34,31 @@ private:
 
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
+    static const std::string MAZE_BUILDER_VERSION_STR;
+
 public:
     // Data class to represent a maze
     struct maze {
         int rows, columns, height;
         mazes::maze_types maze_type;
-        std::function<int(int, int)> get_int;
         std::mt19937 rng;
+        std::function<int(int, int)> get_int;
         int seed;
         bool show_distances;
         int block_type;
-        int shift_x, shift_y;
+        int offset_x, offset_z;
 
         explicit maze() : rows(0), columns(0), height(0)
-            , maze_type(mazes::maze_types::BINARY_TREE), get_int(nullptr)
-            , rng(std::mt19937(std::random_device()())), seed(0)
-            , show_distances(false), block_type(0)
-            , shift_x(0), shift_y(0) {
-
+            , maze_type(mazes::maze_types::BINARY_TREE)
+            , seed(0)
+            , rng(std::mt19937(static_cast<unsigned long>(seed)))
+            , show_distances(false), block_type(-1)
+            , offset_x(0), offset_z(0) {
+            this->get_int = { [this](int low, int high) {
+                std::uniform_int_distribution<int> dist{ low, high };
+                return dist(this->rng);
+                } };
+            this->compute_geometry();
         }
 
         std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
@@ -71,15 +78,11 @@ public:
         std::string to_wavefront_obj_str() const noexcept;
 
         // Expose progress_tracker methods
-        void start_progress() noexcept;
-        void stop_progress() noexcept;
         double get_progress_in_seconds() const noexcept;
         double get_progress_in_ms() const noexcept;
-        std::size_t get_vertices_size() const noexcept;
-
-        void compute_geometry() noexcept;
-
     private:
+        // Compute 3D geometries and add blocks (includes height)
+        void compute_geometry() noexcept;
         class progress_tracker {
             mutable std::mutex m_mtx;
             std::chrono::steady_clock::time_point start_time;
@@ -122,6 +125,8 @@ public:
     }; // maze struct
 
 private:
+    void start_progress() noexcept;
+    void stop_progress() noexcept;
     std::unique_ptr<maze> my_maze;
 public:
     explicit maze_builder() : my_maze(std::make_unique<maze>()) {
@@ -173,13 +178,13 @@ public:
         return *this;
     }
 
-    maze_builder& shift_x(int s_x) {
-        my_maze->shift_x = s_x;
+    maze_builder& offset_x(int s_x) {
+        my_maze->offset_x = s_x;
         return *this;
     }
 
-    maze_builder& shift_y(int s_y) {
-        my_maze->shift_y = s_y;
+    maze_builder& offset_z(int s_y) {
+        my_maze->offset_z = s_y;
         return *this;
     }
 

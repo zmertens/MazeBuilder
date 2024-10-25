@@ -22,6 +22,16 @@ static unique_ptr<grid_interface> my_grid = make_unique<grid>(10, 10, 10);
 TEST_CASE( "Test grid init", "[init]" ) {
     REQUIRE(my_grid->get_rows() == 10);
     REQUIRE(my_grid->get_columns() == 10);
+    SECTION("Make a very large grid", "[large grid]") {
+        mt19937 rng{ 42681ul };
+        static auto get_int = [&rng](int low, int high) ->int {
+            uniform_int_distribution<int> dist{ low, high };
+            return dist(rng);
+            };
+        my_grid = make_unique<grid>(1'000, 1'000);
+        binary_tree bt_algo;
+        REQUIRE(bt_algo.run(ref(my_grid), cref(get_int), cref(rng)));
+    }
 }
 
 TEST_CASE( "Test grid insertion and search", "[insert and search]" ) {
@@ -29,6 +39,27 @@ TEST_CASE( "Test grid insertion and search", "[insert and search]" ) {
     my_grid->insert(my_grid->get_root(), my_cell->get_index());
     auto result = my_grid->search(my_grid->get_root(), 0);
     REQUIRE(result->get_index() == my_cell->get_index());
+}
+
+TEST_CASE("Searching the grid yields positive results", "[search]") {
+    unsigned int rows{ 25 }, columns{ 20 };
+    vector<unsigned int> shuffled_ints{ rows * columns };
+    shuffled_ints.reserve(rows * columns);
+    int next_index{ 0 };
+    for (auto itr{ shuffled_ints.begin() }; itr != shuffled_ints.end(); itr++) {
+        *itr = next_index++;
+    }
+
+    auto rd = std::random_device{};
+    auto rng = std::default_random_engine{ rd() };
+    shuffle(begin(shuffled_ints), end(shuffled_ints), rng);
+
+    unique_ptr<grid> _grid{ make_unique<grid>(rows, columns) };
+
+    for (auto&& i : shuffled_ints) {
+        auto&& found = _grid->search(_grid->get_root(), i);
+        REQUIRE(found != nullptr);
+    }
 }
 
 TEST_CASE( "Test grid deletion ", "[delete]" ) {

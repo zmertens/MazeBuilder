@@ -16,20 +16,14 @@
 #include <cpp-base64/base64.h>
 #include <nlohmann/json.hpp>
 
+#include <MazeBuilder/buildinfo.h>
+
 using namespace mazes;
 using namespace std;
 
-unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
-    if (!my_maze->get_int) {
-        mt19937 rng(random_device{}());
-        auto get_int = [&rng](int low, int high)->int {
-            uniform_int_distribution<int> dist(low, high); return dist(rng); };
-        my_maze->get_int = get_int;
-        my_maze->rng = rng;
-    }
+const string maze_builder::MAZE_BUILDER_VERSION_STR = BuildInfo::Version + "-" + BuildInfo::CommitSHA;
 
-    // Compute 3D geometries (includes height)
-    my_maze->compute_geometry();
+unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
     // Transfer ownership, nullify the ptr for this object
     return std::move(my_maze);
 }
@@ -178,22 +172,16 @@ std::vector<std::uint8_t> maze_builder::maze::to_pixels(unsigned int cell_size) 
 std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const noexcept {
 
     nlohmann::json my_json;
-    my_json["output"] = this->to_str64();
+    my_json["str64"] = this->to_str64();
+    my_json["obj64"] = this->to_wavefront_obj_str();
     my_json["num_cols"] = this->columns;
     my_json["num_rows"] = this->rows;
     my_json["depth"] = this->height;
     my_json["algorithm"] = mazes::to_string(this->maze_type);
     my_json["seed"] = this->seed;
+    my_json["version"] = maze_builder::MAZE_BUILDER_VERSION_STR;
 
     return my_json.dump(4);
-}
-
-void maze_builder::maze::start_progress() noexcept {
-    this->m_tracker.start();
-}
-
-void maze_builder::maze::stop_progress() noexcept {
-    this->m_tracker.stop();
 }
 
 double maze_builder::maze::get_progress_in_seconds() const noexcept {
@@ -202,10 +190,6 @@ double maze_builder::maze::get_progress_in_seconds() const noexcept {
 
 double maze_builder::maze::get_progress_in_ms() const noexcept {
     return this->m_tracker.get_duration_in_ms();
-}
-
-std::size_t maze_builder::maze::get_vertices_size() const noexcept {
-    return this->m_vertices.size();
 }
 
 /**
@@ -226,19 +210,22 @@ std::string maze_builder::maze::to_str64() const noexcept {
     return base64_encode(cref(s64));
 }
 
+
 /**
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
 void maze_builder::maze::compute_geometry() noexcept {
     if (this->show_distances) {
-        this->m_grid = make_unique<colored_grid>(rows, columns, height);
+        this->m_grid = make_unique<colored_grid>(this->rows, this->columns, this->height);
     } else {
-        this->m_grid = make_unique<grid>(rows, columns, height);
+        this->m_grid = make_unique<grid>(this->rows, this->columns, this->height);
     }
 
     this->m_vertices.clear();
     this->m_faces.clear();
 
+    // Generate maze and time it
+    this->m_tracker.start();
     bool success = mazes::maze_factory::gen(this->maze_type, ref(this->m_grid), cref(this->get_int), cref(this->rng));
     if (!success) {
     }
@@ -246,9 +233,9 @@ void maze_builder::maze::compute_geometry() noexcept {
     bool use_get_int = (this->block_type == -1) ? true : false;
     istringstream iss{ this->to_str() };
     string line;
-    int row_x = shift_x;
+    int row_x = offset_x;
     while (getline(iss, line, '\n')) {
-        int col_z = shift_y;
+        int col_z = offset_z;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
@@ -265,6 +252,7 @@ void maze_builder::maze::compute_geometry() noexcept {
         }
         row_x++;
     } // getline
+    this->m_tracker.stop();
 } // compute_geometry
 
 /**
