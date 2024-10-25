@@ -2633,7 +2633,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     maze_builder builder;
     auto my_maze = builder.maze_type(my_maze_type).get_int(get_int)
         .rng(rng).rows(gui->rows).columns(gui->columns).height(gui->height)
-        .shift_x(static_cast<int>(p_state->x)).shift_y(static_cast<int>(p_state->y))
+        .offset_x(-25).offset_z(-25)
         .show_distances(false).seed(0).block_type(-1).build();
 
     // INITIALIZE WORKER THREADS
@@ -2768,25 +2768,24 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Export!")) {
-                        my_maze->start_progress();
                         my_maze->block_type = items[model->item_index];
                         my_maze->seed = gui->seed;
                         my_maze->show_distances = false;
-                        my_maze->shift_x = static_cast<int>(p_state->x);
-                        my_maze->shift_y = static_cast<int>(p_state->y);
+                        my_maze->offset_x = static_cast<int>(p_state->x);
+                        my_maze->offset_z = static_cast<int>(p_state->z);
                         my_maze->rows = gui->rows;
                         my_maze->columns = gui->columns;
                         my_maze->height = gui->height;
                         my_maze->maze_type = my_maze_type;
                         my_maze->compute_geometry();
-                        my_maze->stop_progress();
+                        my_maze->get_progress_in_ms();
                         //current_maze_pixels = maze2->to_pixels(25);
                         // Write the maze to a file on Desktop immediately
                         // The maze has a to_str method which the Web API calls /mazes/
                         this->m_pimpl->m_json_data = my_maze->to_json_str();
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
-                        writer.write(gui->outfile, my_maze->to_wavefront_obj_str());
+                        writer.write(gui->outfile, my_maze->to_wavefront_obj_str64());
 #endif
                         ImGui::NewLine();
                         ImGui::Text("Maze written to %s\n", gui->outfile);

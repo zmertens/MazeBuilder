@@ -84,12 +84,11 @@ int main(int argc, char* argv[]) {
             .block_type(block_type)
             .show_distances(maze_args.distances)
             .build();
-        my_maze->start_progress();
         mazes::writer my_writer;
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {
         case mazes::output_types::WAVEFRONT_OBJ_FILE:
-            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
+            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str64());
             break;
         case mazes::output_types::PNG:
             success = my_writer.write_png(cref(maze_args.output), 
@@ -107,10 +106,10 @@ int main(int argc, char* argv[]) {
         }
 
         if (success) {
-            my_maze->stop_progress();
+            auto elapsedms = my_maze->get_progress_in_ms();
 #if defined(MAZE_DEBUG)
             std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
-            std::cout << "INFO: Progress: " << my_maze.get_progress_in_seconds() << " seconds" << std::endl;
+            std::cout << "INFO: Progress: " << elapsedms << " seconds" << std::endl;
 #endif
         }
         else {
