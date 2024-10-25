@@ -48,7 +48,7 @@ public:
         int block_type;
         int offset_x, offset_z;
 
-        explicit maze() : rows(0), columns(0), height(0)
+        explicit maze() : rows(100), columns(100), height(0)
             , maze_type(mazes::maze_types::BINARY_TREE)
             , seed(0)
             , rng(std::mt19937(static_cast<unsigned long>(seed)))
@@ -58,7 +58,7 @@ public:
                 std::uniform_int_distribution<int> dist{ low, high };
                 return dist(this->rng);
                 } };
-            this->compute_geometry();
+            // Constructor
         }
 
         std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
@@ -75,14 +75,15 @@ public:
 
         std::string to_json_str(unsigned int pretty_spaces = 4) const noexcept;
 
-        std::string to_wavefront_obj_str() const noexcept;
+        std::string to_wavefront_obj_str64() const noexcept;
 
         // Expose progress_tracker methods
         double get_progress_in_seconds() const noexcept;
         double get_progress_in_ms() const noexcept;
-    private:
+
         // Compute 3D geometries and add blocks (includes height)
         void compute_geometry() noexcept;
+    private:
         class progress_tracker {
             mutable std::mutex m_mtx;
             std::chrono::steady_clock::time_point start_time;

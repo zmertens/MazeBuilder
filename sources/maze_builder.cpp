@@ -24,6 +24,7 @@ using namespace std;
 const string maze_builder::MAZE_BUILDER_VERSION_STR = BuildInfo::Version + "-" + BuildInfo::CommitSHA;
 
 unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
+    my_maze->compute_geometry();
     // Transfer ownership, nullify the ptr for this object
     return std::move(my_maze);
 }
@@ -51,7 +52,7 @@ optional<tuple<int, int, int, int>> maze_builder::maze::find_block(int p, int q)
 }
 
 // Return a future for when maze has been written
-std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
+std::string maze_builder::maze::to_wavefront_obj_str64() const noexcept {
     stringstream ss;
     ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
@@ -80,7 +81,7 @@ std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
         c++;
     }
 
-    return ss.str();
+    return base64_encode(ss.str());
 } // to_wavefront_obj_str
 
 /**
@@ -173,7 +174,7 @@ std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const no
 
     nlohmann::json my_json;
     my_json["str64"] = this->to_str64();
-    my_json["obj64"] = this->to_wavefront_obj_str();
+    my_json["obj64"] = this->to_wavefront_obj_str64();
     my_json["num_cols"] = this->columns;
     my_json["num_rows"] = this->rows;
     my_json["depth"] = this->height;

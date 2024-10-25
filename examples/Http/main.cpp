@@ -41,9 +41,7 @@ void print_menu() {
 #endif
 }
 
-void process_commands(std::deque<char>& commands,
-    bool& is_running,
-    const std::unique_ptr<mazes::maze_builder::maze>& mb) {
+void process_commands(std::deque<char>& commands, bool& is_running) {
     
     using namespace std;
 
@@ -53,7 +51,7 @@ void process_commands(std::deque<char>& commands,
         return dist(rng);
     };
 
-    auto process_char = [&mb, &is_running, &get_int, &rng](char ch) {
+    auto process_char = [&is_running, &get_int, &rng](char ch) {
         sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
         sf_post_request.setHttpVersion(1, 1);
         sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
@@ -87,12 +85,9 @@ void process_commands(std::deque<char>& commands,
                 break;
             }
             // Create the maze
-            mb->rows = rows;
-            mb->columns = columns;
-            mb->height = depth;
-            rng.seed(seed);
-            mb->rng = rng;
-            auto dump = mb->to_json_str(4);
+            mazes::maze_builder builder;
+            auto temp_maze = builder.rows(rows).columns(columns).height(depth).seed(seed).maze_type(mt).build();
+            auto dump = temp_maze->to_json_str(4);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
             sf_post_request.setField("Content-Length", to_string(dump.size()));
@@ -154,9 +149,6 @@ int main()
 {
     using namespace std;
 
-    mazes::maze_builder builder;
-    auto my_maze = builder.block_type(-1).rows(10).columns(10).height(1).seed(1).maze_type(mazes::maze_types::DFS).build();
-
     float accumulator = 0.0;
     static constexpr auto FIXED_TIMESTEP = 1.0f / 60.0f;
 
@@ -175,7 +167,7 @@ int main()
         }
 
         // Process commands
-        process_commands(commands, ref(is_running), cref(my_maze));
+        process_commands(commands, ref(is_running));
     }
 
     return 0;
