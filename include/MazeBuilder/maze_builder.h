@@ -76,6 +76,7 @@ public:
         std::string to_json_str(unsigned int pretty_spaces = 4) const noexcept;
 
         std::string to_wavefront_obj_str64() const noexcept;
+        std::string to_wavefront_obj_str() const noexcept;
 
         // Expose progress_tracker methods
         double get_progress_in_seconds() const noexcept;

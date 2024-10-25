@@ -21,7 +21,7 @@
 using namespace mazes;
 using namespace std;
 
-const string maze_builder::MAZE_BUILDER_VERSION_STR = BuildInfo::Version + "-" + BuildInfo::CommitSHA;
+const string maze_builder::MAZE_BUILDER_VERSION_STR = build_info::Version + "-" + build_info::CommitSHA;
 
 unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
     my_maze->compute_geometry();
@@ -52,7 +52,7 @@ optional<tuple<int, int, int, int>> maze_builder::maze::find_block(int p, int q)
 }
 
 // Return a future for when maze has been written
-std::string maze_builder::maze::to_wavefront_obj_str64() const noexcept {
+std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
     stringstream ss;
     ss << "# https://www.github.com/zmertens/MazeBuilder\n";
 
@@ -81,8 +81,12 @@ std::string maze_builder::maze::to_wavefront_obj_str64() const noexcept {
         c++;
     }
 
-    return base64_encode(ss.str());
+    return ss.str();
 } // to_wavefront_obj_str
+
+std::string maze_builder::maze::to_wavefront_obj_str64() const noexcept {
+    return base64_encode(this->to_wavefront_obj_str());
+}
 
 /**
  * @brief Generate a PNG image of the maze

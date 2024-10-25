@@ -21,22 +21,6 @@ using namespace mazes;
 args_builder::args_builder(const std::vector<std::string>& vv)
 : my_args{} {
     this->parse(cref(vv));
-    // Apply defaults
-    if (this->my_args.algorithm.empty()) {
-        this->my_args.algorithm = "binary_tree";
-    }
-    if (this->my_args.output.empty()) {
-        this->my_args.output = "stdout";
-    }
-	if (this->my_args.rows == 0) {
-		this->my_args.rows = 100;
-	}
-	if (this->my_args.columns == 0) {
-		this->my_args.columns = 100;
-	}
-	if (this->my_args.height == 0) {
-		this->my_args.height = 10;
-	}
 }
 
 args_builder& args_builder::seed(int seed) noexcept {
@@ -218,9 +202,8 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
                 this->my_args.output = get_val_from_long_option(current);
             }
         } else {
-#if defined(MAZE_DEBUG)
             cerr << "ERROR: Could not handle arguments: " << current << endl;
-#endif
+            break;
         }
     } // loop
 } // parse

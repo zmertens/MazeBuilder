@@ -17,8 +17,9 @@
 #include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_builder.h>
 #include <MazeBuilder/writer.h>
+#include <MazeBuilder/buildinfo.h>
 
-std::string maze_builder_version = "maze_builder=[5.1.5]";
+std::string maze_builder_version = mazes::build_info::Version + "-" + mazes::build_info::CommitSHA;
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
@@ -57,10 +58,25 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 	// Set the version and help strings
-	builder.version(maze_builder_version);
-	builder.help(MAZE_BUILDER_HELP);
+	maze_args.version = maze_builder_version;
+	maze_args.help = MAZE_BUILDER_HELP;
 
-    maze_args = builder.build();
+    // Apply defaults
+    if (maze_args.algorithm.empty()) {
+        maze_args.algorithm = "binary_tree";
+    }
+    if (maze_args.output.empty()) {
+        maze_args.output = "stdout";
+    }
+    if (maze_args.columns == 0) {
+        maze_args.columns = 100;
+    }
+    if (maze_args.rows == 0) {
+        maze_args.rows = 100;
+    }
+    if (maze_args.height == 0) {
+        maze_args.height = 1;
+    }
 
     std::mt19937 rng_engine{ static_cast<unsigned long>(maze_args.seed) };
     auto get_int = [&rng_engine](int low, int high) -> int {
@@ -88,7 +104,7 @@ int main(int argc, char* argv[]) {
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {
         case mazes::output_types::WAVEFRONT_OBJ_FILE:
-            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str64());
+            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
             break;
         case mazes::output_types::PNG:
             success = my_writer.write_png(cref(maze_args.output), 

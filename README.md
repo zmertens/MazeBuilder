@@ -16,7 +16,7 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
           -a, --algorithm    dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
           -r, --rows         maze rows [default=100]
-          -y, --height       maze height [default=10]
+          -y, --height       maze height [default=1]
           -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
           -i, --interactive  No effect
@@ -27,12 +27,12 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
 
 Run the `binary_tree` maze-generating algorithm with long arguments:
 ```sh
-maze_builder.exe --seed=1337 --algorithm=binary_tree --output=bt.obj
+maze_builder.exe --rows=25 --columns=25 --seed=42 --algorithm=binary_tree --output=bt.obj
 ```
 
 Run the `dfs` maze-generating algorithm with short arguments:
 ```sh
-maze_builder.exe -s 1337 -a binary_tree -o dfs.obj
+maze_builder.exe -r 25 -c 25 -s 42 -a binary_tree -o dfs.obj
 ```
 
 ## CMake
