@@ -197,7 +197,6 @@ struct craft::craft_impl {
 
             glGenTextures(2, color_buffers);
             for (auto i = 0; i < 2; ++i) {
-                glActiveTexture(GL_TEXTURE4 + i);
                 glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -221,12 +220,11 @@ struct craft::craft_impl {
             glGenFramebuffers(2, fbo_pingpong);
             glGenTextures(2, color_buffers_pingpong);
             for (auto i = 0; i < 2; i++) {
-                glActiveTexture(GL_TEXTURE6 + i);
 				glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
                 glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffers_pingpong[i], 0);
@@ -581,13 +579,6 @@ struct craft::craft_impl {
         return this->gen_buffer(sizeof(data), data);
     }
 
-    GLuint gen_sky_buffer() {
-        float data[12288];
-        // cube.h -> make_sphere
-        make_sphere(data, 1, 3);
-        return this->gen_buffer(sizeof(data), data);
-    }
-
     GLuint gen_cube_buffer(float x, float y, float z, float n, int w) {
         GLfloat* data = malloc_faces(10, 6);
         float ao[6][4] = { 0 };
@@ -659,7 +650,6 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    // sky_texture_id Attrib doesn't use normals and the GLSL compiler may optimize it out
     void draw_triangles_3d(Attrib* attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -1817,7 +1807,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint buffer, GLuint texture, GLuint sky, const unique_ptr<maze_builder::maze>& mb) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder::maze>& mb) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(mb));
@@ -1825,15 +1815,10 @@ struct craft::craft_impl {
         int q = this->chunked(s->z);
         float light = this->get_daylight();
         float matrix[16];
-        float sky_matrix[16];
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
             matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        set_matrix_3d(
-            sky_matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
-            0.f, 0.f, 0.f, s->rx, s->ry, this->m_model->fov,
-            static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
@@ -1842,16 +1827,10 @@ struct craft::craft_impl {
         glBindTexture(GL_TEXTURE_2D, texture);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
         glUniform1i(attrib->sampler, 0);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, sky);
-        glUniform1i(attrib->extra1, 1);
         glUniform1f(attrib->extra2, light);
         glUniform1f(attrib->extra3, static_cast<GLfloat>(this->m_model->render_radius * this->m_gui->chunk_size));
         glUniform1i(attrib->extra4, static_cast<int>(this->m_model->is_ortho));
         glUniform1f(attrib->timer, this->time_of_day());
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, sky_matrix);
-        draw_triangles_3d(attrib, buffer, 512 * 3);
-        glClear(GL_DEPTH_BUFFER_BIT);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk* chunk = this->m_model->chunks + i;
@@ -2416,8 +2395,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     }
 #endif
 
-    //    this->m_pimpl->check_fullscreen_modes();
-
     const GLubyte* renderer = glGetString(GL_RENDERER);
     const GLubyte* vendor = glGetString(GL_VENDOR);
     const GLubyte* version = glGetString(GL_VERSION);
@@ -2452,16 +2429,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/texture.png");
 
-    GLuint sky_texture_id;
-    glGenTextures(1, &sky_texture_id);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, sky_texture_id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    load_png_texture("textures/sky.png");
-
     GLuint sign;
     glGenTextures(1, &sign);
     glActiveTexture(GL_TEXTURE2);
@@ -2478,12 +2445,19 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     load_png_texture("textures/font.png");
 
+    // Cubemaps
+    static vector<string> cubemap_files = {"textures/right.jpg", "textures/left.jpg", 
+        "textures/top.jpg", "textures/bottom.jpg", 
+        "textures/front.jpg", "textures/back.jpg"};
+    GLuint cubemap_texture_id = load_cubemap(cref(cubemap_files));
+
     // LOAD SHADERS 
     craft_impl::Attrib block_attrib = { 0 };
     craft_impl::Attrib line_attrib = { 0 };
     craft_impl::Attrib text_attrib = { 0 };
     craft_impl::Attrib screen_attrib = { 0 };
     craft_impl::Attrib blur_attrib = { 0 };
+    craft_impl::Attrib skybox_attrib = { 0 };
 
     GLuint program;
 
@@ -2526,8 +2500,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
 
-    GLuint sky_buffer = m_pimpl->gen_sky_buffer();
-
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/screen_vertex.es.glsl", "shaders/es/screen_fragment.es.glsl");
 #else
@@ -2556,6 +2528,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glUseProgram(program);
     glUniform1fv(blur_attrib.extra2, WEIGHTS_IN_BLUR.size(), WEIGHTS_IN_BLUR.data());
     glUseProgram(0);
+
+#if defined(__EMSCRIPTEN__)
+    // @TODO: Skybox ES shader
+#else
+    program = load_program("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
+#endif
+    skybox_attrib.program = program;
+    skybox_attrib.position = 0;
+    skybox_attrib.matrix = glGetUniformLocation(program, "matrix");
+    skybox_attrib.sampler = glGetUniformLocation(program, "skybox");
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2611,6 +2593,61 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
+
+    static constexpr float skybox_vertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f
+    };
+
+    // skybox VAO
+    GLuint skybox_vao, skybox_vbo;
+    glGenVertexArrays(1, &skybox_vao);
+    glGenBuffers(1, &skybox_vbo);
+    glBindVertexArray(skybox_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, skybox_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_vertices), &skybox_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
 
     craft_impl::BloomTools bloom_tools{};
 
@@ -2816,7 +2853,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Show progress when writing
                 ImGui::NewLine();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                ImGui::Text("Finished building maze in %f ms", my_maze->get_progress_in_ms());
+                ImGui::Text("Elapsed %.5f ms", my_maze->get_progress_in_ms());
                 ImGui::NewLine();
                 ImGui::PopStyleColor();
 
@@ -2884,8 +2921,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         ImVec2 voxel_scene_size = ImGui::GetContentRegionAvail();
         int voxel_scene_w = static_cast<int>(voxel_scene_size.x);
         int voxel_scene_h = static_cast<int>(voxel_scene_size.y);
-        this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
-        this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
+        model->voxel_scene_w = voxel_scene_w;
+        model->voxel_scene_h = voxel_scene_h;
 
         // Check if scene size changed
         if (window_resizes) {
@@ -2915,7 +2952,24 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDepthFunc(GL_LEQUAL);
         glEnable(GL_CULL_FACE);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, sky_buffer, texture, sky_texture_id, cref(my_maze));
+        // Skybox
+        // float sky_matrix[16];
+        // set_matrix_3d(
+        //     sky_matrix, model->voxel_scene_w, model->voxel_scene_h,
+        //     0.f, 0.f, 0.f, p_state->rx, p_state->ry, model->fov,
+        //     0, model->render_radius);
+        // glDepthMask(GL_FALSE);
+        // glUseProgram(skybox_attrib.program);
+        // glUniformMatrix4fv(skybox_attrib.matrix, 1, GL_FALSE, sky_matrix);
+        // glActiveTexture(GL_TEXTURE1);
+        // glUniform1i(skybox_attrib.sampler, 1);
+        // glBindVertexArray(skybox_vao);
+        // glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
+        // glDrawArrays(GL_TRIANGLES, 0, 36);
+        // glDepthMask(GL_TRUE);
+        // glBindVertexArray(0);
+
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_maze));
 
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib, texture);
@@ -2974,18 +3028,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
-                glUniform1i(blur_attrib.sampler, 5);
-                glActiveTexture(GL_TEXTURE5);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
-                glUniform1i(blur_attrib.sampler, 6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
-                glActiveTexture(GL_TEXTURE6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
             glBindVertexArray(quad_vao);
-			glDisable(GL_DEPTH_TEST);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
         bloom_tools.first_iteration = true;
@@ -2995,21 +3044,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         // Post-processing the default frame buffer
         // Render HDR buffer to 2D quad and apply bloom filter
         glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
         glUseProgram(screen_attrib.program);
-        //glUniform1i(screen_attrib.sampler, 4);
-        //glUniform1i(screen_attrib.extra3, 6);
         glBindVertexArray(quad_vao);
-        //glActiveTexture(GL_TEXTURE4);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
-        //glActiveTexture(GL_TEXTURE6);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
-        glUniform1f(screen_attrib.extra2, 0.35f);
+        glUniform1f(screen_attrib.extra2, 1.05f);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
         glBindVertexArray(0);
 
         // Flip UV coordinates for the image
@@ -3065,7 +3107,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     db_close();
     db_disable();
 
-    m_pimpl->del_buffer(sky_buffer);
     m_pimpl->delete_all_chunks();
     m_pimpl->delete_all_players();
 
@@ -3075,8 +3116,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
     glDeleteTextures(1, &texture);
     glDeleteTextures(1, &font);
-    glDeleteTextures(1, &sky_texture_id);
     glDeleteTextures(1, &sign);
+    glDeleteTextures(1, &cubemap_texture_id);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
     glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
     glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
@@ -3084,11 +3125,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
+    glDeleteVertexArrays(1, &skybox_vao);
+    glDeleteBuffers(1, &skybox_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(line_attrib.program);
     glDeleteProgram(screen_attrib.program);
     glDeleteProgram(blur_attrib.program);
+    glDeleteProgram(skybox_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
     SDL_DestroyWindow(sdl_window);
