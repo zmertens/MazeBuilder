@@ -118,6 +118,7 @@ struct craft::craft_impl {
         bool show_items;
         bool show_wireframes;
         bool show_crosshairs;
+        bool show_info_text;
         bool apply_bloom_effect;
         char outfile[64];
         int seed;
@@ -131,6 +132,7 @@ struct craft::craft_impl {
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
+            show_info_text(true),
 			apply_bloom_effect(true),
             outfile(".obj"), seed(0), rows(25), height(5), columns(18),
             algo("binary_tree"), view(20), tag("maze here") {
@@ -154,6 +156,10 @@ struct craft::craft_impl {
             chunk_size = 8;
             tag[0] = 'H';
             tag[1] = 'i';
+            show_crosshairs = true;
+            show_info_text = true;
+            show_items = true;
+            show_wireframes = true;
         }
     }; // class
 
@@ -1990,13 +1996,15 @@ struct craft::craft_impl {
         }
     }
 
-    void render_text(Attrib* attrib, int justify, float x, float y, float n, char* text) {
+    void render_text(Attrib* attrib, GLuint font, int justify, float x, float y, float n, char* text) {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 1);
+        glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 0);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, font);
         GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
         x -= n * justify * (length - 1) / 2;
         GLuint buffer = gen_text_buffer(x, y, n, text);
@@ -2444,14 +2452,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/texture.png");
 
-    // GLuint font;
-    // glGenTextures(1, &font);
-    // glActiveTexture(GL_TEXTURE1);
-    // glBindTexture(GL_TEXTURE_2D, font);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load_png_texture("textures/font.png");
-
     GLuint sky_texture_id;
     glGenTextures(1, &sky_texture_id);
     glActiveTexture(GL_TEXTURE1);
@@ -2469,6 +2469,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/sign.png");
+
+    GLuint font;
+    glGenTextures(1, &font);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, font);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    load_png_texture("textures/font.png");
 
     // LOAD SHADERS 
     craft_impl::Attrib block_attrib = { 0 };
@@ -2496,8 +2504,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     block_attrib.extra4 = glGetUniformLocation(program, "is_ortho");
     block_attrib.camera = glGetUniformLocation(program, "camera");
     block_attrib.timer = glGetUniformLocation(program, "timer");
-    // glBindFragDataLocation(program, 0, "fragColor");
-    // glBindFragDataLocation(program, 1, "brightColor");
 
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/line_vertex.es.glsl", "shaders/es/line_fragment.es.glsl");
@@ -2823,16 +2829,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::PopStyleColor();
                 ImGui::NewLine();
 
-                // Check the time
-                int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-                char am_pm = hour < 12 ? 'a' : 'p';
-                hour = hour % 12;
-                hour = hour ? hour : 12;
-                ImGui::Text("chunk.p: %d\nchunk.q: %d\n", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-                ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
-                ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-                ImGui::Text("time: %d%cm\n", hour, am_pm);
-                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Graphics")) {
@@ -2934,6 +2930,39 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
         if (gui->show_crosshairs) {
             m_pimpl->render_crosshairs(&line_attrib);
+        }
+
+        if (gui->show_info_text) {
+            char text_buffer[1024];
+            float ts = 12.f * static_cast<float>(model->scale);
+            float tx = ts / 2.f;
+            float ty = voxel_scene_size.y - ts;
+            // Check the time
+            int hour = static_cast<int>(this->m_pimpl->time_of_day()) * 24;
+            char am_pm = hour < 12 ? 'a' : 'p';
+            hour = hour % 12;
+            hour = hour ? hour : 12;
+            SDL_snprintf(
+                text_buffer, 1024,
+                "%d%cm chunk(%d, %d) player(%.2f, %.2f, %.2f)",
+                hour, am_pm,
+                this->m_pimpl->chunked(p_state->x), this->m_pimpl->chunked(p_state->z),
+                p_state->x, p_state->y, p_state->z);
+            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            // Lower the info text
+            ty -= ts * 2;
+            // Reset text buffer
+            memset(text_buffer, 0, 1024);
+            SDL_snprintf(
+                text_buffer, 1024,
+                "App average: %.3f ms/frame, %.1f FPS",
+                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            ty -= ts * 2;
+            memset(text_buffer, 0, 1024);
+            SDL_snprintf(
+                text_buffer, 1024, "chunk_count(%d) triangles(%d)", model->chunk_count, triangle_faces * 2);
+            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -3045,7 +3074,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     ImGui::DestroyContext();
 
     glDeleteTextures(1, &texture);
-    // glDeleteTextures(1, &font);
+    glDeleteTextures(1, &font);
     glDeleteTextures(1, &sky_texture_id);
     glDeleteTextures(1, &sign);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
