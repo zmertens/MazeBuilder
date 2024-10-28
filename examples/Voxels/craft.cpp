@@ -27,7 +27,8 @@
 
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <string_view>
+#include <locale>
+#include <codecvt>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -380,8 +381,8 @@ struct craft::craft_impl {
     } Model;
 
     // Note: These are public members
+    const std::string_view& m_title;
     const std::string& m_version;
-    const std::string& m_help;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     unique_ptr<Model> m_model;
@@ -389,9 +390,9 @@ struct craft::craft_impl {
 
     std::string m_json_data;
 
-    craft_impl(const std::string& version, const std::string& help, int w, int h)
-        : m_version(version)
-        , m_help(help)
+    craft_impl(const std::string_view& title, const std::string& version, int w, int h)
+        : m_title(title)
+        , m_version(version)
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
@@ -2317,8 +2318,7 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
-
-        this->m_model->window = SDL_CreateWindow("SDL app", INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        this->m_model->window = SDL_CreateWindow(this->m_title.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2368,8 +2368,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string& version, const std::string& help, const int w, const int h)
-    : m_pimpl{ std::make_unique<craft_impl>(cref(version), cref(help), w, h) } {
+craft::craft(const std::string_view& title, const std::string& version, const int w, const int h)
+    : m_pimpl{ std::make_unique<craft_impl>(cref(title), cref(version), w, h) } {
 }
 
 craft::~craft() = default;
@@ -2807,21 +2807,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     ImGui::EndDisabled();
                 }
 
-                // Let JavaScript handle file downloads in web browser  
-                //if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                //    // Call the writer future and get the result
-                //    bool success = write_success.get();
-                //    if (success && gui->outfile[0] != '.') {
-                //        // Dont display a message on the web browser, let the web browser handle that
-                //     
-                //    } else {
-                //        ImGui::NewLine();
-                //        ImGui::Text("Failed to write maze: %s\n", gui->outfile);
-                //        ImGui::NewLine();
-                //    }
-                //    gui->reset();
-                //}
-
                 // Show progress when writing
                 ImGui::NewLine();
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
@@ -2847,7 +2832,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
                 ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
                 ImGui::Text("time: %d%cm\n", hour, am_pm);
-
+                ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
                 ImGui::EndTabItem();
             }
             if (ImGui::BeginTabItem("Graphics")) {
@@ -3011,7 +2996,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             ImGuiWindowFlags_NoMove |
             ImGuiWindowFlags_NoResize |
             ImGuiWindowFlags_NoTitleBar);
-        ImGui::SetWindowPos(ImVec2(display_size.x - 150, display_size.y - 50));
+        ImGui::SetWindowPos(ImVec2(0, display_size.y - 50));
         ImGui::SetWindowSize(ImVec2(150, 50));
         if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
             if (this->m_pimpl->m_gui->capture_mouse) {
@@ -3021,21 +3006,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 SDL_SetWindowRelativeMouseMode(sdl_window, false);
             }
         }
-        ImGui::End();
-
-        ImVec2 fps_window_size = ImVec2(display_size.x * 0.50f, 50);
-        ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.8f - fps_window_size.x, 0));
-        ImGui::SetNextWindowSize(fps_window_size);
-        ImGui::Begin("Framerate Window",
-            nullptr,
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoTitleBar
-        );
-        ImGui::SetWindowFontScale(1.25f);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::End();
 
         ImGui::PopFont();
