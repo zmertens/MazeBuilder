@@ -27,8 +27,6 @@
 
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <locale>
-#include <codecvt>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
@@ -54,10 +52,7 @@
 #include "matrix.h"
 
 #include <MazeBuilder/maze_types_enum.h>
-#include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/cell.h>
 #include <MazeBuilder/writer.h>
 
 // Movement configurations
