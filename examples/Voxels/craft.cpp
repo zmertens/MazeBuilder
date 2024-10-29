@@ -2648,6 +2648,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_vertices), &skybox_vertices, GL_STATIC_DRAW);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    glBindVertexArray(0);
 
     craft_impl::BloomTools bloom_tools{};
 
@@ -2949,25 +2950,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_hdr);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
+        glDepthFunc(GL_LESS);
         glEnable(GL_CULL_FACE);
-
-        // Skybox
-        // float sky_matrix[16];
-        // set_matrix_3d(
-        //     sky_matrix, model->voxel_scene_w, model->voxel_scene_h,
-        //     0.f, 0.f, 0.f, p_state->rx, p_state->ry, model->fov,
-        //     0, model->render_radius);
-        // glDepthMask(GL_FALSE);
-        // glUseProgram(skybox_attrib.program);
-        // glUniformMatrix4fv(skybox_attrib.matrix, 1, GL_FALSE, sky_matrix);
-        // glActiveTexture(GL_TEXTURE1);
-        // glUniform1i(skybox_attrib.sampler, 1);
-        // glBindVertexArray(skybox_vao);
-        // glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
-        // glDrawArrays(GL_TRIANGLES, 0, 36);
-        // glDepthMask(GL_TRUE);
-        // glBindVertexArray(0);
 
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_maze));
 
@@ -3019,6 +3003,21 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
         }
 
+        glDepthFunc(GL_LEQUAL);
+
+        // Skybox
+        float sky_matrix[16];
+        set_matrix_3d(
+            sky_matrix, model->voxel_scene_w, model->voxel_scene_h,
+            0.f, 0.f, 0.f, p_state->rx, p_state->ry, model->fov,
+            0, model->render_radius);
+        glUseProgram(skybox_attrib.program);
+        glUniformMatrix4fv(skybox_attrib.matrix, 1, GL_FALSE, sky_matrix);
+        glUniform1i(skybox_attrib.sampler, 0);
+        glBindVertexArray(skybox_vao);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         // Complete the pingpong buffer for the bloom effect

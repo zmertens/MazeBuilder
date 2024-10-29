@@ -172,19 +172,19 @@ void load_png_texture(const char *file_name) {
 unsigned int load_cubemap(const vector<string>& files) {
     GLuint textureID;
     glGenTextures(1, &textureID);
-    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
     int width, height, nrChannels;
     for (auto i = 0; i < files.size(); i++) {
         auto *data = stbi_load(files.at(i).c_str(), &width, &height, &nrChannels, 0);
         if (data) {
+            stbi_set_flip_vertically_on_load(false);
             glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+            stbi_image_free(data);
         }
         else {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Cubemap tex failed to load at path: %s\n", files.at(i).c_str());
         }
-        stbi_image_free(data);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
