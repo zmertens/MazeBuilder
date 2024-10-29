@@ -172,6 +172,7 @@ void load_png_texture(const char *file_name) {
 unsigned int load_cubemap(const vector<string>& files) {
     GLuint textureID;
     glGenTextures(1, &textureID);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
 
     int width, height, nrChannels;

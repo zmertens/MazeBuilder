@@ -2677,7 +2677,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     maze_builder builder;
     auto my_maze = builder.maze_type(my_maze_type).get_int(get_int)
         .rng(rng).rows(gui->rows).columns(gui->columns).height(gui->height)
-        .offset_x(-25).offset_z(-25)
+        .offset_x(-50).offset_z(50)
         .show_distances(false).seed(0).block_type(-1).build();
 
     // INITIALIZE WORKER THREADS
@@ -2773,7 +2773,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                 }
                 static unsigned int MAX_HEIGHT = 10;
-                if (ImGui::SliderInt("Height", &gui->height, 3, MAX_HEIGHT)) {
+                if (ImGui::SliderInt("Height", &gui->height, 1, MAX_HEIGHT)) {
 
                 }
                 static unsigned int MAX_SEED_VAL = 100;
@@ -3015,6 +3015,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glUniformMatrix4fv(skybox_attrib.matrix, 1, GL_FALSE, sky_matrix);
         glUniform1i(skybox_attrib.sampler, 0);
         glBindVertexArray(skybox_vao);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
@@ -3025,6 +3026,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         for (auto i = 0; i < bloom_tools.NUM_FBO_ITERATIONS; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
+            glUniform1i(blur_attrib.sampler, 0);
+            glActiveTexture(GL_TEXTURE0);
             if (bloom_tools.first_iteration) {
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
@@ -3044,8 +3047,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         // Render HDR buffer to 2D quad and apply bloom filter
         glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(screen_attrib.program);
+        glUniform1i(screen_attrib.sampler, 0);
+        glUniform1i(screen_attrib.extra3, 1);
         glBindVertexArray(quad_vao);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
+        glActiveTexture(GL_TEXTURE1);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure

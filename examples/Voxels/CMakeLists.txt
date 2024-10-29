@@ -78,11 +78,12 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
-    
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
-    endif()
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
 elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
@@ -103,6 +104,13 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
+        target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+        # pass
+    endif()
 
 endif(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
 

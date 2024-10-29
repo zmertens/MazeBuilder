@@ -37,7 +37,7 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, 
             const auto& block = mb->find_block(x, z);
             if (block.has_value()) {
                 const auto& [r, height, c, t] = block.value();
-                for (auto y = -PLANT_HEIGHT_MAX; y < 5 + PLANT_HEIGHT_MAX; y++) {
+                for (auto y = -PLANT_HEIGHT_MAX; y < height + PLANT_HEIGHT_MAX + 1; y++) {
                     func(r, y, c, t * flag, m);
                 }
                 continue;

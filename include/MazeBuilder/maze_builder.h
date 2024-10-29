@@ -48,7 +48,7 @@ public:
         int block_type;
         int offset_x, offset_z;
 
-        explicit maze() : rows(100), columns(100), height(0)
+        explicit maze() : rows(100), columns(100), height(1)
             , maze_type(mazes::maze_types::BINARY_TREE)
             , seed(0)
             , rng(std::mt19937(0))

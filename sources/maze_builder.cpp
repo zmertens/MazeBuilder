@@ -238,9 +238,9 @@ void maze_builder::maze::compute_geometry() noexcept {
     bool use_get_int = (this->block_type == -1) ? true : false;
     istringstream iss{ this->to_str() };
     string line;
-    int row_x = offset_x;
+    int row_x = 0;
     while (getline(iss, line, '\n')) {
-        int col_z = offset_z;
+        int col_z = 0;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
@@ -250,7 +250,7 @@ void maze_builder::maze::compute_geometry() noexcept {
                     // There are 2 data sources, one for rendering and one for writing
                     int block_type = (use_get_int) ? get_int(3, 14) : this->block_type;
                     this->add_block(row_x, h, col_z, block_type, block_size);
-                    m_p_q[{row_x, col_z}] = make_tuple(row_x, h, col_z, block_type);
+                    m_p_q[{row_x + offset_x, col_z + offset_z}] = make_tuple(row_x + offset_x, h, col_z + offset_z, block_type);
                 }
             }
             col_z++;

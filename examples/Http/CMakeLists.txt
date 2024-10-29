@@ -7,7 +7,7 @@ target_include_directories(${MAZE_BUILDER_HTTP_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/
 target_include_directories(${MAZE_BUILDER_HTTP_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
 target_compile_features(${MAZE_BUILDER_HTTP_EXE} PUBLIC cxx_std_17)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
+    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${MAZE_BUILDER_HTTP_EXE} to use -DMAZE_DEBUG flag.")
     target_compile_definitions(${MAZE_BUILDER_HTTP_EXE} PRIVATE "MAZE_DEBUG")
 endif()
 
