@@ -17,6 +17,7 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
         .constructor<const std::string&, const std::string&, int, int>()
         .function("mazes", &craft::mazes)
+        .function("toggle_mouse", &craft::toggle_mouse)
         .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
 }
 #endif

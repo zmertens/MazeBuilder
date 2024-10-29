@@ -32,6 +32,7 @@ public:
     
     // Web interaction
     std::string mazes() const noexcept;
+    void toggle_mouse() const noexcept;
     
     // Singleton pattern
     static std::shared_ptr<craft> get_instance(const std::string_view& title, const std::string& version, int w, int h) {
