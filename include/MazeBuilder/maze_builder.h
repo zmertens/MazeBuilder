@@ -191,6 +191,9 @@ public:
     }
 
     std::unique_ptr<maze> build() noexcept;
+
+    // Static helper to handle JSON writing for multiple mazes
+    static std::string to_json_array_str(const std::vector<std::unique_ptr<mazes::maze_builder::maze>>& mazes, unsigned int pretty_spaces = 4) noexcept;
 }; // class
 
 } // namespace

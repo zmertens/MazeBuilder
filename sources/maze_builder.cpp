@@ -23,8 +23,11 @@ using namespace std;
 
 const string maze_builder::MAZE_BUILDER_VERSION_STR = build_info::Version + "-" + build_info::CommitSHA;
 
+/**
+ * @brief Finalize design for maze, invalidating the builder
+ * @return Return a unique pointer to a maze object
+ */
 unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
-    my_maze->compute_geometry();
     // Transfer ownership, nullify the ptr for this object
     return std::move(my_maze);
 }
@@ -189,6 +192,22 @@ std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const no
     return my_json.dump(4);
 }
 
+/**
+ * @brief Return a JSON string with base64 representation of the mazes
+ * @param mazes container of mazes
+ * @param pretty_spaces = 4
+ *
+ */
+std::string maze_builder::to_json_array_str(const vector<unique_ptr<maze_builder::maze>>& mazes, unsigned int pretty_spaces) noexcept {
+    nlohmann::json json_array = nlohmann::json::array();
+
+    for (const auto& m : mazes) {
+        json_array.push_back(nlohmann::json::parse(m->to_json_str()));
+    }
+
+    return json_array.dump(pretty_spaces);
+}
+
 double maze_builder::maze::get_progress_in_seconds() const noexcept {
     return this->m_tracker.get_duration_in_seconds();
 }
@@ -228,6 +247,9 @@ void maze_builder::maze::compute_geometry() noexcept {
 
     this->m_vertices.clear();
     this->m_faces.clear();
+    this->m_p_q.clear();
+
+    this->rng.seed(static_cast<unsigned long>(this->seed));
 
     // Generate maze and time it
     this->m_tracker.start();

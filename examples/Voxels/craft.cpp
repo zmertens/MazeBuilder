@@ -27,13 +27,10 @@
 
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <cstdio>
 #include <cstdint>
 #include <cstring>
-#include <ctime>
 #include <string>
 #include <algorithm>
-#include <iostream>
 #include <thread>
 #include <future>
 #include <mutex>
@@ -41,6 +38,7 @@
 #include <random>
 #include <utility>
 #include <tuple>
+#include <vector>
 
 #include <noise/noise.h>
 
@@ -112,6 +110,8 @@ struct craft::craft_impl {
         int rows;
         int height;
         int columns;
+        int offset_x;
+        int offset_z;
         std::string algo;
         int view;
         char tag[MAX_SIGN_LENGTH];
@@ -120,7 +120,8 @@ struct craft::craft_impl {
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
             show_info_text(true), apply_bloom_effect(true),
-            outfile(".obj"), seed(0), rows(25), height(5), columns(18),
+            outfile("my_maze1.obj"), seed(10), rows(25), height(5), columns(18),
+            offset_x(0), offset_z(0),
             algo("binary_tree"), view(20), tag("maze here") {
 
         }
@@ -138,7 +139,7 @@ struct craft::craft_impl {
             columns = 28;
             view = 20;
             algo = "binary_tree";
-            seed = 101;
+            seed = 10;
             chunk_size = 8;
             tag[0] = 'H';
             tag[1] = 'i';
@@ -387,7 +388,7 @@ struct craft::craft_impl {
         this->reset_model();
     }
 
-    int worker_run(void* arg, const unique_ptr<maze_builder::maze>& my_maze) {
+    int worker_run(void* arg, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
@@ -399,7 +400,7 @@ struct craft::craft_impl {
             }
             WorkerItem* worker_item = &worker->item;
             if (worker_item->load) {
-                this->load_chunk(worker_item, cref(my_maze));
+                this->load_chunk(worker_item, cref(my_mazes));
             }
 
             this->compute_chunk(worker_item);
@@ -411,13 +412,13 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-    void init_worker_threads(const unique_ptr<maze_builder::maze>& mb) {
+    void init_worker_threads(const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            worker->thrd = thread([this, &mb](void* arg) { this->worker_run(arg, cref(mb)); }, worker.get());
+            worker->thrd = thread([this, &my_mazes](void* arg) { this->worker_run(arg, cref(my_mazes)); }, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -866,6 +867,9 @@ struct craft::craft_impl {
         return result;
     } // hit_test
 
+    /**
+     * @brief Check if selected block is colliding with player wireframe
+     */
     int hit_test_face(Player* player, int* x, int* y, int* z, int* face) {
         State* s = &player->state;
         int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
@@ -1373,7 +1377,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const unique_ptr<maze_builder::maze>& mb) {
+    void load_chunk(WorkerItem* item, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         int p = item->p;
         int q = item->q;
 
@@ -1381,7 +1385,7 @@ struct craft::craft_impl {
         Map* light_map = item->light_maps[1][1];
         // world.h
         static world my_world;
-        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size, cref(mb));
+        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size, cref(my_mazes));
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1410,7 +1414,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<maze_builder::maze>& mb) {
+    void create_chunk(Chunk* chunk, int p, int q, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1420,7 +1424,7 @@ struct craft::craft_impl {
         item->block_maps[1][1] = &chunk->map;
         item->light_maps[1][1] = &chunk->lights;
 
-        load_chunk(item, cref(mb));
+        load_chunk(item, cref(my_mazes));
     }
 
     void delete_chunks() {
@@ -1500,7 +1504,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
+    void force_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1517,7 +1521,7 @@ struct craft::craft_impl {
                     }
                 } else if (this->m_model->chunk_count < MAX_CHUNKS) {
                     chunk = this->m_model->chunks + this->m_model->chunk_count++;
-                    create_chunk(chunk, a, b, cref(mb));
+                    create_chunk(chunk, a, b, cref(my_mazes));
                     gen_chunk_buffer(chunk);
                 }
             }
@@ -1617,9 +1621,9 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
+    void ensure_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         check_workers();
-        force_chunks(player, cref(mb));
+        force_chunks(player, cref(my_mazes));
         for (auto&& worker : this->m_model->workers) {
             worker->mtx.lock();
             if (worker->state == WORKER_IDLE) {
@@ -1790,10 +1794,10 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const unique_ptr<maze_builder::maze>& mb) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         int result = 0;
         State* s = &player->state;
-        this->ensure_chunks(player, cref(mb));
+        this->ensure_chunks(player, cref(my_mazes));
         int p = this->chunked(s->x);
         int q = this->chunked(s->z);
         float light = this->get_daylight();
@@ -1990,7 +1994,9 @@ struct craft::craft_impl {
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
             set_block(hx, hy, hz, 0);
             record_block(hx, hy, hz, 0);
+#if defined(MAZE_DEBUG)
             SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             if (is_plant(get_block(hx, hy + 1, hz))) {
                 set_block(hx, hy + 1, hz, 0);
             }
@@ -2005,7 +2011,9 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
+#if defined(MAZE_DEBUG)
                 SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             }
         }
     }
@@ -2017,6 +2025,9 @@ struct craft::craft_impl {
         for (int i = 0; i < item_count; i++) {
             if (items[i] == hw) {
                 this->m_model->item_index = i;
+#if defined(MAZE_DEBUG)
+                SDL_Log("Copying item index: %d\n", i);
+#endif
                 break;
             }
         }
@@ -2642,7 +2653,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     if (!loaded) {
         p_state->x = 15.f;
         p_state->z = 15.f;
-        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 55.f;
+        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z);
     }
 
     // Init some local vars for handling maze duties
@@ -2656,14 +2667,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
-    maze_builder builder;
-    auto my_maze = builder.maze_type(my_maze_type).get_int(get_int)
-        .rng(rng).rows(gui->rows).columns(gui->columns).height(gui->height)
-        .offset_x(-50).offset_z(-50)
-        .show_distances(false).seed(0).block_type(-1).build();
+    vector<unique_ptr<maze_builder::maze>> my_mazes;
 
     // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads(cref(my_maze));
+    m_pimpl->init_worker_threads(cref(my_mazes));
 
     me->id = 0;
     me->name = "Wade Watts";
@@ -2758,6 +2765,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (ImGui::SliderInt("Height", &gui->height, 1, MAX_HEIGHT)) {
 
                 }
+
+                ImGui::TextColored(ImVec4(0.14f, 0.26f, 0.90f, 1.0f), "offset_x: %d", static_cast<int>(p_state->x));
+                ImGui::TextColored(ImVec4(0.14f, 0.26f, 0.90f, 1.0f), "offset_z: %d", static_cast<int>(p_state->z));
+
                 static unsigned int MAX_SEED_VAL = 100;
                 if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
                     rng.seed(static_cast<unsigned long>(gui->seed));
@@ -2788,24 +2799,39 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Export!")) {
-                        my_maze->block_type = items[model->item_index];
-                        my_maze->seed = gui->seed;
-                        my_maze->show_distances = false;
-                        my_maze->offset_x = static_cast<int>(p_state->x);
-                        my_maze->offset_z = static_cast<int>(p_state->z);
-                        my_maze->rows = gui->rows;
-                        my_maze->columns = gui->columns;
-                        my_maze->height = gui->height;
-                        my_maze->maze_type = my_maze_type;
-                        my_maze->compute_geometry();
-                        my_maze->get_progress_in_ms();
-                        // Write the maze to a file on Desktop immediately
-                        // The maze has a to_str method which the Web API calls /mazes/
-                        this->m_pimpl->m_json_data = my_maze->to_json_str();
+                        // Building maze here has the effect of computing its geometry on this thread
+                        int tx, ty, tz, tface;
+                        this->m_pimpl->hit_test_face(me, &tx, &ty, &tz, &tface);
+                        maze_builder builder;
+                        auto my_next_maze = builder.maze_type(my_maze_type)
+                            .block_type(items[model->item_index])
+                            .get_int(get_int).rng(rng)
+                            .rows(gui->rows).columns(gui->columns).height(gui->height)
+                            .offset_x(tx).offset_z(tz)
+                            .show_distances(false).seed(gui->seed).build();
+                        my_next_maze->compute_geometry();
+                        // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
-                        writer.write(gui->outfile, my_maze->to_wavefront_obj_str64());
+                        writer.write(gui->outfile, my_next_maze->to_wavefront_obj_str());
+#if defined(MAZE_DEBUG)
+                        SDL_Log("Wrote maze to %s\n", gui->outfile);
 #endif
+#endif
+                        my_mazes.push_back(std::move(my_next_maze));
+                        // Write the maze to a file on Desktop immediately
+                        // The maze has a to_str method which the Web API calls /mazes/
+                        this->m_pimpl->m_json_data = maze_builder::to_json_array_str(cref(my_mazes));
+                        // Resetting the model reloads the chunks - show the new maze
+                        this->m_pimpl->reset_model();
+                        gui->reset();
+
+                        // Show progress when writing
+                        ImGui::NewLine();
+                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
+                        ImGui::Text("Elapsed %.5f ms", my_mazes.back()->get_progress_in_ms());
+                        ImGui::NewLine();
+                        ImGui::PopStyleColor();
                     }
                     ImGui::SameLine();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
@@ -2823,26 +2849,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     ImGui::PopStyleVar();
                     ImGui::EndDisabled();
                 }
-
-                // Show progress when writing
-                ImGui::NewLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
-                ImGui::Text("Elapsed %.5f ms", my_maze->get_progress_in_ms());
-                ImGui::NewLine();
-                ImGui::PopStyleColor();
-
-                // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.0f, 0.0f, 0.0f, 1.0f));
-                if (ImGui::Button("Reset")) {
-                    this->m_pimpl->reset_model();
-                    gui->reset();
-                }
-                ImGui::PopStyleColor();
-                ImGui::PopStyleColor();
-                ImGui::PopStyleColor();
-                ImGui::NewLine();
 
                 ImGui::EndTabItem();
             }
@@ -2953,7 +2959,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDepthFunc(GL_LESS);
         glEnable(GL_CULL_FACE);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_maze));
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_mazes));
 
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib, texture);
@@ -2981,10 +2987,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             hour = hour % 12;
             hour = hour ? hour : 12;
             SDL_snprintf(
-                text_buffer, 1024,
-                "chunk(%d %d) | player(%.2f %.2f %.2f)",
+                text_buffer, 1024, "chunk(%d %d) chunk_count(%d) triangles(%d)",
                 this->m_pimpl->chunked(p_state->x), this->m_pimpl->chunked(p_state->z),
-                p_state->x, p_state->y, p_state->z);
+                model->chunk_count, triangle_faces * 2);
             this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
             // Lower the info text
             ty -= ts * 2;
@@ -2992,13 +2997,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             memset(text_buffer, 0, 1024);
             SDL_snprintf(
                 text_buffer, 1024,
-                "App average: %.3f ms/frame | %.1f FPS",
+                "App average: %.3f ms/frame %.1f FPS",
                 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
-            ty -= ts * 2;
-            memset(text_buffer, 0, 1024);
-            SDL_snprintf(
-                text_buffer, 1024, "chunk_count(%d) | triangles(%d)", model->chunk_count, triangle_faces * 2);
             this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
         }
 
