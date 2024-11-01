@@ -186,8 +186,8 @@ struct craft::craft_impl {
             for (auto i = 0; i < 2; ++i) {
                 glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, color_buffers[i], 0);
@@ -2565,6 +2565,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     }
 
     // Init OpenGL fields
+    glEnable(GL_MULTISAMPLE);
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
         // positions   // texCoords
@@ -2961,6 +2962,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LESS);
         glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
 
         triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_mazes));
 
@@ -3005,6 +3008,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
         }
 
+        // Let the skybox pos.z coord determine depth test in shader
         glDepthFunc(GL_LEQUAL);
 
         // Skybox
@@ -3022,15 +3026,17 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glDrawArrays(GL_TRIANGLES, 0, 36);
         glBindVertexArray(0);
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        //static constexpr float BLOOM_CLEAR_COLOR[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+        //glClearBufferfv(GL_COLOR, 1, BLOOM_CLEAR_COLOR);
 
         // Complete the pingpong buffer for the bloom effect
         glUseProgram(blur_attrib.program);
         for (auto i = 0; i < bloom_tools.NUM_FBO_ITERATIONS; i++) {
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
-            glUniform1i(blur_attrib.sampler, 0);
-            glActiveTexture(GL_TEXTURE0);
             if (bloom_tools.first_iteration) {
+                glUniform1i(blur_attrib.sampler, 0);
+                glActiveTexture(GL_TEXTURE0);
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
@@ -3039,6 +3045,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
             glBindVertexArray(quad_vao);
+            glDisable(GL_DEPTH_TEST);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
         bloom_tools.first_iteration = true;
@@ -3047,15 +3054,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
         // Post-processing the default frame buffer
         // Render HDR buffer to 2D quad and apply bloom filter
-        glClear(GL_COLOR_BUFFER_BIT);
+        //glClear(GL_COLOR_BUFFER_BIT);
         glUseProgram(screen_attrib.program);
         glUniform1i(screen_attrib.sampler, 0);
         glUniform1i(screen_attrib.extra3, 1);
         glBindVertexArray(quad_vao);
+        glDisable(GL_DEPTH_TEST);
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
         glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[bloom_tools.horizontal_blur]);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
         glUniform1f(screen_attrib.extra2, 1.05f);
