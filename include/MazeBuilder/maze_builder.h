@@ -162,6 +162,7 @@ public:
 
     maze_builder& seed(int seed) {
         my_maze->seed = seed;
+        my_maze->rng.seed(static_cast<unsigned long>(seed));
         return *this;
     }
 

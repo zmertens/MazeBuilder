@@ -245,12 +245,6 @@ void maze_builder::maze::compute_geometry() noexcept {
         this->m_grid = make_unique<grid>(this->rows, this->columns, this->height);
     }
 
-    this->m_vertices.clear();
-    this->m_faces.clear();
-    this->m_p_q.clear();
-
-    this->rng.seed(static_cast<unsigned long>(this->seed));
-
     // Generate maze and time it
     this->m_tracker.start();
     bool success = mazes::maze_factory::gen(this->maze_type, ref(this->m_grid), cref(this->get_int), cref(this->rng));

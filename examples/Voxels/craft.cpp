@@ -32,7 +32,6 @@
 #include <string>
 #include <algorithm>
 #include <thread>
-#include <future>
 #include <mutex>
 #include <chrono>
 #include <random>
@@ -277,7 +276,7 @@ struct craft::craft_impl {
         GLuint sign_buffer;
     } Chunk;
 
-    typedef struct {
+    struct WorkerItem {
         int p;
         int q;
         int load;
@@ -287,7 +286,9 @@ struct craft::craft_impl {
         int maxy;
         int faces;
         GLfloat* data;
-    } WorkerItem;
+        WorkerItem() {
+        }
+    };
 
     typedef struct {
         int index;
@@ -2651,8 +2652,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->x = 15.f;
-        p_state->z = 15.f;
         p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z);
     }
 
@@ -2725,6 +2724,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             time_accum -= FIXED_TIME_STEP;
             time_step += FIXED_TIME_STEP;
         }
+
         if (model->create_radius != gui->view) {
             model->create_radius = gui->view;
             model->render_radius = gui->view;
@@ -2818,20 +2818,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         SDL_Log("Wrote maze to %s\n", gui->outfile);
 #endif
 #endif
-                        my_mazes.push_back(std::move(my_next_maze));
-                        // Write the maze to a file on Desktop immediately
-                        // The maze has a to_str method which the Web API calls /mazes/
+                        // The JSON data for the Web API - GET /mazes/
                         this->m_pimpl->m_json_data = maze_builder::to_json_array_str(cref(my_mazes));
                         // Resetting the model reloads the chunks - show the new maze
                         this->m_pimpl->reset_model();
                         gui->reset();
 
-                        // Show progress when writing
-                        ImGui::NewLine();
-                        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
-                        ImGui::Text("Elapsed %.5f ms", my_mazes.back()->get_progress_in_ms());
-                        ImGui::NewLine();
-                        ImGui::PopStyleColor();
+                        my_mazes.push_back(std::move(my_next_maze));
                     }
                     ImGui::SameLine();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
@@ -2848,6 +2841,15 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     // Re-enable items and revert style change
                     ImGui::PopStyleVar();
                     ImGui::EndDisabled();
+                }
+
+                if (!my_mazes.empty()) {
+                    // Show last maze compute time
+                    ImGui::NewLine();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
+                    ImGui::Text("Elapsed %.5f ms", my_mazes.back()->get_progress_in_ms());
+                    ImGui::NewLine();
+                    ImGui::PopStyleColor();
                 }
 
                 ImGui::EndTabItem();
@@ -2890,6 +2892,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Text("Commands:");
                 ImGui::Text("LMouse: Delete block");
                 ImGui::Text("RMouse: Build a block");
+                ImGui::Text("MMouse: Copy block type");
                 ImGui::Text("Jump: Spacebar");
                 ImGui::Text("LShift: Zoom");
                 ImGui::Text("WASD: Movement");
