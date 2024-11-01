@@ -9,6 +9,7 @@
 
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/grid.h>
+#include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/distances.h>
@@ -115,6 +116,27 @@ TEST_CASE("Grids are sortable", "[sort]") {
     for (auto&& cell : sorted_cells) {
         max = cell->get_index();
         REQUIRE(cell->get_index() >= max);
+    }
+}
+
+TEST_CASE("Cells have neighbors", "[cells]") {
+
+    // cell1 has cell2 neighbor to the south
+    shared_ptr<cell> cell1{ make_shared<cell>(0, 0, 0) };
+    shared_ptr<cell> cell2{ make_shared<cell>(0, 1, 1) };
+
+    SECTION("Cell has neighbor to south") {
+        cell1->set_south(cell2);
+        REQUIRE(cell1->get_south() == cell2);
+        auto&& neighbors = cell1->get_neighbors();
+        REQUIRE(!neighbors.empty());
+    }
+
+    SECTION("Cells are linked") {
+        // links are bi-directional by default
+        cell1->link(cell1, cell2);
+        REQUIRE(cell1->is_linked(cell2));
+        REQUIRE(cell2->is_linked(cell1));
     }
 }
 

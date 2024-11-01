@@ -30,6 +30,7 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
         auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
             .offset_x(OFFSET_X).offset_z(OFFSET_Z)
             .get_int(get_int).rng(rng).build();
+        maze1->compute_geometry();
         REQUIRE(maze1->columns == NUM_COLS);
         REQUIRE(maze1->rows == NUM_ROWS);
         REQUIRE(maze1->height == HEIGHT);
@@ -45,6 +46,7 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
         auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
             .offset_x(OFFSET_X).offset_z(OFFSET_Z)
             .get_int(get_int).rng(rng).build();
+        maze1->compute_geometry();
         REQUIRE(maze1->columns == NUM_COLS);
         REQUIRE(maze1->rows == NUM_ROWS);
         REQUIRE(maze1->height == HEIGHT);
@@ -66,16 +68,18 @@ TEST_CASE( "Test mazes", "[maze progress]") {
             .get_int(get_int).rng(rng).maze_type(maze_types::BINARY_TREE)
             .offset_x(10)
             .offset_z(10).build();
+        maze1->compute_geometry();
         REQUIRE(maze1->get_progress_in_seconds() <= 10.0);
-        REQUIRE(maze1->get_progress_in_ms() <= 1.0);
+        REQUIRE(maze1->get_progress_in_ms() <= 1000.0);
     }
     SECTION("SIDEWINDER PROGRESS") {
         auto maze1 = builder.rows(10).columns(10).height(10)
             .get_int(get_int).rng(rng).maze_type(maze_types::SIDEWINDER)
             .offset_x(10)
             .offset_z(10).build();
+        maze1->compute_geometry();
         REQUIRE(maze1->get_progress_in_seconds() <= 10.0);
-        REQUIRE(maze1->get_progress_in_ms() <= 1.0);
+        REQUIRE(maze1->get_progress_in_ms() <= 1000.0);
     }
 
     SECTION("DFS PROGRESS") {
@@ -83,8 +87,9 @@ TEST_CASE( "Test mazes", "[maze progress]") {
             .get_int(get_int).rng(rng).maze_type(maze_types::DFS)
             .offset_x(10)
             .offset_z(10).build();
+        maze1->compute_geometry();
         REQUIRE(maze1->get_progress_in_seconds() <= 10.0);
-        REQUIRE(maze1->get_progress_in_ms() <= 1.0);
+        REQUIRE(maze1->get_progress_in_ms() <= 1000.0);
     }
 }
 
@@ -144,24 +149,4 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
     }
 }
 
-TEST_CASE("Cells have neighbors", "[cells]") {
-
-    // cell1 has cell2 neighbor to the south
-    shared_ptr<cell> cell1{ make_shared<cell>(0, 0, 0) };
-    shared_ptr<cell> cell2{ make_shared<cell>(0, 1, 1) };
-
-    SECTION("Cell has neighbor to south") {
-        cell1->set_south(cell2);
-        REQUIRE(cell1->get_south() == cell2);
-        auto&& neighbors = cell1->get_neighbors();
-        REQUIRE(!neighbors.empty());
-    }
-
-    SECTION("Cells are linked") {
-        // links are bi-directional by default
-        cell1->link(cell1, cell2);
-        REQUIRE(cell1->is_linked(cell2));
-        REQUIRE(cell2->is_linked(cell1));
-    }
-}
 

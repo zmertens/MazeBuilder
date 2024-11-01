@@ -100,6 +100,7 @@ int main(int argc, char* argv[]) {
             .block_type(block_type)
             .show_distances(maze_args.distances)
             .build();
+        my_maze->compute_geometry();
         mazes::writer my_writer;
         mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {

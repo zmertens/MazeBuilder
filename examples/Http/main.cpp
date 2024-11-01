@@ -81,6 +81,7 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             // Create the maze
             mazes::maze_builder builder;
             auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
+            temp_maze->compute_geometry();
             auto dump = temp_maze->to_json_str(4);
 
             sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
