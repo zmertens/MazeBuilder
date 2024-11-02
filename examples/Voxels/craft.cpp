@@ -2833,13 +2833,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         SDL_Log("Wrote maze to %s\n", gui->outfile);
 #endif
 #endif
+                        my_mazes.push_back(std::move(my_next_maze));
                         // The JSON data for the Web API - GET /mazes/
-                        this->m_pimpl->m_json_data = maze_builder::to_json_array_str(cref(my_mazes));
+                        this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                         // Resetting the model reloads the chunks - show the new maze
                         this->m_pimpl->reset_model();
                         gui->reset();
-
-                        my_mazes.push_back(std::move(my_next_maze));
                     }
                     ImGui::SameLine();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
