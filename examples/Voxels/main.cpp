@@ -33,17 +33,17 @@ int main(int argc, char* argv[]) {
     };
 
     try {
-#if !defined(__EMSCRIPTEN__)
+
         bool success = false;
         // Run the SDL app
         static constexpr int window_w = 800, window_h = 600;
-        string_view my_title { "Maze Builder 🔧" };
+        string my_title { "Maze Builder 🔧" };
         auto&& maze_builder_3D = craft::get_instance(cref(my_title), mazes::build_info::Version, window_w, window_h);
         success = maze_builder_3D->run(std::cref(get_int), std::ref(rng_engine));
         if (!success) {
             std::cerr << "ERROR: Running SDL app failed." << std::endl;
         }
-#endif
+
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }

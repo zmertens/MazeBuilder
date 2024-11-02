@@ -209,7 +209,7 @@ struct craft::craft_impl {
             glGenFramebuffers(2, fbo_pingpong);
             glGenTextures(2, color_buffers_pingpong);
             for (auto i = 0; i < 2; i++) {
-				glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
                 glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -229,7 +229,7 @@ struct craft::craft_impl {
 
             glGenTextures(1, &color_final);
             glBindTexture(GL_TEXTURE_2D, color_final);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -384,7 +384,7 @@ struct craft::craft_impl {
     } Model;
 
     // Note: These are public members
-    const std::string_view& m_title;
+    const std::string& m_title;
     const std::string& m_version;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
@@ -393,7 +393,7 @@ struct craft::craft_impl {
 
     std::string m_json_data;
 
-    craft_impl(const std::string_view& title, const std::string& version, int w, int h)
+    craft_impl(const std::string& title, const std::string& version, int w, int h)
         : m_title(title)
         , m_version(version)
         , INIT_WINDOW_WIDTH(w)
@@ -2363,7 +2363,7 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string_view& title, const std::string& version, const int w, const int h)
+craft::craft(const std::string& title, const std::string& version, const int w, const int h)
     : m_pimpl{ std::make_unique<craft_impl>(cref(title), cref(version), w, h) } {
 }
 
@@ -2538,7 +2538,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glUseProgram(0);
 
 #if defined(__EMSCRIPTEN__)
-    // @TODO: Skybox ES shader
+    program = load_program("shaders/es/skybox_vertex.es.glsl", "shaders/es/skybox_fragment.es.glsl");
 #else
     program = load_program("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
 #endif
@@ -2579,7 +2579,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     }
 
     // Init OpenGL fields
-    glEnable(GL_MULTISAMPLE);
     // Vertex attributes for a quad that fills the entire screen in Normalized Device Coords
     static constexpr float quad_vertices[] = {
         // positions   // texCoords

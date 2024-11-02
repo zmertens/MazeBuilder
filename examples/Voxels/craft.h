@@ -7,7 +7,6 @@
 #define CRAFT_H
 
 #include <string>
-#include <string_view>
 #include <memory>
 #include <functional>
 #include <list>
@@ -17,7 +16,7 @@
 
 class craft {
 public:
-    craft(const std::string_view& title, const std::string& version, int w, int h);
+    craft(const std::string& title, const std::string& version, int w, int h);
     ~craft();
 
     // Delete copy constructor and copy assignment operator
@@ -35,8 +34,8 @@ public:
     void toggle_mouse() const noexcept;
     
     // Singleton pattern
-    static std::shared_ptr<craft> get_instance(const std::string_view& title, const std::string& version, int w, int h) {
-        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::cref(title), std::cref(version), w, h);
+    static std::shared_ptr<craft> get_instance(const std::string& title, const std::string& version, int w, int h) {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(cref(title), std::cref(version), w, h);
         return instance;
     }
 private:
