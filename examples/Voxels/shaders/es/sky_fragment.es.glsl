@@ -1,4 +1,5 @@
-#version 330 core
+#version 300 es
+precision mediump float;
 
 layout (location = 0) out vec4 fragColor;
 layout (location = 1) out vec4 brightColor;
