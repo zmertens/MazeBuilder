@@ -12,15 +12,7 @@
 #include <functional>
 #include <memory>
 
-#include <MazeBuilder/distances.h>
-#include <MazeBuilder/colored_grid.h>
-#include <MazeBuilder/distance_grid.h>
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/args_builder.h>
-#include <MazeBuilder/output_types_enum.h>
 #include <MazeBuilder/maze_factory.h>
-#include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/writer.h>
 #include <MazeBuilder/maze_builder.h>
 
 class maze {
@@ -34,7 +26,7 @@ private:
 public:
     maze(int r, int c, int d, int s, const std::string& algorithm, const std::string& str)
         : m_rows(r), m_cols(c), m_depth(d), m_seed(s), m_algorithm(algorithm), m_output(str) {
-            mazes::maze_types my_maze_type = mazes::maze_types::BINARY_TREE;
+            mazes::maze_types my_maze_type = mazes::to_maze_type(algorithm);
             
             std::mt19937 rng_engine{ static_cast<unsigned long>(m_seed) };
             auto get_int = [&rng_engine](auto low, auto high) {
@@ -47,7 +39,7 @@ public:
                 .seed(s).rng(rng_engine).get_int(get_int)
                 .block_type(-1).show_distances(true)
                 .maze_type(my_maze_type).build();
-
+            my_maze->compute_geometry();
             m_output = my_maze->to_str();
     }
 
