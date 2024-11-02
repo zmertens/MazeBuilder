@@ -189,7 +189,7 @@ std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const no
     my_json["seed"] = this->seed;
     my_json["v"] = maze_builder::MAZE_BUILDER_VERSION_STR;
 
-    return my_json.dump(4);
+    return my_json.dump(pretty_spaces);
 }
 
 /**

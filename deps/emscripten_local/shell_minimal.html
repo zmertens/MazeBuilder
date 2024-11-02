@@ -33,40 +33,62 @@
         to {transform: rotate(360deg);}
       }
 
-      .emscripten_border {
-        flex: 1;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background-color: #222;
+      .emscripten { position: relative; }
+
+      #canvas {
+        width: 100%;
+        height: 90vh;
       }
 
-      canvas.emscripten {
-        height: 100%;
-        width: 100%;
-        height: auto;
-        display: block;
+      input[type=button] {
+        background-color: lightgray;
+        border: 4px solid greenyellow;
+        color: black;
+        text-decoration: none;
+        cursor: pointer;
+        width: 140px;
+        height: 50px;
+        margin-left: 10px;
+        position: absolute;
+        z-index: 10;
+      }
+
+      input[type=button]:disabled {
+        background-color: lightgray;
+        border: 4px solid gray;
+        color: gray;
+        cursor: not-allowed;
+      }
+
+      input[type=button]:hover {
+        background-color: #f5f5f5ff;
+        border-color: black;
       }
 
    </style>
   </head>
   <body>
-    <div class="emscripten_border">
+    <div class="emscripten">
       <canvas
-        class="emscripten"
         id="canvas"
         oncontextmenu="event.preventDefault()"
-        tabindex="-1"
       ></canvas>
+      <span className="span-button">
+        <input type="button" value="🚀 Download" disabled="true" onClick="handleDownloadClick()" />
+      </span>
     </div>
     <script type="text/javascript">
       let craft = null;
       var Module = {
-        preRun: [],
+        preRun: [
+          function () {
+
+          },
+        ],
         postRun: [],
         onRuntimeInitialized: function () {
-          Module.setStatus("Downloading...");
-          craft = Module.craft.get_instance("Maze Builder - LOCAL", "", 800, 600);
+          Module.setStatus("Polling events...");
+          craft = Module.craft.get_instance("Maze Builder - LOCAL", "", 600, 480);
           startPolling();
         },
         print: (function () {
@@ -95,8 +117,8 @@
         canvas: (function () {
           const canvas = document.querySelector("#canvas");
           const observer = new ResizeObserver((entries) => {
-            width = canvas.clientWidth;
-            height = canvas.clientHeight;
+            width = canvas.innerWidth;
+            height = canvas.innerHeight;
           });
 
           observer.observe(canvas)
@@ -151,21 +173,56 @@
         };
       };
 
+      let currentJsonStr = "";
+
       function startPolling() {
         const intervalId = setInterval(function () {
           if (craft) {
-            const jsonStr = craft.mazes();
-            if (jsonStr) {
+            currentJsonStr = craft.mazes();
+            if (currentJsonStr.length > 0) {
+              console.log("JSON: ", currentJsonStr);
               clearInterval(intervalId);
-              startPolling();
-              console.log("JSON: ", jsonStr);
             } else {
-              console.log("No JSON"); 
+              console.log("No JSON");
             }
+          } else {
+            clearInterval(intervalId);
           }
         }, 3000);
       }
+
+      function handleDownloadClick() {
+        if (currentJsonStr) {
+          const data = JSON.stringify(currentJsonStr);
+          const blob = new Blob([data], { type: "application/text" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${currentJsonStr[1]}.txt`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          // Reset download button state and polling state
+          const button = document.querySelector("input[type=button]");
+          button.disabled = true;
+          startPolling();
+        }
+      }
+
+      function enableDownloadButton() {
+        const button = document.querySelector("input[type=button]");
+        button.disabled = false;
+      }
+
+      if (currentJsonStr.length > 0) {
+        enableDownloadButton();
+      }
     </script>
-    {{{ SCRIPT }}}
+    
+        
+        {{{ SCRIPT }}}
+        
   </body>
 </html>
