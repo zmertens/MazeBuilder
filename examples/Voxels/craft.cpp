@@ -104,6 +104,7 @@ struct craft::craft_impl {
         bool show_crosshairs;
         bool show_info_text;
         bool apply_bloom_effect;
+        float exposure;
         char outfile[64];
         int seed;
         int rows;
@@ -118,7 +119,7 @@ struct craft::craft_impl {
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-            show_info_text(true), apply_bloom_effect(true),
+            show_info_text(true), apply_bloom_effect(true), exposure(0.39f),
             outfile("my_maze1.obj"), seed(10), rows(25), height(5), columns(18),
             offset_x(0), offset_z(0),
             algo("binary_tree"), view(20), tag("maze here") {
@@ -152,17 +153,18 @@ struct craft::craft_impl {
 
     class BloomTools {
     public:
-        GLuint fbo_hdr, fbo_pingpong[2];
+        GLuint fbo_hdr, fbo_pingpong[2], fbo_final;
         GLuint rbo_bloom_depth;
         // Hold 2 floating point color buffers (1 for normal rendering, 
         //  the other one for brightness treshold values)
-        GLuint color_buffers[2], color_buffers_pingpong[2];
+        GLuint color_buffers[2], color_buffers_pingpong[2], color_final;
 
         // State variables
         bool first_iteration, horizontal_blur;
         static constexpr unsigned int NUM_FBO_ITERATIONS = 10;
 
-        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0)
+        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, fbo_final(0)
+            , rbo_bloom_depth(0)
             , color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 }
             , first_iteration(true), horizontal_blur(true) {
         }
@@ -221,6 +223,18 @@ struct craft::craft_impl {
 #if defined(MAZE_DEBUG)
             SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
 #endif
+
+            glGenFramebuffers(1, &fbo_final);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_final);
+
+            glGenTextures(1, &color_final);
+            glBindTexture(GL_TEXTURE_2D, color_final);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_final, 0);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         } // gen
@@ -2885,6 +2899,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
                 ImGui::Checkbox("Apply Bloom Effect", &gui->apply_bloom_effect);
+                ImGui::SliderFloat("Exp", &gui->exposure, 0.1f, 1.0f, "%.2f");
 
                 ImGui::EndTabItem();
             }
@@ -2942,10 +2957,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             // Delete existing FBO objects
             if (glIsTexture(bloom_tools.color_buffers[0]) && glIsTexture(bloom_tools.color_buffers[1])) {
                 glDeleteTextures(2, bloom_tools.color_buffers);
+                glDeleteTextures(1, &bloom_tools.color_final);
+                glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
                 glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
                 glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
                 glDeleteFramebuffers(2, bloom_tools.color_buffers_pingpong);
-                glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+                glDeleteFramebuffers(1, &bloom_tools.fbo_final);
             }
             bloom_tools.gen_framebuffers(voxel_scene_w, voxel_scene_h);
         }
@@ -3024,10 +3041,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
         glDrawArrays(GL_TRIANGLES, 0, 36);
-        glBindVertexArray(0);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        //static constexpr float BLOOM_CLEAR_COLOR[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-        //glClearBufferfv(GL_COLOR, 1, BLOOM_CLEAR_COLOR);
 
         // Complete the pingpong buffer for the bloom effect
         glUseProgram(blur_attrib.program);
@@ -3050,11 +3063,9 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         }
         bloom_tools.first_iteration = true;
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);   
-
         // Post-processing the default frame buffer
         // Render HDR buffer to 2D quad and apply bloom filter
-        //glClear(GL_COLOR_BUFFER_BIT);
+        glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_final);
         glUseProgram(screen_attrib.program);
         glUniform1i(screen_attrib.sampler, 0);
         glUniform1i(screen_attrib.extra3, 1);
@@ -3066,22 +3077,22 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
-        glUniform1f(screen_attrib.extra2, 1.05f);
+        glUniform1f(screen_attrib.extra2, gui->exposure);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
-
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_buffers[0])),
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_final)),
             voxel_scene_size, uv0, uv1);
 
         ImGui::End();
 
         ImGui::PopFont();
 
-        ImGui::Render();
         glViewport(0, 0, display_w, display_h);
+        ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         SDL_GL_SwapWindow(sdl_window);
@@ -3119,9 +3130,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glDeleteTextures(1, &cubemap_texture_id);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
     glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
+    glDeleteFramebuffers(1, &bloom_tools.fbo_final);
     glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
     glDeleteTextures(2, bloom_tools.color_buffers);
     glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+    glDeleteTextures(1, &bloom_tools.color_final);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
     glDeleteVertexArrays(1, &skybox_vao);
