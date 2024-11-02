@@ -173,14 +173,17 @@
         };
       };
 
-      let currentJsonStr = "";
+      let currentJSON = null;
+      let lastStrLength = 0;
 
       function startPolling() {
         const intervalId = setInterval(function () {
           if (craft) {
-            currentJsonStr = craft.mazes();
-            if (currentJsonStr.length > 0) {
-              console.log("JSON: ", currentJsonStr);
+            tempStr = craft.mazes();
+            if (tempStr.length > 0 && tempStr.length !== lastStrLength) {
+              lastStrLength = tempStr.length;
+              currentJSON = JSON.parse(tempStr);
+              enableDownloadButton();
               clearInterval(intervalId);
             } else {
               console.log("No JSON");
@@ -192,13 +195,13 @@
       }
 
       function handleDownloadClick() {
-        if (currentJsonStr) {
-          const data = JSON.stringify(currentJsonStr);
+        if (currentJSON !== null) {
+          const data = atob(currentJSON['obj64']);
           const blob = new Blob([data], { type: "application/text" });
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
-          a.download = `${currentJsonStr[1]}.txt`;
+          a.download = `${currentJSON['algo']}_${currentJSON['seed']}.obj`;
           document.body.appendChild(a);
           a.click();
           document.body.removeChild(a);
@@ -207,6 +210,7 @@
           // Reset download button state and polling state
           const button = document.querySelector("input[type=button]");
           button.disabled = true;
+          currentJSON = null;
           startPolling();
         }
       }
@@ -215,14 +219,8 @@
         const button = document.querySelector("input[type=button]");
         button.disabled = false;
       }
-
-      if (currentJsonStr.length > 0) {
-        enableDownloadButton();
-      }
     </script>
-    
         
         {{{ SCRIPT }}}
-        
   </body>
 </html>

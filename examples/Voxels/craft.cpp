@@ -2815,14 +2815,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Export!")) {
                         // Building maze here has the effect of computing its geometry on this thread
-                        int tx, ty, tz, tface;
-                        this->m_pimpl->hit_test_face(me, &tx, &ty, &tz, &tface);
                         maze_builder builder;
                         auto my_next_maze = builder.maze_type(my_maze_type)
                             .block_type(items[model->item_index])
                             .get_int(get_int).rng(rng)
                             .rows(gui->rows).columns(gui->columns).height(gui->height)
-                            .offset_x(tx).offset_z(tz)
+                            .offset_x(p_state->x).offset_z(p_state->z)
                             .show_distances(false).seed(gui->seed).build();
                         my_next_maze->compute_geometry();
                         // Write on desktop before placing the next maze in the container
