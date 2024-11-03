@@ -15,6 +15,7 @@ log.txt
 *.blend1
 
 build/
+build-*/
 .vscode
 .vs
 

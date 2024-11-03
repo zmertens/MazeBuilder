@@ -2315,7 +2315,9 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
-        this->m_model->window = SDL_CreateWindow(this->m_title.data(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        char title_formatted[32];
+        SDL_snprintf(title_formatted, 32, "%s - %s\n", this->m_title.c_str(), this->m_version.c_str());
+        this->m_model->window = SDL_CreateWindow(title_formatted, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2906,7 +2908,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Text("LMouse: Delete block");
                 ImGui::Text("RMouse: Build a block");
                 ImGui::Text("MMouse: Copy block type");
-                ImGui::Text("Jump: Spacebar");
+                ImGui::Text("Spacebar: Jump");
+                ImGui::Text("Tab: Fly");
                 ImGui::Text("LShift: Zoom");
                 ImGui::Text("WASD: Movement");
                 ImGui::Text("Arrow Keys: Camera rotation");

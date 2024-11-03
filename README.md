@@ -92,10 +92,7 @@ The web app can be run locally with the provided [secure_http_server.py](secure_
 
 ## Resources
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
- - [Full Stack Dev Book](https://www.packtpub.com/en-us/product/full-stack-development-with-spring-boot-and-react-9781801816786)
  - [Craft](https://github.com/fogleman/Craft)
  - [Dear ImGui](https://github.com/ocornut/imgui)
  - [SDL](https://github.com/libsdl-org/SDL)
  - [Catch2](https://github.com/catchorg/Catch2)
- - [Emscripten](https://emscripten.org/)
- - [stb](https://github.com/nothings/stb)
