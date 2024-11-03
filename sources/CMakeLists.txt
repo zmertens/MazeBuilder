@@ -1,5 +1,6 @@
 include(CppCheck)
 include(Doxygen)
+include(BuildInfo)
 
 set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
 
@@ -26,6 +27,10 @@ endif()
 
 # Setup object library
 add_library(${MAZE_BUILDER_LIB}_obj OBJECT ${MAZE_BUILDER_LIB_SOURCES} ${CPP_BASE64_SRCS})
+
+# Generate the version info for the library
+BuildInfo(${MAZE_BUILDER_LIB}_obj)
+
 target_include_directories(${MAZE_BUILDER_LIB}_obj PRIVATE ${CMAKE_SOURCE_DIR}/deps)
 target_compile_features(${MAZE_BUILDER_LIB}_obj PUBLIC cxx_std_17)
 # file(GLOB MAZE_BUILDER_HEADERS ${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h)

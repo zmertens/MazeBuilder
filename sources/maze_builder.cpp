@@ -16,20 +16,18 @@
 #include <cpp-base64/base64.h>
 #include <nlohmann/json.hpp>
 
+#include <MazeBuilder/buildinfo.h>
+
 using namespace mazes;
 using namespace std;
 
-unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
-    if (!my_maze->get_int) {
-        mt19937 rng(random_device{}());
-        auto get_int = [&rng](int low, int high)->int {
-            uniform_int_distribution<int> dist(low, high); return dist(rng); };
-        my_maze->get_int = get_int;
-        my_maze->rng = rng;
-    }
+const string maze_builder::MAZE_BUILDER_VERSION_STR = build_info::Version + "-" + build_info::CommitSHA;
 
-    // Compute 3D geometries (includes height)
-    my_maze->compute_geometry();
+/**
+ * @brief Finalize design for maze, invalidating the builder
+ * @return Return a unique pointer to a maze object
+ */
+unique_ptr<maze_builder::maze> maze_builder::build() noexcept {
     // Transfer ownership, nullify the ptr for this object
     return std::move(my_maze);
 }
@@ -88,6 +86,10 @@ std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
 
     return ss.str();
 } // to_wavefront_obj_str
+
+std::string maze_builder::maze::to_wavefront_obj_str64() const noexcept {
+    return base64_encode(this->to_wavefront_obj_str());
+}
 
 /**
  * @brief Generate a PNG image of the maze
@@ -178,22 +180,32 @@ std::vector<std::uint8_t> maze_builder::maze::to_pixels(unsigned int cell_size) 
 std::string maze_builder::maze::to_json_str(unsigned int pretty_spaces) const noexcept {
 
     nlohmann::json my_json;
-    my_json["output"] = this->to_str64();
+    my_json["str64"] = this->to_str64();
+    my_json["obj64"] = this->to_wavefront_obj_str64();
     my_json["num_cols"] = this->columns;
     my_json["num_rows"] = this->rows;
-    my_json["depth"] = this->height;
-    my_json["algorithm"] = mazes::to_string(this->maze_type);
+    my_json["height"] = this->height;
+    my_json["algo"] = mazes::to_string(this->maze_type);
     my_json["seed"] = this->seed;
+    my_json["v"] = maze_builder::MAZE_BUILDER_VERSION_STR;
 
-    return my_json.dump(4);
+    return my_json.dump(pretty_spaces);
 }
 
-void maze_builder::maze::start_progress() noexcept {
-    this->m_tracker.start();
-}
+/**
+ * @brief Return a JSON string with base64 representation of the mazes
+ * @param mazes container of mazes
+ * @param pretty_spaces = 4
+ *
+ */
+std::string maze_builder::to_json_array_str(const vector<unique_ptr<maze_builder::maze>>& mazes, unsigned int pretty_spaces) noexcept {
+    nlohmann::json json_array = nlohmann::json::array();
 
-void maze_builder::maze::stop_progress() noexcept {
-    this->m_tracker.stop();
+    for (const auto& m : mazes) {
+        json_array.push_back(nlohmann::json::parse(m->to_json_str()));
+    }
+
+    return json_array.dump(pretty_spaces);
 }
 
 double maze_builder::maze::get_progress_in_seconds() const noexcept {
@@ -202,10 +214,6 @@ double maze_builder::maze::get_progress_in_seconds() const noexcept {
 
 double maze_builder::maze::get_progress_in_ms() const noexcept {
     return this->m_tracker.get_duration_in_ms();
-}
-
-std::size_t maze_builder::maze::get_vertices_size() const noexcept {
-    return this->m_vertices.size();
 }
 
 /**
@@ -226,19 +234,19 @@ std::string maze_builder::maze::to_str64() const noexcept {
     return base64_encode(cref(s64));
 }
 
+
 /**
  * @brief Parses the grid, and builds a 3D grid using (x, y, z, w) (w == block type)
 */
 void maze_builder::maze::compute_geometry() noexcept {
     if (this->show_distances) {
-        this->m_grid = make_unique<colored_grid>(rows, columns, height);
+        this->m_grid = make_unique<colored_grid>(this->rows, this->columns, this->height);
     } else {
-        this->m_grid = make_unique<grid>(rows, columns, height);
+        this->m_grid = make_unique<grid>(this->rows, this->columns, this->height);
     }
 
-    this->m_vertices.clear();
-    this->m_faces.clear();
-
+    // Generate maze and time it
+    this->m_tracker.start();
     bool success = mazes::maze_factory::gen(this->maze_type, ref(this->m_grid), cref(this->get_int), cref(this->rng));
     if (!success) {
     }
@@ -246,9 +254,9 @@ void maze_builder::maze::compute_geometry() noexcept {
     bool use_get_int = (this->block_type == -1) ? true : false;
     istringstream iss{ this->to_str() };
     string line;
-    int row_x = shift_x;
+    int row_x = 0;
     while (getline(iss, line, '\n')) {
-        int col_z = shift_y;
+        int col_z = 0;
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == MAZE_CORNER || *itr == MAZE_BARRIER1 || *itr == MAZE_BARRIER2) {
@@ -258,13 +266,14 @@ void maze_builder::maze::compute_geometry() noexcept {
                     // There are 2 data sources, one for rendering and one for writing
                     int block_type = (use_get_int) ? get_int(3, 14) : this->block_type;
                     this->add_block(row_x, h, col_z, block_type, block_size);
-                    m_p_q[{row_x, col_z}] = make_tuple(row_x, h, col_z, block_type);
+                    m_p_q[{row_x + offset_x, col_z + offset_z}] = make_tuple(row_x + offset_x, h, col_z + offset_z, block_type);
                 }
             }
             col_z++;
         }
         row_x++;
     } // getline
+    this->m_tracker.stop();
 } // compute_geometry
 
 /**

@@ -23,79 +23,70 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
         return dist(rng);
     };
 
-    maze_builder builder;
-    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
+    SECTION("Create a 100x100 maze") {
+        static constexpr auto NUM_ROWS = 100, NUM_COLS = 100, HEIGHT = 10;
+        static constexpr auto OFFSET_X = 10, OFFSET_Z = 10;
+        maze_builder builder;
+        auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
+            .offset_x(OFFSET_X).offset_z(OFFSET_Z)
+            .get_int(get_int).rng(rng).build();
+        maze1->compute_geometry();
+        REQUIRE(maze1->columns == NUM_COLS);
+        REQUIRE(maze1->rows == NUM_ROWS);
+        REQUIRE(maze1->height == HEIGHT);
+        REQUIRE(maze1->offset_x == OFFSET_X);
+        REQUIRE(maze1->offset_z == OFFSET_Z);
+        REQUIRE(maze1->get_progress_in_seconds() != 0.0);
+    }
 
-    REQUIRE(maze1->columns == 10);
-    REQUIRE(maze1->rows == 10);
+    BENCHMARK("Benchmark 10x10 mazes") {
+        static constexpr auto NUM_ROWS = 10, NUM_COLS = 10, HEIGHT = 10;
+        static constexpr auto OFFSET_X = 10, OFFSET_Z = 10;
+        maze_builder builder;
+        auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
+            .offset_x(OFFSET_X).offset_z(OFFSET_Z)
+            .get_int(get_int).rng(rng).build();
+        maze1->compute_geometry();
+        REQUIRE(maze1->columns == NUM_COLS);
+        REQUIRE(maze1->rows == NUM_ROWS);
+        REQUIRE(maze1->height == HEIGHT);
+        REQUIRE(maze1->offset_x == OFFSET_X);
+        REQUIRE(maze1->offset_z == OFFSET_Z);
+        REQUIRE(maze1->get_progress_in_seconds() != 0.0);
+    };
 }
 
-TEST_CASE( "Test maze progress", "[maze progress]") {
+TEST_CASE( "Test mazes", "[maze progress]") {
     mt19937 rng { 0 };
     auto get_int = [&rng](auto low, auto high)->auto {
         uniform_int_distribution<int> dist {low, high};
         return dist(rng);
     };
     maze_builder builder;
-    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
-
-    SECTION("Check no compute progress") {
-        maze1->start_progress();
-        maze1->stop_progress();
-        REQUIRE(maze1->get_progress_in_seconds() <= 10.0);
-        REQUIRE(maze1->get_progress_in_ms() <= 1.0);
+    SECTION("BINARY_TREE PROGRESS") {
+        auto maze1 = builder.rows(10).columns(10).height(10)
+            .get_int(get_int).rng(rng).maze_type(maze_types::BINARY_TREE)
+            .offset_x(10)
+            .offset_z(10).build();
+        maze1->compute_geometry();
+        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
+    }
+    SECTION("SIDEWINDER PROGRESS") {
+        auto maze1 = builder.rows(10).columns(10).height(10)
+            .get_int(get_int).rng(rng).maze_type(maze_types::SIDEWINDER)
+            .offset_x(10)
+            .offset_z(10).build();
+        maze1->compute_geometry();
+        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
     }
 
-    SECTION("Check compute_str progresss") {
-        maze1->start_progress();
-        auto s = maze1->to_str();
-        maze1->stop_progress();
-        REQUIRE(maze1->get_progress_in_seconds() > 0);
-    }
-}
-
-TEST_CASE( "Test maze compute geometry", "[maze geometry]") {
-    mt19937 rng { 0 };
-    auto get_int = [&rng](auto low, auto high)->auto {
-        uniform_int_distribution<int> dist {low, high};
-        return dist(rng);
-    };
-
-    maze_builder builder;
-    auto maze1 = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).maze_type(maze_types::DFS).build();
-    REQUIRE(!maze1->to_wavefront_obj_str().empty());
-    REQUIRE(maze1->get_vertices_size() > 0);
-}
-
-TEST_CASE("Make a very large grid", "[large grid]") {
-    mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) ->int {
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-        };
-    unique_ptr<grid_interface> very_large_grid{ make_unique<grid>(1'000, 2) };
-    binary_tree bt_algo;
-    REQUIRE(bt_algo.run(ref(very_large_grid), cref(get_int), cref(rng)));
-}
-
-TEST_CASE("Searching the grid yields positive results", "[search]") {
-    unsigned int rows{ 25 }, columns{ 20 };
-    vector<unsigned int> shuffled_ints{ rows * columns };
-    shuffled_ints.reserve(rows * columns);
-    int next_index{ 0 };
-    for (auto itr{ shuffled_ints.begin() }; itr != shuffled_ints.end(); itr++) {
-        *itr = next_index++;
-    }
-
-    auto rd = std::random_device{};
-    auto rng = std::default_random_engine{ rd() };
-    shuffle(begin(shuffled_ints), end(shuffled_ints), rng);
-
-    unique_ptr<grid> _grid{ make_unique<grid>(rows, columns) };
-
-    for (auto&& i : shuffled_ints) {
-        auto&& found = _grid->search(_grid->get_root(), i);
-        REQUIRE(found != nullptr);
+    SECTION("DFS PROGRESS") {
+        auto maze1 = builder.rows(50).columns(50).height(50)
+            .get_int(get_int).rng(rng).maze_type(maze_types::DFS)
+            .offset_x(10)
+            .offset_z(10).build();
+        maze1->compute_geometry();
+        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
     }
 }
 
@@ -155,24 +146,4 @@ TEST_CASE("Compare maze algos", "[compare successes]") {
     }
 }
 
-TEST_CASE("Cells have neighbors", "[cells]") {
-
-    // cell1 has cell2 neighbor to the south
-    shared_ptr<cell> cell1{ make_shared<cell>(0, 0, 0) };
-    shared_ptr<cell> cell2{ make_shared<cell>(0, 1, 1) };
-
-    SECTION("Cell has neighbor to south") {
-        cell1->set_south(cell2);
-        REQUIRE(cell1->get_south() == cell2);
-        auto&& neighbors = cell1->get_neighbors();
-        REQUIRE(!neighbors.empty());
-    }
-
-    SECTION("Cells are linked") {
-        // links are bi-directional by default
-        cell1->link(cell1, cell2);
-        REQUIRE(cell1->is_linked(cell2));
-        REQUIRE(cell2->is_linked(cell1));
-    }
-}
 

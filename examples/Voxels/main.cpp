@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <string>
 
+#include <MazeBuilder/buildinfo.h>
+
 #include "craft.h"
 
 #if defined(__EMSCRIPTEN__)
@@ -15,6 +17,7 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
         .constructor<const std::string&, const std::string&, int, int>()
         .function("mazes", &craft::mazes)
+        .function("toggle_mouse", &craft::toggle_mouse)
         .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
 }
 #endif
@@ -30,14 +33,17 @@ int main(int argc, char* argv[]) {
     };
 
     try {
+
         bool success = false;
         // Run the SDL app
         static constexpr int window_w = 800, window_h = 600;
-        auto&& maze_builder_3D = craft::get_instance("0.5.0", "NA", window_w, window_h);
+        string my_title { "Maze Builder 🔧" };
+        auto&& maze_builder_3D = craft::get_instance(cref(my_title), mazes::build_info::Version, window_w, window_h);
         success = maze_builder_3D->run(std::cref(get_int), std::ref(rng_engine));
         if (!success) {
             std::cerr << "ERROR: Running SDL app failed." << std::endl;
         }
+
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }

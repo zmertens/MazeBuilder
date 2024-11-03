@@ -27,21 +27,18 @@
 
 #define SDL_FUNCTION_POINTER_IS_VOID_POINTER
 
-#include <string_view>
-#include <cstdio>
 #include <cstdint>
 #include <cstring>
-#include <ctime>
 #include <string>
 #include <algorithm>
-#include <iostream>
 #include <thread>
-#include <future>
 #include <mutex>
+#include <condition_variable>
 #include <chrono>
 #include <random>
 #include <utility>
 #include <tuple>
+#include <vector>
 
 #include <noise/noise.h>
 
@@ -53,10 +50,7 @@
 #include "matrix.h"
 
 #include <MazeBuilder/maze_types_enum.h>
-#include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/cell.h>
 #include <MazeBuilder/writer.h>
 
 // Movement configurations
@@ -66,22 +60,14 @@
 #define KEY_RIGHT SDL_SCANCODE_D
 #define KEY_JUMP SDL_SCANCODE_SPACE
 #define KEY_FLY SDL_SCANCODE_TAB
-#define KEY_OBSERVE SDL_SCANCODE_O
-#define KEY_OBSERVE_INSET SDL_SCANCODE_P
 #define KEY_ITEM_NEXT SDL_SCANCODE_E
 #define KEY_ITEM_PREV SDL_SCANCODE_R
 #define KEY_ZOOM SDL_SCANCODE_LSHIFT
 #define KEY_ORTHO SDL_SCANCODE_F
 #define KEY_TAG SDL_SCANCODE_T
-#define KEY_COMMAND SDL_SCANCODE_SLASH
-#define KEY_SIGN SDL_SCANCODE_GRAVE
-
-// Typing config
-#define CRAFT_KEY_SIGN '`'
 
 // World configs
 #define SCROLL_THRESHOLD 0.1
-#define DB_PATH "craft.db"
 #define MAX_DB_PATH_LEN 64
 #define USE_CACHE true
 #define DAY_LENGTH 600
@@ -117,12 +103,16 @@ struct craft::craft_impl {
         bool show_items;
         bool show_wireframes;
         bool show_crosshairs;
+        bool show_info_text;
         bool apply_bloom_effect;
+        float exposure;
         char outfile[64];
         int seed;
         int rows;
         int height;
         int columns;
+        int offset_x;
+        int offset_z;
         std::string algo;
         int view;
         char tag[MAX_SIGN_LENGTH];
@@ -130,8 +120,9 @@ struct craft::craft_impl {
         Gui() : fullscreen(false), vsync(true), color_mode_dark(false),
             capture_mouse(false), chunk_size(8),
             show_items(true), show_wireframes(true), show_crosshairs(true),
-			apply_bloom_effect(true),
-            outfile(".obj"), seed(0), rows(25), height(5), columns(18),
+            show_info_text(true), apply_bloom_effect(true), exposure(0.39f),
+            outfile("my_maze1.obj"), seed(10), rows(25), height(5), columns(18),
+            offset_x(0), offset_z(0),
             algo("binary_tree"), view(20), tag("maze here") {
 
         }
@@ -149,26 +140,32 @@ struct craft::craft_impl {
             columns = 28;
             view = 20;
             algo = "binary_tree";
-            seed = 101;
+            seed = 10;
             chunk_size = 8;
             tag[0] = 'H';
             tag[1] = 'i';
+            show_crosshairs = true;
+            show_info_text = true;
+            show_items = true;
+            show_wireframes = true;
+            capture_mouse = false;
         }
     }; // class
 
     class BloomTools {
     public:
-        GLuint fbo_hdr, fbo_pingpong[2];
+        GLuint fbo_hdr, fbo_pingpong[2], fbo_final;
         GLuint rbo_bloom_depth;
         // Hold 2 floating point color buffers (1 for normal rendering, 
         //  the other one for brightness treshold values)
-        GLuint color_buffers[2], color_buffers_pingpong[2];
+        GLuint color_buffers[2], color_buffers_pingpong[2], color_final;
 
         // State variables
         bool first_iteration, horizontal_blur;
         static constexpr unsigned int NUM_FBO_ITERATIONS = 10;
 
-        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, rbo_bloom_depth(0)
+        BloomTools() : fbo_hdr(0), fbo_pingpong{ 0, 0 }, fbo_final(0)
+            , rbo_bloom_depth(0)
             , color_buffers{ 0, 0 }, color_buffers_pingpong{ 0, 0 }
             , first_iteration(true), horizontal_blur(true) {
         }
@@ -190,11 +187,10 @@ struct craft::craft_impl {
 
             glGenTextures(2, color_buffers);
             for (auto i = 0; i < 2; ++i) {
-                glActiveTexture(GL_TEXTURE4 + i);
                 glBindTexture(GL_TEXTURE_2D, color_buffers[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, color_buffers[i], 0);
@@ -214,12 +210,11 @@ struct craft::craft_impl {
             glGenFramebuffers(2, fbo_pingpong);
             glGenTextures(2, color_buffers_pingpong);
             for (auto i = 0; i < 2; i++) {
-                glActiveTexture(GL_TEXTURE6 + i);
-				glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
+		glBindFramebuffer(GL_FRAMEBUFFER, fbo_pingpong[i]);
                 glBindTexture(GL_TEXTURE_2D, color_buffers_pingpong[i]);
                 glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_FLOAT, nullptr);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_buffers_pingpong[i], 0);
@@ -229,6 +224,18 @@ struct craft::craft_impl {
 #if defined(MAZE_DEBUG)
             SDL_Log("Creating FBO with width: %d and height: %d\n", w, h);
 #endif
+
+            glGenFramebuffers(1, &fbo_final);
+            glBindFramebuffer(GL_FRAMEBUFFER, fbo_final);
+
+            glGenTextures(1, &color_final);
+            glBindTexture(GL_TEXTURE_2D, color_final);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, color_final, 0);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
         } // gen
@@ -284,7 +291,7 @@ struct craft::craft_impl {
         GLuint sign_buffer;
     } Chunk;
 
-    typedef struct {
+    struct WorkerItem {
         int p;
         int q;
         int load;
@@ -294,7 +301,9 @@ struct craft::craft_impl {
         int maxy;
         int faces;
         GLfloat* data;
-    } WorkerItem;
+        WorkerItem() {
+        }
+    };
 
     typedef struct {
         int index;
@@ -365,11 +374,7 @@ struct craft::craft_impl {
         int scale;
         bool is_ortho;
         float fov;
-        int suppress_char;
-        int mode_changed;
         char db_path[MAX_DB_PATH_LEN];
-        bool typing;
-        size_t text_len;
         int day_length;
         int start_time;
         int start_ticks;
@@ -380,8 +385,8 @@ struct craft::craft_impl {
     } Model;
 
     // Note: These are public members
+    const std::string& m_title;
     const std::string& m_version;
-    const std::string& m_help;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     unique_ptr<Model> m_model;
@@ -389,9 +394,9 @@ struct craft::craft_impl {
 
     std::string m_json_data;
 
-    craft_impl(const std::string& version, const std::string& help, int w, int h)
-        : m_version(version)
-        , m_help(help)
+    craft_impl(const std::string& title, const std::string& version, int w, int h)
+        : m_title(title)
+        , m_version(version)
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
@@ -399,7 +404,7 @@ struct craft::craft_impl {
         this->reset_model();
     }
 
-    int worker_run(void* arg, const unique_ptr<maze_builder::maze>& my_maze) {
+    int worker_run(void* arg, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
@@ -411,7 +416,7 @@ struct craft::craft_impl {
             }
             WorkerItem* worker_item = &worker->item;
             if (worker_item->load) {
-                this->load_chunk(worker_item, cref(my_maze));
+                this->load_chunk(worker_item, cref(my_mazes));
             }
 
             this->compute_chunk(worker_item);
@@ -423,13 +428,13 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-    void init_worker_threads(const unique_ptr<maze_builder::maze>& mb) {
+    void init_worker_threads(const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            worker->thrd = thread([this, &mb](void* arg) { this->worker_run(arg, cref(mb)); }, worker.get());
+            worker->thrd = thread([this, &my_mazes](void* arg) { this->worker_run(arg, cref(my_mazes)); }, worker.get());
             this->m_model->workers.emplace_back(std::move(worker));
         }
     }
@@ -574,13 +579,6 @@ struct craft::craft_impl {
         return this->gen_buffer(sizeof(data), data);
     }
 
-    GLuint gen_sky_buffer() {
-        float data[12288];
-        // cube.h -> make_sphere
-        make_sphere(data, 1, 3);
-        return this->gen_buffer(sizeof(data), data);
-    }
-
     GLuint gen_cube_buffer(float x, float y, float z, float n, int w) {
         GLfloat* data = malloc_faces(10, 6);
         float ao[6][4] = { 0 };
@@ -652,7 +650,6 @@ struct craft::craft_impl {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
 
-    // sky_texture_id Attrib doesn't use normals and the GLSL compiler may optimize it out
     void draw_triangles_3d(Attrib* attrib, GLuint buffer, int count) {
         glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -886,6 +883,9 @@ struct craft::craft_impl {
         return result;
     } // hit_test
 
+    /**
+     * @brief Check if selected block is colliding with player wireframe
+     */
     int hit_test_face(Player* player, int* x, int* y, int* z, int* face) {
         State* s = &player->state;
         int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
@@ -1393,7 +1393,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const unique_ptr<maze_builder::maze>& mb) {
+    void load_chunk(WorkerItem* item, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         int p = item->p;
         int q = item->q;
 
@@ -1401,7 +1401,7 @@ struct craft::craft_impl {
         Map* light_map = item->light_maps[1][1];
         // world.h
         static world my_world;
-        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size, cref(mb));
+        my_world.create_world(p, q, map_set_func, block_map, this->m_gui->chunk_size, cref(my_mazes));
         db_load_blocks(block_map, p, q);
         db_load_lights(light_map, p, q);
     }
@@ -1430,7 +1430,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const unique_ptr<maze_builder::maze>& mb) {
+    void create_chunk(Chunk* chunk, int p, int q, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1440,7 +1440,7 @@ struct craft::craft_impl {
         item->block_maps[1][1] = &chunk->map;
         item->light_maps[1][1] = &chunk->lights;
 
-        load_chunk(item, cref(mb));
+        load_chunk(item, cref(my_mazes));
     }
 
     void delete_chunks() {
@@ -1520,7 +1520,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
+    void force_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1537,7 +1537,7 @@ struct craft::craft_impl {
                     }
                 } else if (this->m_model->chunk_count < MAX_CHUNKS) {
                     chunk = this->m_model->chunks + this->m_model->chunk_count++;
-                    create_chunk(chunk, a, b, cref(mb));
+                    create_chunk(chunk, a, b, cref(my_mazes));
                     gen_chunk_buffer(chunk);
                 }
             }
@@ -1637,9 +1637,9 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const unique_ptr<maze_builder::maze>& mb) {
+    void ensure_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         check_workers();
-        force_chunks(player, cref(mb));
+        force_chunks(player, cref(my_mazes));
         for (auto&& worker : this->m_model->workers) {
             worker->mtx.lock();
             if (worker->state == WORKER_IDLE) {
@@ -1810,23 +1810,18 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint buffer, GLuint texture, GLuint sky, const unique_ptr<maze_builder::maze>& mb) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
         int result = 0;
         State* s = &player->state;
-        this->ensure_chunks(player, cref(mb));
+        this->ensure_chunks(player, cref(my_mazes));
         int p = this->chunked(s->x);
         int q = this->chunked(s->z);
         float light = this->get_daylight();
         float matrix[16];
-        float sky_matrix[16];
         // matrix.cpp -> set_matrix_3d
         set_matrix_3d(
             matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model->fov, static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
-        set_matrix_3d(
-            sky_matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
-            0.f, 0.f, 0.f, s->rx, s->ry, this->m_model->fov,
-            static_cast<int>(this->m_model->is_ortho), this->m_model->render_radius);
         float planes[6][4];
         // matrix.cpp -> frustum_planes
         frustum_planes(planes, this->m_model->render_radius, matrix);
@@ -1835,16 +1830,10 @@ struct craft::craft_impl {
         glBindTexture(GL_TEXTURE_2D, texture);
         glUniform3f(attrib->camera, s->x, s->y, s->z);
         glUniform1i(attrib->sampler, 0);
-        glActiveTexture(GL_TEXTURE1);
-        glBindTexture(GL_TEXTURE_2D, sky);
-        glUniform1i(attrib->extra1, 1);
         glUniform1f(attrib->extra2, light);
         glUniform1f(attrib->extra3, static_cast<GLfloat>(this->m_model->render_radius * this->m_gui->chunk_size));
         glUniform1i(attrib->extra4, static_cast<int>(this->m_model->is_ortho));
         glUniform1f(attrib->timer, this->time_of_day());
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, sky_matrix);
-        draw_triangles_3d(attrib, buffer, 512 * 3);
-        glClear(GL_DEPTH_BUFFER_BIT);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         for (int i = 0; i < this->m_model->chunk_count; i++) {
             Chunk* chunk = this->m_model->chunks + i;
@@ -1989,13 +1978,15 @@ struct craft::craft_impl {
         }
     }
 
-    void render_text(Attrib* attrib, int justify, float x, float y, float n, char* text) {
+    void render_text(Attrib* attrib, GLuint font, int justify, float x, float y, float n, char* text) {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h);
         glUseProgram(attrib->program);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        glUniform1i(attrib->sampler, 1);
+        glUniform1i(attrib->sampler, 3);
         glUniform1i(attrib->extra1, 0);
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, font);
         GLsizei length = static_cast<GLsizei>(SDL_strlen(text));
         x -= n * justify * (length - 1) / 2;
         GLuint buffer = gen_text_buffer(x, y, n, text);
@@ -2019,7 +2010,9 @@ struct craft::craft_impl {
         if (hy > 0 && hy < 256 && is_destructable(hw)) {
             set_block(hx, hy, hz, 0);
             record_block(hx, hy, hz, 0);
+#if defined(MAZE_DEBUG)
             SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             if (is_plant(get_block(hx, hy + 1, hz))) {
                 set_block(hx, hy + 1, hz, 0);
             }
@@ -2034,7 +2027,9 @@ struct craft::craft_impl {
             if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz)) {
                 set_block(hx, hy, hz, items[this->m_model->item_index]);
                 record_block(hx, hy, hz, items[this->m_model->item_index]);
+#if defined(MAZE_DEBUG)
                 SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model->item_index]);
+#endif
             }
         }
     }
@@ -2046,6 +2041,9 @@ struct craft::craft_impl {
         for (int i = 0; i < item_count; i++) {
             if (items[i] == hw) {
                 this->m_model->item_index = i;
+#if defined(MAZE_DEBUG)
+                SDL_Log("Copying item index: %d\n", i);
+#endif
                 break;
             }
         }
@@ -2081,16 +2079,13 @@ struct craft::craft_impl {
                     SDL_SetWindowRelativeMouseMode(this->m_model->window, false);
                     this->m_gui->capture_mouse = false;
                     this->m_gui->fullscreen = false;
-                    this->m_model->typing = false;
                     break;
                 }
                 case SDL_SCANCODE_RETURN: {
-                    if (!this->m_model->typing) {
-                        if (mod_state) {
-                            this->on_right_click();
-                        } else {
-                            this->on_left_click();
-                        }
+                    if (mod_state) {
+                        this->on_right_click();
+                    } else {
+                        this->on_left_click();
                     }
                     break;
                 }
@@ -2105,25 +2100,25 @@ struct craft::craft_impl {
                 case SDL_SCANCODE_7:
                 case SDL_SCANCODE_8:
                 case SDL_SCANCODE_9: {
-                    if (!this->m_model->typing) {
+                    if (this->m_gui->capture_mouse) {
                         this->m_model->item_index = (sc - SDL_SCANCODE_1);
                     }
                     break;
                 }
                 case KEY_FLY: {
-                    if (!this->m_model->typing) {
+                    if (this->m_gui->capture_mouse) {
                         this->m_model->flying = !this->m_model->flying;
                     }
                     break;
                 }
                 case KEY_ITEM_NEXT: {
-                    if (!this->m_model->typing) {
+                    if (this->m_gui->capture_mouse) {
                         this->m_model->item_index = (this->m_model->item_index + 1) % item_count; 
                     }
                     break;
                 }
                 case KEY_ITEM_PREV: {
-                    if (!this->m_model->typing) {
+                    if (this->m_gui->capture_mouse) {
                         this->m_model->item_index--;
                         if (this->m_model->item_index < 0) {
                             this->m_model->item_index = item_count - 1;
@@ -2136,9 +2131,9 @@ struct craft::craft_impl {
                     SDL_Log("Tag: %s\n", this->m_gui->tag);
 #endif
                     int x, y, z, face;
-                    if (!this->m_model->typing && hit_test_face(&this->m_model->player, &x, &y, &z, &face)) {
+                    if (this->m_gui->capture_mouse && hit_test_face(&this->m_model->player, &x, &y, &z, &face)) {
                         set_sign(x, y, z, face, this->m_gui->tag);
-                    } else if (this->m_model->typing) {
+                    } else if (!this->m_gui->capture_mouse) {
                         SDL_StartTextInput(this->m_model->window);
                     }
                     break;
@@ -2147,16 +2142,17 @@ struct craft::craft_impl {
                 break;
             } // case SDL_EVENT_KEY_DOWN
             case SDL_EVENT_TEXT_INPUT: {
-                if (this->m_model->typing) {
+                if (!this->m_gui->capture_mouse) {
                     if (SDL_strlen(this->m_gui->tag) < MAX_SIGN_LENGTH) {
                         SDL_strlcat(this->m_gui->tag, e.text.text, MAX_SIGN_LENGTH);
+                        SDL_StopTextInput(this->m_model->window);
                     }
                 }
                 break;
             }
             case SDL_EVENT_FINGER_MOTION:
             case SDL_EVENT_MOUSE_MOTION: {
-                if (this->m_gui->capture_mouse && SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                if (this->m_gui->capture_mouse) {
                     // Adjust mouse motion based on relative center of voxel_scene_size
                     float adjusted_xrel = e.motion.xrel - static_cast<float>(m_model->voxel_scene_w) / 2.f;
                     float adjusted_yrel = e.motion.yrel - static_cast<float>(m_model->voxel_scene_h) / 2.f;
@@ -2178,21 +2174,22 @@ struct craft::craft_impl {
                 }
                 break;
             }
+            case SDL_EVENT_FINGER_UP:
             case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-                if (SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_LEFT) {
-                    if (mod_state) {
-                        on_right_click();
-                    } else {
-                        on_left_click();
-                    }
-                } else if (SDL_GetWindowRelativeMouseMode(this->m_model->window) && e.button.button == SDL_BUTTON_RIGHT) {
-                    if (mod_state) {
-                        on_light();
-                    } else {
-                        on_right_click();
-                    }
-                } else if (e.button.button == SDL_BUTTON_MIDDLE) {
-                    if (SDL_GetWindowRelativeMouseMode(this->m_model->window)) {
+                if (this->m_gui->capture_mouse) {
+                    if (e.button.button == SDL_BUTTON_LEFT) {
+                        if (mod_state) {
+                            on_right_click();
+                        } else {
+                            on_left_click();
+                        }
+                    } else if (e.button.button == SDL_BUTTON_RIGHT) {
+                        if (mod_state) {
+                            on_light();
+                        } else {
+                            on_right_click();
+                        }
+                    } else if (e.button.button == SDL_BUTTON_MIDDLE) {
                         on_middle_click();
                     }
                 }
@@ -2200,11 +2197,13 @@ struct craft::craft_impl {
                 break;
             }
             case SDL_EVENT_MOUSE_WHEEL: {
-                if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) this->m_model->item_index += e.wheel.y;
-                else this->m_model->item_index -= e.wheel.y;
+                if (this->m_gui->capture_mouse) {
+                    if (e.wheel.direction == SDL_MOUSEWHEEL_NORMAL) this->m_model->item_index += e.wheel.y;
+                    else this->m_model->item_index -= e.wheel.y;
 
-                if (this->m_model->item_index < 0) this->m_model->item_index = item_count - 1;
-                else this->m_model->item_index %= item_count;
+                    if (this->m_model->item_index < 0) this->m_model->item_index = item_count - 1;
+                    else this->m_model->item_index %= item_count;
+                }
                 break;
             }
             case SDL_EVENT_WINDOW_EXPOSED:
@@ -2215,11 +2214,11 @@ struct craft::craft_impl {
             }
             } // switch
         } // SDL_Event
-        // Handle motion updates
 
+        // Handle motion updates
         const bool* state = SDL_GetKeyboardState(nullptr);
 
-        if (!this->m_model->typing) {
+        if (this->m_gui->capture_mouse) {
             this->m_model->is_ortho = state[KEY_ORTHO] ? 64 : 0;
             this->m_model->fov = state[KEY_ZOOM] ? 15 : 65;
             if (state[KEY_FORWARD]) sz--;
@@ -2230,11 +2229,10 @@ struct craft::craft_impl {
             if (state[SDL_SCANCODE_RIGHT]) s->rx += dir_mv;
             if (state[SDL_SCANCODE_UP]) s->ry += dir_mv;
             if (state[SDL_SCANCODE_DOWN]) s->ry -= dir_mv;
-        }
 
-        float vx, vy, vz;
-        get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
-        if (!this->m_model->typing) {
+
+            float vx, vy, vz;
+            get_motion_vector(this->m_model->flying, sz, sx, s->rx, s->ry, &vx, &vy, &vz);
             if (state[KEY_JUMP]) {
                 if (this->m_model->flying) {
                     vy = 1;
@@ -2242,35 +2240,35 @@ struct craft::craft_impl {
                     dy = 8;
                 }
             }
-        }
 
-        float speed = this->m_model->flying ? 16 : 5;
-        int estimate = SDL_roundf(SDL_sqrtf(
-            SDL_powf(vx * speed, 2) +
-            SDL_powf(vy * speed + SDL_abs(dy) * 2, 2) +
-            SDL_powf(vz * speed, 2)) * 8);
-        int step = SDL_max(dt, estimate);
-        float ut = dt / step;
-        vx = vx * ut * speed;
-        vy = vy * ut * speed;
-        vz = vz * ut * speed;
-        for (int i = 0; i < step; i++) {
-            if (this->m_model->flying) {
-                dy = 0;
-            } else {
-                dy -= ut * 25;
-                dy = SDL_max(dy, -250);
+            float speed = this->m_model->flying ? 16 : 5;
+            float estimate = SDL_roundf(SDL_sqrtf(
+                SDL_powf(vx * speed, 2.f) +
+                SDL_powf(vy * speed + dy, 2.f) +
+                SDL_powf(vz * speed, 2.f)) * 8.f);
+            float step = SDL_max(dt, estimate);
+            float ut = dt / step;
+            vx = vx * ut * speed;
+            vy = vy * ut * speed;
+            vz = vz * ut * speed;
+            for (int i = 0; i < static_cast<int>(step); i++) {
+                if (this->m_model->flying) {
+                    dy = 0;
+                } else {
+                    dy -= ut * 25;
+                    dy = SDL_max(dy, -250);
+                }
+                s->x += vx;
+                s->y += vy + dy * ut;
+                s->z += vz;
+                if (collide(2, &s->x, &s->y, &s->z)) {
+                    dy = 0;
+                }
             }
-            s->x += vx;
-            s->y += vy + dy * ut;
-            s->z += vz;
-            if (collide(2, &s->x, &s->y, &s->z)) {
-                dy = 0;
+            if (s->y < 0) {
+                s->y = highest_block(s->x, s->z) + 2;
             }
-        }
-        if (s->y < 0) {
-            s->y = highest_block(s->x, s->z) + 2;
-        }
+        } // capture_mouse
 
         return true;
     } // handle_events_and_motion
@@ -2317,8 +2315,9 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
         Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
-
-        this->m_model->window = SDL_CreateWindow("SDL app", INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
+        char title_formatted[32];
+        SDL_snprintf(title_formatted, 32, "%s - %s\n", this->m_title.c_str(), this->m_version.c_str());
+        this->m_model->window = SDL_CreateWindow(title_formatted, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
         }
@@ -2362,14 +2361,13 @@ struct craft::craft_impl {
         this->m_model->scale = 1;
         this->m_model->is_ortho = false;
         this->m_model->fov = 65.f;
-        SDL_snprintf(this->m_model->db_path, MAX_DB_PATH_LEN, "%s", DB_PATH);
-        this->m_model->typing = false;
+        SDL_snprintf(this->m_model->db_path, MAX_DB_PATH_LEN, "%s", "craft.db");
     }
 
 }; // craft_impl
 
-craft::craft(const std::string& version, const std::string& help, const int w, const int h)
-    : m_pimpl{ std::make_unique<craft_impl>(cref(version), cref(help), w, h) } {
+craft::craft(const std::string& title, const std::string& version, const int w, const int h)
+    : m_pimpl{ std::make_unique<craft_impl>(cref(title), cref(version), w, h) } {
 }
 
 craft::~craft() = default;
@@ -2408,8 +2406,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     }
 #endif
 
-    //    this->m_pimpl->check_fullscreen_modes();
-
     const GLubyte* renderer = glGetString(GL_RENDERER);
     const GLubyte* vendor = glGetString(GL_VENDOR);
     const GLubyte* version = glGetString(GL_VERSION);
@@ -2444,24 +2440,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/texture.png");
 
-    // GLuint font;
-    // glGenTextures(1, &font);
-    // glActiveTexture(GL_TEXTURE1);
-    // glBindTexture(GL_TEXTURE_2D, font);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // load_png_texture("textures/font.png");
-
-    GLuint sky_texture_id;
-    glGenTextures(1, &sky_texture_id);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, sky_texture_id);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    load_png_texture("textures/sky.png");
-
     GLuint sign;
     glGenTextures(1, &sign);
     glActiveTexture(GL_TEXTURE2);
@@ -2470,12 +2448,27 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     load_png_texture("textures/sign.png");
 
+    GLuint font;
+    glGenTextures(1, &font);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, font);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    load_png_texture("textures/font.png");
+
+    // Cubemaps
+    static vector<string> cubemap_files = {"textures/right.jpg", "textures/left.jpg", 
+        "textures/top.jpg", "textures/bottom.jpg", 
+        "textures/front.jpg", "textures/back.jpg"};
+    GLuint cubemap_texture_id = load_cubemap(cref(cubemap_files));
+
     // LOAD SHADERS 
     craft_impl::Attrib block_attrib = { 0 };
     craft_impl::Attrib line_attrib = { 0 };
     craft_impl::Attrib text_attrib = { 0 };
     craft_impl::Attrib screen_attrib = { 0 };
     craft_impl::Attrib blur_attrib = { 0 };
+    craft_impl::Attrib skybox_attrib = { 0 };
 
     GLuint program;
 
@@ -2496,8 +2489,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     block_attrib.extra4 = glGetUniformLocation(program, "is_ortho");
     block_attrib.camera = glGetUniformLocation(program, "camera");
     block_attrib.timer = glGetUniformLocation(program, "timer");
-    // glBindFragDataLocation(program, 0, "fragColor");
-    // glBindFragDataLocation(program, 1, "brightColor");
 
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/line_vertex.es.glsl", "shaders/es/line_fragment.es.glsl");
@@ -2519,8 +2510,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     text_attrib.matrix = glGetUniformLocation(program, "matrix");
     text_attrib.sampler = glGetUniformLocation(program, "sampler");
     text_attrib.extra1 = glGetUniformLocation(program, "is_sign");
-
-    GLuint sky_buffer = m_pimpl->gen_sky_buffer();
 
 #if defined(__EMSCRIPTEN__)
     program = load_program("shaders/es/screen_vertex.es.glsl", "shaders/es/screen_fragment.es.glsl");
@@ -2550,6 +2539,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glUseProgram(program);
     glUniform1fv(blur_attrib.extra2, WEIGHTS_IN_BLUR.size(), WEIGHTS_IN_BLUR.data());
     glUseProgram(0);
+
+#if defined(__EMSCRIPTEN__)
+    program = load_program("shaders/es/skybox_vertex.es.glsl", "shaders/es/skybox_fragment.es.glsl");
+#else
+    program = load_program("shaders/skybox_vertex.glsl", "shaders/skybox_fragment.glsl");
+#endif
+    skybox_attrib.program = program;
+    skybox_attrib.position = 0;
+    skybox_attrib.matrix = glGetUniformLocation(program, "matrix");
+    skybox_attrib.sampler = glGetUniformLocation(program, "skybox");
 
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -2606,6 +2605,62 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
     glBindVertexArray(0);
 
+    static constexpr float skybox_vertices[] = {
+        // positions          
+        -1.0f,  1.0f, -1.0f,
+        -1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f, -1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+
+        -1.0f, -1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f,
+        -1.0f, -1.0f,  1.0f,
+
+        -1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f, -1.0f,
+        1.0f,  1.0f,  1.0f,
+        1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f,  1.0f,
+        -1.0f,  1.0f, -1.0f,
+
+        -1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f, -1.0f,
+        1.0f, -1.0f, -1.0f,
+        -1.0f, -1.0f,  1.0f,
+        1.0f, -1.0f,  1.0f
+    };
+
+    // skybox VAO
+    GLuint skybox_vao, skybox_vbo;
+    glGenVertexArrays(1, &skybox_vao);
+    glGenBuffers(1, &skybox_vbo);
+    glBindVertexArray(skybox_vao);
+    glBindBuffer(GL_ARRAY_BUFFER, skybox_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(skybox_vertices), &skybox_vertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), nullptr);
+    glBindVertexArray(0);
+
     craft_impl::BloomTools bloom_tools{};
 
     craft_impl::Player* me = &m_pimpl->m_model->player;
@@ -2614,9 +2669,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     // LOAD STATE FROM DATABASE 
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->x = 15.f;
-        p_state->z = 15.f;
-        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z) + 55.f;
+        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z);
     }
 
     // Init some local vars for handling maze duties
@@ -2630,14 +2683,10 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
-    maze_builder builder;
-    auto my_maze = builder.maze_type(my_maze_type).get_int(get_int)
-        .rng(rng).rows(gui->rows).columns(gui->columns).height(gui->height)
-        .shift_x(static_cast<int>(p_state->x)).shift_y(static_cast<int>(p_state->y))
-        .show_distances(false).seed(0).block_type(-1).build();
+    vector<unique_ptr<maze_builder::maze>> my_mazes;
 
     // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads(cref(my_maze));
+    m_pimpl->init_worker_threads(cref(my_mazes));
 
     me->id = 0;
     me->name = "Wade Watts";
@@ -2683,7 +2732,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         static bool show_demo_window = false;
 
         // Handle SDL events and motion updates
-        static bool window_resizes = false;
+        static bool window_resizes = true;
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         time_accum += elapsed;
         while (time_accum >= FIXED_TIME_STEP) {
@@ -2692,6 +2741,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             time_accum -= FIXED_TIME_STEP;
             time_step += FIXED_TIME_STEP;
         }
+
         if (model->create_radius != gui->view) {
             model->create_radius = gui->view;
             model->render_radius = gui->view;
@@ -2721,33 +2771,31 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         if (ImGui::BeginTabBar("Tabs")) {
             if (ImGui::BeginTabItem("Builder")) {
                 static unsigned int MAX_ROWS = 50;
-                if (ImGui::SliderInt("Width", &gui->rows, 5, MAX_ROWS)) {
+                if (ImGui::SliderInt("Rows", &gui->rows, 5, MAX_ROWS)) {
 
                 }
                 static unsigned int MAX_COLUMNS = 50;
-                if (ImGui::SliderInt("Length", &gui->columns, 5, MAX_COLUMNS)) {
+                if (ImGui::SliderInt("Columns", &gui->columns, 5, MAX_COLUMNS)) {
 
                 }
                 static unsigned int MAX_HEIGHT = 10;
-                if (ImGui::SliderInt("Height", &gui->height, 3, MAX_HEIGHT)) {
+                if (ImGui::SliderInt("Height", &gui->height, 1, MAX_HEIGHT)) {
 
                 }
+
+                ImGui::TextColored(ImVec4(0.14f, 0.26f, 0.90f, 1.0f), "offset_x: %d", static_cast<int>(p_state->x));
+                ImGui::TextColored(ImVec4(0.14f, 0.26f, 0.90f, 1.0f), "offset_z: %d", static_cast<int>(p_state->z));
+
                 static unsigned int MAX_SEED_VAL = 100;
                 if (ImGui::SliderInt("Seed", &gui->seed, 0, MAX_SEED_VAL)) {
                     rng.seed(static_cast<unsigned long>(gui->seed));
                 }
                 ImGui::InputText("Tag", &gui->tag[0], MAX_SIGN_LENGTH);
-                if (ImGui::IsItemActive()) {
-                    model->typing = true;
-                }
                 ImGui::InputText("Outfile", &gui->outfile[0], IM_ARRAYSIZE(gui->outfile));
-                if (ImGui::IsItemActive()) {
-                    model->typing = true;
-                }
-                if (ImGui::TreeNode("Maze Generator")) {
+                if (ImGui::TreeNode("Maze Algorithm")) {
                     auto preview{ gui->algo.c_str() };
                     ImGui::NewLine();
-                    ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft;
+                    ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft | ImGuiComboFlags_WidthFitPreview;
                     if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
                         for (const auto& itr : algo_list) {
                             bool is_selected = (itr == gui->algo);
@@ -2768,86 +2816,55 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Export!")) {
-                        my_maze->start_progress();
-                        my_maze->block_type = items[model->item_index];
-                        my_maze->seed = gui->seed;
-                        my_maze->show_distances = false;
-                        my_maze->shift_x = static_cast<int>(p_state->x);
-                        my_maze->shift_y = static_cast<int>(p_state->y);
-                        my_maze->rows = gui->rows;
-                        my_maze->columns = gui->columns;
-                        my_maze->height = gui->height;
-                        my_maze->maze_type = my_maze_type;
-                        my_maze->compute_geometry();
-                        my_maze->stop_progress();
-                        //current_maze_pixels = maze2->to_pixels(25);
-                        // Write the maze to a file on Desktop immediately
-                        // The maze has a to_str method which the Web API calls /mazes/
-                        this->m_pimpl->m_json_data = my_maze->to_json_str();
+                        // Building maze here has the effect of computing its geometry on this thread
+                        maze_builder builder;
+                        auto my_next_maze = builder.maze_type(my_maze_type)
+                            .block_type(items[model->item_index])
+                            .get_int(get_int).rng(rng)
+                            .rows(gui->rows).columns(gui->columns).height(gui->height)
+                            .offset_x(p_state->x).offset_z(p_state->z)
+                            .show_distances(false).seed(gui->seed).build();
+                        my_next_maze->compute_geometry();
+                        // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
-                        writer.write(gui->outfile, my_maze->to_wavefront_obj_str());
+                        writer.write(gui->outfile, my_next_maze->to_wavefront_obj_str());
+#if defined(MAZE_DEBUG)
+                        SDL_Log("Wrote maze to %s\n", gui->outfile);
 #endif
-                        ImGui::NewLine();
-                        ImGui::Text("Maze written to %s\n", gui->outfile);
-                        ImGui::NewLine();
-                    } else {
-                        ImGui::SameLine();
-                        ImGui::Text("Building maze... %s\n", gui->outfile);
+#endif
+                        my_mazes.push_back(std::move(my_next_maze));
+                        // The JSON data for the Web API - GET /mazes/
+                        this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
+                        // Resetting the model reloads the chunks - show the new maze
+                        this->m_pimpl->reset_model();
+                        gui->reset();
                     }
+                    ImGui::SameLine();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
+                    ImGui::Text(" => %s\n", gui->outfile);
+                    ImGui::PopStyleColor();
                 } else {
                     // Disable the button
                     ImGui::BeginDisabled(true);
                     ImGui::PushStyleVar(ImGuiStyleVar_Alpha | ImGuiTabItemFlags_None, ImGui::GetStyle().Alpha * 0.5f);
 
                     // Render the button - don't need to check if the button is pressed because it's disabled
-                    ImGui::Button("Build!");
+                    ImGui::Button("Outfile?");
 
                     // Re-enable items and revert style change
                     ImGui::PopStyleVar();
                     ImGui::EndDisabled();
                 }
 
-                // Let JavaScript handle file downloads in web browser  
-                //if (write_success.valid() && write_success.wait_for(chrono::seconds(0)) == future_status::ready) {
-                //    // Call the writer future and get the result
-                //    bool success = write_success.get();
-                //    if (success && gui->outfile[0] != '.') {
-                //        // Dont display a message on the web browser, let the web browser handle that
-                //     
-                //    } else {
-                //        ImGui::NewLine();
-                //        ImGui::Text("Failed to write maze: %s\n", gui->outfile);
-                //        ImGui::NewLine();
-                //    }
-                //    gui->reset();
-                //}
-
-                // Show progress when writing
-                ImGui::NewLine();
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.008f, 0.83f, 0.015f, 1.0f));
-                ImGui::Text("Finished building maze in %f ms", my_maze->get_progress_in_ms());
-                ImGui::NewLine();
-                ImGui::PopStyleColor();
-
-                // Reset should remove outfile name, clear vertex data for all generated mazes and remove them from the world
-                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.023f, 0.015f, 1.0f));
-                if (ImGui::Button("Reset")) {
-                    this->m_pimpl->reset_model();
-                    gui->reset();
+                if (!my_mazes.empty()) {
+                    // Show last maze compute time
+                    ImGui::NewLine();
+                    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
+                    ImGui::Text("Elapsed %.5f ms", my_mazes.back()->get_progress_in_ms());
+                    ImGui::NewLine();
+                    ImGui::PopStyleColor();
                 }
-                ImGui::PopStyleColor();
-                ImGui::NewLine();
-
-                // Check the time
-                int hour = static_cast<int>(m_pimpl->time_of_day() * 24.f);
-                char am_pm = hour < 12 ? 'a' : 'p';
-                hour = hour % 12;
-                hour = hour ? hour : 12;
-                ImGui::Text("chunk.p: %d\nchunk.q: %d\n", m_pimpl->chunked(p_state->x), m_pimpl->chunked(p_state->z));
-                ImGui::Text("player.x: %.2f\nplayer.y: %.2f\nplayer.z: %.2f\n", p_state->x, p_state->y, p_state->z);
-                ImGui::Text("#chunks: %d\n#triangles: %d\n", m_pimpl->m_model->chunk_count, triangle_faces * 2);
-                ImGui::Text("time: %d%cm\n", hour, am_pm);
 
                 ImGui::EndTabItem();
             }
@@ -2881,8 +2898,28 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 ImGui::Checkbox("Show Wireframes", &gui->show_wireframes);
                 ImGui::Checkbox("Show Crosshairs", &gui->show_crosshairs);
                 ImGui::Checkbox("Apply Bloom Effect", &gui->apply_bloom_effect);
+                ImGui::SliderFloat("Exp", &gui->exposure, 0.1f, 1.0f, "%.2f");
 
                 ImGui::EndTabItem();
+            }
+            if (ImGui::BeginTabItem("Commands")) {
+                ImGui::NewLine();
+                ImGui::Text("Commands:");
+                ImGui::Text("LMouse: Delete block");
+                ImGui::Text("RMouse: Build a block");
+                ImGui::Text("MMouse: Copy block type");
+                ImGui::Text("Spacebar: Jump");
+                ImGui::Text("Tab: Fly");
+                ImGui::Text("LShift: Zoom");
+                ImGui::Text("WASD: Movement");
+                ImGui::Text("Arrow Keys: Camera rotation");
+                ImGui::Text("F: Orthogonal projection");
+                ImGui::Text("E: Cycle Item");
+                ImGui::Text("R: Cycle Item");
+                ImGui::Text("T: Tag a block");
+                ImGui::NewLine();
+                ImGui::EndTabItem();
+
             }
             ImGui::EndTabBar();
         } // Tabs
@@ -2901,11 +2938,18 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             ImGuiWindowFlags_NoBringToFrontOnFocus
         );
 
+        // PREPARE TO RENDER
+        if (ImGui::IsWindowHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            SDL_SetWindowRelativeMouseMode(sdl_window, true);
+            gui->capture_mouse = true;
+        }
+
+        // Update Voxel window coords
         ImVec2 voxel_scene_size = ImGui::GetContentRegionAvail();
         int voxel_scene_w = static_cast<int>(voxel_scene_size.x);
         int voxel_scene_h = static_cast<int>(voxel_scene_size.y);
-        this->m_pimpl->m_model->voxel_scene_w = voxel_scene_w;
-        this->m_pimpl->m_model->voxel_scene_h = voxel_scene_h;
+        model->voxel_scene_w = voxel_scene_w;
+        model->voxel_scene_h = voxel_scene_h;
 
         // Check if scene size changed
         if (window_resizes) {
@@ -2913,15 +2957,16 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             // Delete existing FBO objects
             if (glIsTexture(bloom_tools.color_buffers[0]) && glIsTexture(bloom_tools.color_buffers[1])) {
                 glDeleteTextures(2, bloom_tools.color_buffers);
+                glDeleteTextures(1, &bloom_tools.color_final);
+                glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
                 glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
                 glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
                 glDeleteFramebuffers(2, bloom_tools.color_buffers_pingpong);
-                glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+                glDeleteFramebuffers(1, &bloom_tools.fbo_final);
             }
             bloom_tools.gen_framebuffers(voxel_scene_w, voxel_scene_h);
         }
 
-        // PREPARE TO RENDER 
         m_pimpl->delete_chunks();
         m_pimpl->del_buffer(me->buffer);
         me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
@@ -2932,10 +2977,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
         glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_hdr);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
+        glDepthFunc(GL_LESS);
         glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+        glFrontFace(GL_CCW);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, sky_buffer, texture, sky_texture_id, cref(my_maze));
+        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_mazes));
 
         if (gui->show_items) {
             m_pimpl->render_item(&block_attrib, texture);
@@ -2952,7 +2999,48 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             m_pimpl->render_crosshairs(&line_attrib);
         }
 
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        if (gui->show_info_text) {
+            char text_buffer[1024];
+            float ts = 12.f * static_cast<float>(model->scale);
+            float tx = ts / 2.f;
+            float ty = voxel_scene_size.y - ts;
+            // Check the time
+            int hour = static_cast<int>(this->m_pimpl->time_of_day()) * 24;
+            char am_pm = hour < 12 ? 'a' : 'p';
+            hour = hour % 12;
+            hour = hour ? hour : 12;
+            SDL_snprintf(
+                text_buffer, 1024, "chunk(%d %d) chunk_count(%d) triangles(%d)",
+                this->m_pimpl->chunked(p_state->x), this->m_pimpl->chunked(p_state->z),
+                model->chunk_count, triangle_faces * 2);
+            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            // Lower the info text
+            ty -= ts * 2;
+            // Reset text buffer
+            memset(text_buffer, 0, 1024);
+            SDL_snprintf(
+                text_buffer, 1024,
+                "App average: %.3f ms/frame %.1f FPS",
+                1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+        }
+
+        // Let the skybox pos.z coord determine depth test in shader
+        glDepthFunc(GL_LEQUAL);
+
+        // Skybox
+        float sky_matrix[16];
+        set_matrix_3d(
+            sky_matrix, model->voxel_scene_w, model->voxel_scene_h,
+            0.f, 0.f, 0.f, p_state->rx, p_state->ry, model->fov,
+            0, model->render_radius);
+        glUseProgram(skybox_attrib.program);
+        glUniformMatrix4fv(skybox_attrib.matrix, 1, GL_FALSE, sky_matrix);
+        glUniform1i(skybox_attrib.sampler, 0);
+        glBindVertexArray(skybox_vao);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture_id);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
 
         // Complete the pingpong buffer for the bloom effect
         glUseProgram(blur_attrib.program);
@@ -2960,89 +3048,51 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
             glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_pingpong[bloom_tools.horizontal_blur]);
             glUniform1i(blur_attrib.extra1, bloom_tools.horizontal_blur);
             if (bloom_tools.first_iteration) {
+                glUniform1i(blur_attrib.sampler, 0);
+                glActiveTexture(GL_TEXTURE0);
                 // Write to the floating-point buffer / COLOR_ATTACHMENT1 first iteration
-                glUniform1i(blur_attrib.sampler, 5);
-                glActiveTexture(GL_TEXTURE5);
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[1]);
                 bloom_tools.first_iteration = false;
             } else {
-                glUniform1i(blur_attrib.sampler, 6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
-                glActiveTexture(GL_TEXTURE6 + static_cast<GLuint>(!bloom_tools.horizontal_blur));
                 glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
             }
             bloom_tools.horizontal_blur = !bloom_tools.horizontal_blur;
             glBindVertexArray(quad_vao);
-			glDisable(GL_DEPTH_TEST);
+            glDisable(GL_DEPTH_TEST);
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
         bloom_tools.first_iteration = true;
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);   
-
         // Post-processing the default frame buffer
         // Render HDR buffer to 2D quad and apply bloom filter
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
+        glBindFramebuffer(GL_FRAMEBUFFER, bloom_tools.fbo_final);
         glUseProgram(screen_attrib.program);
-        //glUniform1i(screen_attrib.sampler, 4);
-        //glUniform1i(screen_attrib.extra3, 6);
+        glUniform1i(screen_attrib.sampler, 0);
+        glUniform1i(screen_attrib.extra3, 1);
         glBindVertexArray(quad_vao);
-        //glActiveTexture(GL_TEXTURE4);
+        glDisable(GL_DEPTH_TEST);
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers[0]);
-        //glActiveTexture(GL_TEXTURE6);
-        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[bloom_tools.horizontal_blur]);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, bloom_tools.color_buffers_pingpong[!bloom_tools.horizontal_blur]);
         glUniform1i(screen_attrib.extra1, gui->apply_bloom_effect);
         // Exposure
-        glUniform1f(screen_attrib.extra2, 0.35f);
+        glUniform1f(screen_attrib.extra2, gui->exposure);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-
         glBindVertexArray(0);
-
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         // Flip UV coordinates for the image
         ImVec2 uv0 = ImVec2(0.0f, 1.0f);
         ImVec2 uv1 = ImVec2(1.0f, 0.0f);
-        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_buffers[0])),
+        ImGui::Image(reinterpret_cast<void*>(static_cast<intptr_t>(bloom_tools.color_final)),
             voxel_scene_size, uv0, uv1);
 
         ImGui::End();
 
-        ImGui::Begin("Mouse Capture",
-            nullptr,
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoTitleBar);
-        ImGui::SetWindowPos(ImVec2(display_size.x - 150, display_size.y - 50));
-        ImGui::SetWindowSize(ImVec2(150, 50));
-        if (ImGui::Checkbox("Mouse Capture", &this->m_pimpl->m_gui->capture_mouse)) {
-            if (this->m_pimpl->m_gui->capture_mouse) {
-                SDL_SetWindowRelativeMouseMode(sdl_window, true);
-                ImGui::SetWindowFocus("Voxels");
-            } else {
-                SDL_SetWindowRelativeMouseMode(sdl_window, false);
-            }
-        }
-        ImGui::End();
-
-        ImVec2 fps_window_size = ImVec2(display_size.x * 0.50f, 50);
-        ImGui::SetNextWindowPos(ImVec2(display_size.x * 0.8f - fps_window_size.x, 0));
-        ImGui::SetNextWindowSize(fps_window_size);
-        ImGui::Begin("Framerate Window",
-            nullptr,
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoMove |
-            ImGuiWindowFlags_NoTitleBar
-        );
-        ImGui::SetWindowFontScale(1.25f);
-        ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::End();
-
         ImGui::PopFont();
 
-        ImGui::Render();
         glViewport(0, 0, display_w, display_h);
+        ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         SDL_GL_SwapWindow(sdl_window);
@@ -3067,7 +3117,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     db_close();
     db_disable();
 
-    m_pimpl->del_buffer(sky_buffer);
     m_pimpl->delete_all_chunks();
     m_pimpl->delete_all_players();
 
@@ -3076,21 +3125,26 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     ImGui::DestroyContext();
 
     glDeleteTextures(1, &texture);
-    // glDeleteTextures(1, &font);
-    glDeleteTextures(1, &sky_texture_id);
+    glDeleteTextures(1, &font);
     glDeleteTextures(1, &sign);
+    glDeleteTextures(1, &cubemap_texture_id);
     glDeleteRenderbuffers(1, &bloom_tools.rbo_bloom_depth);
     glDeleteFramebuffers(1, &bloom_tools.fbo_hdr);
+    glDeleteFramebuffers(1, &bloom_tools.fbo_final);
     glDeleteFramebuffers(2, bloom_tools.fbo_pingpong);
     glDeleteTextures(2, bloom_tools.color_buffers);
     glDeleteTextures(2, bloom_tools.color_buffers_pingpong);
+    glDeleteTextures(1, &bloom_tools.color_final);
     glDeleteVertexArrays(1, &quad_vao);
     glDeleteBuffers(1, &quad_vbo);
+    glDeleteVertexArrays(1, &skybox_vao);
+    glDeleteBuffers(1, &skybox_vbo);
     glDeleteProgram(block_attrib.program);
     glDeleteProgram(text_attrib.program);
     glDeleteProgram(line_attrib.program);
     glDeleteProgram(screen_attrib.program);
     glDeleteProgram(blur_attrib.program);
+    glDeleteProgram(skybox_attrib.program);
 
     SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
     SDL_DestroyWindow(sdl_window);
@@ -3107,4 +3161,12 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
  */
 std::string craft::mazes() const noexcept {
     return this->m_pimpl->m_json_data;
+}
+
+/**
+ * @brief Useful on mobile devices to flip mouse/finger capture
+ *
+ */
+void craft::toggle_mouse() const noexcept {
+    this->m_pimpl->m_gui->capture_mouse = !this->m_pimpl->m_gui->capture_mouse;
 }

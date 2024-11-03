@@ -8,5 +8,6 @@ class CORSHTTPRequestHandler(SimpleHTTPRequestHandler):
         SimpleHTTPRequestHandler.end_headers(self)
 
 if __name__ == '__main__':
+    print("Listening on port: ", 8000)
     httpd = HTTPServer(('localhost', 8000), CORSHTTPRequestHandler)
     httpd.serve_forever()

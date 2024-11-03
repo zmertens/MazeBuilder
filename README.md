@@ -16,7 +16,7 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
           -a, --algorithm    dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
           -r, --rows         maze rows [default=100]
-          -y, --height       maze height [default=10]
+          -y, --height       maze height [default=1]
           -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
           -i, --interactive  No effect
@@ -25,20 +25,20 @@ Exports can then be integrated into game engines and renderers like Unity, Godot
           -v, --version      display program version
 ```
 
-Specify a seed with the `binary_tree` maze-generating algorithm:
+Run the `binary_tree` maze-generating algorithm with long arguments:
 ```sh
-maze_builder.exe --seed=1337 --algorithm=binary_tree -o bt.obj
+maze_builder.exe --rows=25 --columns=25 --seed=42 --algorithm=binary_tree --output=bt.obj
 ```
 
-Run Maze Builder in an `interactive` mode using the [SDL](https://github.com/libsdl-org/SDL) app:
+Run the `dfs` maze-generating algorithm with short arguments:
 ```sh
-maze_builder.exe -i
+maze_builder.exe -r 25 -c 25 -s 42 -a binary_tree -o dfs.obj
 ```
 
 ## CMake
 
 This project uses [CMake](https://cmake.org) 3.2 or greater as the build and test system. CMake can use `FetchContent` to get [SDL](https://github.com/libsdl-org/SDL) and [Catch2](https://github.com/catchorg/Catch2) from the web.
-The SDL app requires modern hardware supporting OpenGL 3.0 or greater.
+The [SDL](https://github.com/libsdl-org/sdl) app requires modern hardware supporting OpenGL 3.0 or greater.
 
 The first build step is to navigate to this local repo where it was cloned.
 
@@ -92,10 +92,7 @@ The web app can be run locally with the provided [secure_http_server.py](secure_
 
 ## Resources
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
- - [Full Stack Dev Book](https://www.packtpub.com/en-us/product/full-stack-development-with-spring-boot-and-react-9781801816786)
  - [Craft](https://github.com/fogleman/Craft)
  - [Dear ImGui](https://github.com/ocornut/imgui)
  - [SDL](https://github.com/libsdl-org/SDL)
  - [Catch2](https://github.com/catchorg/Catch2)
- - [Emscripten](https://emscripten.org/)
- - [stb](https://github.com/nothings/stb)

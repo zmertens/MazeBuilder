@@ -3,17 +3,18 @@
 
 #include <functional>
 #include <memory>
-#include <mutex>
-
-#include "map.h"
+#include <vector>
 
 #include <MazeBuilder/maze_builder.h>
+
+#include "map.h"
 
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class world {
 public:
-    void create_world(int p, int q, world_func func, Map *m, int chunk_size, const std::unique_ptr<mazes::maze_builder::maze>& mb) const noexcept;
+    void create_world(int p, int q, world_func func, Map *m, int chunk_size,
+        const std::vector<std::unique_ptr<mazes::maze_builder::maze>>& mb) const noexcept;
 };
 
 #endif

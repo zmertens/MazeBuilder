@@ -1,6 +1,7 @@
 #include <random>
 #include <vector>
 #include <string>
+#include <memory>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -40,7 +41,7 @@ TEST_CASE("Writer can produce a PNG file", "[does png]") {
 
     maze_builder builder;
     auto my_maze = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
-	
+    my_maze->compute_geometry();
 	auto&& my_png = my_maze->to_pixels(15);
 
 	REQUIRE(!my_png.empty());

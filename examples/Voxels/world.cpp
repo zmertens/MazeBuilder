@@ -1,13 +1,11 @@
 #include "world.h"
 
-#include <MazeBuilder/maze_builder.h>
-
 #include <noise/noise.h>
 
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const unique_ptr<maze_builder::maze>& mb) const noexcept {
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const vector<unique_ptr<maze_builder::maze>>& my_mazes) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -34,13 +32,15 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, 
             static constexpr auto PLANT_HEIGHT_MAX = 2;
 
             // Maze
-            const auto& block = mb->find_block(x, z);
-            if (block.has_value()) {
-                const auto& [r, height, c, t] = block.value();
-                for (auto y = -PLANT_HEIGHT_MAX; y < 5 + PLANT_HEIGHT_MAX; y++) {
-                    func(r, y, c, t * flag, m);
+            for (const auto& my_maze : my_mazes) {
+                const auto& block = my_maze->find_block(x, z);
+                if (block.has_value()) {
+                    const auto& [r, height, c, t] = block.value();
+                    for (auto y = 0; y < height + PLANT_HEIGHT_MAX + 1; y++) {
+                        func(r, y, c, t * flag, m);
+                    }
+                    continue;
                 }
-                continue;
             }
 
             // sand and grass terrain            
