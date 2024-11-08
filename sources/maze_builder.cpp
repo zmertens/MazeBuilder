@@ -54,6 +54,10 @@ optional<tuple<int, int, int, int>> maze_builder::maze::find_block(int p, int q)
     return (itr != m_p_q.cend()) ? make_optional(itr->second) : nullopt;
 }
 
+void maze_builder::maze::populate_cells(std::vector<std::shared_ptr<mazes::cell>>& cells) const noexcept {
+    this->m_grid->populate_vec(ref(cells));
+}
+
 // Return a future for when maze has been written
 std::string maze_builder::maze::to_wavefront_obj_str() const noexcept {
     stringstream ss;

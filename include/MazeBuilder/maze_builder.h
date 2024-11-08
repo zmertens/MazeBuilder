@@ -64,8 +64,8 @@ public:
         std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
         std::vector<std::tuple<int, int, int, int>> get_writable_vertices() const noexcept;
         std::vector<std::vector<std::uint32_t>> get_faces() const noexcept;
-
         std::optional<std::tuple<int, int, int, int>> find_block(int x, int z) const noexcept;
+        void populate_cells(std::vector<std::shared_ptr<mazes::cell>>& cells) const noexcept;
 
         std::string to_str() const noexcept;
 
