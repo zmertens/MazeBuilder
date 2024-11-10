@@ -65,12 +65,12 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     fetch_git_repo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
 
     target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/emscripten_local)
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local)
     target_compile_features(${VOXELS_EXE} PUBLIC cxx_std_17)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/glad/include)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/glad/include)
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/dearimgui)
+    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
     
     target_link_options(${VOXELS_EXE} PRIVATE
     	"SHELL:-s PTHREAD_POOL_SIZE=5 -s WASM=1 -s USE_PTHREADS=1 -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"

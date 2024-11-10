@@ -26,8 +26,11 @@
 #include <vector>
 
 #include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
 #include <SDL3_image/SDL_image.h>
+
+#include <dearimgui/imgui.h>
+#include <dearimgui/backends/imgui_impl_sdl3.h>
+#include <dearimgui/backends/imgui_impl_opengl3.h>
 
 #include <box2d/box2d.h>
 #include <box2d/math_functions.h>
@@ -118,23 +121,8 @@ struct Game::GameImpl {
             return this->texture != nullptr;
         }
 
-        bool loadFromRenderedText(SDL_Renderer *renderer, TTF_Font* font, const std::string& text, SDL_Color textColor) noexcept {
-            this->free();
-            SDL_Surface* textSurface = TTF_RenderText_Solid(font, text.c_str(), text.length(), textColor);
-            if (textSurface) {
-                this->texture = SDL_CreateTextureFromSurface(renderer, textSurface);
-                if (this->texture) {
-                    this->width = textSurface->w;
-                    this->height = textSurface->h;
-                } else {
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture from rendered text!");
-                }
-                SDL_DestroySurface(textSurface);
-            } else {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create text surface!");
-                return false;
-            }
-            return this->texture != nullptr;
+        bool loadFromRenderedText(SDL_Renderer *renderer) noexcept {
+            return false;
         }
 
         void render(SDL_Renderer *renderer, int x, int y) const noexcept {
@@ -149,7 +137,6 @@ struct Game::GameImpl {
     struct SDLHelper {
         SDL_Window* window;
         SDL_Renderer* renderer;
-        TTF_Font* font1;
 
         /**
          * @brief Init SDL subsystems - use iostream on error messages
@@ -157,19 +144,13 @@ struct Game::GameImpl {
          *
          */
         SDLHelper()
-            : window{ nullptr }, renderer{ nullptr }, font1{ nullptr } {
+            : window{ nullptr }, renderer{ nullptr } {
             using namespace std;
 
             if (SDL_Init(SDL_INIT_VIDEO)) {
                 SDL_Log("SDL_Init success\n");
             } else {
                 cerr << "SDL_Init Error: " << endl;
-            }
-
-            if (TTF_Init()) {
-                SDL_Log("TTF_Init success\n");
-            } else {
-                cerr << "TTF_Init Error: " << endl;
             }
 
             auto sdlImgFlags = IMG_INIT_JPG | IMG_INIT_PNG;
@@ -181,23 +162,14 @@ struct Game::GameImpl {
         }
 
         ~SDLHelper() {
-            TTF_CloseFont(font1);
             SDL_DestroyRenderer(renderer);
             SDL_DestroyWindow(window);
-            TTF_Quit();
             IMG_Quit();
             SDL_Quit();
         }
 
         bool loadFont(const std::string& f, unsigned int fSize) noexcept {
-            font1 = TTF_OpenFont(f.c_str(), fSize);
-            if (font1) {
-                SDL_Log("Font loaded: %s\n", f.c_str());
-                return true;
-            } else {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Font not loaded: %s\n", f.c_str());
-                return false;
-            }
+            return false;
         }
 
         void do_events(States& state) noexcept {
@@ -302,7 +274,6 @@ struct Game::GameImpl {
                     auto&& temp = game->workQueue.front();
                     game->workQueue.pop_front();
                     SDL_Log("Processing work item [ start: %d | count: %d]\n", temp.start, temp.count);
-                    vertices.clear();
                     game->doWork(ref(vertices), cref(temp));
                     if (!vertices.empty()) {
                         copy(vertices.begin(), vertices.end(), back_inserter(temp.vertices));
@@ -433,7 +404,7 @@ private:
     void doWork(std::vector<SDL_Vertex>& vertices, const WorkItem& item) {
         using namespace std;
 
-        static auto pushV = [&vertices](auto v1, auto v2, auto v3, auto v4)->void {
+        auto pushV = [&vertices](auto v1, auto v2, auto v3, auto v4)->void {
             // First triangle
             vertices.push_back(v1);
             vertices.push_back(v2);
@@ -579,12 +550,12 @@ bool Game::run(const std::string& workerUrl, const std::string& lastSaveFile) co
 
     // Load fonts and setup text rendering
     Game::GameImpl::SDLTexture fpsText;
-    gameImpl->sdlHelper.loadFont("fonts/DMSans.ttf", 24);
-    SDL_Color currentColor = { 255, 0, 175 };
-    if (!fpsText.loadFromRenderedText(renderer, gameImpl->sdlHelper.font1, "FPS: 60", currentColor)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load text texture: %s\n", SDL_GetError());
-        return false;
-    }
+    //gameImpl->sdlHelper.loadFont("fonts/DMSans.ttf", 24);
+    //SDL_Color currentColor = { 255, 0, 175 };
+    //if (!fpsText.loadFromRenderedText(renderer)) {
+    //    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load text texture: %s\n", SDL_GetError());
+    //    return false;
+    //}
 
     Game::GameImpl::SDLTexture renderToTexture;
     bool res = renderToTexture.loadTarget(renderer, gameImpl->INIT_WINDOW_W, gameImpl->INIT_WINDOW_H);
