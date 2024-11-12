@@ -470,7 +470,7 @@ private:
                 v3.tex_coord = { 1.0f, 1.0f };
                 v4.tex_coord = { 0.0f, 1.0f };
 
-                if (mode == "backgrounds") {
+                if (mode == "backgrounds"s) {
                     uint32_t color = 0xFFFFFFFF;
                     SDL_FColor sdlColor = { static_cast<float>((color >> 24) & 0xFF),
                         static_cast<float>((color >> 16) & 0xFF),
@@ -653,7 +653,9 @@ bool Game::run(const std::string& workerUrl, const std::string& lastSaveFile) co
             b2Vec2 pos = b2Body_GetWorldPoint(entity->bodyId, { -entity->extent.x, -entity->extent.y });
             auto rotation = b2Body_GetRotation(entity->bodyId);
             auto angle = b2Rot_GetAngle(rotation);
-            SDL_FRect renderQuad = { pos.x, pos.y, gameImpl->entityTexture.get()->w, gameImpl->entityTexture.get()->h };
+            SDL_FRect renderQuad = { pos.x, pos.y, 
+                static_cast<float>(gameImpl->entityTexture.get()->w), 
+                static_cast<float>(gameImpl->entityTexture.get()->h) };
             SDL_RenderTextureRotated(renderer, gameImpl->entityTexture.get(), &renderQuad, nullptr, angle, &screenCenter, SDL_FLIP_NONE);
         }
 
