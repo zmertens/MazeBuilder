@@ -44,9 +44,6 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
     
 	# Handle SDL dependencies first
 	find_package(SDL3 QUIET)
-    # @TODO Use find_package when SDL3_image is official release
-    #  -- Update library linkage to use target SDL3_image::SDL3_image --
-	# find_package(SDL3_image QUIET)
     if(NOT SDL3_FOUND)
         message(INFO ": Getting SDL via FetchContent")
         set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
@@ -54,9 +51,11 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
         fetch_git_repo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
         set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
+
+	find_package(SDL3_image QUIET)
 	if(NOT SDL3_image_FOUND)
         message(INFO ": Getting SDL_image via FetchContent")
-        fetch_git_repo(SDL_image https://github.com/libsdl-org/SDL_image.git release-2.8.2)
+        fetch_git_repo(SDL_image https://github.com/libsdl-org/SDL_image.git origin/main)
         set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl_image-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 	
@@ -69,7 +68,7 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
 	endif()
 
     add_executable(${SIMUL_EXE} ${SIMUL_SOURCES} ${DEAR_IMGUI_SOURCES})
-    target_link_libraries(${SIMUL_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3 SDL3_image box2d)
+    target_link_libraries(${SIMUL_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3 SDL3_image::SDL3_image box2d)
     target_compile_features(${SIMUL_EXE} PUBLIC cxx_std_17)
     target_include_directories(${SIMUL_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 	target_include_directories(${SIMUL_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
