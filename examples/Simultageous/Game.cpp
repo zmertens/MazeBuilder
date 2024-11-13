@@ -514,7 +514,6 @@ Game::~Game() {
     g->pendingWorkCount = 0;
     g->state = GameImpl::States::DONE;
     SDL_BroadcastCondition(g->gameCond);
-    //SDL_SignalCondition(g->gameCond);
     SDL_UnlockMutex(g->gameMtx);
     for (auto&& t : g->threads) {
         auto name = SDL_GetThreadName(t);
@@ -606,12 +605,10 @@ bool Game::run(const std::string& workerUrl, const std::string& lastSaveFile) co
         SDL_FPoint screenCenter = { static_cast<float>(display_w / 2), static_cast<float>(display_h / 2) };
 
         // Update FPS data - Check if it's been about a second
-        static auto fpsCounter = 0;
-        fpsCounter += 1;
-        if (fpsCounter >= 60) {
-            SDL_Log("FPS: %d\n", fpsCounter);
-            SDL_Log("Frame Time / Update: %.3fms\n", static_cast<float>(elapsed) / static_cast<float>(fpsCounter));
-            fpsCounter = 0;
+        if (currentTimeStep >= 1.0) {
+            SDL_Log("FPS: %d\n", static_cast<int>(currentTimeStep * 60.0));
+            SDL_Log("Frame Time / Update: %.3fms\n", elapsed / currentTimeStep);
+            currentTimeStep = 0.0;
         }
 
         SDL_SetRenderTarget(renderer, renderToTexture.get());
