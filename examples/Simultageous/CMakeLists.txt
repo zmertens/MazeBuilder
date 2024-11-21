@@ -76,6 +76,7 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
 
     file(COPY "fonts" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
     file(COPY "images" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+    file(COPY "sounds" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 	# Copy shared/dlls on Windows only
 	if(WIN32)

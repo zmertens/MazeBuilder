@@ -18,7 +18,7 @@ int main(int argc, char* argv[]) {
         string title = "simultageous";
         string version = "0.1.0";
         auto myGameInstance = Game::get_instance(cref(title), cref(version), 1280, 720);
-        bool res = myGameInstance->run("https://worker", "lastSave.png");
+        bool res = myGameInstance->run("https://worker");
         if (!res) {
             cerr << "Game failed to run" << endl;
         }

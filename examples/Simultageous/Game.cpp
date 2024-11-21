@@ -146,8 +146,8 @@ struct Game::GameImpl {
         SDLHelper()
             : window{ nullptr }, renderer{ nullptr } {
             using namespace std;
-
-            if (SDL_Init(SDL_INIT_VIDEO)) {
+            
+            if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
                 SDL_Log("SDL_Init success\n");
             } else {
                 cerr << "SDL_Init Error: " << endl;
@@ -525,7 +525,7 @@ Game::~Game() {
     SDL_DestroyCondition(g->gameCond);
 }
 
-bool Game::run(const std::string& workerUrl, const std::string& lastSaveFile) const noexcept {
+bool Game::run(const std::string& workerUrl) const noexcept {
 
     using namespace std;
 
