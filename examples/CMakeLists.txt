@@ -1,4 +1,3 @@
-
 option(MAZE_BUILD_WEB_EXAMPLES "Build ${PROJECT_NAME} examples for the Web!" OFF)
 option(MAZE_BUILD_DESKTOP_EXAMPLES "Build ${PROJECT_NAME} examples for the Desktop!" OFF)
 
@@ -18,5 +17,5 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
     add_subdirectory(Voxels)
     add_subdirectory(CLI)
     add_subdirectory(Http)
-	add_subdirectory(Simultageous)
+	add_subdirectory(Generator)
 endif()
