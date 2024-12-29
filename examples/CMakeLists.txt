@@ -1,6 +1,9 @@
-
 option(MAZE_BUILD_WEB_EXAMPLES "Build ${PROJECT_NAME} examples for the Web!" OFF)
 option(MAZE_BUILD_DESKTOP_EXAMPLES "Build ${PROJECT_NAME} examples for the Desktop!" OFF)
+
+if(MAZE_BUILD_DESKTOP_EXAMPLES AND MAZE_BUILD_WEB_EXAMPLES)
+	message(FATAL_ERROR ": Cannot build both Maze DESKTOP and WEB examples!")
+endif()
 
 if(MAZE_BUILD_WEB_EXAMPLES)
     if(NOT EMSCRIPTEN)
@@ -14,4 +17,5 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
     add_subdirectory(Voxels)
     add_subdirectory(CLI)
     add_subdirectory(Http)
+	add_subdirectory(Generator)
 endif()

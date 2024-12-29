@@ -2,7 +2,7 @@ include(CppCheck)
 include(Doxygen)
 include(BuildInfo)
 
-set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
+set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
 
 set(MAZE_BUILDER_LIB_SOURCES
     args_builder.cpp
