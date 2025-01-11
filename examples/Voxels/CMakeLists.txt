@@ -1,3 +1,4 @@
+include(FetchGitRepo)
 
 # Setup dependencies
 set(DEAR_IMGUI_SOURCES
@@ -37,19 +38,10 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/craft_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
 
-include(FetchContent)
-function(fetch_git_repo REPO_NAME REPO_URL REPO_TAG)
-    if(NOT EXISTS ${REPO_DIR})
-        message(INFO ": Fetching ${REPO_NAME} from ${REPO_URL}")
-        FetchContent_Declare(${REPO_NAME} GIT_REPOSITORY ${REPO_URL} GIT_TAG ${REPO_TAG} GIT_SHALLOW TRUE GIT_PROGRESS TRUE)
-        FetchContent_MakeAvailable(${REPO_NAME})
-    endif()
-endfunction()
-
-set(VOXELS_EXE "voxels")
+set(VOXELS_EXE "mazebuildervoxels")
 # Note that the latest SDL might not be available as an EMSDK port yet
-if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
-    message(INFO ": Building SDL app for the Web!")
+if(EMSCRIPTEN)
+    message(INFO ": Building ${PROJECT_NAME} examples for the Web!")
 
     # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
     if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -62,11 +54,11 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     set_target_properties(${VOXELS_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
 
     set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-    fetch_git_repo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
+    FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
 
-    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3)
+    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local)
-    target_compile_features(${VOXELS_EXE} PUBLIC cxx_std_17)
+    target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_17)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/glad/include)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/dearimgui)
@@ -86,20 +78,20 @@ if(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
     elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
-elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
-    message(INFO ": Building SDL app for the Desktop!")
+else()
+    message(INFO ": Building ${PROJECT_NAME} examples for the Desktop!")
     find_package(SDL3 QUIET)
     if(NOT SDL3_FOUND)
         message(INFO ": Getting SDL via FetchContent")
         set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
         set(SDL_STATIC FALSE CACHE BOOL "Build a SDL static library (if available)")
-        fetch_git_repo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
+        FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
         set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
     add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
-    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_LIB}_static SDL3::SDL3)
-    target_compile_features(${VOXELS_EXE} PUBLIC cxx_std_17)
+    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
+    target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_17)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/glad/include)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
@@ -112,17 +104,17 @@ elseif(MAZE_BUILD_DESKTOP_EXAMPLES)
         # pass
     endif()
 
-endif(MAZE_BUILD_WEB_EXAMPLES AND EMSCRIPTEN)
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
-file(COPY "${CMAKE_SOURCE_DIR}/scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+    # Copy shared/dlls on Windows only
+	if(WIN32)
+		add_custom_command(
+			TARGET ${VOXELS_EXE} POST_BUILD
+			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:${VOXELS_EXE}>
+			VERBATIM
+		)
+	endif()
 
-# Copy over the freshly build SDL dll file to the binary directory
-# if(WIN32)
-#     add_custom_command(
-#         TARGET ${VOXELS_EXE}
-#         COMMENT "Copy SDL DLL"
-#         POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_BINARY_DIR}/_deps/sdl-build/${CMAKE_BUILD_TYPE}/SDL3.dll $<TARGET_FILE_DIR:${VOXELS_EXE}>
-#         VERBATIM)
-# endif()
+endif(EMSCRIPTEN)

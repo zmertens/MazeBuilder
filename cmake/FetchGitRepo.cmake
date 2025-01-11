@@ -1,0 +1,7 @@
+include(FetchContent)
+function(FetchGitRepo REPO_NAME REPO_URL REPO_TAG)
+    if(NOT EXISTS ${REPO_DIR})
+        FetchContent_Declare(${REPO_NAME} GIT_REPOSITORY ${REPO_URL} GIT_TAG ${REPO_TAG} GIT_SHALLOW TRUE GIT_PROGRESS TRUE)
+        FetchContent_MakeAvailable(${REPO_NAME})
+    endif()
+endfunction()

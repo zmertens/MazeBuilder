@@ -1,28 +1,22 @@
 	
 
-	Pico-8 Platformer (1.0)
+	Sci-Fi Sounds (1.0)
 
 	Created/distributed by Kenney (www.kenney.nl)
-	Creation date: 05-08-2024
+	Creation date: 11-10-2020
 
 			------------------------------
 
 	License: (Creative Commons Zero, CC0)
 	http://creativecommons.org/publicdomain/zero/1.0/
 
-	You can use this content for personal, educational, and commercial purposes.
-
-	Support by crediting 'Kenney' or 'www.kenney.nl' (this is not a requirement)
+	This content is free to use in personal, educational and commercial projects.
+	Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
 
 			------------------------------
 
-	• Website : www.kenney.nl
-	• Donate  : www.kenney.nl/donate
+	Donate:   http://support.kenney.nl
+	Patreon:  http://patreon.com/kenney/
 
-	• Patreon : patreon.com/kenney
-	
-	Follow on social media for updates:
-
-	• Twitter:	twitter.com/KenneyNL
-	• Instagram: 	instagram.com/kenney_nl
-	• Mastodon:	mastodon.gamedev.place/@kenney
+	Follow on Twitter for updates:
+	http://twitter.com/KenneyNL

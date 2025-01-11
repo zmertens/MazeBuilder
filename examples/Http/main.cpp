@@ -84,7 +84,7 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             temp_maze->compute_geometry();
             auto dump = temp_maze->to_json_str(4);
 
-            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
+            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};
             sf_post_request.setHttpVersion(1, 1);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
@@ -94,16 +94,16 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
 
             response = http.sendRequest(sf_post_request);
-            cout << "Response status: " << response.getStatus() << " \nbody: " << response.getBody() << endl;
+            cout << "Response status: " << static_cast<int>(response.getStatus()) << " \nbody: " << response.getBody() << endl;
             break;
             } // case '1'
             case '2': {
             cout << "Getting all mazes from the DB...\n";
-            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
+            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Method::Get};
             sf_get_request.setHttpVersion(1, 1);
             response = http.sendRequest(sf_get_request);
-            if (response.getStatus() != sf::Http::Response::Ok) {
-                cerr << "Error: " << response.getStatus() << endl;
+            if (response.getStatus() != sf::Http::Response::Status::Ok) {
+                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
                 break;
             }
             cout << "Response from server: " << response.getBody() << endl;
@@ -113,11 +113,11 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             cout << "Enter id for maze to delete...\n";
             int id = 0;
             cin >> id;
-            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Delete};
+            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Method::Delete};
             sf_del_request.setHttpVersion(1, 1);
             response = http.sendRequest(sf_del_request);
-            if (response.getStatus() != sf::Http::Response::Ok) {
-                cerr << "Error: " << response.getStatus() << endl;
+            if (response.getStatus() != sf::Http::Response::Status::Ok) {
+                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
                 break;
             }
             cout << "Response from server: " << response.getBody() << endl;
