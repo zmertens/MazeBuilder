@@ -2,6 +2,7 @@ find_package(Doxygen REQUIRED dot)
 
 macro(InitDoxygenAwesomeCss)
     # Need to get properties for target here
+    include(FetchContent)
     FetchContent_Declare(
         doxygen-awesome-css
         GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
