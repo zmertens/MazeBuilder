@@ -1,5 +1,3 @@
-include(CppCheck)
-include(Doxygen)
 include(BuildInfo)
 
 set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
@@ -50,8 +48,6 @@ target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OBJ})
 # Static build
 add_library(${MAZE_BUILDER_CORE_LIB}_static STATIC)
 target_link_libraries(${MAZE_BUILDER_CORE_LIB}_static ${MAZE_BUILDER_LIB_OBJ})
-
-#Doxygen(maze_builder sources)
 
 # Installation
 include(GNUInstallDirs)
