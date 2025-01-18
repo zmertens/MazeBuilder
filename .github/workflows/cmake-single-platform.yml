@@ -27,7 +27,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y mesa-common-dev mesa-utils libgl1-mesa-dev libx11-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
         sudo apt-get install -y libfreetype6-dev libudev-dev libopenal-dev libflac-dev libogg-dev libvorbis-dev
-        sudo apt-get install -y cppcheck valgrind doxygen
+        sudo apt-get install -y cppcheck valgrind doxygen graphviz
 
     # Step to download Emsdk
     - name: Download Emsdk
