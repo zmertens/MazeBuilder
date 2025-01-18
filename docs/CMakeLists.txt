@@ -1,4 +1,4 @@
-find_package(Doxygen REQUIRED dot)
+find_package(Doxygen REQUIRED OPTIONAL_COMPONENTS dot)
 
 macro(InitDoxygenAwesomeCss)
     # Need to get properties for target here
@@ -26,11 +26,17 @@ macro(InitDoxygenAwesomeCss)
         ${doxygen-awesome-css_SOURCE_DIR}/doxygen-awesome-interactive-toc.js
     )
 
+    if(UNIX)
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy 
+            ${doxygen-awesome-css_SOURCE_DIR}/doxygen-customer/header.html
+            ${CMAKE_BINARY_DIR}/docs/html/header.html)
+    endif()
+
     execute_process(COMMAND doxygen -w html header.html footer.html style.css
-                    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/docs/html)
+                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
     execute_process(COMMAND sed -i "/<\\/head>/r ${PROJECT_BINARY_DIR}/cmake/extra_headers.html.txt" header.html
-                    WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/docs/html)
-    set(DOXYGEN_HTML_HEADER ${PROJECT_BINARY_DIR}/docs/html/header.html)
+                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
+    set(DOXYGEN_HTML_HEADER ${CMAKE_BINARY_DIR}/docs/html/header.html)
 endmacro()
 
 set(DOXYGEN_PROJECT_NAME "Maze Builder")
