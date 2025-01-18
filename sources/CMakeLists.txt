@@ -42,34 +42,35 @@ if(MAZE_BUILDER_COVERAGE)
 endif()
 
 # Setup object library
-add_library(${MAZE_BUILDER_LIB_OBJ}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
-target_include_directories(${MAZE_BUILDER_LIB_OBJ}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../deps)
-target_compile_features(${MAZE_BUILDER_LIB_OBJ}_obj PRIVATE cxx_std_17)
+set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
+add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../deps)
+target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_17)
 
 # Generate the version info for the library
-BuildInfo(${MAZE_BUILDER_LIB_OBJ}_obj)
+BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
 
 file(GLOB MAZE_BUILDER_HEADERS "${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h")
 # Requires CMake 3.28
-#target_sources(${MAZE_BUILDER_LIB_OBJ}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
-target_include_directories(${MAZE_BUILDER_LIB_OBJ}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
-set_target_properties(${MAZE_BUILDER_LIB_OBJ}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
+#target_sources(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
     message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
-    target_compile_definitions(${MAZE_BUILDER_LIB_OBJ}_obj PRIVATE "MAZE_DEBUG")
+    target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "MAZE_DEBUG")
 endif()
 
 # Shared build
 add_library(${MAZE_BUILDER_CORE_LIB}_shared SHARED)
-target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OBJ}_obj)
+target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OUT}_obj)
 # Static build
 add_library(${MAZE_BUILDER_CORE_LIB}_static STATIC)
-target_link_libraries(${MAZE_BUILDER_CORE_LIB}_static ${MAZE_BUILDER_LIB_OBJ}_obj)
+target_link_libraries(${MAZE_BUILDER_CORE_LIB}_static ${MAZE_BUILDER_LIB_OUT}_obj)
 
 # Installation
 include(GNUInstallDirs)
-#install(TARGETS ${MAZE_BUILDER_LIB_OBJ} ${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_CORE_LIB}_static
+#install(TARGETS ${MAZE_BUILDER_LIB_OUT} ${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_CORE_LIB}_static
 #  EXPORT MazeBuilderLibrary
 #  ARCHIVE COMPONENT development
 #  LIBRARY COMPONENT runtime
