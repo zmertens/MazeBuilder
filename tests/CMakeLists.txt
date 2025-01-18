@@ -23,3 +23,8 @@ target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps")
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
+message(INFO ": Applying memcheck to target ${MAZE_BUILDER_TESTS_EXE}")
+include(Valgrind)
+AddValgrind(${MAZE_BUILDER_TESTS_EXE})
+include(Memcheck)
+AddMemcheck(${MAZE_BUILDER_TESTS_EXE})

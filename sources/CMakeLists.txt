@@ -25,21 +25,19 @@ endif()
 
 if(MAZE_BUILDER_COVERAGE)
     message(INFO ": Building ${PROJECT_NAME} with code coverage")
+    set(RUN_CPPCHECK "run_cppcheck")
     include(CppCheck)
-    if(NOT ${CppCheck_EXECUTABLE})
-        message(FATAL_ERROR ": CppCheck not found")
-    else()
-        message(INFO ": Found CppCheck: ${CppCheck_EXECUTABLE}")
-        add_custom_target(run_cppcheck
-            COMMAND ${CppCheck_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
-            --output-file=cppcheck.xml ${MAZE_BUILD_CORE_SRCS}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-            COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
-        )
-        if(CMAKE_COMPILER_IS_GNUCXX)
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-        endif()
+    message(INFO ": Found CppCheck: ${CPPCHECK_EXECUTABLE}")
+    add_custom_target(${RUN_CPPCHECK}
+        COMMAND ${CPPCHECK_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
+        --output-file=cppcheck.xml ${MAZE_BUILDER_CORE_SRCS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
+    )
+    AddCppCheck(${RUN_CPPCHECK})
+    if(CMAKE_COMPILER_IS_GNUCXX)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
+        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
     endif()
 endif()
 

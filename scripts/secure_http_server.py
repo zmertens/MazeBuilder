@@ -1,5 +1,4 @@
 from http.server import HTTPServer, SimpleHTTPRequestHandler
-import ssl
 
 class CORSHTTPRequestHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
