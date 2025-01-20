@@ -5,7 +5,7 @@
 #include <random>
 
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/maze_algo_interface.h>
+#include <MazeBuilder/algos_interface.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid.h>
@@ -16,43 +16,46 @@
 using namespace mazes;
 using namespace std;
 
+using maze_ptr = unique_ptr<maze>;
+
 TEST_CASE( "Test maze init", "[maze init]" ) {
-    mt19937 rng { 0 };
-    auto get_int = [&rng](auto low, auto high)->auto {
-        uniform_int_distribution<int> dist {low, high};
-        return dist(rng);
-    };
+
 
     SECTION("Create a 100x100 maze") {
         static constexpr auto NUM_ROWS = 100, NUM_COLS = 100, HEIGHT = 10;
         static constexpr auto OFFSET_X = 10, OFFSET_Z = 10;
-        maze_builder builder;
+        mazes::builder builder;
         auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
             .offset_x(OFFSET_X).offset_z(OFFSET_Z)
-            .get_int(get_int).rng(rng).build();
-        maze1->compute_geometry();
+            .build();
+        
+        progress p{};
+        computations::compute_geometry(cref(maze1));
+        auto elapsed = p.elapsed_s();
         REQUIRE(maze1->columns == NUM_COLS);
         REQUIRE(maze1->rows == NUM_ROWS);
         REQUIRE(maze1->height == HEIGHT);
         REQUIRE(maze1->offset_x == OFFSET_X);
         REQUIRE(maze1->offset_z == OFFSET_Z);
-        REQUIRE(maze1->get_progress_in_seconds() != 0.0);
+        REQUIRE(elapsed != 0.0);
     }
 
     BENCHMARK("Benchmark 10x10 mazes") {
         static constexpr auto NUM_ROWS = 10, NUM_COLS = 10, HEIGHT = 10;
         static constexpr auto OFFSET_X = 10, OFFSET_Z = 10;
-        maze_builder builder;
+        mazes::builder builder;
         auto maze1 = builder.rows(NUM_ROWS).columns(NUM_COLS).height(HEIGHT)
             .offset_x(OFFSET_X).offset_z(OFFSET_Z)
-            .get_int(get_int).rng(rng).build();
-        maze1->compute_geometry();
+            .build();
+        progress p{};
+        computations::compute_geometry(cref(maze1));
+        auto elapsed = p.elapsed_ms();
         REQUIRE(maze1->columns == NUM_COLS);
         REQUIRE(maze1->rows == NUM_ROWS);
         REQUIRE(maze1->height == HEIGHT);
         REQUIRE(maze1->offset_x == OFFSET_X);
         REQUIRE(maze1->offset_z == OFFSET_Z);
-        REQUIRE(maze1->get_progress_in_seconds() != 0.0);
+        REQUIRE(elapsed != 0.0);
     };
 }
 
@@ -62,31 +65,37 @@ TEST_CASE( "Test mazes", "[maze progress]") {
         uniform_int_distribution<int> dist {low, high};
         return dist(rng);
     };
-    maze_builder builder;
+    mazes::builder builder;
     SECTION("BINARY_TREE PROGRESS") {
         auto maze1 = builder.rows(10).columns(10).height(10)
-            .get_int(get_int).rng(rng).maze_type(maze_types::BINARY_TREE)
+            .maze_type(algos::BINARY_TREE)
             .offset_x(10)
             .offset_z(10).build();
-        maze1->compute_geometry();
-        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
+        progress p{};
+        computations::compute_geometry(cref(maze1));
+        auto elapsed = p.elapsed_s();
+        REQUIRE(elapsed <= 1000.0);
     }
     SECTION("SIDEWINDER PROGRESS") {
         auto maze1 = builder.rows(10).columns(10).height(10)
-            .get_int(get_int).rng(rng).maze_type(maze_types::SIDEWINDER)
+            .maze_type(algos::SIDEWINDER)
             .offset_x(10)
             .offset_z(10).build();
-        maze1->compute_geometry();
-        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
+        progress p{};
+        computations::compute_geometry(cref(maze1));
+        auto elapsed = p.elapsed_s();
+        REQUIRE(elapsed <= 1000.0);
     }
 
     SECTION("DFS PROGRESS") {
         auto maze1 = builder.rows(50).columns(50).height(50)
-            .get_int(get_int).rng(rng).maze_type(maze_types::DFS)
+            .maze_type(algos::DFS)
             .offset_x(10)
             .offset_z(10).build();
-        maze1->compute_geometry();
-        REQUIRE(maze1->get_progress_in_seconds() <= 1000.0);
+        progress p{};
+        computations::compute_geometry(cref(maze1));
+        auto elapsed = p.elapsed_s();
+        REQUIRE(elapsed <= 1000.0);
     }
 }
 

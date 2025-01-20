@@ -6,14 +6,14 @@
 #include <future>
 #include <random>
 
-#include "maze_algo_interface.h"
+#include "algos_interface.h"
 
 namespace mazes {
 
 class grid_interface;
 class cell;
 
-class binary_tree : public maze_algo_interface {
+class binary_tree : public algos_interface {
 public:
     bool run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
 private:

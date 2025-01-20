@@ -211,7 +211,7 @@ A voxel world that lets you build mazes and exports.
 
 [Check out the Voxels example in a web app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
-The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script, and then open the browser to `http://localhost:8000`.
+The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script. Once the script is running then open the browser to `http://localhost:8000`.
 
 
 ## TODO | 6.0.1-build

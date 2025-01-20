@@ -3,19 +3,21 @@ include(BuildInfo)
 set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
 
 set(MAZE_BUILDER_CORE_SRCS
-    args_builder.cpp
-    sidewinder.cpp
+    args.cpp
     binary_tree.cpp
-    sidewinder.cpp
-    grid.cpp
+    builder.cpp
     cell.cpp
-    writer.cpp
-    maze_builder.cpp
-    maze_factory.cpp
-    distances.cpp
-    distance_grid.cpp
     colored_grid.cpp
-    dfs.cpp)
+    computations.cpp
+    dfs.cpp
+    distance_grid.cpp
+    distances.cpp
+    factory.cpp
+    grid.cpp
+    maze.cpp
+    progress.cpp
+    sidewinder.cpp
+    writer.cpp)
 
 # Use these features on the Web only
 if(EMSCRIPTEN)

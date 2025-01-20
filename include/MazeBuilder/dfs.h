@@ -3,10 +3,13 @@
 
 #include <vector>
 
-#include "maze_algo_interface.h"
+#include <MazeBuilder/algos_interface.h>
 
 namespace mazes {
-    class dfs : public maze_algo_interface {
+
+class grid_interface;
+
+    class dfs : public algos_interface {
     public:
     virtual bool run(const std::unique_ptr<grid_interface>& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
     };

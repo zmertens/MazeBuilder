@@ -13,7 +13,7 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/distances.h>
-#include <MazeBuilder/maze_factory.h>
+#include <MazeBuilder/factory.h>
 
 using namespace mazes;
 using namespace std;

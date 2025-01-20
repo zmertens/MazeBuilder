@@ -31,7 +31,7 @@ bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, const s
         }
         // skip linking neighbor if we have no neighbor, prevent RNG out-of-bounds
         if (!neighbors.empty()) {
-            auto&& random_index = static_cast<size_t>(get_int(0, neighbors.size() - 1));
+            auto&& random_index = static_cast<int>(get_int(0, neighbors.size() - 1));
             auto&& neighbor = neighbors.at(random_index);
             if (neighbor != nullptr)
                 _cell->link(_cell, neighbor, true);

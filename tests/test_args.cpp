@@ -6,7 +6,7 @@
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include <MazeBuilder/args_builder.h>
+#include <MazeBuilder/args.h>
 
 using namespace std;
 using namespace mazes;
@@ -36,51 +36,40 @@ TEST_CASE( "Args are built by vector", "[args]" ) {
 
     REQUIRE(LONG_ARGS.empty() == false);
 
-    mazes::args_builder builder{ cref(LONG_ARGS) };
-    mazes::args maze_args = builder.build();
+    mazes::args args{};
+    REQUIRE(true == args.parse(LONG_ARGS));
 
-    REQUIRE(maze_args.help.empty() == true);
-    REQUIRE(maze_args.version.empty() == true);
-    REQUIRE(maze_args.interactive == false);
-    REQUIRE(maze_args.algorithm.compare(algorithm) == 0);
-    REQUIRE(maze_args.seed == seed);
-    REQUIRE(maze_args.output.compare(output) == 0);
-    REQUIRE(maze_args.columns == columns);
-    REQUIRE(maze_args.height == height);
-    REQUIRE(maze_args.rows == rows);
-	REQUIRE(maze_args.distances == true);
+    REQUIRE_FALSE(args.help.empty());
+    REQUIRE_FALSE(args.version.empty());
+    REQUIRE(args.algo.compare(algorithm) == 0);
+    REQUIRE(args.seed == seed);
+    REQUIRE(args.output.compare(output) == 0);
+    REQUIRE(args.columns == columns);
+    REQUIRE(args.height == height);
+    REQUIRE(args.rows == rows);
+	REQUIRE(args.distances == true);
 
     // Check the ostream operator
     stringstream ss;
-    ss << maze_args;
+    ss << args;
     REQUIRE(!ss.str().empty());
-;
-    // Check help message
-    auto&& maze_args_plus_help = builder.help(help_message).build();
-    REQUIRE(maze_args_plus_help.help.compare(help_message) == 0);
-
-    // Check version message
-    builder.clear();
-    auto&& maze_args_plus_version = builder.version(version_message).build();
-    REQUIRE(maze_args_plus_version.version.compare(version_message) == 0);
 
     static const vector<string> SHORT_ARGS = {
 		"maze_builder.exe",
 		"-s", to_string(seed),
-		"-i",
 		"-a", algorithm,
 		"-o", output,
 		"-c", to_string(columns),
 		"-r", to_string(rows),
-		"-y", to_string(height), "-d"};
+		"-y", to_string(height), 
+        "-d"};
     // First-come-first-serve and grab 'interactive'
-    mazes::args_builder builder2{ cref(SHORT_ARGS) };
-    auto&& maze_args2 = builder2.build();
-    REQUIRE(maze_args2.interactive == true);
+    mazes::args args2;
+    REQUIRE(true == args2.parse(SHORT_ARGS));
 	// Parsing help switch will break the loop
-    REQUIRE(maze_args2.help.empty());
-    REQUIRE(maze_args2.version.empty());
-    REQUIRE(maze_args2.distances == true);
+    REQUIRE(true == !args2.help.empty());
+    REQUIRE(true == !args2.version.empty());
+    REQUIRE(args2.distances == true);
 }
 
 TEST_CASE("Args are bad and cannot be built", "[args]") {
@@ -91,20 +80,7 @@ TEST_CASE("Args are bad and cannot be built", "[args]") {
     "-z"
     };
     // First-come-first-serve and grab 'interactive'
-    mazes::args_builder builder2{ cref(BAD_SHORT_ARGS) };
-    auto&& maze_args2 = builder2.build();
-    REQUIRE_NOTHROW(maze_args2);
-}
-
-TEST_CASE("Args has help and version", "[help, version]") {
-    static const vector<string> SHORT_ARGS = {
-    "maze_builder.exe",
-    "-h", "-v",
-    };
-    // First-come-first-serve and grab 'interactive'
-    mazes::args_builder builder2{ cref(SHORT_ARGS) };
-    auto&& maze_args2 = builder2.build();
-    // Parsing help switch will break the loop
-    REQUIRE(!maze_args2.help.empty());
-    REQUIRE(maze_args2.version.empty());
+    mazes::args args;
+    REQUIRE(false == args.parse(BAD_SHORT_ARGS));
+    REQUIRE_NOTHROW(args.parse(BAD_SHORT_ARGS));
 }

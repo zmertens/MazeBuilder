@@ -8,13 +8,13 @@
 #include <cstdint>
 #include <optional>
 
-#include "maze_types_enum.h"
-#include "cell.h"
+#include <MazeBuilder/enums.h>
+#include <MazeBuilder/cell.h>
 
 namespace mazes {
-
 	class grid_interface {
 	public:
+
         virtual ~grid_interface() = default;
 		virtual unsigned int get_rows() const noexcept = 0;
 		virtual unsigned int get_columns() const noexcept = 0;
@@ -31,7 +31,7 @@ namespace mazes {
 		virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
 		virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
     protected:
-		friend std::ostream& operator<<(std::ostream& os, grid_interface& g) {
+		friend std::ostream& operator<<(std::ostream& os, const grid_interface& g) {
             // First sort cells by row then column
             std::vector<std::shared_ptr<cell>> cells;
             cells.reserve(g.get_rows() * g.get_columns());

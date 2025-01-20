@@ -1,8 +1,3 @@
-/**
- * @brief Data class representing a cell in the maze
- *
- */
-
 #ifndef CELL_H
 #define CELL_H
 
@@ -13,12 +8,9 @@
 
 namespace mazes {
 
-/**
- * @class cell
- *  enable_shared_from_this allows creation of shared_ptr
- *  without creating another instance of 'this'
- */
+/// @brief Cell class for maze generation
 class cell {
+    using cell_ptr_shared = std::shared_ptr<cell>;
 public:
     explicit cell(int index);
     explicit cell(unsigned int row, unsigned int column, int index);
@@ -33,9 +25,6 @@ public:
     unsigned int get_column() const;
     int get_index() const;
 	void set_index(int next_index) noexcept;
-
-	void set_color(std::uint32_t c) noexcept;
-    std::uint32_t get_color() const noexcept;
 
     std::shared_ptr<cell> get_north() const;
     std::shared_ptr<cell> get_south() const;
@@ -63,7 +52,6 @@ private:
 
     unsigned int m_row, m_column;
     int m_index;
-    std::uint32_t m_color;
 
     std::shared_ptr<cell> m_north;
     std::shared_ptr<cell> m_south;
@@ -72,7 +60,7 @@ private:
 
     std::shared_ptr<cell> m_left;
     std::shared_ptr<cell> m_right;
-};
+}; // class
 
 } // namespace
 

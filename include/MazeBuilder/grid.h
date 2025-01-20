@@ -1,7 +1,7 @@
-/**
- * The grid class implements a Binary Search Tree for performance and API reasons
- * Grid represents an ASCII-format maze in 2D, or Wavefront object file in 3D
-*/
+/// \file
+/// The grid class implements a Binary Search Tree for performance and API reasons
+/// Grid represents an ASCII-format maze in 2D, or Wavefront object file in 3D
+///
 
 #ifndef GRID_H
 #define GRID_H
@@ -15,8 +15,8 @@
 #include <optional>
 
 #include "cell.h"
-#include "maze_types_enum.h"
-#include "grid_interface.h"
+#include <MazeBuilder/enums.h>
+#include <MazeBuilder/grid_interface.h>
 
 namespace mazes {
 

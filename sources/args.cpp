@@ -6,85 +6,32 @@ The getters throw exceptions if the arg is not found, generally if a map is prov
 It is preferred to parse program arguments but the map is useful for testing
 */
 
-#include <MazeBuilder/args_builder.h>
+#include <MazeBuilder/args.h>
 
-#include <iostream>
 #include <string>
 #include <regex>
 #include <functional>
 
 using namespace mazes;
 
-/**
- * @brief Construct args from program args
- */
-args_builder::args_builder(const std::vector<std::string>& vv)
-: my_args{} {
-    this->parse(cref(vv));
-}
+/// @brief Default constructor
+args::args()
+: algo{"binary_tree"}
+, distances{false}
+, output{"out.txt"}
+, seed{0}
+, columns{10}
+, rows{10}
+, height{1}
+, version{"0.0.1"}
+, help{"REPLACE_WITH_HELP_MESSAGE"} {
 
-args_builder& args_builder::seed(int seed) noexcept {
-    this->my_args.seed = seed;
-	return *this;
-}
-
-args_builder& args_builder::interactive(bool interactive) noexcept {
-    this->my_args.interactive = interactive;
-    return *this;
-}
-
-args_builder& args_builder::version(const std::string& version) noexcept {
-    this->my_args.version = version;
-	return *this;
-}
-
-args_builder& args_builder::help(const std::string& help) noexcept {
-    this->my_args.help = help;
-    return *this;
-}
-
-args_builder& args_builder::algorithm(const std::string& algorithm) noexcept {
-	this->my_args.algorithm = algorithm;
-	return *this;
-}
-
-args_builder& args_builder::output(const std::string& output) noexcept {
-    this->my_args.output = output;
-	return *this;
-}
-
-args_builder& args_builder::rows(int rows) noexcept {
-    this->my_args.rows = rows;
-    return *this;
-}
-
-args_builder& args_builder::columns(int columns) noexcept {
-    this->my_args.columns = columns;
-    return *this;
-}
-
-args_builder& args_builder::height(int height) noexcept {
-	this->my_args.height = height;
-	return *this;
-}
-
-args_builder& args_builder::distances(bool distances) noexcept {
-	this->my_args.distances = distances;
-    return *this;
-}
-
-void args_builder::clear() noexcept {
-    this->my_args = args{};
-}
-
-args args_builder::build() const noexcept {
-    return this->my_args;
 }
 
 /**
  * @brief Parse program arguments, store data in a stack, and then build the args
  */
-void args_builder::parse(const std::vector<std::string>& vv) noexcept {
+bool args::parse(const std::vector<std::string>& arguments) noexcept {
     using namespace std;
 
     // This function parses "long" options like "--seed=12345" or "--interactive"
@@ -102,7 +49,6 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
         return temp;
     };
 
-    regex interactive_regex ("^--interactive$|^-i$", regex_constants::ECMAScript);
     regex seed_regex ("--seed=[\\d+]+|^-s$", regex_constants::ECMAScript);
     regex rows_regex ("--rows=[\\d+]+|^-r$", regex_constants::ECMAScript);
     regex columns_regex("--columns=[\\d]+|^-c$", regex_constants::ECMAScript);
@@ -115,96 +61,93 @@ void args_builder::parse(const std::vector<std::string>& vv) noexcept {
 
     string short_val_option {""};
     // skip program name with +1
-    auto&& itr = vv.cbegin() + 1;
-    for (; itr != vv.cend(); itr++) {
+    auto&& itr = arguments.cbegin() + 1;
+    for (; itr != arguments.cend(); itr++) {
         string current {*itr};
         if (regex_match(current, help_regex)) {
-            this->my_args.help = "REPLACE_WITH_HELP_MESSAGE";
             break;
         } else if (regex_match(current, version_regex)) {
-            this->my_args.version = "REPLACE_WITH_VERSION_MESSAGE";
             break;
-        } else if (regex_match(current, interactive_regex)) {
-            this->my_args.interactive = true;
         } else if (regex_match(current, seed_regex)) {
             // seed follows an '=' for long option, -s for short option
             if (current.compare("-s") == 0) { 
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.seed = atoi((*(itr + 1)).c_str());
+                if (itr + 1 != arguments.cend()) {
+                    this->seed = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }    
             } else {
-                this->my_args.seed = atoi(get_val_from_long_option(current).c_str());
+                this->seed = atoi(get_val_from_long_option(current).c_str());
             }
 		} else if (regex_match(current, distances_regex)) {
 			// --distances, -d
-            this->my_args.distances = true;
+            this->distances = true;
         } else if (regex_match(current, rows_regex)) {
             // --rows=?, -r ?
             if (current.compare("-r") == 0) {
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.rows = atoi((*(itr + 1)).c_str());
+                if (itr + 1 != arguments.cend()) {
+                    this->rows = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.rows = atoi(get_val_from_long_option(current).c_str());
+                this->rows = atoi(get_val_from_long_option(current).c_str());
             }
         } else if (regex_match(current, columns_regex)) {
             // --columns=?, -c ?
             if (current.compare("-c") == 0) { 
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.columns = atoi((*(itr + 1)).c_str());
+                if (itr + 1 != arguments.cend()) {
+                    this->columns = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.columns = atoi(get_val_from_long_option(current).c_str());
+                this->columns = atoi(get_val_from_long_option(current).c_str());
             }
         } else if (regex_match(current, height_regex)) {
             // --height=?, -y ?
             if (current.compare("-y") == 0) { 
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.height = atoi((*(itr + 1)).c_str());
+                if (itr + 1 != arguments.cend()) {
+                    this->height = atoi((*(itr + 1)).c_str());
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.height = atoi(get_val_from_long_option(current).c_str());
+                this->height = atoi(get_val_from_long_option(current).c_str());
             }
         } else if (regex_match(current, algo_regex)) {
             // --algorithm=?, -a ?
             if (current.compare("-a") == 0) { 
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.algorithm = (*(itr + 1));
+                if (itr + 1 != arguments.cend()) {
+                    this->algo = (*(itr + 1));
                     itr++;
                 } else {
                     break;
                 }
             } else {
-                this->my_args.algorithm = get_val_from_long_option(current);
+                this->algo = get_val_from_long_option(current);
             }
         } else if (regex_match(current, output_regex)) {
             // --output=?, -o ?
             if (current.compare("-o") == 0) { 
-                if (itr + 1 != vv.cend()) {
-                    this->my_args.output = (*(itr + 1));
+                if (itr + 1 != arguments.cend()) {
+                    this->output = (*(itr + 1));
                     itr++;
                 } else {
 					break;
 				}
             } else {
-                this->my_args.output = get_val_from_long_option(current);
+                this->output = get_val_from_long_option(current);
             }
         } else {
-            cerr << "ERROR: Could not handle arguments: " << current << endl;
-            break;
+            return false;
         }
     } // loop
+
+    return true;
 } // parse
 

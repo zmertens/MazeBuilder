@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <cassert>
 
-#include <MazeBuilder/output_types_enum.h>
+#include <MazeBuilder/enums.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
@@ -22,29 +22,29 @@ writer::writer() {
 
 }
 
-output_types writer::get_output_type(const std::string& filename) const noexcept {
+outputs writer::get_output_type(const std::string& filename) const noexcept {
 	if (filename.compare("stdout") == 0) {
-		return output_types::STDOUT;
+		return outputs::STDOUT;
 	}
 
 	// size of file extension is always 4: <dot>[txt|obj|png]
 	static constexpr auto FILE_EXT_LEN = 4;
 	auto found = filename.find(".");
 	if (found == string::npos) {
-		return output_types::UNKNOWN;
+		return outputs::UNKNOWN;
 	}
 	auto short_str = filename.substr(found, string::npos);
 	if (short_str.length() == FILE_EXT_LEN && short_str == ".txt") {
-		return output_types::PLAIN_TEXT;
+		return outputs::PLAIN_TEXT;
 	}
 	else if (short_str.length() == FILE_EXT_LEN && short_str == ".obj") {
-		return output_types::WAVEFRONT_OBJ_FILE;
+		return outputs::WAVEFRONT_OBJ_FILE;
 	}
 	else if (short_str.length() == FILE_EXT_LEN && short_str == ".png") {
-		return output_types::PNG;
+		return outputs::PNG;
 	}
 	else {
-		return output_types::UNKNOWN;
+		return outputs::UNKNOWN;
 	}
 }
 
@@ -59,19 +59,19 @@ bool writer::write(const std::string& filename, const std::string& data) const n
 
 	// open file stream and start writing the data as per the file type
 	try {
-		if (otype == output_types::PLAIN_TEXT) {
+		if (otype == outputs::PLAIN_TEXT) {
 			this->write_file(filename, data);
 			return true;
-		} else if (otype == output_types::WAVEFRONT_OBJ_FILE) {
+		} else if (otype == outputs::WAVEFRONT_OBJ_FILE) {
 			this->write_file(filename, data);
 			return true;
-		} else if (otype == output_types::STDOUT) {
+		} else if (otype == outputs::STDOUT) {
 			cout << data << endl;
 			return true;
-		} else if (otype == output_types::PNG) {
+		} else if (otype == outputs::PNG) {
 			cerr << "ERROR: Incorrect arguments for write_png with output: " << filename << "\n";
 			return false;
-		} else if (otype == output_types::UNKNOWN) {
+		} else if (otype == outputs::UNKNOWN) {
 			cerr << "ERROR: Unknown output type!!\n";
 			return false;
 		} else {

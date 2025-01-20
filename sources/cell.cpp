@@ -93,14 +93,6 @@ void cell::set_index(int next_index) noexcept {
     this->m_index = next_index;
 }
 
-void cell::set_color(std::uint32_t c) noexcept {
-	this->m_color = c;
-}
-
-std::uint32_t cell::get_color() const noexcept {
-	return this->m_color;
-}
-
 shared_ptr<cell> cell::get_north() const {
     return this->m_north;
 }

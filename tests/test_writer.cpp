@@ -5,9 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <MazeBuilder/output_types_enum.h>
 #include <MazeBuilder/writer.h>
-#include <MazeBuilder/maze_types_enum.h>
 #include <MazeBuilder/maze_builder.h>
 
 using namespace std;
@@ -22,33 +20,30 @@ TEST_CASE("Writer can receive program arguments", "[determine output format]") {
 
 	for (auto&& good : good_filenames) {
 		auto&& ftype = my_writer.get_output_type(good);
-		CHECK_FALSE(ftype == output_types::UNKNOWN);
+		CHECK_FALSE(ftype == outputs::UNKNOWN);
 	}
 
 	for (auto&& bad : bad_filenames) {
 		auto&& ftype = my_writer.get_output_type(bad);
-		CHECK(ftype == output_types::UNKNOWN);
+		CHECK(ftype == outputs::UNKNOWN);
 	}
 
-	REQUIRE(my_writer.get_output_type("stdout") == output_types::STDOUT);
+	REQUIRE(my_writer.get_output_type("stdout") == outputs::STDOUT);
 }
 
 TEST_CASE("Writer can produce a PNG file", "[does png]") {
-	mt19937 rng{ random_device{}() };
-	auto get_int = [&rng](auto x, auto y)->auto {
-		return uniform_int_distribution<int>{x, y}(rng);
-		};
-
-    maze_builder builder;
-    auto my_maze = builder.rows(10).columns(10).height(10).get_int(get_int).rng(rng).build();
-    my_maze->compute_geometry();
+    mazes::builder builder;
+    unique_ptr<maze> my_maze = builder.rows(10).columns(10).height(10).build();
+	progress p{};
+	computations::compute_geometry(cref(my_maze));
+	auto elapsed = p.elapsed_s();
 	auto&& my_png = my_maze->to_pixels(15);
 
 	REQUIRE(!my_png.empty());
 
 	writer my_writer;
 
-	REQUIRE(my_writer.get_output_type("1.png") == output_types::PNG);
+	REQUIRE(my_writer.get_output_type("1.png") == outputs::PNG);
 
 	REQUIRE(my_writer.write_png("1.png", my_png, my_maze->rows * 4, my_maze->columns * 4));
 }
