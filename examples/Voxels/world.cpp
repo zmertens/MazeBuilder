@@ -5,7 +5,7 @@
 using namespace std;
 using namespace mazes;
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const vector<unique_ptr<maze_builder::maze>>& my_mazes) const noexcept {
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const vector<unique_ptr<maze>>& my_mazes) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {

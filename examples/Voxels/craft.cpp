@@ -49,9 +49,7 @@
 #include "item.h"
 #include "matrix.h"
 
-#include <MazeBuilder/maze_types_enum.h>
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/writer.h>
 
 // Movement configurations
 #define KEY_FORWARD SDL_SCANCODE_W
@@ -404,7 +402,7 @@ struct craft::craft_impl {
         this->reset_model();
     }
 
-    int worker_run(void* arg, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    int worker_run(void* arg, const vector<unique_ptr<maze>>& my_mazes) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
@@ -428,7 +426,7 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-    void init_worker_threads(const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    void init_worker_threads(const vector<unique_ptr<maze>>& my_mazes) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
@@ -1393,7 +1391,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    void load_chunk(WorkerItem* item, const vector<unique_ptr<maze>>& my_mazes) {
         int p = item->p;
         int q = item->q;
 
@@ -1430,7 +1428,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    void create_chunk(Chunk* chunk, int p, int q, const vector<unique_ptr<maze>>& my_mazes) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1520,7 +1518,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    void force_chunks(Player* player, const vector<unique_ptr<maze>>& my_mazes) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1637,7 +1635,7 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    void ensure_chunks(Player* player, const vector<unique_ptr<maze>>& my_mazes) {
         check_workers();
         force_chunks(player, cref(my_mazes));
         for (auto&& worker : this->m_model->workers) {
@@ -1810,7 +1808,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const vector<unique_ptr<maze_builder::maze>>& my_mazes) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const vector<unique_ptr<maze>>& my_mazes) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(my_mazes));
@@ -2674,8 +2672,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
     // Init some local vars for handling maze duties
     list<string> algo_list;
-    for (auto i{ static_cast<int>(maze_types::BINARY_TREE) }; i < static_cast<int>(maze_types::INVALID_ALGO); ++i) {
-        algo_list.push_back(to_string(static_cast<maze_types>(i)));
+    for (auto i{ static_cast<int>(algos::BINARY_TREE) }; i < static_cast<int>(algos::INVALID_ALGO); ++i) {
+        algo_list.push_back(to_string(static_cast<algos>(i)));
     }
 
     // Make some references
@@ -2683,7 +2681,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
-    vector<unique_ptr<maze_builder::maze>> my_mazes;
+    vector<unique_ptr<maze>> my_mazes;
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads(cref(my_mazes));
@@ -2698,6 +2696,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     CHECK_GL_ERR();
 
     // LOCAL VARIABLES
+    progress prog;
     uint64_t previous = SDL_GetTicks();
     double last_commit = SDL_GetTicks();
     int triangle_faces = 0;
@@ -2817,14 +2816,14 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                 if (gui->outfile[0] != '.') {
                     if (ImGui::Button("Export!")) {
                         // Building maze here has the effect of computing its geometry on this thread
-                        maze_builder builder;
+                        prog.reset();
+                        mazes::builder builder;
                         auto my_next_maze = builder.maze_type(my_maze_type)
                             .block_type(items[model->item_index])
-                            .get_int(get_int).rng(rng)
                             .rows(gui->rows).columns(gui->columns).height(gui->height)
                             .offset_x(p_state->x).offset_z(p_state->z)
                             .show_distances(false).seed(gui->seed).build();
-                        my_next_maze->compute_geometry();
+                        computations::compute_geometry(my_next_maze);
                         // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
@@ -2861,7 +2860,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     // Show last maze compute time
                     ImGui::NewLine();
                     ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
-                    ImGui::Text("Elapsed %.5f ms", my_mazes.back()->get_progress_in_ms());
+                    ImGui::Text("Elapsed %.5f ms", prog.elapsed_ms());
                     ImGui::NewLine();
                     ImGui::PopStyleColor();
                 }

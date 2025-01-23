@@ -14,7 +14,7 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 class world {
 public:
     void create_world(int p, int q, world_func func, Map *m, int chunk_size,
-        const std::vector<std::unique_ptr<mazes::maze_builder::maze>>& mb) const noexcept;
+        const std::vector<std::unique_ptr<mazes::maze>>& mb) const noexcept;
 };
 
 #endif

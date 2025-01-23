@@ -16,6 +16,7 @@
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/writer.h>
 
 namespace mazes {
 

@@ -18,7 +18,6 @@
 #include <nlohmann/json.hpp>
 
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/buildinfo.h>
 
 static constexpr auto MB_MENU_MSG = R"help(
     -- Maze Builder Menu --
@@ -71,17 +70,17 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             string algorithm;
             // Get user input
             cin >> rows >> columns >> height >> seed >> algorithm;
-            mazes::maze_types mt = mazes::to_maze_type(algorithm);
+            mazes::algos mt = mazes::to_maze_type(algorithm);
 
-            if (mt == mazes::maze_types::INVALID_ALGO) {
+            if (mt == mazes::algos::INVALID_ALGO) {
                 cerr << "Unknown algorithm: " << algorithm << endl;
                 break;
             }
 
             // Create the maze
-            mazes::maze_builder builder;
+            mazes::builder builder;
             auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
-            temp_maze->compute_geometry();
+            mazes::computations::compute_geometry(temp_maze);
             auto dump = temp_maze->to_json_str(4);
 
             sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};

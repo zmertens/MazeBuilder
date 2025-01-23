@@ -8,16 +8,7 @@
 #include <vector>
 #include <list>
 
-#include <MazeBuilder/colored_grid.h>
-#include <MazeBuilder/distances.h>
-#include <MazeBuilder/distance_grid.h>
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/args_builder.h>
-#include <MazeBuilder/output_types_enum.h>
-#include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/writer.h>
-#include <MazeBuilder/buildinfo.h>
 
 std::string maze_builder_version = mazes::build_info::Version + "-" + mazes::build_info::CommitSHA;
 
@@ -47,8 +38,11 @@ int main(int argc, char* argv[]) {
 
     vector<string> args_vec{ argv, argv + argc };
 
-    mazes::args_builder builder{ args_vec };
-	mazes::args maze_args = builder.build();
+    mazes::args maze_args{ };
+    if (!maze_args.parse(args_vec)) {
+        cerr << "ERROR: Invalid arguments!!" << endl;
+        return EXIT_FAILURE;
+    }
     
     if (!maze_args.help.empty()) {
         std::cout << MAZE_BUILDER_HELP << std::endl;
@@ -62,8 +56,8 @@ int main(int argc, char* argv[]) {
 	maze_args.help = MAZE_BUILDER_HELP;
 
     // Apply defaults
-    if (maze_args.algorithm.empty()) {
-        maze_args.algorithm = "binary_tree";
+    if (maze_args.algo.empty()) {
+        maze_args.algo = "binary_tree";
     }
     if (maze_args.output.empty()) {
         maze_args.output = "stdout";
@@ -88,49 +82,49 @@ int main(int argc, char* argv[]) {
         static constexpr auto CELL_SIZE = 10;
         bool success = false;
         // Run the command-line program
-        mazes::maze_types my_maze_type = mazes::to_maze_type(maze_args.algorithm);
+        mazes::algos my_maze_type = mazes::to_maze_type(maze_args.algo);
         static constexpr auto block_type = -1;
-        mazes::maze_builder builder;
+        mazes::progress progress;
+        mazes::builder builder;
         auto my_maze = builder.rows(maze_args.rows)
             .columns(maze_args.columns)
             .height(maze_args.height)
             .maze_type(my_maze_type)
-            .get_int(get_int)
-            .rng(rng_engine)
             .block_type(block_type)
             .show_distances(maze_args.distances)
             .build();
-        my_maze->compute_geometry();
+        mazes::computations::compute_geometry(my_maze);
         mazes::writer my_writer;
-        mazes::output_types my_output_type = my_writer.get_output_type(maze_args.output);
+        mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);
         switch (my_output_type) {
-        case mazes::output_types::WAVEFRONT_OBJ_FILE:
+        case mazes::outputs::WAVEFRONT_OBJ_FILE:
             success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
             break;
-        case mazes::output_types::PNG:
+        case mazes::outputs::PNG:
             success = my_writer.write_png(cref(maze_args.output), 
             my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
             break;
-        case mazes::output_types::PLAIN_TEXT: [[fallthrough]];
-        case mazes::output_types::STDOUT: {
+        case mazes::outputs::PLAIN_TEXT: [[fallthrough]];
+        case mazes::outputs::STDOUT: {
             string maze_str = my_maze->to_str();
             success = my_writer.write(cref(maze_args.output), cref(maze_str));
             break;
         }
-        case mazes::output_types::UNKNOWN:
+        case mazes::outputs::UNKNOWN:
             success = false;
             break;
         }
 
         if (success) {
-            auto elapsedms = my_maze->get_progress_in_ms();
+            auto elapsedms = progress.elapsed_ms();
+            progress.reset();
 #if defined(MAZE_DEBUG)
             std::cout << "INFO: Writing to file: " << maze_args.output << " complete!!" << std::endl;
             std::cout << "INFO: Progress: " << elapsedms << " seconds" << std::endl;
 #endif
         }
         else {
-            std::cerr << "ERROR: " << maze_args.algorithm << " failed!!" << std::endl;
+            std::cerr << "ERROR: " << maze_args.algo << " failed!!" << std::endl;
             std::cerr << "ERROR: Writing to file: " << maze_args.output << std::endl;
         }
     } catch (std::exception& ex) {

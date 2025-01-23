@@ -12,8 +12,6 @@
 #include <list>
 #include <random>
 
-#include <MazeBuilder/maze_types_enum.h>
-
 class craft {
 public:
     craft(const std::string& title, const std::string& version, int w, int h);
