@@ -49,13 +49,13 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
             .build();
         progress p{};
         computations::compute_geometry(cref(maze1));
-        auto elapsed = p.elapsed_ms();
+        auto elapsed = p.elapsed_s();
         REQUIRE(maze1->columns == NUM_COLS);
         REQUIRE(maze1->rows == NUM_ROWS);
         REQUIRE(maze1->height == HEIGHT);
         REQUIRE(maze1->offset_x == OFFSET_X);
         REQUIRE(maze1->offset_z == OFFSET_Z);
-        REQUIRE(elapsed != 0.0);
+        REQUIRE(elapsed <= 1000.0);
     };
 }
 

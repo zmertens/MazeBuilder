@@ -20,7 +20,8 @@ class cell;
 using grid_ptr = std::unique_ptr<grid_interface>;
 
 /// @brief Data class to represent a maze
-struct maze {
+class maze {
+public:
     using dimensions = std::tuple<int, int, int, int>;
     using pqmap = std::unordered_map<std::pair<int, int>, dimensions, pair_hash>;
     using maze_ptr = std::unique_ptr<maze>;
