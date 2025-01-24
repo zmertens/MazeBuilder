@@ -10,7 +10,12 @@
 
 using namespace mazes;
 
-void mazes::computations::compute_geometry(const mazes::maze_ptr& m) noexcept {
+/// <summary>
+/// 
+/// </summary>
+/// <param name="m"></param>
+/// <param name=""></param>
+void mazes::computations::compute_geometry(const mazes::maze_ptr& m, grid_ptr g) noexcept {
     using namespace std;
 
     auto add_block = [&m](int x, int y, int z, int w, int block_size) {

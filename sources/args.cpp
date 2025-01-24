@@ -18,7 +18,7 @@ using namespace mazes;
 args::args()
 : algo{"binary_tree"}
 , distances{false}
-, output{"out.txt"}
+, output{"stdout"}
 , seed{0}
 , columns{10}
 , rows{10}

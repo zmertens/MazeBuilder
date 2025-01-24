@@ -10,7 +10,7 @@
 
 #include <MazeBuilder/maze_builder.h>
 
-std::string maze_builder_version = mazes::build_info::Version + "-" + mazes::build_info::CommitSHA;
+std::string maze_builder_version = "maze_builder\tversion\t" + mazes::build_info::Version + "-" + mazes::build_info::CommitSHA;
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
@@ -22,7 +22,6 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
           -y, --height       maze height [default=10]
           -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
-          -i, --interactive  No effect
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
           -h, --help         display this help message
           -v, --version      display program version
@@ -43,34 +42,20 @@ int main(int argc, char* argv[]) {
         cerr << "ERROR: Invalid arguments!!" << endl;
         return EXIT_FAILURE;
     }
-    
-    if (!maze_args.help.empty()) {
-        std::cout << MAZE_BUILDER_HELP << std::endl;
-        return EXIT_SUCCESS;
-    } else if (!maze_args.version.empty()) {
-        std::cout << maze_builder_version << std::endl;
-        return EXIT_SUCCESS;
+    for (const auto& arg : args_vec) {
+        if (arg.compare("-h") == 0 || arg.compare("--help") == 0) {
+            std::cout << MAZE_BUILDER_HELP << std::endl;
+            return EXIT_SUCCESS;
+        }
+        if (arg.compare("-v") == 0 || arg.compare("--version") == 0) {
+            std::cout << maze_builder_version << std::endl;
+            return EXIT_SUCCESS;
+        }
     }
+    
 	// Set the version and help strings
 	maze_args.version = maze_builder_version;
 	maze_args.help = MAZE_BUILDER_HELP;
-
-    // Apply defaults
-    if (maze_args.algo.empty()) {
-        maze_args.algo = "binary_tree";
-    }
-    if (maze_args.output.empty()) {
-        maze_args.output = "stdout";
-    }
-    if (maze_args.columns == 0) {
-        maze_args.columns = 100;
-    }
-    if (maze_args.rows == 0) {
-        maze_args.rows = 100;
-    }
-    if (maze_args.height == 0) {
-        maze_args.height = 1;
-    }
 
     std::mt19937 rng_engine{ static_cast<unsigned long>(maze_args.seed) };
     auto get_int = [&rng_engine](int low, int high) -> int {
@@ -93,6 +78,7 @@ int main(int argc, char* argv[]) {
             .block_type(block_type)
             .show_distances(maze_args.distances)
             .build();
+        my_maze->init();
         mazes::computations::compute_geometry(my_maze);
         mazes::writer my_writer;
         mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);

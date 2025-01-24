@@ -2823,6 +2823,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                             .rows(gui->rows).columns(gui->columns).height(gui->height)
                             .offset_x(p_state->x).offset_z(p_state->z)
                             .show_distances(false).seed(gui->seed).build();
+                        my_next_maze->init();
                         computations::compute_geometry(my_next_maze);
                         // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)

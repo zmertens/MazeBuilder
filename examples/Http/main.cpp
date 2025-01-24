@@ -80,6 +80,7 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             // Create the maze
             mazes::builder builder;
             auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
+            temp_maze->init();
             mazes::computations::compute_geometry(temp_maze);
             auto dump = temp_maze->to_json_str(4);
 
