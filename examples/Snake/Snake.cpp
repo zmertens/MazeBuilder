@@ -1,6 +1,6 @@
 /**
- * @brief Generator class implementation
- *  Simple 2D maze generator using SDL3
+ * @brief Snake class implementation
+ *  Simple 2D maze Snake using SDL3
  *  Press 'B' to generate a new maze
  * 
  * Threading technique uses 'islands':
@@ -10,7 +10,7 @@
  *
  */
 
-#include "Generator.hpp"
+#include "Snake.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -31,20 +31,20 @@
 
 #include <MazeBuilder/maze_builder.h>
 
-struct Generator::GeneratorImpl {
+struct Snake::SnakeImpl {
 
     enum class States {
-        // Generator is starting, show welcome screen
+        // Snake is starting, show welcome screen
         SPLASH,
         // Main menu / configurations
         OPTIONS,
-        // Generator is running
+        // Snake is running
         PLAY,
-        // Level is generated but Generator is paused/options
+        // Level is generated but Snake is paused/options
         PAUSE,
-        // Generator is exiting and done
+        // Snake is exiting and done
         DONE,
-        // Useful when knowing when to re-draw in Generator loop
+        // Useful when knowing when to re-draw in Snake loop
         // Level is being generated and not yet playable
         UPLOADING_LEVEL,
     };
@@ -215,10 +215,10 @@ struct Generator::GeneratorImpl {
 
     // Global - Keep track of worker work count
     int pendingWorkCount;
-    // Keep track of user and Generator states
+    // Keep track of user and Snake states
     States state;
 
-    GeneratorImpl(const std::string& title, const std::string& version, int w, int h)
+    SnakeImpl(const std::string& title, const std::string& version, int w, int h)
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , sdlHelper{}, workQueue{}
         , gameMtx{ nullptr }, gameCond{ nullptr }
@@ -234,7 +234,7 @@ struct Generator::GeneratorImpl {
         this->initWorkers();
     }
 
-    ~GeneratorImpl() {
+    ~SnakeImpl() {
 
     }
 
@@ -245,45 +245,45 @@ struct Generator::GeneratorImpl {
      */
     static int threadFunc(void* data) {
         using namespace std;
-        auto* Generator = reinterpret_cast<GeneratorImpl*>(data);
+        auto* Snake = reinterpret_cast<SnakeImpl*>(data);
         vector<SDL_Vertex> vertices;
 
         while (1) {
             {
-                SDL_LockMutex(Generator->gameMtx);
-                while (Generator->workQueue.empty() && Generator->state != States::DONE) {
-                    SDL_WaitCondition(Generator->gameCond, Generator->gameMtx);
+                SDL_LockMutex(Snake->gameMtx);
+                while (Snake->workQueue.empty() && Snake->state != States::DONE) {
+                    SDL_WaitCondition(Snake->gameCond, Snake->gameMtx);
                 }
 
-                if (Generator->state == States::DONE) {
-                    SDL_UnlockMutex(Generator->gameMtx);
+                if (Snake->state == States::DONE) {
+                    SDL_UnlockMutex(Snake->gameMtx);
                     break;
                 }
 
                 // Now process a work item
-                if (!Generator->workQueue.empty()) {
-                    auto&& temp = Generator->workQueue.front();
-                    Generator->workQueue.pop_front();
+                if (!Snake->workQueue.empty()) {
+                    auto&& temp = Snake->workQueue.front();
+                    Snake->workQueue.pop_front();
                     SDL_Log("Processing work item [ start: %d | count: %d]\n", temp.start, temp.count);
-                    Generator->doWork(ref(vertices), cref(temp));
+                    Snake->doWork(ref(vertices), cref(temp));
                     if (!vertices.empty()) {
                         copy(vertices.begin(), vertices.end(), back_inserter(temp.vertices));
                     } else {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated\n");
                     }
                 }
-                SDL_UnlockMutex(Generator->gameMtx);
+                SDL_UnlockMutex(Snake->gameMtx);
             }
 
             {
                 // Update work count and wake up any threads waiting
-                SDL_LockMutex(Generator->gameMtx);
-                Generator->pendingWorkCount -= 1;
-                SDL_Log("Pending work count: %d\n", Generator->pendingWorkCount);
-                if (Generator->pendingWorkCount <= 0) {
-                    SDL_SignalCondition(Generator->gameCond);
+                SDL_LockMutex(Snake->gameMtx);
+                Snake->pendingWorkCount -= 1;
+                SDL_Log("Pending work count: %d\n", Snake->pendingWorkCount);
+                if (Snake->pendingWorkCount <= 0) {
+                    SDL_SignalCondition(Snake->gameCond);
                 }
-                SDL_UnlockMutex(Generator->gameMtx);
+                SDL_UnlockMutex(Snake->gameMtx);
             }
         }
 
@@ -446,20 +446,20 @@ private:
             } // cells
         } // background / walls
     } // doWork
-}; // GeneratorImpl
+}; // SnakeImpl
 
 
-Generator::Generator(const std::string& title, const std::string& version, int w, int h)
-    : m_impl{ std::make_unique<GeneratorImpl>(std::cref(title), std::cref(version), w, h)} {
+Snake::Snake(const std::string& title, const std::string& version, int w, int h)
+    : m_impl{ std::make_unique<SnakeImpl>(std::cref(title), std::cref(version), w, h)} {
 }
 
-Generator::~Generator() {
+Snake::~Snake() {
     auto&& g = this->m_impl;
     // Clean up threads
     SDL_LockMutex(g->gameMtx);
     // Wake up any threads and wait for them to finish
     g->pendingWorkCount = 0;
-    g->state = GeneratorImpl::States::DONE;
+    g->state = SnakeImpl::States::DONE;
     SDL_BroadcastCondition(g->gameCond);
     SDL_UnlockMutex(g->gameMtx);
     for (auto&& t : g->threads) {
@@ -472,11 +472,11 @@ Generator::~Generator() {
     SDL_DestroyCondition(g->gameCond);
 }
 
-bool Generator::run() const noexcept {
+bool Snake::run() const noexcept {
 
     using namespace std;
 
-    // Create an alias to the Generator implementation
+    // Create an alias to the Snake implementation
     auto&& sdlHelper = this->m_impl->sdlHelper;
     string_view titleView = this->m_impl->title;
     sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
@@ -513,7 +513,7 @@ bool Generator::run() const noexcept {
     SDL_SetRenderVSync(renderer, true);
     auto&& window = sdlHelper.window;
 
-    Generator::GeneratorImpl::SDLTexture renderToTexture;
+    Snake::SnakeImpl::SDLTexture renderToTexture;
     bool res = renderToTexture.loadTarget(renderer, this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H);
     if (!res) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load target texture: %s\n", SDL_GetError());
@@ -526,9 +526,9 @@ bool Generator::run() const noexcept {
     // Timers for keeping track of frame rates
     double previous = SDL_GetTicks();
     double accumulator = 0.0, currentTimeStep = 0.0;
-    // Generator loop
+    // Snake loop
     auto&& gState = this->m_impl->state;
-    while (gState != GeneratorImpl::States::DONE) {
+    while (gState != SnakeImpl::States::DONE) {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = SDL_GetTicks() - previous;
         previous = SDL_GetTicks();
@@ -572,7 +572,7 @@ bool Generator::run() const noexcept {
 
         // Draw/gen the level
         if (!this->m_impl->pendingWorkCount) {
-            if (gState == GeneratorImpl::States::UPLOADING_LEVEL) {
+            if (gState == SnakeImpl::States::UPLOADING_LEVEL) {
                 // Update state and current level
                 SDL_Log("New level uploading\n");
                 mazes::builder builder;
@@ -591,7 +591,7 @@ bool Generator::run() const noexcept {
                 // Now start the worker threads
                 this->m_impl->genLevel(ref(level), cref(cells), cellSize);
 
-                gState = GeneratorImpl::States::PLAY;
+                gState = SnakeImpl::States::PLAY;
             }
 
             // Now draw geometry ensuring complete render with no more work pending

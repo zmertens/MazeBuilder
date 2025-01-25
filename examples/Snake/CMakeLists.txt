@@ -5,7 +5,7 @@ set(EXE_NAME "mazebuildersnake")
 
 set(GENERATOR_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/Generator.cpp)
+	${CMAKE_CURRENT_SOURCE_DIR}/Snake.cpp)
 
 set(DEAR_IMGUI_SOURCES
   ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.cpp
