@@ -59,6 +59,15 @@ public:
     void intopq(int x, int y, int z, int w) noexcept;
 
     std::optional<std::reference_wrapper<const std::unique_ptr<grid_interface>>> get_grid() const noexcept;
+
+    static std::string stringify(const std::unique_ptr<maze>& p) noexcept {
+
+        std::ostringstream oss;
+
+        oss << *(p->get_grid()->get());
+    
+        return oss.str();
+    } // stringify
 private:
 
     pqmap m_p_q;

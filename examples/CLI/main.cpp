@@ -81,8 +81,8 @@ int main(int argc, char* argv[]) {
         my_maze->init();
         mazes::computations::compute_geometry(my_maze);
 
-        auto maze_s = mazes::tools::stringify(cref(my_maze->get_grid().value()));
-        // cout << maze_s << endl;
+        auto maze_s = mazes::maze::stringify(cref(my_maze));
+        cout << maze_s << endl;
 
         // mazes::writer my_writer;
         // mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);
