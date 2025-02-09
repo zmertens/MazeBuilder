@@ -4,6 +4,7 @@ set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
 
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
+    base64_helper.cpp
     binary_tree.cpp
     builder.cpp
     cell.cpp
@@ -14,9 +15,11 @@ set(MAZE_BUILDER_CORE_SRCS
     distances.cpp
     factory.cpp
     grid.cpp
+    json_helper.cpp
     maze.cpp
     progress.cpp
     sidewinder.cpp
+    wavefront_object_helper.cpp
     writer.cpp)
 
 # Use these features on the Web only

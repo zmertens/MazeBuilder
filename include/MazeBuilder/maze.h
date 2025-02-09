@@ -2,6 +2,7 @@
 #define MAZE_H
 
 #include <string>
+#include <ostream>
 #include <memory>
 #include <functional>
 #include <random>
@@ -17,11 +18,10 @@ namespace mazes {
 
 class cell;
 
-using grid_ptr = std::unique_ptr<grid_interface>;
-
 /// @brief Data class to represent a maze
 class maze {
 public:
+
     using dimensions = std::tuple<int, int, int, int>;
     using pqmap = std::unordered_map<std::pair<int, int>, dimensions, pair_hash>;
     using maze_ptr = std::unique_ptr<maze>;
@@ -57,11 +57,13 @@ public:
     std::string to_wavefront_obj_str() const noexcept;
 
     void intopq(int x, int y, int z, int w) noexcept;
+
+    std::optional<std::reference_wrapper<const std::unique_ptr<grid_interface>>> get_grid() const noexcept;
 private:
 
     pqmap m_p_q;
 
-    grid_ptr my_grid;
+    std::unique_ptr<grid_interface> my_grid;
 }; // maze struct
 
 } // namespace mazes

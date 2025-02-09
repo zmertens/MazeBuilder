@@ -259,4 +259,9 @@ void maze::intopq(int x, int y, int z, int w) noexcept {
     m_p_q[{x, z}] = make_tuple(x, y, z, w);
 }
 
-
+std::optional<std::reference_wrapper<const std::unique_ptr<grid_interface>>> maze::get_grid() const noexcept {
+    if (this->my_grid) {
+        return cref(this->my_grid);
+    }
+    return std::nullopt;
+}

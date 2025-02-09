@@ -10,7 +10,7 @@
 
 #include <MazeBuilder/maze_builder.h>
 
-std::string maze_builder_version = "maze_builder\tversion\t" + mazes::build_info::Version + "-" + mazes::build_info::CommitSHA;
+std::string maze_builder_version = "maze_builder\tversion\t" + mazes::VERSION;
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
@@ -80,26 +80,30 @@ int main(int argc, char* argv[]) {
             .build();
         my_maze->init();
         mazes::computations::compute_geometry(my_maze);
-        mazes::writer my_writer;
-        mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);
-        switch (my_output_type) {
-        case mazes::outputs::WAVEFRONT_OBJ_FILE:
-            success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
-            break;
-        case mazes::outputs::PNG:
-            success = my_writer.write_png(cref(maze_args.output), 
-            my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
-            break;
-        case mazes::outputs::PLAIN_TEXT: [[fallthrough]];
-        case mazes::outputs::STDOUT: {
-            string maze_str = my_maze->to_str();
-            success = my_writer.write(cref(maze_args.output), cref(maze_str));
-            break;
-        }
-        case mazes::outputs::UNKNOWN:
-            success = false;
-            break;
-        }
+
+        auto maze_s = mazes::tools::stringify(cref(my_maze->get_grid().value()));
+        // cout << maze_s << endl;
+
+        // mazes::writer my_writer;
+        // mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);
+        // switch (my_output_type) {
+        // case mazes::outputs::WAVEFRONT_OBJ_FILE:
+        //     success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
+        //     break;
+        // case mazes::outputs::PNG:
+        //     success = my_writer.write_png(cref(maze_args.output), 
+        //     my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
+        //     break;
+        // case mazes::outputs::PLAIN_TEXT: [[fallthrough]];
+        // case mazes::outputs::STDOUT: {
+        //     string maze_str = my_maze->to_str();
+        //     success = my_writer.write(cref(maze_args.output), cref(maze_str));
+        //     break;
+        // }
+        // case mazes::outputs::UNKNOWN:
+        //     success = false;
+        //     break;
+        // }
 
         if (success) {
             auto elapsedms = progress.elapsed_ms();
