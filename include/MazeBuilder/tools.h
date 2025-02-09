@@ -9,7 +9,7 @@ namespace mazes {
 
 
         template <typename Ptr>
-        static constexpr std::string stringify(Ptr const& p) noexcept {
+        static std::string stringify(Ptr const& p) noexcept {
             std::ostringstream oss;
             oss << *p.get();
             return oss.str();
