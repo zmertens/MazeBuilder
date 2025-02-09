@@ -14,7 +14,11 @@
  *
  */
 bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
-	return this->run_on_cell(_grid->get_root(), std::cref(get_int), cref(rng));
+	if (auto gg = dynamic_cast<grid*>(_grid.get())) {
+        this->run_on_cell(gg->m_binary_search_tree_root, std::cref(get_int), cref(rng));
+    } else {
+        return false;
+    }
 }
 
 bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {

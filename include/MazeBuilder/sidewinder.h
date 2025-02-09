@@ -14,8 +14,11 @@ class grid_interface;
 class cell;
 
 class sidewinder : public algos_interface {
-public:
-    bool run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+
+
+    public:
+
+    bool run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
 };
 
 }

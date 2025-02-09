@@ -67,22 +67,27 @@ int main(int argc, char* argv[]) {
         static constexpr auto CELL_SIZE = 10;
         bool success = false;
         // Run the command-line program
-        mazes::algos my_maze_type = mazes::to_maze_type(maze_args.algo);
+        mazes::algos my_maze_type = mazes::to_algo_from_string(maze_args.algo);
         static constexpr auto block_type = -1;
         mazes::progress progress;
-        mazes::builder builder;
-        auto my_maze = builder.rows(maze_args.rows)
-            .columns(maze_args.columns)
-            .height(maze_args.height)
-            .maze_type(my_maze_type)
-            .block_type(block_type)
-            .show_distances(maze_args.distances)
-            .build();
-        my_maze->init();
-        mazes::computations::compute_geometry(my_maze);
 
-        auto maze_s = mazes::maze::stringify(cref(my_maze));
-        cout << maze_s << endl;
+        auto maze_opt = mazes::factory::create(
+            make_tuple(maze_args.rows, maze_args.columns, maze_args.height), 
+            my_maze_type, cref(get_int), cref(rng_engine));
+
+        // mazes::builder builder;
+        // auto my_maze = builder.r
+            // .block_type(block_type)
+            // .show_distances(maze_args.distances)
+            // .build();
+        // my_maze->init();
+        // mazes::computations::compute_geometry(my_maze);
+        if (maze_opt.has_value()) {
+            const auto& my_maze = maze_opt.value();
+            auto maze_s = mazes::maze::stringify(cref(my_maze));
+            cout << maze_s << endl;
+            success = true;
+        }
 
         // mazes::writer my_writer;
         // mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);

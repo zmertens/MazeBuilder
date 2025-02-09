@@ -38,7 +38,7 @@ outputs writer::get_output_type(const std::string& filename) const noexcept {
 		return outputs::PLAIN_TEXT;
 	}
 	else if (short_str.length() == FILE_EXT_LEN && short_str == ".obj") {
-		return outputs::WAVEFRONT_OBJ_FILE;
+		return outputs::WAVEFRONT_OBJECT_FILE;
 	}
 	else if (short_str.length() == FILE_EXT_LEN && short_str == ".png") {
 		return outputs::PNG;
@@ -62,7 +62,7 @@ bool writer::write(const std::string& filename, const std::string& data) const n
 		if (otype == outputs::PLAIN_TEXT) {
 			this->write_file(filename, data);
 			return true;
-		} else if (otype == outputs::WAVEFRONT_OBJ_FILE) {
+		} else if (otype == outputs::WAVEFRONT_OBJECT_FILE) {
 			this->write_file(filename, data);
 			return true;
 		} else if (otype == outputs::STDOUT) {

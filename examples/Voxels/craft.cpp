@@ -2673,11 +2673,11 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     // Init some local vars for handling maze duties
     list<string> algo_list;
     for (auto i{ static_cast<int>(algos::BINARY_TREE) }; i < static_cast<int>(algos::INVALID_ALGO); ++i) {
-        algo_list.push_back(to_string(static_cast<algos>(i)));
+        algo_list.push_back(to_string_from_algo(static_cast<algos>(i)));
     }
 
     // Make some references
-    auto my_maze_type = to_maze_type(algo_list.front());
+    auto my_maze_type = to_algo_from_string(algo_list.front());
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
@@ -2800,7 +2800,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                             bool is_selected = (itr == gui->algo);
                             if (ImGui::Selectable(itr.c_str(), is_selected)) {
                                 gui->algo = itr;
-                                my_maze_type = to_maze_type(itr);
+                                my_maze_type = to_algo_from_string(itr);
                             }
                             // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                             if (is_selected)
@@ -2817,25 +2817,25 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                     if (ImGui::Button("Export!")) {
                         // Building maze here has the effect of computing its geometry on this thread
                         prog.reset();
-                        mazes::builder builder;
-                        auto my_next_maze = builder.maze_type(my_maze_type)
-                            .block_type(items[model->item_index])
-                            .rows(gui->rows).columns(gui->columns).height(gui->height)
-                            .offset_x(p_state->x).offset_z(p_state->z)
-                            .show_distances(false).seed(gui->seed).build();
-                        my_next_maze->init();
-                        computations::compute_geometry(my_next_maze);
+                        // mazes::builder builder;
+                        // auto my_next_maze = builder.maze_type(my_maze_type)
+                        //     .block_type(items[model->item_index])
+                        //     .rows(gui->rows).columns(gui->columns).height(gui->height)
+                        //     .offset_x(p_state->x).offset_z(p_state->z)
+                        //     .show_distances(false).seed(gui->seed).build();
+                        // my_next_maze->init();
+                        // computations::compute_geometry(my_next_maze);
                         // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};
-                        writer.write(gui->outfile, my_next_maze->to_wavefront_obj_str());
+                        // writer.write(gui->outfile, my_next_maze->to_wavefront_obj_str());
 #if defined(MAZE_DEBUG)
                         SDL_Log("Wrote maze to %s\n", gui->outfile);
 #endif
 #endif
-                        my_mazes.push_back(std::move(my_next_maze));
+                        // my_mazes.push_back(std::move(my_next_maze));
                         // The JSON data for the Web API - GET /mazes/
-                        this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
+                        // this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                         // Resetting the model reloads the chunks - show the new maze
                         this->m_pimpl->reset_model();
                         gui->reset();

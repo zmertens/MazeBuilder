@@ -70,7 +70,7 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             string algorithm;
             // Get user input
             cin >> rows >> columns >> height >> seed >> algorithm;
-            mazes::algos mt = mazes::to_maze_type(algorithm);
+            mazes::algos mt = mazes::to_algo_from_string(algorithm);
 
             if (mt == mazes::algos::INVALID_ALGO) {
                 cerr << "Unknown algorithm: " << algorithm << endl;
@@ -78,17 +78,19 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             }
 
             // Create the maze
-            mazes::builder builder;
-            auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
-            temp_maze->init();
-            mazes::computations::compute_geometry(temp_maze);
-            auto dump = temp_maze->to_json_str(4);
+            // mazes::builder builder;
+            // auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
+            // temp_maze->init();
+            // mazes::computations::compute_geometry(temp_maze);
+            // auto dump = temp_maze->to_json_str(4);
+
+            auto dump {""};
 
             sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};
             sf_post_request.setHttpVersion(1, 1);
             sf_post_request.setBody(dump);
             sf_post_request.setField("Content-Type", "application/json");
-            sf_post_request.setField("Content-Length", to_string(dump.size()));
+            sf_post_request.setField("Content-Length", to_string(2));
 
             // Note the base64 encoded string is very long
             //cout << "Sent new maze:\n" << my_json.dump(4) << endl;

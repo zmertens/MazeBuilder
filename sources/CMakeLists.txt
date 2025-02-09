@@ -6,7 +6,6 @@ set(MAZE_BUILDER_CORE_SRCS
     args.cpp
     base64_helper.cpp
     binary_tree.cpp
-    builder.cpp
     cell.cpp
     colored_grid.cpp
     computations.cpp

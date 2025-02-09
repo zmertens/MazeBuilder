@@ -575,18 +575,18 @@ bool Snake::run() const noexcept {
             if (gState == SnakeImpl::States::UPLOADING_LEVEL) {
                 // Update state and current level
                 SDL_Log("New level uploading\n");
-                mazes::builder builder;
-                static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
-                auto&& temp = builder.block_type(-1).rows(INIT_MAZE_ROWS).columns(INIT_MAZE_COLS).build();
-                temp->init();
-                mazes::computations::compute_geometry(temp);
-                cells.clear();
-                temp->populate_cells(ref(cells));
-                assert(cells.size() > 0);
-                level.clear();
-                level.reserve(cells.size());
-
-                SDL_FPoint cellSize = { static_cast<float>(display_w / temp->rows), static_cast<float>(display_h / temp->columns) };
+                // mazes::builder builder;
+                // static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
+                // auto&& temp = builder.block_type(-1).rows(INIT_MAZE_ROWS).columns(INIT_MAZE_COLS).build();
+                // temp->init();
+                // mazes::computations::compute_geometry(temp);
+                // cells.clear();
+                // temp->populate_cells(ref(cells));
+                // assert(cells.size() > 0);
+                // level.clear();
+                // level.reserve(cells.size());
+                auto rows = 10, columns = 10;
+                SDL_FPoint cellSize = { static_cast<float>(display_w / rows), static_cast<float>(display_h / columns) };
 
                 // Now start the worker threads
                 this->m_impl->genLevel(ref(level), cref(cells), cellSize);

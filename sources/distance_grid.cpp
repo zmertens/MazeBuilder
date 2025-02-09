@@ -15,56 +15,12 @@ using namespace std;
  * @param height 1
  */
 distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int height)
-	: m_grid(make_shared<grid>(rows, cols, height))
-	, m_distances(make_shared<distances>(this->m_grid->get_root())) {
+	: grid::grid(rows, cols, height)
+	, m_grid(make_shared<grid>(rows, cols, height))
+	, m_distances(make_shared<distances>(this->m_binary_search_tree_root)) {
     this->calc_distances();
 }
 
-unsigned int distance_grid::get_rows() const noexcept {
-	return this->m_grid->get_rows();
-}
-
-unsigned int distance_grid::get_columns() const noexcept {
-	return this->m_grid->get_columns();
-}
-
-unsigned int distance_grid::get_height() const noexcept {
-    return this->m_grid->get_height();
-}
-
-void distance_grid::preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    this->m_grid->preorder(ref(cells));
-}
-
-void distance_grid::populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	this->m_grid->populate_vec(ref(cells));
-}
-
-void distance_grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	return this->m_grid->make_sorted_vec(ref(cells));
-}
-
-void distance_grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
-	this->m_grid->append(other_grid);
-}
-void distance_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
-	this->m_grid->insert(parent, index);
-}
-
-bool distance_grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
-	return this->m_grid->update(ref(parent), old_index, new_index);
-}
-
-std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
-	return this->m_grid->search(start, index);
-}
-void distance_grid::del(std::shared_ptr<cell> parent, int index) noexcept {
-	this->m_grid->del(parent, index);
-}
-
-std::shared_ptr<cell> distance_grid::get_root() const noexcept {
-	return this->m_grid->get_root();
-}
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
 	if (m_distances) {
@@ -96,7 +52,7 @@ optional<std::string> distance_grid::to_base36(int value) const {
  * 	Djikstra's shortest-path algorithm
  */
 void distance_grid::calc_distances() noexcept {
-	auto&& root = this->get_root();
+	auto&& root = this->m_binary_search_tree_root;
 	queue<shared_ptr<cell>> frontier;
 	frontier.push(root);
 	m_distances->set(root, 0);
