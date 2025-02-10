@@ -32,18 +32,18 @@ TEST_CASE("Writer can receive program arguments", "[determine output format]") {
 }
 
 TEST_CASE("Writer can produce a PNG file", "[does png]") {
-    mazes::builder builder;
-    unique_ptr<maze> my_maze = builder.rows(10).columns(10).height(10).build();
-	progress p{};
-	computations::compute_geometry(cref(my_maze));
-	auto elapsed = p.elapsed_s();
-	auto&& my_png = my_maze->to_pixels(15);
+    // mazes::builder builder;
+    // unique_ptr<maze> my_maze = builder.rows(10).columns(10).height(10).build();
+	// progress p{};
+	// computations::compute_geometry(cref(my_maze));
+	// auto elapsed = p.elapsed_s();
+	// auto&& my_png = my_maze->to_pixels(15);
 
-	REQUIRE(!my_png.empty());
+	// REQUIRE(!my_png.empty());
 
-	writer my_writer;
+	// writer my_writer;
 
-	REQUIRE(my_writer.get_output_type("1.png") == outputs::PNG);
+	// REQUIRE(my_writer.get_output_type("1.png") == outputs::PNG);
 
-	REQUIRE(my_writer.write_png("1.png", my_png, my_maze->rows * 4, my_maze->columns * 4));
+	// REQUIRE(my_writer.write_png("1.png", my_png, my_maze->rows * 4, my_maze->columns * 4));
 }

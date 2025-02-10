@@ -17,6 +17,12 @@
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/writer.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/sidewinder.h>
+#include <MazeBuilder/dfs.h>
 
 namespace mazes {
 

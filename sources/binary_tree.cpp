@@ -15,7 +15,7 @@
  */
 bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
 	if (auto gg = dynamic_cast<grid*>(_grid.get())) {
-        this->run_on_cell(gg->m_binary_search_tree_root, std::cref(get_int), cref(rng));
+        return this->run_on_cell(gg->m_binary_search_tree_root, std::cref(get_int), cref(rng));
     } else {
         return false;
     }
@@ -25,22 +25,34 @@ bool mazes::binary_tree::run_on_cell(std::shared_ptr<cell> const& _cell, const s
     using namespace std;
     using namespace mazes;
     if (_cell != nullptr) {
-        this->run_on_cell(_cell->get_left(), cref(get_int), cref(rng));
+        auto left_cell = _cell->get_left();
+        if (left_cell != nullptr) {
+            this->run_on_cell(left_cell, cref(get_int), cref(rng));
+        }
+
         vector<shared_ptr<cell>> neighbors;
-        if (_cell->get_north() != nullptr) {
-            neighbors.emplace_back(_cell->get_north());
+        auto north_cell = _cell->get_north();
+        if (north_cell != nullptr) {
+            neighbors.emplace_back(north_cell);
         }
-        if (_cell->get_east() != nullptr) {
-            neighbors.emplace_back(_cell->get_east());
+        auto east_cell = _cell->get_east();
+        if (east_cell != nullptr) {
+            neighbors.emplace_back(east_cell);
         }
+
         // skip linking neighbor if we have no neighbor, prevent RNG out-of-bounds
         if (!neighbors.empty()) {
-            auto&& random_index = static_cast<int>(get_int(0, neighbors.size() - 1));
-            auto&& neighbor = neighbors.at(random_index);
-            if (neighbor != nullptr)
+            auto random_index = static_cast<int>(get_int(0, neighbors.size() - 1));
+            auto neighbor = neighbors.at(random_index);
+            if (neighbor != nullptr) {
                 _cell->link(_cell, neighbor, true);
+            }
         }
-        this->run_on_cell(_cell->get_right(), cref(get_int), cref(rng));
+
+        auto right_cell = _cell->get_right();
+        if (right_cell != nullptr) {
+            this->run_on_cell(right_cell, cref(get_int), cref(rng));
+        }
     } // if
     return true;
 }
