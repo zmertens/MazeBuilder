@@ -28,6 +28,8 @@ class factory {
 	static std::optional<std::unique_ptr<maze>> create(std::tuple<unsigned int, unsigned int, unsigned int> dimensions,
 		algos a, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
 
+	static std::optional<std::unique_ptr<maze>> create(const std::vector<std::vector<bool>>& m) noexcept;
+
 	private:
 
 	static bool run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;

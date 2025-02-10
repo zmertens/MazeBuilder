@@ -27,6 +27,8 @@ namespace mazes {
 
     explicit grid(unsigned int rows, unsigned int columns, unsigned int height = 1u);
 
+    explicit grid(const std::vector<std::vector<bool>>& m);
+
     // Overrides
 
     /// @brief Provides dimensions of grid in no assumed ordering

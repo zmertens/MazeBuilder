@@ -52,6 +52,54 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     }
 }
 
+grid::grid(const vector<vector<bool>>& m) {
+    unsigned int rows = m.size();
+    unsigned int columns = m[0].size();
+
+    // Create a 2D vector to store the cells
+    vector<vector<shared_ptr<cell>>> cells(rows, vector<shared_ptr<cell>>(columns, nullptr));
+
+    // Create cells for "true" values
+    for (unsigned int row = 0; row < rows; ++row) {
+        for (unsigned int col = 0; col < columns; ++col) {
+            if (m[row][col]) {
+                cells[row][col] = make_shared<cell>(row, col, row * columns + col);
+            }
+        }
+    }
+
+    // Link the cells
+    for (unsigned int row = 0; row < rows; ++row) {
+        for (unsigned int col = 0; col < columns; ++col) {
+            if (cells[row][col]) {
+                auto c = cells[row][col];
+                if (row > 0 && cells[row - 1][col]) {
+                    c->set_north(cells[row - 1][col]);
+                    c->link(c, c->get_north(), true);
+                }
+                if (col > 0 && cells[row][col - 1]) {
+                    c->set_west(cells[row][col - 1]);
+                    c->link(c, c->get_west(), true);
+                }
+                if (row < rows - 1 && cells[row + 1][col]) {
+                    c->set_south(cells[row + 1][col]);
+                    c->link(c, c->get_south(), true);
+                }
+                if (col < columns - 1 && cells[row][col + 1]) {
+                    c->set_east(cells[row][col + 1]);
+                    c->link(c, c->get_east(), true);
+                }
+                // Add cell to the BST
+                if (!m_binary_search_tree_root) {
+                    m_binary_search_tree_root = c;
+                } else {
+                    this->insert(this->m_binary_search_tree_root, c->get_index());
+                }
+            }
+        }
+    }
+}
+
 bool grid::create_binary_search_tree(const std::vector<int>& shuffled_indices) {
     auto [rows, columns, _] = this->m_dimensions;
     int index { 0 }, row{0}, column{0};
@@ -150,22 +198,26 @@ void grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
     }
 }
 
-/**
- * Keep calling insert recursively until we hit null (a leaf)
-*/
 void grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
+    if (!parent) {
+        return;
+    }
+
     if (parent->get_index() > index) {
         if (parent->get_left() == nullptr) {
-            parent->set_left({make_shared<cell>(index)});
+            parent->set_left(make_shared<cell>(index));
         } else {
             this->insert(parent->get_left(), index);
         }
     } else if (parent->get_index() < index) {
         if (parent->get_right() == nullptr) {
-            parent->set_right({make_shared<cell>(index)});
+            parent->set_right(make_shared<cell>(index));
         } else {
             this->insert(parent->get_right(), index);
         }
+    } else {
+        // Index already exists in the BST, do nothing to avoid infinite recursion
+        return;
     }
 }
 

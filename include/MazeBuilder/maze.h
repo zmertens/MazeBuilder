@@ -30,7 +30,7 @@ public:
     int block_type;
 
     explicit maze(unsigned int rows, unsigned int columns, unsigned int height = 1);
-    explicit maze(std::unique_ptr<grid_interface>& g);
+    explicit maze(std::unique_ptr<grid_interface>&& g);
 
     std::optional<std::tuple<int, int, int, int>> find_block(int x, int z) const noexcept;
 

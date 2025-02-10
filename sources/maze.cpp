@@ -20,8 +20,8 @@ maze::maze(unsigned int rows, unsigned int columns, unsigned int height)
     
 }
 
-maze::maze(std::unique_ptr<grid_interface>& g)
-: my_grid(move(g)) {
+maze::maze(std::unique_ptr<grid_interface>&& g)
+: my_grid(std::move(g)) {
 
 }
 

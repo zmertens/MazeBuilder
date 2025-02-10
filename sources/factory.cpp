@@ -22,7 +22,7 @@ std::optional<std::unique_ptr<maze>> factory::create(unsigned int rows, unsigned
 
     unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
     if (run_algo_on_grid(a, ref(g), get_int, mt)) {
-        return make_optional(make_unique<maze>(g));
+        return make_optional(make_unique<maze>(std::move(g)));
     } else {
         return nullopt;
     } 
@@ -43,7 +43,7 @@ std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, un
 
     unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
     if (run_algo_on_grid(a, ref(g), get_int, mt)) {
-        return make_optional(make_unique<maze>(g));
+        return make_optional(make_unique<maze>(move(g)));
     } else {
         return nullopt;
     }
@@ -64,7 +64,7 @@ std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, un
 
     unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
     if (run_algo_on_grid(a, ref(g), get_int, mt)) {
-        return make_optional(make_unique<maze>(g));
+        return make_optional(make_unique<maze>(move(g)));
     } else {
         return nullopt;
     } 
@@ -80,11 +80,30 @@ std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, un
     
         unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
         if (run_algo_on_grid(a, ref(g), cref(get_int), cref(rng))) {
-            return make_optional(make_unique<maze>(g));
+            return make_optional(make_unique<maze>(move(g)));
         } else {
             return nullopt;
         }     
 
+}
+
+std::optional<std::unique_ptr<maze>> factory::create(const std::vector<std::vector<bool>>& m) noexcept {
+    using namespace std;
+
+    algos a = algos::BINARY_TREE;
+
+    std::mt19937 mt;
+    auto get_int = [&mt](auto low, auto high) {
+        std::uniform_int_distribution<int> dist {low, high};
+        return dist(mt);
+    };
+
+    unique_ptr<grid_interface> g = make_unique<grid>(cref(m));
+    if (run_algo_on_grid(a, ref(g), cref(get_int), cref(mt))) {
+        return make_optional(make_unique<maze>(std::move(g)));
+    } else {
+        return nullopt;
+    }
 }
 
 bool factory::run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
@@ -116,3 +135,4 @@ bool factory::run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, cons
         
     } // switch
 }
+
