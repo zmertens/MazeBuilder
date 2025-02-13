@@ -32,7 +32,7 @@ class factory {
 
 	private:
 
-	static bool run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
+	static bool run_algo_on_grid(algos a, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
 
 
 };

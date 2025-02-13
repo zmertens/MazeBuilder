@@ -1,5 +1,5 @@
 #include <MazeBuilder/factory.h>
-
+#include <iostream>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
@@ -90,7 +90,7 @@ std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, un
 std::optional<std::unique_ptr<maze>> factory::create(const std::vector<std::vector<bool>>& m) noexcept {
     using namespace std;
 
-    algos a = algos::BINARY_TREE;
+    algos a = algos::DFS;
 
     std::mt19937 mt;
     auto get_int = [&mt](auto low, auto high) {
@@ -99,21 +99,22 @@ std::optional<std::unique_ptr<maze>> factory::create(const std::vector<std::vect
     };
 
     unique_ptr<grid_interface> g = make_unique<grid>(cref(m));
-    if (run_algo_on_grid(a, ref(g), cref(get_int), cref(mt))) {
+    
+    if (run_algo_on_grid(a, cref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g)));
     } else {
         return nullopt;
     }
 }
 
-bool factory::run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
+bool factory::run_algo_on_grid(algos a, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
     
     switch (a) {
         case algos::BINARY_TREE: {
         
             static binary_tree bt;
         
-            return bt.run(std::ref(g), std::cref(get_int), std::cref(rng));
+            return bt.run(std::cref(g), std::cref(get_int), std::cref(rng));
         }
         
         case algos::SIDEWINDER: {

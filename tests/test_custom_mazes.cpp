@@ -24,9 +24,7 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
 
         REQUIRE(maze_opt.has_value());
 
-        auto s = maze::stringify(cref(maze_opt.value()));
-        
-cout << s << "\n";
+        auto s = maze::stringify(maze_opt.value());
 
         REQUIRE(!s.empty());
     // };

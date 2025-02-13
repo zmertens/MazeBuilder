@@ -29,6 +29,17 @@ namespace mazes {
 
     explicit grid(const std::vector<std::vector<bool>>& m);
 
+    // Rule of Five
+    grid(const grid& other);
+    
+    grid& operator=(const grid& other);
+    
+    grid(grid&& other) noexcept;
+    
+    grid& operator=(grid&& other) noexcept;
+    
+    ~grid();
+
     // Overrides
 
     /// @brief Provides dimensions of grid in no assumed ordering
