@@ -3,7 +3,7 @@
 
 #include <memory>
 #include <random>
-#include <iostream>
+#include <type_traits>
 
 #include <MazeBuilder/maze_builder.h>
 
@@ -12,27 +12,17 @@ using namespace std;
 
 TEST_CASE( "Test maze init", "[maze init]" ) {
 
-    vector<vector<bool>> m1 {
-        {true, false, false},
-        {true, true, false},
-        {false, true, true}
-    };
-
-
-    // BENCHMARK("Benchmark stringify") {
-        auto maze_opt = factory::create(cref(m1));
+     BENCHMARK("Benchmark stringify") {
+        auto maze_opt = factory::create({100, 100, 100});
 
         REQUIRE(maze_opt.has_value());
 
-        unique_ptr<grid_interface> g1 = make_unique<grid>(cref(m1));
+        const auto& g = maze_opt.value()->get_grid();
 
-        REQUIRE(g1);
+        auto s = computations::stringify(cref(maze_opt.value()));
 
-        cout << *g1 << endl;
-        //cout << "hi" << endl;
+        REQUIRE(!s.empty());
+     };
 
-        //auto s = computations::stringify(g1);
-
-        //REQUIRE(!s.empty());
-    // };
+     STATIC_CHECK(std::is_nothrow_move_constructible_v<grid>);
 }

@@ -17,7 +17,7 @@ public:
     /// @brief Compute the 3D geometries and store them in the maze
     static void compute_geometry(const maze_ptr& m, grid_ptr g = {}) noexcept;
 
-    static std::string stringify(const std::unique_ptr<grid_interface>& p) noexcept;
+    static std::string stringify(const std::unique_ptr<maze>& p) noexcept;
 
 }; // class
 } // namespace

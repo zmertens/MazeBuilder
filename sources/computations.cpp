@@ -90,11 +90,11 @@ void mazes::computations::compute_geometry(const mazes::maze_ptr& m, grid_ptr g)
     // p.reset();
 } // compute_geometry
 
-std::string computations::stringify(const std::unique_ptr<grid_interface>& p) noexcept {
+std::string computations::stringify(const std::unique_ptr<maze>& p) noexcept {
     using namespace std;
     ostringstream oss;
     if (p) {
-        oss << *p;
+        oss << *(p->get_grid());
     } else {
         oss << "INFO: Grid pointer is null";
     }
