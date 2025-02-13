@@ -2,10 +2,12 @@
 
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/maze.h>
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/colored_grid.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/factory.h>
 
+#include <sstream>
 #include <random>
 
 using namespace mazes;
@@ -87,3 +89,14 @@ void mazes::computations::compute_geometry(const mazes::maze_ptr& m, grid_ptr g)
     // auto elapsed = p.elapsed_ms();
     // p.reset();
 } // compute_geometry
+
+std::string computations::stringify(const std::unique_ptr<grid_interface>& p) noexcept {
+    using namespace std;
+    ostringstream oss;
+    if (p) {
+        oss << *p;
+    } else {
+        oss << "INFO: Grid pointer is null";
+    }
+    return oss.str();
+} // stringify

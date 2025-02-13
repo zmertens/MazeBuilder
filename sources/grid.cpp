@@ -16,14 +16,14 @@ using namespace std;
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 : m_dimensions{rows, columns, height}
 , m_binary_search_tree_root{nullptr}
-, m_sort_by_row_column{[](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
-        if (c1->get_row() == c2->get_row()) {
-            if (c1->get_column() == c2->get_column()) {
-                return false;
-            }
-            return (c1->get_column() < c2->get_column()) ? true : false;
-        }
-        return (c1->get_row() < c2->get_row()) ? true : false; }}
+, m_sort_by_row_column{ [](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
+        if (c1->get_row() < c2->get_row()) {
+            return true;
+        } else if (c1->get_row() == c2->get_row()) {
+            return c1->get_column() < c2->get_column();
+        } else {
+            return false;
+        }} }
 , m_calc_index{[this, &columns](auto row, auto col)->int 
     {return row * columns + col;}} {
     
@@ -379,7 +379,14 @@ void grid::presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_
 //
 void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     // now use STL sort by row, column with custom lambda function
-    std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
+    std::sort(cells_to_sort.begin(), cells_to_sort.end(), [](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
+        if (c1->get_row() < c2->get_row()) {
+            return true;
+        } else if (c1->get_row() == c2->get_row()) {
+            return c1->get_column() < c2->get_column();
+        } else {
+            return false;
+        }});
 }
 
 // Get the contents of a cell for this type of grid

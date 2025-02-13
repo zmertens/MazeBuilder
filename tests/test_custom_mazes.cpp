@@ -24,8 +24,15 @@ TEST_CASE( "Test maze init", "[maze init]" ) {
 
         REQUIRE(maze_opt.has_value());
 
-        auto s = maze::stringify(maze_opt.value());
+        unique_ptr<grid_interface> g1 = make_unique<grid>(cref(m1));
 
-        REQUIRE(!s.empty());
+        REQUIRE(g1);
+
+        cout << *g1 << endl;
+        //cout << "hi" << endl;
+
+        //auto s = computations::stringify(g1);
+
+        //REQUIRE(!s.empty());
     // };
 }

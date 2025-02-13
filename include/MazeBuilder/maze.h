@@ -36,25 +36,7 @@ public:
 
     void intopq(int x, int y, int z, int w) noexcept;
 
-    /// @brief 
-    /// @param p 
-    /// @return 
-    static std::string stringify(const std::unique_ptr<maze>& p) noexcept {
-
-        std::ostringstream oss;
-        
-        if (p) {
-            if (p->my_grid) {
-                oss << *(p->my_grid);
-            } else {
-                oss << "INFO: Grid pointer is null";
-            }
-        } else {
-            oss << "INFO: Maze is null";
-        }
-
-        return oss.str();
-    } // stringify
+    const std::unique_ptr<grid_interface>& get_grid() const noexcept;
 private:
 
     pqmap m_p_q;

@@ -33,3 +33,7 @@ optional<tuple<int, int, int, int>> maze::maze::find_block(int p, int q) const n
 void maze::intopq(int x, int y, int z, int w) noexcept {
     m_p_q[{x, z}] = make_tuple(x, y, z, w);
 }
+
+const std::unique_ptr<grid_interface>& maze::get_grid() const noexcept {
+    return my_grid;
+}
