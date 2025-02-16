@@ -1,9 +1,9 @@
 #include <MazeBuilder/writer.h>
 
-#include <iostream>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
+#include <string>
 
 #include <MazeBuilder/enums.h>
 
@@ -23,7 +23,7 @@ public:
     /// @param w 1
     /// @param h 1
     /// @return 
-    bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const {
+    bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept {
 
         static constexpr auto STRIDE = 4u;
 
@@ -36,7 +36,7 @@ public:
     /// @param w 
     /// @param h 
     /// @return 
-    bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const {
+    bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept {
 
         static constexpr auto STRIDE = 4u;
 
@@ -47,7 +47,7 @@ public:
     /// @param filename 
     /// @param data 
     /// @return 
-    bool write_file(const std::string& filename, const std::string& data) const {
+    bool write_file(const std::string& filename, const std::string& data) const noexcept {
         using namespace std;
 
         filesystem::path data_path{ filename };
@@ -58,6 +58,11 @@ public:
 
         out_writer.close();
 
+        return true;
+    }
+
+    bool write(std::ostream& oss, const std::string& data) const noexcept {
+        oss << data << "\n";
         return true;
     }
 
@@ -79,9 +84,7 @@ writer::~writer() = default;
 bool writer::write(const std::string& filename, const std::string& data, unsigned int w, unsigned int h) const noexcept {
     using namespace std;
 
-    static constexpr auto det_file_by_suffix = [](auto f)->outputs {
-
-        static constexpr auto MAX_FILE_EXT_LEN = 5;
+    static auto det_file_by_suffix = [](const string& f)->outputs {
 
         // Verify file has valid extension
         auto found = f.find(".");
@@ -89,11 +92,18 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
             throw invalid_argument("Invalid filename: " + f);
         }
 
+        static constexpr auto MAX_FILE_EXT_LEN = 7;
+
         // Determine file type by the extension
         auto short_str = f.substr(found, string::npos);
+
         if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".txt") {
             return outputs::PLAIN_TEXT;
+        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".text") {
+            return outputs::PLAIN_TEXT;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".obj") {
+            return outputs::WAVEFRONT_OBJECT_FILE;
+        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".object") {
             return outputs::WAVEFRONT_OBJECT_FILE;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".png") {
             return outputs::PNG;
@@ -102,7 +112,7 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".jpg") {
             return outputs::JPEG;
         } else {
-            return outputs::STDOUT;
+            throw invalid_argument("Invalid filename: " + f);
         }
 
         }; // lambda
@@ -110,7 +120,11 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
 
     // Handle the output type
 	try {
-        auto ftype = det_file_by_suffix(filename);
+        if (filename == "stdout") {
+            throw invalid_argument("Invalid use of stdout.");
+        }
+
+        auto ftype = det_file_by_suffix(cref(filename));
 
 		if (ftype == outputs::PLAIN_TEXT) {
 			return this->m_impl->write_file(filename, data);
@@ -129,6 +143,5 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
 }
 
 bool writer::write(std::ostream& oss, const std::string& data) const noexcept {
-    oss << data << "\n";
-    return true;
+    return this->m_impl->write(std::ref(oss), std::cref(data));
 }

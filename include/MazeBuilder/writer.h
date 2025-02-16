@@ -6,7 +6,7 @@
 
 namespace mazes {
 
-/// @brief Handles file writing for mazes
+/// @brief Handles file writing for mazes, implements PIMPL idiom
 class writer {
 public:
 	explicit writer();

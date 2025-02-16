@@ -16,7 +16,7 @@ TEST_CASE("Writer can process good text file names", "[good text filenames]") {
 	writer my_writer;
 
     // Good file names that the writer can determine what type to write per the extension
-	vector<string> good_filenames{ "1.txt", "1.obj", ".obj", ".txt", ".png", "my.jpg", "other.jpeg" };
+	vector<string> good_filenames{ "1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg" };
 
 	for (const auto& gf : good_filenames) {
         REQUIRE(my_writer.write(gf, "data"));
@@ -26,7 +26,7 @@ TEST_CASE("Writer can process good text file names", "[good text filenames]") {
 TEST_CASE("Writer can process bad file names", "[bad filenames]") {
     writer my_writer;
 
-    vector<string> bad_filenames{ "1.text", "2.plain_text", "3.plain_txt", "1.object", "2.objobj", "3obj", "a.ping", "" };
+    vector<string> bad_filenames{ "1.tezt", "2.plain_text", "3plain_txt", "1.objected", "2.objobj", "3obj", "a.ping", "" };
 
     for (const auto& bf : bad_filenames) {
         REQUIRE_FALSE(my_writer.write(bf, "data"));
