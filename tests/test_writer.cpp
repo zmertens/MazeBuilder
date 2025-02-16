@@ -20,12 +20,12 @@ TEST_CASE("Writer can receive program arguments", "[determine output format]") {
 
 	for (auto&& good : good_filenames) {
 		auto&& ftype = my_writer.get_output_type(good);
-		CHECK_FALSE(ftype == outputs::UNKNOWN);
+		CHECK_FALSE(ftype == outputs::TOTAL);
 	}
 
 	for (auto&& bad : bad_filenames) {
 		auto&& ftype = my_writer.get_output_type(bad);
-		CHECK(ftype == outputs::UNKNOWN);
+		CHECK(ftype == outputs::TOTAL);
 	}
 
 	REQUIRE(my_writer.get_output_type("stdout") == outputs::STDOUT);

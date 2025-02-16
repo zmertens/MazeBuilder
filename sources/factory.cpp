@@ -1,5 +1,5 @@
 #include <MazeBuilder/factory.h>
-#include <iostream>
+
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
@@ -8,6 +8,25 @@
 
 using namespace mazes;
 
+//std::array<std::function<std::optional<std::unique_ptr<maze>>>, factory::FACTORY_MAPPING_TOTAL> factory::factory_mappings = {
+    //{
+        //[] ()->std::optional<std::unique_ptr<maze>>() {
+        //    return std::make_optional<std::unique_ptr<maze>>();
+        //},
+        //[]()->std::optional<std::unique_ptr<maze>>() {
+        //    return std::make_unique<maze>();
+        //},
+        //[]()->std::optional<std::unique_ptr<maze>>() {
+        //    return std::make_unique<maze>();
+        //},
+        //[]()->std::optional<std::unique_ptr<maze>>() {
+        //    return std::make_unique<maze>();
+        //},
+        //[]()->std::optional<std::unique_ptr<maze>>() {
+        //    return std::make_unique<maze>();
+        //}
+    //}
+//};
 
 std::optional<std::unique_ptr<maze>> factory::create(unsigned int rows, unsigned int columns, unsigned int height) noexcept {
     using namespace std;

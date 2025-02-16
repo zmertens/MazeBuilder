@@ -31,7 +31,7 @@ outputs writer::get_output_type(const std::string& filename) const noexcept {
 	static constexpr auto FILE_EXT_LEN = 4;
 	auto found = filename.find(".");
 	if (found == string::npos) {
-		return outputs::UNKNOWN;
+		return outputs::TOTAL;
 	}
 	auto short_str = filename.substr(found, string::npos);
 	if (short_str.length() == FILE_EXT_LEN && short_str == ".txt") {
@@ -44,7 +44,7 @@ outputs writer::get_output_type(const std::string& filename) const noexcept {
 		return outputs::PNG;
 	}
 	else {
-		return outputs::UNKNOWN;
+        return outputs::TOTAL;
 	}
 }
 
@@ -71,7 +71,7 @@ bool writer::write(const std::string& filename, const std::string& data) const n
 		} else if (otype == outputs::PNG) {
 			cerr << "ERROR: Incorrect arguments for write_png with output: " << filename << "\n";
 			return false;
-		} else if (otype == outputs::UNKNOWN) {
+		} else if (otype == outputs::TOTAL) {
 			cerr << "ERROR: Unknown output type!!\n";
 			return false;
 		} else {

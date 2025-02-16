@@ -2,6 +2,7 @@
 #define ENUMS
 
 #include <string>
+#include <stdexcept>
 
 namespace mazes {
 
@@ -11,13 +12,13 @@ namespace mazes {
     static constexpr auto CORNER = '+';
 
     /// @brief Enum class for output types
-    enum class outputs {
-        PLAIN_TEXT,
-        WAVEFRONT_OBJECT_FILE,
-        PNG,
-        JPEG,
-        STDOUT,
-        UNKNOWN
+    enum class outputs : unsigned int {
+        PLAIN_TEXT = 0,
+        WAVEFRONT_OBJECT_FILE = 1,
+        PNG = 2,
+        JPEG = 3,
+        STDOUT = 4,
+        TOTAL = 5
     };
 
     /// @brief Convert an output enum to a string
@@ -36,7 +37,7 @@ namespace mazes {
         case outputs::STDOUT:
             return "stdout";
         default:
-            return "unknown";
+            throw std::invalid_argument("Invalid output: " + std::to_string(static_cast<unsigned int>(output)));
         }
     };
 
@@ -55,16 +56,16 @@ namespace mazes {
         } else if (output.compare("stdout") == 0) {
             return outputs::STDOUT;
         } else {
-            return outputs::UNKNOWN;
+            throw std::invalid_argument("Invalid output: " + output);
         }
     };
 
     /// @brief Enum class for maze types by the generating algorithm
-    enum class algos {
+    enum class algos : unsigned int {
         BINARY_TREE = 0,
         SIDEWINDER = 1,
         DFS = 2,
-        INVALID_ALGO = 3
+        TOTAL = 3
     };
 
     /// @brief Convert the algo enum to a string
@@ -77,7 +78,7 @@ namespace mazes {
         case algos::DFS:
             return "dfs";
         default:
-            return std::to_string(static_cast<int>(algo));
+            throw std::invalid_argument("Invalid algo: " + std::to_string(static_cast<unsigned int>(algo)));
         }
     };
 
@@ -92,7 +93,7 @@ namespace mazes {
         } else if (algo.compare("dfs") == 0) {
             return algos::DFS;
         } else {
-            return algos::INVALID_ALGO;
+            throw std::invalid_argument("Invalid algo: " + algo);
         }
     };
 } // namespace
