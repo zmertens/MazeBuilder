@@ -10,7 +10,7 @@
 ////////////////////////////////////////////////////////////
 
 #include <MazeBuilder/buildinfo.h>
-#include <MazeBuilder/computations.h>
+#include <MazeBuilder/stringz.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/factory.h>
 #include <MazeBuilder/maze.h>

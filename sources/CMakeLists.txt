@@ -8,7 +8,6 @@ set(MAZE_BUILDER_CORE_SRCS
     binary_tree.cpp
     cell.cpp
     colored_grid.cpp
-    computations.cpp
     dfs.cpp
     distance_grid.cpp
     distances.cpp
@@ -18,6 +17,7 @@ set(MAZE_BUILDER_CORE_SRCS
     maze.cpp
     progress.cpp
     sidewinder.cpp
+    stringz.cpp
     wavefront_object_helper.cpp
     writer.cpp)
 

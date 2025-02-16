@@ -2,13 +2,6 @@
 #define MAZE_H
 
 #include <string>
-#include <ostream>
-#include <memory>
-#include <functional>
-#include <random>
-#include <unordered_map>
-#include <optional>
-#include <cstdint>
 
 #include <MazeBuilder/hash.h>
 #include <MazeBuilder/enums.h>
@@ -22,15 +15,19 @@ class cell;
 class maze {
 public:
 
-    using dimensions = std::tuple<int, int, int, int>;
-    using pqmap = std::unordered_map<std::pair<int, int>, dimensions, pair_hash>;
     using maze_ptr = std::unique_ptr<maze>;
 
-    bool distances;
-    int block_type;
+    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
-    explicit maze(unsigned int rows, unsigned int columns, unsigned int height = 1);
+    explicit maze(unsigned int rows, unsigned int columns, unsigned int levels = 1);
     explicit maze(std::unique_ptr<grid_interface>&& g);
+
+    // Getters
+    unsigned int get_rows() const noexcept;
+    unsigned int get_columns() const noexcept;
+    unsigned int get_levels() const noexcept;
+    bool has_distances() const noexcept;
+    int get_block_id() const noexcept;
 
     std::optional<std::tuple<int, int, int, int>> find_block(int x, int z) const noexcept;
 
@@ -38,6 +35,8 @@ public:
 
     const std::unique_ptr<grid_interface>& get_grid() const noexcept;
 private:
+    bool distances;
+    int block_id;
 
     pqmap m_p_q;
 
