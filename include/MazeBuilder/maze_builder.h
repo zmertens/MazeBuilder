@@ -1,13 +1,7 @@
 #ifndef MAZE_BUILDER_H
 #define MAZE_BUILDER_H
 
-////////////////////////////////////////////////////////////
-/// \defgroup Primary class for handling project includes
-///
-///
-/// 
-///
-////////////////////////////////////////////////////////////
+/// @file Primary file for including project headers
 
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/stringz.h>

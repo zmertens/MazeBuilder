@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
         // mazes::computations::compute_geometry(my_maze);
         if (maze_opt.has_value()) {
             const auto& my_maze = maze_opt.value();
-            auto maze_s = mazes::computations::stringify(cref(my_maze));
+            auto maze_s = mazes::stringz::stringify(cref(my_maze));
             cout << maze_s << endl;
             success = true;
         }
