@@ -1,23 +1,34 @@
 #ifndef WRITER_H
 #define WRITER_H
 
-#include <vector>
-#include <cstdint>
 #include <string>
-
-#include <MazeBuilder/enums.h>
+#include <memory>
 
 namespace mazes {
 
+/// @brief Handles file writing for mazes, implements PIMPL idiom
 class writer {
 public:
-	writer();
-	outputs get_output_type(const std::string& filename) const noexcept;
-	bool write(const std::string& filename, const std::string& data) const noexcept;
-	bool write_png(const std::string& filename, const std::vector<std::uint8_t>& data, 
-		const unsigned int w = 1, const unsigned int h = 1) const;
+	explicit writer();
+    ~writer();
+
+	/// @brief Handles writing to a file
+	/// @param filename 
+	/// @param data
+    /// @param w 1 for image files
+    /// @param h 1 for image files
+	/// @return 
+	bool write(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
+
+    /// @brief Handles writing to cout
+    /// @param oss 
+    /// @param data 
+    /// @return 
+    bool write(std::ostream& oss, const std::string& data) const noexcept;
+
 private:
-	void write_file(const std::string& filename, const std::string& data) const;
+    class writer_impl;
+    std::unique_ptr<writer_impl> m_impl;
 }; // writer
 
 }

@@ -15,7 +15,7 @@
  */
 bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& _grid, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
 	if (auto gg = dynamic_cast<grid*>(_grid.get())) {
-        return this->run_on_cell(gg->m_binary_search_tree_root, std::cref(get_int), cref(rng));
+        return this->run_on_cell(std::cref(gg->m_binary_search_tree_root), std::cref(get_int), cref(rng));
     } else {
         return false;
     }

@@ -5,6 +5,7 @@
 #include <memory>
 #include <random>
 #include <optional>
+#include <array>
 
 #include <MazeBuilder/enums.h>
 
@@ -32,8 +33,10 @@ class factory {
 
 	private:
 
-	static bool run_algo_on_grid(algos a, std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
+	static bool run_algo_on_grid(algos a, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
 
+    //static constexpr auto FACTORY_MAPPING_TOTAL = 5;
+    //static std::array<std::function<std::optional<std::unique_ptr<maze>>>, FACTORY_MAPPING_TOTAL> factory_mappings;
 
 };
 

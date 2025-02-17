@@ -16,13 +16,33 @@ using namespace std;
 maze::maze(unsigned int rows, unsigned int columns, unsigned int height) 
 : my_grid(make_unique<grid>(rows, columns, height))
 , distances(false)
-, block_type(1) {
+, block_id(1) {
     
 }
 
 maze::maze(std::unique_ptr<grid_interface>&& g)
 : my_grid(std::move(g)) {
 
+}
+
+unsigned int maze::get_rows() const noexcept {
+    return std::get<0>(my_grid->get_dimensions());
+}
+
+unsigned int maze::get_columns() const noexcept {
+    return std::get<1>(my_grid->get_dimensions());
+}
+
+unsigned int maze::get_levels() const noexcept {
+    return std::get<2>(my_grid->get_dimensions());
+}
+
+bool maze::has_distances() const noexcept {
+    return distances;
+}
+
+int maze::get_block_id() const noexcept {
+    return block_id;
 }
 
 optional<tuple<int, int, int, int>> maze::maze::find_block(int p, int q) const noexcept {
@@ -34,9 +54,6 @@ void maze::intopq(int x, int y, int z, int w) noexcept {
     m_p_q[{x, z}] = make_tuple(x, y, z, w);
 }
 
-std::optional<std::reference_wrapper<const std::unique_ptr<grid_interface>>> maze::get_grid() const noexcept {
-    if (this->my_grid) {
-        return cref(this->my_grid);
-    }
-    return std::nullopt;
+const std::unique_ptr<grid_interface>& maze::get_grid() const noexcept {
+    return my_grid;
 }

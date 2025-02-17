@@ -2672,7 +2672,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
     // Init some local vars for handling maze duties
     list<string> algo_list;
-    for (auto i{ static_cast<int>(algos::BINARY_TREE) }; i < static_cast<int>(algos::INVALID_ALGO); ++i) {
+    for (auto i{ static_cast<int>(algos::BINARY_TREE) }; i < static_cast<int>(algos::TOTAL); ++i) {
         algo_list.push_back(to_string_from_algo(static_cast<algos>(i)));
     }
 

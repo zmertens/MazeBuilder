@@ -38,14 +38,14 @@ namespace mazes {
         /// @param g 
         /// @return 
         friend std::ostream& operator<<(std::ostream& os, const grid_interface& g) {
-            auto [rows, columns, height] = g.get_dimensions();
+            auto [rows, columns, _] = g.get_dimensions();
 
             // First sort cells by row then column
             std::vector<std::shared_ptr<cell>> cells;
             cells.reserve(rows * columns);
 
             // populate the cells from the grid
-            g.to_vec(cells);
+            g.to_vec(std::ref(cells));
 
             // ---+
             static constexpr auto barrier = { BARRIER2, BARRIER2, BARRIER2, BARRIER2, BARRIER2, CORNER };
@@ -59,51 +59,40 @@ namespace mazes {
             }
             output << "\n";
 
-            auto rowCounter{ 0u }, columnCounter{ 0u };
-            while (rowCounter < rows) {
+            auto row_counter{ 0u }, column_counter{ 0u };
+            auto cell_iter = cells.begin();
+
+            while (row_counter < rows) {
                 std::stringstream top_builder, bottom_builder;
                 top_builder << BARRIER1;
                 bottom_builder << CORNER;
-                
-                while (columnCounter < columns) {
 
-                    auto next_index{ rowCounter * columns + columnCounter };
+                while (column_counter < columns && cell_iter != cells.end()) {
 
-                    if (next_index < cells.size()) {
-                        auto&& temp = cells.at(next_index);
-                        
-                        // Bottom left cell needs boundaries
-                        if (temp == nullptr)
-                            temp = { std::make_shared<cell>(-1, -1, next_index) };
-                        // 5 spaces in body for single-digit number to hold base36 values
-                        static const std::string vertical_barrier_str{ BARRIER1 };
-                        auto has_contents_val = g.contents_of(std::cref(temp)).has_value();
-                        
-                        if (has_contents_val) {
-                            auto val = g.contents_of(std::cref(temp)).value_or(" ");
-                            std::string body = "";
-                            switch (val.size()) {
-                            case 1: body = "  " + val + "  "; break;
-                            case 2: body = " " + val + "  "; break;
-                            case 3: body = " " + val + " "; break;
-                            case 4: body = " " + val; break;
-                                // case 1 is default
-                            default: body = "  " + val + "  "; break;
-                            }
-                            auto east_boundary = temp->is_linked(temp->get_east()) ? " " : vertical_barrier_str;
-                            auto south_boundary = temp->is_linked(temp->get_south()) ? "     " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
-                            top_builder << body << east_boundary;
-                            bottom_builder << south_boundary << "+";
-                        } else {
-                            os << "No contents for cell at index " << next_index << "\n";
-                        }
+                    // 5 spaces in body for single-digit number to hold base36 values
+                    static const std::string vertical_barrier_str{ BARRIER1 };
 
-                        columnCounter++;
+                    auto val = g.contents_of(std::cref(*cell_iter)).value_or("*");
+                    std::string body = "";
+                    switch (val.size()) {
+                    case 1: body = "  " + val + "  "; break;
+                    case 2: body = " " + val + "  "; break;
+                    case 3: body = " " + val + " "; break;
+                    case 4: body = " " + val; break;
+                        // case 1 is default
+                    default: body = "  " + val + "  "; break;
                     }
+                    auto east_boundary = cell_iter->get()->is_linked(cell_iter->get()->get_east()) ? " " : vertical_barrier_str;
+                    auto south_boundary = cell_iter->get()->is_linked(cell_iter->get()->get_south()) ? "     " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+                    top_builder << body << east_boundary;
+                    bottom_builder << south_boundary << "+";
+
+                    ++cell_iter;
+                    ++column_counter;
                 }
 
-                columnCounter = 0;
-                rowCounter++;
+                column_counter = 0;
+                ++row_counter;
 
                 output << top_builder.str() << "\n" << bottom_builder.str() << "\n";
             } // while
@@ -112,7 +101,7 @@ namespace mazes {
 
             return os;
         } // << operator
-	};
-}
+    }; // grid_interface
+} // namespace mazes
 
 #endif // GRID_INTERFACE_H

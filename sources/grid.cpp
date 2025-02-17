@@ -16,14 +16,14 @@ using namespace std;
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 : m_dimensions{rows, columns, height}
 , m_binary_search_tree_root{nullptr}
-, m_sort_by_row_column{[](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
-        if (c1->get_row() == c2->get_row()) {
-            if (c1->get_column() == c2->get_column()) {
-                return false;
-            }
-            return (c1->get_column() < c2->get_column()) ? true : false;
-        }
-        return (c1->get_row() < c2->get_row()) ? true : false; }}
+, m_sort_by_row_column{ [](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
+        if (c1->get_row() < c2->get_row()) {
+            return true;
+        } else if (c1->get_row() == c2->get_row()) {
+            return c1->get_column() < c2->get_column();
+        } else {
+            return false;
+        }} }
 , m_calc_index{[this, &columns](auto row, auto col)->int 
     {return row * columns + col;}} {
     
@@ -52,18 +52,20 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     }
 }
 
-grid::grid(const vector<vector<bool>>& m) {
+grid::grid(const vector<vector<bool>>& m) 
+: m_binary_search_tree_root{nullptr} 
+, m_dimensions{m.size(), (m.empty()) ? 1 : m.at(0).size(), 1} {
     unsigned int rows = m.size();
     unsigned int columns = m[0].size();
 
-    // Create a 2D vector to store the cells
-    vector<vector<shared_ptr<cell>>> cells(rows, vector<shared_ptr<cell>>(columns, nullptr));
+    // Create a vector to store the cells
+    vector<shared_ptr<cell>> cells(rows * columns, nullptr);
 
     // Create cells for "true" values
     for (unsigned int row = 0; row < rows; ++row) {
         for (unsigned int col = 0; col < columns; ++col) {
             if (m[row][col]) {
-                cells[row][col] = make_shared<cell>(row, col, row * columns + col);
+                cells[row * columns + col] = make_shared<cell>(row, col, row * columns + col);
             }
         }
     }
@@ -71,22 +73,22 @@ grid::grid(const vector<vector<bool>>& m) {
     // Link the cells
     for (unsigned int row = 0; row < rows; ++row) {
         for (unsigned int col = 0; col < columns; ++col) {
-            if (cells[row][col]) {
-                auto c = cells[row][col];
-                if (row > 0 && cells[row - 1][col]) {
-                    c->set_north(cells[row - 1][col]);
+            if (cells[row * columns + col]) {
+                auto c = cells[row * columns + col];
+                if (row > 0 && cells[(row - 1) * columns + col]) {
+                    c->set_north(cells[(row - 1) * columns + col]);
                     c->link(c, c->get_north(), true);
                 }
-                if (col > 0 && cells[row][col - 1]) {
-                    c->set_west(cells[row][col - 1]);
+                if (col > 0 && cells[row * columns + (col - 1)]) {
+                    c->set_west(cells[row * columns + (col - 1)]);
                     c->link(c, c->get_west(), true);
                 }
-                if (row < rows - 1 && cells[row + 1][col]) {
-                    c->set_south(cells[row + 1][col]);
+                if (row < rows - 1 && cells[(row + 1) * columns + col]) {
+                    c->set_south(cells[(row + 1) * columns + col]);
                     c->link(c, c->get_south(), true);
                 }
-                if (col < columns - 1 && cells[row][col + 1]) {
-                    c->set_east(cells[row][col + 1]);
+                if (col < columns - 1 && cells[row * columns + (col + 1)]) {
+                    c->set_east(cells[row * columns + (col + 1)]);
                     c->link(c, c->get_east(), true);
                 }
                 // Add cell to the BST
@@ -98,6 +100,52 @@ grid::grid(const vector<vector<bool>>& m) {
             }
         }
     }
+}
+
+// Copy constructor
+grid::grid(const grid& other)
+    : m_binary_search_tree_root(other.m_binary_search_tree_root),
+      m_dimensions(other.m_dimensions) {
+    // Copy other members if necessary
+}
+
+// Copy assignment operator
+grid& grid::operator=(const grid& other) {
+    if (this == &other) {
+        return *this;
+    }
+    m_binary_search_tree_root = other.m_binary_search_tree_root;
+    m_dimensions = other.m_dimensions;
+    // Copy other members if necessary
+    return *this;
+}
+#include <iostream>
+#include <utility>
+// Move constructor
+grid::grid(grid&& other) noexcept
+    : m_dimensions(move(other.m_dimensions)) {
+    // Move other members if necessary
+
+    m_binary_search_tree_root = std::exchange(other.m_binary_search_tree_root, nullptr);
+
+    cout << "Move" << endl;
+}
+
+// Move assignment operator
+grid& grid::operator=(grid&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+    m_binary_search_tree_root = std::exchange(other.m_binary_search_tree_root, nullptr);
+    m_dimensions = move(other.m_dimensions);
+    // Move other members if necessary
+    return *this;
+}
+
+// Destructor
+grid::~grid() {
+    // Clean up resources if necessary
+    m_binary_search_tree_root.reset();
 }
 
 bool grid::create_binary_search_tree(const std::vector<int>& shuffled_indices) {
@@ -331,7 +379,14 @@ void grid::presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_
 //
 void grid::sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept {
     // now use STL sort by row, column with custom lambda function
-    std::sort(cells_to_sort.begin(), cells_to_sort.end(), this->m_sort_by_row_column);
+    std::sort(cells_to_sort.begin(), cells_to_sort.end(), [](shared_ptr<cell> const& c1, shared_ptr<cell> const& c2)->bool {
+        if (c1->get_row() < c2->get_row()) {
+            return true;
+        } else if (c1->get_row() == c2->get_row()) {
+            return c1->get_column() < c2->get_column();
+        } else {
+            return false;
+        }});
 }
 
 // Get the contents of a cell for this type of grid
