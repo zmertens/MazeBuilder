@@ -11,9 +11,6 @@ log.txt
 *.dll
 *.pyc
 
-# Blender Cache Files
-*.blend1
-
 build/
 build-*/
 .vscode
@@ -22,16 +19,16 @@ build-*/
 # Script output files
 scripts/*.txt
 scripts/*.png
-!scripts/nopath.png
-!scripts/wilsons_maze.png
 scripts/*.PNG
 scripts/*.jpg
 scripts/*.jpeg
 scripts/*.JPG
 scripts/*.JPEG
+!scripts/mask.png
 
 # Dear Imgui config
 *.ini
 
 # Python
 .venv
+
