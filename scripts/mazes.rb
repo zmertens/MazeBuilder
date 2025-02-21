@@ -503,27 +503,27 @@ end
 
 1.times do |n|
 
-    # grid = ColoredGrid.new(35, 25)
-    # RecursiveBacktracker.on(grid)
-
-    # start = grid[0, 0]
-    # end1 = grid[grid.rows / 2, grid.columns / 2]
-
-    # grid.distances = start.distances.path_to(end1)
-
-    # filename = "recbak%02d.png" % n
-    # grid.to_png.save(filename)
-
-    filename = "mask.png"
-
-    mask = Mask.from_png(filename)
-    grid = MaskedGrid.new(mask)
-
+    grid = ColoredGrid.new(2, 5)
     RecursiveBacktracker.on(grid)
 
-    grid.to_png(cell_size: 5).save("output2.png")
+    end1 = grid[0, 0]
+    start1 = grid[grid.rows / 2, grid.columns / 2]
 
-    #puts grid
-    puts "loaded mask #{filename}"
+    grid.distances = end1.distances.path_to(start1)
+
+    filename = "recbak%02d.png" % n
+    grid.to_png.save(filename)
+
+    #filename = "mask.png"
+
+    #mask = Mask.from_png(filename)
+    #grid = MaskedGrid.new(mask)
+
+    #Sidewinder.on(grid)
+
+    #grid.to_png(cell_size: 5).save("output2.png")
+
+    puts grid
+    puts "writing to: #{filename}"
     puts "Deadends: #{grid.deadends.count}"
 end

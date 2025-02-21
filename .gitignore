@@ -26,6 +26,10 @@ scripts/*.JPG
 scripts/*.JPEG
 !scripts/mask.png
 
+# Ruby
+Gemfile.lock
+!Gemfile
+
 # Dear Imgui config
 *.ini
 
