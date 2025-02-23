@@ -14,11 +14,12 @@ namespace mazes {
     /// @brief Enum class for output types
     enum class outputs : unsigned int {
         PLAIN_TEXT = 0,
-        WAVEFRONT_OBJECT_FILE = 1,
-        PNG = 2,
-        JPEG = 3,
-        STDOUT = 4,
-        TOTAL = 5
+        JSON = 1,
+        WAVEFRONT_OBJECT_FILE = 2,
+        PNG = 3,
+        JPEG = 4,
+        STDOUT = 5,
+        TOTAL = 6
     };
 
     /// @brief Convert an output enum to a string
@@ -28,6 +29,8 @@ namespace mazes {
         switch (output) {
         case outputs::PLAIN_TEXT:
             return "txt";
+        case outputs::JSON:
+            return "json";
         case outputs::WAVEFRONT_OBJECT_FILE:
             return "obj";
         case outputs::PNG:
@@ -47,6 +50,8 @@ namespace mazes {
     static outputs to_output_from_string(const std::string& output) {
         if (output.compare("txt") == 0) {
             return outputs::PLAIN_TEXT;
+        } else if (output.compare("json") == 0) {
+            return outputs::JSON;
         } else if (output.compare("obj") == 0) {
             return outputs::WAVEFRONT_OBJECT_FILE;
         } else if (output.compare("png") == 0) {

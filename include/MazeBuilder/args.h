@@ -2,49 +2,39 @@
 #define ARGS_H
 
 #include <string>
-#include <sstream>
 #include <unordered_map>
-#include <ostream>
 #include <vector>
-#include <functional>
+#include <ostream>
 
 namespace mazes {
 
 /// @brief Simple argument handler
 struct args {
 public:
-    explicit args();
-
-    friend std::ostream& operator<<(std::ostream& os, const args& a) {
-        std::stringstream ss;
-        ss << "\nINFO: seed=" << a.seed << "\n";
-        ss << "algo=" << a.algo << "\n";
-        ss << "output=" << a.output << "\n";
-        ss << "columns=" << a.columns << "\n";
-        ss << "rows=" << a.rows << "\n";
-        ss << "height=" << a.height << "\n";
-        ss << "help=" << a.help << "\n";
-        ss << "version=" << a.version << "\n";
-        ss << "distances=" << a.distances << "\n";
-
-        return os << ss.str() << "\n";
-    }
+    static constexpr auto ArgsPattern = R"pattern([\s-\w=\\.]+)pattern";
 
     /// @brief Parse program arguments
-    /// @example auto args = mazes::args{};
-    /// @param arg 
+    /// @example
+    ///     auto args = mazes::args{};
+    ///     auto success = args.parse({"-r", "10", "-c", "10", "-s", "2"});
+    /// @param arguments
     /// @return 
-    bool parse(const std::vector<std::string>& arg) noexcept;
+    bool parse(const std::vector<std::string>& arguments) noexcept;
+
+    /// @brief Get a value from the args map
+    /// @param key 
+    /// @return 
+    std::string get(const std::string& key) const noexcept;
+
+    /// @brief Get entire the args map
+    /// @return 
+    const std::unordered_map<std::string, std::string>& get() const noexcept;
+
+    /// @brief Dump the hash table to a string output
+    /// @return 
+    friend std::ostream& operator<<(std::ostream& os, const args& a) noexcept;
 public:
-    std::string algo;
-    bool distances;
-    std::string output;
-    int seed;
-    int columns;
-    int rows;
-    int height;
-    std::string version;
-    std::string help;
+    std::unordered_map<std::string, std::string> args_map;
 };
 
 }

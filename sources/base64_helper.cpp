@@ -18,6 +18,12 @@ public:
 
 base_64_helper::base_64_helper() : impl{ std::make_unique<base_64_helper_impl>() } {}
 
+base_64_helper::~base_64_helper() = default;
+
+base_64_helper::base_64_helper(const base_64_helper& other) : impl(std::make_unique<base_64_helper_impl>(*other.impl)) {
+
+}
+
 void base_64_helper::encode(const std::string& encode, std::string& result) const noexcept {
     this->impl->encode(encode, result);
 }

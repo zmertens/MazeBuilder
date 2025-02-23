@@ -503,11 +503,11 @@ end
 
 1.times do |n|
 
-    grid = ColoredGrid.new(2, 5)
+    grid = ColoredGrid.new(50, 35)
     RecursiveBacktracker.on(grid)
 
-    end1 = grid[0, 0]
-    start1 = grid[grid.rows / 2, grid.columns / 2]
+    end1 = grid[grid.rows / 2, grid.columns / 2]
+    start1 = grid[grid.rows - 1, grid.columns - 1]
 
     grid.distances = end1.distances.path_to(start1)
 

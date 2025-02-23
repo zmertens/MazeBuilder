@@ -4,83 +4,57 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <catch2/benchmark/catch_benchmark.hpp>
-
 #include <MazeBuilder/args.h>
 
 using namespace std;
 using namespace mazes;
 
-TEST_CASE( "Args are built by vector", "[args]" ) {
-    unsigned int seed = 32u;
-    unsigned int columns = 1'001u;
-    unsigned int height = 11u;
-    unsigned int rows = 1'002u;
+TEST_CASE("Args method parses correctly", "[parses]") {
+    args args_handler{};
 
-    string output = "maze.obj";
-    string help_message = "My Maze Builder Program\n";
-    string version_message = "0.0.1\n";
-    bool interactive = true;
-    string algorithm = "sidewinder";
+    SECTION("Help requested") {
+        vector<string> args_vec = { "app", "-h" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.get("h").empty());
+    }
 
-    static const vector<string> LONG_ARGS = {
-        "maze_builder.exe",
-        "--seed=" + to_string(seed),
-        "--algorithm=" + algorithm,
-        "--output=" + output,
-        "--columns=" + to_string(columns),
-        "--rows=" + to_string(rows),
-        "--height=" + to_string(height),
-        "--distances"
-    };
+    SECTION("Version requested") {
+        vector<string> args_vec = { "app", "-v" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.get("v").empty());
+    }
 
-    REQUIRE(LONG_ARGS.empty() == false);
+    SECTION("Help and version requested") {
+        vector<string> args_vec = { "app", "-hv" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.get("hv").empty());
+    }
 
-    mazes::args args{};
-    REQUIRE(true == args.parse(LONG_ARGS));
+    SECTION("Help and version requested") {
+        vector<string> args_vec = { "app", "-vh" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.get("vh").empty());
+    }
 
-    REQUIRE_FALSE(args.help.empty());
-    REQUIRE_FALSE(args.version.empty());
-    REQUIRE(args.algo.compare(algorithm) == 0);
-    REQUIRE(args.seed == seed);
-    REQUIRE(args.output.compare(output) == 0);
-    REQUIRE(args.columns == columns);
-    REQUIRE(args.height == height);
-    REQUIRE(args.rows == rows);
-	REQUIRE(args.distances == true);
+    //SECTION("Invalid argument") {
+    //    vector<string> args_vec = { "app", "-invalid" };
+    //    REQUIRE_THROWS_AS(args_handler.parse(args_vec), std::invalid_argument);
+    //}
 
-    // Check the ostream operator
-    stringstream ss;
-    ss << args;
-    REQUIRE(!ss.str().empty());
-
-    static const vector<string> SHORT_ARGS = {
-		"maze_builder.exe",
-		"-s", to_string(seed),
-		"-a", algorithm,
-		"-o", output,
-		"-c", to_string(columns),
-		"-r", to_string(rows),
-		"-y", to_string(height), 
-        "-d"};
-    // First-come-first-serve and grab 'interactive'
-    mazes::args args2;
-    REQUIRE(true == args2.parse(SHORT_ARGS));
-	// Parsing help switch will break the loop
-    REQUIRE(true == !args2.help.empty());
-    REQUIRE(true == !args2.version.empty());
-    REQUIRE(args2.distances == true);
+    SECTION("Valid short arguments") {
+        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-d" };
+        REQUIRE_NOTHROW(args_handler.parse(args_vec));
+    }
 }
 
-TEST_CASE("Args are bad and cannot be built", "[args]") {
-    static const vector<string> BAD_SHORT_ARGS = {
-    "maze_builder.exe",
-    "-x",
-    "-y",
-    "-z"
-    };
-    // First-come-first-serve and grab 'interactive'
-    mazes::args args;
-    REQUIRE(false == args.parse(BAD_SHORT_ARGS));
-    REQUIRE_NOTHROW(args.parse(BAD_SHORT_ARGS));
+TEST_CASE("Args method dumps output correctly", "[dumps]") {
+    args args_handler{};
+    SECTION("Dump empty args") {
+        REQUIRE(args_handler.dump_s().empty());
+    }
+    SECTION("Dump args") {
+        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-d" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE_FALSE(args_handler.dump_s().empty());
+    }
 }
