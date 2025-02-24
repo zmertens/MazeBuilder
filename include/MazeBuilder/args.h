@@ -11,7 +11,7 @@ namespace mazes {
 /// @brief Simple argument handler
 struct args {
 public:
-    static constexpr auto ArgsPattern = R"pattern([\s-\w=\\.]+)pattern";
+    static constexpr auto ArgsPattern = R"pattern(\.*)pattern";
 
     /// @brief Parse program arguments
     /// @example
@@ -20,6 +20,14 @@ public:
     /// @param arguments
     /// @return 
     bool parse(const std::vector<std::string>& arguments) noexcept;
+
+    /// @brief Parse program arguments
+    /// @example
+    ///     auto args = mazes::args{};
+    ///     auto success = args.parse("-r 10 -c 10 -s 2");
+    /// @param arguments 
+    /// @return 
+    bool parse(const std::string& arguments) noexcept;
 
     /// @brief Get a value from the args map
     /// @param key 
