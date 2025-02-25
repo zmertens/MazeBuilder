@@ -11,7 +11,7 @@ namespace mazes {
 /// @brief Simple argument handler
 struct args {
 public:
-    static constexpr auto ArgsPattern = R"pattern(\.*)pattern";
+    static constexpr auto ArgsPattern = R"pattern([\-\.\=\w\s\d]+)pattern";
 
     /// @brief Parse program arguments
     /// @example
