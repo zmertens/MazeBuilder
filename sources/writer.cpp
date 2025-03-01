@@ -65,7 +65,7 @@ bool writer::write_file(const std::string& filename, const std::string& data) co
 bool writer::write(const std::string& filename, const std::string& data, unsigned int w, unsigned int h) const noexcept {
     using namespace std;
 
-    static auto det_file_by_suffix = [](const string& f)->outputs {
+    static auto det_file_by_suffix = [](const string& f)->output {
 
         // Verify file has valid extension
         auto found = f.find(".");
@@ -79,19 +79,19 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
         auto short_str = f.substr(found, string::npos);
 
         if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".txt") {
-            return outputs::PLAIN_TEXT;
+            return output::PLAIN_TEXT;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".text") {
-            return outputs::PLAIN_TEXT;
+            return output::PLAIN_TEXT;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".obj") {
-            return outputs::WAVEFRONT_OBJECT_FILE;
+            return output::WAVEFRONT_OBJECT_FILE;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".object") {
-            return outputs::WAVEFRONT_OBJECT_FILE;
+            return output::WAVEFRONT_OBJECT_FILE;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".png") {
-            return outputs::PNG;
+            return output::PNG;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".jpeg") {
-            return outputs::JPEG;
+            return output::JPEG;
         } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".jpg") {
-            return outputs::JPEG;
+            return output::JPEG;
         } else {
             throw invalid_argument("Invalid filename: " + f);
         }
@@ -107,13 +107,13 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
 
         auto ftype = det_file_by_suffix(cref(filename));
 
-		if (ftype == outputs::PLAIN_TEXT) {
+		if (ftype == output::PLAIN_TEXT) {
 			return this->write_file(filename, data);
-		} else if (ftype == outputs::WAVEFRONT_OBJECT_FILE) {
+		} else if (ftype == output::WAVEFRONT_OBJECT_FILE) {
 			return this->write_file(filename, data);
-		} else if (ftype == outputs::PNG) {
+		} else if (ftype == output::PNG) {
             return this->write_png(filename, data);
-		} else if (ftype == outputs::JPEG) {
+		} else if (ftype == output::JPEG) {
             return this->write_jpeg(filename, data);
 		} else {
 			return false;

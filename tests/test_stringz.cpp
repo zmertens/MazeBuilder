@@ -13,7 +13,7 @@ using namespace std;
 TEST_CASE( "Test stringify ", "[stringify]" ) {
 
      BENCHMARK("Benchmark stringify") {
-        auto maze_opt = factory::create({100, 100, 100});
+        auto maze_opt = factory::create(configurator().rows(10).columns(10).levels(10)._algo(algo::BINARY_TREE).seed(12345));
 
         REQUIRE(maze_opt.has_value());
 

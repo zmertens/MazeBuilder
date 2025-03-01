@@ -8,142 +8,40 @@
 
 using namespace mazes;
 
-//std::array<std::function<std::optional<std::unique_ptr<maze>>>, factory::FACTORY_MAPPING_TOTAL> factory::factory_mappings = {
-    //{
-        //[] ()->std::optional<std::unique_ptr<maze>>() {
-        //    return std::make_optional<std::unique_ptr<maze>>();
-        //},
-        //[]()->std::optional<std::unique_ptr<maze>>() {
-        //    return std::make_unique<maze>();
-        //},
-        //[]()->std::optional<std::unique_ptr<maze>>() {
-        //    return std::make_unique<maze>();
-        //},
-        //[]()->std::optional<std::unique_ptr<maze>>() {
-        //    return std::make_unique<maze>();
-        //},
-        //[]()->std::optional<std::unique_ptr<maze>>() {
-        //    return std::make_unique<maze>();
-        //}
-    //}
-//};
-
-std::optional<std::unique_ptr<maze>> factory::create(unsigned int rows, unsigned int columns, unsigned int height) noexcept {
+std::optional<std::unique_ptr<maze>> factory::create(configurator const& config) noexcept {
     using namespace std;
 
-    algos a = algos::BINARY_TREE;
-
-    std::mt19937 mt;
+    mt19937 mt { config.seed() };
     auto get_int = [&mt](auto low, auto high) {
-        std::uniform_int_distribution<int> dist {low, high};
+        uniform_int_distribution<int> dist {low, high};
         return dist(mt);
     };
 
-    unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
-    if (run_algo_on_grid(a, ref(g), get_int, mt)) {
+    unique_ptr<grid_interface> g = make_unique<grid>(config.rows(), config.columns(), config.levels());
+    if (run_algo_on_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g)));
-    } else {
-        return nullopt;
-    } 
-}
-	
-std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, unsigned int, unsigned int> dimensions) noexcept {
-    using namespace std;
-
-    algos a = algos::BINARY_TREE;
-
-    std::mt19937 mt;
-    auto get_int = [&mt](auto low, auto high) {
-        std::uniform_int_distribution<int> dist {low, high};
-        return dist(mt);
-    };
-
-    auto [rows, columns, height] = dimensions;
-
-    unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
-    if (run_algo_on_grid(a, ref(g), get_int, mt)) {
-        return make_optional(make_unique<maze>(move(g)));
-    } else {
-        return nullopt;
     }
+    return nullopt;
 }
 
-std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, unsigned int, unsigned int> dimensions,
-    algos a) noexcept {
-
-    using namespace std;
-
-    std::mt19937 mt;
-    auto get_int = [&mt](auto low, auto high) {
-        std::uniform_int_distribution<int> dist {low, high};
-        return dist(mt);
-    };
-
-    auto [rows, columns, height] = dimensions;
-
-    unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
-    if (run_algo_on_grid(a, ref(g), get_int, mt)) {
-        return make_optional(make_unique<maze>(move(g)));
-    } else {
-        return nullopt;
-    } 
-
-}
-
-std::optional<std::unique_ptr<maze>> factory::create(std::tuple<unsigned int, unsigned int, unsigned int> dimensions,
-    algos a, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
-
-        using namespace std;
-
-        auto [rows, columns, height] = dimensions;
+bool factory::run_algo_on_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
     
-        unique_ptr<grid_interface> g = make_unique<grid>(rows, columns, height);
-        if (run_algo_on_grid(a, ref(g), cref(get_int), cref(rng))) {
-            return make_optional(make_unique<maze>(move(g)));
-        } else {
-            return nullopt;
-        }     
-
-}
-
-std::optional<std::unique_ptr<maze>> factory::create(const std::vector<std::vector<bool>>& m) noexcept {
-    using namespace std;
-
-    algos a = algos::DFS;
-
-    std::mt19937 mt;
-    auto get_int = [&mt](auto low, auto high) {
-        std::uniform_int_distribution<int> dist {low, high};
-        return dist(mt);
-    };
-
-    unique_ptr<grid_interface> g = make_unique<grid>(cref(m));
-    
-    if (run_algo_on_grid(a, cref(g), cref(get_int), cref(mt))) {
-        return make_optional(make_unique<maze>(std::move(g)));
-    } else {
-        return nullopt;
-    }
-}
-
-bool factory::run_algo_on_grid(algos a, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
-    
-    switch (a) {
-        case algos::BINARY_TREE: {
+    switch (config._algo()) {
+        case algo::BINARY_TREE: {
         
             static binary_tree bt;
         
             return bt.run(std::cref(g), std::cref(get_int), std::cref(rng));
         }
         
-        case algos::SIDEWINDER: {
+        case algo::SIDEWINDER: {
         
             static sidewinder sw;
         
             return sw.run(std::ref(g), std::cref(get_int), std::cref(rng));
         }
 
-        case algos::DFS: {
+        case algo::DFS: {
         
             static dfs d;
         

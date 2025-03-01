@@ -10,7 +10,6 @@ namespace mazes {
 
 /// @brief Cell class for maze generation
 class cell {
-    using cell_ptr_shared = std::shared_ptr<cell>;
 public:
     explicit cell(int index);
     explicit cell(unsigned int row, unsigned int column, int index);

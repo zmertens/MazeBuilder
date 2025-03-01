@@ -2,7 +2,7 @@
 
 # Maze Builder
 
-Build different representations of mazes quickly and easily on multiple platforms and languages. Below is an example of the string generated from the command-line interface.
+Build textual representations of mazes quickly and easily on multiple platforms and languages. Below is an example of the string generated from the command-line interface.
 
 ```text
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -32,29 +32,35 @@ Build different representations of mazes quickly and easily on multiple platform
 
 ### Exports
 
-The library provides multiple export formats like Wavefront object, PNG and JPEG images, JSON, and plain text or `stdout`.
-The library enables rapid prototyping and generating examples for games and simulations.
-The exports can be integrated into game engines and renderers like `Unity`, `Godot`, `Blender`, `Unreal Engine` and so forth.
+The library provides multiple export formats like Wavefront object, PNG and JPEG images, JSON, and plain text or stdout.
 
-## Examples and the Help Message
+Enables rapid prototyping and creating example levels for games and simulations.
+The exports can be integrated into game engines and renderers like Unity, Godot, Blender, Unreal Engine and so forth.
+
+---
+
+## Help Message
 
 ```sh
         Usages: mazebuildercli.exe [OPTION(S)]... [OUTPUT]
-          Program generates strings with multiple export formats
+          Generates mazes in multiple export formats
         Example: mazebuildercli.exe -r 10 -c 10 -a binary_tree -o out.txt
-          -a, --algorithm    dfs, sidewinder, binary_tree
+          -a, --algo         dfs, sidewinder, binary_tree
           -s, --seed         seed for the mt19937 generator
-          -r, --rows         maze rows
-          -l, --levels       maze levels (also known as height in 3D)
-          -c, --columns      maze columns
+          -r, --rows         rows
+          -l, --levels       levels (also known as height in 3D)
+          -c, --columns      columns
           -d, --distances    show distances between cells as integers
           -o, --output       [.txt], [.png|.jpg], [.obj],
                                 [.json], [stdout]
+          -j, --json         provide arguments in a JSON file
           -h, --help         display this help message
           -v, --version      display this program version
 ```
 
 ---
+
+### Examples
 
 Run the `binary_tree` algorithm with long arguments:
 
@@ -68,15 +74,14 @@ Run the `dfs` algorithm with short arguments:
 mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o dfs.obj
 ```
 
-Use the maze API in C++ programs:
+Use the maze API in a modern C++ program:
 
 ```cpp
-    #include <MazeBuilder/maze_builder.h>
     #include <iostream>
+    #include <MazeBuilder/maze_builder.h>
 
-    void main(void) {
-
-        mazes::maze_ptr m = mazes::factory::create();
+    void main() {
+        auto m = mazes::factory::create(configurator().rows(10).columns(10));
 
         auto s = mazes::stringz::stringify(m);
 
@@ -88,18 +93,18 @@ Use the maze API in C++ programs:
 
 ---
 
-## CMake and configuration
+## CMake Configuration and Testing
 
-[CMake 3.2](https://cmake.org) or greater is used as the build and test system.
-The included examples require external dependencies:
+[CMake 3.2](https://cmake.org) or greater is required.
+The included examples require external dependencies which can be grabbed from the Internet:
   - SDL
   - SFML
   - box2d
   - Catch2
  
-`CMake` can fetch these dependencies from their respective `git` repo's on the Internet.
+CMake can fetch these dependencies from their respective `git` repo's on the Internet.
 
-Using the following CMake options to configure this project:
+Use the following CMake options to configure this project:
 
 
 | CMake Option | Default | Description |
@@ -113,9 +118,9 @@ Using the following CMake options to configure this project:
 
 ---
 
-### CMake build
+### Examples
 
-Configure the examples using a default `CMake` generator: `cmake -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
+`cmake -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
 
 Build it: `cmake --build build-examples --config Release`
 
@@ -128,15 +133,16 @@ The shared and static files have different naming conventions depending on the p
 | Linux | `libmazebuildercore_static.a` | `libmazebuildercore_shared.so` |
 | MacOS | | |
 
-### CTest tests builds
+### Testing
 
-Configure the project for testing: `cmake -S . -B build-tests -DMAZE_BUILDER_TESTS:BOOL=ON`
+Configure the project for testing: 
+`cmake -S . -B build-tests -DMAZE_BUILDER_TESTS:BOOL=ON`
 
-Run the tests with a specific configuration: `ctest --test-dir build-tests/tests --verbose -C Debug`
+Run the tests: `ctest --test-dir build-tests/tests --verbose -C Debug`
 
-### CMake Web builds
+### Build for the Web
 
-Configure the examples for the browser using [Emscripten](https://emscripten.org/) and their toolchain file.
+Configure examples for the browser using [Emscripten](https://emscripten.org/) and their toolchain file.
 
 ```sh
 cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
@@ -146,20 +152,35 @@ cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstrea
 
 ## JSON payloads
 
-The follow is an example of a JSON export: `mazebuildercli.exe -r 10 -c 10 -a binary_tree -o out.json`.
+The follow is an example of a JSON input file:
 
 ```json
 {
-  "rows": 10,
-  "cols": 10,
-  "depth": 1,
-  "seed": 0,
+  "rows": 2,
+  "columns": 5,
+  "levels": 1,
+  "seed": 2,
+  "algo": "dfs",
+  "distances": false,
+  "output": "out.json"
+}
+```
+
+The `out.json` file might look like this:
+
+```json
+{
+  "rows": 2,
+  "columns": 5,
+  "levels": 1,
+  "seed": 2,
+  "algo": "dfs",
+  "distances": false,
   "str": "+---+---+---+---+---+\n
           |           |       |\n
           +   +---+   +---+   +\n
           |       |           |\n
-          +---+---+---+---+---+\n",
-  "distances": false
+          +---+---+---+---+---+\n"
 }
 ```
 
@@ -181,7 +202,7 @@ The Python script `solver.py` plays with the maze generation by loading PNG file
 
 Provided is a web interface in a voxel world that enables interactive maze generation.
 
-[Check out the this example in a web app!](https://jade-semifreddo-f24ef0.netlify.app/)
+[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
 The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script.
 Once the provided script is running, then open the browser to `http://localhost:8000`.

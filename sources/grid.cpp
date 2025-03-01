@@ -52,54 +52,8 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     }
 }
 
-grid::grid(const vector<vector<bool>>& m) 
-: m_binary_search_tree_root{nullptr} 
-, m_dimensions{m.size(), (m.empty()) ? 1 : m.at(0).size(), 1} {
-    unsigned int rows = m.size();
-    unsigned int columns = m[0].size();
-
-    // Create a vector to store the cells
-    vector<shared_ptr<cell>> cells(rows * columns, nullptr);
-
-    // Create cells for "true" values
-    for (unsigned int row = 0; row < rows; ++row) {
-        for (unsigned int col = 0; col < columns; ++col) {
-            if (m[row][col]) {
-                cells[row * columns + col] = make_shared<cell>(row, col, row * columns + col);
-            }
-        }
-    }
-
-    // Link the cells
-    for (unsigned int row = 0; row < rows; ++row) {
-        for (unsigned int col = 0; col < columns; ++col) {
-            if (cells[row * columns + col]) {
-                auto c = cells[row * columns + col];
-                if (row > 0 && cells[(row - 1) * columns + col]) {
-                    c->set_north(cells[(row - 1) * columns + col]);
-                    c->link(c, c->get_north(), true);
-                }
-                if (col > 0 && cells[row * columns + (col - 1)]) {
-                    c->set_west(cells[row * columns + (col - 1)]);
-                    c->link(c, c->get_west(), true);
-                }
-                if (row < rows - 1 && cells[(row + 1) * columns + col]) {
-                    c->set_south(cells[(row + 1) * columns + col]);
-                    c->link(c, c->get_south(), true);
-                }
-                if (col < columns - 1 && cells[row * columns + (col + 1)]) {
-                    c->set_east(cells[row * columns + (col + 1)]);
-                    c->link(c, c->get_east(), true);
-                }
-                // Add cell to the BST
-                if (!m_binary_search_tree_root) {
-                    m_binary_search_tree_root = c;
-                } else {
-                    this->insert(this->m_binary_search_tree_root, c->get_index());
-                }
-            }
-        }
-    }
+grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions) {
+    grid(get<0>(dimensions), get<1>(dimensions), get<2>(dimensions));
 }
 
 // Copy constructor

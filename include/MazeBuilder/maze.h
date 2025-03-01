@@ -2,6 +2,7 @@
 #define MAZE_H
 
 #include <string>
+#include <optional>
 
 #include <MazeBuilder/hash.h>
 #include <MazeBuilder/enums.h>
@@ -14,8 +15,6 @@ class cell;
 /// @brief Data class to represent a maze
 class maze {
 public:
-
-    using maze_ptr = std::unique_ptr<maze>;
 
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
 
