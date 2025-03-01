@@ -6,7 +6,7 @@ using namespace mazes;
 
 class json_helper::json_helper_impl {
 public:
-    /// @brief
+    /// @brief 
     /// @param m
     /// @param pretty_print 
     /// @return 

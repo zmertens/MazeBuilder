@@ -12,12 +12,9 @@ using namespace mazes;
 /// @param m 
 /// @param vertices 
 /// @param faces 
-/// @param offset_x 0
-/// @param offset_z 0
 void stringz::objectify(const std::unique_ptr<maze>& m,
     std::vector<std::tuple<int, int, int, int>>& vertices,
-    std::vector<std::vector<std::uint32_t>>& faces,
-    int offset_x, int offset_z) noexcept {
+    std::vector<std::vector<std::uint32_t>>& faces) noexcept {
     using namespace std;
 
     auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size) {
@@ -72,10 +69,8 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
                 static constexpr auto block_size = 1;
 
                 for (auto h{ 0 }; h < m->get_levels(); h++) {
-                    // Update the data source that stores the maze geometry
-                    // There are 2 data sources, one for rendering and one for writing
+
                     add_block(row_x, h, col_z, m->get_block_id(), block_size);
-                    // intopq(row_x + offset_x, h, col_z + offset_z, m->block_id);
                 }
             }
             col_z++;
@@ -92,7 +87,7 @@ std::string stringz::stringify(const std::unique_ptr<maze>& m) noexcept {
     if (m) {
         oss << *(m->get_grid());
     } else {
-        oss << "Grid pointer is null";
+        oss << "Maze pointer is null";
     }
     return oss.str();
 } // stringify

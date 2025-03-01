@@ -6,10 +6,13 @@
 
 namespace mazes {
 
+/// @brief Base64 encoding and decoding helper class
+/// @details This class provides methods to encode and decode strings using the Base64 encoding scheme
 class base_64_helper {
 public:
+    // Default constructor
     explicit base_64_helper();
-
+    // Destructor
     ~base_64_helper();
 
     // Copy constructor
@@ -24,17 +27,16 @@ public:
     // Move assignment operator
     base_64_helper& operator=(base_64_helper&& other) noexcept = default;
 
-    /// @brief 
-    /// @param encode 
-    /// @param result 
-    void encode(const std::string& encode, std::string& result) const noexcept;
+    /// @brief Transform an input string into base64 characters
+    /// @param s
+    /// @return 
+    std::string encode(const std::string& s) const noexcept;
 
-    /// @brief 
-    /// @param decode 
-    /// @param result 
-    void decode(const std::string& decode, std::string& result) const noexcept;
+    /// @brief Transform an input string from from base64 characters
+    std::string decode(const std::string& s) const noexcept;
 	
 private:
+	/// @brief Forward declaration of the implementation class
 	class base_64_helper_impl;
 	std::unique_ptr<base_64_helper_impl> impl;
 }; // class

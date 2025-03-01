@@ -10,8 +10,9 @@
 namespace mazes {
 
 class maze;
-class grid_interface;
 
+/// @brief String helper class
+/// @details This class provides methods to convert mazes into string representations
 class stringz {
 public:
 
@@ -19,12 +20,9 @@ public:
     /// @param m the maze to convert
     /// @param vertices the vertices of the maze
     /// @param faces the faces of the maze
-    /// @param offset_x the x offset where the maze should be placed
-    /// @param offset_z the z offset where the maze should be placed
     static void objectify(const std::unique_ptr<maze>& m,
         std::vector<std::tuple<int, int, int, int>>& vertices,
-        std::vector<std::vector<std::uint32_t>>& faces,
-        int offset_x = 0, int offset_z = 0) noexcept;
+        std::vector<std::vector<std::uint32_t>>& faces) noexcept;
 
     /// @brief Convert a maze into a string representation
     /// @param m the maze to convert

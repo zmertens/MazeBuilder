@@ -1,7 +1,7 @@
 #ifndef MAZE_BUILDER_H
 #define MAZE_BUILDER_H
 
-/// @file Primary file for including project headers
+/// @file Primary file for including all the headers in the maze builder library
 
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/stringz.h>
@@ -20,6 +20,7 @@
 
 namespace mazes {
 
+/// @brief Version string for the maze builder
 static const std::string VERSION = build_info::Version + "-" + build_info::CommitSHA;
 
 } // namespace

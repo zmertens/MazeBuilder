@@ -1,6 +1,7 @@
 #include <MazeBuilder/wavefront_object_helper.h>
 
 #include <MazeBuilder/maze.h>
+#include <MazeBuilder/buildinfo.h>
 
 #include <sstream>
 #include <cstdint>
@@ -8,17 +9,21 @@
 
 using namespace mazes;
 
+/// @brief Implementation class for the wavefront object helper
 class wavefront_object_helper::wavefront_object_helper_impl {
 public:
     wavefront_object_helper_impl() = default;
+    
     ~wavefront_object_helper_impl() = default;
-    void to_wavefront_obj_str(const std::unique_ptr<maze>& m,
+    
+    std::string to_wavefront_obj_str(const std::unique_ptr<maze>& m,
         const std::vector<std::tuple<int, int, int>>& vertices,
-        const std::vector<std::vector<std::uint32_t>>& faces, std::string& result) const noexcept {
+        const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
+        
         using namespace std;
 
         stringstream ss;
-        ss << "# https:www.github.com/zmertens/MazeBuilder\n";
+        ss << "# maze builder " << build_info::Version << "-" << build_info::CommitSHA << "\n";
 
         // Keep track of writing progress
         int total_verts = static_cast<int>(vertices.size());
@@ -44,16 +49,17 @@ public:
             ss << "\n";
             c++;
         }
-        // Store the result
-        result = ss.str();
+        
+        // Get the result
+        return ss.str();
     }
 };  // wavefront_object_helper_impl
 
 wavefront_object_helper::wavefront_object_helper() : impl{ std::make_unique<wavefront_object_helper_impl>() } {}
 
-void wavefront_object_helper::to_wavefront_object_str(const std::unique_ptr<maze>& m,
+std::string wavefront_object_helper::to_wavefront_object_str(const std::unique_ptr<maze>& m,
     const std::vector<std::tuple<int, int, int>>& vertices,
-    const std::vector<std::vector<std::uint32_t>>& faces,
-    std::string& result) const noexcept {
-    this->impl->to_wavefront_obj_str(cref(m), cref(vertices), cref(faces), ref(result));
+    const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
+
+    return this->impl->to_wavefront_obj_str(cref(m), cref(vertices), cref(faces));
 } // to_wavefront_obj_str

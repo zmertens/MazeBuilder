@@ -12,68 +12,49 @@
 
 using namespace mazes;
 
-/// @brief Hidden implementation for the writer class
-class writer::writer_impl {
-public:
-    explicit writer_impl() = default;
+/// @brief 
+/// @param filename 
+/// @param data 
+/// @param w 1 
+/// @param h 1
+/// @return 
+bool writer::write_png(const std::string& filename, const std::string& data, unsigned int w, unsigned int h) const noexcept {
 
-    /// @brief Write a PNG file
-    /// @param filename 
-    /// @param data 
-    /// @param w 1
-    /// @param h 1
-    /// @return 
-    bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept {
+    static constexpr auto STRIDE = 4u;
 
-        static constexpr auto STRIDE = 4u;
-
-        return (0 != stbi_write_png(filename.c_str(), w, h, STRIDE, data.data(), w * STRIDE));
-    }
-
-    /// @brief Write a JPEG file
-    /// @param filename 
-    /// @param data 
-    /// @param w 
-    /// @param h 
-    /// @return 
-    bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept {
-
-        static constexpr auto STRIDE = 4u;
-
-        return (0 != stbi_write_jpg(filename.c_str(), w, h, STRIDE, data.data(), w * STRIDE));
-    }
-
-    /// @brief Write to a conventional file
-    /// @param filename 
-    /// @param data 
-    /// @return 
-    bool write_file(const std::string& filename, const std::string& data) const noexcept {
-        using namespace std;
-
-        filesystem::path data_path{ filename };
-
-        ofstream out_writer{ data_path };
-
-        out_writer << data;
-
-        out_writer.close();
-
-        return true;
-    }
-
-    bool write(std::ostream& oss, const std::string& data) const noexcept {
-        oss << data << "\n";
-        return true;
-    }
-
-private:
-
-};
-
-writer::writer() : m_impl{ std::make_unique<writer_impl>() } {
+    return (0 != stbi_write_png(filename.c_str(), w, h, STRIDE, data.data(), w * STRIDE));
 }
 
-writer::~writer() = default;
+/// @brief 
+/// @param filename 
+/// @param data 
+/// @param w 1
+/// @param h 1
+/// @return 
+bool writer::write_jpeg(const std::string& filename, const std::string& data, unsigned int w, unsigned int h) const noexcept {
+
+    static constexpr auto STRIDE = 4u;
+
+    return (0 != stbi_write_jpg(filename.c_str(), w, h, STRIDE, data.data(), w * STRIDE));
+}
+
+/// @brief Write to a conventional file
+/// @param filename 
+/// @param data 
+/// @return 
+bool writer::write_file(const std::string& filename, const std::string& data) const noexcept {
+    using namespace std;
+
+    filesystem::path data_path{ filename };
+
+    ofstream out_writer{ data_path };
+
+    out_writer << data;
+
+    out_writer.close();
+
+    return out_writer.good();
+}
 
 /// @brief Main function for handling file I/O
 /// @param filename 
@@ -127,13 +108,13 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
         auto ftype = det_file_by_suffix(cref(filename));
 
 		if (ftype == outputs::PLAIN_TEXT) {
-			return this->m_impl->write_file(filename, data);
+			return this->write_file(filename, data);
 		} else if (ftype == outputs::WAVEFRONT_OBJECT_FILE) {
-			return this->m_impl->write_file(filename, data);
+			return this->write_file(filename, data);
 		} else if (ftype == outputs::PNG) {
-            return this->m_impl->write_png(filename, data);
+            return this->write_png(filename, data);
 		} else if (ftype == outputs::JPEG) {
-            return this->m_impl->write_jpeg(filename, data);
+            return this->write_jpeg(filename, data);
 		} else {
 			return false;
 		}
@@ -143,5 +124,9 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
 }
 
 bool writer::write(std::ostream& oss, const std::string& data) const noexcept {
-    return this->m_impl->write(std::ref(oss), std::cref(data));
+    using namespace std;
+
+    oss << data << "\n";
+
+    return oss.good();
 }

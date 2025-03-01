@@ -1,12 +1,18 @@
 #ifndef HASH_H
 #define HASH_H
 
-#include <functional>
+#include <utility>
 
 namespace mazes {
 
-/// @brief Useful to store a block's 2D positioning in a grid / chunk-based world
+/// @brief Hashing function to store a block's (x, z) position
 struct pair_hash {
+
+    /// @brief Hash function for a pair
+    /// @tparam T1
+    /// @tparam T2
+    /// @param p
+    /// @return the hash value
     template <class T1, class T2>
     std::size_t operator()(const std::pair<T1, T2>& p) const {
         auto hash1 = std::hash<T1>{}(std::get<0>(p));

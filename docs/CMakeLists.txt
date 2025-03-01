@@ -12,6 +12,7 @@ macro(InitDoxygenAwesomeCss)
     FetchContent_GetProperties(doxygen-awesome-css SOURCE_DIR AWESOME_CSS_DIR)
     set(DOXYGEN_GENERATE_TREEVIEW YES)
     set(DOXYGEN_FULL_SIDEBAR NO)
+    set(DOXYGEN_FULL_PATH_NAMES NO)
     set(DOXYGEN_DISABLE_INDEX NO)
     set(DOXYGEN_HAVE_DOT YES)
     set(DOXYGEN_DOT_IMAGE_FORMAT svg)
@@ -28,7 +29,7 @@ macro(InitDoxygenAwesomeCss)
 
     if(UNIX)
         execute_process(COMMAND ${CMAKE_COMMAND} -E copy 
-            ${doxygen-awesome-css_SOURCE_DIR}/doxygen-customer/header.html
+            ${doxygen-awesome-css_SOURCE_DIR}/doxygen-custom/header.html
             ${CMAKE_BINARY_DIR}/docs/html/header.html)
     endif()
 

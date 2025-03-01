@@ -2,15 +2,15 @@
 
 using namespace mazes;
 
-progress::progress() 
-: start_time(std::chrono::steady_clock::now())
-, end_time(std::chrono::steady_clock::now()) {
-
+void progress::start() noexcept {
+    this->mtx.lock();
+    start_time = std::chrono::steady_clock::now();
+    this->mtx.unlock();
 }
 
 void progress::reset() noexcept {
     this->mtx.lock();
-    start_time = end_time = std::chrono::steady_clock::now();
+    start_time = end_time = std::chrono::steady_clock::time_point::min();
     this->mtx.unlock();
 }
 

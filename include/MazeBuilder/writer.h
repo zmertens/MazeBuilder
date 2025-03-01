@@ -2,33 +2,31 @@
 #define WRITER_H
 
 #include <string>
-#include <memory>
 
 namespace mazes {
 
-/// @brief Handles file writing for mazes, implements PIMPL idiom
+/// @brief Handles file writing for text, stdout, images, and object files
 class writer {
 public:
-	explicit writer();
-    ~writer();
 
-	/// @brief Handles writing to a file
+	/// @brief Handles writing to an image file
 	/// @param filename 
-	/// @param data
-    /// @param w 1 for image files
-    /// @param h 1 for image files
+	/// @param data the string to write to a file
+    /// @param w 1 width in pixels
+    /// @param h 1 height in pixels
 	/// @return 
 	bool write(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
 
-    /// @brief Handles writing to cout
+    /// @brief Handles writing to an output stream
     /// @param oss 
     /// @param data 
     /// @return 
     bool write(std::ostream& oss, const std::string& data) const noexcept;
 
 private:
-    class writer_impl;
-    std::unique_ptr<writer_impl> m_impl;
+    bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
+    bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
+    bool write_file(const std::string& filename, const std::string& data) const noexcept;
 }; // writer
 
 }
