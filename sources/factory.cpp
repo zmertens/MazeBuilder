@@ -18,13 +18,13 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
     };
 
     unique_ptr<grid_interface> g = make_unique<grid>(config.rows(), config.columns(), config.levels());
-    if (run_algo_on_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
+    if (apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g)));
     }
     return nullopt;
 }
 
-bool factory::run_algo_on_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
+bool factory::apply_algo_to_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept {
     
     switch (config._algo()) {
         case algo::BINARY_TREE: {

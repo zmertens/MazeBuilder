@@ -11,6 +11,9 @@ namespace mazes {
 
 class maze;
 
+/// @file stringz.h
+
+/// @class stringz
 /// @brief String helper class
 /// @details This class provides methods to convert mazes into string representations
 class stringz {

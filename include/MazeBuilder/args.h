@@ -8,6 +8,8 @@
 
 namespace mazes {
 
+/// @file args.h
+/// @class args
 /// @brief Simple argument handler
 struct args {
 public:

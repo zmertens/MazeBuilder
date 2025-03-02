@@ -12,6 +12,8 @@ namespace mazes {
 class grid_interface;
 class cell;
 
+/// @file binary_tree.h
+/// @class binary_tree
 /// @brief Binary tree algorithm for generating mazes
 class binary_tree : public algo_interface {
 public:

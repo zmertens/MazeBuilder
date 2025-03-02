@@ -11,6 +11,8 @@ namespace mazes {
 
 class grid_interface;
 
+/// @file dfs.h
+/// @class dfs
 /// @brief Depth-first search algorithm for generating mazes
 /// @details Also-known-as the recursive backtracker algorithm
 /// @details This algorithm is used to generate mazes by visiting each cell in the grid and carving a path to the next cell

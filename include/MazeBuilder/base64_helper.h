@@ -6,6 +6,8 @@
 
 namespace mazes {
 
+/// @file base64_helper.h
+/// @class base_64_helper
 /// @brief Base64 encoding and decoding helper class
 /// @details This class provides methods to encode and decode strings using the Base64 encoding scheme
 class base_64_helper {

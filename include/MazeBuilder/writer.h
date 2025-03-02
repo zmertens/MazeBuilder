@@ -5,6 +5,10 @@
 
 namespace mazes {
 
+/// @file writer.h
+/// @brief Handles writing to files, stdout, and images
+
+/// @class writer
 /// @brief Handles file writing for text, stdout, images, and object files
 class writer {
 public:

@@ -1,7 +1,8 @@
 #ifndef MAZE_BUILDER_H
 #define MAZE_BUILDER_H
 
-/// @file Primary file for including all the headers in the maze builder library
+/// @file maze_builder.h
+/// @brief This file includes all the headers in the maze builder library
 
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/stringz.h>

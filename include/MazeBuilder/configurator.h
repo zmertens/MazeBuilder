@@ -7,6 +7,9 @@
 
 namespace mazes {
 
+/// @file configurator.h
+
+/// @class configurator
 /// @brief Configuration class for the maze builder
 class configurator {
 public:

@@ -7,6 +7,8 @@
 
 namespace mazes {
 
+/// @file json_helper.h
+/// @class json_helper
 /// @brief JSON helper class
 /// @details This class provides methods to convert a map of strings into a JSON string
 class json_helper {

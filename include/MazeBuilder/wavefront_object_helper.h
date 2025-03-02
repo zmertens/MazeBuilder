@@ -10,6 +10,10 @@ namespace mazes {
 
 class maze;
 
+/// @file wavefront_object_helper.h
+
+/// @class wavefront_object_helper
+/// @brief Transform a maze into a Wavefront object string
 class wavefront_object_helper {
 public:
     // Default constructor

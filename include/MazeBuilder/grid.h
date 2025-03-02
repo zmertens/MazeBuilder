@@ -12,6 +12,8 @@
 
 namespace mazes {
 
+/// @file grid.h
+/// @class grid
 /// @brief General purpose grid class for maze generation
 class grid : public grid_interface {
 

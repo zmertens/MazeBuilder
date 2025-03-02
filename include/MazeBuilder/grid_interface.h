@@ -15,7 +15,9 @@
 
 namespace mazes {
 
-/// @brief Interface for the grid
+/// @file grid_interface.h
+/// @class grid_interface
+/// @brief Interface for the grid class
 /// @details This interface provides methods to interact with the grid
 /// @details The grid is a collection of cells that are linked together to form a maze
 /// @details The grid can be visualized as a 2D or 3D structure using strings

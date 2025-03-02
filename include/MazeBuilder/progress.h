@@ -6,6 +6,8 @@
 
 namespace mazes {
 
+/// @file progress.h
+/// @class progress
 /// @brief Simple clock for elapsed events
 /// @details This class is used to track the elapsed time between two events
 /// @details Thread safe with mutexes

@@ -5,6 +5,9 @@
 
 namespace mazes {
 
+/// @file hash.h
+
+/// @class pair_hash
 /// @brief Hashing function to store a block's (x, z) position
 struct pair_hash {
 

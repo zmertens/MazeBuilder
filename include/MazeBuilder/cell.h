@@ -8,6 +8,8 @@
 
 namespace mazes {
 
+/// @file cell.h
+/// @class cell
 /// @brief Cell class for maze generation
 class cell {
 public:

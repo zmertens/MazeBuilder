@@ -4,6 +4,9 @@
 #include <string>
 #include <stdexcept>
 
+/// @file enums.h
+/// @brief Enumerations for the maze builder program
+
 namespace mazes {
 
     /// @brief Character representations of walls and barriers in the maze

@@ -27,11 +27,9 @@ macro(InitDoxygenAwesomeCss)
         ${doxygen-awesome-css_SOURCE_DIR}/doxygen-awesome-interactive-toc.js
     )
 
-    if(UNIX)
-        execute_process(COMMAND ${CMAKE_COMMAND} -E copy 
-            ${doxygen-awesome-css_SOURCE_DIR}/doxygen-custom/header.html
-            ${CMAKE_BINARY_DIR}/docs/html/header.html)
-    endif()
+    execute_process(COMMAND ${CMAKE_COMMAND} -E copy 
+        ${doxygen-awesome-css_SOURCE_DIR}/doxygen-custom/header.html
+        ${CMAKE_BINARY_DIR}/docs/html/header.html)
 
     execute_process(COMMAND doxygen -w html header.html footer.html style.css
                     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
@@ -40,7 +38,7 @@ macro(InitDoxygenAwesomeCss)
     set(DOXYGEN_HTML_HEADER ${CMAKE_BINARY_DIR}/docs/html/header.html)
 endmacro()
 
-set(DOXYGEN_PROJECT_NAME "Maze Builder")
+set(DOXYGEN_PROJECT_NAME "Maze Builder Docs")
 set(DOXYGEN_GENERATE_HTML YES)
 set(DOXYGEN_HTML_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/html")
 set(DOXYGEN_EXTRACT_ALL NO)
@@ -51,7 +49,7 @@ set(DOXYGEN_EXPAND_ONLY_PREDEF YES)
 set(DOXYGEN_WARN_IF_UNDOCUMENTED YES)
 
 set(DOXYGEN_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Voxels/textures")
-set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_CURRENT_SOURCE_DIR}/../README.md")
+set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_SOURCE_DIR}/README.md")
 set(DOXYGEN_PROJECT_LOGO "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Voxels/textures/favicon.ico")
 
 set(DOXYGEN_INLINE_SIMPLE_STRUCTS YES)
@@ -65,6 +63,6 @@ InitDoxygenAwesomeCss()
 
 doxygen_add_docs(mazebuilderdocs
                 "${CMAKE_SOURCE_DIR}/include/MazeBuilder"
-                "overview.md"
+                "${CMAKE_SOURCE_DIR}/README.md"
                 ALL
                 COMMENT "Generate HTML documentation")

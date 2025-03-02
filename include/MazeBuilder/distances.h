@@ -1,10 +1,3 @@
-/**
- * @file distances.h
- * @brief Distances class header file - Computes distances between cells in a maze
- * @ingroup Maze
- * 
-*/
-
 #ifndef DISTANCES_H
 #define DISTANCES_H
 
@@ -15,29 +8,33 @@
 
 namespace mazes {
 
-    class cell;
+class cell;
 
-    class distances {
-    public:
-        explicit distances(std::shared_ptr<cell> root);
+/// @file distances.h
+/// @class distances
+/// @brief Distances utility class for counting paths and nodes
+/// @details This class is used to compute the distances between cells in a maze
+class distances {
+public:
+    explicit distances(std::shared_ptr<cell> root);
 
-		int& operator[](const std::shared_ptr<cell>& cell) noexcept {
-			return m_cells[cell];
-		}
+	int& operator[](const std::shared_ptr<cell>& cell) noexcept {
+		return m_cells[cell];
+	}
 
-        void set(std::shared_ptr<cell> cell, int distance) noexcept;
+    void set(std::shared_ptr<cell> cell, int distance) noexcept;
 
-        bool contains(const std::shared_ptr<cell>& cell) const noexcept;
+    bool contains(const std::shared_ptr<cell>& cell) const noexcept;
 
-        std::shared_ptr<distances> path_to(std::shared_ptr<cell> goal) const noexcept;
-        std::pair<std::shared_ptr<cell>, int> max() const noexcept;
+    std::shared_ptr<distances> path_to(std::shared_ptr<cell> goal) const noexcept;
+    std::pair<std::shared_ptr<cell>, int> max() const noexcept;
 
-        void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+    void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
-    private:
-        std::shared_ptr<cell> m_root;
-        std::unordered_map<std::shared_ptr<cell>, int> m_cells;
-    };
+private:
+    std::shared_ptr<cell> m_root;
+    std::unordered_map<std::shared_ptr<cell>, int> m_cells;
+};
 
 } // namespace mazes
 #endif // DISTANCES_H

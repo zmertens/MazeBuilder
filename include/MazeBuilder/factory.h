@@ -14,6 +14,8 @@ namespace mazes {
 class grid_interface;
 class maze;
 
+/// @file factory.h
+/// @class factory
 /// @brief Factory provides a way to create mazes
 class factory {
 
@@ -32,7 +34,7 @@ private:
 	/// @param get_int 
 	/// @param rng 
 	/// @return 
-	static bool run_algo_on_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
+	static bool apply_algo_to_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
 };
 
 } // namespace mazes

@@ -12,7 +12,9 @@ namespace mazes {
 
 class cell;
 
-/// @brief Data class to represent a maze
+/// @file maze.h
+/// @class maze
+/// @brief Data class representing a 2D or 3D maze
 class maze {
 public:
 

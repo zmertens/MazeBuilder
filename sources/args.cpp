@@ -1,5 +1,3 @@
-/// @file Args handles what the program can accept as input
-
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/json_helper.h>
 
