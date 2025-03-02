@@ -70,9 +70,9 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             string algorithm;
             // Get user input
             cin >> rows >> columns >> height >> seed >> algorithm;
-            mazes::algos mt = mazes::to_algo_from_string(algorithm);
+            mazes::algo mt = mazes::to_algo_from_string(algorithm);
 
-            if (mt == mazes::algos::TOTAL) {
+            if (mt == mazes::algo::TOTAL) {
                 cerr << "Unknown algorithm: " << algorithm << endl;
                 break;
             }
