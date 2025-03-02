@@ -23,6 +23,8 @@ target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../deps")
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../include")
 
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/maze_dfs.json" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
 if(MAZE_BUILDER_MEMCHECK)
 	message(INFO ": Applying memcheck to target ${MAZE_BUILDER_TESTS_EXE}")
 	include(Valgrind)

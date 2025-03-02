@@ -31,7 +31,7 @@ TEST_CASE("Args method parses correctly", "[parses]") {
         REQUIRE_FALSE(found);
     }
 
-    SECTION("Valid short arguments") {
+    SECTION("Valid short arguments 1") {
         vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-d" };
         REQUIRE(args_handler.parse(cref(args_vec)));
     }
@@ -39,6 +39,12 @@ TEST_CASE("Args method parses correctly", "[parses]") {
     SECTION("Valid short arguments 2") {
         vector<string> args_vec = { "app", "-s500" };
         REQUIRE(args_handler.parse(cref(args_vec)));
+    }
+
+    SECTION("Valid short arguments 3") {
+        vector<string> args_vec = { "app", "-s500" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+        REQUIRE(!args_handler.get("s").empty());
     }
 
     SECTION("Valid mixed arguments") {
@@ -95,5 +101,95 @@ TEST_CASE("Args method prints correctly", "[prints]") {
         stringstream ss;
         ss << args_handler;
         REQUIRE_FALSE(ss.str().empty());
+    }
+}
+
+TEST_CASE("Args can handle a JSON input string", "[json input string]") {
+    args args_handler{};
+    SECTION("Valid JSON input") {
+        string valid_json = R"json(./app -j {
+            "rows": 10,
+            "columns": 10,
+            "seed": 2,
+            "distances": true,
+            "output": "1.txt"
+        })json";
+        REQUIRE(args_handler.parse(cref(valid_json)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+        REQUIRE(m.find("output") != m.end());
+    }
+
+    SECTION("Valid JSON input 2") {
+        string valid_json = R"json(app -j     {
+            "rows": 10,
+            "columns": 10,
+            "seed": 2,
+            "distances": true,
+            "output": "1.txt"
+        }                    )json";
+        REQUIRE(args_handler.parse(cref(valid_json)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+        REQUIRE(m.find("output") != m.end());
+    }
+
+    SECTION("Invalid JSON input") {
+        // Invalid because there's no closing bracket
+        string invalid_json = R"json(./app -j {
+            "rows": 10,
+            "columns": 10,
+            "seed": 2,
+            "distances": true,
+            "output": "1.txt"
+        )json";
+        REQUIRE_FALSE(args_handler.parse(cref(invalid_json)));
+    }
+}
+
+TEST_CASE("Args can handle a JSON input file", "[json input file]") {
+    args args_handler{};
+    SECTION("Valid JSON input from string args") {
+        string json_file_valid = "./app -j maze_dfs.json";
+        REQUIRE(args_handler.parse(cref(json_file_valid)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+        REQUIRE(m.find("output") != m.end());
+    }
+
+    SECTION("Valid JSON input from string args") {
+        string json_file_valid = "./app --json=maze_dfs.json";
+        REQUIRE(args_handler.parse(cref(json_file_valid)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+        REQUIRE(m.find("output") != m.end());
+    }
+
+    SECTION("Valid JSON input from vector of string args") {
+        vector<string> args_vec = { "./app", "j", "maze_dfs.json" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+        REQUIRE(m.find("output") != m.end());
     }
 }

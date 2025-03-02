@@ -37,6 +37,18 @@ public:
     /// @return 
     std::string from(const std::unordered_map<std::string, std::string>& map, int pretty_print = 4) const noexcept;
 
+    /// @brief Parse and set a JSON string into a C++ map
+    /// @param s 
+    /// @param m 
+    /// @return success or failure on parse
+    bool from(const std::string& s, std::unordered_map<std::string, std::string>& m) const noexcept;
+
+    /// @brief Parse a JSON file into a C++ map from a file on disk
+    /// @param filename 
+    /// @param m 
+    /// @return 
+    bool load(const std::string& filename, std::unordered_map<std::string, std::string>& m) const noexcept;
+
 private:
     /// @brief Forward declaration of the implementation class
     class json_helper_impl;

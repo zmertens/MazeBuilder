@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include <MazeBuilder/enums.h>
+
 namespace mazes {
 
 /// @file writer.h
@@ -27,6 +29,7 @@ public:
     /// @return 
     bool write(std::ostream& oss, const std::string& data) const noexcept;
 
+    static bool is_file_with_suffix(const std::string& f, output o = output::PLAIN_TEXT) noexcept;
 private:
     bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
     bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;

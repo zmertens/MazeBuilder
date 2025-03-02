@@ -1,5 +1,6 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/json_helper.h>
+#include <MazeBuilder/writer.h>
 
 #include <string>
 #include <regex>
@@ -95,6 +96,19 @@ bool args::parse(const std::string& arguments) noexcept {
         }
     }
 
+    // Check if it's a JSON string or file
+    auto val = get("j");
+    if (!val.empty()) {
+        // JSON file
+        if (writer::is_file_with_suffix(cref(val), output::JSON)) {
+            json_helper jh{};
+            return jh.load(cref(val), ref(args_map));
+        }
+        // JSON string
+        json_helper jh{};
+        return jh.from(cref(val), ref(args_map));
+    }
+    
     return true;
 }
 

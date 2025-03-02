@@ -49,6 +49,10 @@ bool writer::write_file(const std::string& filename, const std::string& data) co
 
     ofstream out_writer{ data_path };
 
+    if (!out_writer.is_open()) {
+        return false;
+    }
+
     out_writer << data;
 
     out_writer.close();
@@ -65,55 +69,21 @@ bool writer::write_file(const std::string& filename, const std::string& data) co
 bool writer::write(const std::string& filename, const std::string& data, unsigned int w, unsigned int h) const noexcept {
     using namespace std;
 
-    static auto det_file_by_suffix = [](const string& f)->output {
-
-        // Verify file has valid extension
-        auto found = f.find(".");
-        if (found == string::npos) {
-            throw invalid_argument("Invalid filename: " + f);
-        }
-
-        static constexpr auto MAX_FILE_EXT_LEN = 7;
-
-        // Determine file type by the extension
-        auto short_str = f.substr(found, string::npos);
-
-        if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".txt") {
-            return output::PLAIN_TEXT;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".text") {
-            return output::PLAIN_TEXT;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".obj") {
-            return output::WAVEFRONT_OBJECT_FILE;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".object") {
-            return output::WAVEFRONT_OBJECT_FILE;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".png") {
-            return output::PNG;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".jpeg") {
-            return output::JPEG;
-        } else if (short_str.length() <= MAX_FILE_EXT_LEN && short_str == ".jpg") {
-            return output::JPEG;
-        } else {
-            throw invalid_argument("Invalid filename: " + f);
-        }
-
-        }; // lambda
-
-
     // Handle the output type
 	try {
         if (filename == "stdout") {
             throw invalid_argument("Invalid use of stdout.");
         }
 
-        auto ftype = det_file_by_suffix(cref(filename));
+        auto ftype = writer::is_file_with_suffix(cref(filename));
 
-		if (ftype == output::PLAIN_TEXT) {
+		if (writer::is_file_with_suffix(cref(filename), output::PLAIN_TEXT)) {
 			return this->write_file(filename, data);
-		} else if (ftype == output::WAVEFRONT_OBJECT_FILE) {
+		} else if (writer::is_file_with_suffix(cref(filename), output::WAVEFRONT_OBJECT_FILE)) {
 			return this->write_file(filename, data);
-		} else if (ftype == output::PNG) {
+		} else if (writer::is_file_with_suffix(cref(filename), output::PNG)) {
             return this->write_png(filename, data);
-		} else if (ftype == output::JPEG) {
+		} else if (writer::is_file_with_suffix(cref(filename), output::JPEG)) {
             return this->write_jpeg(filename, data);
 		} else {
 			return false;
@@ -129,4 +99,42 @@ bool writer::write(std::ostream& oss, const std::string& data) const noexcept {
     oss << data << "\n";
 
     return oss.good();
+}
+
+/// @brief Verify the file type by the output type provided
+/// @param f the file to verify
+/// @param o output::PLAIN_TEXT
+bool writer::is_file_with_suffix(const std::string& f, output o) noexcept {
+    using namespace std;
+
+    // Verify file has valid extension
+    auto found = f.find(".");
+    if (found == string::npos) {
+        return false;
+    }
+
+    static constexpr auto MAX_FILE_EXT_LEN = 7;
+
+    // Determine file type by the extension
+    auto short_str = f.substr(found, string::npos);
+
+    if (short_str == ".txt" && o == output::PLAIN_TEXT) {
+        return true;
+    } else if (short_str == ".text" && o == output::PLAIN_TEXT) {
+        return true;
+    } else if (short_str == ".obj" && o == output::WAVEFRONT_OBJECT_FILE) {
+        return true;
+    } else if (short_str == ".object" && o == output::WAVEFRONT_OBJECT_FILE) {
+        return true;
+    } else if (short_str == ".png" && o == output::PNG) {
+        return true;
+    } else if (short_str == ".jpeg" && o == output::JPEG) {
+        return true;
+    } else if (short_str == ".jpg" && o == output::JPEG) {
+        return true;
+    } else if (short_str == ".json" && o == output::JSON) {
+        return true;
+    } else {
+        return false;
+    }
 }
