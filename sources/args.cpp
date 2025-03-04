@@ -7,6 +7,7 @@
 #include <functional>
 #include <algorithm>
 #include <numeric>
+#include <cctype>
 
 using namespace mazes;
 
@@ -14,7 +15,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
     using namespace std;
 
     if (arguments.empty()) {
-        return true;
+        return false;
     }
 
     // Convert the arguments to a single string
@@ -30,89 +31,102 @@ bool args::parse(const std::string& arguments) noexcept {
     using namespace std;
 
     if (arguments.empty()) {
-        return true;
-    }
-
-    // Find the app name
-    auto pos = arguments.find(' ');
-    // Return early if it's just the app name
-    if (pos == std::string::npos) {
-        args_map.insert_or_assign("app", arguments);
-        return true;
-    }
-
-    // Start iterating after the app name
-    auto it = arguments.cbegin() + pos + 1;
-
-    // Check if the arguments without the app name are valid
-    const regex pattern{ ArgsPattern };
-    if (!regex_match(string(it, arguments.cend()), pattern)) {
         return false;
     }
 
-    args_map.insert_or_assign("app", arguments.substr(0, pos));
-
-    auto skip_spaces = [&it, &arguments]() {
-        while (it != arguments.cend() && *it == ' ') {
-            ++it;
-        }
+    // Helper method to remove whitespaces on left and right hand side of string
+  
+    auto trim = [](const std::string& str) -> std::string {
+        auto front = std::find_if_not(str.begin(), str.end(), [](int c) { return std::isspace(c); });
+        auto back = std::find_if_not(str.rbegin(), str.rend(), [](int c) { return std::isspace(c); }).base();
+        return (back <= front ? std::string() : std::string(front, back));
         };
 
-    while (it != arguments.cend()) {
-        skip_spaces();
+    auto args_trimmed = trim(cref(arguments));
 
-        if (it == arguments.cend()) {
+    // Check if the arguments are valid by pattern matching
+    const regex pattern{ ArgsPattern };
+    if (!regex_match(args_trimmed, pattern)) {
+        return false;
+    }
+
+    auto it = args_trimmed.cbegin();
+    auto end = args_trimmed.cend();
+
+    // Extract the app name
+    auto next_space = find(it, end, ' ');
+    args_map.insert_or_assign("app", string(it, next_space));
+    it = next_space;
+
+    while (it != end) {
+        // Skip spaces
+        while (it != end && *it == ' ') {
+            ++it;
+        }
+
+        if (it == end) {
             break;
         }
 
-        if (*it == '-' && (it + 1) != arguments.cend() && *(it + 1) == '-') {
-            // Long option
-            auto key_start = it + 2;
-            it = std::find(key_start, arguments.cend(), '=');
-            if (it != arguments.cend()) {
-                std::string key(key_start, it);
-                advance(it, 1);
-                auto value_start = it;
-                skip_spaces();
-                args_map.insert_or_assign(key, std::string(value_start, it));
+        if (*it == '-') {
+            auto key_start = ++it;
+            if (key_start != end && *key_start == '-') {
+                // Long option
+                ++key_start;
+                auto key_end = find(key_start, end, '=');
+                string key(key_start, key_end);
+                if (key_end != end) {
+                    ++key_end;
+                    auto value_end = find(key_end, end, ' ');
+                    args_map.insert_or_assign(key, string(key_end, value_end));
+                    it = value_end;
+                } else {
+                    auto value_start = find(key_start, end, ' ');
+                    args_map.insert_or_assign(key, string(value_start, end));
+                    it = end;
+                }
             } else {
-                it = std::find(key_start, arguments.cend(), ' ');
-                args_map.insert_or_assign(std::string(key_start, it), "");
-            }
-        } else if (*it == '-' && (it + 1) != arguments.cend() && *(it + 1) != '-') {
-            // Short option
-            std::string key(1, *(it + 1));
-            advance(it, 2);
-            skip_spaces();
-            if (it != arguments.cend() && *it != '-') {
-                auto value_start = it;
-                skip_spaces();
-                args_map.insert_or_assign(key, std::string(value_start, it));
-            } else {
-                args_map.insert_or_assign(key, "");
+                // Short option
+                auto key_end = find_if(key_start, end, [](char c) { return c == ' ' || c == '-'; });
+                string key(key_start, key_end);
+                if (key_end != end && *key_end == ' ') {
+                    ++key_end;
+                    auto value_end = find(key_end, end, ' ');
+                    args_map.insert_or_assign(key, string(key_end, value_end));
+                    it = value_end;
+                } else {
+                    args_map.insert_or_assign(key, "");
+                    it = key_end;
+                }
             }
         } else {
-            advance(it, 1);
+            ++it;
         }
     }
 
     // Check if it's a JSON string or file
-    auto val = get("j");
-    if (!val.empty()) {
-        // JSON file
-        if (writer::is_file_with_suffix(cref(val), output::JSON)) {
-            json_helper jh{};
-            return jh.load(cref(val), ref(args_map));
-        }
-        // JSON string
-        json_helper jh{};
-        return jh.from(cref(val), ref(args_map));
-    }
-    
+    //auto val = args_map.find("j");
+    //if (val != args_map.cend()) {
+    //    auto desc = val->second;
+    //    // JSON file
+    //    if (writer::is_file_with_suffix(cref(desc), output::JSON)) {
+    //        json_helper jh{};
+    //        return jh.load(cref(desc), ref(args_map));
+    //    }
+    //    // JSON string
+    //    json_helper jh{};
+    //    return jh.from(cref(desc), ref(args_map));
+    //}
+    //val = args_map.find("json");
+
     return true;
 }
 
-std::string args::get(const std::string& key) const noexcept {
+void args::clear() noexcept {
+    args_map.erase(args_map.begin(), args_map.end());
+}
+
+std::string args::get_desc(const std::string& key) const noexcept {
     auto it = args_map.find(key);
     if (it != args_map.end()) {
         return it->second;
@@ -120,14 +134,14 @@ std::string args::get(const std::string& key) const noexcept {
     return "";
 }
 
-const std::unordered_map<std::string, std::string>& args::get() const noexcept {
+const std::unordered_map<std::string, std::string>& args::get_map() const noexcept {
     return args_map;
 }
 
 /// @brief Dump the hash table to a string output
 /// @return 
 std::ostream& mazes::operator<<(std::ostream& os, const args& a) noexcept {
-    if (a.args_map.empty()) {
+    if (a.args_map.empty() || !os.good()) {
         return os;
     }
 

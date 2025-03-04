@@ -43,12 +43,12 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (maze_args.get("h").compare("true") == 0 || maze_args.get("help").compare("true") == 0) {
+    if (maze_args.get_desc("h").compare("true") == 0 || maze_args.get_desc("help").compare("true") == 0) {
         cout << MAZE_BUILDER_HELP << endl;
         return EXIT_SUCCESS;
     }
 
-    if (maze_args.get("v").compare("true") == 0 || maze_args.get("version").compare("true") == 0) {
+    if (maze_args.get_desc("v").compare("true") == 0 || maze_args.get_desc("version").compare("true") == 0) {
         cout << maze_builder_version << endl;
         return EXIT_SUCCESS;
     }
