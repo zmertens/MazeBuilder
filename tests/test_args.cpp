@@ -149,8 +149,8 @@ TEST_CASE("Args method prints correctly", "[prints]") {
 
 TEST_CASE("Args can handle a JSON input string", "[json input string]") {
     args args_handler{};
-   /* SECTION("Valid JSON input") {
-        string valid_json = R"json(./app -j `{
+    SECTION("JSON input 1") {
+        string valid_json = R"json(-j `{
             "rows": 10,
             "columns": 10,
             "seed": 2,
@@ -159,7 +159,7 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
         }`)json";
         REQUIRE(args_handler.parse(cref(valid_json)));
 
-        const auto& m = args_handler.get_map();
+        const auto& m = args_handler.get();
         REQUIRE(m.find("rows") != m.end());
         REQUIRE(m.find("columns") != m.end());
         REQUIRE(m.find("seed") != m.end());
@@ -167,27 +167,27 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
         REQUIRE(m.find("output") != m.end());
     }
 
-    SECTION("Valid JSON input 2") {
-        string valid_json = R"json(app -j  `   {
-            "rows": 10,
-            "columns": 10,
-            "seed": 2,
-            "distances": true,
-            "output": "1.txt"
-        }      `              )json";
+    SECTION("JSON input 2") {
+        string valid_json = R"json(--json=`{
+            "c": 10,
+            "s": 2,
+            "r": 10,
+            "d": false,
+            "o": "1.txt"
+        }`)json";
         REQUIRE(args_handler.parse(cref(valid_json)));
 
-        const auto& m = args_handler.get_map();
-        REQUIRE(m.find("rows") != m.end());
-        REQUIRE(m.find("columns") != m.end());
-        REQUIRE(m.find("seed") != m.end());
-        REQUIRE(m.find("distances") != m.end());
-        REQUIRE(m.find("output") != m.end());
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("r") != m.end());
+        REQUIRE(m.find("c") != m.end());
+        REQUIRE(m.find("s") != m.end());
+        REQUIRE(m.find("d") != m.end());
+        REQUIRE(m.find("o") != m.end());
     }
 
-    SECTION("Invalid JSON input") {
+    SECTION("Syntax error in JSON input") {
         // Invalid because there's no closing bracket
-        string invalid_json = R"json(./app -j `{
+        string invalid_json = R"json(-j `{
             "rows": 10,
             "columns": 10,
             "seed": 2,
@@ -195,12 +195,12 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
             "output": "1.txt"
         )json";
         REQUIRE_FALSE(args_handler.parse(cref(invalid_json)));
-    }*/
+    }
 }
 
 TEST_CASE("Args can handle a JSON input file", "[json input file]") {
     args args_handler{};
-    SECTION("JSON input from string args") {
+    SECTION("JSON input file") {
         string json_file_valid = " -j maze_dfs.json  ";
         REQUIRE(args_handler.parse(cref(json_file_valid)));
 
