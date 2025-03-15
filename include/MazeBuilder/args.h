@@ -2,7 +2,7 @@
 #define ARGS_H
 
 #include <string>
-#include <memory>
+#include <unordered_map>
 #include <vector>
 #include <ostream>
 
@@ -13,40 +13,11 @@ namespace mazes {
 /// @brief Simple argument handler
 struct args {
 public:
-
-    // Default constructor
-    explicit args();
-
-    // Destructor
-    ~args();
-
-    // Copy constructor
-    args(const args& other);
-
-    // Copy assignment operator
-    args& operator=(const args& other);
-
-    // Move constructor
-    args(args&& other) noexcept = default;
-
-    // Move assignment operator
-    args& operator=(args&& other) noexcept = default;
-
-    /// @brief Add a flag to the args map
-    /// @param key 
-    /// @param desc 
-    void add_flag(const std::string& key, bool& r, const std::string& desc) noexcept;
-
-    /// @brief Add an option to the args map
-    /// @param key 
-    /// @param desc 
-    void add_option(const std::string& key, const std::string& desc) noexcept;
-
-    /// @brief Parse program arguments from original args
-    /// @param argc 
-    /// @param argv 
-    /// @return 
-    bool parse(int argc, char* argv[]) noexcept;
+    /// @brief Regular expression pattern for checking arguments
+    /// @example "app --rows=10 --columns=10 --levels=1 --algo=dfs --seed=123 --distances --output=stdout"
+    /// @example "app --rows 10 --columns 10"
+    /// @example "app -r 10 -c 10 -l 1 -a dfs -s 123 -d -o stdout"
+    static constexpr auto ArgsPattern = R"pattern(^[A-Za-z0-9]+\s+[\-|\-\-][\w\s\=\.\d]+)pattern";
 
     /// @brief Parse program arguments from a vector of strings
     /// @param arguments
@@ -58,17 +29,23 @@ public:
     /// @return 
     bool parse(const std::string& arguments) noexcept;
 
-    /// @brief Clear the internal CLI program
+    /// @brief Clear the arguments map
     void clear() noexcept;
+
+    /// @brief Get a value from the args map
+    /// @param key 
+    /// @return 
+    std::string get_desc(const std::string& key) const noexcept;
+
+    /// @brief Get entire the args map
+    /// @return 
+    const std::unordered_map<std::string, std::string>& get_map() const noexcept;
 
     /// @brief Display the arguments to a string output
     /// @return 
     friend std::ostream& operator<<(std::ostream& os, const args& a) noexcept;
-private:
-    std::string get(const std::string& key) const noexcept;
-
-    struct args_impl;
-    std::unique_ptr<args_impl> pimpl;
+public:
+    std::unordered_map<std::string, std::string> args_map;
 };
 
 }

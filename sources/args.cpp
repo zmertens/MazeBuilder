@@ -3,83 +3,13 @@
 #include <MazeBuilder/writer.h>
 
 #include <string>
+#include <regex>
 #include <functional>
 #include <algorithm>
-#include <unordered_map>
-
-#include <CLI11/CLI11.hpp>
+#include <numeric>
+#include <cctype>
 
 using namespace mazes;
-
-struct args::args_impl {
-
-private:
-    CLI::App cli_app;
-
-public:
-    explicit args_impl() : cli_app{ "maze_builder" } {}
-
-    void add_flag(const std::string& key, bool& r, const std::string& desc) noexcept {
-        cli_app.add_flag(key, r, desc);
-    }
-
-    void add_option(const std::string& key, const std::string& desc) noexcept {
-        cli_app.add_option(key, desc);
-    }
-
-    std::vector<const CLI::Option*> get_options() const noexcept {
-        return cli_app.get_options();
-    }
-
-    bool parse(int argc, char* argv[], const std::vector<std::string>& flags = {"-h", "-v"}) noexcept {
-        // Copy the flags and options to the CLI program
-        for (const auto& flag : flags) {
-            cli_app.add_flag(flag);
-        }
-
-        try {
-            cli_app.parse(argc, argv);
-        } catch (const CLI::ParseError& e) {
-            return false;
-        }
-        return true;
-    }
-
-    bool parse(const std::string& arguments) noexcept {
-        std::vector<std::string> args = CLI::detail::split_up(arguments);
-        std::vector<char*> argv;
-        for (auto& arg : args) {
-            argv.push_back(const_cast<char*>(arg.c_str()));
-        }
-        return parse(static_cast<int>(argv.size()), argv.data());
-    }
-
-    void clear() noexcept {
-        cli_app.clear();
-    }
-};
-
-args::args() : pimpl{ std::make_unique<args_impl>() } {}
-
-args::~args() = default;
-
-/// @brief Add a flag to the args map
-/// @param key 
-/// @param desc 
-void args::add_flag(const std::string& key, bool& r, const std::string& desc) noexcept {
-    this->pimpl->add_flag(key, std::ref(r), desc);
-}
-
-/// @brief Add an option to the args map
-/// @param key 
-/// @param desc 
-void args::add_option(const std::string& key, const std::string& desc) noexcept {
-    this->pimpl->add_option(key, desc);
-}
-
-bool args::parse(int argc, char* argv[]) noexcept {
-    return this->pimpl->parse(argc, argv);
-}
 
 bool args::parse(const std::vector<std::string>& arguments) noexcept {
     using namespace std;
@@ -88,13 +18,13 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
         return false;
     }
 
-    vector<char*> argv;
-    transform(arguments.cbegin(), arguments.cend(), back_inserter(argv),
-        [](const string& arg) {
-            return const_cast<char*>(arg.c_str());
+    // Convert the arguments to a single string
+    auto str = std::accumulate(arguments.cbegin(), arguments.cend(), std::string{},
+        [](const std::string& a, const std::string& b) {
+            return a.empty() ? b : a + " " + b;
         });
 
-    return this->pimpl->parse(static_cast<int>(argv.size()), argv.data());
+    return this->parse(cref(str));
 }
 
 bool args::parse(const std::string& arguments) noexcept {
@@ -104,32 +34,118 @@ bool args::parse(const std::string& arguments) noexcept {
         return false;
     }
 
-    return this->pimpl->parse(cref(arguments));
+    // Helper method to remove whitespaces on left and right hand side of string
+  
+    auto trim = [](const std::string& str) -> std::string {
+        auto front = std::find_if_not(str.begin(), str.end(), [](int c) { return std::isspace(c); });
+        auto back = std::find_if_not(str.rbegin(), str.rend(), [](int c) { return std::isspace(c); }).base();
+        return (back <= front ? std::string() : std::string(front, back));
+        };
+
+    auto args_trimmed = trim(cref(arguments));
+
+    // Check if the arguments are valid by pattern matching
+    const regex pattern{ ArgsPattern };
+    if (!regex_match(args_trimmed, pattern)) {
+        return false;
+    }
+
+    auto it = args_trimmed.cbegin();
+    auto end = args_trimmed.cend();
+
+    // Extract the app name
+    auto next_space = find(it, end, ' ');
+    args_map.insert_or_assign("app", string(it, next_space));
+    it = next_space;
+
+    while (it != end) {
+        // Skip spaces
+        while (it != end && *it == ' ') {
+            ++it;
+        }
+
+        if (it == end) {
+            break;
+        }
+
+        if (*it == '-') {
+            auto key_start = ++it;
+            if (key_start != end && *key_start == '-') {
+                // Long option
+                ++key_start;
+                auto key_end = find(key_start, end, '=');
+                string key(key_start, key_end);
+                if (key_end != end) {
+                    ++key_end;
+                    auto value_end = find(key_end, end, ' ');
+                    args_map.insert_or_assign(key, string(key_end, value_end));
+                    it = value_end;
+                } else {
+                    auto value_start = find(key_start, end, ' ');
+                    args_map.insert_or_assign(key, string(value_start, end));
+                    it = end;
+                }
+            } else {
+                // Short option
+                auto key_end = find_if(key_start, end, [](char c) { return c == ' ' || c == '-'; });
+                string key(key_start, key_end);
+                if (key_end != end && *key_end == ' ') {
+                    ++key_end;
+                    auto value_end = find(key_end, end, ' ');
+                    args_map.insert_or_assign(key, string(key_end, value_end));
+                    it = value_end;
+                } else {
+                    args_map.insert_or_assign(key, "");
+                    it = key_end;
+                }
+            }
+        } else {
+            ++it;
+        }
+    }
+
+    // Check if it's a JSON string or file
+    //auto val = args_map.find("j");
+    //if (val != args_map.cend()) {
+    //    auto desc = val->second;
+    //    // JSON file
+    //    if (writer::is_file_with_suffix(cref(desc), output::JSON)) {
+    //        json_helper jh{};
+    //        return jh.load(cref(desc), ref(args_map));
+    //    }
+    //    // JSON string
+    //    json_helper jh{};
+    //    return jh.from(cref(desc), ref(args_map));
+    //}
+    //val = args_map.find("json");
+
+    return true;
 }
 
 void args::clear() noexcept {
-    this->pimpl->clear();
+    args_map.erase(args_map.begin(), args_map.end());
+}
+
+std::string args::get_desc(const std::string& key) const noexcept {
+    auto it = args_map.find(key);
+    if (it != args_map.end()) {
+        return it->second;
+    }
+    return "";
+}
+
+const std::unordered_map<std::string, std::string>& args::get_map() const noexcept {
+    return args_map;
 }
 
 /// @brief Dump the hash table to a string output
 /// @return 
 std::ostream& mazes::operator<<(std::ostream& os, const args& a) noexcept {
-    if (!a.pimpl || !os.good()) {
+    if (a.args_map.empty() || !os.good()) {
         return os;
     }
 
-    using namespace std;
-    // Copy the CLI program to a map
-    unordered_map<string, string> args_map;
-
-    const auto& options = a.pimpl->get_options();
-    transform(options.cbegin(), options.cend(),
-        inserter(args_map, args_map.end()),
-        [](const CLI::Option* cli_opt) {
-            return make_pair(cli_opt->get_single_name(), cli_opt->get_description());
-        });
-
     json_helper jh{};
-    os << jh.from(args_map);
+    os << jh.from(a.args_map);
     return os;
 }
