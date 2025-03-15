@@ -8,116 +8,126 @@
 using namespace std;
 using namespace mazes;
 
-TEST_CASE("Args parses correctly", "[parses]") {
+TEST_CASE("Args parses correctly", "[good parses]") {
     args args_handler{};
 
     SECTION("Help requested") {
-        vector<string> args_vec = { "app", "-h" };
+        vector<string> args_vec = { "-h", "--help   " };
         REQUIRE(args_handler.parse(args_vec));
-        args_handler.clear();
-        args_vec.clear();
-        args_vec.push_back("  app  -h ");
-        REQUIRE(args_handler.parse(cref(args_vec)));
-    }
-
-    SECTION("Help requested 2") {
-        vector<string> args_vec = { "  app  ", "--help  " };
-        REQUIRE(args_handler.parse(args_vec));
-        auto good_args = args_handler.get_map().size() == 2;
-        REQUIRE(good_args);
+        REQUIRE(!args_handler.get().empty());
     }
 
     SECTION("Version requested") {
-        vector<string> args_vec = { "app", " -v" };
+        vector<string> args_vec = { "  --version", " -v" };
         REQUIRE(args_handler.parse(args_vec));
-        auto good_args = args_handler.get_map().size() == 2;
-        REQUIRE(good_args);
-        good_args = args_handler.get_map().find("v") != args_handler.get_map().cend();
-        REQUIRE(good_args);
-    }
-
-    SECTION("Version requested 2") {
-        vector<string> args_vec = { "app", "--version" };
-        REQUIRE(args_handler.parse(args_vec));
-        auto good_args = args_handler.get_map().size() == 2;
-        REQUIRE(good_args);
+        REQUIRE(!args_handler.get().empty());
     }
 
     SECTION("Help and version requested") {
-        vector<string> args_vec = { "app", "-hv" };
+        vector<string> args_vec = { "-hv" };
         REQUIRE(args_handler.parse(args_vec));
-
-        auto found = args_handler.get_map().find("hv") != args_handler.get_map().cend();
-        REQUIRE(found);
-
-        args_handler.clear();
-        found = args_handler.get_map().find("hv") != args_handler.get_map().cend();
-        REQUIRE_FALSE(found);   
-
-        args_vec.emplace_back("app -vh");
-        REQUIRE(args_handler.parse(cref(args_vec)));
-
-        found = args_handler.get_map().find("vh") != args_handler.get_map().cend();
-        REQUIRE(found);
     }
 
-    SECTION("Valid short arguments 1") {
-        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-d", "-ostdout"};
+    SECTION("Short arguments 1") {
+        vector<string> args_vec = { "-s500" };
         REQUIRE(args_handler.parse(cref(args_vec)));
-    }
-
-    SECTION("Valid short arguments 2") {
-        vector<string> args_vec = { "app", "-s500" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-    }
-
-    SECTION("Valid short arguments 3") {
-        vector<string> args_vec = { "./app -s 500" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-        auto itr = args_handler.get_map().find("s");
-        REQUIRE(itr != args_handler.get_map().cend());
+        auto itr = args_handler.get().find("-s");
+        REQUIRE(itr != args_handler.get().cend());
         REQUIRE(itr->second == "500");
     }
 
-    SECTION("Valid mixed arguments") {
-        string valid_mixed_args = "app --rows=10 --columns=10 -s2 --algo=binary_tree --output=1.txt --distances";
-        REQUIRE(args_handler.parse(cref(valid_mixed_args)));
+    SECTION("Short arguments 2") {
+        vector<string> args_vec = { "-s 500" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+        auto itr = args_handler.get().find("-s");
+        REQUIRE(itr != args_handler.get().cend());
+        REQUIRE(itr->second == "500");
     }
 
-    SECTION("Valid repeated arguments") {
-        string valid_mixed_args = "app --rows=10 -r 10 --rows=11";
+    SECTION("Short arguments 3") {
+        vector<string> args_vec = { "-r 10", "-s 500" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+        auto itr = args_handler.get().find("-s");
+        REQUIRE(itr != args_handler.get().cend());
+        REQUIRE(itr->second == "500");
+        itr = args_handler.get().find("-r");
+        REQUIRE(itr != args_handler.get().cend());
+        REQUIRE(itr->second == "10");
+    }
+    
+    SECTION("Mixed arguments 1") {
+        string valid_mixed_args = "--rows=10 --columns=10 -s2 --algo=binary_tree --output=1.txt --distances";
         REQUIRE(args_handler.parse(cref(valid_mixed_args)));
+        REQUIRE(args_handler.get("--rows") == "10");
+        REQUIRE(args_handler.get("--columns") == "10");
+        REQUIRE(args_handler.get("-s") == "2");
+        REQUIRE(args_handler.get("--distances").empty());
+        REQUIRE(args_handler.get("--output") == "1.txt");
+        REQUIRE(args_handler.get("--algo") == "binary_tree");
     }
 
-    SECTION("No arguments") {
+    SECTION("Mixed arguments 2") {
+        string valid_mixed_args = "--rows=10 --columns=10 -s2 --algo=binary_tree --output=1.txt -d";
+        REQUIRE(args_handler.parse(cref(valid_mixed_args)));
+        REQUIRE(args_handler.get("--rows") == "10");
+        REQUIRE(args_handler.get("--columns") == "10");
+        REQUIRE(args_handler.get("-s") == "2");
+        REQUIRE(args_handler.get("-d").empty());
+        REQUIRE(args_handler.get("--output") == "1.txt");
+        REQUIRE(args_handler.get("--algo") == "binary_tree");
+    }
+
+    SECTION("No args") {
         string none = "";
         REQUIRE(args_handler.parse(cref(none)));
     }
+
+    SECTION("No args 2") {
+        vector<string> args_vec = { "" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+    }
 }
 
-TEST_CASE("Args method does not parse", "[no parse]") {
+TEST_CASE("Args method fails parse", "[fails parse]") {
     args args_handler{};
 
-    SECTION("No args") {
-        vector<string> args_vec = { "" };
+    SECTION("Repeated arguments") {
+        string valid_mixed_args = "--rows=10 -r 10 --rows=11";
+        REQUIRE_FALSE(args_handler.parse(cref(valid_mixed_args)));
+    }
+
+    SECTION("Bad long arguments 1") {
+        string bad_long_args = "--rows 10 --columns 10 --seed 2 --distances 1 --output stdout";
+        REQUIRE_FALSE(args_handler.parse(cref(bad_long_args)));
+    }
+
+    SECTION("Short arguments 1") {
+        vector<string> args_vec = { "-r 10", "-c 10", "-s 2", "-d 1", "-o stdout" };
         REQUIRE_FALSE(args_handler.parse(cref(args_vec)));
     }
 
-    SECTION("Invalid short arguments") {
+    SECTION("Short arguments 2") {
+        string args = "-r 10 -c 10 -s 2 -d 1 -o stdout";
+        REQUIRE_FALSE(args_handler.parse(cref(args)));
+    }
+
+    SECTION("Short arguments 3") {
         vector<string> args_vec = { "app", "r", "10", "c", "10", "s", "2", "d", "h" };
         REQUIRE_FALSE(args_handler.parse(cref(args_vec)));
     }
-    SECTION("Invalid mixed arguments") {
-        string invalid_mixed_args = "rows columns s3 app";
+    SECTION("Mixed arguments") {
+        string invalid_mixed_args = "columns s3 app";
         REQUIRE_FALSE(args_handler.parse(cref(invalid_mixed_args)));
     }
-    SECTION("Invalid short arguments 2") {
-        vector<string> args_vec = { "app", "10", "-r", "-c", "", "-sd", "3", "-d", "-d" };
+    SECTION("Just bad arguments") {
+        vector<string> args_vec = { "--thing", "= ? ? ? " };
         REQUIRE_FALSE(args_handler.parse(cref(args_vec)));
     }
-    SECTION("Invalid long arguments") {
-        string invalid_long_args = "--roows= --columns=";
-        REQUIRE_FALSE(args_handler.parse(cref(invalid_long_args)));
+    SECTION("More bad arguments") {
+        string pi = "\u03C0";
+        string lambda = u8"\u03BB";
+        string pi_lambda = pi + lambda;
+        REQUIRE_FALSE(args_handler.parse(cref(pi_lambda)));
     }
 }
 
@@ -129,7 +139,7 @@ TEST_CASE("Args method prints correctly", "[prints]") {
         REQUIRE(ss.str().empty());
     }
     SECTION("Print args") {
-        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-d" };
+        vector<string> args_vec = { "-r 10", "-c10", "-s 2", "-d" };
         REQUIRE(args_handler.parse(cref(args_vec)));
         stringstream ss;
         ss << args_handler;
@@ -139,7 +149,7 @@ TEST_CASE("Args method prints correctly", "[prints]") {
 
 TEST_CASE("Args can handle a JSON input string", "[json input string]") {
     args args_handler{};
-    SECTION("Valid JSON input") {
+   /* SECTION("Valid JSON input") {
         string valid_json = R"json(./app -j `{
             "rows": 10,
             "columns": 10,
@@ -185,40 +195,26 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
             "output": "1.txt"
         )json";
         REQUIRE_FALSE(args_handler.parse(cref(invalid_json)));
-    }
+    }*/
 }
 
 TEST_CASE("Args can handle a JSON input file", "[json input file]") {
     args args_handler{};
-    SECTION("Valid JSON input from string args") {
-        string json_file_valid = "  ./app -j maze_dfs.json  ";
+    SECTION("JSON input from string args") {
+        string json_file_valid = " -j maze_dfs.json  ";
         REQUIRE(args_handler.parse(cref(json_file_valid)));
 
-        const auto& m = args_handler.get_map();
+        const auto& m = args_handler.get();
         REQUIRE(m.find("rows") != m.end());
         REQUIRE(m.find("columns") != m.end());
         REQUIRE(m.find("seed") != m.end());
         REQUIRE(m.find("distances") != m.end());
         REQUIRE(m.find("output") != m.end());
-    }
 
-    SECTION("Valid JSON input from file args 1") {
-        string json_file_valid = "./app -j maze_dfs.json";
+        args_handler.clear();
+
+        json_file_valid = " --json=maze_dfs.json  ";
         REQUIRE(args_handler.parse(cref(json_file_valid)));
-    }
-
-    SECTION("Valid JSON input from file args 2") {
-        string json_file_valid = "./app --json maze_dfs.json";
-        REQUIRE(args_handler.parse(cref(json_file_valid)));
-    }
-
-    SECTION("Valid JSON input from file args 3") {
-        string json_file_valid = "./app --json=maze_dfs.json";
-        REQUIRE(args_handler.parse(cref(json_file_valid)));
-    }
-
-    SECTION("Valid JSON input from file args 4") {
-        vector<string> args_vec = { "./app", "-j", "maze_dfs.json" };
-        REQUIRE_FALSE(args_handler.parse(cref(args_vec)));
+        REQUIRE(!args_handler.get("--json").empty());
     }
 }

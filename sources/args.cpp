@@ -5,128 +5,86 @@
 #include <string>
 #include <regex>
 #include <functional>
+#include <sstream>
 #include <algorithm>
-#include <numeric>
-#include <cctype>
 
 using namespace mazes;
 
 bool args::parse(const std::vector<std::string>& arguments) noexcept {
     using namespace std;
 
-    if (arguments.empty()) {
-        return false;
+    // Short argument regex for -x or -y or -z
+    const regex short_arg_regex{ R"(-[a-zA-Z]\s*\d*)" };
+    const regex long_arg_regex{ R"(--[a-zA-Z]+(\s*=\s*\S+)?)" };
+    // Combined short arguments can represent -x1 or -y2 or -z3 
+    const regex combined_short_arg_regex{ R"(-[a-zA-Z]{2,})" };
+    const regex json_arg_regex{ R"(--json=\S+|-j|-j\s*)" };
+
+    for (const auto& arg : arguments) {
+        if (arg.empty()) {
+            continue;
+        }
+
+        auto arg_t = trim(arg);
+
+        smatch match;
+
+        // Check for JSON input first
+        if (regex_match(arg_t, match, json_arg_regex)) {
+            string key = match.str(0);
+            string value = "";
+            auto pos = key.find('=');
+            if (pos != string::npos) {
+                value = key.substr(pos + 1);
+                key = key.substr(0, pos);
+            } else if (key.find('j') != string::npos) {
+                value = trim(arguments.cend()[-1]);
+                key = "j";
+            }
+            args_map[key] = trim(value);
+            json_helper jh{};
+            return jh.load(value, args_map);
+        } else if (regex_match(arg_t, match, long_arg_regex)) {
+            string key = match.str(0);
+            string value = "";
+            auto pos = key.find('=');
+            if (pos != string::npos) {
+                value = key.substr(pos + 1);
+                key = key.substr(0, pos);
+            }
+            args_map[key] = trim(value);
+        } else if (regex_match(arg_t, match, short_arg_regex)) {
+            string key = match.str(0);
+            string value = "";
+            if (key.length() > 2) {
+                value = key.substr(2);
+                key = key.substr(0, 2);
+            }
+            args_map[key] = trim(value);
+        } else if (regex_match(arg_t, match, combined_short_arg_regex)) {
+            for (size_t i = 1; i < match.str(0).length(); ++i) {
+                args_map[string(1, match.str(0)[i])] = "";
+            }
+        } else {
+            return false;
+        }
     }
 
-    // Convert the arguments to a single string
-    auto str = std::accumulate(arguments.cbegin(), arguments.cend(), std::string{},
-        [](const std::string& a, const std::string& b) {
-            return a.empty() ? b : a + " " + b;
-        });
-
-    return this->parse(cref(str));
+    return true;
 }
 
 bool args::parse(const std::string& arguments) noexcept {
-    using namespace std;
-
-    if (arguments.empty()) {
-        return false;
-    }
-
-    // Helper method to remove whitespaces on left and right hand side of string
-  
-    auto trim = [](const std::string& str) -> std::string {
-        auto front = std::find_if_not(str.begin(), str.end(), [](int c) { return std::isspace(c); });
-        auto back = std::find_if_not(str.rbegin(), str.rend(), [](int c) { return std::isspace(c); }).base();
-        return (back <= front ? std::string() : std::string(front, back));
-        };
-
-    auto args_trimmed = trim(cref(arguments));
-
-    // Check if the arguments are valid by pattern matching
-    const regex pattern{ ArgsPattern };
-    if (!regex_match(args_trimmed, pattern)) {
-        return false;
-    }
-
-    auto it = args_trimmed.cbegin();
-    auto end = args_trimmed.cend();
-
-    // Extract the app name
-    auto next_space = find(it, end, ' ');
-    args_map.insert_or_assign("app", string(it, next_space));
-    it = next_space;
-
-    while (it != end) {
-        // Skip spaces
-        while (it != end && *it == ' ') {
-            ++it;
-        }
-
-        if (it == end) {
-            break;
-        }
-
-        if (*it == '-') {
-            auto key_start = ++it;
-            if (key_start != end && *key_start == '-') {
-                // Long option
-                ++key_start;
-                auto key_end = find(key_start, end, '=');
-                string key(key_start, key_end);
-                if (key_end != end) {
-                    ++key_end;
-                    auto value_end = find(key_end, end, ' ');
-                    args_map.insert_or_assign(key, string(key_end, value_end));
-                    it = value_end;
-                } else {
-                    auto value_start = find(key_start, end, ' ');
-                    args_map.insert_or_assign(key, string(value_start, end));
-                    it = end;
-                }
-            } else {
-                // Short option
-                auto key_end = find_if(key_start, end, [](char c) { return c == ' ' || c == '-'; });
-                string key(key_start, key_end);
-                if (key_end != end && *key_end == ' ') {
-                    ++key_end;
-                    auto value_end = find(key_end, end, ' ');
-                    args_map.insert_or_assign(key, string(key_end, value_end));
-                    it = value_end;
-                } else {
-                    args_map.insert_or_assign(key, "");
-                    it = key_end;
-                }
-            }
-        } else {
-            ++it;
-        }
-    }
-
-    // Check if it's a JSON string or file
-    //auto val = args_map.find("j");
-    //if (val != args_map.cend()) {
-    //    auto desc = val->second;
-    //    // JSON file
-    //    if (writer::is_file_with_suffix(cref(desc), output::JSON)) {
-    //        json_helper jh{};
-    //        return jh.load(cref(desc), ref(args_map));
-    //    }
-    //    // JSON string
-    //    json_helper jh{};
-    //    return jh.from(cref(desc), ref(args_map));
-    //}
-    //val = args_map.find("json");
-
-    return true;
+    std::istringstream iss(arguments);
+    std::vector<std::string> args_vec((std::istream_iterator<std::string>(iss)),
+        std::istream_iterator<std::string>());
+    return parse(args_vec);
 }
 
 void args::clear() noexcept {
     args_map.erase(args_map.begin(), args_map.end());
 }
 
-std::string args::get_desc(const std::string& key) const noexcept {
+std::string args::get(const std::string& key) const noexcept {
     auto it = args_map.find(key);
     if (it != args_map.end()) {
         return it->second;
@@ -134,8 +92,17 @@ std::string args::get_desc(const std::string& key) const noexcept {
     return "";
 }
 
-const std::unordered_map<std::string, std::string>& args::get_map() const noexcept {
+const std::unordered_map<std::string, std::string>& args::get() const noexcept {
     return args_map;
+}
+
+std::string args::trim(const std::string& str) const noexcept {
+    if (str.empty()) {
+        return str;
+    }
+    auto start = str.find_first_not_of(" \t");
+    auto end = str.find_last_not_of(" \t");
+    return str.substr(start, end - start + 1);
 }
 
 /// @brief Dump the hash table to a string output

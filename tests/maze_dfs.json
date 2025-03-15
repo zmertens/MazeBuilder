@@ -1,9 +1,9 @@
 {
 	"rows": 10,
 	"columns": 20,
-	"levels": 30
-	"seed": 9000000
+	"levels": 30,
+	"seed": 9000000,
 	"algo": "dfs",
-	"output": "maze_dfs.txt"
+	"output": "maze_dfs.txt",
 	"distances": true
 }

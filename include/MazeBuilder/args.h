@@ -13,12 +13,6 @@ namespace mazes {
 /// @brief Simple argument handler
 struct args {
 public:
-    /// @brief Regular expression pattern for checking arguments
-    /// @example "app --rows=10 --columns=10 --levels=1 --algo=dfs --seed=123 --distances --output=stdout"
-    /// @example "app --rows 10 --columns 10"
-    /// @example "app -r 10 -c 10 -l 1 -a dfs -s 123 -d -o stdout"
-    static constexpr auto ArgsPattern = R"pattern(^[A-Za-z0-9]+\s+[\-|\-\-][\w\s\=\.\d]+)pattern";
-
     /// @brief Parse program arguments from a vector of strings
     /// @param arguments
     /// @return 
@@ -35,11 +29,16 @@ public:
     /// @brief Get a value from the args map
     /// @param key 
     /// @return 
-    std::string get_desc(const std::string& key) const noexcept;
+    std::string get(const std::string& key) const noexcept;
 
     /// @brief Get entire the args map
     /// @return 
-    const std::unordered_map<std::string, std::string>& get_map() const noexcept;
+    const std::unordered_map<std::string, std::string>& get() const noexcept;
+
+    /// @brief Remove whitespace or tabs from a string
+    /// @param str 
+    /// @return 
+    std::string trim(const std::string& str) const noexcept;
 
     /// @brief Display the arguments to a string output
     /// @return 
