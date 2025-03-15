@@ -6,6 +6,7 @@
 #include <regex>
 #include <functional>
 #include <sstream>
+#include <iterator>
 #include <algorithm>
 
 using namespace mazes;
@@ -66,6 +67,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                 if (pos != string::npos) {
                     // Check if loading a JSON file
                     if (backtick_counter == 2 || backtick_counter == 0) {
+                        key = key.substr(0, pos);
                         value = extract_json_str(true);
                     } else {
                         return false;
@@ -148,12 +150,12 @@ std::string args::trim(const std::string& str) const noexcept {
 
 /// @brief Dump the hash table to a string output
 /// @return 
-std::ostream& mazes::operator<<(std::ostream& os, const args& a) noexcept {
-    if (a.args_map.empty() || !os.good()) {
-        return os;
+std::string args::to_str(const args& a) noexcept {
+    if (a.args_map.empty()) {
+        return "";
     }
-
+    std::stringstream ss{};
     json_helper jh{};
-    os << jh.from(a.args_map);
-    return os;
+    ss << jh.from(a.args_map);
+    return ss.str();
 }

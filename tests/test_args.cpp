@@ -1,5 +1,5 @@
 #include <string>
-#include <sstream>
+#include <functional>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -134,16 +134,14 @@ TEST_CASE("Args method fails parse", "[fails parse]") {
 TEST_CASE("Args method prints correctly", "[prints]") {
     args args_handler{};
     SECTION("Print empty args") {
-        stringstream ss;
-        ss << args_handler;
-        REQUIRE(ss.str().empty());
+        auto s = args::to_str(args_handler);
+        REQUIRE(s.empty());
     }
     SECTION("Print args") {
         vector<string> args_vec = { "-r 10", "-c10", "-s 2", "-d" };
         REQUIRE(args_handler.parse(cref(args_vec)));
-        stringstream ss;
-        ss << args_handler;
-        REQUIRE_FALSE(ss.str().empty());
+        auto s = args::to_str(args_handler);
+        REQUIRE_FALSE(s.empty());
     }
 }
 
@@ -215,6 +213,6 @@ TEST_CASE("Args can handle a JSON input file", "[json input file]") {
 
         json_file_valid = " --json=maze_dfs.json  ";
         REQUIRE(args_handler.parse(cref(json_file_valid)));
-        REQUIRE(!args_handler.get("--json").empty());
+        REQUIRE_FALSE(args_handler.get("--json").empty());
     }
 }

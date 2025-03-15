@@ -42,7 +42,7 @@ public:
 
     /// @brief Display the arguments to a string output
     /// @return 
-    friend std::ostream& operator<<(std::ostream& os, const args& a) noexcept;
+    static std::string to_str(const args& a) noexcept;
 public:
     std::unordered_map<std::string, std::string> args_map;
 };
