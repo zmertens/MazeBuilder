@@ -1,10 +1,10 @@
 #include <random>
-#include <exception>
+#include <stdexcept>
 #include <iostream>
 #include <algorithm>
 #include <string>
 
-#include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/maze_builder.h>
 
 #include "craft.h"
 
@@ -38,7 +38,7 @@ int main(int argc, char* argv[]) {
         // Run the SDL app
         static constexpr int window_w = 800, window_h = 600;
         string my_title { "Maze Builder 🔧" };
-        auto&& maze_builder_3D = craft::get_instance(cref(my_title), mazes::build_info::Version, window_w, window_h);
+        auto&& maze_builder_3D = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
         success = maze_builder_3D->run(std::cref(get_int), std::ref(rng_engine));
         if (!success) {
             std::cerr << "ERROR: Running SDL app failed." << std::endl;

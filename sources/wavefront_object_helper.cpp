@@ -17,7 +17,7 @@ public:
     ~wavefront_object_helper_impl() = default;
     
     std::string to_wavefront_obj_str(const std::unique_ptr<maze>& m,
-        const std::vector<std::tuple<int, int, int>>& vertices,
+        const std::vector<std::tuple<int, int, int, int>>& vertices,
         const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
         
         using namespace std;
@@ -57,8 +57,22 @@ public:
 
 wavefront_object_helper::wavefront_object_helper() : impl{ std::make_unique<wavefront_object_helper_impl>() } {}
 
+wavefront_object_helper::~wavefront_object_helper() = default;
+
+wavefront_object_helper::wavefront_object_helper(const wavefront_object_helper& other) : impl(std::make_unique<wavefront_object_helper_impl>(*other.impl)) {
+
+}
+
+wavefront_object_helper& wavefront_object_helper::operator=(const wavefront_object_helper& other) {
+    if (this == &other) {
+        return *this;
+    }
+    impl = std::make_unique<wavefront_object_helper_impl>(*other.impl);
+    return *this;
+}
+
 std::string wavefront_object_helper::to_wavefront_object_str(const std::unique_ptr<maze>& m,
-    const std::vector<std::tuple<int, int, int>>& vertices,
+    const std::vector<std::tuple<int, int, int, int>>& vertices,
     const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
 
     return this->impl->to_wavefront_obj_str(cref(m), cref(vertices), cref(faces));

@@ -1,13 +1,11 @@
-/*
- * Craft engine builds voxels as chunks and renders on-screen using OpenGL
- * Generated mazes are stored in-memory and in an offline database
- * Vertex and indice data is stored in buffers and rendered using OpenGL
- * Supports RESTful APIs for web applications by passing maze data in JSON format
- * Interfaces with Emscripten to provide web API support
- *
- *
- * Originally written in C99, ported to C++17
-*/
+/// @file craft.h
+/// @brief Craft class for the maze builder
+/// @details This file contains the Craft class for the maze builder
+/// @details Craft engine handles voxel generation and renders to the screen using OpenGL
+/// @details Mazes can be generated using Maze Builder
+/// @details Supports RESTful-like APIs for web applications by passing voxel data in JSON format
+/// @details Interfaces with Emscripten to provide web API support
+/// @details Originally written in C99, ported to C++17
 
 #include "craft.h"
 
@@ -1795,15 +1793,6 @@ struct craft::craft_impl {
         }
     }
 
-    //glClear(GL_DEPTH_BUFFER_BIT);
-    /*void render_sky(Attrib* attrib, Player* player, GLuint buffer, GLuint sky) {
-        set_matrix_3d(
-            matrix, this->m_model->voxel_scene_w, this->m_model->voxel_scene_h,
-            0, 0, 0, s->rx, s->ry, this->m_model->fov, 0, this->m_model->render_radius);
-
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    }*/
-
     /**
      * @brief Prepares to render by ensuring the chunks are loaded
      *
@@ -2814,7 +2803,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                 // Check if user has added a prefix to the Wavefront object file
                 if (gui->outfile[0] != '.') {
-                    if (ImGui::Button("Export!")) {
+                    if (ImGui::Button("Build!")) {
                         // Building maze here has the effect of computing its geometry on this thread
                         prog.reset();
                         // mazes::builder builder;
@@ -2825,6 +2814,24 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         //     .show_distances(false).seed(gui->seed).build();
                         // my_next_maze->init();
                         // computations::compute_geometry(my_next_maze);
+
+                        auto next_maze_ptr = mazes::factory::create(
+                            mazes::configurator().columns(gui->columns).rows(gui->rows).levels(gui->height)
+                            .distances(false).seed(gui->seed)._algo(my_maze_type));
+
+                        if (!next_maze_ptr.has_value()) {
+                            SDL_Log("Failed to create maze!");
+                        } else {
+                            // Compute the geometry of the maze
+                            vector<vector<uint32_t>> faces;
+                            std::vector<std::tuple<int, int, int, int>> vertices;
+                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces));
+                            mazes::wavefront_object_helper woh{};
+                            auto wavefront_obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
+                            mazes::writer writer{};
+                            writer.write(string(gui->outfile), cref(wavefront_obj_str));
+                        }
+
                         // Write on desktop before placing the next maze in the container
 #if !defined(__EMSCRIPTEN__)
                         mazes::writer writer{};

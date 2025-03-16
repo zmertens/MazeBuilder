@@ -81,7 +81,9 @@ Use the maze API in a modern C++ program:
     #include <MazeBuilder/maze_builder.h>
 
     void main() {
-        auto m = mazes::factory::create(configurator().rows(10).columns(10));
+        auto m = mazes::factory::create(
+            mazes::configurator()
+                .rows(10).columns(10));
 
         auto s = mazes::stringz::stringify(m);
 

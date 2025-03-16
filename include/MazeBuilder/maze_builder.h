@@ -18,6 +18,8 @@
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
+#include <MazeBuilder/wavefront_object_helper.h>
+#include <MazeBuilder/json_helper.h>
 
 namespace mazes {
 
