@@ -4,7 +4,7 @@
 #include <string>
 #include <optional>
 
-#include <MazeBuilder/hash.h>
+#include <MazeBuilder/hash_funcs.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 
@@ -18,7 +18,7 @@ class cell;
 class maze {
 public:
 
-    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
+    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, hash_funcs>;
 
     explicit maze(unsigned int rows, unsigned int columns, unsigned int levels = 1);
     explicit maze(std::unique_ptr<grid_interface>&& g);
