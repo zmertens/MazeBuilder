@@ -8,11 +8,11 @@
 
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/maze.h>
 
 namespace mazes {
 
 class grid_interface;
-class maze;
 
 /// @file factory.h
 /// @class factory

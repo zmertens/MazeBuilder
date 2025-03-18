@@ -14,6 +14,7 @@ set(MAZE_BUILDER_CORE_SRCS
     factory.cpp
     grid.cpp
     json_helper.cpp
+    lab.cpp
     maze.cpp
     progress.cpp
     sidewinder.cpp

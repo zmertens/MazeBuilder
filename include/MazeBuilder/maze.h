@@ -2,46 +2,37 @@
 #define MAZE_H
 
 #include <string>
-#include <optional>
-
-#include <MazeBuilder/hash_funcs.h>
-#include <MazeBuilder/enums.h>
-#include <MazeBuilder/grid_interface.h>
+#include <memory>
 
 namespace mazes {
 
-class cell;
+class grid_interface;
 
 /// @file maze.h
 /// @class maze
 /// @brief Data class representing a 2D or 3D maze
 class maze {
 public:
+    explicit maze(std::unique_ptr<grid_interface> g) noexcept;
 
-    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, hash_funcs>;
+    int get_levels() const noexcept;
 
-    explicit maze(unsigned int rows, unsigned int columns, unsigned int levels = 1);
-    explicit maze(std::unique_ptr<grid_interface>&& g);
-
-    // Getters
-    unsigned int get_rows() const noexcept;
-    unsigned int get_columns() const noexcept;
-    unsigned int get_levels() const noexcept;
-    bool has_distances() const noexcept;
     int get_block_id() const noexcept;
 
-    std::optional<std::tuple<int, int, int, int>> find_block(int x, int z) const noexcept;
+    bool has_distances() const noexcept;
 
-    void intopq(int x, int y, int z, int w) noexcept;
+    void set_levels(int levels) noexcept;
+    void set_block_id(int block_id) noexcept;
+    void set_distances(bool distances) noexcept;
 
     const std::unique_ptr<grid_interface>& get_grid() const noexcept;
+
 private:
+    std::unique_ptr<grid_interface> m_grid;
+
+    int levels;
     bool distances;
     int block_id;
-
-    pqmap m_p_q;
-
-    std::unique_ptr<grid_interface> my_grid;
 }; // maze struct
 
 } // namespace mazes

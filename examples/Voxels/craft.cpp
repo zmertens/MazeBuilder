@@ -399,7 +399,7 @@ struct craft::craft_impl {
         this->reset_model();
     }
 
-    int worker_run(void* arg, const vector<unique_ptr<maze>>& my_mazes) {
+    int worker_run(void* arg, const mazes::lab& my_mazes) {
         Worker* worker = reinterpret_cast<Worker*>(arg);
         while (1) {
             while (worker->state != WORKER_BUSY && !worker->should_stop) {
@@ -423,7 +423,7 @@ struct craft::craft_impl {
         return 0;
     } // worker_run
 
-    void init_worker_threads(const vector<unique_ptr<maze>>& my_mazes) {
+    void init_worker_threads(const mazes::lab& my_mazes) {
         this->m_model->workers.reserve(NUM_WORKERS);
         for (int i = 0; i < NUM_WORKERS; i++) {
             auto worker = make_unique<Worker>();
@@ -1388,7 +1388,7 @@ struct craft::craft_impl {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void load_chunk(WorkerItem* item, const vector<unique_ptr<maze>>& my_mazes) {
+    void load_chunk(WorkerItem* item, const mazes::lab& my_mazes) {
         int p = item->p;
         int q = item->q;
 
@@ -1425,7 +1425,7 @@ struct craft::craft_impl {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void create_chunk(Chunk* chunk, int p, int q, const vector<unique_ptr<maze>>& my_mazes) {
+    void create_chunk(Chunk* chunk, int p, int q, const mazes::lab& my_mazes) {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1515,7 +1515,7 @@ struct craft::craft_impl {
     }
 
     // Used to init the terrain (chunks) around the player
-    void force_chunks(Player* player, const vector<unique_ptr<maze>>& my_mazes) {
+    void force_chunks(Player* player, const mazes::lab& my_mazes) {
         State* s = &player->state;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1632,7 +1632,7 @@ struct craft::craft_impl {
         worker->cnd.notify_one();
     } // ensure chunks worker
 
-    void ensure_chunks(Player* player, const vector<unique_ptr<maze>>& my_mazes) {
+    void ensure_chunks(Player* player, const mazes::lab& my_mazes) {
         check_workers();
         force_chunks(player, cref(my_mazes));
         for (auto&& worker : this->m_model->workers) {
@@ -1796,7 +1796,7 @@ struct craft::craft_impl {
      * @brief Prepares to render by ensuring the chunks are loaded
      *
      */
-    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const vector<unique_ptr<maze>>& my_mazes) {
+    int render_chunks(Attrib* attrib, Player* player, GLuint texture, const mazes::lab& my_mazes) {
         int result = 0;
         State* s = &player->state;
         this->ensure_chunks(player, cref(my_mazes));
@@ -2364,6 +2364,16 @@ craft::~craft() = default;
 */
 bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
 
+    if (!SDL_SetAppMetadata("Maze builder with voxels", mazes::VERSION.c_str(), ZACHS_GH_REPO)) {
+        return SDL_APP_FAILURE;
+    }
+
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, ZACHS_GH_REPO);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "flipsAndAle");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "MIT License");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "simulation;game;voxel");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, mazes::VERSION.c_str());
+
     // SDL INITIALIZATION //
     if (!SDL_Init(SDL_INIT_VIDEO)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed (%s)\n", SDL_GetError());
@@ -2669,7 +2679,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
-    vector<unique_ptr<maze>> my_mazes;
+    mazes::lab my_mazes;
 
     // INITIALIZE WORKER THREADS
     m_pimpl->init_worker_threads(cref(my_mazes));
@@ -2815,25 +2825,28 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                             if (!next_maze_ptr.has_value()) {
                                 SDL_Log("Failed to create maze!");
-                            } else {
-                                // Compute the geometry of the maze
-                                vector<vector<uint32_t>> faces;
-                                std::vector<std::tuple<int, int, int, int>> vertices;
-                                mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces));
-                                mazes::wavefront_object_helper woh{};
-                                auto wavefront_obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
-                                mazes::writer writer{};
-                                writer.write(string(gui->outfile), cref(wavefront_obj_str));
+                                continue;
+                            }
+                            // Compute the geometry of the maze
+                            vector<vector<uint32_t>> faces;
+                            std::vector<std::tuple<int, int, int, int>> vertices;
+                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces));
+                            mazes::wavefront_object_helper woh{};
+                            auto wavefront_obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
+
+                            for (const auto& v : vertices) {
+                                my_mazes.insert(cref(std::get<0>(v)), cref(std::get<1>(v)), cref(std::get<2>(v)), cref(std::get<3>(v)));
                             }
 
-                            // Write on desktop before placing the next maze in the container
+                            //my_mazes.push_back(std::move(next_maze_ptr));
 #if !defined(__EMSCRIPTEN__)
-
+                            // Write immediately if not on the web
+                            mazes::writer writer{};
+                            writer.write(string(gui->outfile), cref(wavefront_obj_str));
 #if defined(MAZE_DEBUG)
                             SDL_Log("Writing to file... %s\n", gui->outfile);
 #endif
 #endif
-                            //my_mazes.push_back(std::move(my_next_maze));
                             // The JSON data for the Web API - GET /mazes/
                             //this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                             // Resetting the model reloads the chunks - show the new maze
@@ -2857,7 +2870,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         ImGui::EndDisabled();
                     }
 
-                    if (!my_mazes.empty()) {
+                    if (!my_mazes.get_render_vertices().empty()) {
                         // Show last maze compute time
                         ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));

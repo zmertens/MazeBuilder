@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/enums.h>
+#include <MazeBuilder/grid_interface.h>
 
 #include <sstream>
 #include <random>

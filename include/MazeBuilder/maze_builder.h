@@ -20,6 +20,7 @@
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 #include <MazeBuilder/json_helper.h>
+#include <MazeBuilder/lab.h>
 
 namespace mazes {
 
