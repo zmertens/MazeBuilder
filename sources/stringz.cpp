@@ -6,6 +6,7 @@
 
 #include <sstream>
 #include <random>
+#include <tuple>
 
 using namespace mazes;
 
@@ -69,7 +70,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
             if (*itr == CORNER || *itr == BARRIER1 || *itr == BARRIER2) {
                 static constexpr auto block_size = 1;
 
-                for (auto h{ 0 }; h < m->get_levels(); h++) {
+                for (auto h{ 0 }; h < get<1>(m->get_grid()->get_dimensions()); h++) {
 
                     add_block(row_x, h, col_z, m->get_block_id(), block_size);
                 }

@@ -47,11 +47,10 @@ public:
 
     void insert(int x, int y, int z, int w) noexcept;
 
-    // @TODO : clean up
-    std::vector<std::tuple<int, int, int, int>> get_render_vertices() const noexcept;
+    bool empty() const noexcept;
 private:
 
-    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
+    using pqmap = std::unordered_map<std::tuple<int, int, int>, std::tuple<int, int, int, int>, tri_hash>;
     pqmap m_p_q;
     std::vector<std::tuple<int, int, int, int>> m_vertices;
     std::vector<std::vector<std::uint32_t>> m_faces;

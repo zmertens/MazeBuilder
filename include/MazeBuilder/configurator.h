@@ -34,6 +34,11 @@ public:
         return *this;
     }
 
+    configurator& block_id(int val) noexcept {
+        block_id_ = val;
+        return *this;
+    }
+
     configurator& seed(unsigned int s) noexcept {
         seed_ = s;
         return *this;
@@ -54,6 +59,7 @@ public:
     unsigned int columns() const noexcept { return columns_; }
     unsigned int levels() const noexcept { return levels_; }
     algo _algo() const noexcept { return algo_; }
+    int block_id() const noexcept { return block_id_; }
     unsigned int seed() const noexcept { return seed_; }
     bool distances() const noexcept { return distances_; }
     std::string output() const noexcept { return output_; }
@@ -62,6 +68,7 @@ private:
     unsigned int rows_ = 1;
     unsigned int columns_ = 1;
     unsigned int levels_ = 1;
+    int block_id_ = 0;
     algo algo_ = algo::DFS;
     unsigned int seed_ = 2;
     bool distances_ = false;

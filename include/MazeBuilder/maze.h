@@ -14,14 +14,12 @@ class grid_interface;
 class maze {
 public:
     explicit maze(std::unique_ptr<grid_interface> g) noexcept;
-
-    int get_levels() const noexcept;
+    explicit maze(std::unique_ptr<grid_interface> g, int block_id = -1, bool distances = false) noexcept;
 
     int get_block_id() const noexcept;
 
     bool has_distances() const noexcept;
 
-    void set_levels(int levels) noexcept;
     void set_block_id(int block_id) noexcept;
     void set_distances(bool distances) noexcept;
 
@@ -30,7 +28,6 @@ public:
 private:
     std::unique_ptr<grid_interface> m_grid;
 
-    int levels;
     bool distances;
     int block_id;
 }; // maze struct

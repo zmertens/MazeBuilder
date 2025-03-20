@@ -2821,7 +2821,8 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                             auto next_maze_ptr = mazes::factory::create(
                                 mazes::configurator().columns(gui->columns).rows(gui->rows).levels(gui->height)
-                                .distances(false).seed(gui->seed)._algo(my_maze_type));
+                                .distances(false).seed(gui->seed)._algo(my_maze_type)
+                                .block_id(items[model->item_index]));
 
                             if (!next_maze_ptr.has_value()) {
                                 SDL_Log("Failed to create maze!");
@@ -2834,8 +2835,13 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                             mazes::wavefront_object_helper woh{};
                             auto wavefront_obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
 
-                            for (const auto& v : vertices) {
-                                my_mazes.insert(cref(std::get<0>(v)), cref(std::get<1>(v)), cref(std::get<2>(v)), cref(std::get<3>(v)));
+                            vector<tuple<int, int, int, int>> render_vertices(vertices.size() / 8);
+                            for (size_t i = 0; i < vertices.size(); i += 8) {
+                                render_vertices.push_back(vertices[i]);
+                            }
+
+                            for (const auto& v : render_vertices) {
+                                my_mazes.insert(cref(get<0>(v)), cref(get<1>(v)), cref(get<2>(v)), cref(get<3>(v)));
                             }
 
                             //my_mazes.push_back(std::move(next_maze_ptr));
@@ -2870,7 +2876,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         ImGui::EndDisabled();
                     }
 
-                    if (!my_mazes.get_render_vertices().empty()) {
+                    if (!my_mazes.empty()) {
                         // Show last maze compute time
                         ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));

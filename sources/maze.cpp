@@ -2,17 +2,18 @@
 
 #include <MazeBuilder/grid_interface.h>
 
+#include <tuple>
+
 using namespace mazes;
 
-maze::maze(std::unique_ptr<grid_interface> g) noexcept
+/// @brief 
+/// @param g 
+/// @param block_id -1
+/// @param distances false
+maze::maze(std::unique_ptr<grid_interface> g, int block_id, bool distances) noexcept
     : m_grid(std::move_if_noexcept(g))
-    , levels(1)
-    , distances(false)
-    , block_id(0) {
-}
-
-int maze::get_levels() const noexcept {
-    return this->levels;
+    , block_id(block_id)
+    , distances(distances) {
 }
 
 int maze::get_block_id() const noexcept {
@@ -21,10 +22,6 @@ int maze::get_block_id() const noexcept {
 
 bool maze::has_distances() const noexcept {
     return this->distances;
-}
-
-void maze::set_levels(int levels) noexcept {
-    this->levels = levels;
 }
 
 void maze::set_block_id(int block_id) noexcept {

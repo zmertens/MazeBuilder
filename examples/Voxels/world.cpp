@@ -34,9 +34,9 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, 
             // Maze
             const auto& block = mazes.find(x, z);
             if (block.has_value()) {
-                const auto& [r, height, c, t] = block.value();
-                for (auto y = 0; y < height + PLANT_HEIGHT_MAX + 1; y++) {
-                    func(r, y, c, t * flag, m);
+                const auto& [rows, levels, cols, t] = block.value();
+                for (auto y = 0; y < levels + PLANT_HEIGHT_MAX + 1; y++) {
+                    func(rows, y, cols, t * flag, m);
                 }
                 continue;
             }
