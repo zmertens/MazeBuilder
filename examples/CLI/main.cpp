@@ -105,7 +105,14 @@ int main(int argc, char* argv[]) {
 
         static constexpr auto BLOCK_ID = -1;
 
-        auto next_maze_ptr = mazes::factory::create(
+        using maze_ptr = optional<unique_ptr<mazes::maze>>;
+
+        auto dur = mazes::progress<>::duration(mazes::factory::create,
+            mazes::configurator().columns(columns).rows(rows).levels(levels)
+            .distances(false).seed(seed)._algo(my_maze_type)
+            .block_id(BLOCK_ID));
+
+        maze_ptr next_maze_ptr = mazes::factory::create(
             mazes::configurator().columns(columns).rows(rows).levels(levels)
             .distances(false).seed(seed)._algo(my_maze_type)
             .block_id(BLOCK_ID));
@@ -146,12 +153,10 @@ int main(int argc, char* argv[]) {
         }
 
         if (success) {
-            //auto elapsedms = progress.elapsed_ms();
-            //progress.reset();
 #if defined(MAZE_DEBUG)
             std::cout << "Writing to file: " << output_str << " complete!!" << std::endl;
-            //std::cout << "Progress: " << elapsedms << " seconds" << std::endl;
 #endif
+            std::cout << "Duration: " << std::chrono::duration<double, std::milli>(dur).count() << " milliseconds" << std::endl;
         }
         else {
             std::cerr << "Failed output formatting to: " << output_str << std::endl;

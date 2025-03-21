@@ -2,23 +2,27 @@
 
 using namespace mazes;
 
-void progress::start() noexcept {
+template <typename Time, typename Clock>
+void progress<Time, Clock>::start() noexcept {
     this->mtx.lock();
-    start_time = std::chrono::steady_clock::now();
+    start_time = Clock::now();
     this->mtx.unlock();
 }
 
-void progress::reset() noexcept {
+template <typename Time, typename Clock>
+void progress<Time, Clock>::reset() noexcept {
     this->mtx.lock();
-    start_time = end_time = std::chrono::steady_clock::time_point::min();
+    start_time = end_time = typename Clock::time_point::min();
     this->mtx.unlock();
 }
 
-double progress::elapsed_s() const noexcept {
+template <typename Time, typename Clock>
+double progress<Time, Clock>::elapsed_s() const noexcept {
     std::lock_guard<std::mutex> lock(this->mtx);
     return std::chrono::duration<double>(end_time - start_time).count();
 }
 
-double progress::elapsed_ms() const noexcept {
+template <typename Time, typename Clock>
+double progress<Time, Clock>::elapsed_ms() const noexcept {
     return this->elapsed_s() * 1000.0;
 }
