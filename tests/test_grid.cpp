@@ -47,11 +47,11 @@ TEST_CASE("Test to_vec", "[to_vec]") {
     }
 }
 
-TEST_CASE("Cells have neighbors", "[cells]") {
+TEST_CASE("Cells have neighbors", "[neighbors]") {
 
     // cell1 has cell2 neighbor to the south
-    shared_ptr<cell> cell1{ make_shared<cell>(0, 0, 0) };
-    shared_ptr<cell> cell2{ make_shared<cell>(0, 1, 1) };
+    shared_ptr<cell> cell1{ make_shared<cell>(0) };
+    shared_ptr<cell> cell2{ make_shared<cell>(1) };
 
     SECTION("Cell has neighbor to south") {
         cell1->set_south(cell2);

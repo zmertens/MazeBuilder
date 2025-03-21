@@ -15,8 +15,8 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
     using namespace std;
 
     // Short argument regex for -x or -y or -z
-    const regex short_arg_regex{ R"(-[a-zA-Z]\s*\d*)" };
-    const regex long_arg_regex{ R"(--[a-zA-Z]+(\s*=\s*\S+)?)" };
+    const regex short_arg_regex{ R"(-[a-zA-Z])" };
+    const regex long_arg_regex{ R"(--[a-zA-Z]+\=?\S*)" };
     // Combined short arguments can represent -x1 or -y2 or -z3 
     const regex combined_short_arg_regex{ R"(-[a-zA-Z]{2,})" };
     const regex json_arg_regex{ R"(--json=\S+|-j|-j\s*)" };
@@ -40,7 +40,8 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
         return raw_literal;
         };
 
-    for (const auto& arg : arguments) {
+    for (size_t i = 0; i < arguments.size(); ++i) {
+        const auto& arg = arguments[i];
         if (arg.empty()) {
             continue;
         }
@@ -62,7 +63,6 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             // Check for long-option JSON input
             json_helper jh{};
             if (key.find("--json") != string::npos) {
-
                 auto pos = key.find('=');
                 if (pos != string::npos) {
                     // Check if loading a JSON file
@@ -76,7 +76,6 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                     return false;
                 }
             } else {
-                
                 // Check for short-option JSON input
                 if (backtick_counter == 2 || backtick_counter == 0) {
                     value = extract_json_str(false);
@@ -94,19 +93,20 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             if (pos != string::npos) {
                 value = key.substr(pos + 1);
                 key = key.substr(0, pos);
+            } else if (i + 1 < arguments.size() && !regex_match(arguments[i + 1], short_arg_regex) && !regex_match(arguments[i + 1], long_arg_regex)) {
+                value = arguments[++i];
             }
             args_map[key] = trim(value);
         } else if (regex_match(arg_t, match, short_arg_regex)) {
             string key = match.str(0);
             string value = "";
-            if (key.length() > 2) {
-                value = key.substr(2);
-                key = key.substr(0, 2);
+            if (i + 1 < arguments.size() && !regex_match(arguments[i + 1], short_arg_regex) && !regex_match(arguments[i + 1], long_arg_regex)) {
+                value = arguments[++i];
             }
             args_map[key] = trim(value);
         } else if (regex_match(arg_t, match, combined_short_arg_regex)) {
-            for (size_t i = 1; i < match.str(0).length(); ++i) {
-                args_map[string(1, match.str(0)[i])] = "";
+            for (size_t j = 1; j < match.str(0).length(); ++j) {
+                args_map[string(1, match.str(0)[j])] = "";
             }
         } else {
             return false;
@@ -123,16 +123,17 @@ bool args::parse(const std::string& arguments) noexcept {
     return parse(args_vec);
 }
 
+
 void args::clear() noexcept {
     args_map.erase(args_map.begin(), args_map.end());
 }
 
-std::string args::get(const std::string& key) const noexcept {
+std::optional<std::string> args::get(const std::string& key) const noexcept {
     auto it = args_map.find(key);
     if (it != args_map.end()) {
         return it->second;
     }
-    return "";
+    return std::nullopt;
 }
 
 const std::unordered_map<std::string, std::string>& args::get() const noexcept {

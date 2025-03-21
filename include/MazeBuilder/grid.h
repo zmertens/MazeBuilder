@@ -16,7 +16,17 @@ namespace mazes {
 /// @class grid
 /// @brief General purpose grid class for maze generation
 class grid : public grid_interface {
+protected:
+    class node {
+    public:
+        std::shared_ptr<node> left, right;
+        std::shared_ptr<cell> cell_ptr;
 
+        node(std::int32_t idx) : left{nullptr}, right{nullptr}
+            , cell_ptr(std::make_shared<cell>(idx)) {}
+    };
+
+    std::shared_ptr<node> m_binary_search_tree_root;
 public:
     /// @brief Friend classes
     friend class binary_tree;
@@ -91,48 +101,47 @@ public:
 
     /// @brief 
     /// @param other_grid 
-    virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept;
+    //virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept;
 
     /// @brief 
     /// @param parent 
     /// @param index 
-    virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept;
+    //virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept;
+    void insert(std::shared_ptr<node> parent, int index) noexcept;
 
     /// @brief 
     /// @param parent 
     /// @param old_index 
     /// @param new_index 
     /// @return 
-    virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept;
+    //virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept;
 
     /// @brief
     /// @param start
     /// @param index
     /// @return
-    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept;
+    //virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept;
 
     /// @brief
     /// @param parent
     /// @param index
-    virtual void del(std::shared_ptr<cell> parent, int index) noexcept;
-
-protected:
-    std::shared_ptr<cell> m_binary_search_tree_root;
+    //virtual void del(std::shared_ptr<cell> parent, int index) noexcept;
     
 private:
     bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
+    
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
 
-    // Sort by youngest child cell -> oldest child
-    void presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+    // Sort by youngest child -> oldest child
+    void presort(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     // Sort ascending per index-value
-    void inorder(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+    void inorder(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     // Sort ascending per index-value
-    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
+    void sort_by_row_then_col(std::vector<std::shared_ptr<node>>& nodes) const noexcept;
 
-    std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
+    std::function<int(std::shared_ptr<node> const&, std::shared_ptr<node> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 

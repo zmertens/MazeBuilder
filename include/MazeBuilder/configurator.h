@@ -68,7 +68,7 @@ private:
     unsigned int rows_ = 1;
     unsigned int columns_ = 1;
     unsigned int levels_ = 1;
-    int block_id_ = 0;
+    int block_id_ = -1;
     algo algo_ = algo::DFS;
     unsigned int seed_ = 2;
     bool distances_ = false;

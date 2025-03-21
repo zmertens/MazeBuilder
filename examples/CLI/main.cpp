@@ -16,10 +16,10 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
         Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-          -a, --algorithm    dfs, sidewinder, binary_tree [default]
+          -a, --algo         dfs, sidewinder, binary_tree [default]
           -s, --seed         seed for the mt19937 generator [default=0]
           -r, --rows         maze rows [default=100]
-          -y, --height       maze height [default=10]
+          -l, --levels       maze height [default=10]
           -c, --columns      maze columns [default=100]
           -d, --distances    show distances in the maze
           -o, --output       [.txt], [.png], [.obj], [stdout[default]]
@@ -44,64 +44,70 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (maze_args.get("h").compare("true") == 0 || maze_args.get("help").compare("true") == 0) {
+    if (maze_args.get("-h").has_value() || maze_args.get("--help").has_value()) {
         cout << MAZE_BUILDER_HELP << endl;
         return EXIT_SUCCESS;
     }
 
-    if (maze_args.get("v").compare("true") == 0 || maze_args.get("version").compare("true") == 0) {
+    if (maze_args.get("-v").has_value() || maze_args.get("--version").has_value()) {
         cout << maze_builder_version << endl;
         return EXIT_SUCCESS;
     }
 
-    //for (const auto& arg : args_vec) {
-    //    if (arg.compare("-h") == 0 || arg.compare("--help") == 0) {
-    //        std::cout << MAZE_BUILDER_HELP << std::endl;
-    //        return EXIT_SUCCESS;
-    //    }
-    //    if (arg.compare("-v") == 0 || arg.compare("--version") == 0) {
-    //        std::cout << maze_builder_version << std::endl;
-    //        return EXIT_SUCCESS;
-    //    }
-    //}
+    auto seed = 0;
     
-	//// Set the version and help strings
-	//maze_args.version = maze_builder_version;
-	//maze_args.help = MAZE_BUILDER_HELP;
+    if (maze_args.get("-s").has_value()) {
+        seed = atoi(maze_args.get("-s").value().c_str());
+    } else if (maze_args.get("--seed").has_value()) {
+        seed = atoi(maze_args.get("--seed").value().c_str());
+    }
 
- //   std::mt19937 rng_engine{ static_cast<unsigned long>(maze_args.seed) };
- //   auto get_int = [&rng_engine](int low, int high) -> int {
- //       uniform_int_distribution<int> dist {low, high};
- //       return dist(rng_engine);
- //   };
+    std::mt19937 rng_engine{ static_cast<unsigned long>(seed)};
+    auto get_int = [&rng_engine](int low, int high) -> int {
+        uniform_int_distribution<int> dist {low, high};
+        return dist(rng_engine);
+    };
 
-    cout << mazes::args::to_str(cref(maze_args)) << "\n";
+    string algo_str = "";
+    if (maze_args.get("-a").has_value()) {
+        algo_str = maze_args.get("-a").value();
+    } else if (maze_args.get("--algo").has_value()) {
+        algo_str = maze_args.get("--algo").value();
+    }
+
+    // Run the command-line program
 
     try {
-        static constexpr auto CELL_SIZE = 10;
+        
         bool success = false;
-        // Run the command-line program
-        /*mazes::algos my_maze_type = mazes::to_algo_from_string(maze_args.algo);
-        static constexpr auto block_type = -1;
-        mazes::progress progress;
 
-        auto maze_opt = mazes::factory::create(
-            make_tuple(maze_args.rows, maze_args.columns, maze_args.height), 
-            my_maze_type, cref(get_int), cref(rng_engine));*/
+        mazes::algo my_maze_type = mazes::to_algo_from_string(cref(algo_str));
 
-        // mazes::builder builder;
-        // auto my_maze = builder.r
-            // .block_type(block_type)
-            // .show_distances(maze_args.distances)
-            // .build();
-        // my_maze->init();
-        // mazes::computations::compute_geometry(my_maze);
-        //if (maze_opt.has_value()) {
-        //    const auto& my_maze = maze_opt.value();
-        //    auto maze_s = mazes::stringz::stringify(cref(my_maze));
-        //    cout << maze_s << endl;
-        //    success = true;
-        //}
+        auto rows = 0, columns = 0, levels = 1;
+        if (maze_args.get("-c").has_value()) {
+            columns = atoi(maze_args.get("-c").value().c_str());
+        } else if (maze_args.get("--columns").has_value()) {
+            columns = atoi(maze_args.get("--columns").value().c_str());
+        }
+
+        if (maze_args.get("-r").has_value()) {
+            rows = atoi(maze_args.get("-r").value().c_str());
+        } else if (maze_args.get("--rows").has_value()) {
+            rows = atoi(maze_args.get("--rows").value().c_str());
+        }
+
+        static constexpr auto BLOCK_ID = -1;
+
+        auto next_maze_ptr = mazes::factory::create(
+            mazes::configurator().columns(columns).rows(rows).levels(levels)
+            .distances(false).seed(seed)._algo(my_maze_type)
+            .block_id(BLOCK_ID));
+
+        if (next_maze_ptr.has_value()) {
+            auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+            cout << maze_s << endl;
+            success = true;
+        }
 
         // mazes::writer my_writer;
         // mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);

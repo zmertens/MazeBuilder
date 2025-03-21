@@ -19,7 +19,7 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
 
     unique_ptr<grid_interface> g = make_unique<grid>(config.rows(), config.columns(), config.levels());
     if (apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
-        return make_optional(make_unique<maze>(std::move(g), config.block_id(), config.distances()));
+        return make_optional(make_unique<maze>(std::move(g), cref(config)));
     }
     return nullopt;
 }

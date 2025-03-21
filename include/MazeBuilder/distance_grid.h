@@ -28,13 +28,13 @@ public:
     virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
-    std::shared_ptr<distances> get_distances() const noexcept;
+    //std::shared_ptr<distances> get_distances() const noexcept;
 private:
     std::shared_ptr<grid_interface> m_grid;
-	std::shared_ptr<distances> m_distances;
+	//std::shared_ptr<distances> m_distances;
 
 	std::optional<std::string> to_base36(int value) const;
-    void calc_distances() noexcept;
+    //void calc_distances() noexcept;
 };
 }
 

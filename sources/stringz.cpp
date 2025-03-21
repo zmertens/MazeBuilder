@@ -19,6 +19,17 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
     std::vector<std::vector<std::uint32_t>>& faces) noexcept {
     using namespace std;
 
+    if (!m) {
+        // Handle null maze pointer
+        return;
+    }
+
+    auto dimensions = m->get_grid()->get_dimensions();
+    if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0) {
+        // Handle invalid dimensions
+        return;
+    }
+
     auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size) {
         // Calculate the base index for the new vertices
         // OBJ format is 1-based indexing
@@ -52,8 +63,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         // Bottom face
         faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
         faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-    
-    }; // lambda
+        }; // lambda
 
     istringstream iss{ stringify(cref(m)) };
 
@@ -65,13 +75,11 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         int col_z = 0;
 
         for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-
             // Check for barriers and walls then iterate up to the height of the maze
             if (*itr == CORNER || *itr == BARRIER1 || *itr == BARRIER2) {
                 static constexpr auto block_size = 1;
 
-                for (auto h{ 0 }; h < get<1>(m->get_grid()->get_dimensions()); h++) {
-
+                for (auto h{ 0 }; h < get<1>(dimensions); h++) {
                     add_block(row_x, h, col_z, m->get_block_id(), block_size);
                 }
             }
@@ -79,8 +87,8 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         }
         row_x++;
     } // getline
-
 } // objectify
+
 
 std::string stringz::stringify(const std::unique_ptr<maze>& m) noexcept {
     using namespace std;

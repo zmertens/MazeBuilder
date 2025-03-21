@@ -10,36 +10,43 @@
 using namespace mazes;
 using namespace std;
 
-TEST_CASE( "Test stringify ", "[stringify]" ) {
+TEST_CASE( "Benchmark tools ", "[benchmark tools]" ) {
 
-     BENCHMARK("Benchmark stringify") {
-        auto maze_opt = factory::create(configurator().rows(10).columns(10).levels(10)._algo(algo::BINARY_TREE).seed(12345));
+    static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 50;
+    static constexpr auto SEED = 12345;
+    static constexpr auto ALGO = algo::BINARY_TREE;
+
+    BENCHMARK("Benchmark factory::create") {
+        auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
 
         REQUIRE(maze_opt.has_value());
+    };
 
-        const auto& g = maze_opt.value()->get_grid();
+    BENCHMARK("Benchmark stringify") {
+        auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
+
+        REQUIRE(maze_opt.has_value());
 
         auto s = stringz::stringify(cref(maze_opt.value()));
 
         REQUIRE(!s.empty());
-     };
+    };
+
+    //BENCHMARK("Benchmark objectify") {
+
+    //    auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
+
+    //    REQUIRE(maze_opt.has_value());
+
+    //    vector<tuple<int, int, int, int>> vertices;
+
+    //    vector<vector<uint32_t>> faces;
+
+    //    stringz::objectify(cref(maze_opt.value()), vertices, faces);
+
+    //    REQUIRE(!vertices.empty());
+
+    //    REQUIRE(!faces.empty());
+    //};
 }
 
-//TEST_CASE("Test objectify ", "[objectify]") {
-//
-//    auto maze_opt = factory::create({ 100, 100, 100 });
-//
-//    REQUIRE(maze_opt.has_value());
-//
-//    const auto& g = maze_opt.value()->get_grid();
-//
-//    vector<tuple<int, int, int, int>> vertices;
-//
-//    vector<vector<uint32_t>> faces;
-//
-//    stringz::objectify(cref(maze_opt.value()), vertices, faces);
-//
-//    REQUIRE(!vertices.empty());
-//
-//    REQUIRE(!faces.empty());
-//}

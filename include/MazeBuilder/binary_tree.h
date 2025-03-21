@@ -24,12 +24,7 @@ public:
     /// @return success or failure
     bool run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
 private:
-    /// @brief Run the binary tree algorithm on a cell
-    /// @param c
-    /// @param get_int
-    /// @param rng
-    /// @return success or failure
-    bool run_on_cell(std::shared_ptr<cell> const& c, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept;
+
 };
 }
 #endif // BINARY_TREE_H

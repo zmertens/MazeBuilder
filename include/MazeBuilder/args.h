@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <vector>
 #include <ostream>
+#include <optional>
 
 namespace mazes {
 
@@ -29,7 +30,7 @@ public:
     /// @brief Get a value from the args map
     /// @param key 
     /// @return 
-    std::string get(const std::string& key) const noexcept;
+    std::optional<std::string> get(const std::string& key) const noexcept;
 
     /// @brief Get entire the args map
     /// @return 

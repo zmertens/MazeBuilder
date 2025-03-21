@@ -28,17 +28,17 @@ std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>
 }
 
 optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {	
-	const auto& dists = m_distance_grid->get_distances()->path_to(c);
-	if (!dists) {
+	//const auto& dists = m_distance_grid->get_distances()->path_to(c);
+	//if (!dists) {
 		return nullopt;
-	}
+	//}
 
-	auto max = dists->max();
+	//auto max = dists->max();
 
-	int distance1 = dists->operator[](c);
-	float intensity = static_cast<float>(10 - distance1) / 10;
-	int dark = static_cast<int>(255 * intensity);
-	int bright = 128 + static_cast<int>(127 * intensity);
-	return (dark << 16) | (bright << 8) | dark;
+	//int distance1 = dists->operator[](c);
+	//float intensity = static_cast<float>(10 - distance1) / 10;
+	//int dark = static_cast<int>(255 * intensity);
+	//int bright = 128 + static_cast<int>(127 * intensity);
+	//return (dark << 16) | (bright << 8) | dark;
 	//return m_distance_grid->background_color_for(cref(c));
 }
