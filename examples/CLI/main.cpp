@@ -155,8 +155,8 @@ int main(int argc, char* argv[]) {
         if (success) {
 #if defined(MAZE_DEBUG)
             std::cout << "Writing to file: " << output_str << " complete!!" << std::endl;
-#endif
             std::cout << "Duration: " << std::chrono::duration<double, std::milli>(dur).count() << " milliseconds" << std::endl;
+#endif
         }
         else {
             std::cerr << "Failed output formatting to: " << output_str << std::endl;
