@@ -106,7 +106,6 @@ public:
     /// @brief 
     /// @param parent 
     /// @param index 
-    //virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept;
     void insert(std::shared_ptr<node> parent, int index) noexcept;
 
     /// @brief 
@@ -117,10 +116,9 @@ public:
     //virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept;
 
     /// @brief
-    /// @param start
     /// @param index
     /// @return
-    //virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept;
+    std::shared_ptr<cell> search(int index) const noexcept;
 
     /// @brief
     /// @param parent
@@ -128,18 +126,31 @@ public:
     //virtual void del(std::shared_ptr<cell> parent, int index) noexcept;
     
 private:
+    /// @brief Initialize the binary search tree
+    /// @param shuffled_indices 
+    /// @return 
     bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
-    
+
+    /// @brief Configure cells by neighbors (N, S, E, W)
+    /// @param cells 
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
 
-    // Sort by youngest child -> oldest child
+    /// @brief Sort by youngest child -> oldest child
+    /// @param parent
+    /// @param cells
     void presort(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
-    // Sort ascending per index-value
+    /// @brief Sort ascending per index-value
+    /// @param parent
+    /// @param cells
     void inorder(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
-    // Sort ascending per index-value
+    /// @brief Sort ascending per index-value
+    /// @param nodes
     void sort_by_row_then_col(std::vector<std::shared_ptr<node>>& nodes) const noexcept;
+
+    template <typename Node = node>
+    std::shared_ptr<Node> search(std::shared_ptr<Node> const& parent, int index) const noexcept;
 
     std::function<int(std::shared_ptr<node> const&, std::shared_ptr<node> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column

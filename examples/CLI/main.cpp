@@ -75,6 +75,13 @@ int main(int argc, char* argv[]) {
         algo_str = maze_args.get("--algo").value();
     }
 
+    string output_str = "";
+    if (maze_args.get("-o").has_value()) {
+        output_str = maze_args.get("-o").value();
+    } else if (maze_args.get("--output").has_value()) {
+        output_str = maze_args.get("--output").value();
+    }
+
     // Run the command-line program
 
     try {
@@ -103,43 +110,51 @@ int main(int argc, char* argv[]) {
             .distances(false).seed(seed)._algo(my_maze_type)
             .block_id(BLOCK_ID));
 
-        if (next_maze_ptr.has_value()) {
-            auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
-            cout << maze_s << endl;
-            success = true;
+        auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+
+        if (!next_maze_ptr.has_value()) {
+            throw runtime_error("Failed to create maze");
         }
 
-        // mazes::writer my_writer;
-        // mazes::outputs my_output_type = my_writer.get_output_type(maze_args.output);
-        // switch (my_output_type) {
-        // case mazes::outputs::WAVEFRONT_OBJ_FILE:
-        //     success = my_writer.write(cref(maze_args.output), my_maze->to_wavefront_obj_str());
-        //     break;
-        // case mazes::outputs::PNG:
-        //     success = my_writer.write_png(cref(maze_args.output), 
-        //     my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
-        //     break;
-        // case mazes::outputs::PLAIN_TEXT: [[fallthrough]];
-        // case mazes::outputs::STDOUT: {
-        //     string maze_str = my_maze->to_str();
-        //     success = my_writer.write(cref(maze_args.output), cref(maze_str));
-        //     break;
-        // }
-        // case mazes::outputs::UNKNOWN:
-        //     success = false;
-        //     break;
-        // }
+        mazes::writer my_writer;
+        mazes::output my_output_type = mazes::to_output_from_string(output_str.substr(output_str.find_last_of(".") + 1));
+        switch (my_output_type) {
+        case mazes::output::WAVEFRONT_OBJECT_FILE: {
+            vector<tuple<int, int, int, int>> vertices;
+            vector<vector<uint32_t>> faces;
+            mazes::wavefront_object_helper woh{};
+            auto obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
+            success = my_writer.write(cref(output_str), cref(obj_str));
+            break;
+        }
+        case mazes::output::PNG: {
+            //success = my_writer.write_png(cref(maze_args.output), 
+            //my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
+            break;
+        }
+        case mazes::output::PLAIN_TEXT: {
+            success = my_writer.write(cref(output_str), cref(maze_s));
+            break;
+        }
+        case mazes::output::STDOUT: {
+            cout << maze_s << endl;
+            success = true;
+            break;
+        }
+        default:
+            success = false;
+        }
 
         if (success) {
             //auto elapsedms = progress.elapsed_ms();
             //progress.reset();
 #if defined(MAZE_DEBUG)
-            //std::cout << "Writing to file: " << maze_args.output << " complete!!" << std::endl;
+            std::cout << "Writing to file: " << output_str << " complete!!" << std::endl;
             //std::cout << "Progress: " << elapsedms << " seconds" << std::endl;
 #endif
         }
         else {
-
+            std::cerr << "Failed output formatting to: " << output_str << std::endl;
         }
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 

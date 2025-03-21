@@ -239,6 +239,16 @@ std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() cons
 //    }
 //}
 
+/// @brief Public implementation of insert
+/// @param parent 
+/// @param index 
+//void grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
+//    auto&& found = this->search(index);
+//}
+
+/// @brief Private implementation of insert
+/// @param parent 
+/// @param index 
 void grid::insert(std::shared_ptr<node> parent, int index) noexcept {
     if (!parent) {
         return;
@@ -325,17 +335,22 @@ void grid::insert(std::shared_ptr<node> parent, int index) noexcept {
 //        return false;
 //    }
 //}
-//
-//shared_ptr<cell> grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
-//    if (start == nullptr || start->get_index() == index) {
-//        return start;
-//    } else if (start->get_index() > index) {
-//        return search(start->get_left(), index);
-//    } else {
-//        return search(start->get_right(), index);
-//    }
-//}
-//
+
+shared_ptr<cell> grid::search(int index) const noexcept {
+    return this->search(this->m_binary_search_tree_root, index)->cell_ptr;
+}
+
+template <typename Node>
+std::shared_ptr<Node> grid::search(std::shared_ptr<Node> const& parent, int index) const noexcept {
+    if (parent == nullptr || parent->cell_ptr->get_index() == index) {
+        return parent;
+    } else if (parent->cell_ptr->get_index() > index) {
+        return search(parent->left, index);
+    } else {
+        return search(parent->right, index);
+    }
+}
+
 //// NOT IMPLEMENTED !!
 //void grid::del(std::shared_ptr<cell> parent, int index) noexcept {
 //    if (!parent) 
