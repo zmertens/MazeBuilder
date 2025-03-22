@@ -15,9 +15,10 @@ namespace mazes {
 template <typename Time = std::chrono::microseconds, typename Clock = std::chrono::high_resolution_clock>
 class progress {
     mutable std::mutex mtx;
-    std::chrono::steady_clock::time_point start_time;
-    std::chrono::steady_clock::time_point end_time;
+    typename Clock::time_point start_time;
+    typename Clock::time_point end_time;
 public:
+    explicit progress() : start_time(Clock::now()), end_time(start_time) {}
 
     /// @brief 
     /// @tparam F 
@@ -28,7 +29,8 @@ public:
     /// @return 
     template <typename F, typename... Args, typename Duration = Time>
     static Duration duration(F&& f, Args&&... args) {
-        auto start = Clock::now();
+        progress p;
+        p.start();
 
         auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 
@@ -36,23 +38,32 @@ public:
             return Duration::zero();
         }
 
-        auto end = Clock::now();
-        auto duration = std::chrono::duration_cast<Duration>(end - start);
+        auto duration = p.elapsed<Duration>();
         return duration;
     }
 
+    /// @brief 
+    void start() noexcept {
+        std::lock_guard<std::mutex> lock(this->mtx);
+        start_time = Clock::now();
+        end_time = start_time;
+    }
 
-    void start() noexcept;
+    /// @brief 
+    void reset() noexcept {
+        std::lock_guard<std::mutex> lock(this->mtx);
+        start_time = end_time = typename Clock::time_point::min();
+    }
 
-    /// @brief Reset the clock
-    void reset() noexcept;
-
-    /// @brief Get the elapsed time in seconds
+    /// @brief Capture the elapsed time
+    /// @tparam T 
     /// @return 
-    double elapsed_s() const noexcept;
-
-    /// @brief Get the elapsed time in milliseconds
-    double elapsed_ms() const noexcept;
+    template <typename T = double>
+    T elapsed() noexcept {
+        std::lock_guard<std::mutex> lock(this->mtx);
+        end_time = Clock::now();
+        return static_cast<T>(std::chrono::duration_cast<Time>(end_time - start_time).count());
+    }
 }; // progress
 } // namespace mazes
 

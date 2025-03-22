@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 #include <list>
+#include <iomanip>
 
 #include <MazeBuilder/maze_builder.h>
 
@@ -103,19 +104,24 @@ int main(int argc, char* argv[]) {
             rows = atoi(maze_args.get("--rows").value().c_str());
         }
 
+        if (maze_args.get("-l").has_value()) {
+            levels = atoi(maze_args.get("-l").value().c_str());
+        } else if (maze_args.get("--levels").has_value()) {
+            levels = atoi(maze_args.get("--levels").value().c_str());
+        }
+
         static constexpr auto BLOCK_ID = -1;
 
         using maze_ptr = optional<unique_ptr<mazes::maze>>;
 
-        auto dur = mazes::progress<>::duration(mazes::factory::create,
-            mazes::configurator().columns(columns).rows(rows).levels(levels)
-            .distances(false).seed(seed)._algo(my_maze_type)
-            .block_id(BLOCK_ID));
-
+        mazes::progress<chrono::milliseconds, chrono::high_resolution_clock> clock;
+        clock.start();
         maze_ptr next_maze_ptr = mazes::factory::create(
             mazes::configurator().columns(columns).rows(rows).levels(levels)
             .distances(false).seed(seed)._algo(my_maze_type)
             .block_id(BLOCK_ID));
+
+        auto dur = clock.elapsed<>();
 
         if (!next_maze_ptr.has_value()) {
             throw runtime_error("Failed to create maze");
@@ -167,7 +173,7 @@ int main(int argc, char* argv[]) {
 
         if (success) {
             std::cout << "Writing to file: " << output_str << std::endl;
-            std::cout << "Duration: " << std::chrono::duration<double, std::milli>(dur).count() << " milliseconds" << std::endl;
+            std::cout << "Duration: " << fixed << setprecision(5) << dur << " milliseconds" << std::endl;
         }
         else {
             std::cerr << "Failed output formatting to: " << output_str << std::endl;

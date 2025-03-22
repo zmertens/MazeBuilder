@@ -4,6 +4,7 @@
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/grid.h>
+#include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/maze.h>
 
 using namespace mazes;
@@ -17,7 +18,13 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
         return dist(mt);
     };
 
-    unique_ptr<grid_interface> g = make_unique<grid>(config.rows(), config.columns(), config.levels());
+    unique_ptr<grid_interface> g = nullptr;
+    if (config.distances()) {
+        g = make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+    } else {
+        g = make_unique<grid>(config.rows(), config.columns(), config.levels());
+    }
+
     if (apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g), cref(config)));
     }

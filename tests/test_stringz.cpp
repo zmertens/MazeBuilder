@@ -10,17 +10,11 @@
 using namespace mazes;
 using namespace std;
 
-TEST_CASE( "Benchmark tools ", "[benchmark tools]" ) {
+TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
 
     static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 50;
     static constexpr auto SEED = 12345;
     static constexpr auto ALGO = algo::BINARY_TREE;
-
-    BENCHMARK("Benchmark factory::create") {
-        auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
-
-        REQUIRE(maze_opt.has_value());
-    };
 
     BENCHMARK("Benchmark stringify") {
         auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));

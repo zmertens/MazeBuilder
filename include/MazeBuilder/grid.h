@@ -6,6 +6,7 @@
 #include <string>
 #include <functional>
 #include <utility>
+#include <future>
 #include <optional>
 
 #include <MazeBuilder/grid_interface.h>
@@ -100,10 +101,6 @@ public:
     // CRUD operations
 
     /// @brief 
-    /// @param other_grid 
-    //virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept;
-
-    /// @brief 
     /// @param parent 
     /// @param index 
     void insert(std::shared_ptr<node> parent, int index) noexcept;
@@ -149,6 +146,16 @@ private:
     /// @param nodes
     void sort_by_row_then_col(std::vector<std::shared_ptr<node>>& nodes) const noexcept;
 
+    /// @brief Private implementation for insert
+    /// @param parent 
+    /// @param new_node 
+    void grid::insert(std::shared_ptr<node>& parent, std::shared_ptr<node>& new_node) noexcept;
+
+    /// @brief Search for a node with a given index
+    /// @tparam Node 
+    /// @param parent 
+    /// @param index 
+    /// @return 
     template <typename Node = node>
     std::shared_ptr<Node> search(std::shared_ptr<Node> const& parent, int index) const noexcept;
 
@@ -157,6 +164,9 @@ private:
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
+
+    mutable std::promise<bool> m_promise;
+    mutable std::future<bool> m_future;
 }; // class
 
 } // namespace mazes
