@@ -76,6 +76,32 @@ int main(int argc, char* argv[]) {
         algo_str = maze_args.get("--algo").value();
     }
 
+    auto rows = 0, columns = 0, levels = 1;
+    if (maze_args.get("-c").has_value()) {
+        columns = atoi(maze_args.get("-c").value().c_str());
+    } else if (maze_args.get("--columns").has_value()) {
+        columns = atoi(maze_args.get("--columns").value().c_str());
+    }
+
+    if (maze_args.get("-r").has_value()) {
+        rows = atoi(maze_args.get("-r").value().c_str());
+    } else if (maze_args.get("--rows").has_value()) {
+        rows = atoi(maze_args.get("--rows").value().c_str());
+    }
+
+    if (maze_args.get("-l").has_value()) {
+        levels = atoi(maze_args.get("-l").value().c_str());
+    } else if (maze_args.get("--levels").has_value()) {
+        levels = atoi(maze_args.get("--levels").value().c_str());
+    }
+
+    bool distances{ false };
+    if (maze_args.get("-d").has_value()) {
+        distances = true;
+    } else if (maze_args.get("--distances").has_value()) {
+        distances = true;
+    }
+
     string output_str = "";
     if (maze_args.get("-o").has_value()) {
         output_str = maze_args.get("-o").value();
@@ -91,25 +117,6 @@ int main(int argc, char* argv[]) {
 
         mazes::algo my_maze_type = mazes::to_algo_from_string(cref(algo_str));
 
-        auto rows = 0, columns = 0, levels = 1;
-        if (maze_args.get("-c").has_value()) {
-            columns = atoi(maze_args.get("-c").value().c_str());
-        } else if (maze_args.get("--columns").has_value()) {
-            columns = atoi(maze_args.get("--columns").value().c_str());
-        }
-
-        if (maze_args.get("-r").has_value()) {
-            rows = atoi(maze_args.get("-r").value().c_str());
-        } else if (maze_args.get("--rows").has_value()) {
-            rows = atoi(maze_args.get("--rows").value().c_str());
-        }
-
-        if (maze_args.get("-l").has_value()) {
-            levels = atoi(maze_args.get("-l").value().c_str());
-        } else if (maze_args.get("--levels").has_value()) {
-            levels = atoi(maze_args.get("--levels").value().c_str());
-        }
-
         static constexpr auto BLOCK_ID = -1;
 
         using maze_ptr = optional<unique_ptr<mazes::maze>>;
@@ -118,7 +125,7 @@ int main(int argc, char* argv[]) {
         clock.start();
         maze_ptr next_maze_ptr = mazes::factory::create(
             mazes::configurator().columns(columns).rows(rows).levels(levels)
-            .distances(false).seed(seed)._algo(my_maze_type)
+            .distances(distances).seed(seed)._algo(my_maze_type)
             .block_id(BLOCK_ID));
 
         auto dur = clock.elapsed<>();
