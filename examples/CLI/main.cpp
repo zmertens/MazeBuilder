@@ -117,10 +117,14 @@ int main(int argc, char* argv[]) {
             .distances(false).seed(seed)._algo(my_maze_type)
             .block_id(BLOCK_ID));
 
-        auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
-
         if (!next_maze_ptr.has_value()) {
             throw runtime_error("Failed to create maze");
+        }
+
+        auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+
+        if (output_str.empty()) {
+            output_str = "stdout";
         }
 
         mazes::writer my_writer;
@@ -139,6 +143,15 @@ int main(int argc, char* argv[]) {
             //my_maze->to_pixels(CELL_SIZE), maze_args.rows * CELL_SIZE, maze_args.columns * CELL_SIZE);
             break;
         }
+        case mazes::output::JSON: {
+            mazes::json_helper jh{};
+            maze_args.set("duration", to_string(chrono::duration<double, milli>(dur).count()));
+            maze_args.set("str", maze_s);
+            const auto& args = maze_args.get();
+            const auto& args_to_json_str = jh.from(cref(args));
+            success = my_writer.write(cref(output_str), cref(args_to_json_str));
+            break;
+        }
         case mazes::output::PLAIN_TEXT: {
             success = my_writer.write(cref(output_str), cref(maze_s));
             break;
@@ -153,10 +166,8 @@ int main(int argc, char* argv[]) {
         }
 
         if (success) {
-#if defined(MAZE_DEBUG)
-            std::cout << "Writing to file: " << output_str << " complete!!" << std::endl;
+            std::cout << "Writing to file: " << output_str << std::endl;
             std::cout << "Duration: " << std::chrono::duration<double, std::milli>(dur).count() << " milliseconds" << std::endl;
-#endif
         }
         else {
             std::cerr << "Failed output formatting to: " << output_str << std::endl;

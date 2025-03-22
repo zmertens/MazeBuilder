@@ -140,6 +140,10 @@ const std::unordered_map<std::string, std::string>& args::get() const noexcept {
     return args_map;
 }
 
+void args::set(const std::string& key, const std::string& value) noexcept {
+    args_map.insert_or_assign(key, value);
+}
+
 std::string args::trim(const std::string& str) const noexcept {
     if (str.empty()) {
         return str;

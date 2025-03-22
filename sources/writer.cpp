@@ -6,6 +6,7 @@
 #include <string>
 
 #include <MazeBuilder/enums.h>
+#include <MazeBuilder/json_helper.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
@@ -79,7 +80,9 @@ bool writer::write(const std::string& filename, const std::string& data, unsigne
 
 		if (writer::is_file_with_suffix(cref(filename), output::PLAIN_TEXT)) {
 			return this->write_file(filename, data);
-		} else if (writer::is_file_with_suffix(cref(filename), output::WAVEFRONT_OBJECT_FILE)) {
+        } else if (writer::is_file_with_suffix(cref(filename), output::JSON)) {
+            return this->write_file(cref(filename), data);
+        } else if (writer::is_file_with_suffix(cref(filename), output::WAVEFRONT_OBJECT_FILE)) {
 			return this->write_file(filename, data);
 		} else if (writer::is_file_with_suffix(cref(filename), output::PNG)) {
             return this->write_png(filename, data);

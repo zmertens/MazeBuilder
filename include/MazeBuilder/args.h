@@ -36,6 +36,11 @@ public:
     /// @return 
     const std::unordered_map<std::string, std::string>& get() const noexcept;
 
+    /// @brief Set a value
+    /// @param key 
+    /// @param value 
+    void set(const std::string& key, const std::string& value) noexcept;
+
     /// @brief Remove whitespace or tabs from a string
     /// @param str 
     /// @return 
