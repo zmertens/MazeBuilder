@@ -52,7 +52,7 @@ public:
     /// @brief 
     void reset() noexcept {
         std::lock_guard<std::mutex> lock(this->mtx);
-        start_time = end_time = typename Clock::time_point::min();
+        start_time = end_time = Clock::now();
     }
 
     /// @brief Capture the elapsed time

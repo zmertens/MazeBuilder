@@ -149,7 +149,7 @@ private:
     /// @brief Private implementation for insert
     /// @param parent 
     /// @param new_node 
-    void grid::insert(std::shared_ptr<node>& parent, std::shared_ptr<node>& new_node) noexcept;
+    void insert(std::shared_ptr<node>& parent, std::shared_ptr<node>& new_node) noexcept;
 
     /// @brief Search for a node with a given index
     /// @tparam Node 

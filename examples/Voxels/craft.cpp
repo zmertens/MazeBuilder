@@ -2880,7 +2880,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         // Show last maze compute time
                         ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));
-                        ImGui::Text("Elapsed %.5f ms", prog.elapsed_ms());
+                        ImGui::Text("Elapsed %.5f ms", prog.elapsed());
                         ImGui::NewLine();
                         ImGui::PopStyleColor();
                     }

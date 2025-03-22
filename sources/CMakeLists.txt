@@ -66,8 +66,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInf
 endif()
 
 # Shared build
-add_library(${MAZE_BUILDER_CORE_LIB}_shared SHARED)
-target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OUT}_obj)
+if(NOT EMSCRIPTEN)
+    add_library(${MAZE_BUILDER_CORE_LIB}_shared SHARED)
+    target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OUT}_obj)
+endif()
+
 # Static build
 add_library(${MAZE_BUILDER_CORE_LIB}_static STATIC)
 target_link_libraries(${MAZE_BUILDER_CORE_LIB}_static ${MAZE_BUILDER_LIB_OUT}_obj)
