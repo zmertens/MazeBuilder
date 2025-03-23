@@ -1,13 +1,14 @@
 #ifndef GRID_H
 #define GRID_H
 
-#include <vector>
-#include <memory>
-#include <string>
 #include <functional>
-#include <utility>
 #include <future>
+#include <mutex>
+#include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include <MazeBuilder/grid_interface.h>
 
@@ -28,6 +29,8 @@ protected:
     };
 
     std::shared_ptr<node> m_binary_search_tree_root;
+
+    void configure_nodes(std::vector<int> const& indices) noexcept;
 public:
     /// @brief Friend classes
     friend class binary_tree;
@@ -38,7 +41,7 @@ public:
     /// @param rows 
     /// @param columns 
     /// @param height 
-    explicit grid(unsigned int rows, unsigned int columns, unsigned int height = 1u);
+    explicit grid(unsigned int rows = 1u, unsigned int columns = 1u, unsigned int height = 1u);
 
     /// @brief Constructor for grid
     /// @param dimensions 
@@ -65,14 +68,10 @@ public:
     /// @brief Destructor
     virtual ~grid();
 
-    // Statics
-    template <typename G = std::unique_ptr<grid_interface>>
-    static std::optional<std::unique_ptr<grid>> make_opt(const G g) noexcept {
-        if (const auto* gg = dynamic_cast<const grid*>(g.get())) {
-            return std::make_optional(std::make_unique<grid>(*gg));
-        }
-        return std::nullopt;
-    }
+    /// @brief Initialize and configure
+    /// @param callback notifies when configuration is complete
+    /// @return 
+    virtual std::future<bool> get_future() noexcept;
 
     // Overrides
 
@@ -98,39 +97,15 @@ public:
     /// @return 
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
-    // CRUD operations
-
-    /// @brief 
-    /// @param parent 
-    /// @param index 
-    void insert(std::shared_ptr<node> parent, int index) noexcept;
-
-    /// @brief 
-    /// @param parent 
-    /// @param old_index 
-    /// @param new_index 
-    /// @return 
-    //virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept;
-
     /// @brief
     /// @param index
     /// @return
     std::shared_ptr<cell> search(int index) const noexcept;
-
-    /// @brief
-    /// @param parent
-    /// @param index
-    //virtual void del(std::shared_ptr<cell> parent, int index) noexcept;
     
 private:
-    /// @brief Initialize the binary search tree
-    /// @param shuffled_indices 
-    /// @return 
-    bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
-
     /// @brief Configure cells by neighbors (N, S, E, W)
     /// @param cells 
-    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
+    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     /// @brief Sort by youngest child -> oldest child
     /// @param parent
@@ -165,8 +140,8 @@ private:
 
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
 
-    mutable std::promise<bool> m_promise;
-    mutable std::future<bool> m_future;
+    mutable std::promise<bool> m_config_promise;
+    mutable std::once_flag m_config_flag;
 }; // class
 
 } // namespace mazes

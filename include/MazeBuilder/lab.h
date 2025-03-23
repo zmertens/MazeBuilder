@@ -1,10 +1,6 @@
 #ifndef LAB_H
 #define LAB_H
 
-#include <cstdint>
-#include <vector>
-#include <memory>
-#include <string>
 #include <optional>
 #include <utility>
 #include <tuple>
@@ -41,9 +37,8 @@ public:
     // Move assignment operator
     lab& operator=(lab&& other) noexcept = default;
 
-    void append(const std::optional<std::unique_ptr<maze>>& m) noexcept;
-
     std::optional<std::tuple<int, int, int, int>> find(int x, int z) const noexcept;
+    std::optional<std::tuple<int, int, int, int>> find(int x, int y, int z) const noexcept;
 
     void insert(int x, int y, int z, int w) noexcept;
 
@@ -52,8 +47,6 @@ private:
 
     using pqmap = std::unordered_map<std::tuple<int, int, int>, std::tuple<int, int, int, int>, tri_hash>;
     pqmap m_p_q;
-    std::vector<std::tuple<int, int, int, int>> m_vertices;
-    std::vector<std::vector<std::uint32_t>> m_faces;
 };
 }
 

@@ -29,7 +29,7 @@ public:
     /// @brief Get dimensions of a grid with no assumptions about the ordering of the dimensions
     virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept = 0;
     
-    /// @brief Transformation functions
+    /// @brief Transformation and display functions
     virtual void to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;	
     virtual void to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept = 0;
 

@@ -180,7 +180,7 @@ int main(int argc, char* argv[]) {
 
         if (success) {
             std::cout << "Writing to file: " << output_str << std::endl;
-            std::cout << "Duration: " << fixed << setprecision(5) << dur << " milliseconds" << std::endl;
+            std::cout << "Duration: " << fixed << setprecision(3) << dur << " milliseconds" << std::endl;
         }
         else {
             std::cerr << "Failed output formatting to: " << output_str << std::endl;

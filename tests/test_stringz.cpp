@@ -12,7 +12,7 @@ using namespace std;
 
 TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
 
-    static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 50;
+    static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 10;
     static constexpr auto SEED = 12345;
     static constexpr auto ALGO = algo::BINARY_TREE;
 

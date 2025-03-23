@@ -21,6 +21,10 @@ bool sidewinder::run(std::unique_ptr<grid_interface> const& g, const std::functi
     using namespace std;
 
     if (auto gg = dynamic_cast<grid*>(g.get())) {
+        if (!gg) {
+            return false;
+        }
+
         vector<shared_ptr<cell>> store;
         unsigned int last_row = 0, row_counter = 0;
         std::vector<shared_ptr<cell>> cells;

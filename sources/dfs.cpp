@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iterator>
 
-#include <MazeBuilder/grid.h>
+#include <MazeBuilder/grid.h>>
 #include <MazeBuilder/cell.h>
 
 using namespace mazes;
@@ -18,7 +18,10 @@ using namespace std;
 bool dfs::run(const std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
 
     if (auto gg = dynamic_cast<grid*>(g.get())) {
-     
+        if (!gg) {
+            return false;
+        }
+
         auto [rows, columns, _] = gg->get_dimensions();
      
         auto&& start = gg->search(get_int(0, rows * columns));
@@ -43,8 +46,8 @@ bool dfs::run(const std::unique_ptr<grid_interface>& g, const std::function<int(
                 stack_of_cells.pop();
             } else {
                 // Mark current cell's neighbor as visited
-                auto&& random_index = get_int(0, neighbors.size() - 1);
-                auto&& neighbor = neighbors.at(random_index);
+                const auto& random_index = get_int(0, neighbors.size() - 1);
+                const auto& neighbor = neighbors.at(random_index);
                 current_cell->link(current_cell, neighbor);
                 stack_of_cells.push(neighbor);
             }

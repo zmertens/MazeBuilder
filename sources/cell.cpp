@@ -48,19 +48,19 @@ bool cell::is_linked(const shared_ptr<cell>& c) const {
 }
 
 bool cell::has_northern_neighbor() const noexcept {
-    return this->is_linked(this->m_north);
+    return nullptr != this->m_north;
 }
 
 bool cell::has_southern_neighbor() const noexcept {
-    return this->is_linked(this->m_south);
+    return nullptr != this->m_south;
 }
 
 bool cell::has_eastern_neighbor() const noexcept {
-    return this->is_linked(this->m_east);
+    return nullptr != this->m_east;
 }
 
 bool cell::has_western_neighbor() const noexcept {
-    return this->is_linked(this->m_west);
+    return nullptr != this->m_west;
 }
 
 vector<shared_ptr<cell>> cell::get_neighbors() const noexcept {

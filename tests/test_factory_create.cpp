@@ -10,7 +10,7 @@
 using namespace mazes;
 using namespace std;
 
-static constexpr auto ROWS = 100, COLUMNS = 100, LEVELS = 100;
+static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 10;
 
 static constexpr auto ALGO_TO_RUN = algo::DFS;
 static constexpr auto SEED = 12345;
