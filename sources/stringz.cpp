@@ -5,7 +5,10 @@
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 
+#if defined(MAZE_DEBUG)
 #include <sstream>
+#endif
+
 #include <random>
 #include <tuple>
 
@@ -62,12 +65,11 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 5, baseIndex + 1});
     };
 
-    istringstream iss{ sv.data()};
-
-    string line = "";
-
     int row_x = 0;
 
+#if defined(MAZE_DEBUG)
+    istringstream iss{ sv.data()};
+    string line = "";
     while (getline(iss, line, '\n')) {
         int col_z = 0;
 
@@ -77,45 +79,41 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
                 static constexpr auto block_size = 1;
 
                 for (auto h{ 0 }; h < get<2>(dimensions); h++) {
-                    add_block(row_x, h, col_z, m->get_block_id(), block_size);
+                    add_block(row_x, col_z, h, m->get_block_id(), block_size);
                 }
             }
             col_z++;
         }
-        row_x++;
+        row_x++;c
     } // getline
+#else
+    int col_z = 0;
+    for (size_t i = 0; i < sv.size(); ++i) {
+        if (sv[i] == '\n') {
+            row_x++;
+            col_z = 0;
+            continue;
+        }
 
-    //int row_x = 0;
-    //size_t line_size = sv.size();
-    //for (size_t i = 0; i < line_size; ++i) {
-    //    if (sv[i] == '\n') {
-    //        row_x++;
-    //        continue;
-    //    }
-
-    //    int col_z = 0;
-    //    for (size_t j = i; j < line_size && sv[j] != '\n'; ++j) {
-    //        if (sv[j] == CORNER || sv[j] == BARRIER1 || sv[j] == BARRIER2) {
-    //            static constexpr auto block_size = 1;
-    //            for (auto h = 0; h < m->get_levels(); ++h) {
-    //                add_block(row_x, h, col_z, m->get_block_id(), block_size);
-    //            }
-    //        }
-    //        col_z++;
-    //    }
-    //    i += col_z;
-    //}
+        if (sv[i] == CORNER || sv[i] == BARRIER1 || sv[i] == BARRIER2) {
+            static constexpr auto block_size = 1;
+            for (auto h = 0; h < m->get_levels(); ++h) {
+                add_block(row_x, col_z, h, m->get_block_id(), block_size);
+            }
+        }
+        col_z++;
+    }
+#endif
 }
 
 void stringz::objectify(lab& labyrinth, std::string_view sv) noexcept {
     using namespace std;
 
-    istringstream iss{ sv.data() };
-
-    string line = "";
-
     int row_x = 0;
 
+#if defined(MAZE_DEBUG)
+    istringstream iss{ sv.data() };
+    string line = "";
     while (getline(iss, line, '\n')) {
         int col_z = 0;
 
@@ -132,27 +130,25 @@ void stringz::objectify(lab& labyrinth, std::string_view sv) noexcept {
         }
         row_x++;
     } // getline
+#else
+    int col_z = 0;
+    for (size_t i = 0; i < sv.size(); ++i) {
+        if (sv[i] == '\n') {
+            row_x++;
+            col_z = 0;
+            continue;
+        }
 
-    //int row_x = 0;
-    //size_t line_size = sv.size();
-    //for (size_t i = 0; i < line_size; ++i) {
-    //    if (sv[i] == '\n') {
-    //        row_x++;
-    //        continue;
-    //    }
+        if (sv[i] == CORNER || sv[i] == BARRIER1 || sv[i] == BARRIER2) {
+            static constexpr auto block_size = 1;
+            for (auto h = 0; h < labyrinth.get_levels(); ++h) {
+                labyrinth.insert(row_x, col_z, h, labyrinth.get_random_block_id());
+            }
+        }
+        col_z++;
+    }
+#endif
 
-    //    int col_z = 0;
-    //    for (size_t j = i; j < line_size && sv[j] != '\n'; ++j) {
-    //        if (sv[j] == CORNER || sv[j] == BARRIER1 || sv[j] == BARRIER2) {
-    //            static constexpr auto block_size = 1;
-    //            for (auto h = 0; h < labyrinth.get_levels(); ++h) {
-    //                labyrinth.insert(row_x, h, col_z, labyrinth.get_random_block_id());
-    //            }
-    //        }
-    //        col_z++;
-    //    }
-    //    i += col_z;
-    //}
 }
 
 /// @brief 
