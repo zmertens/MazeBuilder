@@ -84,7 +84,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
             }
             col_z++;
         }
-        row_x++;c
+        row_x++;
     } // getline
 #else
     int col_z = 0;

@@ -2335,7 +2335,7 @@ struct craft::craft_impl {
         this->m_model->render_radius = RENDER_CHUNK_RADIUS;
         this->m_model->delete_radius = DELETE_CHUNK_RADIUS;
         this->m_model->sign_radius = RENDER_SIGN_RADIUS;
-        SDL_memset(&this->m_model->player, 0, sizeof(Player) * MAX_PLAYERS);
+        SDL_memset(reinterpret_cast<void*>(&this->m_model->player), 0, sizeof(Player) * MAX_PLAYERS);
         this->m_model->player.state.y = 64;
         this->m_model->player_count = 1;
         this->m_model->flying = false;
@@ -2819,6 +2819,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         if (ImGui::Button("Build!")) {
                             // Building maze here has the effect of computing its geometry on this thread
                             prog.reset();
+                            prog.start();
 
                             auto next_maze_ptr = mazes::factory::create(
                                 mazes::configurator().columns(gui->columns).rows(gui->rows).levels(gui->height)
@@ -2827,7 +2828,6 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                             if (!next_maze_ptr.has_value()) {
                                 SDL_Log("Failed to create maze!");
-                                continue;
                             }
 
                             my_mazes.set_levels(gui->height);

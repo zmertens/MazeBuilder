@@ -10,7 +10,7 @@
 #include <exception>
 #include <string>
 
-#include "Snake.hpp"
+#include "Physics.hpp"
 
 int main(int argc, char* argv[]) {
 	using namespace std;
@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     try {
         string title = "generator";
         string version = "0.1.0";
-        auto myGameInstance = Snake::get_instance(cref(title), cref(version), 1280, 720);
+        auto myGameInstance = Physics::get_instance(cref(title), cref(version), 1280, 720);
         bool res = myGameInstance->run();
         if (!res) {
             cerr << "Generator failed to run" << endl;

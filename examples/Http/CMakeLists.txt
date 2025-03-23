@@ -19,7 +19,7 @@ if(EMSCRIPTEN)
     set(SFML_BUILD_GRAPHICS OFF)
     set(SFML_BUILD_WINDOW OFF)
     set(SFML_USE_SYSTEM_DEPS OFF)
-    FetchGitRepo(SFML ${SFML_REPO_URL} almostv3)
+    FetchGitRepo(SFML ${SFML_REPO_URL} 3.0.0)
 
     target_link_libraries(${HTTP_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static sfml-network SDL3::SDL3)
     target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local)
@@ -56,4 +56,13 @@ else()
     endif()
 
     target_link_libraries(${HTTP_EXE} PRIVATE sfml-network)
+	
+	# Copy shared/dlls on Windows only
+	if(WIN32)
+		add_custom_command(
+			TARGET ${HTTP_EXE} POST_BUILD
+			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Network> $<TARGET_FILE_DIR:${HTTP_EXE}>
+			VERBATIM
+		)
+	endif()
 endif()
