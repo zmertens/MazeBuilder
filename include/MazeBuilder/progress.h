@@ -45,14 +45,12 @@ public:
     /// @brief 
     void start() noexcept {
         std::lock_guard<std::mutex> lock(this->mtx);
-        start_time = Clock::now();
-        end_time = start_time;
+        start_time = end_time = Clock::now();
     }
 
     /// @brief 
     void reset() noexcept {
-        std::lock_guard<std::mutex> lock(this->mtx);
-        start_time = end_time = Clock::now();
+        this->start();
     }
 
     /// @brief Capture the elapsed time
