@@ -23,6 +23,18 @@ bool maze::has_distances() const noexcept {
     return this->m_config.distances();
 }
 
+int maze::get_rows() const noexcept {
+    return this->m_config.rows();
+}
+
+int maze::get_columns() const noexcept {
+    return this->m_config.columns();
+}
+
+int maze::get_levels() const noexcept {
+    return this->m_config.levels();
+}
+
 const std::unique_ptr<grid_interface>& maze::get_grid() const noexcept {
     return m_grid;
 }

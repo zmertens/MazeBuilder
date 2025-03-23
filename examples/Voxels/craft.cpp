@@ -2827,28 +2827,24 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 
                             if (!next_maze_ptr.has_value()) {
                                 SDL_Log("Failed to create maze!");
+                                continue;
                             }
+
+                            my_mazes.set_levels(gui->height);
+
                             // Compute the geometry of the maze
                             vector<vector<uint32_t>> faces;
                             std::vector<std::tuple<int, int, int, int>> vertices;
-                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces));
+                            auto s = mazes::stringz::stringify(next_maze_ptr.value());
+                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces), s);
+                            mazes::stringz::objectify(ref(my_mazes), s);
                             mazes::wavefront_object_helper woh{};
-                            //auto wavefront_obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
+                            auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
 
-                            vector<tuple<int, int, int, int>> render_vertices(vertices.size() / 8);
-                            //for (size_t i = 0; i < vertices.size(); i += 8) {
-                            //    render_vertices.push_back(vertices[i]);
-                            //}
-
-                            //for (const auto& v : render_vertices) {
-                            //    my_mazes.insert(cref(get<0>(v)), cref(get<1>(v)), cref(get<2>(v)), cref(get<3>(v)));
-                            //}
-
-                            //my_mazes.push_back(std::move(next_maze_ptr));
 #if !defined(__EMSCRIPTEN__)
                             // Write immediately if not on the web
                             mazes::writer writer{};
-                            //writer.write(string(gui->outfile), cref(wavefront_obj_str));
+                            writer.write(string(gui->outfile), cref(wavefront_obj_str));
 #if defined(MAZE_DEBUG)
                             SDL_Log("Writing to file... %s\n", gui->outfile);
 #endif

@@ -147,7 +147,7 @@ int main(int argc, char* argv[]) {
             vector<tuple<int, int, int, int>> vertices;
             vector<vector<uint32_t>> faces;
             mazes::wavefront_object_helper woh{};
-            auto obj_str = woh.to_wavefront_object_str(cref(next_maze_ptr.value()), cref(vertices), cref(faces));
+            auto obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
             success = my_writer.write(cref(output_str), cref(obj_str));
             break;
         }

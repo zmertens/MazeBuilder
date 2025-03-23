@@ -20,6 +20,10 @@ public:
 
     bool has_distances() const noexcept;
 
+    int get_rows() const noexcept;
+    int get_columns() const noexcept;
+    int get_levels() const noexcept;
+
     const std::unique_ptr<grid_interface>& get_grid() const noexcept;
 
 private:

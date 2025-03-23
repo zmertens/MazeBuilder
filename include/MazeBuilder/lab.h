@@ -37,16 +37,23 @@ public:
     // Move assignment operator
     lab& operator=(lab&& other) noexcept = default;
 
-    std::optional<std::tuple<int, int, int, int>> find(int x, int z) const noexcept;
-    std::optional<std::tuple<int, int, int, int>> find(int x, int y, int z) const noexcept;
+    std::optional<std::tuple<int, int, int, int>> find(int p, int q) const noexcept;
+    std::optional<std::tuple<int, int, int, int>> find(int p, int q, int r) const noexcept;
 
     void insert(int x, int y, int z, int w) noexcept;
 
     bool empty() const noexcept;
+
+    int get_levels() const noexcept;
+    void set_levels(int levels) noexcept;
+
+    int get_random_block_id() const noexcept;
 private:
 
-    using pqmap = std::unordered_map<std::tuple<int, int, int>, std::tuple<int, int, int, int>, tri_hash>;
+    using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
     pqmap m_p_q;
+
+    int levels;
 };
 }
 

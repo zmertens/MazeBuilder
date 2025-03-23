@@ -16,7 +16,7 @@ TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
     static constexpr auto SEED = 12345;
     static constexpr auto ALGO = algo::BINARY_TREE;
 
-    BENCHMARK("Benchmark stringify") {
+    BENCHMARK("Benchmark stringz::stringify") {
         auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
 
         REQUIRE(maze_opt.has_value());
@@ -26,21 +26,23 @@ TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
         REQUIRE(!s.empty());
     };
 
-    //BENCHMARK("Benchmark objectify") {
+    BENCHMARK("Benchmark stringz::objectify") {
 
-    //    auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
+        auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
 
-    //    REQUIRE(maze_opt.has_value());
+        REQUIRE(maze_opt.has_value());
 
-    //    vector<tuple<int, int, int, int>> vertices;
+        auto s = stringz::stringify(cref(maze_opt.value()));
 
-    //    vector<vector<uint32_t>> faces;
+        vector<tuple<int, int, int, int>> vertices;
 
-    //    stringz::objectify(cref(maze_opt.value()), vertices, faces);
+        vector<vector<uint32_t>> faces;
 
-    //    REQUIRE(!vertices.empty());
+        stringz::objectify(cref(maze_opt.value()), vertices, faces, s);
 
-    //    REQUIRE(!faces.empty());
-    //};
+        REQUIRE(!vertices.empty());
+
+        REQUIRE(!faces.empty());
+    };
 }
 

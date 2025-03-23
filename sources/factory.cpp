@@ -25,20 +25,15 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
         g = make_unique<grid>(config.rows(), config.columns(), config.levels());
     }
 
-    // Call get_future on the specific grid type and wait for it to complete)
+    // Call get_future on the specific grid type
+    auto success{ false };
     if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(g.get())) {
-        if (!distance_grid_ptr->get_future().get()) {
-            return nullopt;
-        }
+        success = distance_grid_ptr->get_future().get();
     } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
-        if (!grid_ptr->get_future().get()) {
-            return nullopt;
-        } else {
-            return nullopt;
-        }
+        success = grid_ptr->get_future().get();
     }
 
-    if (apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
+    if (success && apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g), cref(config)));
     }
     return nullopt;

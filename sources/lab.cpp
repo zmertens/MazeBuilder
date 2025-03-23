@@ -1,6 +1,7 @@
 #include <MazeBuilder/lab.h>
 
 #include <sstream>
+#include <random>
 
 #include <MazeBuilder/stringz.h>
 #include <MazeBuilder/enums.h>
@@ -29,20 +30,35 @@ lab& lab::operator=(const lab& other) {
 }
 
 std::optional<std::tuple<int, int, int, int>> lab::find(int p, int q) const noexcept {
-    auto itr = m_p_q.find({ p, 1, q });
+    auto itr = m_p_q.find({ p, q });
     return (itr != m_p_q.cend()) ? make_optional(itr->second) : std::nullopt;
 }
 
-std::optional<std::tuple<int, int, int, int>> lab::find(int p, int q, int r) const noexcept {
-    auto itr = m_p_q.find({ p, q, r });
-    return (itr != m_p_q.cend()) ? make_optional(itr->second) : std::nullopt;
-}
-
-void lab::insert(int x, int y, int z, int w) noexcept {
-    m_p_q.insert_or_assign({ x, y, z }, std::make_tuple(x, y, z, w));
+void lab::insert(int p, int q, int r, int w) noexcept {
+    m_p_q.insert_or_assign({ p, q }, std::make_tuple(p, q, r, w));
 }
 
 bool lab::empty() const noexcept {
     return m_p_q.empty();
+}
+
+int lab::get_levels() const noexcept {
+    return levels;
+}
+
+void lab::set_levels(int levels) noexcept {
+    this->levels = levels;
+}
+
+int lab::get_random_block_id() const noexcept {
+    using namespace std;
+
+    mt19937 mt{ 42681ul };
+    auto get_int = [&mt](int low, int high) {
+        uniform_int_distribution<int> dist{ low, high };
+        return dist(mt);
+        };
+
+    return get_int(0, 23);
 }
 

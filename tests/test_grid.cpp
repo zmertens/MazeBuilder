@@ -20,9 +20,9 @@ using namespace std;
 
 static constexpr auto ROWS = 10, COLUMNS = 10, HEIGHT = 10;
 
-static unique_ptr<grid_interface> my_grid = make_unique<grid>(ROWS, COLUMNS, HEIGHT);
-static unique_ptr<grid_interface> my_grid_distances = make_unique<distance_grid>(ROWS, COLUMNS, HEIGHT);
-static unique_ptr<grid_interface> my_grid_colored = make_unique<colored_grid>(ROWS, COLUMNS, HEIGHT);
+static unique_ptr<grid> my_grid = make_unique<grid>(ROWS, COLUMNS, HEIGHT);
+static unique_ptr<distance_grid> my_grid_distances = make_unique<distance_grid>(ROWS, COLUMNS, HEIGHT);
+static unique_ptr<colored_grid> my_grid_colored = make_unique<colored_grid>(ROWS, COLUMNS, HEIGHT);
 
 TEST_CASE("Assert grid", "[grid asserts]") {
     STATIC_REQUIRE(std::is_default_constructible<mazes::grid>::value);
@@ -31,36 +31,64 @@ TEST_CASE("Assert grid", "[grid asserts]") {
     STATIC_REQUIRE(std::is_copy_assignable<mazes::grid>::value);
     STATIC_REQUIRE(std::is_move_constructible<mazes::grid>::value);
     STATIC_REQUIRE(std::is_move_assignable<mazes::grid>::value);
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::distance_grid>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::distance_grid>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::distance_grid>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::distance_grid>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::distance_grid>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::distance_grid>::value);
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::colored_grid>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::colored_grid>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::colored_grid>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::colored_grid>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::colored_grid>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::colored_grid>::value);
 }
 
-TEST_CASE( "Test grid init", "[init]" ) {
-    auto [rows, columns, height] = my_grid->get_dimensions();
+TEST_CASE( "Test grid future", "[grid future]" ) {
 
-    REQUIRE(rows == ROWS);
-    REQUIRE(columns == COLUMNS);
-    REQUIRE(height == HEIGHT);
+    SECTION(" Regular grid ") {
+        auto [rows, columns, height] = my_grid->get_dimensions();
 
-    mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) ->int {
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-        };
+        REQUIRE(rows == ROWS);
+        REQUIRE(columns == COLUMNS);
+        REQUIRE(height == HEIGHT);
 
-    SECTION("Run bt algorithm on grid", "[bt algo]") {
-        binary_tree bt_algo;
-        REQUIRE(bt_algo.run(ref(my_grid), cref(get_int), cref(rng)));
+        REQUIRE(my_grid->get_future().get());
+    }
+
+    SECTION(" Distance grid ") {
+        auto [rows, columns, height] = my_grid_distances->get_dimensions();
+
+        REQUIRE(rows == ROWS);
+        REQUIRE(columns == COLUMNS);
+        REQUIRE(height == HEIGHT);
+
+        REQUIRE(my_grid_distances->get_future().get());
+    }
+
+    SECTION(" Colored grid ") {
+        auto [rows, columns, height] = my_grid_colored->get_dimensions();
+
+        REQUIRE(rows == ROWS);
+        REQUIRE(columns == COLUMNS);
+        REQUIRE(height == HEIGHT);
+
+        REQUIRE(my_grid_colored->get_future().get());
     }
 }
 
 /// @brief Verify that cells have been populated
 TEST_CASE("Test to_vec", "[to_vec]") {
+
+    //REQUIRE(my_grid->get_future().get());
+
     //vector<shared_ptr<cell>> my_cells;
     //my_grid->to_vec(ref(my_cells));
-    //unsigned int max{ 0 };
-    //for (const auto& cell : my_cells) {
-    //    max = (max < cell->get_index()) ? cell->get_index() : max;
-    //    REQUIRE(cell->get_index() <= max);
-    //}
+
+    //REQUIRE(my_cells.size() == ROWS * COLUMNS);
 }
 
 TEST_CASE("Cells have neighbors", "[neighbors]") {

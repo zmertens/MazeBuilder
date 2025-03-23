@@ -1,6 +1,5 @@
 #include <MazeBuilder/wavefront_object_helper.h>
 
-#include <MazeBuilder/maze.h>
 #include <MazeBuilder/buildinfo.h>
 
 #include <sstream>
@@ -16,7 +15,7 @@ public:
     
     ~wavefront_object_helper_impl() = default;
     
-    std::string to_wavefront_obj_str(const std::unique_ptr<maze>& m,
+    std::string to_wavefront_obj_str(
         const std::vector<std::tuple<int, int, int, int>>& vertices,
         const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
         
@@ -71,9 +70,9 @@ wavefront_object_helper& wavefront_object_helper::operator=(const wavefront_obje
     return *this;
 }
 
-std::string wavefront_object_helper::to_wavefront_object_str(const std::unique_ptr<maze>& m,
+std::string wavefront_object_helper::to_wavefront_object_str(
     const std::vector<std::tuple<int, int, int, int>>& vertices,
     const std::vector<std::vector<std::uint32_t>>& faces) const noexcept {
 
-    return this->impl->to_wavefront_obj_str(cref(m), cref(vertices), cref(faces));
+    return this->impl->to_wavefront_obj_str(cref(vertices), cref(faces));
 } // to_wavefront_obj_str

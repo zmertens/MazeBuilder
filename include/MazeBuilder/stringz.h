@@ -1,15 +1,17 @@
 #ifndef STRINGZ_H
 #define STRINGZ_H
 
-#include <memory>
-#include <string>
-#include <vector>
 #include <cstdint>
+#include <memory>
+#include <string_view>
+#include <string>
 #include <tuple>
+#include <vector>
 
 namespace mazes {
 
 class maze;
+class lab;
 
 /// @file stringz.h
 
@@ -23,9 +25,14 @@ public:
     /// @param m the maze to convert
     /// @param vertices the vertices of the maze
     /// @param faces the faces of the maze
+    /// @param s the string representation of the maze
     static void objectify(const std::unique_ptr<maze>& m,
         std::vector<std::tuple<int, int, int, int>>& vertices,
-        std::vector<std::vector<std::uint32_t>>& faces) noexcept;
+        std::vector<std::vector<std::uint32_t>>& faces,
+        std::string_view sv = std::string_view{}) noexcept;
+
+    static void objectify(lab& labyrinth,
+        std::string_view sv = std::string_view{}) noexcept;
 
     /// @brief Convert a maze into a string representation
     /// @param m the maze to convert

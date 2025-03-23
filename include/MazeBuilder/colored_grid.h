@@ -24,7 +24,7 @@ class colored_grid : public grid {
     friend class dfs;
     friend class sidewinder;
 
-    explicit colored_grid(unsigned int rows, unsigned int cols, unsigned int height = 1u);
+    explicit colored_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
     virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;

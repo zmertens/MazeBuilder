@@ -10,12 +10,12 @@
 using namespace mazes;
 using namespace std;
 
-/**
- * @brief Construct a new distance grid object
- * @param height 1
- */
+/// @brief 
+/// @param rows 1
+/// @param cols 1
+/// @param height 1 
 colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int height)
-    : grid::grid(rows, cols, height)
+    : distance_grid::grid(rows, cols, height)
 	, m_distance_grid{ make_shared<distance_grid>(rows, cols, height) } {
 
 }

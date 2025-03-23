@@ -8,8 +8,6 @@
 
 namespace mazes {
 
-class maze;
-
 /// @file wavefront_object_helper.h
 
 /// @class wavefront_object_helper
@@ -40,7 +38,7 @@ public:
     /// @param vertices 
     /// @param faces 
     /// @return 
-    std::string to_wavefront_object_str(const std::unique_ptr<maze>& m,
+    std::string to_wavefront_object_str(
         const std::vector<std::tuple<int, int, int, int>>& vertices,
         const std::vector<std::vector<std::uint32_t>>& faces) const noexcept;
 private:

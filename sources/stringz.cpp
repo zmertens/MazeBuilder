@@ -1,6 +1,7 @@
 #include <MazeBuilder/stringz.h>
 
 #include <MazeBuilder/maze.h>
+#include <MazeBuilder/lab.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 
@@ -13,10 +14,13 @@ using namespace mazes;
 /// @brief 
 /// @param m 
 /// @param vertices 
-/// @param faces 
+/// @param faces
+/// @param s {}
+/// Benchmark => 3s avg
 void stringz::objectify(const std::unique_ptr<maze>& m,
     std::vector<std::tuple<int, int, int, int>>& vertices,
-    std::vector<std::vector<std::uint32_t>>& faces) noexcept {
+    std::vector<std::vector<std::uint32_t>>& faces,
+    std::string_view sv) noexcept {
     using namespace std;
 
     if (!m) {
@@ -32,7 +36,6 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
 
     auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size) {
         // Calculate the base index for the new vertices
-        // OBJ format is 1-based indexing
         std::uint32_t baseIndex = static_cast<std::uint32_t>(vertices.size() + 1);
         // Define the 8 vertices of the cube
         vertices.emplace_back(x, y, z, w);
@@ -45,27 +48,21 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         vertices.emplace_back(x, y + block_size, z + block_size, w);
 
         // Define faces using the vertices above (12 triangles for 6 faces)
-        // Front face
-        faces.push_back({ {baseIndex, baseIndex + 1, baseIndex + 2} });
-        faces.push_back({ {baseIndex, baseIndex + 2, baseIndex + 3} });
-        // Back face
-        faces.push_back({ {baseIndex + 4, baseIndex + 6, baseIndex + 5} });
-        faces.push_back({ {baseIndex + 4, baseIndex + 7, baseIndex + 6} });
-        // Left face
-        faces.push_back({ {baseIndex, baseIndex + 3, baseIndex + 7} });
-        faces.push_back({ {baseIndex, baseIndex + 7, baseIndex + 4} });
-        // Right face
-        faces.push_back({ {baseIndex + 1, baseIndex + 5, baseIndex + 6} });
-        faces.push_back({ {baseIndex + 1, baseIndex + 6, baseIndex + 2} });
-        // Top face
-        faces.push_back({ {baseIndex + 3, baseIndex + 2, baseIndex + 6} });
-        faces.push_back({ {baseIndex + 3, baseIndex + 6, baseIndex + 7} });
-        // Bottom face
-        faces.push_back({ {baseIndex, baseIndex + 4, baseIndex + 5} });
-        faces.push_back({ {baseIndex, baseIndex + 5, baseIndex + 1} });
-        }; // lambda
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 1, baseIndex + 2});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 2, baseIndex + 3});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 4, baseIndex + 6, baseIndex + 5});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 4, baseIndex + 7, baseIndex + 6});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 3, baseIndex + 7});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 7, baseIndex + 4});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 1, baseIndex + 5, baseIndex + 6});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 1, baseIndex + 6, baseIndex + 2});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 3, baseIndex + 2, baseIndex + 6});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 3, baseIndex + 6, baseIndex + 7});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 4, baseIndex + 5});
+        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 5, baseIndex + 1});
+    };
 
-    istringstream iss{ stringify(cref(m)) };
+    istringstream iss{ sv.data()};
 
     string line = "";
 
@@ -79,7 +76,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
             if (*itr == CORNER || *itr == BARRIER1 || *itr == BARRIER2) {
                 static constexpr auto block_size = 1;
 
-                for (auto h{ 0 }; h < get<1>(dimensions); h++) {
+                for (auto h{ 0 }; h < get<2>(dimensions); h++) {
                     add_block(row_x, h, col_z, m->get_block_id(), block_size);
                 }
             }
@@ -87,9 +84,81 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         }
         row_x++;
     } // getline
-} // objectify
 
+    //int row_x = 0;
+    //size_t line_size = sv.size();
+    //for (size_t i = 0; i < line_size; ++i) {
+    //    if (sv[i] == '\n') {
+    //        row_x++;
+    //        continue;
+    //    }
 
+    //    int col_z = 0;
+    //    for (size_t j = i; j < line_size && sv[j] != '\n'; ++j) {
+    //        if (sv[j] == CORNER || sv[j] == BARRIER1 || sv[j] == BARRIER2) {
+    //            static constexpr auto block_size = 1;
+    //            for (auto h = 0; h < m->get_levels(); ++h) {
+    //                add_block(row_x, h, col_z, m->get_block_id(), block_size);
+    //            }
+    //        }
+    //        col_z++;
+    //    }
+    //    i += col_z;
+    //}
+}
+
+void stringz::objectify(lab& labyrinth, std::string_view sv) noexcept {
+    using namespace std;
+
+    istringstream iss{ sv.data() };
+
+    string line = "";
+
+    int row_x = 0;
+
+    while (getline(iss, line, '\n')) {
+        int col_z = 0;
+
+        for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
+            // Check for barriers and walls then iterate up to the height of the maze
+            if (*itr == CORNER || *itr == BARRIER1 || *itr == BARRIER2) {
+                static constexpr auto block_size = 1;
+
+                for (auto h{ 0 }; h < labyrinth.get_levels(); h++) {
+                    labyrinth.insert(row_x, col_z, h, labyrinth.get_random_block_id());
+                }
+            }
+            col_z++;
+        }
+        row_x++;
+    } // getline
+
+    //int row_x = 0;
+    //size_t line_size = sv.size();
+    //for (size_t i = 0; i < line_size; ++i) {
+    //    if (sv[i] == '\n') {
+    //        row_x++;
+    //        continue;
+    //    }
+
+    //    int col_z = 0;
+    //    for (size_t j = i; j < line_size && sv[j] != '\n'; ++j) {
+    //        if (sv[j] == CORNER || sv[j] == BARRIER1 || sv[j] == BARRIER2) {
+    //            static constexpr auto block_size = 1;
+    //            for (auto h = 0; h < labyrinth.get_levels(); ++h) {
+    //                labyrinth.insert(row_x, h, col_z, labyrinth.get_random_block_id());
+    //            }
+    //        }
+    //        col_z++;
+    //    }
+    //    i += col_z;
+    //}
+}
+
+/// @brief 
+/// @param m 
+/// @return
+/// Benchmark => 300ms avg
 std::string stringz::stringify(const std::unique_ptr<maze>& m) noexcept {
     using namespace std;
 

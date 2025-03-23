@@ -16,6 +16,7 @@ set(MAZE_BUILDER_CORE_SRCS
     json_helper.cpp
     lab.cpp
     maze.cpp
+    #randomizer.cpp
     sidewinder.cpp
     stringz.cpp
     wavefront_object_helper.cpp
