@@ -12,8 +12,9 @@ namespace mazes {
 /// @class cell
 /// @brief Cell class for maze generation
 class cell {
+
 public:
-    explicit cell(std::int32_t index);
+    explicit cell(std::int32_t index = 0);
 
     void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     void unlink(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
@@ -42,8 +43,7 @@ public:
     void set_north(std::shared_ptr<cell> const& other);
     void set_south(std::shared_ptr<cell> const& other);
     void set_east(std::shared_ptr<cell> const& other);
-    void set_west(std::shared_ptr<cell> const& other); 
-
+    void set_west(std::shared_ptr<cell> const& other);
 private:
     bool has_key(const std::shared_ptr<cell>& c) const;
 

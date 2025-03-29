@@ -62,8 +62,6 @@ std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const 
     return breadcrumbs;
 }
 
-
-
 std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
     int max_distance = 0;
     std::shared_ptr<cell> max_cell = m_root;
@@ -80,4 +78,28 @@ void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const no
     for (const auto& [c, _] : m_cells) {
         cells.push_back(c);
     }
+}
+
+std::shared_ptr<distances> distances::dist() const noexcept {
+    using namespace std;
+
+    auto d = make_shared<distances>(m_root);
+    vector<shared_ptr<cell>> frontier = { m_root };
+
+    while (!frontier.empty()) {
+        vector<shared_ptr<cell>> new_frontier;
+
+        for (const auto& cell : frontier) {
+            for (const auto& [linked, _] : cell->get_links()) {
+                if (!d->contains(linked)) {
+                    d->set(linked, d->operator[](cell) + 1);
+                    new_frontier.push_back(linked);
+                }
+            }
+        }
+
+        frontier = new_frontier;
+    }
+
+    return d;
 }

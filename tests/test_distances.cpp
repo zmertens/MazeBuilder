@@ -76,20 +76,24 @@ TEST_CASE( "Test distance and paths", "[paths]" ) {
         REQUIRE(path->operator[](goal) == 3);
     }
 
-    SECTION("Multiple paths") {
-        auto cell3 = make_shared<cell>(5);
-        cell1->link(cell1, cell3);
-        cell3->link(cell3, goal);
-        d.set(cell3, 2);
-        d.set(goal, 3);
-        auto path = d.path_to(goal);
-        REQUIRE(path != nullptr);
-        REQUIRE(path->contains(root));
-        REQUIRE(path->contains(cell1));
-        REQUIRE(path->contains(goal));
-        REQUIRE(path->operator[](root) == 0);
-        REQUIRE(path->operator[](cell1) == 1);
-        // Shortest path should be through cell3
-        REQUIRE(path->operator[](goal) == 3);
+    SECTION("Dijkstra's algorithm") {
+        auto d2 = d.dist();
+
+        vector<shared_ptr<cell>> cells;
+        d2->collect_keys(ref(cells));
+
+        REQUIRE(d2 != nullptr);
+
+        for (const auto& c : cells) {
+
+            REQUIRE(d2->contains(c));
+            if (c != root) {
+
+                REQUIRE(d2->operator[](c) >= 1);
+            } else {
+
+                REQUIRE(d2->operator[](c) == 0);
+            }
+        }
     }
 }

@@ -14,7 +14,7 @@ class cell;
 /// @class distances
 /// @brief Distances utility class for counting paths and nodes
 /// @details This class is used to compute the distances between cells in a maze
-class distances {
+class distances : public std::enable_shared_from_this<distances> {
 public:
     /// @brief Constructor that initializes the distances object with a given root cell.
     /// @param root A shared pointer to the root cell used to initialize the distances object.
@@ -52,6 +52,7 @@ public:
     /// @param cells A reference to a vector of shared pointers to cell objects from which keys will be collected.
     void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
+    std::shared_ptr<distances> dist() const noexcept;
 private:
     std::shared_ptr<cell> m_root;
     std::unordered_map<std::shared_ptr<cell>, int> m_cells;

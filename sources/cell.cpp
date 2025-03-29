@@ -3,6 +3,8 @@
 using namespace mazes;
 using namespace std;
 
+/// @brief 
+/// @param index 0
 cell::cell(std::int32_t index)
 : m_index{ index }
 , m_links{}
