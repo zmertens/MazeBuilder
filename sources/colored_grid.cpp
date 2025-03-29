@@ -43,4 +43,4 @@ optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell
 	int dark = static_cast<int>(255 * intensity);
 	int bright = 128 + static_cast<int>(127 * intensity);
 	return (dark << 16) | (bright << 8) | dark;
-}
+} 

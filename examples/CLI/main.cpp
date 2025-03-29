@@ -157,7 +157,12 @@ int main(int argc, char* argv[]) {
             vector<uint8_t> pixels;
             auto pixels_w{ 0 }, pixels_h{ 0 };
             pixels.reserve(rows * columns * STRIDE);
-            mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            if (distances) {
+                mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            } else {
+                mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            }
+
             success = my_writer.write_png(cref(output_file_str), cref(pixels), pixels_w, pixels_h, STRIDE);
             break;
         }
@@ -167,7 +172,12 @@ int main(int argc, char* argv[]) {
             vector<uint8_t> pixels;
             auto pixels_w{ 0 }, pixels_h{ 0 };
             pixels.reserve(rows * columns * STRIDE);
-            mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            if (distances) {
+                mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            } else {
+                mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            }
+
             success = my_writer.write_jpeg(cref(output_file_str), cref(pixels), pixels_w, pixels_h, STRIDE);
             break;
         }

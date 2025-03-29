@@ -218,74 +218,113 @@ void stringz::to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels,
 void stringz::to_pixels(const std::unique_ptr<maze>& m, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
     using namespace std;
 
-    if (!m) {
-        // Handle null maze pointer
-        return;
-    }
+    vector<vector<shared_ptr<cell>>> cells2;
+    m->get_grid()->to_vec2(ref(cells2));
 
-    const auto& g = m->get_grid();
-    auto dimensions = g->get_dimensions();
+    auto dimensions = m->get_grid()->get_dimensions();
     width = get<0>(dimensions) * 2 + 1;
     height = get<1>(dimensions) * 2 + 1;
 
-    // Create a 2D array to represent the maze
-    vector<vector<uint32_t>> maze_array(height, vector<uint32_t>(width, 0xFFFFFF));
-
-    vector<shared_ptr<cell>> cells;
-    g->to_vec(cells);
-
-    for (const auto& c : cells) {
-        int x = c->get_index() % get<0>(dimensions) * 2 + 1;
-        int y = c->get_index() / get<0>(dimensions) * 2 + 1;
-
-        // Set the cell background color (defaults to white)
-        uint32_t color = g->background_color_for(c).value_or(0xFFFFFF);
-        maze_array[y][x] = color;
-
-        // Set the walls
-        if (!c->is_linked(c->get_north())) {
-            maze_array[y - 1][x] = 0x000000; // North wall
-        }
-        if (!c->is_linked(c->get_south())) {
-            maze_array[y + 1][x] = 0x000000; // South wall
-        }
-        if (!c->is_linked(c->get_east())) {
-            maze_array[y][x + 1] = 0x000000; // East wall
-        }
-        if (!c->is_linked(c->get_west())) {
-            maze_array[y][x - 1] = 0x000000; // West wall
-        }
-    }
-
-    // Set the outer walls
-    for (int x = 0; x < width; ++x) {
-        maze_array[0][x] = 0x000000; // Top wall
-        maze_array[height - 1][x] = 0x000000; // Bottom wall
-    }
-    for (int y = 0; y < height; ++y) {
-        maze_array[y][0] = 0x000000; // Left wall
-        maze_array[y][width - 1] = 0x000000; // Right wall
-    }
-
-    // Convert the 2D array to pixel data
+    // Initialize the pixels as 255 (white)
     pixels.resize(width * height * stride, 255);
+    // Ensure cells2 is correctly sized
+    if (cells2.size() != get<0>(dimensions) || (cells2.size() > 0 && cells2[0].size() != get<1>(dimensions))) {
+        // Handle incorrect sizing
+        return;
+    }
+
+    // Fill the pixels using the cells and their gradient colors
     for (int y = 0; y < height; ++y) {
         for (int x = 0; x < width; ++x) {
+            int cell_y = y / 2;
+            int cell_x = x / 2;
+
+            // Check if the indices are within bounds
+            if (cell_y >= cells2.size() || cell_x >= cells2[cell_y].size()) {
+
+                continue;
+            }
+
+            auto c = cells2[cell_y][cell_x];
+
+            if (!c) {
+
+                continue;
+            }
+
+            auto color_opt = m->get_grid()->background_color_for(cref(c));
+            uint32_t color = color_opt.value_or(0xFFFFFF);
+
             auto index = (y * width + x) * stride;
-            uint32_t color = maze_array[y][x];
-            pixels[index] = (color >> 16) & 0xFF; // Red
-            pixels[index + 1] = (color >> 8) & 0xFF; // Green
-            pixels[index + 2] = color & 0xFF; // Blue
-            pixels[index + 3] = 255; // Alpha
+            // Red
+            pixels[index] = (color >> 16) & 0xFF;
+            // Green
+            pixels[index + 1] = (color >> 8) & 0xFF;
+            // Blue
+            pixels[index + 2] = color & 0xFF;
+            // Alpha channel
+            pixels[index + 3] = 255;
+        }
+    }
+
+    // Apply wall coloring
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int cell_y = y / 2;
+            int cell_x = x / 2;
+
+            // Check if the indices are within bounds
+            if (cell_y >= cells2.size() || cell_x >= cells2[cell_y].size()) {
+
+                continue;
+            }
+
+            auto c = cells2[cell_y][cell_x];
+
+            if (!c) {
+                continue;
+            }
+
+            uint32_t wall_color = 0x000000;
+
+            // Set the walls 
+            if (c->has_northern_neighbor() && !c->is_linked(c->get_north()) && y % 2 == 0) {
+                auto index = (y * width + x) * stride;
+                pixels[index] = (wall_color >> 16) & 0xFF;
+                pixels[index + 1] = (wall_color >> 8) & 0xFF;
+                pixels[index + 2] = wall_color & 0xFF;
+                pixels[index + 3] = 255;
+            }
+            if (c->has_southern_neighbor() && !c->is_linked(c->get_south()) && y % 2 == 1) {
+                auto index = (y * width + x) * stride;
+                pixels[index] = (wall_color >> 16) & 0xFF;
+                pixels[index + 1] = (wall_color >> 8) & 0xFF;
+                pixels[index + 2] = wall_color & 0xFF;
+                pixels[index + 3] = 255;
+            }
+            if (c->has_eastern_neighbor() && !c->is_linked(c->get_east()) && x % 2 == 1) {
+                auto index = (y * width + x) * stride;
+                pixels[index] = (wall_color >> 16) & 0xFF;
+                pixels[index + 1] = (wall_color >> 8) & 0xFF;
+                pixels[index + 2] = wall_color & 0xFF;
+                pixels[index + 3] = 255;
+            }
+            if (c->has_western_neighbor() && !c->is_linked(c->get_west()) && x % 2 == 0) {
+                auto index = (y * width + x) * stride;
+                pixels[index] = (wall_color >> 16) & 0xFF;
+                pixels[index + 1] = (wall_color >> 8) & 0xFF;
+                pixels[index + 2] = wall_color & 0xFF;
+                pixels[index + 3] = 255;
+            }
         }
     }
 
 #if defined(MAZE_DEBUG)
-    cout << "Width: " << width << " Height: " << height << endl;
+    cout << "Width: " << width << "\nHeight: " << height << endl;
+    cout << "Stride: " << stride << endl;
     cout << "Pixels: " << pixels.size() << endl;
 #endif
 }
-
 
 /// @brief 
 /// @param m 

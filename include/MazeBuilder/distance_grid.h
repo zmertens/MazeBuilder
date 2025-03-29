@@ -34,7 +34,6 @@ private:
 	std::shared_ptr<distances> m_distances;
 
 	std::optional<std::string> to_base36(int value) const;
-    void calc_distances() noexcept;
 };
 }
 

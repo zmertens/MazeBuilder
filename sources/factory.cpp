@@ -36,11 +36,11 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
         success = colored_grid_ptr->get_future().get();
     } else if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(g.get())) {
         success = distance_grid_ptr->get_future().get();
-    } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
+    } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) { 
         success = grid_ptr->get_future().get();
     }
 
-    if (success && apply_algo_to_grid(cref(config), ref(g), cref(get_int), cref(mt))) {
+    if (success && apply_algo_to_grid(cref(config), cref(g), cref(get_int), cref(mt))) {
         return make_optional(make_unique<maze>(std::move(g), cref(config)));
     }
     return nullopt;

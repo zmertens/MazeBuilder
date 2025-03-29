@@ -1,6 +1,7 @@
 #include <MazeBuilder/distances.h>
 
 #include <iterator>
+#include <queue>
 #include <MazeBuilder/cell.h>
 
 using namespace mazes;
@@ -83,22 +84,29 @@ void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const no
 std::shared_ptr<distances> distances::dist() const noexcept {
     using namespace std;
 
+    if (!m_root) {
+
+        return nullptr;
+    }
+
     auto d = make_shared<distances>(m_root);
-    vector<shared_ptr<cell>> frontier = { m_root };
 
+    queue<shared_ptr<cell>> frontier;
+    frontier.push(m_root);
+    d->set(m_root, 0);
+    // apply shortest path algorithm
     while (!frontier.empty()) {
-        vector<shared_ptr<cell>> new_frontier;
 
-        for (const auto& cell : frontier) {
-            for (const auto& [linked, _] : cell->get_links()) {
-                if (!d->contains(linked)) {
-                    d->set(linked, d->operator[](cell) + 1);
-                    new_frontier.push_back(linked);
-                }
+        auto current = frontier.front();
+        frontier.pop();
+        auto current_distance = d->operator[](current);
+        for (const auto& neighbor : current->get_neighbors()) {
+
+            if (!d->contains(neighbor)) {
+                d->set(neighbor, d->operator[](current) + 1);
+                frontier.push(neighbor);
             }
         }
-
-        frontier = new_frontier;
     }
 
     return d;

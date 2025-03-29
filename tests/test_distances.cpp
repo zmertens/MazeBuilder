@@ -42,7 +42,7 @@ TEST_CASE( "Test distance and paths", "[paths]" ) {
         auto path = single_cell_distances.path_to(root);
         REQUIRE(path != nullptr);
         REQUIRE(path->contains(root));
-        REQUIRE((*path)[root] == 0);
+        REQUIRE(path->operator[](root) == 0);
     }
 
     SECTION("Circular path") {
@@ -53,10 +53,10 @@ TEST_CASE( "Test distance and paths", "[paths]" ) {
         REQUIRE(path->contains(cell1));
         REQUIRE(path->contains(cell2));
         REQUIRE(path->contains(goal));
-        REQUIRE((*path)[root] == 0);
-        REQUIRE((*path)[cell1] == 1);
-        REQUIRE((*path)[cell2] == 2);
-        REQUIRE((*path)[goal] == 3);
+        REQUIRE(path->operator[](root) == 0);
+        REQUIRE(path->operator[](cell1) == 1);
+        REQUIRE(path->operator[](cell2) == 2);
+        REQUIRE(path->operator[](goal) == 3);
     }
 
     SECTION("Multiple paths") {

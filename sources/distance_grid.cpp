@@ -42,9 +42,7 @@ std::future<bool> distance_grid::get_future() noexcept {
     return std::async(std::launch::async, [this, shuffled_indices]() mutable {
         this->configure_nodes(cref(shuffled_indices));
 
-        m_distances = make_shared<distances>(this->m_binary_search_tree_root->cell_ptr);
-
-        this->calc_distances();
+        m_distances = make_shared<distances>(this->m_binary_search_tree_root->cell_ptr)->dist();
 
         return true;
         });
@@ -73,35 +71,6 @@ std::optional<std::string> distance_grid::to_base36(int value) const {
 	} while (value > 0);
 	std::reverse(result.begin(), result.end());
 	return result;
-}
-
-/// @brief Compute the distances between cells given a root cell
-/// @details Uses Djikstra's shortest-path algorithms
-void distance_grid::calc_distances() noexcept {
-    using namespace std;
-
-    if (!this->m_binary_search_tree_root) {
-        return;
-    }
-
-	auto&& root = this->m_binary_search_tree_root->cell_ptr;
-	queue<shared_ptr<cell>> frontier;
-	frontier.push(root);
-	m_distances->set(root, 0);
-	// apply shortest path algorithm
-	while (!frontier.empty()) {
-
-		auto current = frontier.front();
-		frontier.pop();
-		auto current_distance = m_distances->operator[](current);
-		for (const auto& neighbor : current->get_neighbors()) {
-
-			if (!m_distances->contains(neighbor)) {
-				m_distances->set(neighbor, m_distances->operator[](current) + 1);
-				frontier.push(neighbor);
-			}
-		}
-	}
 }
 
 std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
