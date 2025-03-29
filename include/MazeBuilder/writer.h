@@ -2,8 +2,8 @@
 #define WRITER_H
 
 #include <string>
-
-#include <MazeBuilder/enums.h>
+#include <vector>
+#include <cstdint>
 
 namespace mazes {
 
@@ -15,13 +15,23 @@ namespace mazes {
 class writer {
 public:
 
-	/// @brief Handles writing to an image file
-	/// @param filename 
-	/// @param data the string to write to a file
-    /// @param w 1 width in pixels
-    /// @param h 1 height in pixels
-	/// @return 
-	bool write(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
+    /// @brief Write pixels to a PNG file
+    /// @param filename 
+    /// @param data 
+    /// @param w 100
+    /// @param h 100
+    /// @param stride 4
+    /// @return 
+    bool write_png(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w = 100, unsigned int h = 100, unsigned int stride = 4) const noexcept;
+
+    /// @brief Write pixels to a JPEG file
+    /// @param filename 
+    /// @param data 
+    /// @param w 100
+    /// @param h 100
+    /// @param stride 4
+    /// @return 
+    bool write_jpeg(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w = 100, unsigned int h = 100, unsigned int stride = 4) const noexcept;
 
     /// @brief Handles writing to an output stream
     /// @param oss 
@@ -29,10 +39,10 @@ public:
     /// @return 
     bool write(std::ostream& oss, const std::string& data) const noexcept;
 
-    static bool is_file_with_suffix(const std::string& f, output o = output::PLAIN_TEXT) noexcept;
-private:
-    bool write_jpeg(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
-    bool write_png(const std::string& filename, const std::string& data, unsigned int w = 1, unsigned int h = 1) const noexcept;
+    /// @brief Write to a file
+    /// @param filename
+    /// @param data 
+    /// @return 
     bool write_file(const std::string& filename, const std::string& data) const noexcept;
 }; // writer
 

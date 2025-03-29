@@ -151,6 +151,58 @@ void stringz::objectify(lab& labyrinth, std::string_view sv) noexcept {
 
 }
 
+/// @brief Converts a string representation of an image to a pixel array.
+/// @param s 
+/// @param pixels 
+/// @param width 
+/// @param height 
+/// @param stride 4
+void stringz::to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
+    using namespace std;
+
+    auto temp_width{ 0 };
+    width = height = 0;
+
+    // Determine width and height (assume fixed dimensions)
+    for (char c : s) {
+        if (c == '\n') {
+            height += 1;
+            if (temp_width > width) {
+                width = temp_width;
+            }
+            temp_width = 0;
+        } else {
+            temp_width += 1;
+        }
+    }
+
+    // Account for the last line in the file
+    if (temp_width > 0) {
+        height += 1;
+        if (temp_width > width) {
+            width = temp_width;
+        }
+    }
+
+    // Initialize the pixels as 255 (white)
+    pixels.resize(width * height * stride, 255);
+
+    // Fill the pixels by parsing the string
+    int x{ 0 }, y{ 0 };
+    for (char c : s) {
+        if (c == '\n') {
+            y += 1;
+            x = 0;
+        } else {
+            auto index = (y * width + x) * stride;
+            pixels[index] = pixels[index + 1] = pixels[index + 2] = (c == CORNER || c == BARRIER1 || c == BARRIER2) ? 0 : 255;
+            // Alpha channel
+            pixels[index + 3] = 255;
+            x += 1;
+        }
+    }
+}
+
 /// @brief 
 /// @param m 
 /// @return

@@ -31,8 +31,19 @@ public:
         std::vector<std::vector<std::uint32_t>>& faces,
         std::string_view sv = std::string_view{}) noexcept;
 
+    /// @brief Compute the 3D geometries of a maze
+    /// @param labyrinth the collection of mazes
+    /// @param sv 
     static void objectify(lab& labyrinth,
         std::string_view sv = std::string_view{}) noexcept;
+
+    /// @brief Converts a string representation of an image to a pixel array.
+    /// @param s 
+    /// @param pixels vector to store the resulting pixel data
+    /// @param width integer reference to store the width of the image
+    /// @param height integer reference to store the height of the image
+    static void to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels, int& width, int& height,
+        int stride = 4) noexcept;
 
     /// @brief Convert a maze into a string representation
     /// @param m the maze to convert

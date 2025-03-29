@@ -53,13 +53,19 @@ namespace mazes {
     static output to_output_from_string(const std::string& o) {
         if (o.compare("txt") == 0) {
             return output::PLAIN_TEXT;
+        } else if (o.compare("text") == 0) {
+            return output::PLAIN_TEXT;
         } else if (o.compare("json") == 0) {
             return output::JSON;
         } else if (o.compare("obj") == 0) {
             return output::WAVEFRONT_OBJECT_FILE;
+        } else if (o.compare("object") == 0) {
+            return output::WAVEFRONT_OBJECT_FILE;
         } else if (o.compare("png") == 0) {
             return output::PNG;
         } else if (o.compare("jpeg") == 0) {
+            return output::JPEG;
+        } else if (o.compare("jpg") == 0) {
             return output::JPEG;
         } else if (o.compare("stdout") == 0) {
             return output::STDOUT;

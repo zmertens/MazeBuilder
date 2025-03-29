@@ -71,11 +71,11 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(INFO ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
         target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    else()
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
 else()
@@ -97,11 +97,9 @@ else()
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-        message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(INFO ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
         target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
-    elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-        # pass
     endif()
 
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
