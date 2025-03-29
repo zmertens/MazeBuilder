@@ -45,6 +45,14 @@ public:
     static void to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels, int& width, int& height,
         int stride = 4) noexcept;
 
+    /// @brief Converts a maze to a pixel representation.
+    /// @param m A unique pointer to the maze object to be converted.
+    /// @param pixels A vector to store the resulting pixel data.
+    /// @param width An integer reference to store the width of the pixel data.
+    /// @param height An integer reference to store the height of the pixel data.
+    /// @param stride The number of bytes per row in the pixel data.
+    static void to_pixels(const std::unique_ptr<maze>& m, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride = 4) noexcept;
+
     /// @brief Convert a maze into a string representation
     /// @param m the maze to convert
     /// @return the string representation

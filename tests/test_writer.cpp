@@ -19,7 +19,7 @@ TEST_CASE("Writer can process good text file names", "[good text filenames]") {
 	vector<string> good_filenames{ "1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg" };
 
 	for (const auto& gf : good_filenames) {
-        REQUIRE(my_writer.write(gf, "data"));
+        REQUIRE(my_writer.write_file(gf, "data"));
 	}
 }
 
@@ -29,16 +29,16 @@ TEST_CASE("Writer can process bad file names", "[bad filenames]") {
     vector<string> bad_filenames{ "1.tezt", "2.plain_text", "3plain_txt", "1.objected", "2.objobj", "3obj", "a.ping", "" };
 
     for (const auto& bf : bad_filenames) {
-        REQUIRE_FALSE(my_writer.write(bf, "data"));
+        REQUIRE_FALSE(my_writer.write_file(bf, "data"));
     }
 }
 
-TEST_CASE("writer::write writes data to file successfully", "[writer writes]") {
+TEST_CASE("Writer writes data to file successfully", "[writer writes]") {
     mazes::writer w;
     std::string filename = "test_file.txt";
     std::string data = "Hello, world!";
 
-    REQUIRE_NOTHROW(w.write(filename, data));
+    REQUIRE_NOTHROW(w.write_file(filename, data));
 
     // Verify the file contents
     std::ifstream f1 (filename);
@@ -51,7 +51,7 @@ TEST_CASE("writer::write writes data to file successfully", "[writer writes]") {
     std::remove(filename.c_str());
 }
 
-TEST_CASE("Writer writes data to stdout successfully", "[writer verifies writes]") {
+TEST_CASE("Writer writes data to stdout successfully", "[writer to stdout]") {
     mazes::writer w;
     std::string data = "Hello, world!";
     std::ostringstream oss;

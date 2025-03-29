@@ -7,6 +7,7 @@
 
 #if defined(MAZE_DEBUG)
 #include <sstream>
+#include <iostream>
 #endif
 
 #include <random>
@@ -202,6 +203,80 @@ void stringz::to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels,
         }
     }
 }
+
+/// @brief Generates a pixel array from a maze object.
+/// @param m 
+/// @param pixels 
+/// @param width
+/// @param height
+/// @param stride 4
+void stringz::to_pixels(const std::unique_ptr<maze>& m, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
+    using namespace std;
+
+    if (!m) {
+        // Handle null maze pointer
+        return;
+    }
+
+    const auto& g = m->get_grid();
+    auto dimensions = g->get_dimensions();
+    width = get<0>(dimensions) * 2 + 1;
+    height = get<1>(dimensions) * 2 + 1;
+
+    // Initialize the pixels as white
+    pixels.resize(width * height * stride, 255);
+
+    vector<shared_ptr<cell>> cells;
+    g->to_vec(cells);
+
+    auto set_pixel = [&](int x, int y, uint32_t color) {
+        auto index = (y * width + x) * stride;
+        pixels[index] = (color >> 16) & 0xFF; // Red
+        pixels[index + 1] = (color >> 8) & 0xFF; // Green
+        pixels[index + 2] = color & 0xFF; // Blue
+        pixels[index + 3] = 255; // Alpha
+        };
+
+    for (const auto& c : cells) {
+        int x = c->get_index() % get<0>(dimensions) * 2 + 1;
+        int y = c->get_index() / get<0>(dimensions) * 2 + 1;
+
+        // Set the cell background color (defaults to white)
+        uint32_t color = g->background_color_for(c).value_or(0xFFFFFF);
+
+        set_pixel(x, y, color);
+
+        // Set the walls
+        if (!c->is_linked(c->get_north())) {
+            set_pixel(x, y - 1, 0x000000); // North wall
+        }
+        if (!c->is_linked(c->get_south())) {
+            set_pixel(x, y + 1, 0x000000); // South wall
+        }
+        if (!c->is_linked(c->get_east())) {
+            set_pixel(x + 1, y, 0x000000); // East wall
+        }
+        if (!c->is_linked(c->get_west())) {
+            set_pixel(x - 1, y, 0x000000); // West wall
+        }
+    }
+
+    // Set the outer walls
+    for (int x = 0; x < width; ++x) {
+        set_pixel(x, 0, 0x000000); // Top wall
+        set_pixel(x, height - 1, 0x000000); // Bottom wall
+    }
+    for (int y = 0; y < height; ++y) {
+        set_pixel(0, y, 0x000000); // Left wall
+        set_pixel(width - 1, y, 0x000000); // Right wall
+    }
+
+#if defined(MAZE_DEBUG)
+    cout << "Width: " << width << " Height: " << height << endl;
+    cout << "Pixels: " << pixels.size() << endl;
+#endif
+}
+
 
 /// @brief 
 /// @param m 

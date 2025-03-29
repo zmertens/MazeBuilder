@@ -12,6 +12,7 @@
 #include <MazeBuilder/colored_grid.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/distances.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/factory.h>
 #include <MazeBuilder/grid.h>

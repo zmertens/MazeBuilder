@@ -128,6 +128,7 @@ int main(int argc, char* argv[]) {
         maze_ptr next_maze_ptr = mazes::factory::create(
             mazes::configurator().columns(columns).rows(rows).levels(levels)
             .distances(distances).seed(seed)._algo(my_maze_type)
+            ._output(my_output_type)
             .block_id(BLOCK_ID));
 
         auto dur = clock.elapsed<>();
@@ -166,7 +167,7 @@ int main(int argc, char* argv[]) {
             vector<uint8_t> pixels;
             auto pixels_w{ 0 }, pixels_h{ 0 };
             pixels.reserve(rows * columns * STRIDE);
-            mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+            mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
             success = my_writer.write_jpeg(cref(output_file_str), cref(pixels), pixels_w, pixels_h, STRIDE);
             break;
         }
@@ -202,7 +203,7 @@ int main(int argc, char* argv[]) {
 #endif
         }
         else {
-            std::cerr << "Failed output formatting to: " << output_file_str << std::endl;
+            std::cerr << "Writing to: " << output_file_str << " failed!" << std::endl;
         }
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 

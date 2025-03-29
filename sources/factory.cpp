@@ -4,6 +4,7 @@
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/grid.h>
+#include <MazeBuilder/colored_grid.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/maze.h>
 
@@ -20,14 +21,20 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
 
     unique_ptr<grid_interface> g = nullptr;
     if (config.distances()) {
-        g = make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+        if (config._output() == output::PNG || config._output() == output::JPEG) {
+            g = make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
+        } else {
+            g = make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+        }
     } else {
         g = make_unique<grid>(config.rows(), config.columns(), config.levels());
     }
 
     // Call get_future on the specific grid type
     auto success{ false };
-    if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(g.get())) {
+    if (auto colored_grid_ptr = dynamic_cast<colored_grid*>(g.get())) {
+        success = colored_grid_ptr->get_future().get();
+    } else if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(g.get())) {
         success = distance_grid_ptr->get_future().get();
     } else if (auto grid_ptr = dynamic_cast<grid*>(g.get())) {
         success = grid_ptr->get_future().get();

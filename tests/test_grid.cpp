@@ -91,7 +91,7 @@ TEST_CASE("Test to_vec", "[to_vec]") {
     //REQUIRE(my_cells.size() == ROWS * COLUMNS);
 }
 
-TEST_CASE("Cells have neighbors", "[neighbors]") {
+TEST_CASE("Cells have neighbors", "[neighbors link]") {
 
     // cell1 has cell2 neighbor to the south
     shared_ptr<cell> cell1{ make_shared<cell>(0) };
@@ -113,5 +113,30 @@ TEST_CASE("Cells have neighbors", "[neighbors]") {
         REQUIRE(cell1->is_linked(cell2));
         REQUIRE(cell2->is_linked(cell1));
     }
+}
+
+TEST_CASE("Test cells get_neighbors method", "[get_neighbors]") {
+    // Create cells
+    auto cell0 = std::make_shared<cell>(0);
+    auto cell1 = std::make_shared<cell>(1);
+    auto cell2 = std::make_shared<cell>(2);
+    auto cell3 = std::make_shared<cell>(3);
+    auto cell4 = std::make_shared<cell>(4);
+
+    // Set neighbors
+    cell0->set_north(cell1);
+    cell0->set_south(cell2);
+    cell0->set_east(cell3);
+    cell0->set_west(cell4);
+
+    // Get neighbors
+    auto neighbors = cell0->get_neighbors();
+
+    // Verify neighbors
+    REQUIRE(neighbors.size() == 4);
+    REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell1) != neighbors.end());
+    REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell2) != neighbors.end());
+    REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell3) != neighbors.end());
+    REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell4) != neighbors.end());
 }
 

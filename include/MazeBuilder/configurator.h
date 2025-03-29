@@ -49,8 +49,8 @@ public:
         return *this;
     }
 
-    configurator& output(const std::string& s) noexcept {
-        output_ = s;
+    configurator& _output(output o) noexcept {
+        output_ = o;
         return *this;
     }
 
@@ -62,7 +62,7 @@ public:
     int block_id() const noexcept { return block_id_; }
     unsigned int seed() const noexcept { return seed_; }
     bool distances() const noexcept { return distances_; }
-    std::string output() const noexcept { return output_; }
+    output _output() const noexcept { return output_; }
 
 private:
     unsigned int rows_ = 1;
@@ -72,7 +72,7 @@ private:
     algo algo_ = algo::DFS;
     unsigned int seed_ = 2;
     bool distances_ = false;
-    std::string output_ = "stdout";
+    output output_ = output::STDOUT;
 };
 
 } // namespace
