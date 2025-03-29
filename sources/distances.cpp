@@ -29,6 +29,11 @@ bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
 /// @param goal A shared pointer to the goal cell for which the path is to be computed.
 /// @return A shared pointer to a distances object representing the path to the goal cell, or nullptr if the path cannot be found.
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
+    if (!goal || !contains(goal)) {
+
+        return nullptr;
+    }
+
     auto breadcrumbs = std::make_shared<distances>(m_root);
     auto current = goal;
 

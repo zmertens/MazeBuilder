@@ -2844,7 +2844,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
 #if !defined(__EMSCRIPTEN__)
                             // Write immediately if not on the web
                             mazes::writer writer{};
-                            writer.write(string(gui->outfile), cref(wavefront_obj_str));
+                            writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
 #if defined(MAZE_DEBUG)
                             SDL_Log("Writing to file... %s\n", gui->outfile);
 #endif
