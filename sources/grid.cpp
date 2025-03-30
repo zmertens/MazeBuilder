@@ -10,7 +10,9 @@
 
 #include <MazeBuilder/cell.h>
 
+#if defined(MAZE_DEBUG)
 #include <iostream>
+#endif
 
 using namespace mazes;
 
@@ -24,7 +26,7 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 
 grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions)
 : m_dimensions(dimensions)
-, m_binary_search_tree_root{ nullptr }        
+, m_binary_search_tree_root{ nullptr }
 , m_sort_by_row_column{ [](std::shared_ptr<node> const& c1, std::shared_ptr<node> const& c2)->bool {
     if (c1->cell_ptr->get_index() < c2->cell_ptr->get_index()) {
         return true;
@@ -96,6 +98,7 @@ std::future<bool> grid::get_future() noexcept {
     for (auto itr{ shuffled_indices.begin() }; itr != shuffled_indices.end(); itr++) {
         *itr = next_index++;
     }
+    shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
 
     return std::async(std::launch::async, [this, shuffled_indices]() mutable {
         this->configure_nodes(cref(shuffled_indices));
@@ -106,7 +109,8 @@ std::future<bool> grid::get_future() noexcept {
 
 void grid::configure_nodes(std::vector<int> const& indices) noexcept {
     using namespace std;
-    lock_guard<mutex> lock(m_config_mutex); // Ensure proper synchronization
+
+    lock_guard<mutex> lock(m_config_mutex);
 
     auto [ROWS, COLUMNS, _] = this->get_dimensions();
 
@@ -115,8 +119,11 @@ void grid::configure_nodes(std::vector<int> const& indices) noexcept {
 
     int row{ 0 }, column{ 0 }, index{ 0 };
 
+    shared_ptr<node> new_node = {};
+
     while (row < ROWS && column < COLUMNS && index < ROWS * COLUMNS) {
         int calc_index = this->m_calc_index(row, column);
+
         if (calc_index < 0 || calc_index >= static_cast<int>(indices.size())) {
             m_config_promise.set_value(false);
             return;
@@ -124,17 +131,10 @@ void grid::configure_nodes(std::vector<int> const& indices) noexcept {
 
         index = indices.at(calc_index);
 
-        shared_ptr<node> new_node;
-
-        if (this->m_binary_search_tree_root == nullptr) {
-            this->m_binary_search_tree_root = make_shared<node>(index);
-            new_node = this->m_binary_search_tree_root;
-            cells.emplace_back(new_node->cell_ptr);
-        } else {
-            new_node = make_shared<node>(index);
-            this->insert(ref(this->m_binary_search_tree_root), cref(new_node));
-            cells.emplace_back(new_node->cell_ptr);
-        }
+        new_node = make_shared<node>(index);
+        // Insert method handles null root and checks
+        this->insert(ref(this->m_binary_search_tree_root), cref(new_node));
+        cells.emplace_back(new_node->cell_ptr);
 
         column = ++column % COLUMNS;
         if (column == 0) {
@@ -146,6 +146,7 @@ void grid::configure_nodes(std::vector<int> const& indices) noexcept {
 
     this->m_config_promise.set_value(true);
 }
+
 
 /// @brief Configure by nearest row, column pairing
 /// @details A cell at (0, 0) will have a southern neighbor at (0, 1)
@@ -222,8 +223,11 @@ void grid::insert(std::shared_ptr<node>& parent, std::shared_ptr<node> const& ne
             return;
         }
     }
+
     parent = new_node;
 }
+
+
 
 std::shared_ptr<cell> grid::search(int index) const noexcept {
     if (this->m_binary_search_tree_root == nullptr) {
