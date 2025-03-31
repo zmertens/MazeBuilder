@@ -40,9 +40,9 @@ std::optional<std::unique_ptr<maze>> factory::create(configurator const& config)
         success = grid_ptr->get_future();
     }
 
-    //if (success && apply_algo_to_grid(cref(config), cref(g), cref(get_int), cref(mt))) {
-    //    return make_optional(make_unique<maze>(std::move(g), cref(config)));
-    //}
+    if (success && apply_algo_to_grid(cref(config), cref(g), cref(get_int), cref(mt))) {
+        return make_optional(make_unique<maze>(std::move(g), cref(config)));
+    }
     return nullopt;
 }
 

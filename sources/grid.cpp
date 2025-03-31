@@ -26,15 +26,6 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 
 grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions)
 : m_dimensions(dimensions)
-, m_binary_search_tree_root{ nullptr }
-, m_sort_by_row_column{ [](std::shared_ptr<node> const& c1, std::shared_ptr<node> const& c2)->bool {
-    if (c1->cell_ptr->get_index() < c2->cell_ptr->get_index()) {
-        return true;
-    } else if (c1->cell_ptr->get_index() == c2->cell_ptr->get_index()) {
-        return c1->left->cell_ptr->get_index() < c2->left->cell_ptr->get_index();
-    } else {
-        return false;
-    }} }
 , m_calc_index{ [this](auto row, auto col)->int
     { return row * std::get<1>(this->m_dimensions) + col; } } {
 
@@ -42,8 +33,7 @@ grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions)
 
 // Copy constructor
 grid::grid(const grid& other)
-: m_dimensions(other.m_dimensions)
-, m_binary_search_tree_root(other.m_binary_search_tree_root) {
+: m_dimensions(other.m_dimensions) {
 }
 
 // Copy assignment operator
@@ -51,7 +41,6 @@ grid& grid::operator=(const grid& other) {
     if (this == &other) {
         return *this;
     }
-    m_binary_search_tree_root = (other.m_binary_search_tree_root == nullptr) ? nullptr : other.m_binary_search_tree_root;
     m_dimensions = other.m_dimensions;
     // Copy other members if necessary
     return *this;
@@ -61,7 +50,6 @@ grid& grid::operator=(const grid& other) {
 grid::grid(grid&& other) noexcept
 : m_dimensions(other.m_dimensions) {
     // Move other members if necessary
-    m_binary_search_tree_root = std::exchange(other.m_binary_search_tree_root, nullptr);
 }
 
 // Move assignment operator
@@ -69,7 +57,6 @@ grid& grid::operator=(grid&& other) noexcept {
     if (this == &other) {
         return *this;
     }
-    m_binary_search_tree_root = std::exchange(other.m_binary_search_tree_root, nullptr);
     m_dimensions = other.m_dimensions;
     return *this;
 }
@@ -77,7 +64,9 @@ grid& grid::operator=(grid&& other) noexcept {
 // Destructor
 grid::~grid() {
     // Clean up resources if necessary
-    m_binary_search_tree_root.reset();
+    for (auto&& [_, c] : m_cells) {
+        c.reset();
+    }
 }
 
 /// @brief Inheritable configuration task
@@ -101,13 +90,13 @@ bool grid::get_future() noexcept {
     shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
 
     //return std::async(std::launch::async, [this, shuffled_indices]() mutable {
-        this->configure_nodes(cref(shuffled_indices));
+        this->build_fut(cref(shuffled_indices));
 
         return true;
         //});
 }
 
-void grid::configure_nodes(std::vector<int> const& indices) noexcept {
+void grid::build_fut(std::vector<int> const& indices) noexcept {
     using namespace std;
 
     //lock_guard<mutex> lock(m_config_mutex);
@@ -119,9 +108,7 @@ void grid::configure_nodes(std::vector<int> const& indices) noexcept {
 
     int row{ 0 }, column{ 0 }, index{ 0 };
 
-    shared_ptr<node> new_node = {};
-
-    int current_cell_counter_from_root = 0;
+    shared_ptr<cell> new_node = {};
 
     //while (row < ROWS && column < COLUMNS && index < ROWS * COLUMNS) {
     for (auto itr = indices.cbegin(); itr != indices.cend(); ++itr) {
@@ -135,31 +122,33 @@ void grid::configure_nodes(std::vector<int> const& indices) noexcept {
         //index = indices.at(calc_index);
         index = *itr;
 
-        new_node = make_shared<node>(index);
+        new_node = make_shared<cell>(index);
 
-        if (m_binary_search_tree_root == nullptr) {
-            m_binary_search_tree_root = new_node;
-            cells.emplace_back(new_node->cell_ptr);
-        } else {
-            // Insert method handles null root and checks
-            this->insert(cref(new_node));
-            //this->insert_recursive(ref(this->m_binary_search_tree_root), cref(new_node));
-            cells.emplace_back(new_node->cell_ptr);
+        m_cells.insert({ index, new_node });
 
-        }
+        cells.emplace_back(new_node);
+
+        //if (m_binary_search_tree_root == nullptr) {
+        //    m_binary_search_tree_root = new_node;
+        //    cells.emplace_back(new_node->cell_ptr);
+        //} else {
+        //    // Insert method handles null root and checks
+        //    this->insert(cref(new_node));
+        //    //this->insert_recursive(ref(this->m_binary_search_tree_root), cref(new_node));
+        //    cells.emplace_back(new_node->cell_ptr);
+        //}
 
         // Insert method handles null root and checks
         //this->insert(cref(new_node));
         //this->insert_recursive(ref(this->m_binary_search_tree_root), cref(new_node));
         //cells.emplace_back(new_node->cell_ptr);
 
-        auto new_count = this->count();
+        /*auto new_count = this->count();
         if (new_count == current_cell_counter_from_root) {
 #if defined(MAZE_DEBUG)
             cout << "BST insertion failed at count: " << new_count << endl;
 #endif
-        }
-        current_cell_counter_from_root = new_count;
+        }*/
 
         //column = ++column % COLUMNS;
         //if (column == 0) {
@@ -227,88 +216,44 @@ std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() cons
 /// @brief Private implementation for inserting new nodes
 /// @param parent 
 /// @param new_node 
-void grid::insert(std::shared_ptr<node> const& new_node) noexcept {
-    using namespace std;
+//void grid::insert(std::shared_ptr<node> const& new_node) noexcept {
+//    using namespace std;
 
-    if (!m_binary_search_tree_root) {
-        m_binary_search_tree_root = new_node;
-        return;
-    }
+    //if (!m_binary_search_tree_root) {
+    //    m_binary_search_tree_root = new_node;
+    //    return;
+    //}
 
-    auto current = m_binary_search_tree_root;
+    //auto current = m_binary_search_tree_root;
 
-    while (current) {
-        if (new_node->cell_ptr->get_index() < current->cell_ptr->get_index()) {
-            if (!current->left) {
-                current->left = new_node;
-                return;
-            }
-            current = current->left;
-        } else if (new_node->cell_ptr->get_index() > current->cell_ptr->get_index()) {
-            if (!current->right) {
-                current->right = new_node;
-                return;
-            }
-            current = current->right;
-        } else {
-            // Handle the case where the indices are equal
-            return;
-        }
-    }
-}
-
-
-
-
-void grid::insert_recursive(std::shared_ptr<node>& parent, std::shared_ptr<node> const& new_node) noexcept {
-    if (!parent) {
-        return;
-    }
-
-    if (parent->cell_ptr->get_index() > new_node->cell_ptr->get_index()) {
-        if (parent->left == nullptr) {
-            parent->left = new_node;
-        } else {
-            this->insert_recursive(ref(parent->left), cref(new_node));
-        }
-    } else if (parent->cell_ptr->get_index() < new_node->cell_ptr->get_index()) {
-        if (parent->right == nullptr) {
-            parent->right = new_node;
-        } else {
-            this->insert_recursive(ref(parent->right), cref(new_node));
-        }
-    } else {
-        // Index already exists in the BST, do nothing to avoid infinite recursion
-        return;
-    }
-}
+    //while (current) {
+    //    if (new_node->cell_ptr->get_index() < current->cell_ptr->get_index()) {
+    //        if (!current->left) {
+    //            current->left = new_node;
+    //            return;
+    //        }
+    //        current = current->left;
+    //    } else if (new_node->cell_ptr->get_index() > current->cell_ptr->get_index()) {
+    //        if (!current->right) {
+    //            current->right = new_node;
+    //            return;
+    //        }
+    //        current = current->right;
+    //    } else {
+    //        // Handle the case where the indices are equal
+    //        return;
+    //    }
+    //}
+//}
 
 std::shared_ptr<cell> grid::search(int index) const noexcept {
-    if (this->m_binary_search_tree_root == nullptr) {
-        return nullptr;
-    }
-    auto node = this->search(this->m_binary_search_tree_root, index);
-    if (node == nullptr) {
-        return nullptr;
-    }
-    return node->cell_ptr;
-}
+    auto itr = m_cells.find(index);
 
-template <typename Node>
-std::shared_ptr<Node> grid::search(std::shared_ptr<Node> const& parent, int index) const noexcept {
-    if (parent == nullptr || parent->cell_ptr->get_index() == index) {
-        return parent;
-    } else if (parent->cell_ptr->get_index() > index) {
-        return search(parent->left, index);
-    } else {
-        return search(parent->right, index);
-    }
+    return (itr != m_cells.cend()) ? itr->second : nullptr;
 }
 
 int grid::count() const noexcept {
-    std::vector<std::shared_ptr<cell>> cells;
-    this->inorder(this->m_binary_search_tree_root, ref(cells));
-    return cells.size();
+    return static_cast<int>(m_cells.size());
 }
 
 // Populate the vector of cells from the BST using natural ordering
@@ -317,8 +262,12 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
     //    m_config_promise.get_future().wait();
     //    });
 
-    // Populate the cells starting from the root
-    this->presort(this->m_binary_search_tree_root, ref(cells));
+    //// Populate the cells starting from the root
+    //this->presort(this->m_binary_search_tree_root, ref(cells));
+
+    for (auto&& [_, c] : m_cells) {
+        cells.emplace_back(c);
+    }
 }
 
 void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept {
@@ -351,31 +300,6 @@ void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const
             cells[i][j] = flat_cells[index];
         }
     }
-}
-
-void grid::inorder(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    if (parent != nullptr) {
-        this->inorder(parent->left, ref(cells));
-        cells.emplace_back(parent->cell_ptr);
-        this->inorder(parent->right, ref(cells));
-    }
-}
-
-void grid::presort(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    if (parent != nullptr) {
-        cells.emplace_back(parent->cell_ptr);
-        this->presort(parent->left, ref(cells));
-        this->presort(parent->right, ref(cells));
-    }
-}
-
-//
-// Sort the grid as if it were 2-dimensional grid
-// Compare rows, then if equal, compare columns
-//
-void grid::sort_by_row_then_col(std::vector<std::shared_ptr<node>>& nodes) const noexcept {
-    // now use STL sort by row, column with custom lambda function
-    std::sort(nodes.begin(), nodes.end(), this->m_sort_by_row_column);
 }
 
 // Get the contents of a cell for this type of grid

@@ -9,6 +9,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <unordered_map>
 
 #include <MazeBuilder/grid_interface.h>
 
@@ -19,18 +20,7 @@ namespace mazes {
 /// @brief General purpose grid class for maze generation
 class grid : public grid_interface {
 protected:
-    class node {
-    public:
-        std::shared_ptr<node> left, right;
-        std::shared_ptr<cell> cell_ptr;
-
-        node(std::int32_t idx) : left{nullptr}, right{nullptr}
-            , cell_ptr(std::make_shared<cell>(idx)) {}
-    };
-
-    std::shared_ptr<node> m_binary_search_tree_root;
-
-    void configure_nodes(std::vector<int> const& indices) noexcept;
+    void build_fut(std::vector<int> const& indices) noexcept;
 public:
     /// @brief Friend classes
     friend class binary_tree;
@@ -111,41 +101,12 @@ private:
     /// @param cells 
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
-    /// @brief Sort by youngest child -> oldest child
-    /// @param parent
-    /// @param cells
-    void presort(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-
-    /// @brief Sort ascending per index-value
-    /// @param parent
-    /// @param cells
-    void inorder(std::shared_ptr<node> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-
-    /// @brief Sort ascending per index-value
-    /// @param nodes
-    void sort_by_row_then_col(std::vector<std::shared_ptr<node>>& nodes) const noexcept;
-
-    /// @brief Private implementation for insert
-    /// @param parent 
-    /// @param new_node 
-    void insert(std::shared_ptr<node> const& new_node) noexcept;
-
-    void insert_recursive(std::shared_ptr<node>& parent, std::shared_ptr<node> const& new_node) noexcept;
-
-
-    /// @brief Search for a node with a given index
-    /// @tparam Node 
-    /// @param parent 
-    /// @param index 
-    /// @return 
-    template <typename Node = node>
-    std::shared_ptr<Node> search(std::shared_ptr<Node> const& parent, int index) const noexcept;
-
-    std::function<int(std::shared_ptr<node> const&, std::shared_ptr<node> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
+
+    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 
     mutable std::promise<bool> m_config_promise;
     mutable std::once_flag m_config_flag;

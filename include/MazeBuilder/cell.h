@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <mutex>
 
 namespace mazes {
 
@@ -19,8 +20,8 @@ public:
     void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
     void unlink(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
 
-    std::unordered_map<std::shared_ptr<cell>, bool> get_links() const;
-    bool is_linked(const std::shared_ptr<cell>& c) const;
+    const std::unordered_map<std::shared_ptr<cell>, bool>& get_links();
+    bool is_linked(const std::shared_ptr<cell>& c);
 
     bool has_northern_neighbor() const noexcept;
 
@@ -45,7 +46,7 @@ public:
     void set_east(std::shared_ptr<cell> const& other);
     void set_west(std::shared_ptr<cell> const& other);
 private:
-    bool has_key(const std::shared_ptr<cell>& c) const;
+    bool has_key(const std::shared_ptr<cell>& c);
 
     std::unordered_map<std::shared_ptr<cell>, bool> m_links;
 
@@ -55,6 +56,8 @@ private:
     std::shared_ptr<cell> m_south;
     std::shared_ptr<cell> m_east;
     std::shared_ptr<cell> m_west;
+
+    std::mutex m_mtx;
 }; // class
 
 } // namespace

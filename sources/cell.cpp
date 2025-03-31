@@ -15,7 +15,8 @@ cell::cell(std::int32_t index)
 
 }
 
-bool cell::has_key(const shared_ptr<cell>& c) const {
+bool cell::has_key(const shared_ptr<cell>& c) {
+    lock_guard<mutex> lock(m_mtx);
     return m_links.find(c) != m_links.end();
 }
 
@@ -24,8 +25,13 @@ bool cell::has_key(const shared_ptr<cell>& c) const {
 /// @param c2 
 /// @param bidi true
 void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    this->m_links.insert_or_assign(c2, true);
-    if (bidi) {
+    {
+        lock_guard<mutex> lock(m_mtx);
+        if (c2) {
+            this->m_links.insert_or_assign(c2, true);
+        }
+    }
+    if (c2 && c1 && bidi) {
         c2->link(c2, c1, false);
     }
 }
@@ -35,17 +41,20 @@ void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
 /// @param c2 
 /// @param bidi true
 void cell::unlink(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    this->m_links.erase(c1);
+    {
+        lock_guard<mutex> lock(m_mtx);
+        this->m_links.erase(c1);
+    }
     if (bidi) {
         c2->unlink(c2, c1, false);
     }
 }
 
-unordered_map<shared_ptr<cell>, bool> cell::get_links() const {
+const std::unordered_map<shared_ptr<cell>, bool>& cell::get_links() {
+    lock_guard<mutex> lock(m_mtx);
     return this->m_links;
 }
-
-bool cell::is_linked(const shared_ptr<cell>& c) const {
+bool cell::is_linked(const shared_ptr<cell>& c) {
     return has_key(c);
 }
 

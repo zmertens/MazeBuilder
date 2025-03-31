@@ -40,9 +40,9 @@ bool distance_grid::get_future() noexcept {
     }
 
     //return std::async(std::launch::async, [this, shuffled_indices]() mutable {
-        this->configure_nodes(cref(shuffled_indices));
+        this->build_fut(cref(shuffled_indices));
 
-        m_distances = make_shared<distances>(this->m_binary_search_tree_root->cell_ptr)->dist();
+        //m_distances = make_shared<distances>(nullptr)->dist();
 
         return true;
         //});

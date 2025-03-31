@@ -16,47 +16,47 @@
 /// @param rng 
 /// @return 
 bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
-    using namespace std;
-
-	if (auto gg = dynamic_cast<grid*>(g.get())) {
+    if (auto gg = dynamic_cast<grid*>(g.get())) {
         if (!gg) {
-            return false;
+            return false;  // This check is redundant since dynamic_cast already checked
         }
 
-        stack<shared_ptr<grid::node>> node_stack;
-        node_stack.push(gg->m_binary_search_tree_root);
+        // Clear the existing links so we start with a fresh maze
+        auto [rows, columns, _] = gg->get_dimensions();
+        std::vector<std::shared_ptr<cell>> cells;
+        cells.reserve(rows * columns);
+        gg->to_vec(cells);
 
-        while (!node_stack.empty()) {
-            auto current_node = node_stack.top();
-            node_stack.pop();
+        // Clear existing links
+        for (auto& cell : cells) {
+            for (auto& neighbor : cell->get_neighbors()) {
+                if (neighbor) {
+                    cell->unlink(cell, neighbor, true);
+                }
+            }
+        }
 
-            auto c = current_node->cell_ptr;
-            if (c) {
-                vector<shared_ptr<cell>> neighbors;
-                auto north_cell = c->get_north();
-                if (north_cell != nullptr) {
-                    neighbors.emplace_back(north_cell);
-                }
-                auto east_cell = c->get_east();
-                if (east_cell != nullptr) {
-                    neighbors.emplace_back(east_cell);
-                }
+        // Process each node from the map
+        for (const auto& [index, c] : gg->m_cells) {
+            //auto c = node_ptr->cell_ptr;
+            if (!c) continue;
 
-                // Skip linking neighbor if we have no neighbor, prevent RNG out-of-bounds
-                if (!neighbors.empty()) {
-                    auto random_index = static_cast<int>(get_int(0, neighbors.size() - 1));
-                    auto neighbor = neighbors.at(random_index);
-                    if (neighbor != nullptr) {
-                        c->link(c, neighbor, true);
-                    }
-                }
+            std::vector<std::shared_ptr<cell>> neighbors;
+            auto north_cell = c->get_north();
+            if (north_cell) {
+                neighbors.emplace_back(north_cell);
+            }
+            auto east_cell = c->get_east();
+            if (east_cell) {
+                neighbors.emplace_back(east_cell);
+            }
 
-                // Push right and left children to the stack
-                if (current_node->right) {
-                    node_stack.push(current_node->right);
-                }
-                if (current_node->left) {
-                    node_stack.push(current_node->left);
+            // Skip linking neighbor if we have no neighbor, prevent RNG out-of-bounds
+            if (!neighbors.empty()) {
+                auto random_index = static_cast<int>(get_int(0, static_cast<int>(neighbors.size()) - 1));
+                auto neighbor = neighbors.at(random_index);
+                if (neighbor) {
+                    c->link(c, neighbor, true);
                 }
             }
         }
