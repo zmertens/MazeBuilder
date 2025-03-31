@@ -4,10 +4,12 @@
 #include <iosfwd>
 #include <fstream>
 #include <sstream>
+#include <stdexcept>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <MazeBuilder/writer.h>
+#include <MazeBuilder/enums.h>
 
 using namespace std;
 using namespace mazes;
@@ -26,10 +28,15 @@ TEST_CASE("Writer can process good text file names", "[good text filenames]") {
 TEST_CASE("Writer can process bad file names", "[bad filenames]") {
     writer my_writer;
 
-    vector<string> bad_filenames{ "1.tezt", "2.plain_text", "3plain_txt", "1.objected", "2.objobj", "3obj", "a.ping", "" };
+    vector<string> more_filenames{ "1-text", "2.plain_text", "3plain_txt", "4.objected", "5.objobj", "6obj", "a.ping", "pong" };
 
-    for (const auto& bf : bad_filenames) {
-        REQUIRE_FALSE(my_writer.write_file(bf, "data"));
+    for (const auto& more : more_filenames) {
+        REQUIRE(my_writer.write_file(more, "data"));
+    }
+
+    for (auto bf : more_filenames) {
+        auto bf_substr = bf.substr(bf.find_last_of('.') + 1);
+        REQUIRE_THROWS_AS(mazes::to_output_from_string(bf_substr), std::invalid_argument);
     }
 }
 

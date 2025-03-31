@@ -155,7 +155,9 @@ void grid::build_fut(std::vector<int> const& indices) noexcept {
         //    ++row;
         //}
     }
-
+    sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
+        return c1->get_index() < c2->get_index();
+        });
     this->configure_cells(std::ref(cells));
 
     //this->m_config_promise.set_value(true);
@@ -168,45 +170,49 @@ void grid::build_fut(std::vector<int> const& indices) noexcept {
 /// @param cells
 void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
     using namespace std;
-
     auto [rows, columns, _] = this->m_dimensions;
 
-    unsigned int rowCounter = 0, columnCounter = 0;
-    unsigned int next_index = 0;
-    while (rowCounter < rows && columnCounter < columns && next_index < rows * columns) {
-        next_index = this->m_calc_index(rowCounter, columnCounter);
-        auto&& cell = cells.at(next_index);
+    for (unsigned int row = 0; row < rows; ++row) {
+        for (unsigned int col = 0; col < columns; ++col) {
+            int index = this->m_calc_index(row, col);
 
-        if (rowCounter - 1 >= 0 && rowCounter - 1 < rows) {
-            next_index = this->m_calc_index(rowCounter - 1, columnCounter);
-            auto&& found = cells.at(next_index);
-            if (found != nullptr)
-                cell->set_north(found);
+            if (index > cells.size()) {
+#if defined(MAZE_DEBUG)
+                cerr << "Grid configuration failed at index: " << index << endl;
+#endif
+            }
+
+            auto&& c = cells.at(index);
+
+            // Set north neighbor
+            if (row > 0) {
+                int north_index = this->m_calc_index(row - 1, col);
+                auto&& north_cell = cells.at(north_index);
+                c->set_north(north_cell);
+            }
+
+            // Set south neighbor
+            if (row < rows - 1) {
+                int south_index = this->m_calc_index(row + 1, col);
+                auto&& south_cell = cells.at(south_index);
+                c->set_south(south_cell);
+            }
+
+            // Set west neighbor
+            if (col > 0) {
+                int west_index = this->m_calc_index(row, col - 1);
+                auto&& west_cell = cells.at(west_index);
+                c->set_west(west_cell);
+            }
+
+            // Set east neighbor
+            if (col < columns - 1) {
+                int east_index = this->m_calc_index(row, col + 1);
+                auto&& east_cell = cells.at(east_index);
+                c->set_east(east_cell);
+            }
         }
-        if (rowCounter + 1 < rows) {
-            next_index = this->m_calc_index(rowCounter + 1, columnCounter);
-            auto&& found = cells.at(next_index);
-            if (found != nullptr)
-                cell->set_south(found);
-        }
-        if (columnCounter - 1 >= 0 && columnCounter - 1 < columns) {
-            next_index = this->m_calc_index(rowCounter, columnCounter - 1);
-            auto&& found = cells.at(next_index);
-            if (found != nullptr)
-                cell->set_west(found);
-        }
-        if (columnCounter + 1 < columns) {
-            next_index = this->m_calc_index(rowCounter, columnCounter + 1);
-            auto&& found = cells.at(next_index);
-            if (found != nullptr)
-                cell->set_east(found);
-        }
-        columnCounter = ++columnCounter % columns;
-        // check if there's a new row
-        if (columnCounter == 0) {
-            ++rowCounter;
-        }
-    } // while
+    }
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
@@ -268,6 +274,10 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
     for (auto&& [_, c] : m_cells) {
         cells.emplace_back(c);
     }
+
+    sort(cells.begin(), cells.end(), [](std::shared_ptr<cell> const& c1, std::shared_ptr<cell> const& c2) {
+        return c1->get_index() < c2->get_index();
+        });
 }
 
 void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept {
