@@ -29,7 +29,7 @@ public:
 
     std::shared_ptr<distances> get_distances() const noexcept;
 
-    virtual std::future<bool> get_future() noexcept override;
+    virtual bool get_future() noexcept override;
 private:
 	std::shared_ptr<distances> m_distances;
 

@@ -22,9 +22,9 @@ bool dfs::run(const std::unique_ptr<grid_interface>& g, const std::function<int(
             return false;
         }
 
-        auto [rows, columns, _] = gg->get_dimensions();
+        //auto [rows, columns, _] = gg->get_dimensions();
      
-        auto&& start = gg->search(get_int(0, rows * columns));
+        auto&& start = gg->search(get_int(0, gg->count()));
 
         if (!start) {
             return false;

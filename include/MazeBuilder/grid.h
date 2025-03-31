@@ -71,7 +71,7 @@ public:
     /// @brief Initialize and configure
     /// @param callback notifies when configuration is complete
     /// @return 
-    virtual std::future<bool> get_future() noexcept;
+    virtual bool get_future() noexcept;
 
     // Overrides
 
@@ -101,6 +101,10 @@ public:
     /// @param index
     /// @return
     std::shared_ptr<cell> search(int index) const noexcept;
+
+    /// @brief Get the count of cells in the grid
+    /// @return The number of cells in the grid
+    int count() const noexcept;
     
 private:
     /// @brief Configure cells by neighbors (N, S, E, W)
@@ -124,7 +128,10 @@ private:
     /// @brief Private implementation for insert
     /// @param parent 
     /// @param new_node 
-    void insert(std::shared_ptr<node>& parent, std::shared_ptr<node> const& new_node) noexcept;
+    void insert(std::shared_ptr<node> const& new_node) noexcept;
+
+    void insert_recursive(std::shared_ptr<node>& parent, std::shared_ptr<node> const& new_node) noexcept;
+
 
     /// @brief Search for a node with a given index
     /// @tparam Node 

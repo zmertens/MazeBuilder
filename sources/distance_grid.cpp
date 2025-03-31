@@ -20,7 +20,7 @@ distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int 
 
 /// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
 /// @return future to init task
-std::future<bool> distance_grid::get_future() noexcept {
+bool distance_grid::get_future() noexcept {
     using namespace std;
 
     mt19937 rng{ 42681ul };
@@ -39,13 +39,13 @@ std::future<bool> distance_grid::get_future() noexcept {
         *itr = next_index++;
     }
 
-    return std::async(std::launch::async, [this, shuffled_indices]() mutable {
+    //return std::async(std::launch::async, [this, shuffled_indices]() mutable {
         this->configure_nodes(cref(shuffled_indices));
 
         m_distances = make_shared<distances>(this->m_binary_search_tree_root->cell_ptr)->dist();
 
         return true;
-        });
+        //});
 }
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
