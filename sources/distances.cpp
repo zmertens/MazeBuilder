@@ -14,7 +14,9 @@ distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
     // Initialize distances for linked cells
     const auto& links = root->get_links();
     for (const auto& [linked_cell, _] : links) {
-        m_cells.insert_or_assign(linked_cell, 1); // Default distance for linked cells
+
+        // Default distance for linked cells
+        m_cells.insert_or_assign(linked_cell, 1);
     }
 }
 

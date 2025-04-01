@@ -21,6 +21,9 @@ namespace mazes {
 class grid : public grid_interface {
 protected:
     void build_fut(std::vector<int> const& indices) noexcept;
+
+    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
+
 public:
     /// @brief Friend classes
     friend class binary_tree;
@@ -105,8 +108,6 @@ private:
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
-
-    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 
     mutable std::promise<bool> m_config_promise;
     mutable std::once_flag m_config_flag;

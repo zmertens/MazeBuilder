@@ -42,7 +42,9 @@ bool distance_grid::get_future() noexcept {
     //return std::async(std::launch::async, [this, shuffled_indices]() mutable {
         this->build_fut(cref(shuffled_indices));
 
-        //m_distances = make_shared<distances>(nullptr)->dist();
+        auto found = search(get_int(0, ROWS * COLUMNS - 1));
+        m_distances = make_shared<distances>(found);
+        m_distances = m_distances->dist();
 
         return true;
         //});

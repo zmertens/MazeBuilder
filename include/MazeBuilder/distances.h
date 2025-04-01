@@ -52,6 +52,8 @@ public:
     /// @param cells A reference to a vector of shared pointers to cell objects from which keys will be collected.
     void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
+    /// @brief Returns a shared pointer to a distances object.
+    /// @return A std::shared_ptr pointing to a distances object.
     std::shared_ptr<distances> dist() const noexcept;
 private:
     std::shared_ptr<cell> m_root;
