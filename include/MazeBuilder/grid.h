@@ -20,8 +20,18 @@ namespace mazes {
 /// @brief General purpose grid class for maze generation
 class grid : public grid_interface {
 protected:
+
+    /// @brief Builds a future based on the provided indices.
+    /// @param indices A constant reference to a vector of integers representing the indices.
     void build_fut(std::vector<int> const& indices) noexcept;
 
+    /// @brief Configure cells by neighbors (N, S, E, W)
+    /// @param cells 
+    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+
+    mutable std::promise<bool> m_config_promise;
+    mutable std::once_flag m_config_flag;
+    std::mutex m_cells_mutex;
     std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 
 public:
@@ -64,7 +74,7 @@ public:
     /// @brief Initialize and configure
     /// @param callback notifies when configuration is complete
     /// @return 
-    virtual bool get_future() noexcept;
+    virtual std::future<bool> get_future() noexcept;
 
     // Overrides
 
@@ -100,18 +110,10 @@ public:
     int count() const noexcept;
     
 private:
-    /// @brief Configure cells by neighbors (N, S, E, W)
-    /// @param cells 
-    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-
     // Calculate the flat index from row and column
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
-
-    mutable std::promise<bool> m_config_promise;
-    mutable std::once_flag m_config_flag;
-    std::mutex m_config_mutex;
 }; // class
 
 } // namespace mazes

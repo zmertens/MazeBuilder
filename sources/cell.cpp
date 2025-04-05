@@ -16,7 +16,6 @@ cell::cell(std::int32_t index)
 }
 
 bool cell::has_key(const shared_ptr<cell>& c) {
-    lock_guard<mutex> lock(m_mtx);
     return m_links.find(c) != m_links.end();
 }
 
@@ -25,11 +24,8 @@ bool cell::has_key(const shared_ptr<cell>& c) {
 /// @param c2 
 /// @param bidi true
 void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    {
-        lock_guard<mutex> lock(m_mtx);
-        if (c2) {
-            this->m_links.insert_or_assign(c2, true);
-        }
+    if (c2) {
+        this->m_links.insert_or_assign(c2, true);
     }
     if (c2 && c1 && bidi) {
         c2->link(c2, c1, false);
@@ -41,17 +37,13 @@ void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
 /// @param c2 
 /// @param bidi true
 void cell::unlink(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    {
-        lock_guard<mutex> lock(m_mtx);
-        this->m_links.erase(c1);
-    }
+    this->m_links.erase(c1);
     if (bidi) {
         c2->unlink(c2, c1, false);
     }
 }
 
 const std::unordered_map<shared_ptr<cell>, bool>& cell::get_links() {
-    lock_guard<mutex> lock(m_mtx);
     return this->m_links;
 }
 bool cell::is_linked(const shared_ptr<cell>& c) {
@@ -88,11 +80,11 @@ vector<shared_ptr<cell>> cell::get_neighbors() const noexcept {
     return neighbors;
 }
 
-int cell::get_index() const {
+std::int32_t cell::get_index() const noexcept {
     return this->m_index;
 }
 
-void cell::set_index(int next_index) noexcept {
+void cell::set_index(std::int32_t next_index) noexcept {
     this->m_index = next_index;
 }
 

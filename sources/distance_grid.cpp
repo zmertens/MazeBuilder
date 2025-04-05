@@ -6,6 +6,8 @@
 
 #include <queue>
 #include <random>
+#include <algorithm>
+#include <numeric>
 
 using namespace mazes;
 
@@ -20,26 +22,24 @@ distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int 
 
 /// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
 /// @return future to init task
-bool distance_grid::get_future() noexcept {
+std::future<bool> distance_grid::get_future() noexcept {
     using namespace std;
 
     mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) ->int {
+    static auto get_int = [&rng](int low, int high) -> int {
         uniform_int_distribution<int> dist{ low, high };
         return dist(rng);
         };
 
     auto [ROWS, COLUMNS, _] = this->get_dimensions();
 
-    vector<int> shuffled_indices;
-    shuffled_indices.resize(ROWS * COLUMNS);
-    fill(shuffled_indices.begin(), shuffled_indices.end(), 0);
-    unsigned int next_index{ 0 };
-    for (auto itr{ shuffled_indices.begin() }; itr != shuffled_indices.end(); itr++) {
-        *itr = next_index++;
-    }
+    vector<int> shuffled_indices(ROWS * COLUMNS);
+    iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
+    shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
 
-    //return std::async(std::launch::async, [this, shuffled_indices]() mutable {
+    return std::async(std::launch::async, [this, ROWS, COLUMNS, shuffled_indices]() mutable {
+        lock_guard<mutex> lock(m_cells_mutex);
+
         this->build_fut(cref(shuffled_indices));
 
         auto found = search(get_int(0, ROWS * COLUMNS - 1));
@@ -47,7 +47,7 @@ bool distance_grid::get_future() noexcept {
         m_distances = m_distances->dist();
 
         return true;
-        //});
+        });
 }
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
