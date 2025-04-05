@@ -16,16 +16,18 @@ std::string maze_builder_version = "maze_builder\nversion\t" + mazes::VERSION;
 static constexpr auto MAZE_BUILDER_HELP = R"help(
         Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
+        Options: case-sensitive, long options must use '=' combination
         Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-        Options: case-sensitive
+        Example: mb.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt_
           -a, --algo         dfs, sidewinder, binary_tree [default]
+          -c, --columns      columns
+          -d, --distances    show distances using base36 numbers
+          -h, --help         display this help message
+          -j, --json         run with arguments in JSON format
           -s, --seed         seed for the mt19937 generator
           -r, --rows         rows
           -l, --levels       levels or the height
-          -c, --columns      columns
-          -d, --distances    show distances using base36 numbers
           -o, --output       [txt|text] [jpg|jpeg] [png] [obj|object] [stdout]
-          -h, --help         display this help message
           -v, --version      display program version
     )help";
 
