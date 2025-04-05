@@ -11,8 +11,8 @@ using namespace mazes;
 using namespace std;
 
 static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 10;
-
 static constexpr auto ALGO_TO_RUN = algo::DFS;
+static constexpr auto ALGO_S = "dfs";
 static constexpr auto SEED = 12345;
 
 TEST_CASE( "Test factory create1", "[create1]" ) {
@@ -27,7 +27,7 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
             mazes::progress<chrono::milliseconds, chrono::steady_clock>::duration(
                 mazes::factory::create,
                 mazes::configurator().columns(COLUMNS).rows(ROWS).levels(LEVELS)
-                .distances(false).seed(SEED)._algo(ALGO_TO_RUN))).count());
+                .distances(false).seed(SEED)._algo(to_algo_from_string(string(ALGO_S))))).count());
     }
     
     auto max{ 0 };
@@ -42,4 +42,13 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
         REQUIRE(maze_opt.has_value());
     };
 
+}
+
+TEST_CASE("Invalid args when converting algo string", "[invalid args]") {
+
+    vector<string> algos_to_convert = { "dfz", "BINARY_TREE", "adjacentwinder" };
+
+    for (auto a : algos_to_convert) {
+        REQUIRE_THROWS_AS(mazes::to_algo_from_string(cref(a)), std::invalid_argument);
+    }
 }
