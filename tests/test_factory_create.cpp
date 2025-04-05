@@ -41,7 +41,6 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
 
         REQUIRE(maze_opt.has_value());
     };
-
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {

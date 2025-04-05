@@ -199,9 +199,6 @@ int grid::count() const noexcept {
 
 // Populate the vector of cells from the BST using natural ordering
 void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    std::call_once(m_config_flag, [this]() {
-        m_config_promise.get_future().wait();
-        });
 
     for (auto&& [_, c] : m_cells) {
         cells.emplace_back(c);
@@ -213,9 +210,6 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 }
 
 void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept {
-    std::call_once(m_config_flag, [this]() {
-        m_config_promise.get_future().wait();
-        });
 
     // Populate the cells starting from the root
     std::vector<std::shared_ptr<cell>> flat_cells;

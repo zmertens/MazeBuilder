@@ -30,7 +30,6 @@ protected:
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
 
     mutable std::promise<bool> m_config_promise;
-    mutable std::once_flag m_config_flag;
     std::mutex m_cells_mutex;
     std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 

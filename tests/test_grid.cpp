@@ -55,9 +55,6 @@ TEST_CASE( "Test grid future", "[grid future]" ) {
         REQUIRE(rows == ROWS);
         REQUIRE(columns == COLUMNS);
         REQUIRE(height == HEIGHT);
-
-        //REQUIRE(my_grid->get_future().get());
-        REQUIRE(my_grid->get_future());
     }
 
     SECTION(" Distance grid ") {
@@ -66,9 +63,6 @@ TEST_CASE( "Test grid future", "[grid future]" ) {
         REQUIRE(rows == ROWS);
         REQUIRE(columns == COLUMNS);
         REQUIRE(height == HEIGHT);
-
-        //REQUIRE(my_grid_distances->get_future().get());
-        REQUIRE(my_grid_distances->get_future());
     }
 
     SECTION(" Colored grid ") {
@@ -77,21 +71,20 @@ TEST_CASE( "Test grid future", "[grid future]" ) {
         REQUIRE(rows == ROWS);
         REQUIRE(columns == COLUMNS);
         REQUIRE(height == HEIGHT);
-
-        //REQUIRE(my_grid_colored->get_future().get());
-        REQUIRE(my_grid_colored->get_future());
     }
 }
 
 /// @brief Verify that cells have been populated
 TEST_CASE("Test to_vec", "[to_vec]") {
 
-    //REQUIRE(my_grid->get_future().get());
+    // Each grid can be "futurized" only once
+    REQUIRE(my_grid != nullptr);
+    REQUIRE(my_grid->get_future().get());
 
-    //vector<shared_ptr<cell>> my_cells;
-    //my_grid->to_vec(ref(my_cells));
+    vector<shared_ptr<cell>> my_cells;
+    my_grid->to_vec(ref(my_cells));
 
-    //REQUIRE(my_cells.size() == ROWS * COLUMNS);
+    REQUIRE(my_cells.size() == ROWS * COLUMNS);
 }
 
 TEST_CASE("Cells have neighbors", "[neighbors link]") {

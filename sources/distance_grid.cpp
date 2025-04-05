@@ -9,6 +9,10 @@
 #include <algorithm>
 #include <numeric>
 
+#if defined(MAZE_DEBUG)
+#include <iostream>
+#endif
+
 using namespace mazes;
 
 /// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
@@ -27,6 +31,10 @@ std::future<bool> distance_grid::get_future() noexcept {
 
     mt19937 rng{ 42681ul };
     static auto get_int = [&rng](int low, int high) -> int {
+        if (low > high) {
+            throw invalid_argument("Invalid range for uniform_int_distribution");
+        }
+
         uniform_int_distribution<int> dist{ low, high };
         return dist(rng);
         };
@@ -40,13 +48,31 @@ std::future<bool> distance_grid::get_future() noexcept {
     return std::async(std::launch::async, [this, ROWS, COLUMNS, shuffled_indices]() mutable {
         lock_guard<mutex> lock(m_cells_mutex);
 
-        this->build_fut(cref(shuffled_indices));
+        try {
+            this->build_fut(cref(shuffled_indices));
 
-        auto found = search(get_int(0, ROWS * COLUMNS - 1));
-        m_distances = make_shared<distances>(found);
-        m_distances = m_distances->dist();
+            auto found = search(get_int(0, ROWS * COLUMNS - 1));
+            if (!found) {
+                throw runtime_error("Search returned a null cell.");
+            }
 
-        return true;
+            m_distances = make_shared<distances>(found);
+            if (!m_distances) {
+                throw runtime_error("Failed to create distances object.");
+            }
+
+            m_distances = m_distances->dist();
+            if (!m_distances) {
+                throw runtime_error("Failed to get distances.");
+            }
+
+            return true;
+        } catch (const exception& e) {
+#if defined(MAZE_DEBUG)
+            cerr << "Exception in async task: " << e.what() << endl;
+#endif
+            return false;
+        }
         });
 }
 
