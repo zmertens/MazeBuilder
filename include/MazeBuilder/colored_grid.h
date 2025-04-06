@@ -6,37 +6,41 @@
 #include <vector>
 #include <optional>
 
-#include "grid_interface.h"
+#include <MazeBuilder/distance_grid.h>
 
 namespace mazes {
 
-    class cell;
-    class distance_grid;
-	class colored_grid : public grid_interface
-	{
-    public:
-        explicit colored_grid(unsigned int rows, unsigned int cols, unsigned int height = 1u);
+class cell;
 
-        virtual unsigned int get_rows() const noexcept override;
-        virtual unsigned int get_columns() const noexcept override;
-        virtual unsigned int get_height() const noexcept override;
+/// @file colored_grid.h
+/// @class colored_grid
+/// @brief Extension of the grid class to include color information
+class colored_grid : public distance_grid {
+    
+public:
+    
+    friend class binary_tree;
+    friend class dfs;
+    friend class sidewinder;
 
-        virtual void preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
-        virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept override;
-        virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
+    /// @brief Constructs a colored grid with specified dimensions.
+    /// @param width The width of the grid. Defaults to 1.
+    /// @param length The length of the grid. Defaults to 1.
+    /// @param levels The number of levels in the grid. Defaults to 1.
+    explicit colored_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
-        virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept override;
-        virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;
-        virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept override;
-        virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept override;
-        virtual void del(std::shared_ptr<cell> parent, int index) noexcept override;
+    /// @brief Retrieves the contents of a given cell, if available.
+    /// @param c A shared pointer to the cell whose contents are to be retrieved.
+    /// @return An optional string containing the contents of the cell. If the cell has no contents, the optional will be empty.
+    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
 
-        virtual std::shared_ptr<cell> get_root() const noexcept override;
-        virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
-        virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
-	private:
-        std::shared_ptr<distance_grid> m_distance_grid;
-	};
+    /// @brief Retrieves the background color for a given cell, if available.
+    /// @param c A shared pointer to the cell for which the background color is to be retrieved.
+    /// @return An optional containing the background color as a 32-bit unsigned integer, or an empty optional if no background color is available.
+    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+	
+private:
+};
 
 }
 #endif // COLORED_GRID_H

@@ -25,8 +25,10 @@ jobs:
     - name: Install Dependencies
       run: |
         sudo apt-get update
-        sudo apt-get install -y mesa-common-dev mesa-utils libgl1-mesa-dev libx11-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev doxygen
+        sudo apt-get install -y mesa-common-dev mesa-utils libgl1-mesa-dev libx11-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
         sudo apt-get install -y libfreetype6-dev libudev-dev libopenal-dev libflac-dev libogg-dev libvorbis-dev
+        sudo apt-get install -y cppcheck valgrind doxygen graphviz
+        sudo apt-get install -y libunwind-dev libunwind8
 
     # Step to download Emsdk
     - name: Download Emsdk
@@ -45,19 +47,25 @@ jobs:
 
     # Configure CMake with Emscripten toolchain
     - name: Configure CMake for Emscripten
-      run: cmake -B ${{github.workspace}}/build-emscripten -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DMAZE_BUILD_WEB_EXAMPLES=ON
+      run: cmake -B ${{github.workspace}}/build-emscripten -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DMAZE_BUILDER_EXAMPLES=ON
 
     # Build with Emscripten
     - name: Build with Emscripten
       run: cmake --build ${{github.workspace}}/build-emscripten --config ${{env.BUILD_TYPE}}
 
-# Configure CMake for default build (without Emscripten)
+    # Configure CMake for default build (without Emscripten)
     - name: Configure CMake for Default Build
-      run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMAZE_BUILD_DESKTOP_EXAMPLES=ON
+      run: cmake -B ${{github.workspace}}/build-default -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMAZE_BUILDER_EXAMPLES=ON -DMAZE_BUILDER_TESTS=ON -DMAZE_BUILDER_DOCS=ON
 
     - name: Build Default
       run: cmake --build ${{github.workspace}}/build-default --config ${{env.BUILD_TYPE}}
-    
+
+    - name: Configure CMake for memory analysis
+      run: cmake -B ${{github.workspace}}/build-memcheck -DMAZE_BUILDER_EXAMPLES=ON -DMAZE_BUILDER_TESTS=ON -DMAZE_BUILDER_MEMCHECK=ON
+
+    - name: Build memory analysis
+      run: cmake --build ${{github.workspace}}/build-memcheck --config ${{env.BUILD_TYPE}}
+
     - name: Test
       working-directory: ${{github.workspace}}/build-default
       # Execute tests defined by the CMake configuration.

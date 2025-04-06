@@ -5,65 +5,75 @@
 #include <MazeBuilder/cell.h>
 
 #include <queue>
+#include <random>
+#include <algorithm>
+#include <numeric>
+
+#if defined(MAZE_DEBUG)
 #include <iostream>
+#endif
 
 using namespace mazes;
-using namespace std;
 
-/**
- * @brief Construct a new distance grid object with a generated maze
- * @param height 1
- */
+/// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
+/// @param rows 1
+/// @param cols 1
+/// @param levels 1
 distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int height)
-	: m_grid(make_shared<grid>(rows, cols, height))
-	, m_distances(make_shared<distances>(this->m_grid->get_root())) {
-    this->calc_distances();
+	: grid::grid(rows, cols, height) {
+
 }
 
-unsigned int distance_grid::get_rows() const noexcept {
-	return this->m_grid->get_rows();
-}
+/// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
+/// @return future to init task
+std::future<bool> distance_grid::get_future() noexcept {
+    using namespace std;
 
-unsigned int distance_grid::get_columns() const noexcept {
-	return this->m_grid->get_columns();
-}
+    mt19937 rng{ 42681ul };
+    static auto get_int = [&rng](int low, int high) -> int {
+        if (low > high) {
+            throw invalid_argument("Invalid range for uniform_int_distribution");
+        }
 
-unsigned int distance_grid::get_height() const noexcept {
-    return this->m_grid->get_height();
-}
+        uniform_int_distribution<int> dist{ low, high };
+        return dist(rng);
+        };
 
-void distance_grid::preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    this->m_grid->preorder(ref(cells));
-}
+    auto [ROWS, COLUMNS, _] = this->get_dimensions();
 
-void distance_grid::populate_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	this->m_grid->populate_vec(ref(cells));
-}
+    vector<int> shuffled_indices(ROWS * COLUMNS);
+    iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
+    shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
 
-void distance_grid::make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-	return this->m_grid->make_sorted_vec(ref(cells));
-}
+    return std::async(std::launch::async, [this, ROWS, COLUMNS, shuffled_indices]() mutable {
+        lock_guard<mutex> lock(m_cells_mutex);
 
-void distance_grid::append(std::shared_ptr<grid_interface> const& other_grid) noexcept {
-	this->m_grid->append(other_grid);
-}
-void distance_grid::insert(std::shared_ptr<cell> const& parent, int index) noexcept {
-	this->m_grid->insert(parent, index);
-}
+        try {
+            this->build_fut(cref(shuffled_indices));
 
-bool distance_grid::update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept {
-	return this->m_grid->update(ref(parent), old_index, new_index);
-}
+            auto found = search(get_int(0, ROWS * COLUMNS - 1));
+            if (!found) {
+                throw runtime_error("Search returned a null cell.");
+            }
 
-std::shared_ptr<cell> distance_grid::search(std::shared_ptr<cell> const& start, int index) const noexcept {
-	return this->m_grid->search(start, index);
-}
-void distance_grid::del(std::shared_ptr<cell> parent, int index) noexcept {
-	this->m_grid->del(parent, index);
-}
+            m_distances = make_shared<distances>(found);
+            if (!m_distances) {
+                throw runtime_error("Failed to create distances object.");
+            }
 
-std::shared_ptr<cell> distance_grid::get_root() const noexcept {
-	return this->m_grid->get_root();
+            m_distances = m_distances->dist();
+            if (!m_distances) {
+                throw runtime_error("Failed to get distances.");
+            }
+
+            return true;
+        } catch (const exception& e) {
+#if defined(MAZE_DEBUG)
+            cerr << "Exception in async task: " << e.what() << endl;
+#endif
+            return false;
+        }
+        });
 }
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
@@ -73,14 +83,14 @@ std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell
 			return to_base36(d);
 		}
 	}
-	return this->m_grid->contents_of(c);
+	return grid::contents_of(c);
 }
 
 std::optional<std::uint32_t> distance_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
-	return this->m_grid->background_color_for(cref(c));
+	return grid::background_color_for(cref(c));
 }
 
-optional<std::string> distance_grid::to_base36(int value) const {
+std::optional<std::string> distance_grid::to_base36(int value) const {
 	static constexpr auto base36_chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	std::string result;
 	do {
@@ -91,33 +101,6 @@ optional<std::string> distance_grid::to_base36(int value) const {
 	return result;
 }
 
-/**
- * @brief Compute the distances between cells using 
- * 	Djikstra's shortest-path algorithm
- */
-void distance_grid::calc_distances() noexcept {
-	auto&& root = this->get_root();
-	queue<shared_ptr<cell>> frontier;
-	frontier.push(root);
-	m_distances->set(root, 0);
-	// apply shortest path algorithm
-	while (!frontier.empty()) {
-		auto current = frontier.front();
-		frontier.pop();
-		auto current_distance = m_distances->operator[](current);
-		for (const auto& neighbor : current->get_neighbors()) {
-			if (!m_distances->contains(neighbor)) {
-				m_distances->set(neighbor, m_distances->operator[](current) + 1);
-				frontier.push(neighbor);
-			}
-		}
-	}
-}
-
-/**
- * @brief Get the distances object
- * @return shared_ptr<distances>
- */
 std::shared_ptr<distances> distance_grid::get_distances() const noexcept {
 	return this->m_distances;
 }

@@ -1,66 +1,118 @@
-/**
- * The grid class implements a Binary Search Tree for performance and API reasons
- * Grid represents an ASCII-format maze in 2D, or Wavefront object file in 3D
-*/
-
 #ifndef GRID_H
 #define GRID_H
 
-#include <vector>
-#include <memory>
-#include <sstream>
-#include <string>
 #include <functional>
-#include <algorithm>
+#include <future>
+#include <mutex>
+#include <memory>
 #include <optional>
+#include <string>
+#include <utility>
+#include <vector>
+#include <unordered_map>
 
-#include "cell.h"
-#include "maze_types_enum.h"
-#include "grid_interface.h"
+#include <MazeBuilder/grid_interface.h>
 
 namespace mazes {
 
+/// @file grid.h
+/// @class grid
+/// @brief General purpose grid class for maze generation
 class grid : public grid_interface {
+protected:
+
+    /// @brief Builds a future based on the provided indices.
+    /// @param indices A constant reference to a vector of integers representing the indices.
+    void build_fut(std::vector<int> const& indices) noexcept;
+
+    /// @brief Configure cells by neighbors (N, S, E, W)
+    /// @param cells 
+    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+
+    mutable std::promise<bool> m_config_promise;
+    std::mutex m_cells_mutex;
+    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
+
 public:
-    explicit grid(unsigned int rows, unsigned int columns, unsigned int height = 1u);
+    /// @brief Friend classes
+    friend class binary_tree;
+    friend class dfs;
+    friend class sidewinder;
 
-    virtual unsigned int get_rows() const noexcept override;
-    virtual unsigned int get_columns() const noexcept override;
-    virtual unsigned int get_height() const noexcept override;
+    /// @brief Constructor for grid
+    /// @param rows 
+    /// @param columns 
+    /// @param height 
+    explicit grid(unsigned int rows = 1u, unsigned int columns = 1u, unsigned int height = 1u);
 
-    // Statistical queries
-    unsigned int max_index(std::shared_ptr<cell> const& parent, unsigned int max = 0) const noexcept;
-    unsigned int min_index(std::shared_ptr<cell> const& parent, unsigned int min = 0) const noexcept;
+    /// @brief Constructor for grid
+    /// @param dimensions 
+    explicit grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions);
 
-    virtual void populate_vec(std::vector<std::shared_ptr<cell>>& _cells) const noexcept override;
-    virtual void preorder(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
-    virtual void make_sorted_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
+    /// @brief Copy constructor
+    /// @param other 
+    grid(const grid& other);
+    
+    /// @brief Assignment operator
+    /// @param other 
+    /// @return 
+    grid& operator=(const grid& other);
+    
+    /// @brief Move constructor
+    /// @param other 
+    grid(grid&& other) noexcept;
+    
+    /// @brief Move assignment operator
+    /// @param other 
+    /// @return 
+    grid& operator=(grid&& other) noexcept;
+    
+    /// @brief Destructor
+    virtual ~grid();
 
-    virtual void append(std::shared_ptr<grid_interface> const& other_grid) noexcept override;
-    virtual void insert(std::shared_ptr<cell> const& parent, int index) noexcept override;
-    virtual bool update(std::shared_ptr<cell>& parent, int old_index, int new_index) noexcept override;
-    virtual std::shared_ptr<cell> search(std::shared_ptr<cell> const& start, int index) const noexcept override;
-    virtual void del(std::shared_ptr<cell> parent, int index) noexcept override;
+    /// @brief Initialize and configure
+    /// @param callback notifies when configuration is complete
+    /// @return 
+    virtual std::future<bool> get_future() noexcept;
 
-    virtual std::shared_ptr<cell> get_root() const noexcept override;
+    // Overrides
 
+    /// @brief Provides dimensions of grid in no assumed ordering
+    /// @return 
+    virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept override;
+
+    /// @brief Convert a 2D grid to a vector of cells (sorted by row then column)
+    /// @param cells 
+    virtual void to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
+
+    /// @brief Convert a 2D grid to a vector of vectors of cells (sorted by row then column)
+    /// @param cells
+    virtual void to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept override;
+
+    /// @brief Get detailed information of a cell in the grid
+    /// @param c 
+    /// @return 
     virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+
+    /// @brief Get the background color for a cell in the grid
+    /// @param c 
+    /// @return 
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+
+    /// @brief
+    /// @param index
+    /// @return
+    std::shared_ptr<cell> search(int index) const noexcept;
+
+    /// @brief Get the count of cells in the grid
+    /// @return The number of cells in the grid
+    int count() const noexcept;
+    
 private:
-    bool create_binary_search_tree(const std::vector<int>& shuffled_indices);
-    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
-
-    // Sort by youngest child cell -> oldest child
-    void presort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-    // Sort ascending per index-value
-    void sort(std::shared_ptr<cell> const& parent, std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
-    void sort_by_row_then_col(std::vector<std::shared_ptr<cell>>& cells_to_sort) const noexcept;
-
-    std::function<int(std::shared_ptr<cell> const&, std::shared_ptr<cell> const&)> m_sort_by_row_column;
     // Calculate the flat index from row and column
     std::function<int(unsigned int, unsigned int)> m_calc_index;
-    std::shared_ptr<cell> m_binary_search_tree_root;
-    const unsigned int m_rows, m_columns, m_height;
+
+    std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
 }; // class
 
 } // namespace mazes

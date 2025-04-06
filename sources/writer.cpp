@@ -1,108 +1,68 @@
-/**
- * Writer class handles stdout, and basic file writing to text or Wavefront obj file
- */
-
 #include <MazeBuilder/writer.h>
 
-#include <iostream>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
-#include <cassert>
+#include <string>
 
-#include <MazeBuilder/output_types_enum.h>
+#include <MazeBuilder/enums.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb/stb_image_write.h>
 
-using namespace std;
 using namespace mazes;
 
-writer::writer() {
+/// @brief Write pixels to a PNG file
+/// @param filename 
+/// @param data 
+/// @param w 100
+/// @param h 100
+/// @param stride 4
+/// @return 
+bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
 
+    return (0 != stbi_write_png(filename.c_str(), w, h, stride, data.data(), w * stride));
 }
 
-output_types writer::get_output_type(const std::string& filename) const noexcept {
-	if (filename.compare("stdout") == 0) {
-		return output_types::STDOUT;
-	}
+/// @brief Write pixels to a JPEG file
+/// @param filename 
+/// @param data 
+/// @param w 100
+/// @param h 100
+/// @param stride 4
+/// @return 
+bool writer::write_jpeg(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
 
-	// size of file extension is always 4: <dot>[txt|obj|png]
-	static constexpr auto FILE_EXT_LEN = 4;
-	auto found = filename.find(".");
-	if (found == string::npos) {
-		return output_types::UNKNOWN;
-	}
-	auto short_str = filename.substr(found, string::npos);
-	if (short_str.length() == FILE_EXT_LEN && short_str == ".txt") {
-		return output_types::PLAIN_TEXT;
-	}
-	else if (short_str.length() == FILE_EXT_LEN && short_str == ".obj") {
-		return output_types::WAVEFRONT_OBJ_FILE;
-	}
-	else if (short_str.length() == FILE_EXT_LEN && short_str == ".png") {
-		return output_types::PNG;
-	}
-	else {
-		return output_types::UNKNOWN;
-	}
+    return (0 != stbi_write_jpg(filename.c_str(), w, h, stride, data.data(), w * stride));
 }
 
-/**
- * @brief writer::write
- * @param filename can be stdout, .txt, .png, or .obj
- * @param data represents a grid in plain text (ASCII) or Wavefront object file (mesh) or PNG (bytes)
- * @return
- */
-bool writer::write(const std::string& filename, const std::string& data) const noexcept {
-    auto otype = get_output_type(filename);
+/// @brief Write to a conventional file
+/// @param filename 
+/// @param data 
+/// @return 
+bool writer::write_file(const std::string& filename, const std::string& data) const noexcept {
+    using namespace std;
 
-	// open file stream and start writing the data as per the file type
-	try {
-		if (otype == output_types::PLAIN_TEXT) {
-			this->write_file(filename, data);
-			return true;
-		} else if (otype == output_types::WAVEFRONT_OBJ_FILE) {
-			this->write_file(filename, data);
-			return true;
-		} else if (otype == output_types::STDOUT) {
-			cout << data << endl;
-			return true;
-		} else if (otype == output_types::PNG) {
-			cerr << "ERROR: Incorrect arguments for write_png with output: " << filename << "\n";
-			return false;
-		} else if (otype == output_types::UNKNOWN) {
-			cerr << "ERROR: Unknown output type!!\n";
-			return false;
-		} else {
-			cerr << "ERROR: Unknown output type!!\n";
-			return false;
-		}
-	} catch (...) {
-		return false;
-	}
+    filesystem::path data_path{ filename };
+
+    ofstream out_writer{ data_path };
+
+    if (!out_writer.is_open()) {
+        return false;
+    }
+
+    out_writer << data;
+
+    out_writer.close();
+
+    return out_writer.good();
 }
 
-/**
- * @brief writer::write_file
- * @param filename
- * @param data
- * @param w = 1
- * @param h = 1
- */
-bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data,
-	const unsigned int w, const unsigned int h) const {
-	return stbi_write_png(filename.c_str(), w, h, 4, data.data(), w * 4);
+bool writer::write(std::ostream& oss, const std::string& data) const noexcept {
+    using namespace std;
+
+    oss << data << "\n";
+
+    return oss.good();
 }
 
-/**
- * @brief writer::write_file
- * @param filename
- * @param data
- */
-void writer::write_file(const std::string& filename, const std::string& data) const {
-    filesystem::path data_path {filename};
-    ofstream out_writer {data_path};
-	out_writer << data;
-	out_writer.close();
-}

@@ -1,17 +1,23 @@
 #include <MazeBuilder/distances.h>
 
-#include <iostream>
-
+#include <iterator>
+#include <queue>
 #include <MazeBuilder/cell.h>
 
 using namespace mazes;
 using namespace std;
 
 distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
-    const auto& links = root->get_links();
-    copy(links.cbegin(), links.cend(), inserter(m_cells, m_cells.end()));
     // Distance from root to root is 0
-	m_cells.insert_or_assign(root, 0);
+    m_cells.insert_or_assign(root, 0);
+
+    // Initialize distances for linked cells
+    const auto& links = root->get_links();
+    for (const auto& [linked_cell, _] : links) {
+
+        // Default distance for linked cells
+        m_cells.insert_or_assign(linked_cell, 1);
+    }
 }
 
 void distances::set(std::shared_ptr<cell> cell, int distance) noexcept {
@@ -22,52 +28,41 @@ bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
 	return m_cells.find(cell) != m_cells.cend();
 }
 
-/**
- * @brief Compute the path to a goal cell
- */
+/// @brief Computes the shortest path to a goal cell within a distances object.
+/// @param goal A shared pointer to the goal cell for which the path is to be computed.
+/// @return A shared pointer to a distances object representing the path to the goal cell, or nullptr if the path cannot be found.
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
-    auto path = std::make_shared<distances>(m_root);
+    if (!goal || !contains(goal)) {
+
+        return nullptr;
+    }
+
+    auto breadcrumbs = std::make_shared<distances>(m_root);
     auto current = goal;
 
-    while (current != goal) {
-        if (!contains(current)) {
-#if defined(MAZE_DEBUG)
-            std::cerr << "ERROR: Current cell not found in distances.\n";
-#endif
-            return nullptr;
-        }
-        path->m_cells[current] = m_cells.at(current);
-        auto neighbors = current->get_neighbors();
+    breadcrumbs->set(current, m_cells.at(current));
 
-        // Filter neighbors to only those that are linked and contained in distances
-        std::vector<std::shared_ptr<cell>> valid_neighbors;
-        for (const auto& neighbor : neighbors) {
-            if (contains(neighbor) && current->is_linked(neighbor)) {
-                valid_neighbors.push_back(neighbor);
+    while (current != m_root) {
+
+        auto found{ false };
+
+        auto neighbors = current->get_links();
+
+        for (const auto& [neighbor, _] : neighbors) {
+            if (m_cells.at(neighbor) < m_cells.at(current)) {
+                breadcrumbs->set(neighbor, m_cells.at(neighbor));
+                current = neighbor;
+                found = true;
+                break;
             }
         }
 
-        if (valid_neighbors.empty()) {
-#if defined(MAZE_DEBUG)
-            std::cerr << "ERROR: No valid neighbors found for current cell.\n";
-#endif
+        if (!found) {
             return nullptr;
         }
-
-        // Find the neighbor with the minimum distance
-        current = *std::min_element(valid_neighbors.begin(), valid_neighbors.end(),
-            [this](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b) {
-                return m_cells.at(a) < m_cells.at(b);
-            });
-
-        // Logging for debugging
-#if defined(MAZE_DEBUG)
-        std::cerr << "INFO: Current cell updated to: " << current->get_index() << "\n";
-#endif
     }
 
-    path->m_cells[m_root] = 0;
-    return path;
+    return breadcrumbs;
 }
 
 std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
@@ -86,4 +81,35 @@ void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const no
     for (const auto& [c, _] : m_cells) {
         cells.push_back(c);
     }
+}
+
+std::shared_ptr<distances> distances::dist() const noexcept {
+    using namespace std;
+
+    if (!m_root) {
+
+        return nullptr;
+    }
+
+    auto d = make_shared<distances>(m_root);
+
+    queue<shared_ptr<cell>> frontier;
+    frontier.push(m_root);
+    d->set(m_root, 0);
+    // apply shortest path algorithm
+    while (!frontier.empty()) {
+
+        auto current = frontier.front();
+        frontier.pop();
+        auto current_distance = d->operator[](current);
+        for (const auto& neighbor : current->get_neighbors()) {
+
+            if (!d->contains(neighbor)) {
+                d->set(neighbor, d->operator[](current) + 1);
+                frontier.push(neighbor);
+            }
+        }
+    }
+
+    return d;
 }

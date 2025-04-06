@@ -1,20 +1,68 @@
-
 # Set the name of the executable
-set(MAZE_BUILDER_HTTP_EXE "http")
-add_executable(${MAZE_BUILDER_HTTP_EXE} main.cpp)
-target_link_libraries(${MAZE_BUILDER_HTTP_EXE} PRIVATE ${MAZE_BUILDER_LIB}_static)
-target_include_directories(${MAZE_BUILDER_HTTP_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_include_directories(${MAZE_BUILDER_HTTP_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
-target_compile_features(${MAZE_BUILDER_HTTP_EXE} PUBLIC cxx_std_17)
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${MAZE_BUILDER_HTTP_EXE} to use -DMAZE_DEBUG flag.")
-    target_compile_definitions(${MAZE_BUILDER_HTTP_EXE} PRIVATE "MAZE_DEBUG")
+set(HTTP_EXE "mazebuilderhttp")
+if(EMSCRIPTEN)
+    add_executable(${HTTP_EXE} ${DEAR_IMGUI_SOURCES} main.cpp)
+    set_target_properties(${HTTP_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
+
+    include(FetchGitRepo)
+
+    # Get SDL
+    set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
+    FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
+
+    # Get SFML
+    include(FetchGitRepo)
+    set(SFML_REPO_URL "https://github.com/zmertens/SFML.git")
+    message(INFO ": Fetching SFML from ${SFML_REPO_URL}")
+    set(SFML_BUILD_AUDIO ON)
+    set(SFML_BUILD_NETWORK ON)
+    set(SFML_BUILD_GRAPHICS OFF)
+    set(SFML_BUILD_WINDOW OFF)
+    set(SFML_USE_SYSTEM_DEPS OFF)
+    FetchGitRepo(SFML ${SFML_REPO_URL} almostv3)
+
+    target_link_libraries(${HTTP_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static sfml-network SDL3::SDL3)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local)
+    target_compile_features(${HTTP_EXE} PRIVATE cxx_std_17)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/dearimgui)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+    
+    target_link_options(${HTTP_EXE} PRIVATE
+    	"SHELL:-s WASM=1"
+        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s ASYNCIFY -O3"
+        #"SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
+    )
+else()
+    message(INFO ": Building ${HTTP_EXE} for the Desktop!")
+    add_executable(${HTTP_EXE} main.cpp)
+    target_link_libraries(${HTTP_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+    target_include_directories(${HTTP_EXE} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
+    target_compile_features(${HTTP_EXE} PRIVATE cxx_std_17)
+
+    # Get SFML from the web
+    # Leave out find_package until official EMSDK support is added
+    # find_package(SFML 3.0.0 COMPONENTS network)
+    if(NOT SFML_FOUND)
+        set(SFML_REPO_URL "https://github.com/SFML/SFML.git")
+        message(INFO ": Fetching SFML from ${SFML_REPO_URL}")
+        set(SFML_BUILD_AUDIO OFF)
+        set(SFML_BUILD_NETWORK ON)
+        set(SFML_BUILD_GRAPHICS OFF)
+        set(SFML_BUILD_WINDOW OFF)
+        set(SFML_USE_SYSTEM_DEPS OFF)
+        FetchGitRepo(SFML ${SFML_REPO_URL} 3.0.0)
+    endif()
+
+    target_link_libraries(${HTTP_EXE} PRIVATE sfml-network)
+	
+	# Copy shared/dlls on Windows only
+	if(WIN32)
+		add_custom_command(
+			TARGET ${HTTP_EXE} POST_BUILD
+			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Network> $<TARGET_FILE_DIR:${HTTP_EXE}>
+			VERBATIM
+		)
+	endif()
 endif()
-
-# Get SFML from the web
-message(INFO ": Fetching SFML from https://github.com/SFML/SFML.git")
-include(FetchContent)
-FetchContent_Declare(SFML GIT_REPOSITORY https://github.com/SFML/SFML.git GIT_TAG 2.6.x GIT_SHALLOW TRUE GIT_PROGRESS TRUE)
-FetchContent_MakeAvailable(SFML)
-target_link_libraries(${MAZE_BUILDER_HTTP_EXE} PRIVATE sfml-network)
-

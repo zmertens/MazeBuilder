@@ -2,35 +2,24 @@
 
 Maze Builder is open source under the MIT License.
 
-Issues are disabled on the GitHub repo. Please make a pull request summarizing the changes and improvements.
-For example, visit the the [PRs](https://github.com/zmertens/MazeBuilder/pulls) page.
-In the PR summary, add two sections, one for **Summary** where the maze-generating algorithm is explained.
-Adding a picture of the output is encouraged. The second section is **Changes** where the changes (can use a checklist) are listed.
+Please make a pull request (PR) summarizing the changes and improvements (Issues are disabled).
+
+For example, visit the the [GitHUb PRs page](https://github.com/zmertens/MazeBuilder/pulls).
+
+In the PR summary, provide some example code showing how the mazes are being used and displayed.
 
 ## Getting Started
 
-Adding a new maze algorithm as a script is a good place to start...
+Adding a new maze algorithm as a script is a good place to start contributing and experimenting.
 
   1. **Add the Algorithm Script**: Add a script implementing the algorithm under `scripts`.
-  2. **Write a Test**: Add a Catch2 test to the "maze builder lib" tests under `tests`.
+  2. **Write a Test**: Add a Catch2 test to the tests under `tests`.
   3. **Ensure Consistency**: Ensure that the script's output and the test's output match the exepcted values.
-
-## CPP Code
-
-The codebase tries to follow modern C++ coding styles and conventions:
-
-  * **Smart Pointers**: Include `<memory>` and use `std::unique_ptr<T>` or `std::shared_ptr<T>` over `malloc`, `free`, `new`, and `delete`. 
-    * It is okay to do `MyClass* class_ptr = &MyClass::obj;`.
-  * **Inline Functions**: No use of `inline` on functions.
-
-## Shaders
-
-Verify new shaders work on both OpenGL ES 3.0 and OpenGL Core 3.0 settings.
-
-## TODOs
-
-Use `@TODO` in code documentation sparingly. Instead, prefer implementing a fix or test instead.
 
 ## Need Help?
 
-If you have questions or need help, feel free to reach out by opening a discussion on the [Discussions](https://github.com/zmertens/MazeBuilder/discussions).
+If you have questions or need help, feel free to reach out by starting a discussion on the [Discussions](https://github.com/zmertens/MazeBuilder/discussions).
+
+See the [Maze Builder docs](https://zmertens.github.io/mazebuilder.github.io/index.html) for detailed information on the API and classes.
+
+

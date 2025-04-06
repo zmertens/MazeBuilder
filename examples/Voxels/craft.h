@@ -1,19 +1,12 @@
-/**
- * Monolithic class to handle running craft and encapsulating it's features
- * Supports Web interaction via mouse, fullscreen, and mazes APIs
- */
-
 #ifndef CRAFT_H
 #define CRAFT_H
 
 #include <string>
 #include <memory>
 #include <functional>
-#include <list>
 #include <random>
 
-#include <MazeBuilder/maze_types_enum.h>
-
+/// @brief Monolithic class to handle running a voxel engine
 class craft {
 public:
     craft(const std::string& title, const std::string& version, int w, int h);

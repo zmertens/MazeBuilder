@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.2...3.5)
+cmake_minimum_required(VERSION 3.1...3.5)
 
 # Generators using Ninja can tell if the build files are generated as a side effect of running the command, which can help avoid unnecessary rebuilds.
 cmake_policy(SET CMP0058 NEW)
@@ -19,19 +19,31 @@ else()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 endif()
 
-project(maze_builder VERSION 5.9.3 LANGUAGES C CXX)
+project(MazeBuilder VERSION 6.0.1 LANGUAGES C CXX)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-include(NoInSourceBuilds)
-include(CTest)
-include(Packaging)
+set(MAZE_BUILDER_CORE_LIB "mazebuildercore")
 
-set(MAZE_BUILDER_LIB "maze_builder_lib")
+option(MAZE_BUILDER_DOCS "Build ${PROJECT_NAME} documentation" OFF)
+option(MAZE_BUILDER_TESTS "Build ${PROJECT_NAME} with tests" OFF)
+option(MAZE_BUILDER_COVERAGE "Build ${PROJECT_NAME} with code coverage" OFF)
+option(MAZE_BUILDER_MEMCHECK "Build ${PROJECT_NAME} with memory analysis" OFF)
+option(MAZE_BUILDER_EXAMPLES "Build ${PROJECT_NAME} examples" OFF)
+
+include(NoInSourceBuilds)
 
 add_subdirectory(sources)
-add_subdirectory(tests)
-add_subdirectory(examples bin)
+if(MAZE_BUILDER_DOCS)
+    add_subdirectory(docs)
+endif()
+if(MAZE_BUILDER_TESTS)
+    add_subdirectory(tests)
+endif()
+if(MAZE_BUILDER_EXAMPLES)
+    add_subdirectory(examples bin)
+endif()

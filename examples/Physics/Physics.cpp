@@ -1,16 +1,16 @@
-/**
- * @brief Generator class implementation
- *  Simple 2D maze generator using SDL3
- *  Press 'B' to generate a new maze
- * 
- * Threading technique uses 'islands':
- *  Example: https://github.com/SFML/SFML/tree/2.6.1/examples/island
- *
- * Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
- *
- */
+//
+// @brief Physics class implementation
+//  Simple 2D maze Physics using SDL3
+//  Press 'B' to generate a new maze
+// 
+// Threading technique uses 'islands':
+//  Example: https://github.com/SFML/SFML/tree/2.6.1/examples/island
+//
+// Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
+//
+//
 
-#include "Generator.hpp"
+#include "Physics.hpp"
 
 #include <cassert>
 #include <cstdint>
@@ -31,20 +31,20 @@
 
 #include <MazeBuilder/maze_builder.h>
 
-struct Generator::GeneratorImpl {
+struct Physics::PhysicsImpl {
 
     enum class States {
-        // Generator is starting, show welcome screen
+        // Physics is starting, show welcome screen
         SPLASH,
-        // Main menu / configurations
+        // Main menu / configurations 
         OPTIONS,
-        // Generator is running
+        // Physics is running
         PLAY,
-        // Level is generated but Generator is paused/options
+        // Level is generated but Physics is paused/options
         PAUSE,
-        // Generator is exiting and done
+        // Physics is exiting and done
         DONE,
-        // Useful when knowing when to re-draw in Generator loop
+        // Useful when knowing when to re-draw in Physics loop
         // Level is being generated and not yet playable
         UPLOADING_LEVEL,
     };
@@ -215,10 +215,10 @@ struct Generator::GeneratorImpl {
 
     // Global - Keep track of worker work count
     int pendingWorkCount;
-    // Keep track of user and Generator states
+    // Keep track of user and Physics states
     States state;
 
-    GeneratorImpl(const std::string& title, const std::string& version, int w, int h)
+    PhysicsImpl(const std::string& title, const std::string& version, int w, int h)
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , sdlHelper{}, workQueue{}
         , gameMtx{ nullptr }, gameCond{ nullptr }
@@ -234,7 +234,7 @@ struct Generator::GeneratorImpl {
         this->initWorkers();
     }
 
-    ~GeneratorImpl() {
+    ~PhysicsImpl() {
 
     }
 
@@ -245,45 +245,45 @@ struct Generator::GeneratorImpl {
      */
     static int threadFunc(void* data) {
         using namespace std;
-        auto* Generator = reinterpret_cast<GeneratorImpl*>(data);
+        auto* Physics = reinterpret_cast<PhysicsImpl*>(data);
         vector<SDL_Vertex> vertices;
 
         while (1) {
             {
-                SDL_LockMutex(Generator->gameMtx);
-                while (Generator->workQueue.empty() && Generator->state != States::DONE) {
-                    SDL_WaitCondition(Generator->gameCond, Generator->gameMtx);
+                SDL_LockMutex(Physics->gameMtx);
+                while (Physics->workQueue.empty() && Physics->state != States::DONE) {
+                    SDL_WaitCondition(Physics->gameCond, Physics->gameMtx);
                 }
 
-                if (Generator->state == States::DONE) {
-                    SDL_UnlockMutex(Generator->gameMtx);
+                if (Physics->state == States::DONE) {
+                    SDL_UnlockMutex(Physics->gameMtx);
                     break;
                 }
 
                 // Now process a work item
-                if (!Generator->workQueue.empty()) {
-                    auto&& temp = Generator->workQueue.front();
-                    Generator->workQueue.pop_front();
+                if (!Physics->workQueue.empty()) {
+                    auto&& temp = Physics->workQueue.front();
+                    Physics->workQueue.pop_front();
                     SDL_Log("Processing work item [ start: %d | count: %d]\n", temp.start, temp.count);
-                    Generator->doWork(ref(vertices), cref(temp));
+                    Physics->doWork(ref(vertices), cref(temp));
                     if (!vertices.empty()) {
                         copy(vertices.begin(), vertices.end(), back_inserter(temp.vertices));
                     } else {
                         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated\n");
                     }
                 }
-                SDL_UnlockMutex(Generator->gameMtx);
+                SDL_UnlockMutex(Physics->gameMtx);
             }
 
             {
                 // Update work count and wake up any threads waiting
-                SDL_LockMutex(Generator->gameMtx);
-                Generator->pendingWorkCount -= 1;
-                SDL_Log("Pending work count: %d\n", Generator->pendingWorkCount);
-                if (Generator->pendingWorkCount <= 0) {
-                    SDL_SignalCondition(Generator->gameCond);
+                SDL_LockMutex(Physics->gameMtx);
+                Physics->pendingWorkCount -= 1;
+                SDL_Log("Pending work count: %d\n", Physics->pendingWorkCount);
+                if (Physics->pendingWorkCount <= 0) {
+                    SDL_SignalCondition(Physics->gameCond);
                 }
-                SDL_UnlockMutex(Generator->gameMtx);
+                SDL_UnlockMutex(Physics->gameMtx);
             }
         }
 
@@ -401,10 +401,10 @@ private:
 
                 const auto& cellSize = item.cellSize;
 
-                auto x1 = static_cast<float>(current->get_column()) * cellSize.x;
-                auto y1 = static_cast<float>(current->get_row()) * cellSize.y;
-                auto x2 = static_cast<float>(current->get_column() + 1) * cellSize.x;
-                auto y2 = static_cast<float>(current->get_row() + 1) * cellSize.y;
+                auto x1 = static_cast<float>(current->get_index()) * cellSize.x;
+                auto y1 = static_cast<float>(current->get_index()) * cellSize.y;
+                auto x2 = static_cast<float>(current->get_index() + 1) * cellSize.x;
+                auto y2 = static_cast<float>(current->get_index() + 1) * cellSize.y;
 
                 SDL_Vertex v1, v2, v3, v4;
                 // Define the four corners of the cell
@@ -446,20 +446,20 @@ private:
             } // cells
         } // background / walls
     } // doWork
-}; // GeneratorImpl
+}; // PhysicsImpl
 
 
-Generator::Generator(const std::string& title, const std::string& version, int w, int h)
-    : m_impl{ std::make_unique<GeneratorImpl>(std::cref(title), std::cref(version), w, h)} {
+Physics::Physics(const std::string& title, const std::string& version, int w, int h)
+    : m_impl{ std::make_unique<PhysicsImpl>(std::cref(title), std::cref(version), w, h)} {
 }
 
-Generator::~Generator() {
+Physics::~Physics() {
     auto&& g = this->m_impl;
     // Clean up threads
     SDL_LockMutex(g->gameMtx);
     // Wake up any threads and wait for them to finish
     g->pendingWorkCount = 0;
-    g->state = GeneratorImpl::States::DONE;
+    g->state = PhysicsImpl::States::DONE;
     SDL_BroadcastCondition(g->gameCond);
     SDL_UnlockMutex(g->gameMtx);
     for (auto&& t : g->threads) {
@@ -472,11 +472,11 @@ Generator::~Generator() {
     SDL_DestroyCondition(g->gameCond);
 }
 
-bool Generator::run() const noexcept {
+bool Physics::run() const noexcept {
 
     using namespace std;
 
-    // Create an alias to the Generator implementation
+    // Create an alias to the Physics implementation
     auto&& sdlHelper = this->m_impl->sdlHelper;
     string_view titleView = this->m_impl->title;
     sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
@@ -513,7 +513,7 @@ bool Generator::run() const noexcept {
     SDL_SetRenderVSync(renderer, true);
     auto&& window = sdlHelper.window;
 
-    Generator::GeneratorImpl::SDLTexture renderToTexture;
+    Physics::PhysicsImpl::SDLTexture renderToTexture;
     bool res = renderToTexture.loadTarget(renderer, this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H);
     if (!res) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load target texture: %s\n", SDL_GetError());
@@ -526,9 +526,9 @@ bool Generator::run() const noexcept {
     // Timers for keeping track of frame rates
     double previous = SDL_GetTicks();
     double accumulator = 0.0, currentTimeStep = 0.0;
-    // Generator loop
+    // Physics loop
     auto&& gState = this->m_impl->state;
-    while (gState != GeneratorImpl::States::DONE) {
+    while (gState != PhysicsImpl::States::DONE) {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = SDL_GetTicks() - previous;
         previous = SDL_GetTicks();
@@ -572,26 +572,26 @@ bool Generator::run() const noexcept {
 
         // Draw/gen the level
         if (!this->m_impl->pendingWorkCount) {
-            if (gState == GeneratorImpl::States::UPLOADING_LEVEL) {
+            if (gState == PhysicsImpl::States::UPLOADING_LEVEL) {
                 // Update state and current level
                 SDL_Log("New level uploading\n");
-                mazes::maze_builder builder;
-                static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
-                auto&& temp = builder.block_type(-1).rows(INIT_MAZE_ROWS).columns(INIT_MAZE_COLS).build();
-                temp->compute_geometry();
-                cells.clear();
-                cells.reserve(INIT_MAZE_ROWS * INIT_MAZE_COLS);
-                temp->populate_cells(ref(cells));
-                assert(cells.size() > 0);
-                level.clear();
-                level.reserve(cells.size());
-
-                SDL_FPoint cellSize = { static_cast<float>(display_w / temp->rows), static_cast<float>(display_h / temp->columns) };
+                // mazes::builder builder;
+                // static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
+                // auto&& temp = builder.block_type(-1).rows(INIT_MAZE_ROWS).columns(INIT_MAZE_COLS).build();
+                // temp->init();
+                // mazes::computations::compute_geometry(temp);
+                // cells.clear();
+                // temp->populate_cells(ref(cells));
+                // assert(cells.size() > 0);
+                // level.clear();
+                // level.reserve(cells.size());
+                auto rows = 10, columns = 10;
+                SDL_FPoint cellSize = { static_cast<float>(display_w / rows), static_cast<float>(display_h / columns) };
 
                 // Now start the worker threads
                 this->m_impl->genLevel(ref(level), cref(cells), cellSize);
 
-                gState = GeneratorImpl::States::PLAY;
+                gState = PhysicsImpl::States::PLAY;
             }
 
             // Now draw geometry ensuring complete render with no more work pending

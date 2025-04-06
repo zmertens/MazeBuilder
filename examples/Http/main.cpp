@@ -1,9 +1,3 @@
-/**
- * Makes basic HTTP request to a server using SFML
- * POSTS/GETs data to/from server:
- *  On user actions - get top 10 scores - send new score
- */
-
 #include <memory>
 #include <vector>
 #include <variant>
@@ -15,10 +9,7 @@
 
 #include <SFML/Network.hpp>
 
-#include <nlohmann/json.hpp>
-
 #include <MazeBuilder/maze_builder.h>
-#include <MazeBuilder/buildinfo.h>
 
 static constexpr auto MB_MENU_MSG = R"help(
     -- Maze Builder Menu --
@@ -71,39 +62,53 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             string algorithm;
             // Get user input
             cin >> rows >> columns >> height >> seed >> algorithm;
-            mazes::maze_types mt = mazes::to_maze_type(algorithm);
+            mazes::algo mt = mazes::to_algo_from_string(algorithm);
 
-            if (mt == mazes::maze_types::INVALID_ALGO) {
+            if (mt == mazes::algo::TOTAL) {
                 cerr << "Unknown algorithm: " << algorithm << endl;
                 break;
             }
 
             // Create the maze
-            mazes::maze_builder builder;
-            auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
-            temp_maze->compute_geometry();
-            auto dump = temp_maze->to_json_str(4);
+            auto next_maze_ptr = mazes::factory::create(mazes::configurator().rows(rows).columns(columns).levels(height).seed(seed)._algo(mt));
 
-            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Post};
+            if (!next_maze_ptr.value()) {
+                cerr << "Error creating maze: " << endl;
+                break;
+            }
+
+            auto next_maze_ptr_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+
+            unordered_map<string, string> my_json_map;
+            my_json_map["rows"] = to_string(rows);
+            my_json_map["columns"] = to_string(columns);
+            my_json_map["levels"] = to_string(height);
+            my_json_map["seed"] = to_string(seed);
+            my_json_map["algo"] = algorithm;
+            my_json_map["str"] = next_maze_ptr_s;
+
+            mazes::json_helper jh{};
+            auto json_s = jh.from(cref(my_json_map));
+
+            static constexpr auto content_len = 2;
+
+            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};
             sf_post_request.setHttpVersion(1, 1);
-            sf_post_request.setBody(dump);
+            sf_post_request.setBody(json_s);
             sf_post_request.setField("Content-Type", "application/json");
-            sf_post_request.setField("Content-Length", to_string(dump.size()));
-
-            // Note the base64 encoded string is very long
-            //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
+            sf_post_request.setField("Content-Length", to_string(content_len));
 
             response = http.sendRequest(sf_post_request);
-            cout << "Response status: " << response.getStatus() << " \nbody: " << response.getBody() << endl;
+            cout << "Response status: " << static_cast<int>(response.getStatus()) << " \nbody: " << response.getBody() << endl;
             break;
             } // case '1'
             case '2': {
             cout << "Getting all mazes from the DB...\n";
-            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Get};
+            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Method::Get};
             sf_get_request.setHttpVersion(1, 1);
             response = http.sendRequest(sf_get_request);
-            if (response.getStatus() != sf::Http::Response::Ok) {
-                cerr << "Error: " << response.getStatus() << endl;
+            if (response.getStatus() != sf::Http::Response::Status::Ok) {
+                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
                 break;
             }
             cout << "Response from server: " << response.getBody() << endl;
@@ -113,11 +118,11 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             cout << "Enter id for maze to delete...\n";
             int id = 0;
             cin >> id;
-            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Delete};
+            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Method::Delete};
             sf_del_request.setHttpVersion(1, 1);
             response = http.sendRequest(sf_del_request);
-            if (response.getStatus() != sf::Http::Response::Ok) {
-                cerr << "Error: " << response.getStatus() << endl;
+            if (response.getStatus() != sf::Http::Response::Status::Ok) {
+                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
                 break;
             }
             cout << "Response from server: " << response.getBody() << endl;

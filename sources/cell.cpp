@@ -3,51 +3,39 @@
 using namespace mazes;
 using namespace std;
 
-cell::cell(int index)
-: m_row{ 0 }
-, m_column{ 0 }
-, m_index{ index }
+/// @brief 
+/// @param index 0
+cell::cell(std::int32_t index)
+: m_index{ index }
 , m_links{}
 , m_north{ nullptr }
 , m_south{ nullptr }
 , m_east{ nullptr }
-, m_west{ nullptr }
-, m_left{ nullptr }
-, m_right{}  {
+, m_west{ nullptr }  {
 
 }
 
-cell::cell(unsigned int row, unsigned int column, int index) 
-: m_row{row}
-, m_column{column}
-, m_index{index}
-, m_links{}
-, m_north{nullptr}
-, m_south{nullptr}
-, m_east{nullptr}
-, m_west{nullptr}
-, m_left{ nullptr }
-, m_right{} {
-
-}
-
-bool cell::has_key(const shared_ptr<cell>& c) const {
+bool cell::has_key(const shared_ptr<cell>& c) {
     return m_links.find(c) != m_links.end();
 }
 
-/**
- * @param bidi = true
-*/
+/// @brief 
+/// @param c1 
+/// @param c2 
+/// @param bidi true
 void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    this->m_links.insert_or_assign(c2, true);
-    if (bidi) {
+    if (c2) {
+        this->m_links.insert_or_assign(c2, true);
+    }
+    if (c2 && c1 && bidi) {
         c2->link(c2, c1, false);
     }
 }
 
-/**
- * @param bidi = true
-*/
+/// @brief 
+/// @param c1 
+/// @param c2 
+/// @param bidi true
 void cell::unlink(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
     this->m_links.erase(c1);
     if (bidi) {
@@ -55,12 +43,27 @@ void cell::unlink(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
     }
 }
 
-unordered_map<shared_ptr<cell>, bool> cell::get_links() const {
+const std::unordered_map<shared_ptr<cell>, bool>& cell::get_links() {
     return this->m_links;
 }
-
-bool cell::is_linked(const shared_ptr<cell>& c) const {
+bool cell::is_linked(const shared_ptr<cell>& c) {
     return has_key(c);
+}
+
+bool cell::has_northern_neighbor() const noexcept {
+    return nullptr != this->m_north;
+}
+
+bool cell::has_southern_neighbor() const noexcept {
+    return nullptr != this->m_south;
+}
+
+bool cell::has_eastern_neighbor() const noexcept {
+    return nullptr != this->m_east;
+}
+
+bool cell::has_western_neighbor() const noexcept {
+    return nullptr != this->m_west;
 }
 
 vector<shared_ptr<cell>> cell::get_neighbors() const noexcept {
@@ -77,28 +80,12 @@ vector<shared_ptr<cell>> cell::get_neighbors() const noexcept {
     return neighbors;
 }
 
-unsigned int cell::get_row() const {
-    return this->m_row;
-}
-
-unsigned int cell::get_column() const {
-    return this->m_column;
-}
-
-int cell::get_index() const {
+std::int32_t cell::get_index() const noexcept {
     return this->m_index;
 }
 
-void cell::set_index(int next_index) noexcept {
+void cell::set_index(std::int32_t next_index) noexcept {
     this->m_index = next_index;
-}
-
-void cell::set_color(std::uint32_t c) noexcept {
-	this->m_color = c;
-}
-
-std::uint32_t cell::get_color() const noexcept {
-	return this->m_color;
 }
 
 shared_ptr<cell> cell::get_north() const {
@@ -131,28 +118,4 @@ void cell::set_east(shared_ptr<cell> const& other) {
 
 void cell::set_west(shared_ptr<cell> const& other) {
     this->m_west = other;
-}
-
-std::shared_ptr<cell> cell::get_left() const {
-    return this->m_left;
-}
-
-std::shared_ptr<cell> cell::get_right() const {
-    return this->m_right;
-}
-
-void cell::set_left(std::shared_ptr<cell> const& other_left) {
-    this->m_left = other_left;
-}
-
-void cell::set_right(std::shared_ptr<cell> const& other_right) {
-    this->m_right = other_right;
-}
-
-void cell::set_row(unsigned int r) noexcept {
-    this->m_row = r;
-}
-
-void cell::set_column(unsigned int c) noexcept {
-    this->m_column = c;
 }
