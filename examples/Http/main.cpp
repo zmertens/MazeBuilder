@@ -1,9 +1,3 @@
-/**
- * Makes basic HTTP request to a server using SFML
- * POSTS/GETs data to/from server:
- *  On user actions - get top 10 scores - send new score
- */
-
 #include <memory>
 #include <vector>
 #include <variant>
@@ -14,8 +8,6 @@
 #include <deque>
 
 #include <SFML/Network.hpp>
-
-#include <nlohmann/json.hpp>
 
 #include <MazeBuilder/maze_builder.h>
 
@@ -78,22 +70,33 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             }
 
             // Create the maze
-            // mazes::builder builder;
-            // auto temp_maze = builder.rows(rows).columns(columns).height(height).seed(seed).maze_type(mt).build();
-            // temp_maze->init();
-            // mazes::computations::compute_geometry(temp_maze);
-            // auto dump = temp_maze->to_json_str(4);
+            auto next_maze_ptr = mazes::factory::create(mazes::configurator().rows(rows).columns(columns).levels(height).seed(seed)._algo(mt));
 
-            auto dump {""};
+            if (!next_maze_ptr.value()) {
+                cerr << "Error creating maze: " << endl;
+                break;
+            }
+
+            auto next_maze_ptr_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+
+            unordered_map<string, string> my_json_map;
+            my_json_map["rows"] = to_string(rows);
+            my_json_map["columns"] = to_string(columns);
+            my_json_map["levels"] = to_string(height);
+            my_json_map["seed"] = to_string(seed);
+            my_json_map["algo"] = algorithm;
+            my_json_map["str"] = next_maze_ptr_s;
+
+            mazes::json_helper jh{};
+            auto json_s = jh.from(cref(my_json_map));
+
+            static constexpr auto content_len = 2;
 
             sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};
             sf_post_request.setHttpVersion(1, 1);
-            sf_post_request.setBody(dump);
+            sf_post_request.setBody(json_s);
             sf_post_request.setField("Content-Type", "application/json");
-            sf_post_request.setField("Content-Length", to_string(2));
-
-            // Note the base64 encoded string is very long
-            //cout << "Sent new maze:\n" << my_json.dump(4) << endl;
+            sf_post_request.setField("Content-Length", to_string(content_len));
 
             response = http.sendRequest(sf_post_request);
             cout << "Response status: " << static_cast<int>(response.getStatus()) << " \nbody: " << response.getBody() << endl;
