@@ -8,8 +8,8 @@
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/cell.h>
-#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/distances.h>

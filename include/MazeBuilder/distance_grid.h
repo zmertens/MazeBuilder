@@ -23,13 +23,23 @@ public:
     friend class sidewinder;
 
 	explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
-		
+
+    /// @brief 
+    /// @param indices 
+    /// @return 
+    void start_configuration(const std::vector<int>& indices) noexcept override;
+
+    /// @brief 
+    /// @param c 
+    /// @return 
     virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+
+    /// @brief 
+    /// @param c 
+    /// @return 
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
     std::shared_ptr<distances> get_distances() const noexcept;
-
-    virtual std::future<bool> get_future() noexcept override;
 private:
 	std::shared_ptr<distances> m_distances;
 

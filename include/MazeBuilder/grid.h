@@ -2,80 +2,76 @@
 #define GRID_H
 
 #include <functional>
-#include <future>
-#include <mutex>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
-#include <utility>
-#include <vector>
+#include <tuple>
 #include <unordered_map>
+#include <vector>
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/observable_interface.h>
 
 namespace mazes {
 
 /// @file grid.h
 /// @class grid
 /// @brief General purpose grid class for maze generation
-class grid : public grid_interface {
-protected:
-
-    /// @brief Builds a future based on the provided indices.
-    /// @param indices A constant reference to a vector of integers representing the indices.
-    void build_fut(std::vector<int> const& indices) noexcept;
-
-    /// @brief Configure cells by neighbors (N, S, E, W)
-    /// @param cells 
-    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-
-    mutable std::promise<bool> m_config_promise;
-    std::mutex m_cells_mutex;
-    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
-
+class grid : public grid_interface, public observable_interface {
 public:
+
+    /// @brief 
+    /// @param indices 
+    /// @return 
+    virtual void start_configuration(const std::vector<int>& indices) noexcept;
+public:
+
     /// @brief Friend classes
     friend class binary_tree;
     friend class dfs;
     friend class sidewinder;
 
-    /// @brief Constructor for grid
-    /// @param rows 
-    /// @param columns 
-    /// @param height 
-    explicit grid(unsigned int rows = 1u, unsigned int columns = 1u, unsigned int height = 1u);
+    /// @brief 
+    /// @param r 
+    /// @param c 
+    /// @param l 
+    grid(unsigned int r = 1u, unsigned int c = 1u, unsigned int l = 1u);
 
-    /// @brief Constructor for grid
-    /// @param dimensions 
-    explicit grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions);
+    /// @brief 
+    /// @param dimens 
+    grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens);
 
     /// @brief Copy constructor
     /// @param other 
     grid(const grid& other);
-    
+
     /// @brief Assignment operator
     /// @param other 
     /// @return 
     grid& operator=(const grid& other);
-    
+
     /// @brief Move constructor
     /// @param other 
     grid(grid&& other) noexcept;
-    
+
     /// @brief Move assignment operator
     /// @param other 
     /// @return 
     grid& operator=(grid&& other) noexcept;
-    
+
     /// @brief Destructor
     virtual ~grid();
 
-    /// @brief Initialize and configure
-    /// @param callback notifies when configuration is complete
-    /// @return 
-    virtual std::future<bool> get_future() noexcept;
-
     // Overrides
+
+    /// @brief 
+    /// @param observer 
+    void register_observer(std::function<bool(void)> const& observer) noexcept override;
+
+    /// @brief 
+    /// @return 
+    bool is_observed() noexcept override;
 
     /// @brief Provides dimensions of grid in no assumed ordering
     /// @return 
@@ -106,13 +102,28 @@ public:
 
     /// @brief Get the count of cells in the grid
     /// @return The number of cells in the grid
-    int count() const noexcept;
-    
+    int num_cells() const noexcept;
+
+protected:
+    /// @brief 
+    /// @param result 
+    void notify_observers() noexcept;
+
 private:
-    // Calculate the flat index from row and column
+    /// @brief Configure cells by neighbors (N, S, E, W)
+    /// @param cells 
+    void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+
+    /// @brief Calculate the flat index for a 2D grid
     std::function<int(unsigned int, unsigned int)> m_calc_index;
 
+    std::unordered_map<int, std::shared_ptr<cell>> m_cells;
     std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
+
+    std::vector<std::function<bool(void)>> m_observers;
+    std::mutex m_observers_mutex;
+
+    std::atomic<bool> m_configured;
 }; // class
 
 } // namespace mazes

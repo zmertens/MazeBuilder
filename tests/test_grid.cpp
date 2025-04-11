@@ -7,6 +7,7 @@
 #include <random>
 #include <memory>
 #include <vector>
+#include <numeric>
 
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/cell.h>
@@ -79,7 +80,13 @@ TEST_CASE("Test to_vec", "[to_vec]") {
 
     // Each grid can be "futurized" only once
     REQUIRE(my_grid != nullptr);
-    REQUIRE(my_grid->get_future().get());
+
+    mt19937 mt{ std::random_device{}() };
+    std::vector<int> shuffled_indices(ROWS * COLUMNS);
+    std::iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
+    std::shuffle(shuffled_indices.begin(), shuffled_indices.end(), mt);
+
+    my_grid->start_configuration(shuffled_indices);
 
     vector<shared_ptr<cell>> my_cells;
     my_grid->to_vec(ref(my_cells));

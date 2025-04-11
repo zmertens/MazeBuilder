@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <optional>
 #include <tuple>
+#include <functional>
 
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/cell.h>
@@ -19,7 +20,7 @@ namespace mazes {
 /// @class grid_interface
 /// @brief Interface for the grid class
 /// @details This interface provides methods to interact with the grid
-/// @details The grid is a collection of cells that are linked together to form a maze
+/// @details The grid is configurable
 /// @details The grid can be visualized as a 2D or 3D structure using strings
 /// @details The grid can be transformed into a vector of cells or a vector of vectors of cells
 /// @details The grid can provide detailed information about a cell

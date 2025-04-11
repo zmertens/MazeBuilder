@@ -8,6 +8,7 @@
 #include <random>
 #include <algorithm>
 #include <numeric>
+#include <stdexcept>
 
 #if defined(MAZE_DEBUG)
 #include <iostream>
@@ -26,54 +27,41 @@ distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int 
 
 /// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
 /// @return future to init task
-std::future<bool> distance_grid::get_future() noexcept {
+void distance_grid::start_configuration(const std::vector<int>& indices) noexcept {
     using namespace std;
 
-    mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) -> int {
-        if (low > high) {
-            throw invalid_argument("Invalid range for uniform_int_distribution");
+    grid::start_configuration(cref(indices));
+
+    try {
+
+        auto [ROWS, COLUMNS, _] = this->get_dimensions();
+
+        auto found = search(ROWS * COLUMNS - 1);
+
+        if (!found) {
+
+            throw std::runtime_error("Search returned a null cell.");
         }
 
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-        };
+        m_distances = std::make_shared<distances>(found);
 
-    auto [ROWS, COLUMNS, _] = this->get_dimensions();
+        if (!m_distances) {
 
-    vector<int> shuffled_indices(ROWS * COLUMNS);
-    iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
-    shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
+            throw std::runtime_error("Failed to create distances object.");
+        }
 
-    return std::async(std::launch::async, [this, ROWS, COLUMNS, shuffled_indices]() mutable {
-        lock_guard<mutex> lock(m_cells_mutex);
+        m_distances = m_distances->dist();
+        //m_distances = m_distances->path_to(search(0));
 
-        try {
-            this->build_fut(cref(shuffled_indices));
+        if (!m_distances) {
 
-            auto found = search(get_int(0, ROWS * COLUMNS - 1));
-            if (!found) {
-                throw runtime_error("Search returned a null cell.");
-            }
-
-            m_distances = make_shared<distances>(found);
-            if (!m_distances) {
-                throw runtime_error("Failed to create distances object.");
-            }
-
-            m_distances = m_distances->dist();
-            if (!m_distances) {
-                throw runtime_error("Failed to get distances.");
-            }
-
-            return true;
-        } catch (const exception& e) {
+            throw std::runtime_error("Failed to get distances.");
+        }
+    } catch (const std::exception& e) {
 #if defined(MAZE_DEBUG)
-            cerr << "Exception in async task: " << e.what() << endl;
+        std::cerr << "Exception in distance_grid::start_configuration: " << e.what() << std::endl;
 #endif
-            return false;
-        }
-        });
+    }
 }
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {

@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <random>
-#include <utility>
+#include <tuple>
 #include <functional>
 
 #include <MazeBuilder/cell.h>
@@ -18,17 +18,20 @@
 using namespace mazes;
 
 /// @brief 
-/// @param rows 1
-/// @param columns 1
-/// @param height 1
+/// @param rows
+/// @param columns
+/// @param height
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     : grid::grid(std::make_tuple(rows, columns, height)) {
 }
 
-grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimensions)
-: m_dimensions(dimensions)
+/// @brief 
+/// @param dimensions 
+grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
+: m_dimensions(dimens)
 , m_calc_index{ [this](auto row, auto col)->int
-    { return row * std::get<1>(this->m_dimensions) + col; } } {
+    { return row * std::get<1>(this->m_dimensions) + col; } }
+, m_configured{ false } {
 
 }
 
@@ -70,30 +73,31 @@ grid::~grid() {
     }
 }
 
-/// @brief Inheritable configuration task
-/// @return 
-std::future<bool> grid::get_future() noexcept {
-    using namespace std;
-
-    mt19937 rng{ 42681ul };
-    static auto get_int = [&rng](int low, int high) -> int {
-        uniform_int_distribution<int> dist{ low, high };
-        return dist(rng);
-        };
-
-    vector<int> shuffled_indices(get<0>(this->m_dimensions) * get<1>(this->m_dimensions));
-    iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
-    shuffle(shuffled_indices.begin(), shuffled_indices.end(), rng);
-
-    return std::async(std::launch::async, [this, shuffled_indices]() mutable {
-        lock_guard<mutex> lock(m_cells_mutex);
-        this->build_fut(cref(shuffled_indices));
-        return true;
-        });
+void grid::notify_observers() noexcept {
+    std::lock_guard<std::mutex> lock(m_observers_mutex);
+    auto success{ false };
+    for (const auto& observer : m_observers) {
+        success = observer();
+    }
+    m_configured = success;
 }
 
-void grid::build_fut(std::vector<int> const& indices) noexcept {
+void grid::register_observer(std::function<bool(void)> const& observer) noexcept {
+    std::lock_guard<std::mutex> lock(m_observers_mutex);
+    m_observers.emplace_back(observer);
+}
+
+bool grid::is_observed() noexcept {
+    return m_configured;
+}
+
+void grid::start_configuration(std::vector<int> const& indices) noexcept {
     using namespace std;
+
+    if (m_configured) {
+
+        return;
+    }
 
     auto [ROWS, COLUMNS, _] = this->get_dimensions();
 
@@ -110,27 +114,34 @@ void grid::build_fut(std::vector<int> const& indices) noexcept {
 
         new_node = make_shared<cell>(index);
 
-        m_cells.insert({ index, new_node });
-
         cells.emplace_back(new_node);
-        auto new_count = static_cast<int>(m_cells.size());  
+
 #if defined(MAZE_DEBUG)
+        auto new_count = static_cast<int>(cells.size());
         if (new_count == last_cell_count) {
+
             cout << "Cell insertion failed at count: " << new_count << endl;
-            m_config_promise.set_value(false);
+
+            break;
         }
 #endif
     }
 
     sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
+
         return c1->get_index() < c2->get_index();
         });
 
     this->configure_cells(std::ref(cells));
 
-    this->m_config_promise.set_value(true);
-}
+    for (const auto& c : cells) {
+        m_cells.insert({ c->get_index(), c });
+    }
 
+    if (!m_observers.empty()) {
+        notify_observers();
+    }
+}
 
 /// @brief Configure by nearest row, column pairing
 /// @details A cell at (0, 0) will have a southern neighbor at (0, 1)
@@ -193,8 +204,8 @@ std::shared_ptr<cell> grid::search(int index) const noexcept {
     return (itr != m_cells.cend()) ? itr->second : nullptr;
 }
 
-int grid::count() const noexcept {
-    return static_cast<int>(m_cells.size());
+int grid::num_cells() const noexcept {
+    return static_cast<unsigned int>(m_cells.size());
 }
 
 // Populate the vector of cells from the BST using natural ordering
@@ -209,6 +220,7 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
         });
 }
 
+// Create a 2D representation of the grid
 void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept {
 
     // Populate the cells starting from the root

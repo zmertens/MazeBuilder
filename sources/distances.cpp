@@ -32,37 +32,34 @@ bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
 /// @param goal A shared pointer to the goal cell for which the path is to be computed.
 /// @return A shared pointer to a distances object representing the path to the goal cell, or nullptr if the path cannot be found.
 std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
+    using namespace std;
+
     if (!goal || !contains(goal)) {
 
         return nullptr;
     }
 
-    auto breadcrumbs = std::make_shared<distances>(m_root);
-    auto current = goal;
+    auto d = make_shared<distances>(m_root);
 
-    breadcrumbs->set(current, m_cells.at(current));
+    queue<shared_ptr<cell>> frontier;
+    frontier.push(goal);
+    d->set(m_root, 0);
+    // apply shortest path algorithm
+    while (!frontier.empty()) {
 
-    while (current != m_root) {
+        auto current = frontier.front();
+        frontier.pop();
+        auto current_distance = d->operator[](current);
+        for (const auto& neighbor : current->get_neighbors()) {
 
-        auto found{ false };
-
-        auto neighbors = current->get_links();
-
-        for (const auto& [neighbor, _] : neighbors) {
-            if (m_cells.at(neighbor) < m_cells.at(current)) {
-                breadcrumbs->set(neighbor, m_cells.at(neighbor));
-                current = neighbor;
-                found = true;
-                break;
+            if (!d->contains(neighbor)) {
+                d->set(neighbor, d->operator[](current) + 1);
+                frontier.push(neighbor);
             }
-        }
-
-        if (!found) {
-            return nullptr;
         }
     }
 
-    return breadcrumbs;
+    return d;
 }
 
 std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {

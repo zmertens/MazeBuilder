@@ -28,6 +28,8 @@ public:
 
 private:
 
+    static std::optional<std::unique_ptr<grid_interface>> create_grid(configurator const& config) noexcept;
+
 	/// @brief Apply an algorithm to a grid
 	/// @param config 
 	/// @param g 
