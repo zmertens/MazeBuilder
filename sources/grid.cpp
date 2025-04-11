@@ -211,6 +211,11 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
     for (auto&& [_, c] : m_cells) {
         cells.emplace_back(c);
     }
+
+    sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
+
+        return c1->get_index() < c2->get_index();
+        });
 }
 
 // Get the contents of a cell for this type of grid

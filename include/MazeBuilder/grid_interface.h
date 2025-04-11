@@ -57,8 +57,8 @@ protected:
 
         // ---+
         static constexpr auto barrier = { BARRIER2, BARRIER2, BARRIER2, BARRIER2, BARRIER2, CORNER };
-        static const std::string wall_plus_corner{ barrier };
-        
+        static const std::string wall_plus_corner = "-----+";
+
         std::stringstream output;
         output << CORNER;
         
