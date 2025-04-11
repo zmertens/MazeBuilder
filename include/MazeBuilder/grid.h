@@ -1,6 +1,10 @@
 #ifndef GRID_H
 #define GRID_H
 
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/observable_interface.h>
+
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -9,9 +13,6 @@
 #include <tuple>
 #include <unordered_map>
 #include <vector>
-
-#include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/observable_interface.h>
 
 namespace mazes {
 
