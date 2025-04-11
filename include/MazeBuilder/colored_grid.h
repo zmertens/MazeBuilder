@@ -11,6 +11,7 @@
 namespace mazes {
 
 class cell;
+class distances;
 
 /// @file colored_grid.h
 /// @class colored_grid
@@ -42,6 +43,7 @@ public:
     virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 	
 private:
+    std::shared_ptr<distances> m_distances;
 };
 
 }

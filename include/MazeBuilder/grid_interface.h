@@ -32,7 +32,6 @@ public:
     
     /// @brief Transformation and display functions
     virtual void to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;	
-    virtual void to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept = 0;
 
     /// @brief Get detailed information of a cell in the grid
     /// @param c 

@@ -11,7 +11,7 @@ namespace mazes {
 /// @file cell.h
 /// @class cell
 /// @brief Cell class for maze generation
-class cell {
+class cell : public std::enable_shared_from_this<cell> {
 
 public:
     /// @brief Constructs a cell object with an optional index.
@@ -22,13 +22,13 @@ public:
     /// @param c1 A shared pointer to the first cell object.
     /// @param c2 A shared pointer to the second cell object.
     /// @param bidi A boolean flag indicating if the link should be bidirectional. Defaults to true.
-    void link(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
+    void link(const std::shared_ptr<cell>& other, bool bidi = true) noexcept;
 
     /// @brief Unlinks two cells, optionally in both directions.
     /// @param c1 A shared pointer to the first cell.
     /// @param c2 A shared pointer to the second cell.
     /// @param bidi A boolean indicating whether to unlink in both directions. Defaults to true.
-    void unlink(std::shared_ptr<cell> c1, std::shared_ptr<cell> c2, bool bidi=true);
+    void unlink(const std::shared_ptr<cell>& other, bool bidi = true) noexcept;
 
     /// @brief Retrieves a constant reference to an unordered map of cell links and their boolean states.
     /// @return A constant reference to an unordered map where the keys are shared pointers to cell objects

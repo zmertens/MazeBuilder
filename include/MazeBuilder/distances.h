@@ -3,62 +3,56 @@
 
 #include <unordered_map>
 #include <vector>
-#include <algorithm>
 #include <memory>
+#include <cstdint>
 
 namespace mazes {
 
-class cell;
+class grid;
 
-/// @file distances.h
-/// @class distances
-/// @brief Distances utility class for counting paths and nodes
-/// @details This class is used to compute the distances between cells in a maze
-class distances : public std::enable_shared_from_this<distances> {
+class distances {
 public:
-    /// @brief Constructor that initializes the distances object with a given root cell.
-    /// @param root A shared pointer to the root cell used to initialize the distances object.
-    explicit distances(std::shared_ptr<cell> root);
+    /// @brief Constructor that initializes the distances object with a given root index.
+    /// @param root_index The index of the root cell used to initialize the distances object.
+    explicit distances(int32_t root_index);
 
-    /// @brief Overloaded operator to access the distance of a cell.
-    /// @param cell A shared pointer to the cell whose distance is to be accessed.
-    /// @return A reference to the integer distance associated with the specified cell.
-	int& operator[](const std::shared_ptr<cell>& cell) noexcept {
-		return m_cells[cell];
-	}
+    /// @brief Overloaded operator to access the distance of a cell by index.
+    /// @param index The index of the cell whose distance is to be accessed.
+    /// @return A reference to the integer distance associated with the specified cell index.
+    int& operator[](int32_t index) noexcept;
 
-    /// @brief Accesses the value associated with a given cell in a shared pointer.
-    /// @param cell A shared pointer to the cell whose associated value is to be accessed.
-    /// @return A constant reference to the integer value associated with the specified cell.
-    const int& operator[](const std::shared_ptr<cell>& cell) const noexcept {
-        return m_cells.at(cell);
-    }
+    /// @brief Accesses the value associated with a given cell index.
+    /// @param index The index of the cell whose associated value is to be accessed.
+    /// @return A constant reference to the integer value associated with the specified cell index.
+    const int& operator[](int32_t index) const noexcept;
 
-    /// @brief Sets the distance of a cell in the distances object.
-    /// @param cell A shared pointer to the cell whose distance is to be set.
-    void set(std::shared_ptr<cell> cell, int distance) noexcept;
+    /// @brief Sets the distance of a cell by index.
+    /// @param index The index of the cell whose distance is to be set.
+    void set(int32_t index, int distance) noexcept;
 
-    /// @brief Checks if a given cell is contained in the distances object.
-    /// @param cell A shared pointer to the cell to check for containment.
-    bool contains(const std::shared_ptr<cell>& cell) const noexcept;
+    /// @brief Checks if a given cell index is contained in the distances object.
+    /// @param index The index of the cell to check for containment.
+    bool contains(int32_t index) const noexcept;
 
-    /// @brief Computes the shortest path to a goal cell within a distances object.
-    std::shared_ptr<distances> path_to(std::shared_ptr<cell> goal) const noexcept;
+    /// @brief Computes the shortest path to a goal cell index within a distances object.
+    /// @param goal_index The index of the goal cell.
+    /// @param grid A reference to the grid object for retrieving cell pointers.
+    /// @return A shared pointer to a distances object representing the path.
+    std::shared_ptr<distances> path_to(int32_t goal_index, const grid& grid) const noexcept;
 
-    /// @brief Computes the maximum distance and cell in a distances object.
-    std::pair<std::shared_ptr<cell>, int> max() const noexcept;
+    /// @brief Computes the maximum distance and cell index in a distances object.
+    /// @return A pair containing the index of the cell with the maximum distance and the distance value.
+    std::pair<int32_t, int> max() const noexcept;
 
-    /// @brief Collects keys from a vector of shared pointers to cell objects.
-    /// @param cells A reference to a vector of shared pointers to cell objects from which keys will be collected.
-    void collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+    /// @brief Collects all cell indices stored in the distances object.
+    /// @param indices A reference to a vector to store the collected indices.
+    void collect_keys(std::vector<int32_t>& indices) const noexcept;
 
-    /// @brief Returns a shared pointer to a distances object.
-    /// @return A std::shared_ptr pointing to a distances object.
-    std::shared_ptr<distances> dist() const noexcept;
 private:
-    std::shared_ptr<cell> m_root;
-    std::unordered_map<std::shared_ptr<cell>, int> m_cells;
-};
+    int32_t m_root_index;
+    std::unordered_map<int32_t, int> m_cells;
+}; // class distances
 
 } // namespace mazes
+
 #endif // DISTANCES_H

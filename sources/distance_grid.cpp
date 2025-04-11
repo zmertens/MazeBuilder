@@ -43,19 +43,18 @@ void distance_grid::start_configuration(const std::vector<int>& indices) noexcep
             throw std::runtime_error("Search returned a null cell.");
         }
 
-        m_distances = std::make_shared<distances>(found);
+        m_distances = std::make_shared<distances>(found->get_index());
 
         if (!m_distances) {
 
             throw std::runtime_error("Failed to create distances object.");
         }
 
-        m_distances = m_distances->dist();
-        //m_distances = m_distances->path_to(search(0));
+        m_distances = m_distances->path_to(0, *this);
 
         if (!m_distances) {
 
-            throw std::runtime_error("Failed to get distances.");
+            throw std::runtime_error("Failed to get path to goal.");
         }
     } catch (const std::exception& e) {
 #if defined(MAZE_DEBUG)
@@ -66,11 +65,17 @@ void distance_grid::start_configuration(const std::vector<int>& indices) noexcep
 
 std::optional<std::string> distance_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
 	if (m_distances) {
-		const auto d = m_distances->operator[](c);
-		if (d >= 0) {
-			return to_base36(d);
-		}
+
+        if (m_distances->contains(c->get_index())) {
+
+            const auto d = m_distances->operator[](c->get_index());
+            if (d >= 0) {
+
+                return to_base36(d);
+            }
+        }
 	}
+
 	return grid::contents_of(c);
 }
 

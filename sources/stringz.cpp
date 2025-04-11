@@ -12,6 +12,7 @@
 
 #include <random>
 #include <tuple>
+#include <unordered_set>
 
 using namespace mazes;
 
@@ -209,122 +210,18 @@ void stringz::to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels,
 #endif
 }
 
-/// @brief Generates a pixel array from a maze object.
-/// @param m 
-/// @param pixels 
-/// @param width
-/// @param height
-/// @param stride 4
+/// @brief Generates a pixel array from a maze object using cell background colors.
+/// @param m The maze object containing the grid and cells.
+/// @param pixels The output pixel array.
+/// @param width The width of the resulting image.
+/// @param height The height of the resulting image.
+/// @param stride The number of bytes per pixel (e.g., 4 for RGBA).
 void stringz::to_pixels(const std::unique_ptr<maze>& m, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
     using namespace std;
 
-    vector<vector<shared_ptr<cell>>> cells2;
-    m->get_grid()->to_vec2(ref(cells2));
-
-    auto dimensions = m->get_grid()->get_dimensions();
-    width = get<0>(dimensions) * 2 + 1;
-    height = get<1>(dimensions) * 2 + 1;
-
-    // Initialize the pixels as 255 (white)
-    pixels.resize(width * height * stride, 255);
-    // Ensure cells2 is correctly sized
-    if (cells2.size() != get<0>(dimensions) || (cells2.size() > 0 && cells2[0].size() != get<1>(dimensions))) {
-        // Handle incorrect sizing
-        return;
-    }
-
-    // Fill the pixels using the cells and their gradient colors
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int cell_y = y / 2;
-            int cell_x = x / 2;
-
-            // Check if the indices are within bounds
-            if (cell_y >= cells2.size() || cell_x >= cells2[cell_y].size()) {
-
-                continue;
-            }
-
-            auto c = cells2[cell_y][cell_x];
-
-            if (!c) {
-
-                continue;
-            }
-
-            auto color_opt = m->get_grid()->background_color_for(cref(c));
-            uint32_t color = color_opt.value_or(0xFFFFFF);
-
-            auto index = (y * width + x) * stride;
-            // Red
-            pixels[index] = (color >> 16) & 0xFF;
-            // Green
-            pixels[index + 1] = (color >> 8) & 0xFF;
-            // Blue
-            pixels[index + 2] = color & 0xFF;
-            // Alpha channel
-            pixels[index + 3] = 255;
-        }
-    }
-
-    // Apply wall coloring
-    for (int y = 0; y < height; ++y) {
-        for (int x = 0; x < width; ++x) {
-            int cell_y = y / 2;
-            int cell_x = x / 2;
-
-            // Check if the indices are within bounds
-            if (cell_y >= cells2.size() || cell_x >= cells2[cell_y].size()) {
-
-                continue;
-            }
-
-            auto c = cells2[cell_y][cell_x];
-
-            if (!c) {
-                continue;
-            }
-
-            uint32_t wall_color = 0x000000;
-
-            // Set the walls 
-            if (c->has_northern_neighbor() && !c->is_linked(c->get_north()) && y % 2 == 0) {
-                auto index = (y * width + x) * stride;
-                pixels[index] = (wall_color >> 16) & 0xFF;
-                pixels[index + 1] = (wall_color >> 8) & 0xFF;
-                pixels[index + 2] = wall_color & 0xFF;
-                pixels[index + 3] = 255;
-            }
-            if (c->has_southern_neighbor() && !c->is_linked(c->get_south()) && y % 2 == 1) {
-                auto index = (y * width + x) * stride;
-                pixels[index] = (wall_color >> 16) & 0xFF;
-                pixels[index + 1] = (wall_color >> 8) & 0xFF;
-                pixels[index + 2] = wall_color & 0xFF;
-                pixels[index + 3] = 255;
-            }
-            if (c->has_eastern_neighbor() && !c->is_linked(c->get_east()) && x % 2 == 1) {
-                auto index = (y * width + x) * stride;
-                pixels[index] = (wall_color >> 16) & 0xFF;
-                pixels[index + 1] = (wall_color >> 8) & 0xFF;
-                pixels[index + 2] = wall_color & 0xFF;
-                pixels[index + 3] = 255;
-            }
-            if (c->has_western_neighbor() && !c->is_linked(c->get_west()) && x % 2 == 0) {
-                auto index = (y * width + x) * stride;
-                pixels[index] = (wall_color >> 16) & 0xFF;
-                pixels[index + 1] = (wall_color >> 8) & 0xFF;
-                pixels[index + 2] = wall_color & 0xFF;
-                pixels[index + 3] = 255;
-            }
-        }
-    }
-
-#if defined(MAZE_DEBUG)
-    cout << "Width: " << width << "\nHeight: " << height << endl;
-    cout << "Stride: " << stride << endl;
-    cout << "Pixels: " << pixels.size() << endl;
-#endif
+    to_pixels(stringify(cref(m)), ref(pixels), ref(width), ref(height), stride);
 }
+
 
 /// @brief 
 /// @param m 

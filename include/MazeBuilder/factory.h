@@ -8,11 +8,11 @@
 
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/maze.h>
 
 namespace mazes {
 
 class grid_interface;
+class maze;
 
 /// @file factory.h
 /// @class factory
@@ -29,14 +29,6 @@ public:
 private:
 
     static std::optional<std::unique_ptr<grid_interface>> create_grid(configurator const& config) noexcept;
-
-	/// @brief Apply an algorithm to a grid
-	/// @param config 
-	/// @param g 
-	/// @param get_int 
-	/// @param rng 
-	/// @return 
-	static bool apply_algo_to_grid(configurator const& config, std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) noexcept;
 };
 
 } // namespace mazes

@@ -6,6 +6,7 @@
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/randomizer.h>
 
 using namespace mazes;
 
@@ -14,7 +15,7 @@ using namespace mazes;
 /// @param g the grid to generate the maze on, and manipulate the cells
 /// @param get_int
 /// @param rng
-bool sidewinder::run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept {
+bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
     using namespace std;
 
     vector<shared_ptr<cell>> store;
@@ -34,16 +35,16 @@ bool sidewinder::run(std::unique_ptr<grid_interface> const& g, const std::functi
         bool at_northern_boundary{ itr->get_north() == nullptr };
     
         // Verify the sidewinder is reaching eastern wall and then flip a coin to go north or not
-        bool should_close_out = at_eastern_boundary || (!at_northern_boundary && get_int(0, 1) == 0);
+        bool should_close_out = at_eastern_boundary || (!at_northern_boundary && rng(0, 1) == 0);
         if (should_close_out) {
-            auto random_index{ get_int(0, store.size() - 1) };
+            auto random_index{ rng(0, store.size() - 1) };
             auto&& random_cell = store.at(random_index);
             if (!random_cell || !at_northern_boundary) {
-                random_cell->link(move(random_cell), move(random_cell->get_north()), true);
+                random_cell->link(random_cell->get_north(), true);
             }
             store.clear();
         } else if (!at_eastern_boundary) {
-            itr->link(itr, itr->get_east(), true);
+            itr->link(itr->get_east(), true);
         }
     }
 

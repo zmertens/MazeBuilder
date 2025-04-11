@@ -20,26 +20,32 @@ bool cell::has_key(const shared_ptr<cell>& c) {
 }
 
 /// @brief 
-/// @param c1 
-/// @param c2 
+/// @param other
 /// @param bidi true
-void cell::link(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    if (c2) {
-        this->m_links.insert_or_assign(c2, true);
-    }
-    if (c2 && c1 && bidi) {
-        c2->link(c2, c1, false);
+void cell::link(const std::shared_ptr<cell>& other, bool bidi) noexcept {
+    if (other) {
+        // Link this cell to the other cell
+        this->m_links.insert_or_assign(other, true);
+
+        // If bidirectional, link the other cell back to this cell
+        if (bidi) {
+            other->link(shared_from_this(), false);
+        }
     }
 }
 
 /// @brief 
-/// @param c1 
-/// @param c2 
+/// @param other 
 /// @param bidi true
-void cell::unlink(shared_ptr<cell> c1, shared_ptr<cell> c2, bool bidi) {
-    this->m_links.erase(c1);
-    if (bidi) {
-        c2->unlink(c2, c1, false);
+void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
+    if (other) {
+        // Unlink this cell from the other cell
+        this->m_links.erase(other);
+
+        // If bidirectional, unlink the other cell from this cell
+        if (bidi) {
+            other->unlink(shared_from_this(), false);
+        }
     }
 }
 

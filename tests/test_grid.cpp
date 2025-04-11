@@ -94,7 +94,7 @@ TEST_CASE("Test to_vec", "[to_vec]") {
     REQUIRE(my_cells.size() == ROWS * COLUMNS);
 }
 
-TEST_CASE("Cells have neighbors", "[neighbors link]") {
+TEST_CASE("Cells can link", "[cell link]") {
 
     // cell1 has cell2 neighbor to the south
     shared_ptr<cell> cell1{ make_shared<cell>(0) };
@@ -110,11 +110,41 @@ TEST_CASE("Cells have neighbors", "[neighbors link]") {
         REQUIRE(!neighbors.empty());
     }
 
-    SECTION("Cells are linked") {
-        // links are bi-directional by default
-        cell1->link(cell1, cell2);
-        REQUIRE(cell1->is_linked(cell2));
-        REQUIRE(cell2->is_linked(cell1));
+    SECTION("Bidirectional linking between cells") {
+        cell1->link(cell2);
+
+        REQUIRE(cell1->is_linked(cell2) == true);
+        REQUIRE(cell2->is_linked(cell1) == true);
+    }
+
+    SECTION("Unidirectional linking between cells") {
+        cell1->link(cell2, false);
+
+        REQUIRE(cell1->is_linked(cell2) == true);
+        REQUIRE(cell2->is_linked(cell1) == false);
+    }
+
+    SECTION("Unlinking cells") {
+        cell1->link(cell2, true);
+        REQUIRE(cell1->is_linked(cell2) == true);
+        REQUIRE(cell2->is_linked(cell1) == true);
+
+        cell1->unlink(cell2, true);
+        cell2->unlink(cell1, true);
+        REQUIRE_FALSE(cell1->is_linked(cell2));
+        REQUIRE_FALSE(cell2->is_linked(cell1));
+    }
+
+    SECTION("Get links from a cell") {
+        auto cell3 = std::make_shared<mazes::cell>(2);
+
+        cell1->link(cell2, true);
+        cell1->link(cell3, true);
+
+        auto links = cell1->get_links();
+        REQUIRE(links.size() == 2);
+        REQUIRE(links.find(cell2) != links.end());
+        REQUIRE(links.find(cell3) != links.end());
     }
 }
 
@@ -141,5 +171,16 @@ TEST_CASE("Test cells get_neighbors method", "[get_neighbors]") {
     REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell2) != neighbors.end());
     REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell3) != neighbors.end());
     REQUIRE(std::find(neighbors.begin(), neighbors.end(), cell4) != neighbors.end());
+
+    SECTION("Linking neighbors") {
+        cell1->set_north(cell2);
+        REQUIRE(cell1->get_north() == cell2);
+        cell2->set_south(cell1);
+        REQUIRE(cell2->get_south() == cell1);
+
+        cell1->link(cell2, true);
+        REQUIRE(cell1->is_linked(cell2) == true);
+        REQUIRE(cell2->is_linked(cell1) == true);
+    }
 }
 

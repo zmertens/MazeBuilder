@@ -5,6 +5,7 @@
 /// @brief This file includes all the headers in the maze builder library
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/base64_helper.h>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/cell.h>
@@ -20,6 +21,7 @@
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/progress.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/stringz.h>
 #include <MazeBuilder/wavefront_object_helper.h>

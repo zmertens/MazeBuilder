@@ -9,6 +9,7 @@
 namespace mazes {
 
 class grid_interface;
+class randomizer;
 
 /// @file algo_interface.h
 
@@ -19,10 +20,9 @@ class algo_interface {
 public:
     /// @brief Interface method that algorithms implement to generate a maze
     /// @param g 
-    /// @param get_int 
-    /// @param rng 
+    /// @param rng
     /// @return 
-    virtual bool run(const std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept = 0;
+    virtual bool run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const noexcept = 0;
 };
 }
 #endif // ALGO_INTERFACE_H

@@ -36,11 +36,11 @@ public:
     /// @param r 
     /// @param c 
     /// @param l 
-    grid(unsigned int r = 1u, unsigned int c = 1u, unsigned int l = 1u);
+    explicit grid(unsigned int r = 1u, unsigned int c = 1u, unsigned int l = 1u);
 
     /// @brief 
     /// @param dimens 
-    grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens);
+    explicit grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens);
 
     /// @brief Copy constructor
     /// @param other 
@@ -80,10 +80,6 @@ public:
     /// @brief Convert a 2D grid to a vector of cells (sorted by row then column)
     /// @param cells 
     virtual void to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept override;
-
-    /// @brief Convert a 2D grid to a vector of vectors of cells (sorted by row then column)
-    /// @param cells
-    virtual void to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept override;
 
     /// @brief Get detailed information of a cell in the grid
     /// @param c 

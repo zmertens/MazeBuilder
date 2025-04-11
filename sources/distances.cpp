@@ -1,112 +1,124 @@
 #include <MazeBuilder/distances.h>
+#include <MazeBuilder/grid.h>
 
-#include <iterator>
-#include <queue>
-#include <MazeBuilder/cell.h>
+#include <deque>
+
+#if defined(MAZE_DEBUG)
+#include <iostream>
+#endif
 
 using namespace mazes;
-using namespace std;
 
-distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
-    // Distance from root to root is 0
-    m_cells.insert_or_assign(root, 0);
-
-    // Initialize distances for linked cells
-    const auto& links = root->get_links();
-    for (const auto& [linked_cell, _] : links) {
-
-        // Default distance for linked cells
-        m_cells.insert_or_assign(linked_cell, 1);
-    }
+distances::distances(int32_t root_index)
+    : m_root_index(root_index) {
+    m_cells.insert_or_assign(root_index, 0);
 }
 
-void distances::set(std::shared_ptr<cell> cell, int distance) noexcept {
-    m_cells.insert_or_assign(cell, distance);
+int& distances::operator[](int32_t index) noexcept {
+    return m_cells[index];
 }
 
-bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
-	return m_cells.find(cell) != m_cells.cend();
+const int& distances::operator[](int32_t index) const noexcept {
+    return m_cells.at(index);
 }
 
-/// @brief Computes the shortest path to a goal cell within a distances object.
-/// @param goal A shared pointer to the goal cell for which the path is to be computed.
-/// @return A shared pointer to a distances object representing the path to the goal cell, or nullptr if the path cannot be found.
-std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
-    using namespace std;
+void distances::set(int32_t index, int distance) noexcept {
+    m_cells[index] = distance;
+}
 
-    if (!goal || !contains(goal)) {
+bool distances::contains(int32_t index) const noexcept {
+    return m_cells.find(index) != m_cells.end();
+}
 
-        return nullptr;
+std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g) const noexcept {
+    // Create a new distances object to store the path
+    auto path = std::make_shared<distances>(m_root_index);
+
+    // If the goal index is the same as the root index, return an empty path
+    if (goal_index == m_root_index) {
+        return path;
     }
 
-    auto d = make_shared<distances>(m_root);
+    path->set(m_root_index, 0);
 
-    queue<shared_ptr<cell>> frontier;
-    frontier.push(goal);
-    d->set(m_root, 0);
-    // apply shortest path algorithm
-    while (!frontier.empty()) {
+    // Parent map to reconstruct the path
+    std::unordered_map<int32_t, int32_t> parent;
 
-        auto current = frontier.front();
-        frontier.pop();
-        auto current_distance = d->operator[](current);
-        for (const auto& neighbor : current->get_neighbors()) {
+    // BFS queue
+    std::deque<int32_t> queue;
+    queue.push_back(goal_index);
+    // Mark the start of the path
+    parent[goal_index] = -1;
 
-            if (!d->contains(neighbor)) {
-                d->set(neighbor, d->operator[](current) + 1);
-                frontier.push(neighbor);
+    while (!queue.empty()) {
+        int32_t current = queue.front();
+        queue.pop_front();
+
+        // Retrieve the current cell
+        auto cell = g.search(current);
+        if (!cell) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "Error: grid::search returned nullptr for index " << current << std::endl;
+#endif
+            continue;
+        }
+
+        // Iterate over linked neighbors
+        for (const auto& link : cell->get_links()) {
+            int32_t neighbor_index = link.first->get_index();
+
+            // Skip if the neighbor is already visited
+            if (parent.find(neighbor_index) != parent.cend()) {
+                continue;
+            }
+
+            // Mark the parent of the neighbor
+            parent[neighbor_index] = current;
+
+            // Add the neighbor to the queue
+            queue.push_back(neighbor_index);
+
+            // If we reach the root index, reconstruct the path
+            if (neighbor_index == m_root_index) {
+                int32_t step = m_root_index;
+
+                // Ensure the root index has a distance of 0
+                path->set(m_root_index, 0);
+                int distance = 0;
+                while (step != -1) {
+                    path->set(step, distance);
+                    step = parent[step];
+                    distance += 1;
+                }
+
+                return path;
             }
         }
     }
 
-    return d;
+    // If no path is found, return the empty path
+    return std::make_shared<distances>(m_root_index);
 }
 
-std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
+
+
+std::pair<int32_t, int> distances::max() const noexcept {
+    int32_t max_index = m_root_index;
     int max_distance = 0;
-    std::shared_ptr<cell> max_cell = m_root;
-    for (const auto& [c, d] : m_cells) {
-        if (d > max_distance) {
-            max_cell = c;
-            max_distance = d;
-        }
-    }
-    return { max_cell, max_distance };
-}
 
-void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    for (const auto& [c, _] : m_cells) {
-        cells.push_back(c);
-    }
-}
-
-std::shared_ptr<distances> distances::dist() const noexcept {
-    using namespace std;
-
-    if (!m_root) {
-
-        return nullptr;
-    }
-
-    auto d = make_shared<distances>(m_root);
-
-    queue<shared_ptr<cell>> frontier;
-    frontier.push(m_root);
-    d->set(m_root, 0);
-    // apply shortest path algorithm
-    while (!frontier.empty()) {
-
-        auto current = frontier.front();
-        frontier.pop();
-        auto current_distance = d->operator[](current);
-        for (const auto& neighbor : current->get_neighbors()) {
-
-            if (!d->contains(neighbor)) {
-                d->set(neighbor, d->operator[](current) + 1);
-                frontier.push(neighbor);
-            }
+    for (const auto& [index, distance] : m_cells) {
+        if (distance > max_distance) {
+            max_index = index;
+            max_distance = distance;
         }
     }
 
-    return d;
+    return { max_index, max_distance };
+}
+
+void distances::collect_keys(std::vector<int32_t>& indices) const noexcept {
+    indices.clear();
+    for (const auto& [index, _] : m_cells) {
+        indices.push_back(index);
+    }
 }

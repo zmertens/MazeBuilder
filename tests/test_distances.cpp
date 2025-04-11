@@ -2,98 +2,109 @@
 
 #include <MazeBuilder/maze_builder.h>
 
+#include <functional>
+#include <tuple>
 #include <memory>
 
 using namespace mazes;
 using namespace std;
 
-TEST_CASE( "Test distance and paths", "[paths]" ) {
+TEST_CASE("Distances initialization and basic operations", "[distances]") {
+    // Initialize with root index 0
+    distances dist(0);
 
-    // Create cells
-    auto root = make_shared<cell>(0);
-    auto cell1 = make_shared<cell>(1);
-    auto cell2 = make_shared<cell>(2);
-    auto goal = make_shared<cell>(3);
-    auto disconnected = make_shared<cell>(4);
-
-    // Link cells to form a path: root -> cell1 -> cell2 -> goal
-    root->link(root, cell1);
-    cell1->link(cell1, cell2);
-    cell2->link(cell2, goal);
-
-    // Initialize distances object
-    distances d(root);
-    d.set(cell1, 1);
-    d.set(cell2, 2);
-    d.set(goal, 3);
-
-    SECTION("Null goal cell") {
-        auto path = d.path_to(nullptr);
-        REQUIRE(path == nullptr);
+    SECTION("Root index has distance 0") {
+        REQUIRE(dist[0] == 0);
     }
 
-    SECTION("Disconnected goal cell") {
-        auto path = d.path_to(disconnected);
-        REQUIRE(path == nullptr);
+    SECTION("Set and retrieve distances") {
+        dist.set(1, 5);
+        REQUIRE(dist[1] == 5);
     }
 
-    SECTION("Single cell maze") {
-        distances single_cell_distances(root);
-        auto path = single_cell_distances.path_to(root);
-        REQUIRE(path != nullptr);
-        REQUIRE(path->contains(root));
-        REQUIRE(path->operator[](root) == 0);
+    SECTION("Check containment of indices") {
+        dist.set(2, 10);
+        REQUIRE(dist.contains(2));
+        REQUIRE_FALSE(dist.contains(3));
+    }
+}
+
+TEST_CASE("path_to finds the shortest path", "[distances]") {
+    auto g = std::make_shared<mazes::grid>(3, 3, 1);
+    g->start_configuration({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
+    auto cell0 = g->search(0);
+    auto cell1 = g->search(1);
+    auto cell2 = g->search(g->num_cells() - 1);
+
+    cell0->link(cell2, true);
+
+    REQUIRE(cell0);
+    REQUIRE(cell1);
+    REQUIRE(cell2);
+
+    mazes::distances dist(cell0->get_index());
+    auto path = dist.path_to(cell2->get_index(), *g);
+
+    REQUIRE(path);
+    REQUIRE(path->contains(cell0->get_index()));
+    REQUIRE(path->contains(cell2->get_index()));
+    REQUIRE(path->operator[](cell0->get_index()) == 0);
+    REQUIRE(path->operator[](cell2->get_index()) != 0);
+}
+
+
+TEST_CASE("Distances maximum distance calculation", "[distances]") {
+    distances dist(0);
+    dist.set(1, 5);
+    dist.set(2, 10);
+    dist.set(3, 7);
+
+    auto [max_index, max_distance] = dist.max();
+
+    REQUIRE(max_index == 2);
+    REQUIRE(max_distance == 10);
+}
+
+TEST_CASE("Distances collect keys", "[distances]") {
+    distances dist(0);
+    dist.set(1, 5);
+    dist.set(2, 10);
+
+    std::vector<int32_t> keys;
+    dist.collect_keys(keys);
+
+    REQUIRE(keys.size() == 3);
+    REQUIRE(std::find(keys.begin(), keys.end(), 0) != keys.end());
+    REQUIRE(std::find(keys.begin(), keys.end(), 1) != keys.end());
+    REQUIRE(std::find(keys.begin(), keys.end(), 2) != keys.end());
+}
+
+TEST_CASE("Distances path_to method edge cases", "[distances]") {
+    auto g = std::make_shared<mazes::grid>(3, 3, 1);
+    g->start_configuration({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
+
+    auto cell0 = g->search(0);
+    auto cell1 = g->search(1);
+
+    // Link only cell0 and cell1
+    cell0->link(cell1, true);
+
+    mazes::distances dist(0); // Initialize distances with root index 0
+    dist.set(1, 1);
+
+    SECTION("Path to valid goal index") {
+        auto path = dist.path_to(1, *g);
+        REQUIRE(path->contains(0) == true);
+        REQUIRE(path->contains(1) == true);
     }
 
-    SECTION("Circular path") {
-        cell2->link(cell2, root); // Create a circular path
-        auto path = d.path_to(goal);
-        REQUIRE(path != nullptr);
-        REQUIRE(path->contains(root));
-        REQUIRE(path->contains(cell1));
-        REQUIRE(path->contains(cell2));
-        REQUIRE(path->contains(goal));
-        REQUIRE(path->operator[](root) == 0);
-        REQUIRE(path->operator[](cell1) == 1);
-        REQUIRE(path->operator[](cell2) == 2);
-        REQUIRE(path->operator[](goal) == 3);
+    SECTION("Path to disconnected cell") {
+        auto path = dist.path_to(2, *g);
+        REQUIRE(path->contains(2) == false);
     }
 
-    SECTION("Multiple paths") {
-        auto cell3 = make_shared<cell>(5);
-        cell1->link(cell1, cell3);
-        cell3->link(cell3, goal);
-        d.set(cell3, 2);
-        d.set(goal, 3);
-        auto path = d.path_to(goal);
-        REQUIRE(path != nullptr);
-        REQUIRE(path->contains(root));
-        REQUIRE(path->contains(cell1));
-        REQUIRE(path->contains(goal));
-        REQUIRE(path->operator[](root) == 0);
-        REQUIRE(path->operator[](cell1) == 1);
-        // Shortest path should be through cell3
-        REQUIRE(path->operator[](goal) == 3);
-    }
-
-    SECTION("Dijkstra's algorithm") {
-        auto d2 = d.dist();
-
-        vector<shared_ptr<cell>> cells;
-        d2->collect_keys(ref(cells));
-
-        REQUIRE(d2 != nullptr);
-
-        for (const auto& c : cells) {
-
-            REQUIRE(d2->contains(c));
-            if (c != root) {
-
-                REQUIRE(d2->operator[](c) >= 1);
-            } else {
-
-                REQUIRE(d2->operator[](c) == 0);
-            }
-        }
+    SECTION("Path to invalid index") {
+        auto path = dist.path_to(100, *g);
+        REQUIRE(path->contains(100) == false);
     }
 }

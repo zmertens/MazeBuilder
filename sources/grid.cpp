@@ -13,7 +13,6 @@
 #if defined(MAZE_DEBUG)
 #include <iostream>
 #endif
-#include <numeric>
 
 using namespace mazes;
 
@@ -99,10 +98,8 @@ void grid::start_configuration(std::vector<int> const& indices) noexcept {
         return;
     }
 
-    auto [ROWS, COLUMNS, _] = this->get_dimensions();
-
     vector<shared_ptr<cell>> cells;
-    cells.reserve(ROWS * COLUMNS);
+    cells.reserve(indices.size());
 
     int row{ 0 }, column{ 0 }, index{ 0 }, last_cell_count{ 0 };
 
@@ -213,39 +210,6 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 
     for (auto&& [_, c] : m_cells) {
         cells.emplace_back(c);
-    }
-
-    sort(cells.begin(), cells.end(), [](std::shared_ptr<cell> const& c1, std::shared_ptr<cell> const& c2) {
-        return c1->get_index() < c2->get_index();
-        });
-}
-
-// Create a 2D representation of the grid
-void grid::to_vec2(std::vector<std::vector<std::shared_ptr<cell>>>& cells) const noexcept {
-
-    // Populate the cells starting from the root
-    std::vector<std::shared_ptr<cell>> flat_cells;
-    this->to_vec(ref(flat_cells));
-
-    // Get the grid dimensions
-    auto [rows, columns, _] = this->get_dimensions();
-
-    // Resize the 2D vector to match the grid dimensions
-    cells.resize(rows);
-    for (auto& row : cells) {
-        row.resize(columns);
-    }
-
-    // Fill the 2D vector with cells from the 1D vector
-    for (unsigned int i = 0; i < rows; ++i) {
-        for (unsigned int j = 0; j < columns; ++j) {
-            auto index = this->m_calc_index(i, j);
-            if (index < 0 || index >= flat_cells.size()) {
-                return;
-            }
-
-            cells[i][j] = flat_cells[index];
-        }
     }
 }
 

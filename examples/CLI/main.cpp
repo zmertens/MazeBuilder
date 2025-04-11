@@ -22,11 +22,11 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
           -a, --algo         dfs, sidewinder, binary_tree [default]
           -c, --columns      columns
           -d, --distances    show distances using base36 numbers
+          -e, --encode       encode maze to base64 string
           -h, --help         display this help message
           -j, --json         run with arguments in JSON format
           -s, --seed         seed for the mt19937 generator
           -r, --rows         rows
-          -l, --levels       levels or the height
           -o, --output       [txt|text] [jpg|jpeg] [png] [obj|object] [stdout]
           -v, --version      display program version
     )help";
@@ -60,9 +60,9 @@ int main(int argc, char* argv[]) {
 
     auto seed = 0;
     if (maze_args.get("-s").has_value()) {
-        seed = atoi(maze_args.get("-s").value().c_str());
+        seed = stoi(maze_args.get("-s").value());
     } else if (maze_args.get("--seed").has_value()) {
-        seed = atoi(maze_args.get("--seed").value().c_str());
+        seed = stoi(maze_args.get("--seed").value());
     }
 
     std::mt19937 rng_engine{ static_cast<unsigned long>(seed)};
@@ -80,21 +80,21 @@ int main(int argc, char* argv[]) {
 
     auto rows = 3, columns = 2, levels = 1;
     if (maze_args.get("-c").has_value()) {
-        columns = atoi(maze_args.get("-c").value().c_str());
+        columns = stoi(maze_args.get("-c").value());
     } else if (maze_args.get("--columns").has_value()) {
-        columns = atoi(maze_args.get("--columns").value().c_str());
+        columns = stoi(maze_args.get("--columns").value());
     }
 
     if (maze_args.get("-r").has_value()) {
-        rows = atoi(maze_args.get("-r").value().c_str());
+        rows = stoi(maze_args.get("-r").value());
     } else if (maze_args.get("--rows").has_value()) {
-        rows = atoi(maze_args.get("--rows").value().c_str());
+        rows = stoi(maze_args.get("--rows").value());
     }
 
     if (maze_args.get("-l").has_value()) {
-        levels = atoi(maze_args.get("-l").value().c_str());
+        levels = stoi(maze_args.get("-l").value());
     } else if (maze_args.get("--levels").has_value()) {
-        levels = atoi(maze_args.get("--levels").value().c_str());
+        levels = stoi(maze_args.get("--levels").value());
     }
 
     bool distances{ false };
@@ -102,6 +102,13 @@ int main(int argc, char* argv[]) {
         distances = true;
     } else if (maze_args.get("--distances").has_value()) {
         distances = true;
+    }
+
+    bool encodes{ false };
+    if (maze_args.get("-e").has_value()) {
+        encodes = true;
+    } else if (maze_args.get("--encodes").has_value()) {
+        encodes = true;
     }
 
     string output_file_str = "stdout";
@@ -139,7 +146,10 @@ int main(int argc, char* argv[]) {
             throw runtime_error("Failed to create maze");
         }
 
-        auto maze_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+        auto temp_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
+
+        mazes::base64_helper my_base64;
+        auto maze_s = (encodes) ? my_base64.encode(cref(temp_s)) : temp_s;
 
         mazes::writer my_writer;
 
@@ -187,14 +197,13 @@ int main(int argc, char* argv[]) {
 
             mazes::json_helper jh{};
             maze_args.set("duration", to_string(chrono::duration<double, milli>(dur).count()));
-            maze_args.set("str", maze_s);
+            maze_args.set("str", cref(maze_s));
             const auto& args = maze_args.get();
             const auto& args_to_json_str = jh.from(cref(args));
             success = my_writer.write_file(cref(output_file_str), cref(args_to_json_str));
             break;
         }
         case mazes::output::PLAIN_TEXT: {
-
             success = my_writer.write_file(cref(output_file_str), cref(maze_s));
             break;
         }

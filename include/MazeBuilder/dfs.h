@@ -6,10 +6,13 @@
 #include <functional>
 #include <memory>
 #include <random>
+#include <vector>
 
 namespace mazes {
 
 class grid_interface;
+class randomizer;
+class cell;
 
 /// @file dfs.h
 /// @class dfs
@@ -17,13 +20,15 @@ class grid_interface;
 /// @details Also-known-as the recursive backtracker algorithm
 /// @details This algorithm is used to generate mazes by visiting each cell in the grid and carving a path to the next cell
 class dfs : public algo_interface {
-    public:
+public:
     /// @brief Run the depth-first search algorithm
     /// @param g
-    /// @param get_int
     /// @param rng
     /// @return success or failure
-    virtual bool run(const std::unique_ptr<grid_interface>& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    virtual bool run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const noexcept override;
+
+private:
+    std::vector<std::shared_ptr<cell>> get_unvisited_neighbors(std::shared_ptr<cell> const& c) const noexcept;
 };
 }
 

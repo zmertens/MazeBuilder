@@ -10,14 +10,17 @@
 using namespace mazes;
 
 /// @brief 
-lab::lab() {
+lab::lab()
+: m_p_q{}
+, levels{} {
 
 }
 
 lab::~lab() = default;
 
 lab::lab(const lab& other)
-: m_p_q(other.m_p_q) {
+: m_p_q(other.m_p_q)
+, levels{} {
 
 }
 

@@ -5,7 +5,6 @@
 
 #include <functional>
 #include <memory>
-#include <random>
 
 namespace mazes {
 
@@ -19,10 +18,9 @@ class binary_tree : public algo_interface {
 public:
     /// @brief Run the binary tree algorithm
     /// @param g
-    /// @param get_int
     /// @param rng
     /// @return success or failure
-    bool run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept override;
 private:
 
 };

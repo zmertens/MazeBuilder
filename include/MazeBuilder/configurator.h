@@ -70,7 +70,7 @@ private:
     unsigned int levels_ = 1;
     int block_id_ = -1;
     algo algo_ = algo::DFS;
-    unsigned int seed_ = 2;
+    unsigned int seed_ = 0;
     bool distances_ = false;
     output output_ = output::STDOUT;
 };

@@ -15,7 +15,7 @@ using namespace std;
 /// @param cols 1
 /// @param height 1 
 colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int height)
-    : grid(rows, cols, height) {
+    : grid(rows, cols, height), m_distances(make_shared<distances>(0)) {
 
 }
 
@@ -35,20 +35,18 @@ optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell
         return nullopt;
     }
 
-    return grid::background_color_for(cref(c));
+	const auto& d = this->m_distances->path_to(c->get_index(), *this);
+	if (!d) {
 
-	//const auto& d = this->get_distances()->path_to(c);
-	//if (!d) {
+        return grid::background_color_for(cref(c));
+	}
 
- //       return distance_grid::background_color_for(cref(c));
-	//}
+	auto max = d->max();
 
-	//auto max = d->max();
+    int distance1 = d->operator[](max.first);
 
-	//int distance1 = d->operator[](c);
-
-	//float intensity = static_cast<float>(10 - distance1) / 10;
-	//int dark = static_cast<int>(255 * intensity);
-	//int bright = 128 + static_cast<int>(127 * intensity);
-	//return (dark << 16) | (bright << 8) | dark;
+	float intensity = static_cast<float>(10 - distance1) / 10;
+	int dark = static_cast<int>(255 * intensity);
+	int bright = 128 + static_cast<int>(127 * intensity);
+	return (dark << 16) | (bright << 8) | dark;
 } 
