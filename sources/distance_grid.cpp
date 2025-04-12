@@ -36,7 +36,7 @@ void distance_grid::start_configuration(const std::vector<int>& indices) noexcep
 
         auto [ROWS, COLUMNS, _] = this->get_dimensions();
 
-        auto found = search(ROWS * COLUMNS - 1);
+        auto found = search(ROWS * COLUMNS);
 
         if (!found) {
 

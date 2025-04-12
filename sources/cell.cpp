@@ -16,7 +16,15 @@ cell::cell(std::int32_t index)
 }
 
 bool cell::has_key(const shared_ptr<cell>& c) {
-    return m_links.find(c) != m_links.end();
+    std::lock_guard<std::shared_mutex> lock(m_links_mutex);
+    for (const auto& [weak_cell, _] : m_links) {
+        if (auto shared_cell = weak_cell.lock()) {
+            if (shared_cell == c) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 /// @brief 
@@ -24,10 +32,11 @@ bool cell::has_key(const shared_ptr<cell>& c) {
 /// @param bidi true
 void cell::link(const std::shared_ptr<cell>& other, bool bidi) noexcept {
     if (other) {
-        // Link this cell to the other cell
-        this->m_links.insert_or_assign(other, true);
+        {
+            std::lock_guard<std::shared_mutex> lock(m_links_mutex);
+            m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
+        }
 
-        // If bidirectional, link the other cell back to this cell
         if (bidi) {
             other->link(shared_from_this(), false);
         }
@@ -39,8 +48,9 @@ void cell::link(const std::shared_ptr<cell>& other, bool bidi) noexcept {
 /// @param bidi true
 void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
     if (other) {
+        std::lock_guard<std::shared_mutex> lock(m_links_mutex);
         // Unlink this cell from the other cell
-        this->m_links.erase(other);
+        m_links.erase(std::weak_ptr<cell>(other));
 
         // If bidirectional, unlink the other cell from this cell
         if (bidi) {
@@ -49,9 +59,19 @@ void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
     }
 }
 
-const std::unordered_map<shared_ptr<cell>, bool>& cell::get_links() {
-    return this->m_links;
+std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const {
+    std::vector<std::pair<std::shared_ptr<cell>, bool>> shared_links;
+    {
+        std::lock_guard<std::shared_mutex> lock(m_links_mutex);
+        for (const auto& [weak_cell, linked] : m_links) {
+            if (auto shared_cell = weak_cell.lock()) {
+                shared_links.emplace_back(shared_cell, linked);
+            }
+        }
+    }
+    return shared_links;
 }
+
 bool cell::is_linked(const shared_ptr<cell>& c) {
     return has_key(c);
 }

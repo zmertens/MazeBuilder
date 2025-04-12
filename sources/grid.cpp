@@ -132,7 +132,7 @@ void grid::start_configuration(std::vector<int> const& indices) noexcept {
     this->configure_cells(std::ref(cells));
 
     for (const auto& c : cells) {
-        m_cells.insert({ c->get_index(), c });
+        m_cells.emplace(c->get_index(), c);
     }
 
     if (!m_observers.empty()) {

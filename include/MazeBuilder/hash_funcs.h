@@ -1,9 +1,10 @@
 #ifndef HASH_FUNCS_H
 #define HASH_FUNCS_H
 
-#include <utility>
-#include <tuple>
 #include <functional>
+#include <memory>
+#include <tuple>
+#include <utility>
 
 namespace mazes {
 
@@ -56,6 +57,25 @@ struct tri_hash {
         auto hash2 = std::hash<T2>{}(std::get<1>(p));
         auto hash3 = std::hash<T3>{}(std::get<2>(p));
         return hash1 ^ hash2 ^ hash3;
+    }
+};
+
+/// @class weak_ptr_hash
+/// @brief Hashing function to store a weak_ptr
+struct weak_ptr_hash {
+
+    /// @brief Hashing function
+    /// @tparam T 
+    /// @param weak 
+    /// @return 
+    template <typename T>
+    std::size_t operator()(const std::weak_ptr<T>& weak) const {
+        if (auto shared = weak.lock()) {
+            return std::hash<std::shared_ptr<T>>{}(shared);
+        }
+
+        // Return 0 for expired weak_ptr
+        return 0;
     }
 };
 

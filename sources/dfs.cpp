@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iterator>
 
-#include <MazeBuilder/grid.h>>
+#include <MazeBuilder/grid.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/randomizer.h>
 

@@ -1,10 +1,14 @@
 #ifndef CELL_H
 #define CELL_H
 
-#include <memory>
-#include <vector>
-#include <unordered_map>
 #include <cstdint>
+#include <memory>
+#include <shared_mutex>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include <MazeBuilder/hash_funcs.h>
 
 namespace mazes {
 
@@ -33,7 +37,7 @@ public:
     /// @brief Retrieves a constant reference to an unordered map of cell links and their boolean states.
     /// @return A constant reference to an unordered map where the keys are shared pointers to cell objects
     ///     and the values are boolean states indicating the link status.
-    const std::unordered_map<std::shared_ptr<cell>, bool>& get_links();
+    std::vector<std::pair<std::shared_ptr<cell>, bool>> get_links() const;
 
     /// @brief Checks if a cell is linked.
     /// @param c A shared pointer to the cell to check.
@@ -100,9 +104,18 @@ public:
     /// @param other A shared pointer to the cell that will be set as the west neighbor.
     void set_west(std::shared_ptr<cell> const& other);
 private:
+    /// @brief Equals function for weak pointers to cell objects.
+    struct weak_ptr_equal {
+        template <typename T>
+        bool operator()(const std::weak_ptr<T>& lhs, const std::weak_ptr<T>& rhs) const {
+            return !lhs.owner_before(rhs) && !rhs.owner_before(lhs);
+        }
+    };
+
     bool has_key(const std::shared_ptr<cell>& c);
 
-    std::unordered_map<std::shared_ptr<cell>, bool> m_links;
+    std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> m_links;
+    mutable std::shared_mutex m_links_mutex;
 
     std::int32_t m_index;
 
