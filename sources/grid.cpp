@@ -152,41 +152,48 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
         for (unsigned int col = 0; col < COLUMNS; ++col) {
             int index = this->m_calc_index(row, col);
 
-            if (index > cells.size()) {
-#if defined(MAZE_DEBUG)
-                cerr << "Grid configuration failed at index: " << index << endl;
-#endif
+            if (index >= cells.size()) {
+
+                break;
             }
 
             auto&& c = cells.at(index);
 
-            // Set north neighbor
             if (row > 0) {
-                int north_index = this->m_calc_index(row - 1, col);
-                auto&& north_cell = cells.at(north_index);
-                c->set_north(north_cell);
+                auto north_index = this->m_calc_index(row - 1, col);
+                if (north_index >= 0 && north_index < cells.size()) {
+                    auto&& north_cell = cells.at(north_index);
+                    c->set_north(north_cell);
+                }
             }
 
             // Set south neighbor
             if (row < ROWS - 1) {
-                int south_index = this->m_calc_index(row + 1, col);
-                auto&& south_cell = cells.at(south_index);
-                c->set_south(south_cell);
+                auto south_index = this->m_calc_index(row + 1, col);
+                if (south_index >= 0 && south_index < cells.size()) {
+                    auto&& south_cell = cells.at(south_index);
+                    c->set_south(south_cell);
+                }
             }
 
             // Set west neighbor
             if (col > 0) {
-                int west_index = this->m_calc_index(row, col - 1);
-                auto&& west_cell = cells.at(west_index);
-                c->set_west(west_cell);
+                auto west_index = this->m_calc_index(row, col - 1);
+                if (west_index >= 0 && west_index < cells.size()) {
+                    auto&& west_cell = cells.at(west_index);
+                    c->set_west(west_cell);
+                }
             }
 
             // Set east neighbor
             if (col < COLUMNS - 1) {
-                int east_index = this->m_calc_index(row, col + 1);
-                auto&& east_cell = cells.at(east_index);
-                c->set_east(east_cell);
+                auto east_index = this->m_calc_index(row, col + 1);
+                if (east_index >= 0 && east_index < cells.size()) {
+                    auto&& east_cell = cells.at(east_index);
+                    c->set_east(east_cell);
+                }
             }
+
         }
     }
 }

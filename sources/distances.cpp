@@ -36,6 +36,7 @@ std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g)
 
     // If the goal index is the same as the root index, return an empty path
     if (goal_index == m_root_index) {
+
         return path;
     }
 
@@ -45,18 +46,29 @@ std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g)
     std::unordered_map<int32_t, int32_t> parent;
 
     // BFS queue
-    std::deque<int32_t> queue;
-    queue.push_back(goal_index);
+    std::deque<int32_t> q;
+    q.push_back(goal_index);
     // Mark the start of the path
     parent[goal_index] = -1;
 
-    while (!queue.empty()) {
-        int32_t current = queue.front();
-        queue.pop_front();
+    static constexpr auto MAX_ITERATIONS = 1000000;
+    auto current_iteration = 0;
+
+    while (!q.empty()) {
+
+#if defined(MAZE_DEBUG)
+        if (current_iteration++ > MAX_ITERATIONS) {
+            std::cerr << "Error: BFS exceeded maximum iterations." << std::endl;
+            return path;
+        }
+#endif
+
+        int32_t current = q.front();
+        q.pop_front();
 
         // Retrieve the current cell
-        auto cell = g.search(current);
-        if (!cell) {
+        auto c = g.search(current);
+        if (!c) {
 #if defined(MAZE_DEBUG)
             std::cerr << "Error: grid::search returned nullptr for index " << current << std::endl;
 #endif
@@ -64,8 +76,21 @@ std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g)
         }
 
         // Iterate over linked neighbors
-        for (const auto& link : cell->get_links()) {
+        for (const auto& link : c->get_links()) {
+            if (!link.first) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Error: Null neighbor in cell links for index " << current << std::endl;
+#endif
+                continue;
+            }
+
             int32_t neighbor_index = link.first->get_index();
+            if (neighbor_index == current) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Error: Cell links to itself at index " << current << std::endl;
+#endif
+                continue;
+            }
 
             // Skip if the neighbor is already visited
             if (parent.find(neighbor_index) != parent.cend()) {
@@ -76,7 +101,7 @@ std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g)
             parent[neighbor_index] = current;
 
             // Add the neighbor to the queue
-            queue.push_back(neighbor_index);
+            q.push_back(neighbor_index);
 
             // If we reach the root index, reconstruct the path
             if (neighbor_index == m_root_index) {

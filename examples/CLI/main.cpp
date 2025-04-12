@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
             auto pixels_w{ 0 }, pixels_h{ 0 };
             pixels.reserve(rows * columns * STRIDE);
             if (distances) {
-                mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+                mazes::stringz::to_pixels_colored(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
             } else {
                 mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
             }
@@ -185,7 +185,7 @@ int main(int argc, char* argv[]) {
             auto pixels_w{ 0 }, pixels_h{ 0 };
             pixels.reserve(rows * columns * STRIDE);
             if (distances) {
-                mazes::stringz::to_pixels(cref(next_maze_ptr.value()), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+                mazes::stringz::to_pixels_colored(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
             } else {
                 mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
             }

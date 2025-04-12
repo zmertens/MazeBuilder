@@ -10,6 +10,7 @@
 #include <iostream>
 #endif
 
+#include <cctype>
 #include <random>
 #include <tuple>
 #include <unordered_set>
@@ -216,10 +217,84 @@ void stringz::to_pixels(const std::string& s, std::vector<std::uint8_t>& pixels,
 /// @param width The width of the resulting image.
 /// @param height The height of the resulting image.
 /// @param stride The number of bytes per pixel (e.g., 4 for RGBA).
-void stringz::to_pixels(const std::unique_ptr<maze>& m, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
+void stringz::to_pixels_colored(const std::string& s, std::vector<std::uint8_t>& pixels, int& width, int& height, int stride) noexcept {
     using namespace std;
 
-    to_pixels(stringify(cref(m)), ref(pixels), ref(width), ref(height), stride);
+    if (s.empty()) {
+
+        width = height = 0;
+        pixels.clear();
+        return;
+    }
+
+    // Determine width and height (assume fixed dimensions)
+    auto temp_width{ 0 };
+    width = height = 0;
+    for (char c : s) {
+
+        if (c == '\n') {
+            height += 1;
+            if (temp_width > width) {
+                width = temp_width;
+            }
+            temp_width = 0;
+        } else {
+            temp_width += 1;
+        }
+    }
+
+    if (temp_width > 0) {
+
+        height += 1;
+        if (temp_width > width) {
+            width = temp_width;
+        }
+    }
+
+    // Initialize the pixel array
+    pixels.resize(width * height * stride, 255);
+
+    // Parse the string to extract numbers and map them to colors
+    // Fill the pixel array
+    int x{ 0 }, y{ 0 };
+    for (char c : s) {
+
+        if (c == '\n') {
+
+            y += 1;
+            x = 0;
+        } else {
+            auto index = (y * width + x) * stride;
+
+            if (std::isdigit(c)) {
+                // Color for digits in RGBA format
+                pixels[index] = 0;
+                pixels[index + 1] = 255;
+                pixels[index + 2] = 0;
+            } else if (c == CORNER || c == BARRIER1 || c == BARRIER2) {
+                // Color for barriers, walls in RGBA format
+                pixels[index] = 0;
+                pixels[index + 1] = 0;
+                pixels[index + 2] = 255;
+            } else if (c == ' ') {
+                // Color for empty spaces in RGBA format
+                pixels[index] = 255;
+                pixels[index + 1] = 255;
+                pixels[index + 2] = 255;
+            }
+
+            // Alpha channel
+            pixels[index + 3] = 255;
+
+            x += 1;
+        }
+    }
+
+#if defined(MAZE_DEBUG)
+    cout << "Width: " << width << "\nHeight: " << height << endl;
+    cout << "Stride: " << stride << endl;
+    cout << "Pixels: " << pixels.size() << endl;
+#endif
 }
 
 

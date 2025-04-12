@@ -1,20 +1,23 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include <functional>
 #include <algorithm>
-#include <sstream>
-#include <random>
+#include <cstdint>
+#include <deque>
+#include <functional>
 #include <memory>
-#include <vector>
 #include <numeric>
-
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/cell.h>
-#include <MazeBuilder/distance_grid.h>
-#include <MazeBuilder/colored_grid.h>
+#include <random>
+#include <sstream>
+#include <unordered_set>
+#include <vector>
 
 #include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/randomizer.h>
 
 using namespace mazes;
 using namespace std;
@@ -48,7 +51,7 @@ TEST_CASE("Assert grid", "[grid asserts]") {
     STATIC_REQUIRE(std::is_move_assignable<mazes::colored_grid>::value);
 }
 
-TEST_CASE( "Test grid future", "[grid future]" ) {
+TEST_CASE( "Test grid dimensions", "[grid dimensions]" ) {
 
     SECTION(" Regular grid ") {
         auto [rows, columns, height] = my_grid->get_dimensions();
@@ -78,19 +81,29 @@ TEST_CASE( "Test grid future", "[grid future]" ) {
 /// @brief Verify that cells have been populated
 TEST_CASE("Test to_vec", "[to_vec]") {
 
-    // Each grid can be "futurized" only once
-    REQUIRE(my_grid != nullptr);
+    REQUIRE_FALSE(my_grid->is_observed());
+    REQUIRE_FALSE(my_grid_distances->is_observed());
+    REQUIRE_FALSE(my_grid_colored->is_observed());
 
-    mt19937 mt{ std::random_device{}() };
-    std::vector<int> shuffled_indices(ROWS * COLUMNS);
-    std::iota(shuffled_indices.begin(), shuffled_indices.end(), 0);
-    std::shuffle(shuffled_indices.begin(), shuffled_indices.end(), mt);
+    randomizer rng;
+    rng.seed();
+    auto shuffled_indices = rng.get_num_ints_incl(0, ROWS * COLUMNS);
 
-    my_grid->start_configuration(shuffled_indices);
+    my_grid->start_configuration(cref(shuffled_indices));
+    my_grid_distances->start_configuration(cref(shuffled_indices));
+    my_grid_colored->start_configuration(cref(shuffled_indices));
 
     vector<shared_ptr<cell>> my_cells;
     my_grid->to_vec(ref(my_cells));
 
+    REQUIRE(my_cells.size() == ROWS * COLUMNS);
+
+    my_cells.clear();
+    my_grid_distances->to_vec(ref(my_cells));
+    REQUIRE(my_cells.size() == ROWS * COLUMNS);
+
+    my_cells.clear();
+    my_grid_colored->to_vec(ref(my_cells));
     REQUIRE(my_cells.size() == ROWS * COLUMNS);
 }
 
