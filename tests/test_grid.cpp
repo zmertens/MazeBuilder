@@ -28,6 +28,16 @@ static unique_ptr<grid> my_grid = make_unique<grid>(ROWS, COLUMNS, HEIGHT);
 static unique_ptr<distance_grid> my_grid_distances = make_unique<distance_grid>(ROWS, COLUMNS, HEIGHT);
 static unique_ptr<colored_grid> my_grid_colored = make_unique<colored_grid>(ROWS, COLUMNS, HEIGHT);
 
+/// @brief Helper function to find a cell in a vector of links
+/// @param links The vector of links to search
+/// @param target The cell to find
+/// @return True if the cell is found, false otherwise
+bool find_cell_in_links(const std::vector<std::pair<std::shared_ptr<cell>, bool>>& links, const std::shared_ptr<cell>& target) {
+    return std::any_of(links.begin(), links.end(), [&target](const auto& link) {
+        return link.first == target;
+        });
+}
+
 TEST_CASE("Assert grid", "[grid asserts]") {
     STATIC_REQUIRE(std::is_default_constructible<mazes::grid>::value);
     STATIC_REQUIRE(std::is_destructible<mazes::grid>::value);
@@ -156,8 +166,8 @@ TEST_CASE("Cells can link", "[cell link]") {
 
         auto links = cell1->get_links();
         REQUIRE(links.size() == 2);
-        REQUIRE(links.find(cell2) != links.end());
-        REQUIRE(links.find(cell3) != links.end());
+        REQUIRE(find_cell_in_links(links, cell2));
+        REQUIRE(find_cell_in_links(links, cell3));
     }
 }
 
