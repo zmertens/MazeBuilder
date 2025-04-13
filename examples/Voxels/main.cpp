@@ -18,7 +18,7 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
         .constructor<const std::string&, const std::string&, int, int>()
         .function("mazes", &craft::mazes)
         .function("toggle_mouse", &craft::toggle_mouse)
-        .class_function("instance", &mazes::singleton_base<craft>::instance, emscripten::allow_raw_pointers());
+        .class_function("get_instance", &mazes::singleton_base<craft>::get_instance, emscripten::allow_raw_pointers());
 }
 #endif
 
@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
         // Run the SDL app
         static constexpr int window_w = 800, window_h = 600;
         string my_title { "Maze Builder 🔧" };
-        auto&& voxel_engine = craft::instance(cref(my_title), mazes::VERSION, window_w, window_h);
+        auto&& voxel_engine = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
         success = voxel_engine->run(std::ref(rng));
         if (!success) {
             std::cerr << "ERROR: Running SDL app failed." << std::endl;

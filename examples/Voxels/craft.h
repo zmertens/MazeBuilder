@@ -6,13 +6,10 @@
 #include <functional>
 #include <random>
 
-#include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/randomizer.h>
 
 /// @brief Monolithic class to handle running a voxel engine
-class craft : public mazes::singleton_base<craft> {
-
-    friend class mazes::singleton_base<craft>;
+class craft {
 public:
     craft(const std::string& title, const std::string& version, int w, int h);
     ~craft();
@@ -22,6 +19,13 @@ public:
     // Web interaction
     std::string mazes() const noexcept;
     void toggle_mouse() const noexcept;
+
+    template <typename... Args>
+    /// @brief Static method to access the singleton instance of the craft class.
+    static std::shared_ptr<craft> get_instance(Args&&... args) noexcept {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::forward<Args>(args)...);
+        return instance;
+    }
 
 private:
     struct craft_impl;
