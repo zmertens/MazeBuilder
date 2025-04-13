@@ -2,7 +2,7 @@
 
 # Maze Builder
 
-Create and customize mazes on multiple platforms and languages. Below is an example of the string generated from the command-line interface example.
+Create and customize mazes on multiple platforms and languages. Below shows an example of the output string generated from the command-line interface: `mazebuildercli.exe -r 10 -c 10 -a dfs`
 
 ```text
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -30,17 +30,16 @@ Create and customize mazes on multiple platforms and languages. Below is an exam
 
 ---
 
-## Exports
+## Output Formats
 
-The library provides multiple export formats like Wavefront object, PNG and JPEG images, JSON, and plain text or stdout.
+The library provides multiple output formats like Wavefront object, PNG and JPEG images, JSON, and plain text or stdout.
 
-Here's an example JSON output:
+Here's an example of the command-line program producing JSON output: `mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
 
 ```json
 {
   "rows": 2,
   "columns": 5,
-  "levels": 1,
   "seed": 2,
   "algo": "dfs",
   "distances": false,
@@ -56,21 +55,24 @@ Here's an example JSON output:
 
 ## Help Message
 
+View the help message from the command-line example: `./mazebuildercli --help`
+
 ```sh
-        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
+        Usages: app.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
         Options: case-sensitive, long options must use '=' combination
-        Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-        Example: mb.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt_
+        Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt
+        Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt
           -a, --algo         dfs, sidewinder, binary_tree [default]
           -c, --columns      columns
           -d, --distances    show distances using base36 numbers
+          -e, --encode       encode maze to base64 string
           -h, --help         display this help message
           -j, --json         run with arguments in JSON format
           -s, --seed         seed for the mt19937 generator
           -r, --rows         rows
-          -l, --levels       levels or the height
-          -o, --output       [txt|text] [jpg|jpeg] [png] [obj|object] [stdout]
+          -o, --output       [txt|text] [json] [jpg|jpeg] [png] 
+                              [obj|object] [stdout]
           -v, --version      display program version
 ```
 
@@ -94,12 +96,13 @@ Use the C++ API in a modern C++ program:
 
 ```cpp
     #include <iostream>
+    
     #include <MazeBuilder/maze_builder.h>
 
     void main() {
-        auto m = mazes::factory::create(
-            mazes::configurator()
-                .rows(10).columns(10));
+        auto rows{10}, cols{10};
+
+        auto m = mazes::factory::create(rows, cols);
 
         auto s = mazes::stringz::stringify(m);
 
@@ -134,7 +137,7 @@ Use the following CMake options to configure the project:
 
 ---
 
-### Example Commands
+### Build Commands
 
 Configure it: `cmake -GNinja -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
 
@@ -160,7 +163,7 @@ Run the tests: `ctest --test-dir build-tests/tests --verbose -C Debug`
 
 ---
 
-### Build for the Web
+### Configure for the Web
 
 Configure examples for the browser using [Emscripten](https://emscripten.org/) and their toolchain file.
 

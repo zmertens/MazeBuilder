@@ -23,6 +23,7 @@
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
+#include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/stringz.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 #include <MazeBuilder/writer.h>

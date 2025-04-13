@@ -17,6 +17,20 @@
 
 using namespace mazes;
 
+/// @brief 
+/// @param rows 10
+/// @param columns 10
+/// @return 
+std::optional<std::unique_ptr<maze>> factory::create_q(unsigned int rows, unsigned int columns) noexcept {
+    using namespace std;
+
+    configurator config;
+    config.rows(rows).columns(columns).levels(1).distances(false).seed(0)._algo(algo::DFS);
+    config._output(output::STDOUT).block_id(-1);
+
+    return create(config);
+}
+
 std::optional<std::unique_ptr<maze>> factory::create(configurator const& config) noexcept {
     using namespace std;
 

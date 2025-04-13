@@ -14,11 +14,11 @@
 std::string maze_builder_version = "maze_builder\nversion\t" + mazes::VERSION;
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
-        Usages: maze_builder.exe [OPTION(S)]... [OUTPUT]
+        Usages: app.exe [OPTION(S)]... [OUTPUT]
         Generates mazes and exports to different formats
         Options: case-sensitive, long options must use '=' combination
-        Example: maze_builder.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-        Example: mb.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt_
+        Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt
+        Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt
           -a, --algo         dfs, sidewinder, binary_tree [default]
           -c, --columns      columns
           -d, --distances    show distances using base36 numbers
@@ -27,7 +27,8 @@ static constexpr auto MAZE_BUILDER_HELP = R"help(
           -j, --json         run with arguments in JSON format
           -s, --seed         seed for the mt19937 generator
           -r, --rows         rows
-          -o, --output       [txt|text] [jpg|jpeg] [png] [obj|object] [stdout]
+          -o, --output       [txt|text] [json] [jpg|jpeg] [png] 
+                              [obj|object] [stdout]
           -v, --version      display program version
     )help";
 
@@ -64,12 +65,6 @@ int main(int argc, char* argv[]) {
     } else if (maze_args.get("--seed").has_value()) {
         seed = stoi(maze_args.get("--seed").value());
     }
-
-    std::mt19937 rng_engine{ static_cast<unsigned long>(seed)};
-    auto get_int = [&rng_engine](int low, int high) -> int {
-        uniform_int_distribution<int> dist {low, high};
-        return dist(rng_engine);
-    };
 
     string algo_str = "dfs";
     if (maze_args.get("-a").has_value()) {

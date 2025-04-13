@@ -22,6 +22,12 @@ class factory {
 public:
 
 	/// @brief Create a maze pointer
+	/// @param rows 
+	/// @param columns 
+	/// @return 
+	static std::optional<std::unique_ptr<maze>> create_q(unsigned int rows = 10, unsigned int columns = 10) noexcept;
+
+	/// @brief Create a maze pointer
 	/// @param config 
 	/// @return 
 	static std::optional<std::unique_ptr<maze>> create(configurator const& config) noexcept;
