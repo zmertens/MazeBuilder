@@ -20,10 +20,9 @@ public:
     std::string mazes() const noexcept;
     void toggle_mouse() const noexcept;
 
-    template <typename... Args>
     /// @brief Static method to access the singleton instance of the craft class.
-    static std::shared_ptr<craft> get_instance(Args&&... args) noexcept {
-        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::forward<Args>(args)...);
+    static std::shared_ptr<craft> get_instance(const std::string& title, const std::string& version, int w, int h) noexcept {
+        static std::shared_ptr<craft> instance = std::make_shared<craft>(std::cref(title), std::cref(version), w, h);
         return instance;
     }
 

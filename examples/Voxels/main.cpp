@@ -18,7 +18,7 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
         .constructor<const std::string&, const std::string&, int, int>()
         .function("mazes", &craft::mazes)
         .function("toggle_mouse", &craft::toggle_mouse)
-        .class_function("get_instance", &mazes::singleton_base<craft>::get_instance, emscripten::allow_raw_pointers());
+        .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
 }
 #endif
 
