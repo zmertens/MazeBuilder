@@ -1,5 +1,7 @@
 #include <MazeBuilder/cell.h>
 
+#include <mutex>
+
 using namespace mazes;
 using namespace std;
 
