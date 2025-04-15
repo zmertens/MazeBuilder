@@ -15,12 +15,18 @@ namespace mazes {
 /// @file cell.h
 /// @class cell
 /// @brief Cell class for maze generation
-class cell : public std::enable_shared_from_this<cell> {
+class cell final : public std::enable_shared_from_this<cell> {
 
 public:
     /// @brief Constructs a cell object with an optional index.
     /// @param index The index to initialize the cell with. Defaults to 0.
     explicit cell(std::int32_t index = 0);
+
+    ~cell();
+    cell(const cell& other);
+    cell& operator=(const cell& other);
+    cell(cell&& other) noexcept;
+    cell& operator=(cell&& other) noexcept;
 
     /// @brief Links two cell objects, optionally in both directions.
     /// @param c1 A shared pointer to the first cell object.

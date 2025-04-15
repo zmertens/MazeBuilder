@@ -15,6 +15,73 @@ cell::cell(std::int32_t index)
 
 }
 
+// Destructor
+cell::~cell() {
+    std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+    m_links.clear();
+}
+
+// Copy Constructor
+cell::cell(const cell& other)
+    : m_index(other.m_index),
+      m_north(other.m_north),
+      m_south(other.m_south),
+      m_east(other.m_east),
+      m_west(other.m_west) {
+    std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
+    m_links = other.m_links;
+}
+
+// Copy Assignment Operator
+cell& cell::operator=(const cell& other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    std::unique_lock<std::shared_mutex> lock_this(m_links_mutex);
+    std::unique_lock<std::shared_mutex> lock_other(other.m_links_mutex);
+
+    m_index = other.m_index;
+    m_north = other.m_north;
+    m_south = other.m_south;
+    m_east = other.m_east;
+    m_west = other.m_west;
+    m_links = other.m_links;
+
+    return *this;
+}
+
+// Move Constructor
+cell::cell(cell&& other) noexcept
+    : m_index(other.m_index),
+      m_north(std::move(other.m_north)),
+      m_south(std::move(other.m_south)),
+      m_east(std::move(other.m_east)),
+      m_west(std::move(other.m_west)) {
+
+    std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
+    m_links = std::move(other.m_links);
+}
+
+// Move Assignment Operator
+cell& cell::operator=(cell&& other) noexcept {
+    if (this == &other) {
+        return *this;
+    }
+
+    std::unique_lock<std::shared_mutex> lock_this(m_links_mutex);
+    std::unique_lock<std::shared_mutex> lock_other(other.m_links_mutex);
+
+    m_index = other.m_index;
+    m_north = std::move(other.m_north);
+    m_south = std::move(other.m_south);
+    m_east = std::move(other.m_east);
+    m_west = std::move(other.m_west);
+    m_links = std::move(other.m_links);
+
+    return *this;
+}
+
 bool cell::has_key(const shared_ptr<cell>& c) {
     std::lock_guard<std::shared_mutex> lock(m_links_mutex);
     for (const auto& [weak_cell, _] : m_links) {

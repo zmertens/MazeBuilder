@@ -70,6 +70,11 @@ grid::~grid() {
     for (auto&& [_, c] : m_cells) {
         c.reset();
     }
+    m_cells.clear();
+    m_observers.clear();
+    m_configured = false;
+    m_dimensions = { 0, 0, 0 };
+    m_calc_index = {};
 }
 
 void grid::notify_observers() noexcept {
