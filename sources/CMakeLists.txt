@@ -29,17 +29,32 @@ if(EMSCRIPTEN)
 endif()
 
 if(MAZE_BUILDER_COVERAGE)
-    message(INFO ": Building ${PROJECT_NAME} with code coverage")
-    set(RUN_CPPCHECK "run_cppcheck")
+    message(STATUS "Building ${PROJECT_NAME} with code coverage")
+    
+    # Include CppCheck module first
     include(CppCheck)
-    message(INFO ": Found CppCheck: ${CPPCHECK_EXECUTABLE}")
-    add_custom_target(${RUN_CPPCHECK}
-        COMMAND ${CPPCHECK_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
-        --output-file=cppcheck.xml ${MAZE_BUILDER_CORE_SRCS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
-    )
-    AddCppCheck(${RUN_CPPCHECK})
+    
+    # Find cppcheck executable
+    find_program(CPPCHECK_EXECUTABLE cppcheck)
+    if(NOT CPPCHECK_EXECUTABLE)
+        message(WARNING "cppcheck not found, static analysis will be skipped")
+    else()
+        message(STATUS "Found CppCheck: ${CPPCHECK_EXECUTABLE}")
+        
+        # Create the custom target with proper executable reference
+        set(RUN_CPPCHECK "run_cppcheck")
+        add_custom_target(${RUN_CPPCHECK}
+            COMMAND ${CPPCHECK_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
+            --output-file=cppcheck.xml ${MAZE_BUILDER_CORE_SRCS}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
+        )
+        
+        # No need to call AddCppCheck on the custom target
+        # The AddCppCheck function is designed for actual library/executable targets
+        # AddCppCheck(${MAZE_BUILDER_LIB_OUT}_obj)
+    endif()
+    
     if(CMAKE_COMPILER_IS_GNUCXX)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
@@ -62,7 +77,7 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_S
 set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
+    message(STATUS ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
     target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "MAZE_DEBUG")
 endif()
 

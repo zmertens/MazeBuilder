@@ -30,15 +30,19 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
         // Remove flags
         if (is_long) {
             auto pos = raw_literal.find_first_of("=");
-            raw_literal = raw_literal.substr(pos + 1);
+            if (pos != string::npos) {
+                raw_literal.erase(0, pos + 1);
+            }
         } else {
             auto pos = raw_literal.find_first_of("j");
-            raw_literal = raw_literal.substr(pos + 1);
+            if (pos != string::npos) {
+                raw_literal.erase(0, pos + 1);
+            }
         }
 
         raw_literal.erase(std::remove(raw_literal.begin(), raw_literal.end(), '`'), raw_literal.end());
         return raw_literal;
-        };
+    };
 
     for (size_t i = 0; i < arguments.size(); ++i) {
         const auto& arg = arguments[i];
@@ -92,7 +96,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             auto pos = key.find('=');
             if (pos != string::npos) {
                 value = key.substr(pos + 1);
-                key = key.substr(0, pos);
+                key.resize(pos);
             } else if (i + 1 < arguments.size() && !regex_match(arguments[i + 1], short_arg_regex) && !regex_match(arguments[i + 1], long_arg_regex)) {
                 value = arguments[++i];
             }

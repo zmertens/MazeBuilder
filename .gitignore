@@ -36,3 +36,5 @@ Gemfile.lock
 # Python
 .venv
 
+# Cppcheck XML
+sources/cppcheck.xml

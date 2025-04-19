@@ -41,7 +41,7 @@ set(CRAFT_SOURCES
 set(VOXELS_EXE "mazebuildervoxels")
 # Note that the latest SDL might not be available as an EMSDK port yet
 if(EMSCRIPTEN)
-    message(INFO ": Building ${PROJECT_NAME} examples for the Web!")
+    message(INFO ": Building ${VOXELS_EXE} examples for the Web!")
 
     # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
     if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -72,17 +72,17 @@ if(EMSCRIPTEN)
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(INFO ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
+        message(STATUS ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s SAFE_HEAP=2 -s ASSERTIONS=2 -gsource-map")
         target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
     else()
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
 else()
-    message(INFO ": Building ${PROJECT_NAME} examples for the Desktop!")
+    message(INFO ": Building ${VOXELS_EXE} examples for the Desktop!")
     find_package(SDL3 QUIET)
     if(NOT SDL3_FOUND)
-        message(INFO ": Getting SDL via FetchContent")
+        message(STATUS ": Getting SDL via FetchContent")
         set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
         set(SDL_STATIC FALSE CACHE BOOL "Build a SDL static library (if available)")
         FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
@@ -98,7 +98,7 @@ else()
     target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(INFO ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
+        message(STATUS ": Enabled ${VOXELS_EXE} to use -DMAZE_DEBUG flag.")
         target_compile_definitions(${VOXELS_EXE} PRIVATE "MAZE_DEBUG")
     endif()
 
