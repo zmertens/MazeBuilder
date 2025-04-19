@@ -119,6 +119,7 @@ private:
     };
 
     bool has_key(const std::shared_ptr<cell>& c);
+    void cleanup_links();
 
     std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> m_links;
     mutable std::shared_mutex m_links_mutex;

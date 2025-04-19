@@ -96,6 +96,19 @@ bool cell::has_key(const shared_ptr<cell>& c) {
     return false;
 }
 
+void cell::cleanup_links() {
+    std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+    for (auto it = m_links.begin(); it != m_links.end(); ) {
+        if (it->first.expired()) {
+
+            // Remove expired weak_ptr
+            it = m_links.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
 /// @brief 
 /// @param other
 /// @param bidi true
@@ -110,6 +123,8 @@ void cell::link(const std::shared_ptr<cell>& other, bool bidi) noexcept {
             other->link(shared_from_this(), false);
         }
     }
+
+    cleanup_links();
 }
 
 /// @brief 
@@ -126,6 +141,8 @@ void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
             other->unlink(shared_from_this(), false);
         }
     }
+
+    cleanup_links();
 }
 
 std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const {

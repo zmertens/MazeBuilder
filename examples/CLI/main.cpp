@@ -11,6 +11,25 @@
 
 #include <MazeBuilder/maze_builder.h>
 
+#include "cli.h"
+
+#if defined(__EMSCRIPTEN__)
+#include <emscripten/bind.h>
+
+// This is necessary due to emscripten's handling of templates
+std::shared_ptr<cli> get() {
+    return mazes::singleton_base<cli>::instance();
+}
+
+EMSCRIPTEN_BINDINGS(cli_module) {
+    emscripten::function("get", &get, emscripten::allow_raw_pointers());
+    emscripten::class_<cli>("cli")
+        .smart_ptr<std::shared_ptr<cli>>("std::shared_ptr<cli>")
+        .function("stringify_from_dimens", &cli::stringify_from_dimens);
+}
+
+#endif // EMSCRIPTEN_BINDINGS
+
 std::string maze_builder_version = "maze_builder\nversion\t" + mazes::VERSION;
 
 static constexpr auto MAZE_BUILDER_HELP = R"help(
@@ -39,6 +58,8 @@ int main(int argc, char* argv[]) {
 #if defined(MAZE_DEBUG)
     maze_builder_version += " - DEBUG";
 #endif
+
+#if !defined(__EMSCRIPTEN__)
 
     // Copy command arguments and skip the program name
     vector<string> args_vec{ argv + 1, argv + argc };
@@ -224,6 +245,8 @@ int main(int argc, char* argv[]) {
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl; 
     }
+
+#endif // EMSCRIPTEN
 
     return EXIT_SUCCESS;
 } // main
