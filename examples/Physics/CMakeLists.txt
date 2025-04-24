@@ -38,7 +38,7 @@ else()
         message(INFO ": Getting SDL via FetchContent")
         set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
         set(SDL_STATIC FALSE CACHE BOOL "Build a SDL static library (if available)")
-        FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git preview-3.1.3)
+        FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git release-3.2.10)
         set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 

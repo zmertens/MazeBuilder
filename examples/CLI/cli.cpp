@@ -1,12 +1,19 @@
 #include "cli.h"
 
+#include <string>
+
 #include <MazeBuilder/maze_builder.h>
 
 std::string cli::stringify_from_args(const std::string& args) const noexcept {
     using namespace std;
-    using namespace mazes;
 
-    
+    mazes::args a;
+    if (!a.parse(args)) {
+
+        return "Invalid arguments";
+    }
+
+    return stringify_from_dimens(stoi(a.args_map["rows"]), stoi(a.args_map["columns"]));
 }
 
 std::string cli::stringify_from_dimens(unsigned int rows, unsigned int cols) const noexcept {
