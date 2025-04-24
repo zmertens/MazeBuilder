@@ -22,6 +22,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <string_view>
 
 #include <SDL3/SDL.h>
 
@@ -50,15 +51,16 @@ struct Physics::PhysicsImpl {
     };
 
     struct WorkItem {
-        const std::vector<std::shared_ptr<mazes::cell>>& cells;
+        const std::string_view& mazeString;
         const SDL_FPoint cellSize;
         std::vector<SDL_Vertex>& vertices;
         int start, count;
+        int rows, columns;  // Grid dimensions
 
-        WorkItem(const std::vector<std::shared_ptr<mazes::cell>>& cells, const SDL_FPoint cellSize,
-            std::vector<SDL_Vertex>& vertices, int start, int count)
-            : cells(cells), cellSize(cellSize)
-            , vertices(vertices), start{ start }, count{ count } {
+        WorkItem(const std::string_view& mazeString, const SDL_FPoint cellSize,
+            std::vector<SDL_Vertex>& vertices, int start, int count, int rows, int columns)
+            : mazeString(mazeString), cellSize(cellSize)
+            , vertices(vertices), start{ start }, count{ count }, rows{ rows }, columns{ columns } {
         }
     };
 
@@ -262,14 +264,20 @@ struct Physics::PhysicsImpl {
 
                 // Now process a work item
                 if (!Physics->workQueue.empty()) {
+                    
                     auto&& temp = Physics->workQueue.front();
                     Physics->workQueue.pop_front();
-                    SDL_Log("Processing work item [ start: %d | count: %d]\n", temp.start, temp.count);
+                    SDL_Log("Processing work item [ start: %d | count: %d | rows: %d | columns: %d]\n", temp.start, temp.count, temp.rows, temp.columns);
+                    vertices.clear(); // Ensure the vector is empty before processing
                     Physics->doWork(ref(vertices), cref(temp));
+
+                    SDL_Log("Generated %zu vertices for this work item\n", vertices.size());
+                    
                     if (!vertices.empty()) {
                         copy(vertices.begin(), vertices.end(), back_inserter(temp.vertices));
+                        SDL_Log("Total vertices after copy: %zu\n", temp.vertices.size());
                     } else {
-                        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated\n");
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated for this work item\n");
                     }
                 }
                 SDL_UnlockMutex(Physics->gameMtx);
@@ -295,22 +303,86 @@ struct Physics::PhysicsImpl {
      *  Compute target block space for workers to process
      *  Construct all work items
      */
-    void genLevel(std::vector<SDL_Vertex>& vertices, const std::vector<std::shared_ptr<mazes::cell>>& cells, SDL_FPoint cellSize) noexcept {
+    void genLevel(std::vector<SDL_Vertex>& vertices, const std::string_view& mazeString, SDL_FPoint cellSize) noexcept {
         using namespace std;
 
-        //this->state = States::UPLOADING_LEVEL;
         if (this->pendingWorkCount == 0) {
             SDL_WaitCondition(gameCond, gameMtx);
         }
 
-        // Each worker processes a block of vertices
-        static constexpr auto BLOCK_COUNT = 4;
-        static auto VERTS_PER_BLOCK = cells.size() / BLOCK_COUNT;
-        for (auto w{ 0 }; w < BLOCK_COUNT; w++) {
-            auto pointStart = w * VERTS_PER_BLOCK;
-            auto pointCount = (w == BLOCK_COUNT - 1) ? cells.size() - pointStart : VERTS_PER_BLOCK;
-            workQueue.push_back({ cref(cells), cellSize, ref(vertices), static_cast<int>(pointStart), static_cast<int>(pointCount) });
+        if (mazeString.empty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty, cannot generate level\n");
+            return;
         }
+
+        // Log a sample of the maze string to verify its contents
+        size_t sampleSize = std::min(size_t(100), mazeString.size());
+        string sampleString = string(mazeString.substr(0, sampleSize));
+        SDL_Log("Maze string begins with: '%s'\n", sampleString.c_str());
+        SDL_Log("Total maze string length: %zu\n", mazeString.size());
+
+        // Calculate maze dimensions
+        size_t firstNewLine = mazeString.find('\n');
+        if (firstNewLine == string::npos) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
+            return;
+        }
+        
+        int columnsInMaze = static_cast<int>(firstNewLine);
+        
+        // Count rows
+        int rowsInMaze = 1; // Start with 1 for the first line
+        for (size_t i = 0; i < mazeString.size(); i++) {
+            if (mazeString[i] == '\n') {
+                rowsInMaze++;
+            }
+        }
+
+        SDL_Log("Calculated maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
+
+        // Divide work among threads
+        static constexpr auto BLOCK_COUNT = 4;
+        
+        // Each worker gets approximately equal sized chunks of the string
+        size_t charsPerWorker = mazeString.size() / BLOCK_COUNT;
+        
+        // Clear the work queue first
+        workQueue.clear();
+        
+        // Create work items
+        for (auto w = 0; w < BLOCK_COUNT; w++) {
+            size_t startIdx = w * charsPerWorker;
+            size_t endIdx = (w == BLOCK_COUNT - 1) ? mazeString.size() : (w + 1) * charsPerWorker;
+            
+            // Ensure we don't split in the middle of a line
+            if (w > 0) {
+                while (startIdx > 0 && mazeString[startIdx] != '\n') {
+                    startIdx--;
+                }
+                if (startIdx > 0) startIdx++; // Skip the newline
+            }
+            
+            if (w < BLOCK_COUNT - 1) {
+                while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
+                    endIdx++;
+                }
+                if (endIdx < mazeString.size()) endIdx++; // Include the newline
+            }
+            
+            size_t count = endIdx - startIdx;
+            SDL_Log("Worker %d: Processing from %zu to %zu (count: %zu)\n", w, startIdx, endIdx, count);
+            
+            workQueue.push_back({ 
+                cref(mazeString), 
+                cellSize, 
+                ref(vertices), 
+                static_cast<int>(startIdx), 
+                static_cast<int>(count), 
+                rowsInMaze, 
+                columnsInMaze 
+            });
+        }
+
         SDL_LockMutex(this->gameMtx);
         this->pendingWorkCount = BLOCK_COUNT;
         SDL_SignalCondition(gameCond);
@@ -361,91 +433,154 @@ private:
             vertices.push_back(v2);
             vertices.push_back(v3);
             vertices.push_back(v4);
-            };
+        };
 
-        const auto& cells = item.cells;
+        // Define colors
+        SDL_FColor wallColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
+        SDL_FColor cellColor = { 1.0f, 1.0f, 1.0f, 1.0f }; // White
 
-        uint32_t wallColor = 0x000000FF;
-        SDL_FColor sdlWallColor = { static_cast<float>((wallColor >> 24) & 0xFF),
-            static_cast<float>((wallColor >> 16) & 0xFF),
-            static_cast<float>((wallColor >> 8) & 0xFF),
-            static_cast<float>(wallColor & 0xFF) };
+        const auto& mazeString = item.mazeString;
+        const auto& cellSize = item.cellSize;
+        SDL_Log("Processing maze string segment from %d to %d\n", item.start, item.start + item.count);
+        
+        // Log a sample of the maze string to see what we're working with
+        std::string sampleString;
+        if (!mazeString.empty()) {
+            size_t sampleSize = std::min(size_t(100), mazeString.size());
+            sampleString = std::string(mazeString.substr(0, sampleSize));
+            SDL_Log("Maze string sample: '%s'\n", sampleString.c_str());
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty!\n");
+            return;
+        }
+        
+        // First pass: identify the maze dimensions
+        // Find the number of columns by finding the first newline character
+        size_t firstNewLine = mazeString.find('\n');
+        if (firstNewLine == string::npos) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
+            return;
+        }
+        
+        int columnsInMaze = static_cast<int>(firstNewLine);
+        
+        // Count total number of rows in the maze
+        int rowsInMaze = 1; // Start with 1 for the first line
+        for (size_t i = 0; i < mazeString.size(); i++) {
+            if (mazeString[i] == '\n') {
+                rowsInMaze++;
+            }
+        }
 
+        SDL_Log("Maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
 
-        // @TEST ! This is a sample triangle
-        //// Vertex 1
-        //SDL_Vertex v1, v2, v3;
-        //v1.position = { 400.0f, 100.0f };
-        //v1.color = { 255, 0, 0, 255 };
-        //v1.tex_coord = { 0.0f, 0.0f };
-
-        //// Vertex 2
-        //v2.position = { 700.0f, 500.0f };
-        //v2.color = { 0, 255, 0, 255 };
-        //v2.tex_coord = { 1.0f, 1.0f };
-
-        //// Vertex 3
-        //v3.position = { 100.0f, 500.0f };
-        //v3.color = { 0, 0, 255, 255 };
-        //v3.tex_coord = { 0.0f, 1.0f };
-
-        //vertices.push_back(v1);
-        //vertices.push_back(v2);
-        //vertices.push_back(v3);
-
-        for (const auto& mode : { "backgrounds", "walls" }) {
-            // Iterate only over the cells that are in the work item
-            //  Note the '<' operator to ensure derefencing the "end" iterator is not done
-            for (auto itr = cells.cbegin() + item.start; itr < cells.cbegin() + item.start + item.count; ++itr) {
-                auto&& current = *itr;
-
-                const auto& cellSize = item.cellSize;
-
-                auto x1 = static_cast<float>(current->get_index()) * cellSize.x;
-                auto y1 = static_cast<float>(current->get_index()) * cellSize.y;
-                auto x2 = static_cast<float>(current->get_index() + 1) * cellSize.x;
-                auto y2 = static_cast<float>(current->get_index() + 1) * cellSize.y;
-
+        // Process only the part of the string assigned to this worker
+        size_t startIdx = max(size_t(0), min(size_t(item.start), mazeString.size() - 1));
+        size_t endIdx = min(mazeString.size(), startIdx + static_cast<size_t>(item.count));
+        
+        // Go back to beginning of line to ensure we don't start mid-cell
+        while (startIdx > 0 && mazeString[startIdx] != '\n') {
+            startIdx--;
+        }
+        if (startIdx > 0) startIdx++; // Skip the newline character
+        
+        // Go forward to end of line to ensure we don't end mid-cell
+        while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
+            endIdx++;
+        }
+        
+        string_view segment = mazeString.substr(startIdx, endIdx - startIdx);
+        SDL_Log("Processing segment of length %zu\n", segment.size());
+        
+        // Parse maze format - each row has two parts: horizontal walls (+---+) and vertical walls (|   |)
+        int currentRow = 0;
+        int currentCol = 0;
+        
+        for (size_t i = 0; i < segment.size(); i++) {
+            char c = segment[i];
+            
+            if (c == '\n') {
+                // Move to the next row
+                currentCol = 0;
+                currentRow++;
+                continue;
+            }
+            
+            // Calculate position for this character
+            // Use fixed scaling to completely avoid infinity issues
+            // Apply a view scaling factor to ensure vertices are visible in the viewport
+            float scale = 10.0f; // Fixed scale that won't cause overflow
+            float viewScaleX = static_cast<float>(INIT_WINDOW_W) / (static_cast<float>(columnsInMaze) * scale);
+            float viewScaleY = static_cast<float>(INIT_WINDOW_H) / (static_cast<float>(rowsInMaze) * scale / 2.0f);
+            float viewScale = std::min(viewScaleX, viewScaleY) * 0.9f; // 90% of available space for margins
+            
+            float x = static_cast<float>(currentCol) * scale * viewScale;
+            float y = static_cast<float>(currentRow) * scale / 2.0f * viewScale;
+            
+            // Process different maze characters
+            if (c == '+') {
+                // Corner - just a reference point, don't render anything
+                currentCol++;
+            } else if (c == '-') {
+                // Horizontal wall
                 SDL_Vertex v1, v2, v3, v4;
-                // Define the four corners of the cell
-                v1.position = { static_cast<float>(x1), static_cast<float>(y1) };
-                v2.position = { static_cast<float>(x2), static_cast<float>(y1) };
-                v3.position = { static_cast<float>(x2), static_cast<float>(y2) };
-                v4.position = { static_cast<float>(x1), static_cast<float>(y2) };
-                v1.tex_coord = { 0.0f, 0.0f };
-                v2.tex_coord = { 1.0f, 0.0f };
-                v3.tex_coord = { 1.0f, 1.0f };
-                v4.tex_coord = { 0.0f, 1.0f };
-
-                if (mode == "backgrounds"s) {
-                    uint32_t color = 0xFFFFFFFF;
-                    SDL_FColor sdlColor = { static_cast<float>((color >> 24) & 0xFF),
-                        static_cast<float>((color >> 16) & 0xFF),
-                        static_cast<float>((color >> 8) & 0xFF),
-                        static_cast<float>(color & 0xFF) };
-
-                    v1.color = v2.color = v3.color = v4.color = sdlColor;
-
-                    pushV(v1, v2, v3, v4);
-                } else {
-                    v1.color = v2.color = v3.color = v4.color = sdlWallColor;
-
-                    if (!current->get_north()) {
-                        pushV(v1, v2, v3, v4);
-                    }
-                    if (!current->get_west()) {
-                        pushV(v1, v2, v3, v4);
-                    }
-                    if (auto east = current->get_east(); east && !current->is_linked(east)) {
-                        pushV(v1, v2, v3, v4);
-                    }
-                    if (auto south = current->get_south(); south && !current->is_linked(south)) {
-                        pushV(v1, v2, v3, v4);
-                    }
-                }
-            } // cells
-        } // background / walls
-    } // doWork
+                v1.position = { x, y };
+                v2.position = { x + cellSize.x, y };
+                v3.position = { x + cellSize.x, y + cellSize.y * 0.1f };
+                v4.position = { x, y + cellSize.y * 0.1f };
+                v1.color = v2.color = v3.color = v4.color = wallColor;
+                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
+                pushV(v1, v2, v3, v4);
+                currentCol++;
+            } else if (c == '|') {
+                // Vertical wall
+                SDL_Vertex v1, v2, v3, v4;
+                v1.position = { x, y };
+                v2.position = { x + cellSize.x * 0.1f, y };
+                v3.position = { x + cellSize.x * 0.1f, y + cellSize.y };
+                v4.position = { x, y + cellSize.y };
+                v1.color = v2.color = v3.color = v4.color = wallColor;
+                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
+                pushV(v1, v2, v3, v4);
+                currentCol++;
+            } else if (c == ' ') {
+                // Empty space, just increment the column
+                currentCol++;
+            }
+        }
+        
+        // Second pass: draw cell backgrounds
+        // Reset position tracking
+        currentRow = 0;
+        currentCol = 0;
+        
+        for (size_t i = 0; i < segment.size(); i++) {
+            if (segment[i] == '\n') {
+                currentCol = 0;
+                currentRow++;
+                continue;
+            }
+            
+            // We're only interested in the cell spaces (between vertical walls)
+            if (currentRow % 2 == 1 && segment[i] == ' ') {
+                // This is inside a cell
+                float x = static_cast<float>(currentCol) * cellSize.x;
+                float y = static_cast<float>((currentRow - 1) / 2) * cellSize.y; // Convert back to cell coordinates
+                
+                // Draw cell background
+                SDL_Vertex v1, v2, v3, v4;
+                v1.position = { x, y };
+                v2.position = { x + cellSize.x, y };
+                v3.position = { x + cellSize.x, y + cellSize.y };
+                v4.position = { x, y + cellSize.y };
+                v1.color = v2.color = v3.color = v4.color = cellColor;
+                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
+                pushV(v1, v2, v3, v4);
+            }
+            
+            currentCol++;
+        }
+    }
 }; // PhysicsImpl
 
 
@@ -480,7 +615,28 @@ bool Physics::run() const noexcept {
     auto&& sdlHelper = this->m_impl->sdlHelper;
     string_view titleView = this->m_impl->title;
     sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
+    if (!sdlHelper.window) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed: %s\n", SDL_GetError());
+        return false;
+    }
+    
+    // Create the renderer with software rendering which is more compatible
     sdlHelper.renderer = SDL_CreateRenderer(sdlHelper.window, nullptr);
+    if (!sdlHelper.renderer) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
+        SDL_DestroyWindow(sdlHelper.window);
+        return false;
+    }
+    
+    // Check if renderer was created successfully
+    if (auto props = SDL_GetRendererProperties(sdlHelper.renderer); props != 0) {
+        SDL_Log("Renderer created: %s\n", SDL_GetStringProperty(props, SDL_PROP_RENDERER_NAME_STRING, "default"));
+        // SDL_Log("Renderer flags: %u\n", info.flags);
+        // SDL_Log("Max texture width: %d\n", info.max_texture_width);
+        // SDL_Log("Max texture height: %d\n", info.max_texture_height);
+    } else {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
+    }
 
     SDL_Surface* icon = SDL_LoadBMP("resources/icon.bmp");
     if (icon) {
@@ -521,7 +677,7 @@ bool Physics::run() const noexcept {
 
     // Define the level by its vertices renderizable
     vector<SDL_Vertex> level;
-    vector<shared_ptr<mazes::cell>> cells;
+    string_view cells;
 
     // Timers for keeping track of frame rates
     double previous = SDL_GetTicks();
@@ -565,6 +721,11 @@ bool Physics::run() const noexcept {
         }
 
         SDL_SetRenderTarget(renderer, renderToTexture.get());
+        if (SDL_GetRenderTarget(renderer) != renderToTexture.get()) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to set render target to texture\n");
+            // Try again
+            SDL_SetRenderTarget(renderer, renderToTexture.get());
+        }
 
         // Render prep
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -573,29 +734,176 @@ bool Physics::run() const noexcept {
         // Draw/gen the level
         if (!this->m_impl->pendingWorkCount) {
             if (gState == PhysicsImpl::States::UPLOADING_LEVEL) {
+                
                 // Update state and current level
-                SDL_Log("New level uploading\n");
-                // mazes::builder builder;
-                // static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
-                // auto&& temp = builder.block_type(-1).rows(INIT_MAZE_ROWS).columns(INIT_MAZE_COLS).build();
-                // temp->init();
-                // mazes::computations::compute_geometry(temp);
-                // cells.clear();
-                // temp->populate_cells(ref(cells));
-                // assert(cells.size() > 0);
-                // level.clear();
-                // level.reserve(cells.size());
-                auto rows = 10, columns = 10;
-                SDL_FPoint cellSize = { static_cast<float>(display_w / rows), static_cast<float>(display_h / columns) };
 
-                // Now start the worker threads
-                this->m_impl->genLevel(ref(level), cref(cells), cellSize);
+                static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
+                auto maze_ptr = mazes::factory::create_q(INIT_MAZE_ROWS, INIT_MAZE_COLS);
+                if (!maze_ptr.has_value()) {
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze with rows: %d and cols: %d\n", INIT_MAZE_ROWS, INIT_MAZE_COLS);
+                } else {
+                    SDL_Log("New level uploading with rows: %d and cols: %d\n", INIT_MAZE_ROWS, INIT_MAZE_COLS);
+
+                    // Get the string representation of the maze
+                    std::string mazeStr = mazes::stringz::stringify(maze_ptr.value());
+                    
+                    // Store the maze string in a more permanent storage since string_view only references it
+                    static std::string persistentMazeStr;
+                    persistentMazeStr = mazeStr; // Copy the string to ensure it stays in memory
+                    cells = persistentMazeStr;   // Now cells references the persistent string
+                    
+                    SDL_Log("Generated maze string of size: %zu\n", cells.size());
+                    if (cells.empty()) {
+                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Generated maze string is empty!\n");
+                    } else {
+                        // Log the first 200 characters to see what's in the string
+                        std::string sample = persistentMazeStr.substr(0, std::min(size_t(200), persistentMazeStr.size()));
+                        SDL_Log("Maze string starts with: '%s'\n", sample.c_str());
+                    }
+                    
+                    assert(cells.size() > 0);
+
+                    level.clear();
+                    level.reserve(cells.size() * 24); // Each cell can have up to 4 walls, each wall is 6 vertices (2 triangles)
+                    
+                    // Get the actual rows and columns from the maze
+                    auto rows = maze_ptr.value()->get_rows();
+                    auto columns = maze_ptr.value()->get_columns();
+                    
+                    // Calculate appropriate cell size based on window dimensions and maze size
+                    // Prevent division by zero which could cause infinities
+                    auto safeColumns = std::max(1, columns);
+                    auto safeRows = std::max(1, rows);
+                    
+                    SDL_FPoint cellSize = { 
+                        static_cast<float>(display_w) / static_cast<float>(safeColumns), 
+                        static_cast<float>(display_h) / static_cast<float>(safeRows) 
+                    };
+                    
+                    // Validate cell size is reasonable to prevent inf/NaN
+                    if (cellSize.x <= 0 || std::isinf(cellSize.x) || std::isnan(cellSize.x) || 
+                        cellSize.y <= 0 || std::isinf(cellSize.y) || std::isnan(cellSize.y)) {
+                        cellSize.x = 10.0f; // Default to reasonable values if calculation fails
+                        cellSize.y = 10.0f;
+                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid cell size calculated: (%f, %f). Using defaults.\n", 
+                            cellSize.x, cellSize.y);
+                    }
+                    
+                    SDL_Log("Using cell size: (%f, %f) for grid of %d rows x %d columns\n", 
+                        cellSize.x, cellSize.y, rows, columns);
+    
+                    // Now start the worker threads
+                    this->m_impl->genLevel(ref(level), cref(cells), cellSize);
+                }
 
                 gState = PhysicsImpl::States::PLAY;
             }
 
+            // Check SDL rendering state and texture validity
+            SDL_Log("Render target texture valid: %s", renderToTexture.get() != nullptr ? "yes" : "no");
+            SDL_Log("Current render target: %s", SDL_GetRenderTarget(renderer) == renderToTexture.get() ? "render texture" : "default");
+            
+            // Log viewport settings
+            SDL_Rect v;
+            SDL_GetRenderViewport(renderer, &v);
+            SDL_Log("Viewport: x=%d, y=%d, w=%d, h=%d", v.x, v.y, v.w, v.h);
+            
             // Now draw geometry ensuring complete render with no more work pending
-            SDL_RenderGeometry(renderer, nullptr, level.data(), level.size(), nullptr, 0);
+            SDL_Log("Attempting to render %zu vertices\n", level.size());
+            
+            // Check if we have any vertices to render
+            if (level.empty()) {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "No vertices to render\n");
+                // Draw a simple rectangle to show something on screen
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_FRect r = {10, 10, display_w - 20, display_h - 20};
+                SDL_RenderFillRect(renderer, &r);
+            } else {
+                // Instead of using SDL_RenderGeometry which is having issues,
+                // let's draw the maze using simple SDL drawing primitives
+                
+                // First draw a white background
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_RenderClear(renderer);
+                
+                // Now parse the maze string directly and draw it
+                int maxCols = 0;
+                int maxRows = 0;
+                
+                // First, calculate maze dimensions
+                const char* mazeData = cells.data();
+                size_t mazeLen = cells.size();
+                int currentRow = 0;
+                int colCount = 0;
+                
+                for (size_t i = 0; i < mazeLen; i++) {
+                    if (mazeData[i] == '\n') {
+                        maxCols = std::max(maxCols, colCount);
+                        colCount = 0;
+                        currentRow++;
+                    } else {
+                        colCount++;
+                    }
+                }
+                maxRows = currentRow + 1;
+                
+                // Calculate cell size to fit the window
+                float cellW = static_cast<float>(display_w) / static_cast<float>(maxCols + 1);
+                float cellH = static_cast<float>(display_h) / static_cast<float>(maxRows + 1);
+                float cellSize = std::min(cellW, cellH);
+                
+                // Offset to center the maze
+                float offsetX = (display_w - (maxCols * cellSize)) / 2.0f;
+                float offsetY = (display_h - (maxRows * cellSize)) / 2.0f;
+                
+                SDL_Log("Drawing maze with dimensions: %d rows x %d cols", maxRows, maxCols);
+                SDL_Log("Using cell size: %.2f with offsets: (%.2f, %.2f)", cellSize, offsetX, offsetY);
+                
+                // Now draw the maze
+                currentRow = 0;
+                int currentCol = 0;
+                
+                // Set to black for drawing walls
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                
+                for (size_t i = 0; i < mazeLen; i++) {
+                    char c = mazeData[i];
+                    
+                    if (c == '\n') {
+                        currentCol = 0;
+                        currentRow++;
+                        continue;
+                    }
+                    
+                    float x = offsetX + (currentCol * cellSize);
+                    float y = offsetY + (currentRow * cellSize);
+                    
+                    // Draw based on character
+                    if (c == '+') {
+                        // Draw a small dot at the corner
+                        SDL_FRect rect = {x - 1, y - 1, 3, 3};
+                        SDL_RenderFillRect(renderer, &rect);
+                    }
+                    else if (c == '-') {
+                        // Horizontal wall
+                        SDL_RenderLine(renderer, 
+                            x, y,
+                            x + cellSize, y
+                        );
+                    }
+                    else if (c == '|') {
+                        // Vertical wall
+                        SDL_RenderLine(renderer,
+                            x, y,
+                            x, y + cellSize
+                        );
+                    }
+                    
+                    currentCol++;
+                }
+                
+                SDL_Log("Maze drawing completed successfully");
+            }
         }
 
         // Finally, draw text to screen
