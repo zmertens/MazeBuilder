@@ -8,12 +8,13 @@
 #include <functional>
 
 #include <MazeBuilder/singleton_base.h>
-#include <box2d/box2d.h>
 
 // Forward declarations
 namespace mazes {
     class cell;
 }
+
+struct SDL_Renderer; // Forward declaration
 
 class Physics : public mazes::singleton_base<Physics> {
     friend class mazes::singleton_base<Physics>;
@@ -24,6 +25,15 @@ public:
     bool run() const noexcept;
 
 private:
+    // Physics and collision processing
+    void processPhysicsCollisions() const;
+    void updatePhysicsObjects() const;
+    
+    // Rendering methods
+    void drawPhysicsObjects(SDL_Renderer* renderer) const;
+    void drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const;
+    void generateNewLevel(int display_w, int display_h) const;
+
     struct PhysicsImpl;
     std::unique_ptr<PhysicsImpl> m_impl;
 };
