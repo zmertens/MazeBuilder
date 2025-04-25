@@ -42,12 +42,29 @@ else()
         set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
     endif()
 
+    # Add Box2D dependency
+    find_package(box2d QUIET)
+    if(NOT box2d_FOUND)
+        message(INFO ": Getting Box2D via FetchContent")
+        FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.0)
+        set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/box2d-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+        set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)
+    endif()
+
     add_executable(${EXE_NAME} ${EXE_SOURCES} ${DEAR_IMGUI_SOURCES})
-    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
+    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_17)
     target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
 	target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
     target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/dearimgui)
+
+    # Add Box2D include directory if not already included by find_package
+    if(TARGET box2d)
+        get_target_property(BOX2D_INCLUDE_DIRS box2d INTERFACE_INCLUDE_DIRECTORIES)
+        if(BOX2D_INCLUDE_DIRS)
+            target_include_directories(${EXE_NAME} PRIVATE ${BOX2D_INCLUDE_DIRS})
+        endif()
+    endif()
 
     file(COPY "resources" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 

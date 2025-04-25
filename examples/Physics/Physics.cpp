@@ -26,6 +26,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <box2d/box2d.h>
+
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
@@ -49,14 +51,59 @@ struct Physics::PhysicsImpl {
         // Level is being generated and not yet playable
         UPLOADING_LEVEL,
     };
+    
+    // Game-specific constants
+    static constexpr float WALL_HIT_THRESHOLD = 4.0f; // Number of hits before a wall breaks
+    static constexpr float BALL_RADIUS = 0.2f;
+    static constexpr float WALL_WIDTH = 0.1f;
+    static constexpr int MAX_BALLS = 10;
+    
+    struct Wall {
+        b2BodyId bodyId = b2_nullBodyId;
+        b2ShapeId shapeId = b2_nullShapeId;
+        int hitCount = 0;
+        bool isDestroyed = false;
+    };
+    
+    struct Ball {
+        b2BodyId bodyId = b2_nullBodyId;
+        b2ShapeId shapeId = b2_nullShapeId;
+        bool isActive = false;
+        bool isDragging = false;
+        bool isExploding = false;
+        float explosionTimer = 0.0f;
+    };
+    
+    struct ExitCell {
+        int row;
+        int col;
+        b2BodyId bodyId = b2_nullBodyId;
+        b2ShapeId shapeId = b2_nullShapeId;
+        int ballsCollected = 0;
+    };
+        
+    // Box2D world and physics components
+    b2WorldId physicsWorldId = b2_nullWorldId;
+    float timeStep = 1.0f / 60.0f;
+    int32_t velocityIterations = 6;
+    int32_t positionIterations = 2;
+    
+    // Game-specific variables
+    std::vector<Wall> walls;
+    std::vector<Ball> balls;
+    ExitCell exitCell;
+    int score = 0;
+    float pixelsPerMeter = 10.0f; // Scale factor for Box2D (which uses meters)
+    bool isDragging = false;
+    int draggedBallIndex = -1;
+    b2Vec2 lastMousePos = {0.0f, 0.0f};
 
     struct WorkItem {
         const std::string_view& mazeString;
         const SDL_FPoint cellSize;
         std::vector<SDL_Vertex>& vertices;
         int start, count;
-        int rows, columns;  // Grid dimensions
-
+        int rows, columns;
         WorkItem(const std::string_view& mazeString, const SDL_FPoint cellSize,
             std::vector<SDL_Vertex>& vertices, int start, int count, int rows, int columns)
             : mazeString(mazeString), cellSize(cellSize)
@@ -111,18 +158,12 @@ struct Physics::PhysicsImpl {
     struct SDLHelper {
         SDL_Window* window;
         SDL_Renderer* renderer;
-
         SDL_AudioDeviceID audioDeviceId;
         SDL_AudioStream* audioStream;
         std::uint8_t* wavBuffer;
         std::uint32_t wavLength;
         SDL_AudioSpec audioSpec;
 
-        /**
-         * @brief Init SDL subsystems - use iostream on error messages
-         *  since the SDL_Log functions are not available in this context
-         *
-         */
         SDLHelper()
             : window{ nullptr }, renderer{ nullptr }
             , audioDeviceId{}, audioStream{}
@@ -170,7 +211,6 @@ struct Physics::PhysicsImpl {
                     break;
                 }
             }
-
         }
 
         void playAudioStream() noexcept {
@@ -207,17 +247,12 @@ struct Physics::PhysicsImpl {
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
     SDLHelper sdlHelper;
-    // Thread helpers
     std::deque<WorkItem> workQueue;
     std::vector<SDL_Thread*> threads;
     SDL_Mutex* gameMtx;
     SDL_Condition* gameCond;
-
     SDLTexture entityTexture;
-
-    // Global - Keep track of worker work count
     int pendingWorkCount;
-    // Keep track of user and Physics states
     States state;
 
     PhysicsImpl(const std::string& title, const std::string& version, int w, int h)
@@ -240,11 +275,6 @@ struct Physics::PhysicsImpl {
 
     }
 
-    /**
-     * @brief C-style function for SDL_Thread
-     *  Handles when workers should process work items
-     *
-     */
     static int threadFunc(void* data) {
         using namespace std;
         auto* Physics = reinterpret_cast<PhysicsImpl*>(data);
@@ -262,7 +292,6 @@ struct Physics::PhysicsImpl {
                     break;
                 }
 
-                // Now process a work item
                 if (!Physics->workQueue.empty()) {
                     
                     auto&& temp = Physics->workQueue.front();
@@ -270,7 +299,6 @@ struct Physics::PhysicsImpl {
                     SDL_Log("Processing work item [ start: %d | count: %d | rows: %d | columns: %d]\n", temp.start, temp.count, temp.rows, temp.columns);
                     vertices.clear(); // Ensure the vector is empty before processing
                     Physics->doWork(ref(vertices), cref(temp));
-
                     SDL_Log("Generated %zu vertices for this work item\n", vertices.size());
                     
                     if (!vertices.empty()) {
@@ -284,7 +312,6 @@ struct Physics::PhysicsImpl {
             }
 
             {
-                // Update work count and wake up any threads waiting
                 SDL_LockMutex(Physics->gameMtx);
                 Physics->pendingWorkCount -= 1;
                 SDL_Log("Pending work count: %d\n", Physics->pendingWorkCount);
@@ -298,80 +325,50 @@ struct Physics::PhysicsImpl {
         return 0;
     }
 
-    /**
-     * @brief Trigger work queue changes and signal threads
-     *  Compute target block space for workers to process
-     *  Construct all work items
-     */
     void genLevel(std::vector<SDL_Vertex>& vertices, const std::string_view& mazeString, SDL_FPoint cellSize) noexcept {
         using namespace std;
-
         if (this->pendingWorkCount == 0) {
             SDL_WaitCondition(gameCond, gameMtx);
         }
-
         if (mazeString.empty()) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty, cannot generate level\n");
             return;
         }
-
-        // Log a sample of the maze string to verify its contents
-        size_t sampleSize = std::min(size_t(100), mazeString.size());
-        string sampleString = string(mazeString.substr(0, sampleSize));
-        SDL_Log("Maze string begins with: '%s'\n", sampleString.c_str());
+        SDL_Log("Maze string begins with: '%s'\n", mazeString.substr(0, 20));
         SDL_Log("Total maze string length: %zu\n", mazeString.size());
-
-        // Calculate maze dimensions
         size_t firstNewLine = mazeString.find('\n');
         if (firstNewLine == string::npos) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
             return;
         }
-        
         int columnsInMaze = static_cast<int>(firstNewLine);
-        
-        // Count rows
-        int rowsInMaze = 1; // Start with 1 for the first line
+        int rowsInMaze = 1;
         for (size_t i = 0; i < mazeString.size(); i++) {
             if (mazeString[i] == '\n') {
                 rowsInMaze++;
             }
         }
-
         SDL_Log("Calculated maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
-
-        // Divide work among threads
         static constexpr auto BLOCK_COUNT = 4;
-        
-        // Each worker gets approximately equal sized chunks of the string
         size_t charsPerWorker = mazeString.size() / BLOCK_COUNT;
-        
-        // Clear the work queue first
         workQueue.clear();
-        
-        // Create work items
         for (auto w = 0; w < BLOCK_COUNT; w++) {
             size_t startIdx = w * charsPerWorker;
             size_t endIdx = (w == BLOCK_COUNT - 1) ? mazeString.size() : (w + 1) * charsPerWorker;
-            
-            // Ensure we don't split in the middle of a line
             if (w > 0) {
                 while (startIdx > 0 && mazeString[startIdx] != '\n') {
                     startIdx--;
                 }
-                if (startIdx > 0) startIdx++; // Skip the newline
+                if (startIdx > 0) startIdx++;
             }
-            
             if (w < BLOCK_COUNT - 1) {
                 while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
                     endIdx++;
                 }
-                if (endIdx < mazeString.size()) endIdx++; // Include the newline
+                if (endIdx < mazeString.size()) endIdx++;
             }
-            
             size_t count = endIdx - startIdx;
             SDL_Log("Worker %d: Processing from %zu to %zu (count: %zu)\n", w, startIdx, endIdx, count);
-            
             workQueue.push_back({ 
                 cref(mazeString), 
                 cellSize, 
@@ -382,22 +379,14 @@ struct Physics::PhysicsImpl {
                 columnsInMaze 
             });
         }
-
         SDL_LockMutex(this->gameMtx);
         this->pendingWorkCount = BLOCK_COUNT;
         SDL_SignalCondition(gameCond);
         SDL_UnlockMutex(this->gameMtx);
     }
 
-private:
-    /**
-     * @brief Create a thread and a null work item for each worker
-     *  Init the work item when gen_maze is called
-     *
-     */
     void initWorkers() noexcept {
         using namespace std;
-
         static constexpr auto NUM_WORKERS = 4;
         for (auto w{ 0 }; w < NUM_WORKERS; w++) {
             string name = { "thread: " + to_string(w) };
@@ -409,41 +398,21 @@ private:
         }
     }
 
-    /**
-     * @brief Perform rendering operations on the work item
-     *  Design maze structure using SDL_FPoint data
-     *  Interprating the maze as having cells with possible 1-3 walls per cell
-     *  Each work item has a const-reference to the cells
-     *  The cells are initialized @genLevel
-     *
-     * @param vertices
-     * @param item the work item to process
-     *
-     */
     void doWork(std::vector<SDL_Vertex>& vertices, const WorkItem& item) {
         using namespace std;
-
+        SDL_FColor wallColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
         auto pushV = [&vertices](auto v1, auto v2, auto v3, auto v4)->void {
-            // First triangle
             vertices.push_back(v1);
             vertices.push_back(v2);
             vertices.push_back(v4);
-
-            // Second triangle
             vertices.push_back(v2);
             vertices.push_back(v3);
             vertices.push_back(v4);
         };
-
-        // Define colors
-        SDL_FColor wallColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
         SDL_FColor cellColor = { 1.0f, 1.0f, 1.0f, 1.0f }; // White
-
         const auto& mazeString = item.mazeString;
         const auto& cellSize = item.cellSize;
         SDL_Log("Processing maze string segment from %d to %d\n", item.start, item.start + item.count);
-        
-        // Log a sample of the maze string to see what we're working with
         std::string sampleString;
         if (!mazeString.empty()) {
             size_t sampleSize = std::min(size_t(100), mazeString.size());
@@ -453,76 +422,48 @@ private:
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty!\n");
             return;
         }
-        
-        // First pass: identify the maze dimensions
-        // Find the number of columns by finding the first newline character
         size_t firstNewLine = mazeString.find('\n');
         if (firstNewLine == string::npos) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
             return;
         }
-        
+        size_t startIdx = max(size_t(0), min(size_t(item.start), mazeString.size() - 1));
         int columnsInMaze = static_cast<int>(firstNewLine);
-        
-        // Count total number of rows in the maze
-        int rowsInMaze = 1; // Start with 1 for the first line
+        int rowsInMaze = 1;
         for (size_t i = 0; i < mazeString.size(); i++) {
             if (mazeString[i] == '\n') {
                 rowsInMaze++;
             }
         }
-
         SDL_Log("Maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
-
-        // Process only the part of the string assigned to this worker
-        size_t startIdx = max(size_t(0), min(size_t(item.start), mazeString.size() - 1));
         size_t endIdx = min(mazeString.size(), startIdx + static_cast<size_t>(item.count));
-        
-        // Go back to beginning of line to ensure we don't start mid-cell
         while (startIdx > 0 && mazeString[startIdx] != '\n') {
             startIdx--;
         }
-        if (startIdx > 0) startIdx++; // Skip the newline character
-        
-        // Go forward to end of line to ensure we don't end mid-cell
+        if (startIdx > 0) startIdx++;
         while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
             endIdx++;
         }
-        
         string_view segment = mazeString.substr(startIdx, endIdx - startIdx);
         SDL_Log("Processing segment of length %zu\n", segment.size());
-        
-        // Parse maze format - each row has two parts: horizontal walls (+---+) and vertical walls (|   |)
         int currentRow = 0;
         int currentCol = 0;
-        
         for (size_t i = 0; i < segment.size(); i++) {
             char c = segment[i];
-            
             if (c == '\n') {
-                // Move to the next row
                 currentCol = 0;
                 currentRow++;
                 continue;
             }
-            
-            // Calculate position for this character
-            // Use fixed scaling to completely avoid infinity issues
-            // Apply a view scaling factor to ensure vertices are visible in the viewport
-            float scale = 10.0f; // Fixed scale that won't cause overflow
+            float scale = 10.0f;
             float viewScaleX = static_cast<float>(INIT_WINDOW_W) / (static_cast<float>(columnsInMaze) * scale);
             float viewScaleY = static_cast<float>(INIT_WINDOW_H) / (static_cast<float>(rowsInMaze) * scale / 2.0f);
-            float viewScale = std::min(viewScaleX, viewScaleY) * 0.9f; // 90% of available space for margins
-            
+            float viewScale = std::min(viewScaleX, viewScaleY) * 0.9f;
             float x = static_cast<float>(currentCol) * scale * viewScale;
             float y = static_cast<float>(currentRow) * scale / 2.0f * viewScale;
-            
-            // Process different maze characters
             if (c == '+') {
-                // Corner - just a reference point, don't render anything
                 currentCol++;
             } else if (c == '-') {
-                // Horizontal wall
                 SDL_Vertex v1, v2, v3, v4;
                 v1.position = { x, y };
                 v2.position = { x + cellSize.x, y };
@@ -533,7 +474,6 @@ private:
                 pushV(v1, v2, v3, v4);
                 currentCol++;
             } else if (c == '|') {
-                // Vertical wall
                 SDL_Vertex v1, v2, v3, v4;
                 v1.position = { x, y };
                 v2.position = { x + cellSize.x * 0.1f, y };
@@ -544,30 +484,20 @@ private:
                 pushV(v1, v2, v3, v4);
                 currentCol++;
             } else if (c == ' ') {
-                // Empty space, just increment the column
                 currentCol++;
             }
         }
-        
-        // Second pass: draw cell backgrounds
-        // Reset position tracking
         currentRow = 0;
         currentCol = 0;
-        
         for (size_t i = 0; i < segment.size(); i++) {
             if (segment[i] == '\n') {
                 currentCol = 0;
                 currentRow++;
                 continue;
             }
-            
-            // We're only interested in the cell spaces (between vertical walls)
             if (currentRow % 2 == 1 && segment[i] == ' ') {
-                // This is inside a cell
                 float x = static_cast<float>(currentCol) * cellSize.x;
-                float y = static_cast<float>((currentRow - 1) / 2) * cellSize.y; // Convert back to cell coordinates
-                
-                // Draw cell background
+                float y = static_cast<float>((currentRow - 1) / 2) * cellSize.y;
                 SDL_Vertex v1, v2, v3, v4;
                 v1.position = { x, y };
                 v2.position = { x + cellSize.x, y };
@@ -577,12 +507,267 @@ private:
                 v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
                 pushV(v1, v2, v3, v4);
             }
-            
             currentCol++;
         }
     }
-}; // PhysicsImpl
 
+    // Initialize the Box2D physics world
+    void initPhysics() {
+        float lengthUnitsPerMeter = 128.0f;
+        b2SetLengthUnitsPerMeter(lengthUnitsPerMeter);
+    
+        b2WorldDef worldDef = b2DefaultWorldDef();
+    
+        // Realistic gravity is achieved by multiplying gravity by the length unit.
+        worldDef.gravity.y = 9.8f * lengthUnitsPerMeter;
+
+        physicsWorldId = b2CreateWorld(&worldDef);
+        
+        // Clear any existing entities
+        walls.clear();
+        balls.clear();
+        
+        SDL_Log("Box2D physics world initialized");
+    }
+    
+    // Convert screen coordinates to physics world coordinates
+    b2Vec2 screenToPhysics(float screenX, float screenY) {
+        return {screenX / pixelsPerMeter, screenY / pixelsPerMeter};
+    }
+    
+    // Convert physics world coordinates to screen coordinates
+    SDL_FPoint physicsToScreen(float physX, float physY) {
+        return {physX * pixelsPerMeter, physY * pixelsPerMeter};
+    }
+    
+    // Create a ball at the specified position
+    Ball createBall(float x, float y) {
+        // Create a dynamic body for the ball
+        b2BodyDef bodyDef;
+        bodyDef.type = b2_dynamicBody;
+        bodyDef.position = {x, y};
+        bodyDef.linearVelocity = {
+            (float)((rand() % 100) - 50) / 25.0f,  // Random x velocity
+            (float)((rand() % 100) - 50) / 25.0f   // Random y velocity
+        };
+
+        bodyDef.isBullet = true;  // Enable continuous collision detection
+        bodyDef.userData = this;
+        
+        b2BodyId ballBodyId = b2CreateBody(physicsWorldId, &bodyDef);
+        
+        // Create a circle shape for the ball
+        b2Circle circleShape;
+        circleShape.radius = BALL_RADIUS;
+        b2Polygon box = b2MakeBox(1.0f, 1.0f);
+
+        // Create fixture for the ball with proper restitution (bounciness)
+        b2Polygon box = b2MakeBox(1.0f, 1.0f);
+        b2ShapeDef shapeDef = b2DefaultShapeDef();
+        shapeDef.density = 1.0f;
+        b2ShapeId ballShapeId = b2CreatePolygonShape(ballBodyId, &shapeDef, &box);
+        
+        // Return a new ball with this body
+        Ball newBall;
+        newBall.bodyId = ballBodyId;
+        newBall.shapeId = ballShapeId;
+        newBall.isActive = true;
+        
+        return newBall;
+    }
+
+    // Convert the ASCII maze into Box2D physics objects
+    void createMazePhysics(const std::string_view& mazeString, float cellSize) {
+        // Clear any existing physics objects
+        if (B2_IS_NON_NULL(physicsWorldId)) {
+            b2DestroyWorld(physicsWorldId);
+        }
+        
+        // Create a new physics world
+        initPhysics();
+        walls.clear();
+        balls.clear();
+        
+        // Calculate maze dimensions
+        int maxCols = 0;
+        int maxRows = 0;
+        
+        // First, calculate maze dimensions
+        const char* mazeData = mazeString.data();
+        size_t mazeLen = mazeString.size();
+        int currentRow = 0;
+        int colCount = 0;
+        
+        for (size_t i = 0; i < mazeLen; i++) {
+            if (mazeData[i] == '\n') {
+                maxCols = std::max(maxCols, colCount);
+                colCount = 0;
+                currentRow++;
+            } else {
+                colCount++;
+            }
+        }
+        maxRows = currentRow + 1;
+        
+        // Reset tracking variables
+        currentRow = 0;
+        int currentCol = 0;
+        
+        // Create world boundaries
+        float worldWidth = maxCols * cellSize / pixelsPerMeter;
+        float worldHeight = maxRows * cellSize / pixelsPerMeter;
+        
+        // Create walls for maze
+        for (size_t i = 0; i < mazeLen; i++) {
+            char c = mazeData[i];
+            
+            if (c == '\n') {
+                currentCol = 0;
+                currentRow++;
+                continue;
+            }
+            
+            // Convert to physics coordinates
+            float x = (currentCol * cellSize) / pixelsPerMeter;
+            float y = (currentRow * cellSize) / pixelsPerMeter;
+            
+            // Create walls for different maze characters
+            if (c == '-' || c == '|') {
+                b2BodyDef wallDef;
+                wallDef.type = b2_staticBody;
+                wallDef.position = {x, y};
+                
+                // Store the wall index in the user data to identify it later
+                int wallIndex = walls.size();
+                static auto wallDefPtrData = 1'000 + wallIndex; // Use offset to identify as wall
+                wallDef.userData = &wallDefPtrData; // Store the wall index in user data
+                
+                b2BodyId wallBodyId = b2CreateBody(physicsWorldId, &wallDef);
+                
+                // Create different shapes based on wall orientation
+                b2Polygon wallShape = b2MakeBox(1.f, 1.f);
+                if (c == '-') {
+                    // Horizontal wall
+                    wallShape = {
+                        cellSize / (2.0f * pixelsPerMeter),   // half-width
+                        WALL_WIDTH / 2.0f                     // half-height
+                };
+                } else {
+                    // Vertical wall
+                    wallShape = {
+                        WALL_WIDTH / 2.0f,                    // half-width
+                        cellSize / (2.0f * pixelsPerMeter)    // half-height
+                    };
+                }
+                
+                b2ShapeDef fixtureDef = b2DefaultShapeDef();
+                fixtureDef.density = 0.0f;  // static bodies
+                b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &fixtureDef, &wallShape);
+                
+                // Add wall to our tracking
+                Wall wall;
+                wall.bodyId = wallBodyId;
+                wall.shapeId = wallShapeId;
+                wall.hitCount = 0;
+                wall.isDestroyed = false;
+                walls.push_back(wall);
+            }
+            
+            currentCol++;
+        }
+        
+        // Create a random exit cell
+        int exitRow = rand() % maxRows;
+        int exitCol = rand() % maxCols;
+        
+        exitCell.row = exitRow;
+        exitCell.col = exitCol;
+        
+        b2BodyDef exitDef;
+        exitDef.type = b2_staticBody;
+        exitDef.position = {
+            (exitCol * cellSize) / pixelsPerMeter,
+            (exitRow * cellSize) / pixelsPerMeter
+        };
+        static auto exitDefPtrData = 2'000; // Use offset to identify as exit
+        exitDef.userData = &exitDefPtrData;  // Special ID for exit
+        
+        exitCell.bodyId = b2CreateBody(physicsWorldId, &exitDef);
+        
+        b2Circle exitShape;
+        exitShape.radius = cellSize / (2.0f * pixelsPerMeter);
+        b2ShapeDef exitFixtureDef = b2DefaultShapeDef();
+        exitFixtureDef.density = 0.0f;  // static bodies
+        exitCell.shapeId = b2CreateCircleShape(exitCell.bodyId, &exitFixtureDef, &exitShape);
+        
+        // Create initial balls
+        int numInitialBalls = 5;
+        for (int i = 0; i < numInitialBalls; i++) {
+            // Pick random cell that's not the exit
+            int ballRow, ballCol;
+            do {
+                ballRow = rand() % maxRows;
+                ballCol = rand() % maxCols;
+            } while (ballRow == exitRow && ballCol == exitCol);
+            
+            float ballX = (ballCol * cellSize + cellSize / 2) / pixelsPerMeter;
+            float ballY = (ballRow * cellSize + cellSize / 2) / pixelsPerMeter;
+            
+            balls.push_back(createBall(ballX, ballY));
+        }
+        
+        SDL_Log("Maze physics created with %zu walls and %zu balls", walls.size(), balls.size());
+    }
+    
+    // Utility method for handling wall collisions
+    void handleWallCollision(b2BodyId possibleWallId, b2BodyId possibleBallId) {
+        // If this is a ball hitting a wall
+        void* wallUserData = b2Body_GetUserData(possibleWallId);
+        
+        // Check if it's a wall by checking the user data range
+        // Walls are stored with pointer values starting at 1000
+        if (wallUserData && (uintptr_t)wallUserData >= 1000 && (uintptr_t)wallUserData < 2000) {
+            int wallIndex = (uintptr_t)wallUserData - 1000;
+            
+            // Make sure the index is valid
+            if (wallIndex >= 0 && wallIndex < walls.size()) {
+                Wall& wall = walls[wallIndex];
+                wall.hitCount++;
+                
+                // Check if wall should break
+                if (wall.hitCount >= WALL_HIT_THRESHOLD && !wall.isDestroyed) {
+                    wall.isDestroyed = true;
+                    // Schedule this wall for removal (can't remove during collision callback)
+                }
+                
+                // Visual feedback could be added here
+            }
+        }
+    }
+    
+    // Utility method for handling ball-to-ball collisions
+    void handleBallCollision(b2BodyId bodyAId, b2BodyId bodyBId) {
+        // Check if both are balls (balls have user data == this)
+        if (reinterpret_cast<uintptr_t>(b2Body_GetUserData(bodyAId)) == reinterpret_cast<uintptr_t>(this) && 
+        reinterpret_cast<uintptr_t>(b2Body_GetUserData(bodyBId)) == reinterpret_cast<uintptr_t>(this)) {
+            
+            // Find the corresponding ball objects
+            Ball* ballA = nullptr;
+            Ball* ballB = nullptr;
+            
+            for (auto& ball : balls) {
+                if (b2Body_GetPosition(ball.bodyId).x == b2Body_GetPosition(bodyAId).x && b2Body_GetPosition(ball.bodyId).y == b2Body_GetPosition(bodyAId).y) ballA = &ball;
+                if (b2Body_GetPosition(ball.bodyId).x == b2Body_GetPosition(bodyBId).x && b2Body_GetPosition(ball.bodyId).y == b2Body_GetPosition(bodyBId).y) ballB = &ball;
+            }
+            
+            if (ballA && ballB) {
+                // Start explosion animation for both balls
+                ballA->isExploding = true;
+                ballB->isExploding = true;
+            }
+        }
+    }
+};
 
 Physics::Physics(const std::string& title, const std::string& version, int w, int h)
     : m_impl{ std::make_unique<PhysicsImpl>(std::cref(title), std::cref(version), w, h)} {
@@ -590,9 +775,7 @@ Physics::Physics(const std::string& title, const std::string& version, int w, in
 
 Physics::~Physics() {
     auto&& g = this->m_impl;
-    // Clean up threads
     SDL_LockMutex(g->gameMtx);
-    // Wake up any threads and wait for them to finish
     g->pendingWorkCount = 0;
     g->state = PhysicsImpl::States::DONE;
     SDL_BroadcastCondition(g->gameCond);
@@ -610,8 +793,6 @@ Physics::~Physics() {
 bool Physics::run() const noexcept {
 
     using namespace std;
-
-    // Create an alias to the Physics implementation
     auto&& sdlHelper = this->m_impl->sdlHelper;
     string_view titleView = this->m_impl->title;
     sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
@@ -619,25 +800,17 @@ bool Physics::run() const noexcept {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return false;
     }
-    
-    // Create the renderer with software rendering which is more compatible
     sdlHelper.renderer = SDL_CreateRenderer(sdlHelper.window, nullptr);
     if (!sdlHelper.renderer) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
         SDL_DestroyWindow(sdlHelper.window);
         return false;
     }
-    
-    // Check if renderer was created successfully
     if (auto props = SDL_GetRendererProperties(sdlHelper.renderer); props != 0) {
         SDL_Log("Renderer created: %s\n", SDL_GetStringProperty(props, SDL_PROP_RENDERER_NAME_STRING, "default"));
-        // SDL_Log("Renderer flags: %u\n", info.flags);
-        // SDL_Log("Max texture width: %d\n", info.max_texture_width);
-        // SDL_Log("Max texture height: %d\n", info.max_texture_height);
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
     }
-
     SDL_Surface* icon = SDL_LoadBMP("resources/icon.bmp");
     if (icon) {
         SDL_SetWindowIcon(sdlHelper.window, icon);
@@ -645,8 +818,6 @@ bool Physics::run() const noexcept {
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s\n", SDL_GetError());
     }
-
-    // Setup SDL audio device
     static const string loadingWAV = "resources/loading.wav";
     if (!sdlHelper.loadWAV(loadingWAV)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file\n");
@@ -662,7 +833,7 @@ bool Physics::run() const noexcept {
     SDL_PutAudioStreamData(sdlHelper.audioStream, sdlHelper.wavBuffer, sdlHelper.wavLength);
     SDL_FlushAudioStream(sdlHelper.audioStream);
     static auto stream_bytes_len = SDL_GetAudioStreamAvailable(sdlHelper.audioStream);
-
+    vector<SDL_Vertex> level;
     sdlHelper.playAudioStream();
 
     auto&& renderer = sdlHelper.renderer;
@@ -675,154 +846,98 @@ bool Physics::run() const noexcept {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load target texture: %s\n", SDL_GetError());
     }
 
-    // Define the level by its vertices renderizable
     vector<SDL_Vertex> level;
     string_view cells;
-
-    // Timers for keeping track of frame rates
     double previous = SDL_GetTicks();
     double accumulator = 0.0, currentTimeStep = 0.0;
-    // Physics loop
     auto&& gState = this->m_impl->state;
     while (gState != PhysicsImpl::States::DONE) {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = SDL_GetTicks() - previous;
         previous = SDL_GetTicks();
-
         accumulator += elapsed;
         while (accumulator >= FIXED_TIME_STEP) {
-            // Input events
             sdlHelper.do_events(ref(gState));
-
-            // Update
             accumulator -= elapsed;
             currentTimeStep += FIXED_TIME_STEP;
         }
-
-        // Update screen-related properties
         int display_w, display_h;
         SDL_GetWindowSize(window, &display_w, &display_h);
         float aspectRatioMin, aspectRatioMax;
         SDL_GetWindowAspectRatio(window, &aspectRatioMin, &aspectRatioMax);
-
         SDL_FPoint screenCenter = { static_cast<float>(display_w / 2), static_cast<float>(display_h / 2) };
-
-        // Update FPS data - Check if it's been about a second
         if (currentTimeStep >= 1.0) {
             SDL_Log("FPS: %d\n", static_cast<int>(currentTimeStep * 60.0));
             SDL_Log("Frame Time / Update: %.3fms\n", elapsed / currentTimeStep);
             currentTimeStep = 0.0;
         }
-
-        // Audio stream updates
         if (SDL_GetAudioStreamAvailable(sdlHelper.audioStream) < sdlHelper.wavLength) {
             SDL_PutAudioStreamData(sdlHelper.audioStream, sdlHelper.wavBuffer, sdlHelper.wavLength);
             stream_bytes_len = SDL_GetAudioStreamAvailable(sdlHelper.audioStream);
         }
-
         SDL_SetRenderTarget(renderer, renderToTexture.get());
         if (SDL_GetRenderTarget(renderer) != renderToTexture.get()) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to set render target to texture\n");
-            // Try again
             SDL_SetRenderTarget(renderer, renderToTexture.get());
         }
-
-        // Render prep
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
-
-        // Draw/gen the level
         if (!this->m_impl->pendingWorkCount) {
             if (gState == PhysicsImpl::States::UPLOADING_LEVEL) {
-                
-                // Update state and current level
-
                 static constexpr auto INIT_MAZE_ROWS = 100, INIT_MAZE_COLS = 50;
                 auto maze_ptr = mazes::factory::create_q(INIT_MAZE_ROWS, INIT_MAZE_COLS);
                 if (!maze_ptr.has_value()) {
                     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze with rows: %d and cols: %d\n", INIT_MAZE_ROWS, INIT_MAZE_COLS);
                 } else {
                     SDL_Log("New level uploading with rows: %d and cols: %d\n", INIT_MAZE_ROWS, INIT_MAZE_COLS);
-
-                    // Get the string representation of the maze
                     std::string mazeStr = mazes::stringz::stringify(maze_ptr.value());
-                    
-                    // Store the maze string in a more permanent storage since string_view only references it
                     static std::string persistentMazeStr;
-                    persistentMazeStr = mazeStr; // Copy the string to ensure it stays in memory
-                    cells = persistentMazeStr;   // Now cells references the persistent string
-                    
+                    persistentMazeStr = mazeStr;
+                    cells = persistentMazeStr;
                     SDL_Log("Generated maze string of size: %zu\n", cells.size());
                     if (cells.empty()) {
                         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Generated maze string is empty!\n");
                     } else {
-                        // Log the first 200 characters to see what's in the string
                         std::string sample = persistentMazeStr.substr(0, std::min(size_t(200), persistentMazeStr.size()));
                         SDL_Log("Maze string starts with: '%s'\n", sample.c_str());
                     }
-                    
                     assert(cells.size() > 0);
-
                     level.clear();
-                    level.reserve(cells.size() * 24); // Each cell can have up to 4 walls, each wall is 6 vertices (2 triangles)
-                    
-                    // Get the actual rows and columns from the maze
+                    level.reserve(cells.size() * 24);
                     auto rows = maze_ptr.value()->get_rows();
                     auto columns = maze_ptr.value()->get_columns();
-                    
-                    // Calculate appropriate cell size based on window dimensions and maze size
-                    // Prevent division by zero which could cause infinities
                     auto safeColumns = std::max(1, columns);
                     auto safeRows = std::max(1, rows);
-                    
-                    SDL_FPoint cellSize = { 
-                        static_cast<float>(display_w) / static_cast<float>(safeColumns), 
-                        static_cast<float>(display_h) / static_cast<float>(safeRows) 
+                    SDL_FPoint cellSize = {
+                        static_cast<float>(display_w) / static_cast<float>(safeColumns),
+                        static_cast<float>(display_h) / static_cast<float>(safeRows)
                     };
-                    
-                    // Validate cell size is reasonable to prevent inf/NaN
-                    if (cellSize.x <= 0 || std::isinf(cellSize.x) || std::isnan(cellSize.x) || 
+                    if (cellSize.x <= 0 || std::isinf(cellSize.x) || std::isnan(cellSize.x) ||
                         cellSize.y <= 0 || std::isinf(cellSize.y) || std::isnan(cellSize.y)) {
-                        cellSize.x = 10.0f; // Default to reasonable values if calculation fails
+                        cellSize.x = 10.0f;
                         cellSize.y = 10.0f;
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid cell size calculated: (%f, %f). Using defaults.\n", 
+                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid cell size calculated: (%f, %f). Using defaults.\n",
                             cellSize.x, cellSize.y);
                     }
-                    
-                    SDL_Log("Using cell size: (%f, %f) for grid of %d rows x %d columns\n", 
+                    SDL_Log("Using cell size: (%f, %f) for grid of %d rows x %d columns\n",
                         cellSize.x, cellSize.y, rows, columns);
-    
-                    // Now start the worker threads
                     this->m_impl->genLevel(ref(level), cref(cells), cellSize);
+                    this->m_impl->createMazePhysics(cells, cellSize.x);
                 }
-
                 gState = PhysicsImpl::States::PLAY;
             }
-
-            // Check SDL rendering state and texture validity
             SDL_Log("Render target texture valid: %s", renderToTexture.get() != nullptr ? "yes" : "no");
             SDL_Log("Current render target: %s", SDL_GetRenderTarget(renderer) == renderToTexture.get() ? "render texture" : "default");
-            
-            // Log viewport settings
             SDL_Rect v;
             SDL_GetRenderViewport(renderer, &v);
             SDL_Log("Viewport: x=%d, y=%d, w=%d, h=%d", v.x, v.y, v.w, v.h);
-            
-            // Now draw geometry ensuring complete render with no more work pending
             SDL_Log("Attempting to render %zu vertices\n", level.size());
-            
-            // Check if we have any vertices to render
             if (level.empty()) {
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "No vertices to render\n");
-                // Draw a simple rectangle to show something on screen
                 SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                 SDL_FRect r = {10, 10, display_w - 20, display_h - 20};
                 SDL_RenderFillRect(renderer, &r);
             } else {
-                // Instead of using SDL_RenderGeometry which is having issues,
-                // let's draw the maze using simple SDL drawing primitives
-                
-                // First draw a white background
                 SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
                 SDL_RenderClear(renderer);
                 
@@ -846,75 +961,297 @@ bool Physics::run() const noexcept {
                     }
                 }
                 maxRows = currentRow + 1;
-                
-                // Calculate cell size to fit the window
+                currentRow = 0;
                 float cellW = static_cast<float>(display_w) / static_cast<float>(maxCols + 1);
                 float cellH = static_cast<float>(display_h) / static_cast<float>(maxRows + 1);
                 float cellSize = std::min(cellW, cellH);
-                
-                // Offset to center the maze
                 float offsetX = (display_w - (maxCols * cellSize)) / 2.0f;
                 float offsetY = (display_h - (maxRows * cellSize)) / 2.0f;
-                
                 SDL_Log("Drawing maze with dimensions: %d rows x %d cols", maxRows, maxCols);
                 SDL_Log("Using cell size: %.2f with offsets: (%.2f, %.2f)", cellSize, offsetX, offsetY);
-                
-                // Now draw the maze
-                currentRow = 0;
                 int currentCol = 0;
-                
-                // Set to black for drawing walls
-                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-                
                 for (size_t i = 0; i < mazeLen; i++) {
                     char c = mazeData[i];
-                    
                     if (c == '\n') {
                         currentCol = 0;
                         currentRow++;
                         continue;
                     }
-                    
                     float x = offsetX + (currentCol * cellSize);
                     float y = offsetY + (currentRow * cellSize);
-                    
-                    // Draw based on character
                     if (c == '+') {
-                        // Draw a small dot at the corner
                         SDL_FRect rect = {x - 1, y - 1, 3, 3};
                         SDL_RenderFillRect(renderer, &rect);
                     }
                     else if (c == '-') {
-                        // Horizontal wall
                         SDL_RenderLine(renderer, 
-                            x, y,
+                            x, y,   
                             x + cellSize, y
                         );
                     }
                     else if (c == '|') {
-                        // Vertical wall
                         SDL_RenderLine(renderer,
                             x, y,
                             x, y + cellSize
                         );
                     }
-                    
                     currentCol++;
                 }
-                
                 SDL_Log("Maze drawing completed successfully");
             }
+            SDL_SetRenderTarget(renderer, nullptr);
+            SDL_SetRenderDrawColor(renderer, 255, 0, 175, 255);
+            SDL_RenderTexture(renderer, renderToTexture.get(), nullptr, nullptr);
+            SDL_RenderPresent(renderer);
         }
 
-        // Finally, draw text to screen
-        SDL_SetRenderDrawColor(renderer, 255, 0, 175, 255);
-
-        SDL_SetRenderTarget(renderer, nullptr);
-
-        SDL_RenderTexture(renderer, renderToTexture.get(), nullptr, nullptr);
-
-        SDL_RenderPresent(renderer);
+        // Update physics world and render physics entities
+        if (gState == PhysicsImpl::States::PLAY && B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
+            // Step physics world
+            b2World_Step(
+                this->m_impl->physicsWorldId,
+                this->m_impl->timeStep,
+                this->m_impl->velocityIterations
+            );
+            
+            // Process contact events in Box2D 3.1.0 style
+            b2ContactEvents contactEvents = b2World_GetContactEvents(this->m_impl->physicsWorldId);
+            
+            // Handle contact hit events
+            for (int i = 0; i < contactEvents.hitCount; ++i) {
+                b2ContactHitEvent* hitEvent = &contactEvents.hitEvents[i];
+                b2BodyId bodyA = b2Shape_GetBody(hitEvent->shapeIdA);
+                b2BodyId bodyB = b2Shape_GetBody(hitEvent->shapeIdB);
+                
+                // Process wall collisions
+                this->m_impl->handleWallCollision(bodyA, bodyB);
+                this->m_impl->handleWallCollision(bodyB, bodyA);
+                
+                // Process ball-to-ball collisions
+                this->m_impl->handleBallCollision(bodyA, bodyB);
+            }
+            
+            // Process contact begin events
+            for (int i = 0; i < contactEvents.beginCount; ++i) {
+                b2ContactBeginTouchEvent* beginEvent = &contactEvents.beginEvents[i];
+                b2BodyId bodyA = b2Shape_GetBody(beginEvent->shapeIdA);
+                b2BodyId bodyB = b2Shape_GetBody(beginEvent->shapeIdB);
+                
+                // Check if a ball reached the exit
+                uintptr_t exitId = 2000;  // Special ID for exit
+                
+                if (reinterpret_cast<uintptr_t>(b2Body_GetUserData(bodyA)) == exitId || 
+                    reinterpret_cast<uintptr_t>(b2Body_GetUserData(bodyB)) == exitId) {
+                    
+                    b2BodyId ballId = reinterpret_cast<uintptr_t>(b2Body_GetUserData(bodyA)) == exitId ? bodyB : bodyA;
+                    
+                    // Find the ball that reached the exit
+                    for (auto& ball : this->m_impl->balls) {
+                        if (b2Body_GetPosition(ball.bodyId).x == b2Body_GetPosition(ballId).x
+                        && b2Body_GetPosition(ball.bodyId).y == b2Body_GetPosition(ballId).y &&
+                        ball.isActive && !ball.isExploding) {
+                            // Collect the ball
+                            ball.isActive = false;
+                            this->m_impl->exitCell.ballsCollected++;
+                            this->m_impl->score += 100;
+                            
+                            // Remove the ball
+                            b2DestroyBody(ball.bodyId);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Handle any destroyed walls (can't remove during collision callbacks)
+            for (int i = this->m_impl->walls.size() - 1; i >= 0; --i) {
+                auto& wall = this->m_impl->walls[i];
+                if (wall.isDestroyed) {
+                    b2DestroyBody(wall.bodyId);
+                    this->m_impl->walls.erase(this->m_impl->walls.begin() + i);
+                }
+            }
+            
+            // Handle exploding balls
+            for (int i = this->m_impl->balls.size() - 1; i >= 0; --i) {
+                auto& ball = this->m_impl->balls[i];
+                
+                // Update explosion animation
+                if (ball.isExploding) {
+                    ball.explosionTimer += this->m_impl->timeStep;
+                    
+                    if (ball.explosionTimer > 0.5f) { // After half a second, remove the ball
+                        b2DestroyBody(ball.bodyId);
+                        this->m_impl->balls.erase(this->m_impl->balls.begin() + i);
+                    }
+                }
+                
+                // Check if ball is outside the play area
+                if (ball.isActive && !ball.isExploding) {
+                    b2Vec2 position = b2Body_GetPosition(ball.bodyId);
+                    if (position.x < -5 || position.x > 100 + 5 || 
+                        position.y < -5 || position.y > 100 + 5) {
+                        
+                        // Ball is outside the maze, mark it as inactive
+                        ball.isActive = false;
+                    }
+                }
+            }
+            
+            // Handle ball dragging
+            float mouseX, mouseY;
+            uint32_t mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+            b2Vec2 mousePos = this->m_impl->screenToPhysics(mouseX, mouseY);
+            
+            // Start dragging a ball if mouse button is pressed
+            if (mouseState & SDL_BUTTON_LMASK) {
+                if (!this->m_impl->isDragging) {
+                    // Check if we're clicking on a ball
+                    for (int i = 0; i < this->m_impl->balls.size(); i++) {
+                        auto& ball = this->m_impl->balls[i];
+                        
+                        if (!ball.isActive || ball.isExploding)
+                            continue;
+                            
+                        b2Vec2 ballPos = b2Body_GetPosition(ball.bodyId);
+                        float distance = b2Distance(ballPos, mousePos);
+                        
+                        if (distance <= this->m_impl->BALL_RADIUS * 1.5f) {
+                            this->m_impl->isDragging = true;
+                            this->m_impl->draggedBallIndex = i;
+                            this->m_impl->lastMousePos = mousePos;
+                            break;
+                        }
+                    }
+                } 
+                else if (this->m_impl->draggedBallIndex >= 0 && 
+                         this->m_impl->draggedBallIndex < this->m_impl->balls.size()) {
+                    // Apply force to the ball based on mouse movement
+                    auto& ball = this->m_impl->balls[this->m_impl->draggedBallIndex];
+                    
+                    if (ball.isActive && !ball.isExploding) {
+                        b2Vec2 delta = mousePos - this->m_impl->lastMousePos;
+                        b2Body_ApplyForceToCenter(ball.bodyId, delta * 50.0f, true); // Scale the force
+                        this->m_impl->lastMousePos = mousePos;
+                    }
+                }
+            } 
+            else {
+                // Mouse released, stop dragging
+                this->m_impl->isDragging = false;
+                this->m_impl->draggedBallIndex = -1;
+            }
+            
+            // Render physics entities
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+            SDL_RenderClear(renderer);
+            
+            // Render walls
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+            for (const auto& wall : this->m_impl->walls) {
+                // Get wall position and dimensions
+                b2Vec2 pos = b2Body_GetPosition(wall.bodyId);
+                SDL_FPoint screenPos = this->m_impl->physicsToScreen(pos.x, pos.y);
+                
+                // Get fixture and shape to determine dimensions
+                b2ShapeDef shapeDef = b2DefaultShapeDef();
+                // auto polygonShape = b2CreatePolygonShape(wall.bodyId, &shapeDef, &wall.shapeId);
+                
+                // Convert Box2D dimensions to screen coordinates
+                float halfWidth = 3.f;//polygonShape.vertices[1].x * this->m_impl->pixelsPerMeter;
+                float halfHeight = 3.f;//polygonShape->m_vertices[2].y * this->m_impl->pixelsPerMeter;
+                
+                SDL_FRect rect = {
+                    screenPos.x - halfWidth, 
+                    screenPos.y - halfHeight,
+                    halfWidth * 2,
+                    halfHeight * 2
+                };
+                
+                // Color walls based on hit count
+                int hitRatio = (int)(255 * wall.hitCount / this->m_impl->WALL_HIT_THRESHOLD);
+                SDL_SetRenderDrawColor(renderer, 0, 0, 255 - hitRatio, 255);
+                SDL_RenderFillRect(renderer, &rect);
+            }
+            
+            // Render balls
+            for (const auto& ball : this->m_impl->balls) {
+                if (!ball.isActive) 
+                    continue;
+                    
+                b2Vec2 pos = b2Body_GetPosition(ball.bodyId);
+                SDL_FPoint screenPos = this->m_impl->physicsToScreen(pos.x, pos.y);
+                float radius = this->m_impl->BALL_RADIUS * this->m_impl->pixelsPerMeter;
+                
+                if (ball.isExploding) {
+                    // Render explosion animation
+                    float explosionProgress = ball.explosionTimer / 0.5f; // 0.5 is max time
+                    float expandedRadius = radius * (1.0f + explosionProgress * 2.0f);
+                    
+                    // Fade out as explosion progresses
+                    int alpha = (int)(255 * (1.0f - explosionProgress));
+                    
+                    SDL_SetRenderDrawColor(renderer, 255, 165, 0, alpha); // Orange
+                    
+                    // Draw explosion as a circle
+                    for (int w = 0; w < 8; w++) {
+                        float angle = (float)w * 3.14159f / 4.0f;
+                        SDL_RenderLine(
+                            renderer,
+                            screenPos.x,
+                            screenPos.y,
+                            screenPos.x + cos(angle) * expandedRadius,
+                            screenPos.y + sin(angle) * expandedRadius
+                        );
+                    }
+                }
+                else {
+                    // Normal ball rendering
+                    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+                    
+                    // Draw ball as a filled circle
+                    for (int y = -radius; y <= radius; y++) {
+                        for (int x = -radius; x <= radius; x++) {
+                            if (x*x + y*y <= radius*radius) {
+                                SDL_RenderPoint(renderer, screenPos.x + x, screenPos.y + y);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Render exit cell
+            if (B2_IS_NON_NULL(this->m_impl->exitCell.bodyId)) {
+                b2Vec2 pos = b2Body_GetPosition(this->m_impl->exitCell.bodyId);
+                SDL_FPoint screenPos = this->m_impl->physicsToScreen(pos.x, pos.y);
+                float radius = this->m_impl->BALL_RADIUS * 2 * this->m_impl->pixelsPerMeter;
+                
+                SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+                
+                // Draw exit as a circle with X inside
+                for (int y = -radius; y <= radius; y++) {
+                    for (int x = -radius; x <= radius; x++) {
+                        if (x*x + y*y <= radius*radius) {
+                            SDL_RenderPoint(renderer, screenPos.x + x, screenPos.y + y);
+                        }
+                    }
+                }
+                
+                // Draw X
+                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+                SDL_RenderLine(renderer, 
+                    screenPos.x - radius/2, screenPos.y - radius/2,
+                    screenPos.x + radius/2, screenPos.y + radius/2);
+                SDL_RenderLine(renderer, 
+                    screenPos.x + radius/2, screenPos.y - radius/2,
+                    screenPos.x - radius/2, screenPos.y + radius/2);
+            }
+            
+            // Draw score
+            char scoreText[32];
+            SDL_snprintf(scoreText, sizeof(scoreText), "Score: %d", this->m_impl->exitCell.ballsCollected);
+            // Render score text with SDL_RenderText or similar function
+        }
     }
-
     return true;
-} // run
+}
