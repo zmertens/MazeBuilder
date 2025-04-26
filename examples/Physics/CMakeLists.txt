@@ -47,7 +47,6 @@ else()
     if(NOT box2d_FOUND)
         message(INFO ": Getting Box2D via FetchContent")
         FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.0)
-        set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/box2d-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
         set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)
     endif()
 

@@ -26,7 +26,7 @@ int main(int argc, char* argv[]) {
     cout << MESSAGE << endl;
 
     try {
-        string title = "generator";
+        string title = "Big Generator";
         string version = "0.1.0";
         auto myGameInstance = mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
         bool res = myGameInstance->run();
