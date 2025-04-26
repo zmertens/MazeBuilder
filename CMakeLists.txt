@@ -27,6 +27,16 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Handle compiler-specific flags in a cross-platform way
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
+    # GCC, Clang, and AppleClang use -W flags
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=maybe-uninitialized")
+elseif(MSVC)
+    # MSVC uses /W flags
+    string(REGEX REPLACE "/W[0-4]" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4 /we4700")
+endif()
+
 set(MAZE_BUILDER_CORE_LIB "mazebuildercore")
 
 option(MAZE_BUILDER_DOCS "Build ${PROJECT_NAME} documentation" OFF)

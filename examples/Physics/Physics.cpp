@@ -1037,18 +1037,32 @@ struct Physics::PhysicsImpl {
                 float impactSpeed = b2Length(ballVel);
                 
                 // Only count the hit if it's a significant impact
-                if (impactSpeed > 2.0f) {
+                if (impactSpeed > 1.5f) { // Threshold for counting a hit
                     wall.hitCount++;
-                    SDL_Log("Wall hit! Wall index: %d, Hit count: %d, Impact speed: %.2f, Threshold: %.2f", 
-                           wallIndex, wall.hitCount, impactSpeed, WALL_HIT_THRESHOLD);
+                    SDL_Log("Wall hit! Wall index: %d, Hit count: %d/%d, Impact speed: %.2f", 
+                           wallIndex, wall.hitCount, (int)WALL_HIT_THRESHOLD, impactSpeed);
                     
                     // Apply a small impulse to make the hit feel more impactful
                     b2Vec2 normalizedVel = ballVel;
                     if (impactSpeed > 0) {
                         normalizedVel = normalizedVel * (1.0f / impactSpeed);
                     }
-                    b2Vec2 opposingForce = normalizedVel * -0.5f; // Apply opposing force
+                    // Add some randomness to the bounce for more dynamic behavior
+                    float randomAngle = ((rand() % 20) - 10) * 0.01f; // Small random angle adjustment
+                    float cosR = cosf(randomAngle);
+                    float sinR = sinf(randomAngle);
+                    b2Vec2 adjustedDir = {
+                        normalizedVel.x * cosR - normalizedVel.y * sinR,
+                        normalizedVel.x * sinR + normalizedVel.y * cosR
+                    };
+                    
+                    // Create a more dynamic collision response
+                    b2Vec2 opposingForce = adjustedDir * -0.7f * impactSpeed; // Scale with impact speed
                     b2Body_ApplyLinearImpulseToCenter(possibleBallId, opposingForce, true);
+                    
+                    // Increase the ball's angular velocity for more interesting physics
+                    float spin = (rand() % 10) * 0.3f;
+                    b2Body_ApplyAngularImpulse(possibleBallId, spin, true);
                 }
                 
                 // Check if wall should break
@@ -1056,7 +1070,13 @@ struct Physics::PhysicsImpl {
                     wall.isDestroyed = true;
                     SDL_Log("Wall %d destroyed after %d hits!", wallIndex, wall.hitCount);
                     
-                    // Note: The wall will be physically destroyed in updatePhysicsObjects
+                    // Increment score
+                    score += 10;
+                    
+                    // IMPORTANT: Do NOT destroy the body here - let updatePhysicsObjects do it
+                    // This fixes the timing issue between physics and rendering
+                    // The wall will be visually marked as destroyed but the body remains valid
+                    // until the next physics update cycle where it will be properly removed
                 }
             }
         }
@@ -1197,6 +1217,103 @@ struct Physics::PhysicsImpl {
             }
             isDragging = false;
             draggedBallIndex = -1;
+        }
+    }
+
+    // Draw a wall with appropriate color and damage effects based on hit count
+    void drawWall(SDL_Renderer* renderer, const Wall& wall, float screenX, float screenY, 
+                  float halfWidth, float halfHeight) const {
+        // Calculate color based on hit count
+        float hitRatio = static_cast<float>(wall.hitCount) / WALL_HIT_THRESHOLD;
+        
+        // Start with black and transition to yellow-orange-red as damage increases
+        uint8_t red = 0, green = 0, blue = 0;
+        
+        if (wall.hitCount == 0) {
+            // Undamaged wall - black
+            red = green = blue = 0;
+        } 
+        else if (hitRatio < 0.33f) {
+            // First stage - orange-ish with slight red
+            red = 220;
+            green = 120;
+            blue = 0;
+        }
+        else if (hitRatio < 0.67f) {
+            // Second stage - more red
+            red = 240;
+            green = 80;
+            blue = 0;
+        }
+        else {
+            // Final stage - bright red/yellow (near breaking)
+            red = 255;
+            green = static_cast<uint8_t>(hitRatio > 0.9f ? 255 : 40); // Flash yellow when about to break
+            blue = 0;
+        }
+        
+        SDL_SetRenderDrawColor(renderer, red, green, blue, 255);
+        
+        // Draw the wall rectangle
+        SDL_FRect rect = {
+            screenX - halfWidth,
+            screenY - halfHeight,
+            halfWidth * 2,
+            halfHeight * 2
+        };
+        
+        SDL_RenderFillRect(renderer, &rect);
+        
+        // Add damage visual effects
+        if (wall.hitCount > 0) {
+            // Draw cracks that increase with damage
+            SDL_SetRenderDrawColor(renderer, 255, 255, 255, 180); // Whitish cracks
+            
+            int numCracks = 1 + static_cast<int>(hitRatio * 6);
+            
+            for (int i = 0; i < numCracks; i++) {
+                // Generate random crack patterns
+                float crackStartX = screenX - halfWidth * (0.8f * (static_cast<float>(rand()) / RAND_MAX));
+                float crackStartY = screenY - halfHeight * (0.8f * (static_cast<float>(rand()) / RAND_MAX));
+                
+                // Create zigzag crack pattern
+                float prevX = crackStartX;
+                float prevY = crackStartY;
+                
+                int segments = 3 + static_cast<int>(hitRatio * 3);
+                
+                for (int j = 0; j < segments; j++) {
+                    float nextX = screenX + halfWidth * (1.6f * (static_cast<float>(rand()) / RAND_MAX) - 0.8f);
+                    float nextY = screenY + halfHeight * (1.6f * (static_cast<float>(rand()) / RAND_MAX) - 0.8f);
+                    
+                    SDL_RenderLine(renderer, prevX, prevY, nextX, nextY);
+                    
+                    prevX = nextX;
+                    prevY = nextY;
+                }
+            }
+            
+            // Add pulsing effect when near breaking
+            if (hitRatio > 0.75f) {
+                static float pulseTimer = 0.0f;
+                pulseTimer += 0.03f;
+                
+                float pulseAlpha = (sinf(pulseTimer * 10.0f) + 1.0f) * 0.5f * 150.0f; // Pulsing intensity
+                
+                SDL_SetRenderDrawColor(renderer, 255, 255, 0, static_cast<uint8_t>(pulseAlpha));
+                SDL_RenderRect(renderer, &rect);
+                
+                // Add a second rect for more intense effect when very close to breaking
+                if (hitRatio > 0.9f) {
+                    SDL_FRect innerRect = {
+                        screenX - halfWidth + 2,
+                        screenY - halfHeight + 2,
+                        (halfWidth * 2) - 4,
+                        (halfHeight * 2) - 4
+                    };
+                    SDL_RenderRect(renderer, &innerRect);
+                }
+            }
         }
     }
 };
@@ -1566,64 +1683,7 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
         }
         
         // Draw the wall with a color based on hit count
-        float hitRatio = static_cast<float>(wall.hitCount) / this->m_impl->WALL_HIT_THRESHOLD;
-        
-        // Change color based on hit count: blue → purple → red as hits increase
-        uint8_t red = static_cast<uint8_t>(hitRatio * 255);
-        uint8_t green = 0;
-        uint8_t blue = static_cast<uint8_t>((1.0f - hitRatio) * 180);
-        
-        SDL_SetRenderDrawColor(renderer, red, green, blue, 255);
-        
-        // Handle rotation if needed
-        if (camera.rotation != 0.0f) {
-            // For rotation, we need to use vertices
-            SDL_Vertex vertices[6];
-            SDL_FColor color = {red/255.0f, green/255.0f, blue/255.0f, 1.0f};
-            
-            // Calculate corners of the rotated rectangle
-            float cos_r = cosf(camera.rotation);
-            float sin_r = sinf(camera.rotation);
-            
-            // Define the four corner points
-            SDL_FPoint points[4] = {
-                {screenX - halfWidth, screenY - halfHeight},  // Top left
-                {screenX + halfWidth, screenY - halfHeight},  // Top right
-                {screenX + halfWidth, screenY + halfHeight},  // Bottom right
-                {screenX - halfWidth, screenY + halfHeight}   // Bottom left
-            };
-            
-            // Create vertices for two triangles
-            for (int i = 0; i < 4; i++) {
-                vertices[i].position = points[i];
-                vertices[i].color = color;
-                vertices[i].tex_coord = {0.0f, 0.0f};
-            }
-            
-            // Create two triangles (0,1,3) and (1,2,3)
-            vertices[4] = vertices[3];
-            vertices[5] = vertices[1];
-            
-            // Render the triangles
-            SDL_RenderGeometry(renderer, nullptr, vertices, 6, nullptr, 0);
-        } 
-        else {
-            // No rotation, use a simple rectangle
-            SDL_FRect rect = {
-                screenX - halfWidth,
-                screenY - halfHeight,
-                halfWidth * 2,
-                halfHeight * 2
-            };
-            
-            SDL_RenderFillRect(renderer, &rect);
-            
-            // Add a highlight effect based on recent hits
-            if (wall.hitCount > 0 && wall.hitCount < this->m_impl->WALL_HIT_THRESHOLD) {
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 100); // White highlight
-                SDL_RenderRect(renderer, &rect);
-            }
-        }
+        this->m_impl->drawWall(renderer, wall, screenX, screenY, halfWidth, halfHeight);
     }
     
     // Render balls
@@ -1647,8 +1707,9 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
         float radius = this->m_impl->BALL_RADIUS * this->m_impl->pixelsPerMeter * camera.zoom;
         
         // Debug log to verify ball positions
-        SDL_Log("Ball: physics(%.2f,%.2f) world(%.2f,%.2f) screen(%.2f,%.2f) r=%.2f active=%d", 
-            pos.x, pos.y, worldX, worldY, screenX, screenY, radius, ball.isActive ? 1 : 0);
+
+        // SDL_Log("Ball: physics(%.2f,%.2f) world(%.2f,%.2f) screen(%.2f,%.2f) r=%.2f active=%d", 
+            // pos.x, pos.y, worldX, worldY, screenX, screenY, radius, ball.isActive ? 1 : 0);
         
         if (ball.isExploding) {
             // Render explosion animation
@@ -1750,7 +1811,7 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
             screenX - radius/2, screenY + radius/2);
             
         // Log exit position
-        SDL_Log("Exit at screen pos (%.2f, %.2f)", screenX, screenY);
+        // SDL_Log("Exit at screen pos (%.2f, %.2f)", screenX, screenY);
     }
 }
 
@@ -1954,7 +2015,7 @@ void Physics::drawDebugTestObjects(SDL_Renderer* renderer) const {
     SDL_RenderLine(renderer, centerX - 50.0f, centerY, centerX + 50.0f, centerY);
     SDL_RenderLine(renderer, centerX, centerY - 50.0f, centerX, centerY + 50.0f);
     
-    SDL_Log("Debug shapes drawn at (%d, %d)", display_w, display_h);
+    // SDL_Log("Debug shapes drawn at (%d, %d)", display_w, display_h);
 }
 
 // Camera coordinate transformation implementation
