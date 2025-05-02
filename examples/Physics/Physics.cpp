@@ -41,6 +41,8 @@
 #include "Texture.hpp"
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
+static constexpr auto RESOURCE_PATH_PREFIX = "resources";
+static constexpr auto PHYSICS_JSON_PATH = "resources/physics.json";
 
 struct Physics::PhysicsImpl {
     
@@ -1144,18 +1146,30 @@ bool Physics::run() const noexcept {
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
     }
-    SDL_Surface* icon = SDL_LoadBMP("resources/icon.bmp");
+
+
+    unordered_map<string, string> resourceMap{};
+    mazes::json_helper jh{};
+    jh.load(PHYSICS_JSON_PATH,  ref(resourceMap));
+
+    // Use the new strip_json_quotes method to properly handle the JSON string values
+    auto resourceLoadingStrView = mazes::stringz::strip_json_quotes(resourceMap["icon_image_path"]);
+
+    const auto iconPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
+    SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
     if (icon) {
         SDL_SetWindowIcon(sdlHelper.window, icon);
         SDL_DestroySurface(icon);
     } else {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s\n", SDL_GetError());
     }
-    
-    // Setup SDL audio device
-    static const string loadingWAV = "resources/loading.wav";
-    if (!sdlHelper.loadWAV(loadingWAV)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file\n");
+
+    // Setup SDL audio device with properly stripped JSON value
+    resourceLoadingStrView = mazes::stringz::strip_json_quotes(resourceMap["loading_sound_path"]);
+
+    const auto loadingPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
+    if (!sdlHelper.loadWAV(loadingPath.c_str())) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file: %s\n", loadingPath.c_str());
     }
 
     sdlHelper.playAudioStream();

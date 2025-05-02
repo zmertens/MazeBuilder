@@ -313,3 +313,58 @@ std::string stringz::stringify(const std::unique_ptr<maze>& m) noexcept {
     }
     return oss.str();
 } // stringify
+
+/// @brief Strip specific characters from the beginning and end of a string view
+/// @param s The string view to strip characters from
+/// @param to_strip_from_s The character to strip
+/// @return A new string view with the specified characters removed from both ends
+std::string_view stringz::strip(const std::string_view& s, char to_strip_from_s) noexcept {
+    if (s.empty()) {
+        return s;
+    }
+    
+    auto start = s.find_first_not_of(to_strip_from_s);
+    auto end = s.find_last_not_of(to_strip_from_s);
+    
+    if (start == std::string_view::npos || end == std::string_view::npos) {
+        return s;
+    }
+    
+    return s.substr(start, end - start + 1);
+}
+
+/// @brief Strip quotes from a JSON string value
+/// @param s The string view potentially containing JSON quotes
+/// @return A string view with JSON quotes removed from both ends
+std::string_view stringz::strip_json_quotes(const std::string_view& s) noexcept {
+    if (s.empty()) {
+        return s;
+    }
+    
+    // Debug print to see the exact string content
+#if defined(MAZE_DEBUG)
+    std::cout << "Original string: [" << s << "]" << std::endl;
+#endif
+    
+    std::string_view result = s;
+    
+    // First remove any leading/trailing whitespace
+    auto start = result.find_first_not_of(" \t\n\r\"");
+    auto end = result.find_last_not_of(" \t\n\r\"");
+    
+    if (start == std::string_view::npos || end == std::string_view::npos) {
+        return result;
+    }
+    
+    result = result.substr(start, end - start + 1);
+    
+    // Now check if the trimmed string starts and ends with quotes
+    if (result.size() >= 2 && result.front() == '\"' && result.back() == '\"') {
+        result = result.substr(1, result.size() - 2);
+    }
+    
+    // Handle escaped quotes within the string if needed
+    // (This would require more complex parsing if the JSON has escaped quotes)
+    
+    return strip(result, '\"');
+}

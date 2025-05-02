@@ -97,6 +97,11 @@ else()
 	target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps)
     target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/dearimgui)
 
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        message(STATUS ": Enabled ${EXE_NAME} to use -DMAZE_DEBUG flag.")
+        target_compile_definitions(${EXE_NAME} PRIVATE "MAZE_DEBUG")
+    endif()
+
     # Add Box2D include directory if not already included by find_package
     if(TARGET box2d)
         set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)

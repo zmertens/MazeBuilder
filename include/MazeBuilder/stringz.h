@@ -58,6 +58,17 @@ public:
     /// @return the string representation
     static std::string stringify(const std::unique_ptr<maze>& m) noexcept;
 
+    /// @brief Strip specific characters from the beginning and end of a string view
+    /// @param s The string view to strip characters from
+    /// @param to_strip_from_s The character to strip
+    /// @return A new string view with the specified characters removed from both ends
+    static std::string_view strip(const std::string_view& s, char to_strip_from_s) noexcept;
+
+    /// @brief Strip quotes from a JSON string value
+    /// @param s The string view potentially containing JSON quotes
+    /// @return A string view with JSON quotes removed from both ends
+    static std::string_view strip_json_quotes(const std::string_view& s) noexcept;
+
 }; // class
 } // namespace
 
