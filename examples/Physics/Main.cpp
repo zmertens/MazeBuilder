@@ -37,15 +37,15 @@ int main(int argc, char* argv[]) {
 	using namespace std;
 
     static constexpr auto MESSAGE = R"msg(
-        --- WELCOME TO THE MAZE GENERATOR ---
-        |   1. Press 'B' on keyboard to generate a 2D maze   |
-        -------------------------------------------
+        --- WELCOME TO THE MAZE BUILDER - Physics Example  ---
+        |   1. Press 'B' on keyboard to generate a new level |
+        ------------------------------------------------------
     )msg";
 
     cout << MESSAGE << endl;
 
     try {
-        string title = "physics - gamedev.js jam 2025";
+        string title = "Breaking Walls";
         string version = "0.1.0";
         auto myGameInstance = mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
         bool res = myGameInstance->run();

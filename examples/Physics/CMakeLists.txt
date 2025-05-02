@@ -5,7 +5,10 @@ set(EXE_NAME "mazebuilderphysics")
 
 set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp)
 
 set(DEAR_IMGUI_SOURCES
   ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.cpp

@@ -2,7 +2,8 @@
 
 # Maze Builder
 
-Create and customize mazes on multiple platforms and languages. Below shows an example of the output string generated from the command-line interface: `mazebuildercli.exe -r 10 -c 10 -a dfs`
+Create and customize mazes on multiple platforms and languages.
+An example of an output string generated from the command-line interface is shown here:
 
 ```text
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -53,32 +54,11 @@ Here's an example of the command-line program producing JSON output: `mazebuilde
 
 ---
 
-## Help Message
-
-View the help message from the command-line example: `./mazebuildercli --help`
-
-```sh
-        Usages: app.exe [OPTION(S)]... [OUTPUT]
-        Generates mazes and exports to different formats
-        Options: case-sensitive, long options must use '=' combination
-        Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-        Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt
-          -a, --algo         dfs, sidewinder, binary_tree [default]
-          -c, --columns      columns
-          -d, --distances    show distances using base36 numbers
-          -e, --encode       encode maze to base64 string
-          -h, --help         display this help message
-          -j, --json         run with arguments in JSON format
-          -s, --seed         seed for the mt19937 generator
-          -r, --rows         rows
-          -o, --output       [txt|text] [json] [jpg|jpeg] [png] 
-                              [obj|object] [stdout]
-          -v, --version      display program version
-```
-
----
-
 ## Examples
+
+### Command-Line Interface
+
+The command-line interface example allows maze building functionality at the terminal.
 
 Run the `binary_tree` algorithm with long arguments:
 
@@ -92,6 +72,8 @@ Run the `dfs` algorithm with short arguments:
 mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o dfs.obj
 ```
 
+### API 
+
 Use the C++ API in a modern C++ program:
 
 ```cpp
@@ -102,7 +84,7 @@ Use the C++ API in a modern C++ program:
     void main() {
         auto rows{10}, cols{10};
 
-        auto m = mazes::factory::create(rows, cols);
+        auto m = mazes::factory::create_q(rows, cols);
 
         auto s = mazes::stringz::stringify(m);
 
@@ -111,6 +93,26 @@ Use the C++ API in a modern C++ program:
         return 0;
     }
 ```
+
+### Web Interface - Voxels
+
+![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
+
+Provided is a web interface in a voxel world that enables interactive maze generation.
+
+[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
+
+The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script.
+Once the provided script is running, then open the browser to `http://localhost:8000`.
+
+### Http
+
+The HTTP example allows for distributed maze building and sharing.
+The network endpoint is configurable with the included JSON input files.
+
+### Physics
+
+The physics example is a full-fledged video game. Pick balls and bounce against maze walls, breaking and colliding, and navigating to exit cells.
 
 ---
 
@@ -184,17 +186,6 @@ The Python script `solver.py` plays with the maze generation by loading PNG file
   - `pip install numpy pillow networkx`
 
 ---
-
-## Web Interface
-
-![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
-
-Provided is a web interface in a voxel world that enables interactive maze generation.
-
-[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
-
-The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script.
-Once the provided script is running, then open the browser to `http://localhost:8000`.
 
 ## More Learning Resources
 

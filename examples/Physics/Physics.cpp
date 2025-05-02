@@ -1,5 +1,5 @@
 //
-// @brief Physics class implementation
+// Physics class implementation
 //  Simple 2D maze Physics using SDL3
 //  Press 'B' to generate a new maze
 // 
@@ -35,25 +35,14 @@
 
 #include <MazeBuilder/maze_builder.h>
 
+#include "OrthographicCamera.hpp"
+#include "SDLHelper.hpp"
+#include "State.hpp"
+#include "Texture.hpp"
+
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 
 struct Physics::PhysicsImpl {
-
-    enum class States {
-        // Physics is starting, show welcome screen
-        SPLASH,
-        // Main menu / configurations 
-        OPTIONS,
-        // Physics is running
-        PLAY,
-        // Level is generated but Physics is paused/options
-        PAUSE,
-        // Physics is exiting and done
-        DONE,
-        // Useful when knowing when to re-draw in Physics loop
-        // Level is being generated and not yet playable
-        UPLOADING_LEVEL,
-    };
     
     // Game-specific constants
     static constexpr float WALL_HIT_THRESHOLD = 4.0f; // Number of hits before a wall breaks
@@ -123,212 +112,7 @@ struct Physics::PhysicsImpl {
         }
     };
 
-    // Wrapper for SDL_Texture
-    struct SDLTexture {
-    private:
-        SDL_Texture* texture;
-        int width, height;
-    public:
-        SDLTexture() : texture{ nullptr }, width(0), height(0) {
-        }
-
-        ~SDLTexture() {
-            this->free();
-        }
-
-        void free() noexcept {
-            if (this->texture) {
-                SDL_DestroyTexture(texture);
-            }
-        }
-
-        SDL_Texture* get() const noexcept {
-            return this->texture;
-        }
-
-        bool loadTarget(SDL_Renderer* renderer, int w, int h) {
-            this->free();
-            this->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
-            if (!this->texture) {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture: %s\n", SDL_GetError());
-            } else {
-                this->width = w;
-                this->height = h;
-            }
-            return this->texture != nullptr;
-        }
-
-        void render(SDL_Renderer *renderer, int x, int y) const noexcept {
-            SDL_FRect renderQuad = { static_cast<float>(x),
-                static_cast<float>(y),
-                static_cast<float>(width),
-                static_cast<float>(height) };
-            SDL_RenderTexture(renderer, texture, nullptr, &renderQuad);
-        }
-    };
-
-    struct SDLHelper {
-        SDL_Window* window;
-        SDL_Renderer* renderer;
-        SDL_AudioDeviceID audioDeviceId;
-        SDL_AudioStream* audioStream;
-        std::uint8_t* wavBuffer;
-        std::uint32_t wavLength;
-        SDL_AudioSpec audioSpec;
-
-        SDLHelper()
-            : window{ nullptr }, renderer{ nullptr }
-            , audioDeviceId{}, audioStream{}
-            , wavBuffer{}, wavLength{}, audioSpec{} {
-            using namespace std;
-            
-            if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-                SDL_Log("SDL_Init success\n");
-            } else {
-                cerr << "SDL_Init Error: " << endl;
-            }
-        }
-
-        ~SDLHelper() {
-            SDL_DestroyRenderer(renderer);
-            SDL_DestroyWindow(window);
-
-            // Audio device only cleaned if it is played/binded
-            if (this->audioDeviceId) {
-                SDL_free(this->wavBuffer);
-                SDL_DestroyAudioStream(this->audioStream);
-                SDL_CloseAudioDevice(this->audioDeviceId);
-            }
-
-            SDL_Quit();
-        }
-
-        bool loadFont(const std::string& f, unsigned int fSize) noexcept {
-            return false;
-        }
-
-        void do_events(States& state, OrthographicCamera& camera) noexcept {
-            using namespace std;
-            SDL_Event e;
-            while (SDL_PollEvent(&e)) {
-                if (e.type == SDL_EVENT_KEY_DOWN) {
-                    if (e.key.scancode == SDL_SCANCODE_ESCAPE) {
-                        state = States::DONE;
-                        break;
-                    } else if (e.key.scancode == SDL_SCANCODE_B) {
-                        state = States::UPLOADING_LEVEL;
-                    } 
-                    // Arrow key controls for camera movement
-                    else if (e.key.scancode == SDL_SCANCODE_LEFT) {
-                        camera.x += camera.panSpeed * 2.0f;
-                        SDL_Log("Camera moved left: x=%.2f, y=%.2f", camera.x, camera.y);
-                    }
-                    else if (e.key.scancode == SDL_SCANCODE_RIGHT) {
-                        camera.x -= camera.panSpeed * 2.0f;
-                        SDL_Log("Camera moved right: x=%.2f, y=%.2f", camera.x, camera.y);
-                    }
-                    else if (e.key.scancode == SDL_SCANCODE_UP) {
-                        camera.y += camera.panSpeed * 2.0f;
-                        SDL_Log("Camera moved up: x=%.2f, y=%.2f", camera.x, camera.y);
-                    }
-                    else if (e.key.scancode == SDL_SCANCODE_DOWN) {
-                        camera.y -= camera.panSpeed * 2.0f;
-                        SDL_Log("Camera moved down: x=%.2f, y=%.2f", camera.x, camera.y);
-                    }
-                    // Rotation controls with Q/E keys
-                    else if (e.key.scancode == SDL_SCANCODE_Q) {
-                        camera.rotation -= camera.rotationSpeed * 2.0f;
-                        SDL_Log("Camera rotated counter-clockwise: rotation=%.2f", camera.rotation);
-                    }
-                    else if (e.key.scancode == SDL_SCANCODE_E) {
-                        camera.rotation += camera.rotationSpeed * 2.0f;
-                        SDL_Log("Camera rotated clockwise: rotation=%.2f", camera.rotation);
-                    }
-                    // Zoom controls with +/- (equals/minus) keys
-                    else if (e.key.scancode == SDL_SCANCODE_EQUALS) { // + key (may require shift)
-                        camera.zoom *= (1.0f + camera.zoomSpeed);
-                        SDL_Log("Camera zoomed in: zoom=%.2f", camera.zoom);
-                    }
-                    else if (e.key.scancode == SDL_SCANCODE_MINUS) { // - key
-                        camera.zoom /= (1.0f + camera.zoomSpeed);
-                        SDL_Log("Camera zoomed out: zoom=%.2f", camera.zoom);
-                    }
-                    // Reset camera with R key
-                    else if (e.key.scancode == SDL_SCANCODE_R) {
-                        camera.x = 0.0f;
-                        camera.y = 0.0f;
-                        camera.zoom = 1.0f;
-                        camera.rotation = 0.0f;
-                        SDL_Log("Camera reset to default position and orientation");
-                    }
-                } else if (e.type == SDL_EVENT_QUIT) {
-                    state = States::DONE;
-                    break;
-                }
-            }
-            
-            // Also check for continuous key presses for smoother camera movement
-            const auto* keyState = SDL_GetKeyboardState(NULL);
-            if (keyState[SDL_SCANCODE_LEFT]) {
-                camera.x += camera.panSpeed;
-            }
-            if (keyState[SDL_SCANCODE_RIGHT]) {
-                camera.x -= camera.panSpeed;
-            }
-            if (keyState[SDL_SCANCODE_UP]) {
-                camera.y += camera.panSpeed;
-            }
-            if (keyState[SDL_SCANCODE_DOWN]) {
-                camera.y -= camera.panSpeed;
-            }
-            
-            // Add continuous rotation and zoom (for smoother control)
-            if (keyState[SDL_SCANCODE_Q]) {
-                camera.rotation -= camera.rotationSpeed;
-            }
-            if (keyState[SDL_SCANCODE_E]) {
-                camera.rotation += camera.rotationSpeed;
-            }
-            if (keyState[SDL_SCANCODE_EQUALS]) { // + key
-                camera.zoom *= (1.0f + camera.zoomSpeed * 0.005f); // gentler continuous zoom
-            }
-            if (keyState[SDL_SCANCODE_MINUS]) { // - key
-                camera.zoom /= (1.0f + camera.zoomSpeed * 0.005f); // gentler continuous zoom
-            }
-            
-            // Enforce zoom limits to prevent extreme values
-            camera.zoom = max(0.1f, min(5.0f, camera.zoom));
-        }
-
-        void playAudioStream() noexcept {
-            if (this->audioDeviceId) {
-                SDL_BindAudioStream(this->audioDeviceId, this->audioStream);
-                SDL_ResumeAudioStreamDevice(this->audioStream);
-            }
-        }
-
-        void pauseAudioStream() noexcept {
-            if (this->audioDeviceId) {
-                SDL_PauseAudioStreamDevice(this->audioStream);
-            }
-        }
-
-        void stopAudioStream() noexcept {
-            if (this->audioDeviceId) {
-                SDL_UnbindAudioStream(this->audioStream);
-                SDL_FlushAudioStream(this->audioStream);
-            }
-        }
-    
-        bool loadWAV(const std::string& path) noexcept {
-            if (!SDL_LoadWAV(path.c_str(), &audioSpec, &wavBuffer, &wavLength)) {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file: %s\n%s\n", path.c_str(), SDL_GetError());
-                return false;
-            }
-            return true;
-        }
-    };
-
+   
     const std::string& title;
     const std::string& version;
     const int INIT_WINDOW_W, INIT_WINDOW_H;
@@ -338,9 +122,8 @@ struct Physics::PhysicsImpl {
     std::vector<SDL_Thread*> threads;
     SDL_Mutex* gameMtx;
     SDL_Condition* gameCond;
-    SDLTexture entityTexture;
     int pendingWorkCount;
-    States state;
+    State state;
 
     // Camera for coordinate transformations
     OrthographicCamera camera;
@@ -349,7 +132,7 @@ struct Physics::PhysicsImpl {
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , sdlHelper{}, workQueue{}
         , gameMtx{ nullptr }, gameCond{ nullptr }
-        , pendingWorkCount{ 0 }, state{ States::SPLASH } {
+        , pendingWorkCount{ 0 }, state{ State::SPLASH } {
         gameCond = SDL_CreateCondition();
         if (!gameCond) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating condition variable: %s\n", SDL_GetError());
@@ -373,11 +156,11 @@ struct Physics::PhysicsImpl {
         while (1) {
             {
                 SDL_LockMutex(Physics->gameMtx);
-                while (Physics->workQueue.empty() && Physics->state != States::DONE) {
+                while (Physics->workQueue.empty() && Physics->state != State::DONE) {
                     SDL_WaitCondition(Physics->gameCond, Physics->gameMtx);
                 }
 
-                if (Physics->state == States::DONE) {
+                if (Physics->state == State::DONE) {
                     SDL_UnlockMutex(Physics->gameMtx);
                     break;
                 }
@@ -1326,7 +1109,7 @@ Physics::~Physics() {
     auto&& g = this->m_impl;
     SDL_LockMutex(g->gameMtx);
     g->pendingWorkCount = 0;
-    g->state = PhysicsImpl::States::DONE;
+    g->state = State::DONE;
     SDL_BroadcastCondition(g->gameCond);
     SDL_UnlockMutex(g->gameMtx);
     for (auto&& t : g->threads) {
@@ -1342,6 +1125,8 @@ Physics::~Physics() {
 bool Physics::run() const noexcept {
     using namespace std;
     auto&& sdlHelper = this->m_impl->sdlHelper;
+    sdlHelper.init();
+    
     string_view titleView = this->m_impl->title;
     sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
     if (!sdlHelper.window) {
@@ -1372,17 +1157,6 @@ bool Physics::run() const noexcept {
     if (!sdlHelper.loadWAV(loadingWAV)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file\n");
     }
-    sdlHelper.audioStream = SDL_CreateAudioStream(&sdlHelper.audioSpec, &sdlHelper.audioSpec);
-    if (!sdlHelper.audioStream) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create audio stream: %s\n", SDL_GetError());
-    }
-    sdlHelper.audioDeviceId = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
-    if (!sdlHelper.audioDeviceId) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to open audio device: %s\n", SDL_GetError());
-    }
-    SDL_PutAudioStreamData(sdlHelper.audioStream, sdlHelper.wavBuffer, sdlHelper.wavLength);
-    SDL_FlushAudioStream(sdlHelper.audioStream);
-    static auto stream_bytes_len = SDL_GetAudioStreamAvailable(sdlHelper.audioStream);
 
     sdlHelper.playAudioStream();
     
@@ -1400,7 +1174,7 @@ bool Physics::run() const noexcept {
     auto&& gState = this->m_impl->state;
     
     // Set the state to PLAY at startup
-    gState = PhysicsImpl::States::PLAY;
+    gState = State::PLAY;
     
     // Set a good default value for pixelsPerMeter
     this->m_impl->pixelsPerMeter = 20.0f;
@@ -1420,7 +1194,7 @@ bool Physics::run() const noexcept {
         b2World_Step(this->m_impl->physicsWorldId, this->m_impl->timeStep, 4);
     }
     
-    while (gState != PhysicsImpl::States::DONE) {
+    while (gState != State::DONE) {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = SDL_GetTicks() - previous;
         previous = SDL_GetTicks();
@@ -1428,13 +1202,13 @@ bool Physics::run() const noexcept {
         
         // Handle events and update physics at a fixed time step
         while (accumulator >= FIXED_TIME_STEP) {
-            sdlHelper.do_events(ref(gState), ref(this->m_impl->camera));
+            sdlHelper.poll_events(ref(gState), ref(this->m_impl->camera));
             accumulator -= FIXED_TIME_STEP;
             currentTimeStep += FIXED_TIME_STEP;
         }
 
         // Update physics simulation if we're in PLAY state
-        if (gState == PhysicsImpl::States::PLAY && 
+        if (gState == State::PLAY && 
             B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
              
             // Step Box2D world with sub-steps instead of velocity/position iterations
@@ -1448,11 +1222,7 @@ bool Physics::run() const noexcept {
             this->updatePhysicsObjects();
         }
 
-        // Audio stream updates
-        if (SDL_GetAudioStreamAvailable(sdlHelper.audioStream) < sdlHelper.wavLength) {
-            SDL_PutAudioStreamData(sdlHelper.audioStream, sdlHelper.wavBuffer, sdlHelper.wavLength);
-            stream_bytes_len = SDL_GetAudioStreamAvailable(sdlHelper.audioStream);
-        }
+        sdlHelper.updateAudioData();
         
         // Get window dimensions
         SDL_GetWindowSize(window, &display_w, &display_h);
@@ -1462,16 +1232,16 @@ bool Physics::run() const noexcept {
         SDL_RenderClear(renderer);
         
         // Generate new level if needed
-        if (gState == PhysicsImpl::States::UPLOADING_LEVEL) {
+        if (gState == State::UPLOADING_LEVEL) {
             this->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
-            gState = PhysicsImpl::States::PLAY;
+            gState = State::PLAY;
         }
         
         // Draw the maze using the persistent maze string
         this->drawMaze(renderer, persistentMazeStr, display_w, display_h);
         
         // Draw the physics entities (balls, walls, exit) if we're in PLAY state
-        if (gState == PhysicsImpl::States::PLAY && 
+        if (gState == State::PLAY && 
             B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
             this->drawPhysicsObjects(renderer);
         }
@@ -1622,7 +1392,7 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     SDL_GetCurrentRenderOutputSize(renderer, &display_w, &display_h);
     
     // Get camera for transformations
-    const OrthographicCamera& camera = this->m_impl->camera;
+    const auto& camera = this->m_impl->camera;
     
     // Count active balls for debugging
     int activeBallCount = 0;
@@ -1823,7 +1593,7 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
     }
     
     // Get camera state for transformations
-    const OrthographicCamera& camera = this->m_impl->camera;
+    const auto& camera = this->m_impl->camera;
     
     // Calculate maze dimensions
     int maxCols = 0;
@@ -2018,76 +1788,6 @@ void Physics::drawDebugTestObjects(SDL_Renderer* renderer) const {
     // SDL_Log("Debug shapes drawn at (%d, %d)", display_w, display_h);
 }
 
-// Camera coordinate transformation implementation
-SDL_FPoint OrthographicCamera::worldToScreen(float worldX, float worldY, int screenWidth, int screenHeight) const {
-    // Step 1: Apply camera position offset
-    // Note: We ADD the camera position to move in the opposite direction
-    // This creates the illusion of camera movement when we're actually moving the world
-    float offsetX = worldX + this->x;
-    float offsetY = worldY + this->y;
-    
-    // Step 2: Apply zoom factor - centered at screen center
-    // Move to origin, scale, then move back
-    float screenCenterX = screenWidth / 2.0f;
-    float screenCenterY = screenHeight / 2.0f;
-    
-    float zoomOffsetX = offsetX - screenCenterX;
-    float zoomOffsetY = offsetY - screenCenterY;
-    
-    float zoomedX = screenCenterX + zoomOffsetX * this->zoom;
-    float zoomedY = screenCenterY + zoomOffsetY * this->zoom;
-    
-    // Step 3: Apply rotation around screen center if needed
-    float finalX = zoomedX;
-    float finalY = zoomedY;
-    
-    if (this->rotation != 0.0f) {
-        float cosR = cosf(this->rotation);
-        float sinR = sinf(this->rotation);
-        
-        // Translate to origin, rotate, translate back
-        float rotOffsetX = zoomedX - screenCenterX;
-        float rotOffsetY = zoomedY - screenCenterY;
-        
-        finalX = screenCenterX + rotOffsetX * cosR - rotOffsetY * sinR;
-        finalY = screenCenterY + rotOffsetX * sinR + rotOffsetY * cosR;
-    }
-    
-    return {finalX, finalY};
-}
-
-void OrthographicCamera::screenToWorld(float screenX, float screenY, float& worldX, float& worldY, int screenWidth, int screenHeight) const {
-    float screenCenterX = screenWidth / 2.0f;
-    float screenCenterY = screenHeight / 2.0f;
-    
-    // Step 1: Undo rotation
-    float unrotatedX = screenX;
-    float unrotatedY = screenY;
-    
-    if (this->rotation != 0.0f) {
-        float cosR = cosf(-this->rotation);  // Use negative rotation to reverse
-        float sinR = sinf(-this->rotation);
-        
-        float rotOffsetX = screenX - screenCenterX;
-        float rotOffsetY = screenY - screenCenterY;
-        
-        unrotatedX = screenCenterX + rotOffsetX * cosR - rotOffsetY * sinR;
-        unrotatedY = screenCenterY + rotOffsetX * sinR + rotOffsetY * cosR;
-    }
-    
-    // Step 2: Undo zoom (centered at screen center)
-    float zoomOffsetX = unrotatedX - screenCenterX;
-    float zoomOffsetY = unrotatedY - screenCenterY;
-    
-    float unzoomedX = screenCenterX + zoomOffsetX / this->zoom;
-    float unzoomedY = screenCenterY + zoomOffsetY / this->zoom;
-    
-    // Step 3: Undo camera position offset
-    // Note: We SUBTRACT the camera position (opposite of worldToScreen)
-    worldX = unzoomedX - this->x;
-    worldY = unzoomedY - this->y;
-}
-
 // Handle camera input (keyboard, mouse)
 void Physics::handleCameraInput() const {
     // Get SDL keyboard state
@@ -2132,7 +1832,7 @@ void Physics::handleCameraInput() const {
     }
     
     // Ensure zoom stays within reasonable limits
-    this->m_impl->camera.zoom = std::max(0.1f, std::min(5.0f, this->m_impl->camera.zoom));
+    this->m_impl->camera.zoom = SDL_max(0.1f, SDL_min(5.0f, this->m_impl->camera.zoom));
 }
 
 // Update camera position and properties
