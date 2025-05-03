@@ -1,13 +1,15 @@
 //
 // Physics class implementation
-//  Simple 2D maze Physics using SDL3
-//  Press 'B' to generate a new maze
+// Simple 2D physics simulation with bouncy balls using SDL3, box2d, and maze_builder
 // 
 // Threading technique uses 'islands':
-//  Example: https://github.com/SFML/SFML/tree/2.6.1/examples/island
+// Example: https://github.com/SFML/SFML/tree/2.6.1/examples/island
 //
 // Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
 //
+// Score system: 10 points per wall destroyed
+//              -1 point per friendly ball bounce
+//              100 points per exit bounce
 //
 
 #include "Physics.hpp"
@@ -35,11 +37,13 @@
 
 #include <MazeBuilder/maze_builder.h>
 
+#include "Ball.hpp"
 #include "OrthographicCamera.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
 #include "Texture.hpp"
 #include "WorkerConcurrent.hpp"
+#include "Wall.hpp"
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 static constexpr auto RESOURCE_PATH_PREFIX = "resources";
@@ -49,8 +53,8 @@ struct Physics::PhysicsImpl {
     
     // Game-specific constants
     static constexpr float WALL_HIT_THRESHOLD = 4.0f; // Number of hits before a wall breaks
-    static constexpr float BALL_RADIUS = 0.45f; // Reduced from 0.2f to make balls smaller
     static constexpr float WALL_WIDTH = 0.1f;
+
     static constexpr int MAX_BALLS = 10;
     
     // Maze rendering variables
@@ -59,24 +63,6 @@ struct Physics::PhysicsImpl {
     float offsetY = 0.0f;     // Y offset for centering the maze
     int maxCols = 0;          // Number of columns in the maze
     int maxRows = 0;          // Number of rows in the maze
-    
-    struct Wall {
-        b2BodyId bodyId = b2_nullBodyId;
-        b2ShapeId shapeId = b2_nullShapeId;
-        int hitCount = 0;
-        bool isDestroyed = false;
-        int row, col;         // Added to track wall position in the maze
-        char type;            // '-', '|', or '+' to determine wall type
-    };
-    
-    struct Ball {
-        b2BodyId bodyId = b2_nullBodyId;
-        b2ShapeId shapeId = b2_nullShapeId;
-        bool isActive = false;
-        bool isDragging = false;
-        bool isExploding = false;
-        float explosionTimer = 0.0f;
-    };
     
     struct ExitCell {
         int row;
@@ -174,43 +160,8 @@ struct Physics::PhysicsImpl {
     
     // Create a ball at the specified position
     Ball createBall(float x, float y) {
-        // Create a dynamic body for the ball
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = b2_dynamicBody;
-        bodyDef.position = {x, y};
-        bodyDef.linearVelocity = {
-            (float)((rand() % 100) - 50) / 30.0f,  // Increased initial velocity
-            (float)((rand() % 100) - 50) / 30.0f   // for better collisions
-        };
-        bodyDef.linearDamping = 0.2f;  // Reduced damping for more movement
-        bodyDef.angularDamping = 0.4f; // Reduced spinning damping
-        bodyDef.isBullet = true;       // Enable continuous collision detection
-        bodyDef.userData = reinterpret_cast<void*>(this);
-        
-        b2BodyId ballBodyId = b2CreateBody(physicsWorldId, &bodyDef);
-        
-        // Explicitly set the body to be awake
-        b2Body_SetAwake(ballBodyId, true);
-        
-        // Create a circle shape for the ball
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = 1.5f;  // Heavier balls for better collision impacts
-        shapeDef.material.rollingResistance = 0.1f; // Lower resistance for smoother rolling
-        shapeDef.material.friction = 0.2f; // Lower friction
-        shapeDef.material.restitution = 0.8f; // Higher restitution for more bounce
-        
-        // In Box2D 3.1.0, the circle is defined separately from the shape def
-        b2Circle circle = {{0.f, 0.f}, BALL_RADIUS};
-        
-        b2ShapeId ballShapeId = b2CreateCircleShape(ballBodyId, &shapeDef, &circle);
-        
-        // Return a new ball with this body
-        Ball newBall;
-        newBall.bodyId = ballBodyId;
-        newBall.shapeId = ballShapeId;
-        newBall.isActive = true;
-        
-        return newBall;
+        static constexpr auto COMMON_BALL_RADIUS = 0.45f;
+        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorldId };
     }
 
     // Convert the ASCII maze into Box2D physics objects
@@ -368,18 +319,7 @@ struct Physics::PhysicsImpl {
                     b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
                     // Add wall to our tracking
-                    Wall wall;
-                    wall.bodyId = wallBodyId;
-                    wall.shapeId = wallShapeId;
-                    wall.hitCount = 0;
-                    wall.isDestroyed = false;
-                    wall.row = currentRow;
-                    wall.col = currentCol;
-                    wall.type = '-';
-                    walls.push_back(wall);
-                    
-                    SDL_Log("Created horizontal wall at (%d,%d) position (%.2f,%.2f)", 
-                        currentRow, currentCol, physX, physY);
+                    walls.push_back(Wall{wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::HORIZONTAL });
                 } 
                 else if (c == '|') {
                     // Vertical wall - height of full cell, width is smaller
@@ -389,19 +329,7 @@ struct Physics::PhysicsImpl {
                     b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
                     b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
-                    // Add wall to our tracking
-                    Wall wall;
-                    wall.bodyId = wallBodyId;
-                    wall.shapeId = wallShapeId;
-                    wall.hitCount = 0;
-                    wall.isDestroyed = false;
-                    wall.row = currentRow;
-                    wall.col = currentCol;
-                    wall.type = '|';
-                    walls.push_back(wall);
-                    
-                    SDL_Log("Created vertical wall at (%d,%d) position (%.2f,%.2f)",
-                        currentRow, currentCol, physX, physY);
+                    walls.push_back(Wall{ wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::VERTICAL });
                 }
                 else if (c == '+') {
                     // Junction/corner - create a small square
@@ -411,18 +339,7 @@ struct Physics::PhysicsImpl {
                     b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
                     // Add wall to our tracking
-                    Wall wall;
-                    wall.bodyId = wallBodyId;
-                    wall.shapeId = wallShapeId;
-                    wall.hitCount = 0;
-                    wall.isDestroyed = false;
-                    wall.row = currentRow;
-                    wall.col = currentCol;
-                    wall.type = '+';
-                    walls.push_back(wall);
-                    
-                    SDL_Log("Created corner wall at (%d,%d) position (%.2f,%.2f)",
-                        currentRow, currentCol, physX, physY);
+                    walls.push_back(Wall{ wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::CORNER });
                 }
             }
             
@@ -539,7 +456,7 @@ struct Physics::PhysicsImpl {
             if (wallIndex >= 0 && wallIndex < walls.size()) {
                 Wall& wall = walls[wallIndex];
                 
-                if (wall.isDestroyed) {
+                if (wall.getIsDestroyed()) {
                     return; // Skip if wall is already flagged for destruction
                 }
                 
@@ -549,9 +466,9 @@ struct Physics::PhysicsImpl {
                 
                 // Only count the hit if it's a significant impact
                 if (impactSpeed > 1.5f) { // Threshold for counting a hit
-                    wall.hitCount++;
+                    wall.setHitCount(wall.getHitCount() + 1);
                     SDL_Log("Wall hit! Wall index: %d, Hit count: %d/%d, Impact speed: %.2f", 
-                           wallIndex, wall.hitCount, (int)WALL_HIT_THRESHOLD, impactSpeed);
+                           wallIndex, wall.getHitCount(), (int)WALL_HIT_THRESHOLD, impactSpeed);
                     
                     // Apply a small impulse to make the hit feel more impactful
                     b2Vec2 normalizedVel = ballVel;
@@ -577,9 +494,9 @@ struct Physics::PhysicsImpl {
                 }
                 
                 // Check if wall should break
-                if (wall.hitCount >= WALL_HIT_THRESHOLD && !wall.isDestroyed) {
-                    wall.isDestroyed = true;
-                    SDL_Log("Wall %d destroyed after %d hits!", wallIndex, wall.hitCount);
+                if (wall.getHitCount() >= WALL_HIT_THRESHOLD && !wall.getIsDestroyed()) {
+                    wall.setIsDestroyed(true);
+                    SDL_Log("Wall %d destroyed after %d hits!", wallIndex, wall.getHitCount());
                     
                     // Increment score
                     score += 10;
@@ -605,23 +522,23 @@ struct Physics::PhysicsImpl {
             // Find the corresponding ball objects
             Ball* ballA = nullptr;
             Ball* ballB = nullptr;
-            
+
             for (Ball& ball : balls) {
-                if (b2Body_GetPosition(bodyAId).x == b2Body_GetPosition(ball.bodyId).x
-                && b2Body_GetPosition(bodyAId).y == b2Body_GetPosition(ball.bodyId).y ) {
+                if (b2Body_GetPosition(bodyAId).x == b2Body_GetPosition(ball.getBodyId()).x
+                && b2Body_GetPosition(bodyAId).y == b2Body_GetPosition(ball.getBodyId()).y ) {
                     ballA = &ball;
                 }
 
-                if (b2Body_GetPosition(bodyBId).x == b2Body_GetPosition(ball.bodyId).x
-                && b2Body_GetPosition(bodyBId).y == b2Body_GetPosition(ball.bodyId).y ) {
+                if (b2Body_GetPosition(bodyBId).x == b2Body_GetPosition(ball.getBodyId()).x
+                && b2Body_GetPosition(bodyBId).y == b2Body_GetPosition(ball.getBodyId()).y ) {
                     ballB = &ball;
                 }
             }
             
             if (ballA && ballB) {
                 // Start explosion animation for both balls
-                ballA->isExploding = true;
-                ballB->isExploding = true;
+                ballA->setIsExploding(true);
+                ballB->setIsExploding(true);
             }
         }
     }
@@ -638,27 +555,27 @@ struct Physics::PhysicsImpl {
                 for (int i = 0; i < balls.size(); i++) {
                     auto& ball = balls[i];
                     
-                    if (!ball.isActive || ball.isExploding)
+                    if (!ball.getIsActive() || ball.getIsExploding())
                         continue;
                     
                     // Get ball position and compare to mouse
-                    b2Vec2 ballPos = b2Body_GetPosition(ball.bodyId);
+                    b2Vec2 ballPos = b2Body_GetPosition(ball.getBodyId());
                     float distance = b2Distance(mousePhysicsPos, ballPos);
                     
                     // If mouse is over this ball with improved hit detection radius
-                    if (distance <= BALL_RADIUS * 2.0f) {
+                    if (distance <= ball.getRadius() * 2.0f) {
                         // Start dragging this ball
                         isDragging = true;
                         draggedBallIndex = i;
                         lastMousePos = mousePhysicsPos;
-                        ball.isDragging = true;
+                        ball.setIsDragging(true);
                         
                         // Wake up the body explicitly to ensure it responds to forces
-                        b2Body_SetAwake(ball.bodyId, true);
+                        b2Body_SetAwake(ball.getBodyId(), true);
                         
                         // Apply a small impulse to "pick up" the ball
                         b2Vec2 impulse = {0.0f, -0.5f};
-                        b2Body_ApplyLinearImpulseToCenter(ball.bodyId, impulse, true);
+                        b2Body_ApplyLinearImpulseToCenter(ball.getBodyId(), impulse, true);
                         
                         SDL_Log("Ball %d selected for dragging at physics pos (%.2f, %.2f)", 
                                 i, ballPos.x, ballPos.y);
@@ -670,9 +587,9 @@ struct Physics::PhysicsImpl {
                 // Continue dragging the selected ball
                 auto& ball = balls[draggedBallIndex];
                 
-                if (ball.isActive && !ball.isExploding) {
+                if (ball.getIsActive() && !ball.getIsExploding()) {
                     // Get ball position
-                    b2Vec2 ballPos = b2Body_GetPosition(ball.bodyId);
+                    b2Vec2 ballPos = b2Body_GetPosition(ball.getBodyId());
                     
                     // Calculate direct vector to target position
                     b2Vec2 toTarget = mousePhysicsPos - ballPos;
@@ -683,7 +600,7 @@ struct Physics::PhysicsImpl {
                     b2Vec2 force = toTarget * forceScale;
                     
                     // Apply force to the ball center
-                    b2Body_ApplyForceToCenter(ball.bodyId, force, true);
+                    b2Body_ApplyForceToCenter(ball.getBodyId(), force, true);
                     
                     // 2. Set a target velocity for more direct control
                     float speedFactor = 15.0f; // Increased for more responsiveness
@@ -696,7 +613,7 @@ struct Physics::PhysicsImpl {
                         targetVelocity = targetVelocity * (maxSpeed / currentSpeed);
                     }
                     
-                    b2Body_SetLinearVelocity(ball.bodyId, targetVelocity);
+                    b2Body_SetLinearVelocity(ball.getBodyId(), targetVelocity);
                     
                     // Log dragging for debugging (less frequently)
                     static int logCounter = 0;
@@ -714,14 +631,14 @@ struct Physics::PhysicsImpl {
         else {
             // Mouse released, stop dragging
             if (isDragging && draggedBallIndex >= 0 && draggedBallIndex < balls.size()) {
-                balls[draggedBallIndex].isDragging = false;
+                balls[draggedBallIndex].setIsDragging(false);
                 
                 // Apply a small release velocity based on recent movement
                 auto& ball = balls[draggedBallIndex];
-                if (ball.isActive && !ball.isExploding) {
-                    b2Vec2 currentVel = b2Body_GetLinearVelocity(ball.bodyId);
+                if (ball.getIsActive() && !ball.getIsExploding()) {
+                    b2Vec2 currentVel = b2Body_GetLinearVelocity(ball.getBodyId());
                     // Keep some of the current velocity for a natural release feel
-                    b2Body_SetLinearVelocity(ball.bodyId, currentVel * 0.8f);
+                    b2Body_SetLinearVelocity(ball.getBodyId(), currentVel * 0.8f);
                 }
                 
                 SDL_Log("Released ball %d", draggedBallIndex);
@@ -735,12 +652,12 @@ struct Physics::PhysicsImpl {
     void drawWall(SDL_Renderer* renderer, const Wall& wall, float screenX, float screenY, 
                   float halfWidth, float halfHeight) const {
         // Calculate color based on hit count
-        float hitRatio = static_cast<float>(wall.hitCount) / WALL_HIT_THRESHOLD;
+        float hitRatio = static_cast<float>(wall.getHitCount()) / WALL_HIT_THRESHOLD;
         
         // Start with black and transition to yellow-orange-red as damage increases
         uint8_t red = 0, green = 0, blue = 0;
         
-        if (wall.hitCount == 0) {
+        if (wall.getHitCount() == 0) {
             // Undamaged wall - black
             red = green = blue = 0;
         } 
@@ -776,7 +693,7 @@ struct Physics::PhysicsImpl {
         SDL_RenderFillRect(renderer, &rect);
         
         // Add damage visual effects
-        if (wall.hitCount > 0) {
+        if (wall.getHitCount() > 0) {
             // Draw cracks that increase with damage
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 180); // Whitish cracks
             
@@ -835,7 +752,10 @@ Physics::Physics(const std::string& title, const std::string& version, int w, in
 
 bool Physics::run() const noexcept {
     using namespace std;
+
     auto&& sdlHelper = this->m_impl->sdlHelper;
+    auto&& workers = this->m_impl->workerConcurrent;
+
     sdlHelper.init();
     
     string_view titleView = this->m_impl->title;
@@ -857,7 +777,7 @@ bool Physics::run() const noexcept {
     }
 
     // Workers
-    this->m_impl->workerConcurrent.initThreads();
+    workers.initThreads();
 
     unordered_map<string, string> resourceMap{};
     mazes::json_helper jh{};
@@ -1025,16 +945,16 @@ void Physics::processPhysicsCollisions() const {
             
             // Find the ball that reached the exit
             for (auto& ball : this->m_impl->balls) {
-                if (b2Body_GetPosition(ball.bodyId).x == b2Body_GetPosition(ballId).x
-                && b2Body_GetPosition(ball.bodyId).y == b2Body_GetPosition(ballId).y &&
-                ball.isActive && !ball.isExploding) {
+                if (b2Body_GetPosition(ball.getBodyId()).x == b2Body_GetPosition(ballId).x
+                && b2Body_GetPosition(ball.getBodyId()).y == b2Body_GetPosition(ballId).y &&
+                ball.getIsActive() && !ball.getIsExploding()) {
                     // Collect the ball
-                    ball.isActive = false;
+                    ball.setIsActive(false);
                     this->m_impl->exitCell.ballsCollected++;
                     this->m_impl->score += 100;
                     
                     // Remove the ball
-                    b2DestroyBody(ball.bodyId);
+                    b2DestroyBody(ball.getBodyId());
                     break;
                 }
             }
@@ -1047,14 +967,14 @@ void Physics::updatePhysicsObjects() const {
     // Handle any destroyed walls 
     for (int i = this->m_impl->walls.size() - 1; i >= 0; --i) {
         auto& wall = this->m_impl->walls[i];
-        if (wall.isDestroyed) {
+        if (wall.getIsDestroyed()) {
             // Log destruction for debugging
-            SDL_Log("Destroying wall %d with hit count %d", i, wall.hitCount);
+            SDL_Log("Destroying wall %d with hit count %d", i, wall.getHitCount());
             
             // Destroy the body in the physics world
-            if (B2_IS_NON_NULL(wall.bodyId)) {
-                b2DestroyBody(wall.bodyId);
-                wall.bodyId = b2_nullBodyId;
+            if (B2_IS_NON_NULL(wall.getBodyId())) {
+                b2DestroyBody(wall.getBodyId());
+                wall.setBodyId(b2_nullBodyId);
             }
             
             // Remove from our tracking array
@@ -1067,21 +987,21 @@ void Physics::updatePhysicsObjects() const {
         auto& ball = this->m_impl->balls[i];
         
         // Update explosion animation
-        if (ball.isExploding) {
-            ball.explosionTimer += this->m_impl->timeStep;
+        if (ball.getIsExploding()) {
+            ball.setExplosionTimer(ball.getExplosionTimer() + this->m_impl->timeStep);
             
-            if (ball.explosionTimer > 0.5f) { // After half a second, remove the ball
-                if (B2_IS_NON_NULL(ball.bodyId)) {
-                    b2DestroyBody(ball.bodyId);
-                    ball.bodyId = b2_nullBodyId;
+            if (ball.getExplosionTimer() > 0.5f) { // After half a second, remove the ball
+                if (B2_IS_NON_NULL(ball.getBodyId())) {
+                    b2DestroyBody(ball.getBodyId());
+                    ball.setBodyId(b2_nullBodyId);
                 }
                 this->m_impl->balls.erase(this->m_impl->balls.begin() + i);
             }
         }
         
         // Check if ball is outside the play area
-        if (ball.isActive && !ball.isExploding) {
-            b2Vec2 position = b2Body_GetPosition(ball.bodyId);
+        if (ball.getIsActive() && !ball.getIsExploding()) {
+            b2Vec2 position = b2Body_GetPosition(ball.getBodyId());
             
             // Boundary check with revised bounds - the previous values were too restrictive
             float worldWidth = (this->m_impl->maxCols * this->m_impl->cellSize) / this->m_impl->pixelsPerMeter;
@@ -1093,7 +1013,7 @@ void Physics::updatePhysicsObjects() const {
                 position.y < -margin || position.y > worldHeight + margin) {
                 
                 SDL_Log("Ball %d marked inactive - out of bounds at (%.2f, %.2f)", i, position.x, position.y);
-                ball.isActive = false;
+                ball.setIsActive(false);
             }
         }
     }
@@ -1120,7 +1040,7 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     // Count active balls for debugging
     int activeBallCount = 0;
     for (const auto& ball : this->m_impl->balls) {
-        if (ball.isActive) activeBallCount++;
+        if (ball.getIsActive()) activeBallCount++;
     }
     
     SDL_Log("Drawing physics objects: walls=%zu, balls=%zu (active=%d), cellSize=%.2f, offsetX=%.2f, offsetY=%.2f, camera=(%.2f,%.2f,%.2f)",
@@ -1147,12 +1067,12 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     
     // Render walls based on their physical properties and current state
     for (const auto& wall : this->m_impl->walls) {
-        if (wall.isDestroyed)
+        if (wall.getIsDestroyed())
             continue;
 
         // Calculate world position
-        float worldX = offsetX + (wall.col * cellSize);
-        float worldY = offsetY + (wall.row * cellSize);
+        float worldX = offsetX + (wall.getCol() * cellSize);
+        float worldY = offsetY + (wall.getRow() * cellSize);
         
         // Transform with camera
         SDL_FPoint screenPos = camera.worldToScreen(worldX, worldY, display_w, display_h);
@@ -1163,11 +1083,11 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
         float halfWidth, halfHeight;
         
         // Determine wall dimensions based on wall type
-        if (wall.type == '-') {
+        if (wall.getOrientation() == Wall::Orientation::HORIZONTAL) {
             halfWidth = cellSize * 0.5f * camera.zoom;
             halfHeight = cellSize * 0.1f * camera.zoom;
         } 
-        else if (wall.type == '|') {
+        else if (wall.getOrientation() == Wall::Orientation::VERTICAL) {
             halfWidth = cellSize * 0.1f * camera.zoom;
             halfHeight = cellSize * 0.5f * camera.zoom;
         }
@@ -1181,11 +1101,11 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     
     // Render balls
     for (const auto& ball : this->m_impl->balls) {
-        if (!ball.isActive) 
+        if (!ball.getIsActive()) 
             continue;
             
         // Get ball position from Box2D
-        b2Vec2 pos = b2Body_GetPosition(ball.bodyId);
+        b2Vec2 pos = b2Body_GetPosition(ball.getBodyId());
         
         // Convert physics coordinates to world coordinates
         float worldX = offsetX + (pos.x * this->m_impl->pixelsPerMeter);
@@ -1197,16 +1117,16 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
         float screenY = screenPos.y;
         
         // Scale radius based on zoom
-        float radius = this->m_impl->BALL_RADIUS * this->m_impl->pixelsPerMeter * camera.zoom;
+        float radius = ball.getRadius() * this->m_impl->pixelsPerMeter * camera.zoom;
         
         // Debug log to verify ball positions
 
         // SDL_Log("Ball: physics(%.2f,%.2f) world(%.2f,%.2f) screen(%.2f,%.2f) r=%.2f active=%d", 
             // pos.x, pos.y, worldX, worldY, screenX, screenY, radius, ball.isActive ? 1 : 0);
         
-        if (ball.isExploding) {
+        if (ball.getIsExploding()) {
             // Render explosion animation
-            float explosionProgress = ball.explosionTimer / 0.5f; // 0.5 is max time
+            float explosionProgress = ball.getExplosionTimer() / 0.5f; // 0.5 is max time
             float expandedRadius = radius * (1.0f + explosionProgress * 2.0f);
             
             // Fade out as explosion progresses
@@ -1456,7 +1376,7 @@ void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, in
     auto m_ptr = mazes::factory::create_q(INIT_MAZE_ROWS, INIT_MAZE_COLS);
     if (!m_ptr.has_value()) {
     
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze: %s\n");
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze\n");
         return;
     }
 

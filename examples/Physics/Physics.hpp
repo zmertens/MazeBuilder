@@ -22,16 +22,11 @@ private:
     // Physics and collision processing
     void processPhysicsCollisions() const;
     void updatePhysicsObjects() const;
-    
-    // Camera control methods
-    void updateCamera(float deltaTime) const;
-    void handleCameraInput() const;
-    
+       
     // Rendering methods
     void drawPhysicsObjects(SDL_Renderer* renderer) const;
     void drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const;
     void generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const;
-    void drawDebugTestObjects(SDL_Renderer* renderer) const;
 
     struct PhysicsImpl;
     std::unique_ptr<PhysicsImpl> m_impl;
