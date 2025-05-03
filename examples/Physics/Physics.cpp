@@ -39,6 +39,7 @@
 #include "SDLHelper.hpp"
 #include "State.hpp"
 #include "Texture.hpp"
+#include "WorkerConcurrent.hpp"
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 static constexpr auto RESOURCE_PATH_PREFIX = "resources";
@@ -100,303 +101,28 @@ struct Physics::PhysicsImpl {
     bool isDragging = false;
     int draggedBallIndex = -1;
     b2Vec2 lastMousePos = {0.0f, 0.0f};
-
-    struct WorkItem {
-        const std::string_view& mazeString;
-        const SDL_FPoint cellSize;
-        std::vector<SDL_Vertex>& vertices;
-        int start, count;
-        int rows, columns;
-        WorkItem(const std::string_view& mazeString, const SDL_FPoint cellSize,
-            std::vector<SDL_Vertex>& vertices, int start, int count, int rows, int columns)
-            : mazeString(mazeString), cellSize(cellSize)
-            , vertices(vertices), start{ start }, count{ count }, rows{ rows }, columns{ columns } {
-        }
-    };
-
    
     const std::string& title;
     const std::string& version;
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
     SDLHelper sdlHelper;
-    std::deque<WorkItem> workQueue;
-    std::vector<SDL_Thread*> threads;
-    SDL_Mutex* gameMtx;
-    SDL_Condition* gameCond;
-    int pendingWorkCount;
     State state;
+    WorkerConcurrent workerConcurrent;
 
     // Camera for coordinate transformations
     OrthographicCamera camera;
 
     PhysicsImpl(const std::string& title, const std::string& version, int w, int h)
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , sdlHelper{}, workQueue{}
-        , gameMtx{ nullptr }, gameCond{ nullptr }
-        , pendingWorkCount{ 0 }, state{ State::SPLASH } {
-        gameCond = SDL_CreateCondition();
-        if (!gameCond) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating condition variable: %s\n", SDL_GetError());
-        }
-        gameMtx = SDL_CreateMutex();
-        if (!gameMtx) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating mutex: %s\n", SDL_GetError());
-        }
-        this->initWorkers();
+        , sdlHelper{}, state{ State::SPLASH }, workerConcurrent{state} {
+
     }
 
     ~PhysicsImpl() {
 
-    }
-
-    static int threadFunc(void* data) {
-        using namespace std;
-        auto* Physics = reinterpret_cast<PhysicsImpl*>(data);
-        vector<SDL_Vertex> vertices;
-
-        while (1) {
-            {
-                SDL_LockMutex(Physics->gameMtx);
-                while (Physics->workQueue.empty() && Physics->state != State::DONE) {
-                    SDL_WaitCondition(Physics->gameCond, Physics->gameMtx);
-                }
-
-                if (Physics->state == State::DONE) {
-                    SDL_UnlockMutex(Physics->gameMtx);
-                    break;
-                }
-
-                if (!Physics->workQueue.empty()) {
-                    
-                    auto&& temp = Physics->workQueue.front();
-                    Physics->workQueue.pop_front();
-                    SDL_Log("Processing work item [ start: %d | count: %d | rows: %d | columns: %d]\n", temp.start, temp.count, temp.rows, temp.columns);
-                    vertices.clear(); // Ensure the vector is empty before processing
-                    Physics->doWork(ref(vertices), cref(temp));
-                    SDL_Log("Generated %zu vertices for this work item\n", vertices.size());
-                    
-                    if (!vertices.empty()) {
-                        copy(vertices.begin(), vertices.end(), back_inserter(temp.vertices));
-                        SDL_Log("Total vertices after copy: %zu\n", temp.vertices.size());
-                    } else {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated for this work item\n");
-                    }
-                }
-                SDL_UnlockMutex(Physics->gameMtx);
-            }
-
-            {
-                SDL_LockMutex(Physics->gameMtx);
-                Physics->pendingWorkCount -= 1;
-                SDL_Log("Pending work count: %d\n", Physics->pendingWorkCount);
-                if (Physics->pendingWorkCount <= 0) {
-                    SDL_SignalCondition(Physics->gameCond);
-                }
-                SDL_UnlockMutex(Physics->gameMtx);
-            }
-        }
-
-        return 0;
-    }
-
-    void genLevel(std::vector<SDL_Vertex>& vertices, const std::string_view& mazeString, SDL_FPoint cellSize) noexcept {
-        using namespace std;
-        if (this->pendingWorkCount == 0) {
-            SDL_WaitCondition(gameCond, gameMtx);
-        }
-        if (mazeString.empty()) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty, cannot generate level\n");
-            return;
-        }
-        SDL_Log("Maze string begins with: '%s'\n", mazeString.substr(0, 20));
-        SDL_Log("Total maze string length: %zu\n", mazeString.size());
-        size_t firstNewLine = mazeString.find('\n');
-        if (firstNewLine == string::npos) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
-            return;
-        }
-        int columnsInMaze = static_cast<int>(firstNewLine);
-        int rowsInMaze = 1;
-        for (size_t i = 0; i < mazeString.size(); i++) {
-            if (mazeString[i] == '\n') {
-                rowsInMaze++;
-            }
-        }
-        SDL_Log("Calculated maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
-        static constexpr auto BLOCK_COUNT = 4;
-        size_t charsPerWorker = mazeString.size() / BLOCK_COUNT;
-        workQueue.clear();
-        for (auto w = 0; w < BLOCK_COUNT; w++) {
-            size_t startIdx = w * charsPerWorker;
-            size_t endIdx = (w == BLOCK_COUNT - 1) ? mazeString.size() : (w + 1) * charsPerWorker;
-            if (w > 0) {
-                while (startIdx > 0 && mazeString[startIdx] != '\n') {
-                    startIdx--;
-                }
-                if (startIdx > 0) startIdx++;
-            }
-            if (w < BLOCK_COUNT - 1) {
-                while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
-                    endIdx++;
-                }
-                if (endIdx < mazeString.size()) endIdx++;
-            }
-            size_t count = endIdx - startIdx;
-            SDL_Log("Worker %d: Processing from %zu to %zu (count: %zu)\n", w, startIdx, endIdx, count);
-            workQueue.push_back({ 
-                cref(mazeString), 
-                cellSize, 
-                ref(vertices), 
-                static_cast<int>(startIdx), 
-                static_cast<int>(count), 
-                rowsInMaze, 
-                columnsInMaze 
-            });
-        }
-        SDL_LockMutex(this->gameMtx);
-        this->pendingWorkCount = BLOCK_COUNT;
-        SDL_SignalCondition(gameCond);
-        SDL_UnlockMutex(this->gameMtx);
-    }
-
-    void initWorkers() noexcept {
-        using namespace std;
-        static constexpr auto NUM_WORKERS = 4;
-        for (auto w{ 0 }; w < NUM_WORKERS; w++) {
-            string name = { "thread: " + to_string(w) };
-            SDL_Thread* temp = SDL_CreateThread(threadFunc, name.data(), this);
-            if (!temp) {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateThread failed: %s\n", SDL_GetError());
-            }
-            threads.push_back(temp);
-        }
-    }
-
-    void doWork(std::vector<SDL_Vertex>& vertices, const WorkItem& item) {
-        using namespace std;
-        SDL_FColor wallColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
-        auto pushV = [&vertices](auto v1, auto v2, auto v3, auto v4)->void {
-            vertices.push_back(v1);
-            vertices.push_back(v2);
-            vertices.push_back(v4);
-            vertices.push_back(v2);
-            vertices.push_back(v3);
-            vertices.push_back(v4);
-        };
-        SDL_FColor cellColor = { 1.0f, 1.0f, 1.0f, 1.0f }; // White
-        const auto& mazeString = item.mazeString;
-        const auto& cellSize = item.cellSize;
-        SDL_Log("Processing maze string segment from %d to %d\n", item.start, item.start + item.count);
-        std::string sampleString;
-        if (!mazeString.empty()) {
-            size_t sampleSize = std::min(size_t(100), mazeString.size());
-            sampleString = std::string(mazeString.substr(0, sampleSize));
-            SDL_Log("Maze string sample: '%s'\n", sampleString.c_str());
-        } else {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty!\n");
-            return;
-        }
-        size_t firstNewLine = mazeString.find('\n');
-        if (firstNewLine == string::npos) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze format: no newlines found\n");
-            return;
-        }
-        size_t startIdx = max(size_t(0), min(size_t(item.start), mazeString.size() - 1));
-        int columnsInMaze = static_cast<int>(firstNewLine);
-        int rowsInMaze = 1;
-        for (size_t i = 0; i < mazeString.size(); i++) {
-            if (mazeString[i] == '\n') {
-                rowsInMaze++;
-            }
-        }
-        SDL_Log("Maze dimensions: %d rows x %d columns\n", rowsInMaze, columnsInMaze);
-        size_t endIdx = min(mazeString.size(), startIdx + static_cast<size_t>(item.count));
-        while (startIdx > 0 && mazeString[startIdx] != '\n') {
-            startIdx--;
-        }
-        if (startIdx > 0) startIdx++;
-        while (endIdx < mazeString.size() && mazeString[endIdx] != '\n') {
-            endIdx++;
-        }
-        string_view segment = mazeString.substr(startIdx, endIdx - startIdx);
-        SDL_Log("Processing segment of length %zu\n", segment.size());
-        int currentRow = 0;
-        int currentCol = 0;
-        
-        // Calculate the proper offsets for centering the maze
-        float mazeWidth = columnsInMaze * cellSize.x;
-        float mazeHeight = rowsInMaze * cellSize.y;
-        float offsetX = (static_cast<float>(INIT_WINDOW_W) - mazeWidth) / 2.0f;
-        float offsetY = (static_cast<float>(INIT_WINDOW_H) - mazeHeight) / 2.0f;
-        
-        // Ensure offsets are never negative
-        offsetX = std::max(0.0f, offsetX);
-        offsetY = std::max(0.0f, offsetY);
-
-        for (size_t i = 0; i < segment.size(); i++) {
-            char c = segment[i];
-            if (c == '\n') {
-                currentCol = 0;
-                currentRow++;
-                continue;
-            }
-            
-            // Calculate position with proper offsets for centering
-            float x = offsetX + static_cast<float>(currentCol) * cellSize.x;
-            float y = offsetY + static_cast<float>(currentRow) * cellSize.y;
-            
-            if (c == '+') {
-                currentCol++;
-            } else if (c == '-') {
-                SDL_Vertex v1, v2, v3, v4;
-                v1.position = { x, y };
-                v2.position = { x + cellSize.x, y };
-                v3.position = { x + cellSize.x, y + cellSize.y * 0.1f };
-                v4.position = { x, y + cellSize.y * 0.1f };
-                v1.color = v2.color = v3.color = v4.color = wallColor;
-                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
-                pushV(v1, v2, v3, v4);
-                currentCol++;
-            } else if (c == '|') {
-                SDL_Vertex v1, v2, v3, v4;
-                v1.position = { x, y };
-                v2.position = { x + cellSize.x * 0.1f, y };
-                v3.position = { x + cellSize.x * 0.1f, y + cellSize.y };
-                v4.position = { x, y + cellSize.y };
-                v1.color = v2.color = v3.color = v4.color = wallColor;
-                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
-                pushV(v1, v2, v3, v4);
-                currentCol++;
-            } else if (c == ' ') {
-                currentCol++;
-            }
-        }
-        
-        currentRow = 0;
-        currentCol = 0;
-        for (size_t i = 0; i < segment.size(); i++) {
-            if (segment[i] == '\n') {
-                currentCol = 0;
-                currentRow++;
-                continue;
-            }
-            if (currentRow % 2 == 1 && segment[i] == ' ') {
-                // Calculate position with proper offsets for centering
-                float x = offsetX + static_cast<float>(currentCol) * cellSize.x;
-                float y = offsetY + static_cast<float>(currentRow) * cellSize.y;
-                
-                SDL_Vertex v1, v2, v3, v4;
-                v1.position = { x, y };
-                v2.position = { x + cellSize.x, y };
-                v3.position = { x + cellSize.x, y + cellSize.y };
-                v4.position = { x, y + cellSize.y };
-                v1.color = v2.color = v3.color = v4.color = cellColor;
-                v1.tex_coord = v2.tex_coord = v3.tex_coord = v4.tex_coord = { 0.0f, 0.0f };
-                pushV(v1, v2, v3, v4);
-            }
-            currentCol++;
-        }
+        // Doing this here prevents issues when the app is launched and closed quickly
+        workerConcurrent.generate("12345");
     }
 
     // Initialize the Box2D physics world
@@ -1107,23 +833,6 @@ Physics::Physics(const std::string& title, const std::string& version, int w, in
     : m_impl{ std::make_unique<PhysicsImpl>(std::cref(title), std::cref(version), w, h)} {
 }
 
-Physics::~Physics() {
-    auto&& g = this->m_impl;
-    SDL_LockMutex(g->gameMtx);
-    g->pendingWorkCount = 0;
-    g->state = State::DONE;
-    SDL_BroadcastCondition(g->gameCond);
-    SDL_UnlockMutex(g->gameMtx);
-    for (auto&& t : g->threads) {
-        auto name = SDL_GetThreadName(t);
-        int status = 0;
-        SDL_WaitThread(t, &status);
-        SDL_Log("Worker thread with status [ %s | %d ] to finish\n", name, status);
-    }
-    SDL_DestroyMutex(g->gameMtx);
-    SDL_DestroyCondition(g->gameCond);
-}
-
 bool Physics::run() const noexcept {
     using namespace std;
     auto&& sdlHelper = this->m_impl->sdlHelper;
@@ -1147,6 +856,8 @@ bool Physics::run() const noexcept {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
     }
 
+    // Workers
+    this->m_impl->workerConcurrent.initThreads();
 
     unordered_map<string, string> resourceMap{};
     mazes::json_helper jh{};
@@ -1247,6 +958,7 @@ bool Physics::run() const noexcept {
         
         // Generate new level if needed
         if (gState == State::UPLOADING_LEVEL) {
+            this->m_impl->workerConcurrent.generate("things and stuff");
             this->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
             gState = State::PLAY;
         }
@@ -1259,9 +971,6 @@ bool Physics::run() const noexcept {
             B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
             this->drawPhysicsObjects(renderer);
         }
-        
-        // Draw debug test objects
-        // this->drawDebugTestObjects(renderer);
         
         // Present the rendered frame
         SDL_RenderPresent(renderer);
@@ -1768,89 +1477,3 @@ void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, in
     SDL_Log("New level generated successfully");
 }
 
-// Draw debug test objects to verify rendering is working
-void Physics::drawDebugTestObjects(SDL_Renderer* renderer) const {
-    int display_w, display_h;
-    SDL_GetCurrentRenderOutputSize(renderer, &display_w, &display_h);
-    
-    // Draw a green rectangle to confirm we can render anything
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
-    SDL_FRect greenRect = {20.0f, 20.0f, 100.0f, 100.0f};
-    SDL_RenderFillRect(renderer, &greenRect);
-    
-    // Draw a red circle
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-    float centerX = display_w / 4.0f;
-    float centerY = display_h / 4.0f;
-    float radius = 40.0f;
-    
-    for (int y = -radius; y <= radius; y++) {
-        for (int x = -radius; x <= radius; x++) {
-            if (x*x + y*y <= radius*radius) {
-                SDL_RenderPoint(renderer, centerX + x, centerY + y);
-            }
-        }
-    }
-    
-    // Draw a blue cross
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-    centerX = display_w * 3.0f / 4.0f;
-    centerY = display_h * 3.0f / 4.0f;
-    SDL_RenderLine(renderer, centerX - 50.0f, centerY, centerX + 50.0f, centerY);
-    SDL_RenderLine(renderer, centerX, centerY - 50.0f, centerX, centerY + 50.0f);
-    
-    // SDL_Log("Debug shapes drawn at (%d, %d)", display_w, display_h);
-}
-
-// Handle camera input (keyboard, mouse)
-void Physics::handleCameraInput() const {
-    // Get SDL keyboard state
-    const auto* keyState = SDL_GetKeyboardState(nullptr);
-    
-    // Camera movement with WASD keys
-    if (keyState[SDL_SCANCODE_W]) {
-        this->m_impl->camera.y -= this->m_impl->camera.panSpeed;
-    }
-    if (keyState[SDL_SCANCODE_S]) {
-        this->m_impl->camera.y += this->m_impl->camera.panSpeed;
-    }
-    if (keyState[SDL_SCANCODE_A]) {
-        this->m_impl->camera.x -= this->m_impl->camera.panSpeed;
-    }
-    if (keyState[SDL_SCANCODE_D]) {
-        this->m_impl->camera.x += this->m_impl->camera.panSpeed;
-    }
-    
-    // Camera rotation with Q and E keys
-    if (keyState[SDL_SCANCODE_Q]) {
-        this->m_impl->camera.rotation -= this->m_impl->camera.rotationSpeed;
-    }
-    if (keyState[SDL_SCANCODE_E]) {
-        this->m_impl->camera.rotation += this->m_impl->camera.rotationSpeed;
-    }
-    
-    // Camera zoom with + and - keys
-    if (keyState[SDL_SCANCODE_EQUALS]) { // + key
-        this->m_impl->camera.zoom *= (1.0f + this->m_impl->camera.zoomSpeed);
-    }
-    if (keyState[SDL_SCANCODE_MINUS]) { // - key
-        this->m_impl->camera.zoom /= (1.0f + this->m_impl->camera.zoomSpeed);
-    }
-    
-    // Reset camera with R key
-    if (keyState[SDL_SCANCODE_R]) {
-        this->m_impl->camera.x = 0.0f;
-        this->m_impl->camera.y = 0.0f;
-        this->m_impl->camera.zoom = 1.0f;
-        this->m_impl->camera.rotation = 0.0f;
-    }
-    
-    // Ensure zoom stays within reasonable limits
-    this->m_impl->camera.zoom = SDL_max(0.1f, SDL_min(5.0f, this->m_impl->camera.zoom));
-}
-
-// Update camera position and properties
-void Physics::updateCamera(float deltaTime) const {
-    // Handle user input for camera control
-    handleCameraInput();
-}

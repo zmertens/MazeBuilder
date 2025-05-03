@@ -8,7 +8,8 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/WorkerConcurrent.cpp)
 
 set(DEAR_IMGUI_SOURCES
   ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.cpp
