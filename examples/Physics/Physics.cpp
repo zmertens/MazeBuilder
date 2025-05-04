@@ -14,18 +14,18 @@
 
 #include "Physics.hpp"
 
-#include <cmath>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
-#include <memory>
 #include <deque>
-#include <sstream>
-#include <iostream>
-#include <random>
 #include <functional>
+#include <iostream>
+#include <memory>
+#include <random>
+#include <sstream>
+#include <string_view>
 #include <string>
 #include <vector>
-#include <string_view>
 
 #include <SDL3/SDL.h>
 
@@ -42,8 +42,9 @@
 #include "SDLHelper.hpp"
 #include "State.hpp"
 #include "Texture.hpp"
-#include "WorkerConcurrent.hpp"
 #include "Wall.hpp"
+#include "WorkerConcurrent.hpp"
+#include "World.hpp"
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 static constexpr auto RESOURCE_PATH_PREFIX = "resources";
@@ -73,7 +74,7 @@ struct Physics::PhysicsImpl {
     };
         
     // Box2D world and physics components
-    b2WorldId physicsWorldId = b2_nullWorldId;
+    std::unique_ptr<World> physicsWorld;
     float timeStep = 1.0f / 60.0f;
     int32_t velocityIterations = 6;
     int32_t positionIterations = 2;
@@ -113,19 +114,8 @@ struct Physics::PhysicsImpl {
 
     // Initialize the Box2D physics world
     void initPhysics() {
-        // Set length units per meter as recommended in Box2D FAQ
-        // This gives us a better scale for the simulation
-        // Box2D works best with moving objects between 0.1 and 10 meters in size
-        float lengthUnitsPerMeter = 1.0f;
-        b2SetLengthUnitsPerMeter(lengthUnitsPerMeter);
-    
-        b2WorldDef worldDef = b2DefaultWorldDef();
-    
-        // Use a realistic but slightly reduced gravity for better gameplay
-        worldDef.gravity.y = 9.8f;
-        
-        // Create physics world
-        physicsWorldId = b2CreateWorld(&worldDef);
+        // Create the world with gravity
+        physicsWorld = std::make_unique<World>(9.8f);
         
         // Clear any existing entities
         walls.clear();
@@ -134,8 +124,6 @@ struct Physics::PhysicsImpl {
         // Set good values for physics simulation
         timeStep = 1.0f / 60.0f;        // Simulate at 60Hz
         pixelsPerMeter = 40.0f;         // Good scaling factor for visibility
-        
-        SDL_Log("Box2D physics world initialized with gravity: %f", worldDef.gravity.y);
     }
     
     // Convert screen coordinates to physics world coordinates
@@ -161,14 +149,14 @@ struct Physics::PhysicsImpl {
     // Create a ball at the specified position
     Ball createBall(float x, float y) {
         static constexpr auto COMMON_BALL_RADIUS = 0.45f;
-        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorldId };
+        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorld->getWorldId() };
     }
 
     // Convert the ASCII maze into Box2D physics objects
     void createMazePhysics(const std::string_view& mazeString, float cellSize) {
         // Clear any existing physics objects
-        if (B2_IS_NON_NULL(physicsWorldId)) {
-            b2DestroyWorld(physicsWorldId);
+        if (physicsWorld) {
+            physicsWorld->destroyWorld();
         }
         
         // Create a new physics world
@@ -236,7 +224,7 @@ struct Physics::PhysicsImpl {
         b2BodyDef boundaryDef = b2DefaultBodyDef();
         boundaryDef.type = b2_staticBody;
         boundaryDef.userData = reinterpret_cast<void*>(3000); // Special identifier for boundaries
-        b2BodyId boundaryBodyId = b2CreateBody(physicsWorldId, &boundaryDef);
+        b2BodyId boundaryBodyId = physicsWorld->createBody(&boundaryDef);
         
         b2ShapeDef boundaryShapeDef = b2DefaultShapeDef();
         boundaryShapeDef.density = 0.0f;
@@ -251,25 +239,25 @@ struct Physics::PhysicsImpl {
         // Top boundary
         {
             b2Segment segment = {{worldLeft, worldTop}, {worldRight, worldTop}};
-            b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
+            physicsWorld->createSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
         }
         
         // Bottom boundary
         {
             b2Segment segment = {{worldLeft, worldBottom}, {worldRight, worldBottom}};
-            b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
+            physicsWorld->createSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
         }
         
         // Left boundary
         {
             b2Segment segment = {{worldLeft, worldTop}, {worldLeft, worldBottom}};
-            b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
+            physicsWorld->createSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
         }
         
         // Right boundary
         {
             b2Segment segment = {{worldRight, worldTop}, {worldRight, worldBottom}};
-            b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
+            physicsWorld->createSegmentShape(boundaryBodyId, &boundaryShapeDef, &segment);
         }
         
         // Now create walls for maze structure using a more precise approach
@@ -297,7 +285,7 @@ struct Physics::PhysicsImpl {
                 // We need to store our wall index in the userData
                 wallDef.userData = reinterpret_cast<void*>(1000 + wallIndex); // Use offset to identify as wall
                 
-                b2BodyId wallBodyId = b2CreateBody(physicsWorldId, &wallDef);
+                b2BodyId wallBodyId = physicsWorld->createBody(&wallDef);
                 
                 // Explicitly set the body to be awake using the proper API function
                 b2Body_SetAwake(wallBodyId, true);
@@ -316,7 +304,7 @@ struct Physics::PhysicsImpl {
                     float halfHeight = (cellHeight / pixelsPerMeter) * 0.1f; // 20% of cell height (centered)
                     
                     b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
-                    b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
+                    b2ShapeId wallShapeId = physicsWorld->createPolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
                     // Add wall to our tracking
                     walls.push_back(Wall{wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::HORIZONTAL });
@@ -327,7 +315,7 @@ struct Physics::PhysicsImpl {
                     float halfHeight = (cellHeight / pixelsPerMeter) * 0.5f; // Full height of cell
                     
                     b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
-                    b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
+                    b2ShapeId wallShapeId = physicsWorld->createPolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
                     walls.push_back(Wall{ wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::VERTICAL });
                 }
@@ -336,7 +324,7 @@ struct Physics::PhysicsImpl {
                     float halfSize = (cellWidth / pixelsPerMeter) * 0.15f;  // 30% of cell size (squared)
                     
                     b2Polygon boxShape = b2MakeBox(halfSize, halfSize);
-                    b2ShapeId wallShapeId = b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
+                    b2ShapeId wallShapeId = physicsWorld->createPolygonShape(wallBodyId, &shapeDef, &boxShape);
                     
                     // Add wall to our tracking
                     walls.push_back(Wall{ wallBodyId, wallShapeId, 0, false, currentRow, currentCol, Wall::Orientation::CORNER });
@@ -399,7 +387,7 @@ struct Physics::PhysicsImpl {
         // Store special ID for exit
         exitDef.userData = reinterpret_cast<void*>(2000); // Use offset to identify as exit
         
-        exitCell.bodyId = b2CreateBody(physicsWorldId, &exitDef);
+        exitCell.bodyId = physicsWorld->createBody(&exitDef);
         
         // Create circle shape for exit
         b2ShapeDef circleDef = b2DefaultShapeDef();
@@ -410,7 +398,7 @@ struct Physics::PhysicsImpl {
         float exitRadius = cellWidth / (3.0f * pixelsPerMeter);
         b2Circle exitCircle = {{0.f, 0.f}, exitRadius};
         
-        exitCell.shapeId = b2CreateCircleShape(exitCell.bodyId, &circleDef, &exitCircle);
+        exitCell.shapeId = physicsWorld->createCircleShape(exitCell.bodyId, &circleDef, &exitCircle);
         
         // Create balls at the remaining positions (numbers 0-9 in reference maze)
         // Start from the end (highest number) and work backwards
@@ -834,9 +822,9 @@ bool Physics::run() const noexcept {
         this->m_impl->walls.size(), this->m_impl->balls.size());
     
     // Initial physics simulation step to ensure bodies are positioned
-    if (B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
+    if (this->m_impl->physicsWorld) {
         SDL_Log("Performing initial physics step");
-        b2World_Step(this->m_impl->physicsWorldId, this->m_impl->timeStep, 4);
+        this->m_impl->physicsWorld->step(this->m_impl->timeStep, 4);
     }
     
     while (gState != State::DONE) {
@@ -854,11 +842,10 @@ bool Physics::run() const noexcept {
 
         // Update physics simulation if we're in PLAY state
         if (gState == State::PLAY && 
-            B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
+            this->m_impl->physicsWorld) {
              
             // Step Box2D world with sub-steps instead of velocity/position iterations
-            b2World_Step(
-                this->m_impl->physicsWorldId,
+            this->m_impl->physicsWorld->step(
                 this->m_impl->timeStep,
                 4);  // Using 4 sub-steps as recommended in the migration guide
              
@@ -888,7 +875,7 @@ bool Physics::run() const noexcept {
         
         // Draw the physics entities (balls, walls, exit) if we're in PLAY state
         if (gState == State::PLAY && 
-            B2_IS_NON_NULL(this->m_impl->physicsWorldId)) {
+            this->m_impl->physicsWorld) {
             this->drawPhysicsObjects(renderer);
         }
         
@@ -913,7 +900,7 @@ bool Physics::run() const noexcept {
 // Process collisions in the Box2D world
 void Physics::processPhysicsCollisions() const {
     // Process contact events in Box2D 3.1.0 style
-    b2ContactEvents contactEvents = b2World_GetContactEvents(this->m_impl->physicsWorldId);
+    b2ContactEvents contactEvents = this->m_impl->physicsWorld->getContactEvents();
     
     // Handle contact hit events
     for (int i = 0; i < contactEvents.hitCount; ++i) {
@@ -954,7 +941,7 @@ void Physics::processPhysicsCollisions() const {
                     this->m_impl->score += 100;
                     
                     // Remove the ball
-                    b2DestroyBody(ball.getBodyId());
+                    this->m_impl->physicsWorld->destroyBody(ball.getBodyId());
                     break;
                 }
             }
@@ -973,7 +960,7 @@ void Physics::updatePhysicsObjects() const {
             
             // Destroy the body in the physics world
             if (B2_IS_NON_NULL(wall.getBodyId())) {
-                b2DestroyBody(wall.getBodyId());
+                this->m_impl->physicsWorld->destroyBody(wall.getBodyId());
                 wall.setBodyId(b2_nullBodyId);
             }
             
@@ -992,7 +979,7 @@ void Physics::updatePhysicsObjects() const {
             
             if (ball.getExplosionTimer() > 0.5f) { // After half a second, remove the ball
                 if (B2_IS_NON_NULL(ball.getBodyId())) {
-                    b2DestroyBody(ball.getBodyId());
+                    this->m_impl->physicsWorld->destroyBody(ball.getBodyId());
                     ball.setBodyId(b2_nullBodyId);
                 }
                 this->m_impl->balls.erase(this->m_impl->balls.begin() + i);
@@ -1042,10 +1029,6 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     for (const auto& ball : this->m_impl->balls) {
         if (ball.getIsActive()) activeBallCount++;
     }
-    
-    SDL_Log("Drawing physics objects: walls=%zu, balls=%zu (active=%d), cellSize=%.2f, offsetX=%.2f, offsetY=%.2f, camera=(%.2f,%.2f,%.2f)",
-        this->m_impl->walls.size(), this->m_impl->balls.size(), activeBallCount, cellSize, offsetX, offsetY,
-        camera.x, camera.y, camera.zoom);
     
     // DEBUG: Draw a visible boundary around the physics world for debugging
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red

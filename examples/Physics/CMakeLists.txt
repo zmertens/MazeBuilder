@@ -11,7 +11,8 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Wall.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/WorkerConcurrent.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/WorkerConcurrent.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/World.cpp)
 
 set(DEAR_IMGUI_SOURCES
   ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.cpp
