@@ -153,7 +153,7 @@ void WorkerConcurrent::initThreads() noexcept {
         while (1) {
             {
                 SDL_LockMutex(workerPtr->gameMtx);
-                while (workerPtr->workQueue.empty() || workerPtr->state != State::DONE) {
+                while (workerPtr->workQueue.empty()) {
                     SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
                 }
 

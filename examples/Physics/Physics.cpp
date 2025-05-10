@@ -149,7 +149,8 @@ struct Physics::PhysicsImpl {
     // Create a ball at the specified position
     Ball createBall(float x, float y) {
         static constexpr auto COMMON_BALL_RADIUS = 0.45f;
-        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorld->getWorldId() };
+        // Pass 'this' as userData so we can identify balls in collision callbacks
+        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorld->getWorldId(), this };
     }
 
     // Convert the ASCII maze into Box2D physics objects
@@ -427,7 +428,7 @@ struct Physics::PhysicsImpl {
 
     // Utility method for handling wall collisions
     void handleWallCollision(b2BodyId possibleWallId, b2BodyId possibleBallId) {
-        // If this is a ball hitting a wall
+        // Check if possibleWallId is actually a wall by looking at userData tag
         void* wallUserData = b2Body_GetUserData(possibleWallId);
         void* ballUserData = b2Body_GetUserData(possibleBallId);
         
@@ -435,7 +436,11 @@ struct Physics::PhysicsImpl {
         // Walls are stored with pointer values starting at 1000
         uintptr_t wallValue = reinterpret_cast<uintptr_t>(wallUserData);
         
-        // Make sure this is a ball hitting a wall (not another wall or object)
+        // Debug output to help diagnose the issue
+        SDL_Log("Wall collision check: wallValue=%zu, ballUserData=%p, this=%p", 
+                wallValue, ballUserData, this);
+        
+        // Make sure this is a ball hitting a wall (ball userData is set to 'this')
         if (wallValue >= 1000 && wallValue < 2000) {
             // This is a wall - find its index
             int wallIndex = static_cast<int>(wallValue - 1000);
@@ -453,7 +458,7 @@ struct Physics::PhysicsImpl {
                 float impactSpeed = b2Length(ballVel);
                 
                 // Only count the hit if it's a significant impact
-                if (impactSpeed > 1.5f) { // Threshold for counting a hit
+                if (impactSpeed > 0.5f) { // Lower threshold to make it easier to break walls
                     wall.setHitCount(wall.getHitCount() + 1);
                     SDL_Log("Wall hit! Wall index: %d, Hit count: %d/%d, Impact speed: %.2f", 
                            wallIndex, wall.getHitCount(), (int)WALL_HIT_THRESHOLD, impactSpeed);
@@ -482,17 +487,12 @@ struct Physics::PhysicsImpl {
                 }
                 
                 // Check if wall should break
-                if (wall.getHitCount() >= WALL_HIT_THRESHOLD && !wall.getIsDestroyed()) {
+                if (wall.getHitCount() >= WALL_HIT_THRESHOLD) {
                     wall.setIsDestroyed(true);
                     SDL_Log("Wall %d destroyed after %d hits!", wallIndex, wall.getHitCount());
                     
                     // Increment score
                     score += 10;
-                    
-                    // IMPORTANT: Do NOT destroy the body here - let updatePhysicsObjects do it
-                    // This fixes the timing issue between physics and rendering
-                    // The wall will be visually marked as destroyed but the body remains valid
-                    // until the next physics update cycle where it will be properly removed
                 }
             }
         }
