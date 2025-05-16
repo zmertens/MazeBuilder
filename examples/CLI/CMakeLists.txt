@@ -6,11 +6,6 @@ if(EMSCRIPTEN)
 
    message(INFO ": Building ${EXE_NAME} for the Web!")
 
-   # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
-   if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
-       message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE is not set. Please specify the path to the Emscripten toolchain file.")
-   endif()
-
    set(JS_FILE "mazebuilder")
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
@@ -36,10 +31,5 @@ else()
     target_link_libraries(${EXE_NAME} ${MAZE_BUILDER_CORE_LIB}_static)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_17)
     target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
-
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(INFO ": Enabled ${EXE_NAME} to use -DMAZE_DEBUG flag.")
-        target_compile_definitions(${EXE_NAME} PRIVATE "MAZE_DEBUG")
-    endif()
 
 endif()

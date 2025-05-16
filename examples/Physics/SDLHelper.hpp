@@ -2,6 +2,7 @@
 #define SDLHELPER_HPP
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <string_view>
 
@@ -33,7 +34,7 @@ public:
 
     bool loadFont(const std::string& f, unsigned int fSize) noexcept;
 
-    void poll_events(State& state, OrthographicCamera& camera) noexcept;
+    void poll_events(State& state, std::unique_ptr<OrthographicCamera> const& camera) noexcept;
 
     void updateAudioData() noexcept;
 

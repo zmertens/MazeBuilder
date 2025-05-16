@@ -27,9 +27,9 @@
 #include <string>
 #include <vector>
 
-#include <SDL3/SDL.h>
-
 #include <box2d/box2d.h>
+#include <SDL3/SDL.h>
+#include <SFML/Audio.hpp>
 
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
@@ -37,6 +37,7 @@
 
 #include <MazeBuilder/maze_builder.h>
 
+#include "AudioHelper.hpp"
 #include "Ball.hpp"
 #include "OrthographicCamera.hpp"
 #include "SDLHelper.hpp"
@@ -98,11 +99,12 @@ struct Physics::PhysicsImpl {
     WorkerConcurrent workerConcurrent;
 
     // Camera for coordinate transformations
-    OrthographicCamera camera;
+    std::unique_ptr<OrthographicCamera> camera;
 
     PhysicsImpl(const std::string& title, const std::string& version, int w, int h)
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , sdlHelper{}, state{ State::SPLASH }, workerConcurrent{state} {
+        , sdlHelper{}, state{ State::SPLASH }, workerConcurrent{state}
+        , camera{ std::make_unique<OrthographicCamera>() } {
 
     }
 
@@ -122,8 +124,10 @@ struct Physics::PhysicsImpl {
         balls.clear();
         
         // Set good values for physics simulation
-        timeStep = 1.0f / 60.0f;        // Simulate at 60Hz
-        pixelsPerMeter = 40.0f;         // Good scaling factor for visibility
+        // Simulate at 60Hz
+        timeStep = 1.0f / 60.0f;
+         // Good scaling factor for visibility
+        pixelsPerMeter = 40.0f;
     }
     
     // Convert screen coordinates to physics world coordinates
@@ -132,7 +136,7 @@ struct Physics::PhysicsImpl {
         float worldX, worldY;
         int display_w, display_h;
         SDL_GetWindowSize(sdlHelper.window, &display_w, &display_h);
-        camera.screenToWorld(screenX, screenY, worldX, worldY, display_w, display_h);
+        camera->screenToWorld(screenX, screenY, worldX, worldY, display_w, display_h);
         
         // Then convert from world to physics coordinates by accounting for offset and scale
         float physX = (worldX - offsetX) / pixelsPerMeter;
@@ -150,7 +154,7 @@ struct Physics::PhysicsImpl {
     Ball createBall(float x, float y) {
         static constexpr auto COMMON_BALL_RADIUS = 0.45f;
         // Pass 'this' as userData so we can identify balls in collision callbacks
-        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorld->getWorldId(), this };
+        return Ball{ {x, y, 0.f}, COMMON_BALL_RADIUS, physicsWorld->getWorldId() };
     }
 
     // Convert the ASCII maze into Box2D physics objects
@@ -738,6 +742,8 @@ Physics::Physics(const std::string& title, const std::string& version, int w, in
     : m_impl{ std::make_unique<PhysicsImpl>(std::cref(title), std::cref(version), w, h)} {
 }
 
+Physics::~Physics() = default;
+
 bool Physics::run() const noexcept {
     using namespace std;
 
@@ -771,6 +777,18 @@ bool Physics::run() const noexcept {
     mazes::json_helper jh{};
     jh.load(PHYSICS_JSON_PATH,  ref(resourceMap));
 
+    const auto& generateSongName = resourceMap["generate"];
+    sf::SoundBuffer generateSoundBuffer;
+    if (!generateSoundBuffer.loadFromFile("resources/generate.ogg")) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generateSongName.c_str());
+        return false;
+    } else {
+        SDL_Log("Success loading sound file: %s\n", generateSongName.c_str());
+    }
+
+    unique_ptr<sf::Sound> generateSound = make_unique<sf::Sound>(generateSoundBuffer);
+    AudioHelper audioHelper{cref(generateSound)};
+
     // Use the new strip_json_quotes method to properly handle the JSON string values
     auto resourceLoadingStrView = mazes::stringz::strip_json_quotes(resourceMap["icon_image_path"]);
 
@@ -802,11 +820,7 @@ bool Physics::run() const noexcept {
     // Create a static persistent string to store the maze data
     static std::string persistentMazeStr;
     
-    double previous = SDL_GetTicks();
-    double accumulator = 0.0, currentTimeStep = 0.0;
     auto&& gState = this->m_impl->state;
-    
-    // Set the state to PLAY at startup
     gState = State::PLAY;
     
     // Set a good default value for pixelsPerMeter
@@ -826,11 +840,13 @@ bool Physics::run() const noexcept {
         SDL_Log("Performing initial physics step");
         this->m_impl->physicsWorld->step(this->m_impl->timeStep, 4);
     }
-    
+
+    double previous = static_cast<double>(SDL_GetTicks());
+    double accumulator = 0.0, currentTimeStep = 0.0;
     while (gState != State::DONE) {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
-        auto elapsed = SDL_GetTicks() - previous;
-        previous = SDL_GetTicks();
+        auto elapsed = static_cast<double>(SDL_GetTicks()) - previous;
+        previous = static_cast<double>(SDL_GetTicks());
         accumulator += elapsed;
         
         // Handle events and update physics at a fixed time step
@@ -841,13 +857,11 @@ bool Physics::run() const noexcept {
         }
 
         // Update physics simulation if we're in PLAY state
-        if (gState == State::PLAY && 
-            this->m_impl->physicsWorld) {
+        if (gState == State::PLAY && this->m_impl->physicsWorld) {
              
             // Step Box2D world with sub-steps instead of velocity/position iterations
-            this->m_impl->physicsWorld->step(
-                this->m_impl->timeStep,
-                4);  // Using 4 sub-steps as recommended in the migration guide
+            // Using 4 sub-steps as recommended in the migration guide
+            this->m_impl->physicsWorld->step(FIXED_TIME_STEP, 4);
              
             // Handle collisions and physics interactions
             this->processPhysicsCollisions();
@@ -865,6 +879,7 @@ bool Physics::run() const noexcept {
         
         // Generate new level if needed
         if (gState == State::UPLOADING_LEVEL) {
+            audioHelper.playSound("generate");
             this->m_impl->workerConcurrent.generate("things and stuff");
             this->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
             gState = State::PLAY;
@@ -1034,8 +1049,8 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red
     
     // Transform world bounds with camera
-    SDL_FPoint topLeft = camera.worldToScreen(offsetX, offsetY, display_w, display_h);
-    SDL_FPoint bottomRight = camera.worldToScreen(
+    SDL_FPoint topLeft = camera->worldToScreen(offsetX, offsetY, display_w, display_h);
+    SDL_FPoint bottomRight = camera->worldToScreen(
         offsetX + this->m_impl->maxCols * cellSize, 
         offsetY + this->m_impl->maxRows * cellSize,
         display_w, display_h);
@@ -1048,127 +1063,24 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
     };
     SDL_RenderRect(renderer, &worldBounds);
     
-    // Render walls based on their physical properties and current state
+    // Render walls
     for (const auto& wall : this->m_impl->walls) {
-        if (wall.getIsDestroyed())
-            continue;
+        if (wall.getIsDestroyed()) {
 
-        // Calculate world position
-        float worldX = offsetX + (wall.getCol() * cellSize);
-        float worldY = offsetY + (wall.getRow() * cellSize);
-        
-        // Transform with camera
-        SDL_FPoint screenPos = camera.worldToScreen(worldX, worldY, display_w, display_h);
-        float screenX = screenPos.x;
-        float screenY = screenPos.y;
-        
-        // Scale dimensions based on zoom
-        float halfWidth, halfHeight;
-        
-        // Determine wall dimensions based on wall type
-        if (wall.getOrientation() == Wall::Orientation::HORIZONTAL) {
-            halfWidth = cellSize * 0.5f * camera.zoom;
-            halfHeight = cellSize * 0.1f * camera.zoom;
-        } 
-        else if (wall.getOrientation() == Wall::Orientation::VERTICAL) {
-            halfWidth = cellSize * 0.1f * camera.zoom;
-            halfHeight = cellSize * 0.5f * camera.zoom;
-        }
-        else { // '+' (junction/corner)
-            halfWidth = halfHeight = cellSize * 0.15f * camera.zoom;
+            continue;
         }
         
-        // Draw the wall with a color based on hit count
-        this->m_impl->drawWall(renderer, wall, screenX, screenY, halfWidth, halfHeight);
+        wall.draw(renderer, camera, m_impl->pixelsPerMeter, offsetX, offsetY, cellSize, display_w, display_h);
     }
     
     // Render balls
     for (const auto& ball : this->m_impl->balls) {
-        if (!ball.getIsActive()) 
-            continue;
-            
-        // Get ball position from Box2D
-        b2Vec2 pos = b2Body_GetPosition(ball.getBodyId());
-        
-        // Convert physics coordinates to world coordinates
-        float worldX = offsetX + (pos.x * this->m_impl->pixelsPerMeter);
-        float worldY = offsetY + (pos.y * this->m_impl->pixelsPerMeter);
-        
-        // Apply camera transform
-        SDL_FPoint screenPos = camera.worldToScreen(worldX, worldY, display_w, display_h);
-        float screenX = screenPos.x;
-        float screenY = screenPos.y;
-        
-        // Scale radius based on zoom
-        float radius = ball.getRadius() * this->m_impl->pixelsPerMeter * camera.zoom;
-        
-        // Debug log to verify ball positions
+        if (!ball.getIsActive()) {
 
-        // SDL_Log("Ball: physics(%.2f,%.2f) world(%.2f,%.2f) screen(%.2f,%.2f) r=%.2f active=%d", 
-            // pos.x, pos.y, worldX, worldY, screenX, screenY, radius, ball.isActive ? 1 : 0);
-        
-        if (ball.getIsExploding()) {
-            // Render explosion animation
-            float explosionProgress = ball.getExplosionTimer() / 0.5f; // 0.5 is max time
-            float expandedRadius = radius * (1.0f + explosionProgress * 2.0f);
-            
-            // Fade out as explosion progresses
-            int alpha = static_cast<int>(255 * (1.0f - explosionProgress));
-            
-            SDL_SetRenderDrawColor(renderer, 255, 165, 0, alpha); // Orange
-            
-            // Draw explosion as a circle with rays
-            for (int w = 0; w < 16; w++) {
-                float angle = static_cast<float>(w) * 3.14159f / 8.0f;
-                SDL_RenderLine(
-                    renderer,
-                    screenX,
-                    screenY,
-                    screenX + cosf(angle) * expandedRadius,
-                    screenY + sinf(angle) * expandedRadius
-                );
-            }
+            continue;
         }
-        else {
-            // Normal ball rendering - make it more visible with solid red circle
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Bright red
-            
-            // Use efficient circle rendering for large radius
-            const int segments = 32; // Number of line segments to approximate the circle
-            float previousX = screenX + radius;
-            float previousY = screenY;
-            
-            for (int i = 1; i <= segments; i++) {
-                float angle = (2.0f * SDL_PI_F * i) / segments;
-                float x = screenX + radius * cosf(angle);
-                float y = screenY + radius * sinf(angle);
-                
-                SDL_RenderLine(renderer, previousX, previousY, x, y);
-                previousX = x;
-                previousY = y;
-            }
-            
-            // Fill the circle efficiently
-            for (int y = -radius; y <= radius; y += 1) {
-                float width = sqrtf(radius * radius - y * y);
-                SDL_RenderLine(renderer, screenX - width, screenY + y, screenX + width, screenY + y);
-            }
-            
-            // Add highlight effect for better visualization
-            SDL_SetRenderDrawColor(renderer, 255, 200, 200, 255); // Light red highlight
-            float highlight_radius = radius * 0.5f;
-            float highlightOffsetX = -radius * 0.2f; // Offset to upper left for light effect
-            float highlightOffsetY = -radius * 0.2f;
-            
-            for (int y = -highlight_radius; y <= 0; y += 1) {
-                float width = sqrtf(highlight_radius * highlight_radius - y * y);
-                SDL_RenderLine(renderer, 
-                    screenX + highlightOffsetX - width/2, 
-                    screenY + highlightOffsetY + y, 
-                    screenX + highlightOffsetX + width/2, 
-                    screenY + highlightOffsetY + y);
-            }
-        }
+
+        ball.draw(renderer, cref(camera), m_impl->pixelsPerMeter, offsetX, offsetY, cellSize, display_w, display_h);
     }
     
     // Render exit cell
@@ -1178,12 +1090,12 @@ void Physics::drawPhysicsObjects(SDL_Renderer* renderer) const {
         float worldY = offsetY + (this->m_impl->exitCell.row * cellSize);
         
         // Apply camera transform
-        SDL_FPoint screenPos = camera.worldToScreen(worldX, worldY, display_w, display_h);
+        SDL_FPoint screenPos = camera->worldToScreen(worldX, worldY, display_w, display_h);
         float screenX = screenPos.x;
         float screenY = screenPos.y;
         
         // Scale radius based on zoom
-        float radius = cellSize * 0.4f * camera.zoom;
+        float radius = cellSize * 0.4f * camera->zoom;
         
         // Use a bright color for the exit
         SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255); // Bright green
@@ -1291,12 +1203,12 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
         float baseY = offsetY + (currentRow * cellSize);
         
         // Apply camera transformation
-        SDL_FPoint screenPos = camera.worldToScreen(baseX, baseY, display_w, display_h);
+        SDL_FPoint screenPos = camera->worldToScreen(baseX, baseY, display_w, display_h);
         float x = screenPos.x;
         float y = screenPos.y;
         
         // Scale the cell size according to zoom
-        float scaledCellSize = cellSize * camera.zoom;
+        float scaledCellSize = cellSize * camera->zoom;
         
         if (c == ' ') { 
             // Path cell - light gray
@@ -1305,11 +1217,11 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
                 SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255); // Lighter gray
                 
                 // We need to draw a rotated rectangle when the camera is rotated
-                if (camera.rotation != 0.0f) {
+                if (camera->rotation != 0.0f) {
                     // Calculate the four corners of the rotated rectangle
                     float halfSize = scaledCellSize * 0.5f;
-                    float cos_r = cosf(camera.rotation);
-                    float sin_r = sinf(camera.rotation);
+                    float cos_r = cosf(camera->rotation);
+                    float sin_r = sinf(camera->rotation);
                     
                     SDL_Vertex vertices[6];
                     // Define the four corner points of the rotated rectangle

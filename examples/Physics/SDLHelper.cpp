@@ -39,7 +39,7 @@ void SDLHelper::init() noexcept {
     }
 }
 
-void SDLHelper::poll_events(State& state, OrthographicCamera& camera) noexcept {
+void SDLHelper::poll_events(State& state, std::unique_ptr<OrthographicCamera> const& camera) noexcept {
     using namespace std;
 
     SDL_Event e;
@@ -54,45 +54,45 @@ void SDLHelper::poll_events(State& state, OrthographicCamera& camera) noexcept {
             } 
             // Arrow key controls for camera movement
             else if (e.key.scancode == SDL_SCANCODE_LEFT) {
-                camera.x += camera.panSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved left: x=%.2f, y=%.2f", camera.x, camera.y);
+                camera->x += camera->panSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved left: x=%.2f, y=%.2f", camera->x, camera->y);
             }
             else if (e.key.scancode == SDL_SCANCODE_RIGHT) {
-                camera.x -= camera.panSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved right: x=%.2f, y=%.2f", camera.x, camera.y);
+                camera->x -= camera->panSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved right: x=%.2f, y=%.2f", camera->x, camera->y);
             }
             else if (e.key.scancode == SDL_SCANCODE_UP) {
-                camera.y += camera.panSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved up: x=%.2f, y=%.2f", camera.x, camera.y);
+                camera->y += camera->panSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved up: x=%.2f, y=%.2f", camera->x, camera->y);
             }
             else if (e.key.scancode == SDL_SCANCODE_DOWN) {
-                camera.y -= camera.panSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved down: x=%.2f, y=%.2f", camera.x, camera.y);
+                camera->y -= camera->panSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera moved down: x=%.2f, y=%.2f", camera->x, camera->y);
             }
             // Rotation controls with Q/E keys
             else if (e.key.scancode == SDL_SCANCODE_Q) {
-                camera.rotation -= camera.rotationSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera rotated counter-clockwise: rotation=%.2f", camera.rotation);
+                camera->rotation -= camera->rotationSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera rotated counter-clockwise: rotation=%.2f", camera->rotation);
             }
             else if (e.key.scancode == SDL_SCANCODE_E) {
-                camera.rotation += camera.rotationSpeed * 2.0f;
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera rotated clockwise: rotation=%.2f", camera.rotation);
+                camera->rotation += camera->rotationSpeed * 2.0f;
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera rotated clockwise: rotation=%.2f", camera->rotation);
             }
             // Zoom controls with +/- (equals/minus) keys
             else if (e.key.scancode == SDL_SCANCODE_EQUALS) { // + key (may require shift)
-                camera.zoom *= (1.0f + camera.zoomSpeed);
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera zoomed in: zoom=%.2f", camera.zoom);
+                camera->zoom *= (1.0f + camera->zoomSpeed);
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera zoomed in: zoom=%.2f", camera->zoom);
             }
             else if (e.key.scancode == SDL_SCANCODE_MINUS) { // - key
-                camera.zoom /= (1.0f + camera.zoomSpeed);
-                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera zoomed out: zoom=%.2f", camera.zoom);
+                camera->zoom /= (1.0f + camera->zoomSpeed);
+                SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera zoomed out: zoom=%.2f", camera->zoom);
             }
             // Reset camera with R key
             else if (e.key.scancode == SDL_SCANCODE_R) {
-                camera.x = 0.0f;
-                camera.y = 0.0f;
-                camera.zoom = 1.0f;
-                camera.rotation = 0.0f;
+                camera->x = 0.0f;
+                camera->y = 0.0f;
+                camera->zoom = 1.0f;
+                camera->rotation = 0.0f;
                 SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Camera reset to default position and orientation");
             }
         } else if (e.type == SDL_EVENT_QUIT) {
@@ -104,34 +104,34 @@ void SDLHelper::poll_events(State& state, OrthographicCamera& camera) noexcept {
     // Also check for continuous key presses for smoother camera movement
     const auto* keyState = SDL_GetKeyboardState(NULL);
     if (keyState[SDL_SCANCODE_LEFT]) {
-        camera.x += camera.panSpeed;
+        camera->x += camera->panSpeed;
     }
     if (keyState[SDL_SCANCODE_RIGHT]) {
-        camera.x -= camera.panSpeed;
+        camera->x -= camera->panSpeed;
     }
     if (keyState[SDL_SCANCODE_UP]) {
-        camera.y += camera.panSpeed;
+        camera->y += camera->panSpeed;
     }
     if (keyState[SDL_SCANCODE_DOWN]) {
-        camera.y -= camera.panSpeed;
+        camera->y -= camera->panSpeed;
     }
     
     // Add continuous rotation and zoom (for smoother control)
     if (keyState[SDL_SCANCODE_Q]) {
-        camera.rotation -= camera.rotationSpeed;
+        camera->rotation -= camera->rotationSpeed;
     }
     if (keyState[SDL_SCANCODE_E]) {
-        camera.rotation += camera.rotationSpeed;
+        camera->rotation += camera->rotationSpeed;
     }
     if (keyState[SDL_SCANCODE_EQUALS]) { // + key
-        camera.zoom *= (1.0f + camera.zoomSpeed * 0.005f); // gentler continuous zoom
+        camera->zoom *= (1.0f + camera->zoomSpeed * 0.005f); // gentler continuous zoom
     }
     if (keyState[SDL_SCANCODE_MINUS]) { // - key
-        camera.zoom /= (1.0f + camera.zoomSpeed * 0.005f); // gentler continuous zoom
+        camera->zoom /= (1.0f + camera->zoomSpeed * 0.005f); // gentler continuous zoom
     }
     
     // Enforce zoom limits to prevent extreme values
-    camera.zoom = SDL_max(0.1f, SDL_min(5.0f, camera.zoom));
+    camera->zoom = SDL_max(0.1f, SDL_min(5.0f, camera->zoom));
 }
 
 void SDLHelper::updateAudioData() noexcept {

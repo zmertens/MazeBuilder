@@ -5,10 +5,12 @@
 
 #include <box2d/box2d.h>
 
+#include "Drawable.hpp"
+
 /// @file Ball.hpp
 /// @class Ball
 /// @brief Data class for a ball with physics properties
-class Ball {
+class Ball : public Drawable {
 public:
     explicit Ball(std::tuple<float, float, float> coords, float r, const b2WorldId worldId);
 
@@ -31,6 +33,11 @@ public:
     void setExplosionTimer(float timer);
     void setCoords(const std::tuple<float, float, float > & newCoords);
     void setRadius(float newRadius);
+
+    // Overrides
+    void draw(SDL_Renderer* renderer, 
+        std::unique_ptr<OrthographicCamera> const& camera,
+        float pixelsPerMeter, float offsetX, float offsetY, float cellSize, int display_w, int display_h) const override;
 
 private:
     std::tuple<float, float, float> coords;

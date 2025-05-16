@@ -15,6 +15,7 @@ class Physics : public mazes::singleton_base<Physics> {
     friend class mazes::singleton_base<Physics>;
 public:
     Physics(const std::string& title, const std::string& version, int w, int h);
+    ~Physics();
 
     bool run() const noexcept;
 

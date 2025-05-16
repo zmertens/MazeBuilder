@@ -1,4 +1,5 @@
-#pragma once
+#ifndef WORLD_HPP
+#define WORLD_HPP
 
 #include <box2d/box2d.h>
 #include <cstdint>
@@ -44,3 +45,5 @@ public:
 private:
     b2WorldId m_worldId = b2_nullWorldId;
 };
+
+#endif // WORLD_HPP
