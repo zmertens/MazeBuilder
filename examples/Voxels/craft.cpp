@@ -2826,7 +2826,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                                 .distances(false).seed(gui->seed)._algo(my_maze_type)
                                 .block_id(items[model->item_index]));
 
-                            if (!next_maze_ptr.has_value()) {
+                            if (!next_maze_ptr) {
                                 SDL_Log("Failed to create maze!");
                             }
 
@@ -2835,8 +2835,8 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                             // Compute the geometry of the maze
                             vector<vector<uint32_t>> faces;
                             std::vector<std::tuple<int, int, int, int>> vertices;
-                            auto s = mazes::stringz::stringify(next_maze_ptr.value());
-                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces), s);
+                            auto s = next_maze_ptr->str();
+                            mazes::stringz::objectify(cref(next_maze_ptr), ref(vertices), ref(faces), s);
                             mazes::stringz::objectify(ref(my_mazes), s);
                             mazes::wavefront_object_helper woh{};
                             auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
