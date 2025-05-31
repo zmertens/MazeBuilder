@@ -66,14 +66,6 @@ public:
 
     // Overrides
 
-    /// @brief 
-    /// @param observer 
-    void register_observer(std::function<bool(void)> const& observer) noexcept override;
-
-    /// @brief 
-    /// @return 
-    bool is_observed() noexcept override;
-
     /// @brief Provides dimensions of grid in no assumed ordering
     /// @return 
     virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept override;
@@ -101,15 +93,12 @@ public:
     /// @return The number of cells in the grid
     int num_cells() const noexcept;
 
-protected:
-    /// @brief 
-    /// @param result 
-    void notify_observers() noexcept;
-
 private:
     /// @brief Configure cells by neighbors (N, S, E, W)
     /// @param cells 
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
+
+    void clear_cells() noexcept;
 
     /// @brief Calculate the flat index for a 2D grid
     std::function<int(unsigned int, unsigned int)> m_calc_index;

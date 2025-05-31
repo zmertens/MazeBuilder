@@ -25,7 +25,7 @@ public:
     /// @param g
     /// @param rng
     /// @return success or failure
-    virtual bool run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const noexcept override;
+    virtual bool run(grid_interface* g, randomizer& rng) const noexcept override;
 
 private:
     std::vector<std::shared_ptr<cell>> get_unvisited_neighbors(std::shared_ptr<cell> const& c) const noexcept;

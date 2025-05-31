@@ -15,8 +15,8 @@
 /// @param g
 /// @param rng
 /// @return 
-bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
-    if (auto gg = dynamic_cast<grid*>(g.get())) {
+bool mazes::binary_tree::run(grid_interface* g, randomizer& rng) const noexcept {
+    if (auto gg = dynamic_cast<grid*>(g)) {
 
         // Process each node from the map
         for (const auto& [index, c] : gg->m_cells) {
@@ -38,7 +38,7 @@ bool mazes::binary_tree::run(std::unique_ptr<grid_interface> const& g, randomize
                 auto random_index = static_cast<int>(rng(0, static_cast<int>(neighbors.size()) - 1));
                 auto neighbor = neighbors.at(random_index);
                 if (neighbor) {
-                    c->link(neighbor, true);
+                    c->link(c, neighbor, true);
                 }
             }
         }

@@ -13,6 +13,7 @@
 #include <iostream>
 #endif
 
+#include <sstream>
 #include <vector>
 
 using namespace mazes;
@@ -21,7 +22,7 @@ using namespace mazes;
 /// @param rows 10
 /// @param columns 10
 /// @return 
-std::optional<std::unique_ptr<maze>> factory::create_q(unsigned int rows, unsigned int columns) noexcept {
+std::optional<std::unique_ptr<maze>> factory::create_with_rows_columns(unsigned int rows, unsigned int columns) noexcept {
     using namespace std;
 
     configurator config;
@@ -31,63 +32,61 @@ std::optional<std::unique_ptr<maze>> factory::create_q(unsigned int rows, unsign
     return create(config);
 }
 
-std::optional<std::unique_ptr<maze>> factory::create(configurator const& config) noexcept {
+std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     using namespace std;
 
     auto g = create_grid(cref(config));
 
     if (!g.has_value()) {
-        return nullopt;
+        return nullptr;
     }
 
-    // Create a random number generator
+    // Create weak references from shared_ptr's
     randomizer rng;
     rng.seed(config.seed());
+    auto shared_rng = make_shared<randomizer>(rng);
+    auto shared_config = make_shared<const configurator>(config);
 
-    auto callback = [&config, &rng, &g]()->bool {
-        switch (config._algo()) {
-        case algo::BINARY_TREE: {
-
-            static binary_tree bt;
-
-            return bt.run(std::cref(g.value()), std::ref(rng));
-        }
-
-        case algo::SIDEWINDER: {
-
-            static sidewinder sw;
-
-            return sw.run(std::ref(g.value()), std::ref(rng));
-        }
-
-        case algo::DFS: {
-
-            static dfs d;
-
-            return d.run(std::ref(g.value()), std::ref(rng));
-        }
-
-        // Fail on unknown maze type
-        default: return false;
-
-        } // switch
-        }; // lambda
-
-    auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns());
-
-    if (auto grid_ptr = dynamic_cast<grid*>(g.value().get())) {
-
-        grid_ptr->register_observer(cref(callback));
-
-        grid_ptr->start_configuration(cref(random_ints));
-
-        if (grid_ptr->is_observed()) {
-
-            return make_optional(make_unique<maze>(std::move(g.value()), cref(config)));
-        }
+    // Get the raw pointer but keep ownership in g
+    auto* grid_ptr = dynamic_cast<grid*>(g.value().get());
+    if (!grid_ptr) {
+        return nullptr;
     }
 
-    return nullopt;
+    auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns());
+    grid_ptr->start_configuration(cref(random_ints));
+
+    auto success = false;
+
+    switch (shared_config->_algo()) {
+    case algo::BINARY_TREE: {
+        static binary_tree bt;
+        success = bt.run(grid_ptr, std::ref(*shared_rng));
+        break;
+    }
+    case algo::SIDEWINDER: {
+        static sidewinder sw;
+        success = sw.run(grid_ptr, std::ref(*shared_rng));
+        break;
+    }
+    case algo::DFS: {
+        static dfs d;
+        success = d.run(grid_ptr, std::ref(*shared_rng));
+        break;
+    }
+                  // Fail on unknown maze type
+    default:
+        return nullptr;
+    }
+
+    if (success) {
+        // Create the maze using the grid and config
+        stringstream ss;
+        ss << *(g.value().get());
+        return make_unique<maze>(cref(config), ss.str());
+    }
+
+    return nullptr;
 }
 
 std::optional<std::unique_ptr<grid_interface>> factory::create_grid(configurator const& config) noexcept {

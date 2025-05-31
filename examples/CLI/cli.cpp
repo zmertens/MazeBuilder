@@ -22,5 +22,5 @@ std::string cli::stringify_from_dimens(unsigned int rows, unsigned int cols) con
 
     factory my_factory{};
     auto maze_ptr = my_factory.create(configurator().rows(rows).columns(cols));
-    return stringz::stringify(cref(maze_ptr.value()));
+    return maze_ptr->str().data();
 }

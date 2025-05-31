@@ -34,7 +34,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         return;
     }
 
-    auto dimensions = m->get_grid()->get_dimensions();
+    auto dimensions = m->get_dimensions();
     if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0) {
         // Handle invalid dimensions
         return;
@@ -100,7 +100,7 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
 
         if (sv[i] == CORNER || sv[i] == BARRIER1 || sv[i] == BARRIER2) {
             static constexpr auto block_size = 1;
-            for (auto h = 0; h < m->get_levels(); ++h) {
+            for (auto h = 0; h < std::get<2>(dimensions); ++h) {
                 add_block(row_x, col_z, h, m->get_block_id(), block_size);
             }
         }
@@ -305,13 +305,7 @@ void stringz::to_pixels_colored(const std::string& s, std::vector<std::uint8_t>&
 std::string stringz::stringify(const std::unique_ptr<maze>& m) noexcept {
     using namespace std;
 
-    ostringstream oss;
-    if (m) {
-        oss << *(m->get_grid());
-    } else {
-        oss << "Maze pointer is null";
-    }
-    return oss.str();
+    return string{ m->str() };
 } // stringify
 
 /// @brief Strip specific characters from the beginning and end of a string view

@@ -20,7 +20,7 @@ public:
     /// @param g
     /// @param rng
     /// @return success or failure
-    bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept override;
+    bool run(grid_interface* g, randomizer& rng) const noexcept override;
 private:
 
 };

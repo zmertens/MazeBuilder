@@ -109,40 +109,39 @@ void cell::cleanup_links() {
     }
 }
 
-/// @brief 
-/// @param other
-/// @param bidi true
-void cell::link(const std::shared_ptr<cell>& other, bool bidi) noexcept {
-    if (other) {
-        {
-            std::lock_guard<std::shared_mutex> lock(m_links_mutex);
-            m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
-        }
+void cell::link(const std::shared_ptr<cell>& other, const std::shared_ptr<cell>& self, bool bidi) noexcept {
+    //if (!other || !self) return;
 
-        if (bidi) {
-            other->link(shared_from_this(), false);
-        }
-    }
+    //cell* first = self.get() < other.get() ? self.get() : other.get();
+    //cell* second = self.get() < other.get() ? other.get() : self.get();
+    //std::scoped_lock lock(first->m_links_mutex, second->m_links_mutex);
 
-    cleanup_links();
+    //m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
+
+    //if (bidi) {
+    //    other->m_links.insert_or_assign(std::weak_ptr<cell>(self), true);
+    //}
+
+    //cleanup_links();
+    //other->cleanup_links();
 }
 
-/// @brief 
-/// @param other 
-/// @param bidi true
 void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
-    if (other) {
-        std::lock_guard<std::shared_mutex> lock(m_links_mutex);
-        // Unlink this cell from the other cell
-        m_links.erase(std::weak_ptr<cell>(other));
+    //if (!other) return;
 
-        // If bidirectional, unlink the other cell from this cell
-        if (bidi) {
-            other->unlink(shared_from_this(), false);
-        }
-    }
+    //// Lock both mutexes in address order to avoid deadlock
+    //cell* first = this < other.get() ? this : other.get();
+    //cell* second = this < other.get() ? other.get() : this;
+    //std::scoped_lock lock(first->m_links_mutex, second->m_links_mutex);
 
-    cleanup_links();
+    //m_links.erase(std::weak_ptr<cell>(other));
+
+    //if (bidi) {
+    //    //other->m_links.erase(std::weak_ptr<cell>(shared_from_this()));
+    //}
+
+    //cleanup_links();
+    //other->cleanup_links();
 }
 
 std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const {
@@ -217,17 +216,17 @@ shared_ptr<cell> cell::get_west() const {
 }
 
 void cell::set_north(shared_ptr<cell> const& other) {
-    this->m_north = other;
+    //this->m_north = other;
 }
 
 void cell::set_south(shared_ptr<cell> const& other) {
-    this->m_south = other;
+    //this->m_south = other;
 }
 
 void cell::set_east(shared_ptr<cell> const& other) {
-    this->m_east = other;
+    //this->m_east = other;
 }
 
 void cell::set_west(shared_ptr<cell> const& other) {
-    this->m_west = other;
+    //this->m_west = other;
 }

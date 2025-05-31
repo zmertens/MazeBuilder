@@ -15,7 +15,7 @@ namespace mazes {
 /// @file cell.h
 /// @class cell
 /// @brief Cell class for maze generation
-class cell final : public std::enable_shared_from_this<cell> {
+class cell final {
 
 public:
     /// @brief Constructs a cell object with an optional index.
@@ -32,7 +32,7 @@ public:
     /// @param c1 A shared pointer to the first cell object.
     /// @param c2 A shared pointer to the second cell object.
     /// @param bidi A boolean flag indicating if the link should be bidirectional. Defaults to true.
-    void link(const std::shared_ptr<cell>& other, bool bidi = true) noexcept;
+    void link(const std::shared_ptr<cell>& other, const std::shared_ptr<cell>& self, bool bidi = true) noexcept;
 
     /// @brief Unlinks two cells, optionally in both directions.
     /// @param c1 A shared pointer to the first cell.
@@ -109,6 +109,10 @@ public:
     /// @brief Sets the west neighbor of the current cell.
     /// @param other A shared pointer to the cell that will be set as the west neighbor.
     void set_west(std::shared_ptr<cell> const& other);
+
+    /// @brief Cleans up or removes links, typically as part of a resource management or shutdown process.
+    /// This function is used to ensure that all links are properly cleaned up, preventing memory leaks or dangling pointers.
+    void cleanup_links();
 private:
     /// @brief Equals function for weak pointers to cell objects.
     struct weak_ptr_equal {
@@ -119,7 +123,6 @@ private:
     };
 
     bool has_key(const std::shared_ptr<cell>& c);
-    void cleanup_links();
 
     std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> m_links;
     mutable std::shared_mutex m_links_mutex;

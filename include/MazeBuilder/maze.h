@@ -3,6 +3,7 @@
 
 #include <string>
 #include <memory>
+#include <tuple>
 
 namespace mazes {
 
@@ -14,22 +15,18 @@ class grid_interface;
 /// @brief Data class representing a 2D or 3D maze
 class maze {
 public:
-    explicit maze(std::unique_ptr<grid_interface> g, configurator const& config) noexcept;
+    explicit maze(configurator const& config, std::string_view s) noexcept;
 
     int get_block_id() const noexcept;
 
     bool has_distances() const noexcept;
 
-    int get_rows() const noexcept;
-    int get_columns() const noexcept;
-    int get_levels() const noexcept;
+    std::tuple<int, int, int> get_dimensions() const noexcept;
 
-    const std::unique_ptr<grid_interface>& get_grid() const noexcept;
-
+    std::string_view str() const noexcept;
 private:
-    std::unique_ptr<grid_interface> m_grid;
-
-    const configurator& m_config;
+    configurator const& m_config;
+    std::string m_str;
 }; // maze struct
 
 } // namespace mazes

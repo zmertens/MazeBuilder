@@ -15,7 +15,7 @@ using namespace mazes;
 /// @param g the grid to generate the maze on, and manipulate the cells
 /// @param get_int
 /// @param rng
-bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
     using namespace std;
 
     vector<shared_ptr<cell>> store;
@@ -40,11 +40,11 @@ bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) 
             auto random_index{ rng(0, store.size() - 1) };
             auto&& random_cell = store.at(random_index);
             if (!random_cell || !at_northern_boundary) {
-                random_cell->link(random_cell->get_north(), true);
+                random_cell->link(random_cell, random_cell->get_north());
             }
             store.clear();
         } else if (!at_eastern_boundary) {
-            itr->link(itr->get_east(), true);
+            itr->link(itr, itr->get_east());
         }
     }
 

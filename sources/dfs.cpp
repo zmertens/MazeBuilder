@@ -16,9 +16,9 @@ using namespace std;
 /// @param get_int 
 /// @param rng 
 /// @return 
-bool dfs::run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const noexcept {
+bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
 
-    if (auto gg = dynamic_cast<grid*>(g.get())) {
+    if (auto gg = dynamic_cast<grid*>(g)) {
      
         auto&& start = gg->search(rng(0, gg->num_cells() - 1));
 
@@ -44,7 +44,7 @@ bool dfs::run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const n
                 // Mark current cell's neighbor as visited
                 const auto& random_index = rng(0, neighbors.size() - 1);
                 const auto& neighbor = neighbors.at(random_index);
-                current_cell->link(neighbor);
+                current_cell->link(current_cell, neighbor);
                 stack_of_cells.push(neighbor);
             }
         }

@@ -22,7 +22,7 @@ public:
     /// @param g 
     /// @param rng
     /// @return 
-    virtual bool run(const std::unique_ptr<grid_interface>& g, randomizer& rng) const noexcept = 0;
+    virtual bool run(grid_interface* g, randomizer& rng) const noexcept = 0;
 };
 }
 #endif // ALGO_INTERFACE_H

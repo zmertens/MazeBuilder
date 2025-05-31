@@ -70,29 +70,14 @@ grid::~grid() {
     for (auto&& [_, c] : m_cells) {
         c.reset();
     }
-    m_cells.clear();
-    m_observers.clear();
+    clear_cells();
+    {
+        std::lock_guard<std::mutex> lock(m_observers_mutex);
+        m_observers.clear();  // Ensure all std::function objects are properly released
+    }
     m_configured = false;
     m_dimensions = { 0, 0, 0 };
     m_calc_index = {};
-}
-
-void grid::notify_observers() noexcept {
-    std::lock_guard<std::mutex> lock(m_observers_mutex);
-    auto success{ false };
-    for (const auto& observer : m_observers) {
-        success = observer();
-    }
-    m_configured = success;
-}
-
-void grid::register_observer(std::function<bool(void)> const& observer) noexcept {
-    std::lock_guard<std::mutex> lock(m_observers_mutex);
-    m_observers.emplace_back(observer);
-}
-
-bool grid::is_observed() noexcept {
-    return m_configured;
 }
 
 void grid::start_configuration(std::vector<int> const& indices) noexcept {
@@ -139,10 +124,6 @@ void grid::start_configuration(std::vector<int> const& indices) noexcept {
     for (const auto& c : cells) {
         m_cells.emplace(c->get_index(), c);
     }
-
-    if (!m_observers.empty()) {
-        notify_observers();
-    }
 }
 
 /// @brief Configure by nearest row, column pairing
@@ -159,7 +140,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
 
             if (index >= cells.size()) {
 
-                break;
+                return;
             }
 
             auto&& c = cells.at(index);
@@ -201,6 +182,28 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
 
         }
     }
+}
+
+void grid::clear_cells() noexcept {
+    for (auto& [idx, c] : m_cells) {
+        if (c) {
+            // Unlink all links
+            auto links = c->get_links();
+            for (auto& [linked_cell, _] : links) {
+                if (linked_cell) {
+                    c->unlink(linked_cell);
+                }
+            }
+            // Clear neighbors
+            c->set_north(nullptr);
+            c->set_south(nullptr);
+            c->set_east(nullptr);
+            c->set_west(nullptr);
+            // Clean up links
+            c->cleanup_links();
+        }
+    }
+    m_cells.clear();
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
