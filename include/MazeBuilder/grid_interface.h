@@ -27,6 +27,8 @@ namespace mazes {
 class grid_interface {
 
 public:
+    virtual ~grid_interface() = default;
+
     /// @brief Get dimensions of a grid with no assumptions about the ordering of the dimensions
     virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept = 0;
     

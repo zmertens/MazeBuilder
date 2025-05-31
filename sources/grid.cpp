@@ -66,14 +66,13 @@ grid& grid::operator=(grid&& other) noexcept {
 
 // Destructor
 grid::~grid() {
-    // Clean up resources if necessary
-    for (auto&& [_, c] : m_cells) {
-        c.reset();
-    }
+    // First clean up cell references
     clear_cells();
+    
+    // Then clean up other resources
     {
         std::lock_guard<std::mutex> lock(m_observers_mutex);
-        m_observers.clear();  // Ensure all std::function objects are properly released
+        m_observers.clear();
     }
     m_configured = false;
     m_dimensions = { 0, 0, 0 };
@@ -139,16 +138,15 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
             int index = this->m_calc_index(row, col);
 
             if (index >= cells.size()) {
-
                 return;
             }
 
-            auto&& c = cells.at(index);
+            auto c = cells.at(index); // Changed from auto&& to auto to avoid extending lifetime
 
             if (row > 0) {
                 auto north_index = this->m_calc_index(row - 1, col);
                 if (north_index >= 0 && north_index < cells.size()) {
-                    auto&& north_cell = cells.at(north_index);
+                    auto north_cell = cells.at(north_index); // Changed from auto&& to auto
                     c->set_north(north_cell);
                 }
             }
@@ -157,7 +155,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
             if (row < ROWS - 1) {
                 auto south_index = this->m_calc_index(row + 1, col);
                 if (south_index >= 0 && south_index < cells.size()) {
-                    auto&& south_cell = cells.at(south_index);
+                    auto south_cell = cells.at(south_index); // Changed from auto&& to auto
                     c->set_south(south_cell);
                 }
             }
@@ -166,7 +164,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
             if (col > 0) {
                 auto west_index = this->m_calc_index(row, col - 1);
                 if (west_index >= 0 && west_index < cells.size()) {
-                    auto&& west_cell = cells.at(west_index);
+                    auto west_cell = cells.at(west_index); // Changed from auto&& to auto
                     c->set_west(west_cell);
                 }
             }
@@ -175,18 +173,20 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noex
             if (col < COLUMNS - 1) {
                 auto east_index = this->m_calc_index(row, col + 1);
                 if (east_index >= 0 && east_index < cells.size()) {
-                    auto&& east_cell = cells.at(east_index);
+                    auto east_cell = cells.at(east_index); // Changed from auto&& to auto
                     c->set_east(east_cell);
                 }
             }
-
         }
     }
 }
 
 void grid::clear_cells() noexcept {
-    for (auto& [idx, c] : m_cells) {
+    // First, break all connections between cells
+    for (auto& [_, c] : m_cells) {
+
         if (c) {
+            
             // Unlink all links
             auto links = c->get_links();
             for (auto& [linked_cell, _] : links) {
@@ -194,16 +194,21 @@ void grid::clear_cells() noexcept {
                     c->unlink(linked_cell);
                 }
             }
-            // Clear neighbors
+            
+            // Clear neighbors without creating new shared_ptr references
             c->set_north(nullptr);
             c->set_south(nullptr);
             c->set_east(nullptr);
             c->set_west(nullptr);
+            
             // Clean up links
             c->cleanup_links();
         }
     }
+    
+    // After breaking connections, clear the container
     m_cells.clear();
+    std::unordered_map<int, std::shared_ptr<cell>>().swap(m_cells);
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {

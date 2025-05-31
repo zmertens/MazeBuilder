@@ -59,6 +59,7 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     auto success = false;
 
     switch (shared_config->_algo()) {
+    // Algorithm implementations...
     case algo::BINARY_TREE: {
         static binary_tree bt;
         success = bt.run(grid_ptr, std::ref(*shared_rng));
@@ -74,19 +75,24 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
         success = d.run(grid_ptr, std::ref(*shared_rng));
         break;
     }
-                  // Fail on unknown maze type
     default:
         return nullptr;
     }
 
+    std::unique_ptr<maze> result = nullptr;
     if (success) {
         // Create the maze using the grid and config
         stringstream ss;
         ss << *(g.value().get());
-        return make_unique<maze>(cref(config), ss.str());
+        result = make_unique<maze>(cref(config), ss.str());
     }
 
-    return nullptr;
+    // Explicitly clean up the grid before returning
+    if (grid_ptr) {
+        grid_ptr->clear_cells();
+    }
+
+    return result;
 }
 
 std::optional<std::unique_ptr<grid_interface>> factory::create_grid(configurator const& config) noexcept {

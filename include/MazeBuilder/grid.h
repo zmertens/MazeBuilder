@@ -62,7 +62,7 @@ public:
     grid& operator=(grid&& other) noexcept;
 
     /// @brief Destructor
-    virtual ~grid();
+    ~grid() override;
 
     // Overrides
 
@@ -93,12 +93,13 @@ public:
     /// @return The number of cells in the grid
     int num_cells() const noexcept;
 
+
+    /// @brief Clear cells, resetting neighbors and links
+    void clear_cells() noexcept;
 private:
     /// @brief Configure cells by neighbors (N, S, E, W)
     /// @param cells 
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept;
-
-    void clear_cells() noexcept;
 
     /// @brief Calculate the flat index for a 2D grid
     std::function<int(unsigned int, unsigned int)> m_calc_index;
