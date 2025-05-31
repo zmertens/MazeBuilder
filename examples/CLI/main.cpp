@@ -30,34 +30,32 @@ EMSCRIPTEN_BINDINGS(cli_module) {
 
 #endif // EMSCRIPTEN_BINDINGS
 
-std::string maze_builder_version = "maze_builder\nversion\t" + mazes::VERSION;
-
-static constexpr auto MAZE_BUILDER_HELP = R"help(
-        Usages: app.exe [OPTION(S)]... [OUTPUT]
-        Generates mazes and exports to different formats
-        Options: case-sensitive, long options must use '=' combination
-        Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt
-        Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt
-          -a, --algo         dfs, sidewinder, binary_tree [default]
-          -c, --columns      columns
-          -d, --distances    show distances using base36 numbers
-          -e, --encode       encode maze to base64 string
-          -h, --help         display this help message
-          -j, --json         run with arguments in JSON format
-          -s, --seed         seed for the mt19937 generator
-          -r, --rows         rows
-          -o, --output       [txt|text] [json] [jpg|jpeg] [png] 
-                              [obj|object] [stdout]
-          -v, --version      display program version
-    )help";
+static std::string MAZE_BUILDER_VERSION = "maze_builder\t" + mazes::VERSION;
 
 int main(int argc, char* argv[]) {
 
     using namespace std;
 
 #if defined(MAZE_DEBUG)
-    maze_builder_version += " - DEBUG";
+    MAZE_BUILDER_VERSION += " - DEBUG";
 #endif
+
+    static const std::string MAZE_BUILDER_HELP = MAZE_BUILDER_VERSION + "\n" + \
+        "Usages: app.exe [OPTION(S)]... [OUTPUT]\n" \
+        "Generates mazes and exports to different formats\n" \
+        "Options: case-sensitive, long options must use '=' combination\n" \
+        "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" \
+        "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" \
+        "\t-a, --algo         [dfs] [sidewinder], [binary_tree]\n" \
+        "\t-c, --columns      columns\n" \
+        "\t-d, --distances    show distances using base36 numbers\n" \
+        "\t-e, --encode       encode maze to base64 string\n" \
+        "\t-h, --help         display this help message\n" \
+        "\t-j, --json         run with arguments in JSON format\n" \
+        "\t-s, --seed         seed for the mt19937 generator\n" \
+        "\t-r, --rows         rows\n" \
+        "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" \
+        "\t-v, --version      display program version\n";
 
 #if !defined(__EMSCRIPTEN__)
 
@@ -76,7 +74,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (maze_args.get("-v").has_value() || maze_args.get("--version").has_value()) {
-        cout << maze_builder_version << endl;
+        cout << MAZE_BUILDER_VERSION << endl;
         return EXIT_SUCCESS;
     }
 
