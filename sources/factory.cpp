@@ -80,8 +80,8 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     }
 
     // If the grid is a distance grid, calculate distances
-    if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(grid_ptr); success) {
-        distance_grid_ptr->calculate_distances(config.rows() * config.columns(), 0);
+    if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(grid_ptr); success && config.distances()) {
+        distance_grid_ptr->calculate_distances(grid_ptr->num_cells() - 1, 0);
     }
 
     std::unique_ptr<maze> result = nullptr;

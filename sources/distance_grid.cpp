@@ -72,8 +72,8 @@ std::string distance_grid::to_base36(int value) const {
 void distance_grid::calculate_distances(int start_index, int end_index) noexcept {
 
     try {
-        auto start_cell = search(start_index);
-        auto end_cell = search(end_index);
+        auto start_cell = grid::search(start_index);
+        auto end_cell = grid::search(end_index);
 
         if (!start_cell || !end_cell) {
 
