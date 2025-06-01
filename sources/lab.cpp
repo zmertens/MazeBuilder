@@ -1,11 +1,13 @@
 #include <MazeBuilder/lab.h>
 
-#include <sstream>
-#include <random>
 
-#include <MazeBuilder/stringz.h>
+#include <MazeBuilder/cell.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/maze.h>
+#include <MazeBuilder/stringz.h>
+
+#include <random>
+#include <sstream>
 
 using namespace mazes;
 
@@ -65,3 +67,27 @@ int lab::get_random_block_id() const noexcept {
     return get_int(0, 23);
 }
 
+
+void lab::link(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi) noexcept {
+    if (!c1 || !c2) return;
+
+    // Add c2 to c1's links
+    c1->add_link(c2);
+
+    // If bidirectional, add c1 to c2's links
+    if (bidi) {
+        c2->add_link(c1);
+    }
+}
+
+void lab::unlink(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi) noexcept {
+    if (!c1 || !c2) return;
+
+    // Remove c2 from c1's links
+    c1->remove_link(c2);
+
+    // If bidirectional, remove c1 from c2's links
+    if (bidi) {
+        c2->remove_link(c1);
+    }
+}

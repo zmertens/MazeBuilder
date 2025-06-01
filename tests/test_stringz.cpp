@@ -14,7 +14,7 @@ TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
 
     static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 10;
     static constexpr auto SEED = 12345;
-    static constexpr auto ALGO = algo::BINARY_TREE;
+    static constexpr auto ALGO = algo::DFS;
 
     BENCHMARK("Benchmark stringz::stringify") {
         auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));

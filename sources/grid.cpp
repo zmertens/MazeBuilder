@@ -9,6 +9,7 @@
 #include <functional>
 
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/lab.h>
 
 #if defined(MAZE_DEBUG)
 #include <iostream>
@@ -68,12 +69,7 @@ grid& grid::operator=(grid&& other) noexcept {
 grid::~grid() {
     // First clean up cell references
     clear_cells();
-    
-    // Then clean up other resources
-    {
-        std::lock_guard<std::mutex> lock(m_observers_mutex);
-        m_observers.clear();
-    }
+
     m_configured = false;
     m_dimensions = { 0, 0, 0 };
     m_calc_index = {};
@@ -125,89 +121,153 @@ void grid::start_configuration(std::vector<int> const& indices) noexcept {
     }
 }
 
-/// @brief Configure by nearest row, column pairing
-/// @details A cell at (0, 0) will have a southern neighbor at (0, 1)
-/// @details Counting is down top-left to right and then down (like an SQL table)
-/// @param cells
-void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+std::shared_ptr<cell> grid::get_neighbor(const std::shared_ptr<cell>& c, Direction dir) const noexcept {
+    if (!c) return nullptr;
+
+    int cell_index = c->get_index();
+
+    std::lock_guard<std::mutex> lock(m_topology_mutex);
+
+    auto it_cell = m_topology.find(cell_index);
+    if (it_cell == m_topology.end()) {
+        return nullptr;
+    }
+
+    auto& dir_map = it_cell->second;
+    auto it_dir = dir_map.find(dir);
+    if (it_dir == dir_map.end()) {
+        return nullptr;
+    }
+
+    int neighbor_index = it_dir->second;
+    return search(neighbor_index);
+}
+
+void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, const std::shared_ptr<cell>& neighbor) noexcept {
+    if (!c || !neighbor) return;
+
+    int cell_index = c->get_index();
+    int neighbor_index = neighbor->get_index();
+
+    std::lock_guard<std::mutex> lock(m_topology_mutex);
+
+    // Set the primary direction
+    m_topology[cell_index][dir] = neighbor_index;
+
+    // Set the reverse direction WITHOUT calling set_neighbor recursively
+    Direction reverse_dir;
+    switch (dir) {
+    case Direction::North:
+        reverse_dir = Direction::South;
+        break;
+    case Direction::South:
+        reverse_dir = Direction::North;
+        break;
+    case Direction::East:
+        reverse_dir = Direction::West;
+        break;
+    case Direction::West:
+        reverse_dir = Direction::East;
+        break;
+    default:
+        return; // Unknown direction
+    }
+
+    // Directly set the reverse mapping in the topology map
+    m_topology[neighbor_index][reverse_dir] = cell_index;
+}
+
+std::vector<std::shared_ptr<cell>> grid::get_neighbors(const std::shared_ptr<cell>& c) const noexcept {
+    std::vector<std::shared_ptr<cell>> neighbors;
+    if (!c) return neighbors;
+
+    neighbors.reserve(static_cast<size_t>(Direction::Count));
+
+    for (size_t i = 0; i < static_cast<size_t>(Direction::Count); ++i) {
+        Direction dir = static_cast<Direction>(i);
+        if (auto neighbor = get_neighbor(c, dir)) {
+            neighbors.push_back(neighbor);
+        }
+    }
+
+    return neighbors;
+}
+
+void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
     using namespace std;
     auto [ROWS, COLUMNS, _] = this->m_dimensions;
+
+    // Clear existing topology
+    {
+        std::lock_guard<std::mutex> lock(m_topology_mutex);
+        m_topology.clear();
+    }
 
     for (unsigned int row = 0; row < ROWS; ++row) {
         for (unsigned int col = 0; col < COLUMNS; ++col) {
             int index = this->m_calc_index(row, col);
 
-            if (index >= cells.size()) {
+            if (index >= static_cast<int>(cells.size())) {
                 return;
             }
 
-            auto c = cells.at(index); // Changed from auto&& to auto to avoid extending lifetime
+            auto c = cells.at(index);
 
-            if (row > 0) {
-                auto north_index = this->m_calc_index(row - 1, col);
-                if (north_index >= 0 && north_index < cells.size()) {
-                    auto north_cell = cells.at(north_index); // Changed from auto&& to auto
-                    c->set_north(north_cell);
+            // We only need to set East and South neighbors
+            // North and West will be set automatically through the bidirectional mechanism
+
+            // Set east neighbor
+            if (col < COLUMNS - 1) {
+                auto east_index = this->m_calc_index(row, col + 1);
+                if (east_index >= 0 && east_index < static_cast<int>(cells.size())) {
+                    auto east_cell = cells.at(east_index);
+                    set_neighbor(c, Direction::East, east_cell);
                 }
             }
 
             // Set south neighbor
             if (row < ROWS - 1) {
                 auto south_index = this->m_calc_index(row + 1, col);
-                if (south_index >= 0 && south_index < cells.size()) {
-                    auto south_cell = cells.at(south_index); // Changed from auto&& to auto
-                    c->set_south(south_cell);
-                }
-            }
-
-            // Set west neighbor
-            if (col > 0) {
-                auto west_index = this->m_calc_index(row, col - 1);
-                if (west_index >= 0 && west_index < cells.size()) {
-                    auto west_cell = cells.at(west_index); // Changed from auto&& to auto
-                    c->set_west(west_cell);
-                }
-            }
-
-            // Set east neighbor
-            if (col < COLUMNS - 1) {
-                auto east_index = this->m_calc_index(row, col + 1);
-                if (east_index >= 0 && east_index < cells.size()) {
-                    auto east_cell = cells.at(east_index); // Changed from auto&& to auto
-                    c->set_east(east_cell);
+                if (south_index >= 0 && south_index < static_cast<int>(cells.size())) {
+                    auto south_cell = cells.at(south_index);
+                    set_neighbor(c, Direction::South, south_cell);
                 }
             }
         }
     }
+
+    // Mark as configured
+    m_configured = true;
 }
 
 void grid::clear_cells() noexcept {
-    // First, break all connections between cells
-    for (auto& [_, c] : m_cells) {
+    // First, clear topology information
+    {
+        std::lock_guard<std::mutex> lock(m_topology_mutex);
+        m_topology.clear();
+    }
 
+    // Break all links between cells
+    for (auto& [_, c] : m_cells) {
         if (c) {
-            
-            // Unlink all links
+            // Unlink all links - this should remove all connections between cells
             auto links = c->get_links();
             for (auto& [linked_cell, _] : links) {
                 if (linked_cell) {
-                    c->unlink(linked_cell);
+                    // Use remove_link which doesn't try to modify the other cell's links
+                    c->remove_link(linked_cell);
                 }
             }
-            
-            // Clear neighbors without creating new shared_ptr references
-            c->set_north(nullptr);
-            c->set_south(nullptr);
-            c->set_east(nullptr);
-            c->set_west(nullptr);
-            
-            // Clean up links
+
+            // Extra cleanup
             c->cleanup_links();
         }
     }
-    
+
     // After breaking connections, clear the container
     m_cells.clear();
+
+    // Complete reset - swap with an empty map to ensure memory is released
     std::unordered_map<int, std::shared_ptr<cell>>().swap(m_cells);
 }
 

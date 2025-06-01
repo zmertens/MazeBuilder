@@ -11,6 +11,7 @@
 /// @brief Namespace for the maze builder
 namespace mazes {
 
+class cell;
 class maze;
 
 /// @file lab.h
@@ -48,6 +49,18 @@ public:
     void set_levels(int levels) noexcept;
 
     int get_random_block_id() const noexcept;
+
+    /// @brief Links two cell objects, optionally in both directions.
+    /// @param c1 A shared pointer to the first cell object.
+    /// @param c2 A shared pointer to the second cell object.
+    /// @param bidi A boolean flag indicating if the link should be bidirectional. Defaults to true.
+    static void link(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi = true) noexcept;
+
+    /// @brief Unlinks two cell objects, optionally in both directions.
+    /// @param c1 A shared pointer to the first cell object.
+    /// @param c2 A shared pointer to the second cell object.
+    /// @param bidi A boolean flag indicating if the unlink should be bidirectional. Defaults to true.
+    static void unlink(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi = true) noexcept;
 private:
 
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;

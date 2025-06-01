@@ -8,13 +8,8 @@ using namespace std;
 /// @brief 
 /// @param index 0
 cell::cell(std::int32_t index)
-: m_index{ index }
-, m_links{}
-, m_north{ nullptr }
-, m_south{ nullptr }
-, m_east{ nullptr }
-, m_west{ nullptr }  {
-
+    : m_index{ index }
+    , m_links{} {
 }
 
 // Destructor
@@ -25,11 +20,8 @@ cell::~cell() {
 
 // Copy Constructor
 cell::cell(const cell& other)
-    : m_index(other.m_index),
-      m_north(other.m_north),
-      m_south(other.m_south),
-      m_east(other.m_east),
-      m_west(other.m_west) {
+    : m_index(other.m_index) {
+    // Copy links
     std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
     m_links = other.m_links;
 }
@@ -40,27 +32,22 @@ cell& cell::operator=(const cell& other) {
         return *this;
     }
 
-    std::unique_lock<std::shared_mutex> lock_this(m_links_mutex);
-    std::unique_lock<std::shared_mutex> lock_other(other.m_links_mutex);
-
+    // Copy index
     m_index = other.m_index;
-    m_north = other.m_north;
-    m_south = other.m_south;
-    m_east = other.m_east;
-    m_west = other.m_west;
-    m_links = other.m_links;
+
+    // Copy links
+    {
+        std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
+        m_links = other.m_links;
+    }
 
     return *this;
 }
 
 // Move Constructor
 cell::cell(cell&& other) noexcept
-    : m_index(other.m_index),
-      m_north(std::move(other.m_north)),
-      m_south(std::move(other.m_south)),
-      m_east(std::move(other.m_east)),
-      m_west(std::move(other.m_west)) {
-
+    : m_index(other.m_index) {
+    // Move links
     std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
     m_links = std::move(other.m_links);
 }
@@ -71,15 +58,14 @@ cell& cell::operator=(cell&& other) noexcept {
         return *this;
     }
 
-    std::unique_lock<std::shared_mutex> lock_this(m_links_mutex);
-    std::unique_lock<std::shared_mutex> lock_other(other.m_links_mutex);
-
+    // Move index
     m_index = other.m_index;
-    m_north = std::move(other.m_north);
-    m_south = std::move(other.m_south);
-    m_east = std::move(other.m_east);
-    m_west = std::move(other.m_west);
-    m_links = std::move(other.m_links);
+
+    // Move links
+    {
+        std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
+        m_links = std::move(other.m_links);
+    }
 
     return *this;
 }
@@ -97,11 +83,36 @@ bool cell::has_key(const shared_ptr<cell>& c) {
 }
 
 void cell::cleanup_links() {
+    // Create a temporary map to hold non-expired links
+    std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> valid_links;
+
+    {
+        std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+
+        // Identify and collect non-expired links
+        for (const auto& pair : m_links) {
+            if (!pair.first.expired()) {
+                valid_links.insert(pair);
+            }
+        }
+
+        // If we have fewer valid links than total links, replace the map
+        if (valid_links.size() < m_links.size()) {
+            m_links = std::move(valid_links);
+        }
+    }
+}
+
+void cell::add_link(const std::shared_ptr<cell>& other) {
+    if (!other) return;
+
     std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+    m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
+
+    // Instead of calling cleanup_links which would require another lock,
+    // we'll remove any expired links while we already have the lock
     for (auto it = m_links.begin(); it != m_links.end(); ) {
         if (it->first.expired()) {
-
-            // Remove expired weak_ptr
             it = m_links.erase(it);
         } else {
             ++it;
@@ -109,86 +120,39 @@ void cell::cleanup_links() {
     }
 }
 
-void cell::link(const std::shared_ptr<cell>& other, const std::shared_ptr<cell>& self, bool bidi) noexcept {
-    // if (!other || !self) return;
+void cell::remove_link(const std::shared_ptr<cell>& other) {
+    if (!other) return;
 
-    // cell* first = self.get() < other.get() ? self.get() : other.get();
-    // cell* second = self.get() < other.get() ? other.get() : self.get();
-    // std::scoped_lock lock(first->m_links_mutex, second->m_links_mutex);
+    std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+    m_links.erase(std::weak_ptr<cell>(other));
 
-    // m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
-
-    // if (bidi) {
-    //    other->m_links.insert_or_assign(std::weak_ptr<cell>(self), true);
-    // }
-
-    // cleanup_links();
-    // other->cleanup_links();
-}
-
-void cell::unlink(const std::shared_ptr<cell>& other, bool bidi) noexcept {
-    // if (!other) return;
-
-    // // Lock both mutexes in address order to avoid deadlock
-    // cell* first = this < other.get() ? this : other.get();
-    // cell* second = this < other.get() ? other.get() : this;
-    // std::scoped_lock lock(first->m_links_mutex, second->m_links_mutex);
-
-    // m_links.erase(std::weak_ptr<cell>(other));
-
-    // if (bidi) {
-    //    //other->m_links.erase(std::weak_ptr<cell>(shared_from_this()));
-    // }
-
-    // cleanup_links();
-    // other->cleanup_links();
+    // Clean up any expired links while we have the lock
+    for (auto it = m_links.begin(); it != m_links.end(); ) {
+        if (it->first.expired()) {
+            it = m_links.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const {
     std::vector<std::pair<std::shared_ptr<cell>, bool>> shared_links;
-    {
-        std::lock_guard<std::shared_mutex> lock(m_links_mutex);
-        for (const auto& [weak_cell, linked] : m_links) {
-            if (auto shared_cell = weak_cell.lock()) {
-                shared_links.emplace_back(shared_cell, linked);
-            }
+
+    std::shared_lock<std::shared_mutex> lock(m_links_mutex);
+    shared_links.reserve(m_links.size());
+
+    for (const auto& [weak_cell, linked] : m_links) {
+        if (auto shared_cell = weak_cell.lock()) {
+            shared_links.emplace_back(shared_cell, linked);
         }
     }
+
     return shared_links;
 }
 
 bool cell::is_linked(const shared_ptr<cell>& c) {
     return has_key(c);
-}
-
-bool cell::has_northern_neighbor() const noexcept {
-    return nullptr != this->m_north;
-}
-
-bool cell::has_southern_neighbor() const noexcept {
-    return nullptr != this->m_south;
-}
-
-bool cell::has_eastern_neighbor() const noexcept {
-    return nullptr != this->m_east;
-}
-
-bool cell::has_western_neighbor() const noexcept {
-    return nullptr != this->m_west;
-}
-
-vector<shared_ptr<cell>> cell::get_neighbors() const noexcept {
-    vector<shared_ptr<cell>> neighbors;
-    if (this->m_north)
-        neighbors.emplace_back(this->m_north);
-    if (this->m_south)
-        neighbors.emplace_back(this->m_south);
-    if (this->m_west)
-        neighbors.emplace_back(this->m_west);
-    if (this->m_east)
-        neighbors.emplace_back(this->m_east);
-
-    return neighbors;
 }
 
 std::int32_t cell::get_index() const noexcept {
@@ -197,36 +161,4 @@ std::int32_t cell::get_index() const noexcept {
 
 void cell::set_index(std::int32_t next_index) noexcept {
     this->m_index = next_index;
-}
-
-shared_ptr<cell> cell::get_north() const {
-    return this->m_north;
-}
-
-shared_ptr<cell> cell::get_south() const {
-    return this->m_south;
-}
-
-shared_ptr<cell> cell::get_east() const {
-    return this->m_east;
-}
-
-shared_ptr<cell> cell::get_west() const {
-    return this->m_west;
-}
-
-void cell::set_north(shared_ptr<cell> const& other) {
-    this->m_north = other;
-}
-
-void cell::set_south(shared_ptr<cell> const& other) {
-    this->m_south = other;
-}
-
-void cell::set_east(shared_ptr<cell> const& other) {
-    this->m_east = other;
-}
-
-void cell::set_west(shared_ptr<cell> const& other) {
-    this->m_west = other;
 }

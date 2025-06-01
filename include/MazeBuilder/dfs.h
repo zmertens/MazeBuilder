@@ -10,6 +10,7 @@
 
 namespace mazes {
 
+class grid;
 class grid_interface;
 class randomizer;
 class cell;
@@ -28,8 +29,10 @@ public:
     virtual bool run(grid_interface* g, randomizer& rng) const noexcept override;
 
 private:
-    std::vector<std::shared_ptr<cell>> get_unvisited_neighbors(std::shared_ptr<cell> const& c) const noexcept;
+
+    std::vector<std::shared_ptr<cell>> get_unvisited_neighbors(std::shared_ptr<cell> const& c, const grid* g) const noexcept;
 };
+
 }
 
 #endif // DFS_H
