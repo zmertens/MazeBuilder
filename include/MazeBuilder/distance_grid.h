@@ -17,33 +17,40 @@ class cell;
 /// @class distance_grid
 /// @brief A grid that can calculate distances between cells
 class distance_grid : public grid {
-public:
+
     friend class binary_tree;
     friend class dfs;
     friend class sidewinder;
+
+public:
 
 	explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
     /// @brief 
     /// @param indices 
     /// @return 
-    void start_configuration(const std::vector<int>& indices) noexcept override;
+    void configure(const std::vector<int>& indices) noexcept override;
 
     /// @brief 
     /// @param c 
     /// @return 
-    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::string contents_of(std::shared_ptr<cell> const& c) const noexcept override;
 
     /// @brief 
     /// @param c 
     /// @return 
-    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
+
+    /// @brief Calculates distances for a range of indices.
+    /// @param start_index The starting index of the range (inclusive).
+    /// @param end_index The ending index of the range (exclusive).
+    void calculate_distances(int start_index, int end_index) noexcept;
 
     std::shared_ptr<distances> get_distances() const noexcept;
 private:
 	std::shared_ptr<distances> m_distances;
 
-	std::optional<std::string> to_base36(int value) const;
+	std::string to_base36(int value) const;
 };
 }
 

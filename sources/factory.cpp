@@ -54,7 +54,7 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     }
 
     auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns());
-    grid_ptr->start_configuration(cref(random_ints));
+    grid_ptr->configure(cref(random_ints));
 
     auto success = false;
 
@@ -77,6 +77,11 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     }
     default:
         return nullptr;
+    }
+
+    // If the grid is a distance grid, calculate distances
+    if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(grid_ptr); success) {
+        distance_grid_ptr->calculate_distances(config.rows() * config.columns(), 0);
     }
 
     std::unique_ptr<maze> result = nullptr;

@@ -1,6 +1,7 @@
 #ifndef ENUMS
 #define ENUMS
 
+#include <cstdint>
 #include <string>
 #include <stdexcept>
 
@@ -111,6 +112,15 @@ namespace mazes {
         } else {
             throw std::invalid_argument("Invalid algo: " + a);
         }
+    };
+
+    /// @brief Directional neighbors for grid topology
+    enum class Direction : std::uint8_t {
+        North = 0,
+        South = 1,
+        East = 2,
+        West = 3,
+        Count
     };
 } // namespace
 

@@ -1,10 +1,9 @@
 #include <MazeBuilder/colored_grid.h>
  
-#include <optional>
 #include <string>
 
-#include <MazeBuilder/distances.h>
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/distances.h>
 
 #if defined(MAZE_DEBUG)
 #include <iostream>
@@ -22,10 +21,10 @@ colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int he
 
 }
 
-void colored_grid::start_configuration(const std::vector<int>& indices) noexcept {
+void colored_grid::configure(const std::vector<int>& indices) noexcept {
     using namespace std;
 
-    grid::start_configuration(cref(indices));
+    grid::configure(cref(indices));
 
     try {
 
@@ -58,22 +57,22 @@ void colored_grid::start_configuration(const std::vector<int>& indices) noexcept
     }
 }
 
-std::optional<std::string> colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+std::string colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
     if (m_distances) {
 
         if (m_distances->contains(c->get_index())) {
 
-            return std::make_optional(std::to_string(m_distances->operator[](c->get_index())));
+            return std::to_string(m_distances->operator[](c->get_index()));
         }
     }
 
     return grid::contents_of(c);
 }
 
-optional<uint32_t> colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
     if (!c) {
 
-        return nullopt;
+        return grid::background_color_for(cref(c));
     }
 
 	const auto& d = this->m_distances->path_to(c->get_index(), *this);

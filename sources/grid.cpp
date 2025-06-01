@@ -1,12 +1,12 @@
 #include <MazeBuilder/grid.h>
 
-#include <vector>
-#include <string>
-#include <stdexcept>
 #include <algorithm>
-#include <random>
-#include <tuple>
 #include <functional>
+#include <random>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <vector>
 
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/lab.h>
@@ -29,7 +29,7 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 /// @param dimensions 
 grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
 : m_dimensions(dimens)
-, m_calc_index{ [this](auto row, auto col)->int
+, m_calculate_cell_index{ [this](auto row, auto col)->int
     { return row * std::get<1>(this->m_dimensions) + col; } }
 , m_configured{ false } {
 
@@ -72,10 +72,10 @@ grid::~grid() {
 
     m_configured = false;
     m_dimensions = { 0, 0, 0 };
-    m_calc_index = {};
+    m_calculate_cell_index = {};
 }
 
-void grid::start_configuration(std::vector<int> const& indices) noexcept {
+void grid::configure(std::vector<int> const& indices) noexcept {
     using namespace std;
 
     if (m_configured) {
@@ -119,6 +119,9 @@ void grid::start_configuration(std::vector<int> const& indices) noexcept {
     for (const auto& c : cells) {
         m_cells.emplace(c->get_index(), c);
     }
+
+    // Mark as configured
+    m_configured = true;
 }
 
 std::shared_ptr<cell> grid::get_neighbor(const std::shared_ptr<cell>& c, Direction dir) const noexcept {
@@ -205,7 +208,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
 
     for (unsigned int row = 0; row < ROWS; ++row) {
         for (unsigned int col = 0; col < COLUMNS; ++col) {
-            int index = this->m_calc_index(row, col);
+            int index = this->m_calculate_cell_index(row, col);
 
             if (index >= static_cast<int>(cells.size())) {
                 return;
@@ -218,7 +221,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
 
             // Set east neighbor
             if (col < COLUMNS - 1) {
-                auto east_index = this->m_calc_index(row, col + 1);
+                auto east_index = this->m_calculate_cell_index(row, col + 1);
                 if (east_index >= 0 && east_index < static_cast<int>(cells.size())) {
                     auto east_cell = cells.at(east_index);
                     set_neighbor(c, Direction::East, east_cell);
@@ -227,7 +230,7 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
 
             // Set south neighbor
             if (row < ROWS - 1) {
-                auto south_index = this->m_calc_index(row + 1, col);
+                auto south_index = this->m_calculate_cell_index(row + 1, col);
                 if (south_index >= 0 && south_index < static_cast<int>(cells.size())) {
                     auto south_cell = cells.at(south_index);
                     set_neighbor(c, Direction::South, south_cell);
@@ -235,9 +238,6 @@ void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
             }
         }
     }
-
-    // Mark as configured
-    m_configured = true;
 }
 
 void grid::clear_cells() noexcept {
@@ -271,6 +271,22 @@ void grid::clear_cells() noexcept {
     std::unordered_map<int, std::shared_ptr<cell>>().swap(m_cells);
 }
 
+std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::North);
+}
+
+std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::South);
+}
+
+std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::East);
+}
+
+std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::West);
+}
+
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
     return this->m_dimensions;
 }
@@ -299,11 +315,11 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 }
 
 // Get the contents of a cell for this type of grid
-std::optional<std::string> grid::contents_of(const std::shared_ptr<cell>& c) const noexcept {
+std::string grid::contents_of(std::shared_ptr<cell> const& c) const noexcept {
     return { " " };
 }
 
 // Get the background color for this type of grid
-std::optional<std::uint32_t> grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept {
+std::uint32_t grid::background_color_for(std::shared_ptr<cell> const& c) const noexcept {
     return { 0xFFFFFFFF };
 }

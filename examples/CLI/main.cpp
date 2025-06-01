@@ -229,7 +229,7 @@ int main(int argc, char* argv[]) {
         }
         default:
             success = false;
-        }
+        } // switch
 
         if (success) {
 #if defined(MAZE_DEBUG)

@@ -1,15 +1,14 @@
 #ifndef GRID_INTERFACE_H
 #define GRID_INTERFACE_H
 
-#include <vector>
-#include <string>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <ostream>
 #include <sstream>
-#include <memory>
-#include <cstdint>
-#include <optional>
+#include <string>
 #include <tuple>
-#include <functional>
+#include <vector>
 
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/cell.h>
@@ -32,22 +31,26 @@ public:
     /// @brief Get dimensions of a grid with no assumptions about the ordering of the dimensions
     virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept = 0;
 
-    virtual std::shared_ptr<cell> get_east(std::shared_ptr<cell> const& c) const noexcept = 0;
+    virtual std::shared_ptr<cell> get_north(const std::shared_ptr<cell>& c) const noexcept = 0;
 
-    virtual std::shared_ptr<cell> get_south(std::shared_ptr<cell> const& c) const noexcept = 0;
+    virtual std::shared_ptr<cell> get_south(const std::shared_ptr<cell>& c) const noexcept = 0;
 
-    /// @brief Transformation and display functions
+    virtual std::shared_ptr<cell> get_east(const std::shared_ptr<cell>& c) const noexcept = 0;
+
+    virtual std::shared_ptr<cell> get_west(const std::shared_ptr<cell>& c) const noexcept = 0;
+
+    /// @brief Transformation and display cells
     virtual void to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept = 0;	
 
-    /// @brief Get detailed information of a cell in the grid
+    /// @brief Get detailed information of a cell in the grid in the form of a string
     /// @param c 
     /// @return 
-    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept = 0;
+    virtual std::string contents_of(std::shared_ptr<cell> const& c) const noexcept = 0;
 
     /// @brief Returns the background color for the specified cell, if available.
     /// @param c A shared pointer to the cell for which to determine the background color.
-    /// @return An optional 32-bit unsigned integer representing the background color of the cell, or std::nullopt if no color is specified.
-    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept = 0;
+    /// @return An optional 32-bit unsigned integer representing the background color of the cell, or 0x00 otherwise
+    virtual std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept = 0;
 
 protected:
 
@@ -90,7 +93,7 @@ protected:
                 // 5 spaces in body for single-digit number to hold base36 values
                 static const std::string vertical_barrier_str{ BARRIER1 };
 
-                auto val = g.contents_of(std::cref(*cell_iter)).value_or("*");
+                auto val = g.contents_of(std::cref(*cell_iter));
                 std::string body = "";
                 switch (val.size()) {
                 case 1: body = "  " + val + "  "; break;

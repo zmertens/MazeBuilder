@@ -1,6 +1,7 @@
 #ifndef GRID_H
 #define GRID_H
 
+#include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 
 #include <atomic>
@@ -16,19 +17,11 @@
 
 namespace mazes {
 
-// Define direction enum for grid topology
-enum class Direction : std::uint8_t {
-    North = 0,
-    South = 1,
-    East = 2,
-    West = 3,
-    Count // Used to determine array size
-};
-
 /// @file grid.h
 /// @class grid
-/// @brief General purpose grid class for maze generation
+/// @brief General purpose grid class for 2D maze generation
 class grid : public grid_interface {
+
     /// @brief Friend classes
     friend class binary_tree;
     friend class dfs;
@@ -67,35 +60,32 @@ public:
     /// @brief Destructor
     ~grid() override;
 
-    /// @brief 
+    /// @brief Configure the grid's cells' neighbors
     /// @param indices 
     /// @return 
-    virtual void start_configuration(const std::vector<int>& indices) noexcept;
+    virtual void configure(const std::vector<int>& indices) noexcept;
 
-    // Get and set neighbors for a cell
-    std::shared_ptr<cell> get_neighbor(const std::shared_ptr<cell>& c, Direction dir) const noexcept;
+    /// @brief Get neighbor by the cell's respective location
+    /// @param c 
+    /// @param dir 
+    /// @return 
+    std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c, Direction dir) const noexcept;
 
-    void set_neighbor(const std::shared_ptr<cell>& c, Direction dir, const std::shared_ptr<cell>& neighbor) noexcept;
+    /// @brief Get all the neighbors by the cell
+    /// @param c 
+    /// @return 
+    std::vector<std::shared_ptr<cell>> get_neighbors(std::shared_ptr<cell> const& c) const noexcept;
+
+    void set_neighbor(const std::shared_ptr<cell>& c, Direction dir, std::shared_ptr<cell> const& neighbor) noexcept;
 
     // Convenience methods for accessing neighbors
-    std::shared_ptr<cell> get_north(const std::shared_ptr<cell>& c) const noexcept {
-        return get_neighbor(c, Direction::North);
-    }
+    std::shared_ptr<cell> get_north(const std::shared_ptr<cell>& c) const noexcept override;
 
-    std::shared_ptr<cell> get_south(const std::shared_ptr<cell>& c) const noexcept override {
-        return get_neighbor(c, Direction::South);
-    }
+    std::shared_ptr<cell> get_south(const std::shared_ptr<cell>& c) const noexcept override;
 
-    std::shared_ptr<cell> get_east(const std::shared_ptr<cell>& c) const noexcept override {
-        return get_neighbor(c, Direction::East);
-    }
+    std::shared_ptr<cell> get_east(const std::shared_ptr<cell>& c) const noexcept override;
 
-    std::shared_ptr<cell> get_west(const std::shared_ptr<cell>& c) const noexcept {
-        return get_neighbor(c, Direction::West);
-    }
-
-    // Get all neighbors for a cell
-    std::vector<std::shared_ptr<cell>> get_neighbors(const std::shared_ptr<cell>& c) const noexcept;
+    std::shared_ptr<cell> get_west(const std::shared_ptr<cell>& c) const noexcept override;
 
     /// @brief Provides dimensions of grid in no assumed ordering
     /// @return 
@@ -108,12 +98,12 @@ public:
     /// @brief Get detailed information of a cell in the grid
     /// @param c 
     /// @return 
-    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::string contents_of(std::shared_ptr<cell>const & c) const noexcept override;
 
     /// @brief Get the background color for a cell in the grid
     /// @param c 
     /// @return 
-    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+    virtual std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
 
     /// @brief
     /// @param index
@@ -124,8 +114,7 @@ public:
     /// @return The number of cells in the grid
     int num_cells() const noexcept;
 
-
-    /// @brief Clear cells, resetting neighbors and links
+    /// @brief Cleanup cells by cleaning up links within cells
     void clear_cells() noexcept;
 private:
     /// @brief Configure cells by neighbors (N, S, E, W)
@@ -133,7 +122,7 @@ private:
     void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept;
 
     /// @brief Calculate the flat index for a 2D grid
-    std::function<int(unsigned int, unsigned int)> m_calc_index;
+    std::function<int(unsigned int, unsigned int)> m_calculate_cell_index;
 
     // Store cells by index
     std::unordered_map<int, std::shared_ptr<cell>> m_cells;
@@ -143,7 +132,6 @@ private:
     // Key: cell index, Value: map of direction to neighbor cell index
     mutable std::mutex m_topology_mutex;
     std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
-
 
     std::atomic<bool> m_configured;
 }; // class
