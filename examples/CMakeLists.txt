@@ -64,17 +64,17 @@ if(MAZE_BUILDER_EXAMPLES)
         include(FetchGitRepo)
 
         # Add Box2D dependency
-        find_package(box2d QUIET)
-        if(NOT box2d_FOUND)
-            message(INFO ": Getting Box2D via FetchContent")
-            FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.0)
-        endif()
+        #find_package(box2d QUIET)
+        #if(NOT box2d_FOUND)
+        #    message(INFO ": Getting Box2D via FetchContent")
+        #    FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.0)
+        #endif()
 
         # Add Box2D include directory if not already included by find_package
-        if(TARGET box2d)
-            set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)
-            get_target_property(BOX2D_INCLUDE_DIRS box2d INTERFACE_INCLUDE_DIRECTORIES)
-        endif()
+        #if(TARGET box2d)
+        #    set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)
+        #    get_target_property(BOX2D_INCLUDE_DIRS box2d INTERFACE_INCLUDE_DIRECTORIES)
+        #endif()
 
         # Get SDL
         find_package(SDL3 QUIET)
