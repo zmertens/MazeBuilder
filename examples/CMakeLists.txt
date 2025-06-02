@@ -100,5 +100,6 @@ if(MAZE_BUILDER_EXAMPLES)
     add_subdirectory(Voxels)
     add_subdirectory(CLI)
     add_subdirectory(Http)
-	add_subdirectory(Physics)
+    # @TODO Recommit Physics examples when box2d is next released
+	#add_subdirectory(Physics)
 endif()
