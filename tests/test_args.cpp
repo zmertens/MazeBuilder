@@ -227,3 +227,110 @@ TEST_CASE("Args can handle a JSON input file", "[json input file]") {
         REQUIRE(args_handler.get("--json").has_value());
     }
 }
+
+TEST_CASE("Args can handle a JSON arr of objects", "[json arr input]") {
+    args args_handler{};
+    SECTION("JSON arr input string") {
+        string json_array = R"json(-j `[
+            {
+                "rows": 10,
+                "columns": 20,
+                "levels": 30,
+                "seed": 9000000,
+                "algo": "dfs",
+                "output": "maze_dfs.txt",
+                "distances": true
+            },
+            {
+                "rows": 20,
+                "columns": 20,
+                "levels": 3,
+                "seed": 9,
+                "algo": "dfs",
+                "output": "maze_dfs2.txt",
+                "distances": false
+            }
+        ]`)json";
+        
+        REQUIRE(args_handler.parse(cref(json_array)));
+        REQUIRE(args_handler.has_array());
+        
+        // Check that the arr was properly parsed
+        const auto& arr = args_handler.get_array();
+        REQUIRE(arr.size() == 2);
+        
+        // Check first config
+        REQUIRE(arr[0].find("rows") != arr[0].end());
+        REQUIRE(arr[0].find("columns") != arr[0].end());
+        REQUIRE(arr[0].find("levels") != arr[0].end());
+        REQUIRE(arr[0].find("seed") != arr[0].end());
+        REQUIRE(arr[0].find("algo") != arr[0].end());
+        REQUIRE(arr[0].find("output") != arr[0].end());
+        REQUIRE(arr[0].find("distances") != arr[0].end());
+        
+        // Check second config
+        REQUIRE(arr[1].find("rows") != arr[1].end());
+        REQUIRE(arr[1].find("columns") != arr[1].end());
+        REQUIRE(arr[1].find("levels") != arr[1].end());
+        REQUIRE(arr[1].find("seed") != arr[1].end());
+        REQUIRE(arr[1].find("algo") != arr[1].end());
+        REQUIRE(arr[1].find("output") != arr[1].end());
+        REQUIRE(arr[1].find("distances") != arr[1].end());
+        
+        // The main args_map should contain values from the first object in the arr
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("levels") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("algo") != m.end());
+        REQUIRE(m.find("output") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+    }
+    
+    SECTION("JSON arr input file") {
+        string json_file = " -j maze_dfs.json  ";
+        REQUIRE(args_handler.parse(cref(json_file)));
+        REQUIRE(args_handler.has_array());
+        
+        // Check that the arr was properly loaded from file
+        const auto& arr = args_handler.get_array();
+        REQUIRE(arr.size() == 4);
+        
+        // Check specific configurations
+        REQUIRE(arr[0].find("algo") != arr[0].end());
+        auto algo_val = arr[0].find("algo")->second;
+        REQUIRE(algo_val.find("dfs") != std::string::npos);
+        
+        REQUIRE(arr[2].find("algo") != arr[2].end());
+        algo_val = arr[2].find("algo")->second;
+        REQUIRE(algo_val.find("sidewinder") != std::string::npos);
+        
+        REQUIRE(arr[3].find("algo") != arr[3].end());
+        algo_val = arr[3].find("algo")->second;
+        REQUIRE(algo_val.find("binary_tree") != std::string::npos);
+        
+        // The main args_map should contain values from the first object in the arr
+        const auto& m = args_handler.get();
+        REQUIRE(m.find("rows") != m.end());
+        REQUIRE(m.find("columns") != m.end());
+        REQUIRE(m.find("levels") != m.end());
+        REQUIRE(m.find("seed") != m.end());
+        REQUIRE(m.find("algo") != m.end());
+        REQUIRE(m.find("output") != m.end());
+        REQUIRE(m.find("distances") != m.end());
+    }
+    
+    SECTION("to_str() serializes JSON arrays correctly") {
+        string json_file = " -j maze_dfs.json  ";
+        REQUIRE(args_handler.parse(cref(json_file)));
+        REQUIRE(args_handler.has_array());
+        
+        std::string str_output = args::to_str(args_handler);
+        REQUIRE(!str_output.empty());
+        REQUIRE(str_output.find("\"algo\"") != std::string::npos);
+        REQUIRE(str_output.find("\"dfs\"") != std::string::npos);
+        REQUIRE(str_output.find("\"sidewinder\"") != std::string::npos);
+        REQUIRE(str_output.find("\"binary_tree\"") != std::string::npos);
+    }
+}

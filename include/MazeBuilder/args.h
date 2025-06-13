@@ -36,6 +36,14 @@ public:
     /// @return 
     const std::unordered_map<std::string, std::string>& get() const noexcept;
 
+    /// @brief Get the array of parsed configuration maps
+    /// @return Reference to the vector of configuration maps
+    const std::vector<std::unordered_map<std::string, std::string>>& get_array() const noexcept;
+
+    /// @brief Check if the args contains an array of configurations
+    /// @return True if args contains multiple configurations
+    bool has_array() const noexcept;
+
     /// @brief Set a value
     /// @param key 
     /// @param value 
@@ -51,6 +59,9 @@ public:
     static std::string to_str(const args& a) noexcept;
 public:
     std::unordered_map<std::string, std::string> args_map;
+    
+    /// @brief Vector of configuration maps for array-based JSON input
+    std::vector<std::unordered_map<std::string, std::string>> args_array;
 };
 
 }

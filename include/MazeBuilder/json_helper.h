@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 namespace mazes {
 
@@ -37,6 +38,12 @@ public:
     /// @return 
     std::string from(const std::unordered_map<std::string, std::string>& map, int pretty_print = 4) const noexcept;
 
+    /// @brief Get the contents of a vector of maps as a JSON string
+    /// @param arr 
+    /// @param pretty_print Number of spaces to use for indenting the JSON string
+    /// @return 
+    std::string from(const std::vector<std::unordered_map<std::string, std::string>>& arr, int pretty_print = 4) const noexcept;
+
     /// @brief Parse and set a JSON string into a C++ map
     /// @param s 
     /// @param m 
@@ -48,6 +55,18 @@ public:
     /// @param m 
     /// @return 
     bool load(const std::string& filename, std::unordered_map<std::string, std::string>& m) const noexcept;
+
+    /// @brief Parse a JSON array string into a vector of maps
+    /// @param s JSON string containing an array of objects
+    /// @param vm Vector of maps to populate with parsed objects
+    /// @return success or failure on parse
+    bool from_array(const std::string& s, std::vector<std::unordered_map<std::string, std::string>>& vm) const noexcept;
+
+    /// @brief Load a JSON array file into a vector of maps
+    /// @param filename Path to JSON file containing an array of objects
+    /// @param vm Vector of maps to populate with parsed objects
+    /// @return success or failure on load/parse
+    bool load_array(const std::string& filename, std::vector<std::unordered_map<std::string, std::string>>& vm) const noexcept;
 
 private:
     /// @brief Forward declaration of the implementation class

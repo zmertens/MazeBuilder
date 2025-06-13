@@ -89,7 +89,38 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             }
 
             args_map[key] = trim(value);
-            return (backtick_counter == 2) ? jh.from(value, args_map) : jh.load(value, args_map);
+            
+            // Try to parse as array first
+            args_array.clear();
+            if (backtick_counter == 2) {
+                // First try to parse as an array
+                if (jh.from_array(value, args_array)) {
+                    // Successfully parsed as array, also populate first item in args_map
+                    if (!args_array.empty()) {
+                        for (const auto& kv : args_array[0]) {
+                            args_map[kv.first] = kv.second;
+                        }
+                    }
+                    return true;
+                } else {
+                    // Fall back to standard object parsing
+                    return jh.from(value, args_map);
+                }
+            } else {
+                // Try to load file as array
+                if (jh.load_array(value, args_array)) {
+                    // Successfully loaded array, also populate first item in args_map
+                    if (!args_array.empty()) {
+                        for (const auto& kv : args_array[0]) {
+                            args_map[kv.first] = kv.second;
+                        }
+                    }
+                    return true;
+                } else {
+                    // Fall back to standard object loading
+                    return jh.load(value, args_map);
+                }
+            }
         } else if (regex_match(arg_t, match, long_arg_regex)) {
             string key = match.str(0);
             string value = "";
@@ -130,6 +161,7 @@ bool args::parse(const std::string& arguments) noexcept {
 
 void args::clear() noexcept {
     args_map.erase(args_map.begin(), args_map.end());
+    args_array.clear();
 }
 
 std::optional<std::string> args::get(const std::string& key) const noexcept {
@@ -142,6 +174,14 @@ std::optional<std::string> args::get(const std::string& key) const noexcept {
 
 const std::unordered_map<std::string, std::string>& args::get() const noexcept {
     return args_map;
+}
+
+const std::vector<std::unordered_map<std::string, std::string>>& args::get_array() const noexcept {
+    return args_array;
+}
+
+bool args::has_array() const noexcept {
+    return !args_array.empty();
 }
 
 void args::set(const std::string& key, const std::string& value) noexcept {
@@ -160,11 +200,20 @@ std::string args::trim(const std::string& str) const noexcept {
 /// @brief Dump the hash table to a string output
 /// @return 
 std::string args::to_str(const args& a) noexcept {
-    if (a.args_map.empty()) {
+
+    if (a.args_array.empty() && a.args_map.empty()) {
+
         return "";
     }
+
     std::stringstream ss{};
     json_helper jh{};
-    ss << jh.from(a.args_map);
+    if (a.has_array()) {
+
+        ss << jh.from(std::cref(a.get_array()));
+        return ss.str();
+    }
+
+    ss << jh.from(std::cref(a.args_map));
     return ss.str();
 }

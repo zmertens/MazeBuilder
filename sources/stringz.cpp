@@ -70,26 +70,6 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
 
     int row_x = 0;
 
-#if defined(MAZE_DEBUG)
-    istringstream iss{ sv.data()};
-    string line = "";
-    while (getline(iss, line, '\n')) {
-        int col_z = 0;
-
-        for (auto itr = line.cbegin(); itr != line.cend() && col_z < line.size(); itr++) {
-            // Check for barriers and walls then iterate up to the height of the maze
-            if (*itr == CORNER || *itr == BARRIER1 || *itr == BARRIER2) {
-                static constexpr auto block_size = 1;
-
-                for (auto h{ 0 }; h < get<2>(dimensions); h++) {
-                    add_block(row_x, col_z, h, m->get_block_id(), block_size);
-                }
-            }
-            col_z++;
-        }
-        row_x++;
-    } // getline
-#else
     int col_z = 0;
     for (size_t i = 0; i < sv.size(); ++i) {
         if (sv[i] == '\n') {
@@ -106,7 +86,6 @@ void stringz::objectify(const std::unique_ptr<maze>& m,
         }
         col_z++;
     }
-#endif
 }
 
 void stringz::objectify(lab& labyrinth, std::string_view sv) noexcept {
