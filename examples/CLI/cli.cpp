@@ -13,7 +13,9 @@ std::string cli::stringify_from_args(const std::string& args) const noexcept {
         return "Invalid arguments";
     }
 
-    return stringify_from_dimens(stoi(a.args_map["rows"]), stoi(a.args_map["columns"]));
+    auto rows = a.get("rows").value_or("10");
+    auto cols = a.get("columns").value_or("10");
+    return stringify_from_dimens(stoi(rows), stoi(cols));
 }
 
 std::string cli::stringify_from_dimens(unsigned int rows, unsigned int cols) const noexcept {

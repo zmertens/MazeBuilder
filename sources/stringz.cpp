@@ -14,6 +14,7 @@
 #include <random>
 #include <tuple>
 #include <unordered_set>
+#include <algorithm>
 
 using namespace mazes;
 
@@ -340,4 +341,47 @@ std::string_view stringz::strip_json_quotes(const std::string_view& s) noexcept 
     // (This would require more complex parsing if the JSON has escaped quotes)
     
     return strip(result, '\"');
+}
+
+std::string stringz::trim(const std::string& str) noexcept {
+    if (str.empty()) {
+        return str;
+    }
+    auto start = str.find_first_not_of(" \t\r\n");
+    if (start == std::string::npos) {
+        return "";
+    }
+    auto end = str.find_last_not_of(" \t\r\n");
+    return str.substr(start, end - start + 1);
+}
+
+bool stringz::contains(const std::string& str, const std::string& substr) noexcept {
+    return str.find(substr) != std::string::npos;
+}
+
+std::string stringz::get_file_extension(const std::string& filename) noexcept {
+    auto pos = filename.find_last_of(".");
+    if (pos == std::string::npos) {
+        return "";
+    }
+    return filename.substr(pos);
+}
+
+bool stringz::ends_with(const std::string& str, const std::string& suffix) noexcept {
+    if (str.length() < suffix.length()) {
+        return false;
+    }
+    return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
+}
+
+std::vector<std::string> stringz::split(const std::string& str, char delimiter) noexcept {
+    std::vector<std::string> tokens;
+    std::stringstream ss(str);
+    std::string token;
+    while (std::getline(ss, token, delimiter)) {
+        if (!token.empty()) {
+            tokens.push_back(token);
+        }
+    }
+    return tokens;
 }

@@ -12,6 +12,7 @@
 #include <MazeBuilder/maze_builder.h>
 
 #include "cli.h"
+#include "batch_processor.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
@@ -52,6 +53,7 @@ int main(int argc, char* argv[]) {
         "\t-e, --encode       encode maze to base64 string\n" \
         "\t-h, --help         display this help message\n" \
         "\t-j, --json         run with arguments in JSON format\n" \
+        "\t                   supports both single objects and arrays of objects\n" \
         "\t-s, --seed         seed for the mt19937 generator\n" \
         "\t-r, --rows         rows\n" \
         "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" \
@@ -78,170 +80,38 @@ int main(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    auto seed = 0;
-    if (maze_args.get("-s").has_value()) {
-        seed = stoi(maze_args.get("-s").value());
-    } else if (maze_args.get("--seed").has_value()) {
-        seed = stoi(maze_args.get("--seed").value());
-    }
-
-    string algo_str = "dfs";
-    if (maze_args.get("-a").has_value()) {
-        algo_str = maze_args.get("-a").value();
-    } else if (maze_args.get("--algo").has_value()) {
-        algo_str = maze_args.get("--algo").value();
-    }
-
-    auto rows = 3, columns = 2, levels = 1;
-    if (maze_args.get("-c").has_value()) {
-        columns = stoi(maze_args.get("-c").value());
-    } else if (maze_args.get("--columns").has_value()) {
-        columns = stoi(maze_args.get("--columns").value());
-    }
-
-    if (maze_args.get("-r").has_value()) {
-        rows = stoi(maze_args.get("-r").value());
-    } else if (maze_args.get("--rows").has_value()) {
-        rows = stoi(maze_args.get("--rows").value());
-    }
-
-    if (maze_args.get("-l").has_value()) {
-        levels = stoi(maze_args.get("-l").value());
-    } else if (maze_args.get("--levels").has_value()) {
-        levels = stoi(maze_args.get("--levels").value());
-    }
-
-    bool distances{ false };
-    if (maze_args.get("-d").has_value()) {
-        distances = true;
-    } else if (maze_args.get("--distances").has_value()) {
-        distances = true;
-    }
-
-    bool encodes{ false };
-    if (maze_args.get("-e").has_value()) {
-        encodes = true;
-    } else if (maze_args.get("--encodes").has_value()) {
-        encodes = true;
-    }
-
-    string output_file_str = "stdout";
-    if (maze_args.get("-o").has_value()) {
-        output_file_str = maze_args.get("-o").value();
-    } else if (maze_args.get("--output").has_value()) {
-        output_file_str = maze_args.get("--output").value();
-    }
-
-    // Run the command-line program
-
     try {
+        // Get output file path
+        string output_file_str = "stdout";
+        if (maze_args.get("-o").has_value()) {
+            output_file_str = maze_args.get("-o").value();
+        } else if (maze_args.get("--output").has_value()) {
+            output_file_str = maze_args.get("--output").value();
+        }
         
-        bool success = false;
-
-        mazes::algo my_maze_type = mazes::to_algo_from_string(cref(algo_str));
-        mazes::output my_output_type = mazes::to_output_from_string(output_file_str.substr(output_file_str.find_last_of(".") + 1));
-
-        static constexpr auto BLOCK_ID = -1;
-
-        using maze_ptr = optional<unique_ptr<mazes::maze>>;
-
-        mazes::progress<chrono::milliseconds, chrono::high_resolution_clock> clock;
-        clock.start();
-
-        maze_ptr next_maze_ptr = mazes::factory::create(
-            mazes::configurator().columns(columns).rows(rows).levels(levels)
-            .distances(distances).seed(seed)._algo(my_maze_type)
-            ._output(my_output_type)
-            .block_id(BLOCK_ID));
-
-        auto dur = clock.elapsed<>();
-
-        if (!next_maze_ptr.has_value()) {
-            throw runtime_error("Failed to create maze");
-        }
-
-        auto temp_s = mazes::stringz::stringify(cref(next_maze_ptr.value()));
-
-        mazes::base64_helper my_base64;
-        auto maze_s = (encodes) ? my_base64.encode(cref(temp_s)) : temp_s;
-
-        mazes::writer my_writer;
-
-        switch (my_output_type) {
-        case mazes::output::WAVEFRONT_OBJECT_FILE: {
-
-            vector<tuple<int, int, int, int>> vertices;
-            vector<vector<uint32_t>> faces;
-            mazes::wavefront_object_helper woh{};
-            auto obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
-            success = my_writer.write_file(cref(output_file_str), cref(obj_str));
-            break;
-        }
-        case mazes::output::PNG: {
-
-            static constexpr auto STRIDE = 4u;
-            vector<uint8_t> pixels;
-            auto pixels_w{ 0 }, pixels_h{ 0 };
-            pixels.reserve(rows * columns * STRIDE);
-            if (distances) {
-                mazes::stringz::to_pixels_colored(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
-            } else {
-                mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+        // Check if we're dealing with batch processing
+        if (maze_args.has_array()) {
+            // Process all configurations in the array
+            mazes::batch_processor processor;
+            bool success = processor.process_batch(maze_args.get_array(), output_file_str);
+            
+            if (!success) {
+                cerr << "Batch processing failed." << endl;
+                return EXIT_FAILURE;
             }
-
-            success = my_writer.write_png(cref(output_file_str), cref(pixels), pixels_w, pixels_h, STRIDE);
-            break;
-        }
-        case mazes::output::JPEG: {
-
-            static constexpr auto STRIDE = 4u;
-            vector<uint8_t> pixels;
-            auto pixels_w{ 0 }, pixels_h{ 0 };
-            pixels.reserve(rows * columns * STRIDE);
-            if (distances) {
-                mazes::stringz::to_pixels_colored(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
-            } else {
-                mazes::stringz::to_pixels(cref(maze_s), ref(pixels), ref(pixels_w), ref(pixels_h), STRIDE);
+        } else {
+            // Process a single maze with the configuration
+            mazes::batch_processor processor;
+            bool success = processor.process_single(maze_args.get(), output_file_str);
+            
+            if (!success) {
+                cerr << "Maze processing failed." << endl;
+                return EXIT_FAILURE;
             }
-
-            success = my_writer.write_jpeg(cref(output_file_str), cref(pixels), pixels_w, pixels_h, STRIDE);
-            break;
-        }
-        case mazes::output::JSON: {
-
-            mazes::json_helper jh{};
-            maze_args.set("duration", to_string(chrono::duration<double, milli>(dur).count()));
-            maze_args.set("str", cref(maze_s));
-            const auto& args = maze_args.get();
-            const auto& args_to_json_str = jh.from(cref(args));
-            success = my_writer.write_file(cref(output_file_str), cref(args_to_json_str));
-            break;
-        }
-        case mazes::output::PLAIN_TEXT: {
-            success = my_writer.write_file(cref(output_file_str), cref(maze_s));
-            break;
-        }
-        case mazes::output::STDOUT: {
-
-            cout << maze_s << endl;
-            success = true;
-            break;
-        }
-        default:
-            success = false;
-        } // switch
-
-        if (success) {
-#if defined(MAZE_DEBUG)
-            std::cout << "Writing to file: " << output_file_str << std::endl;
-            std::cout << "Duration: " << fixed << setprecision(3) << dur << " milliseconds" << std::endl;
-#endif
-        }
-        else {
-            std::cerr << "Writing to: " << output_file_str << " failed!" << std::endl;
         }
     } catch (std::exception& ex) {
-        std::cerr << ex.what() << std::endl; 
+        std::cerr << ex.what() << std::endl;
+        return EXIT_FAILURE;
     }
 
 #endif // EMSCRIPTEN

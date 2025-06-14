@@ -17,13 +17,13 @@ TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
     static constexpr auto ALGO = algo::DFS;
 
     BENCHMARK("Benchmark stringz::stringify") {
-        auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
+       auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO).seed(SEED));
 
-        REQUIRE(maze_opt);
+       REQUIRE(maze_opt);
 
-        auto s = stringz::stringify(cref(maze_opt));
+       auto s = stringz::stringify(cref(maze_opt));
 
-        REQUIRE(!s.empty());
+       REQUIRE(!s.empty());
     };
 
     //BENCHMARK("Benchmark stringz::objectify") {

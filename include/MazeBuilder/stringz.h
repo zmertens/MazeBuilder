@@ -58,6 +58,34 @@ public:
     /// @return the string representation
     static std::string stringify(const std::unique_ptr<maze>& m) noexcept;
 
+    /// @brief Trim whitespace from both ends of a string
+    /// @param str The string to trim
+    /// @return A trimmed copy of the string
+    static std::string trim(const std::string& str) noexcept;
+    
+    /// @brief Check if a string contains a substring
+    /// @param str The string to search in
+    /// @param substr The substring to search for
+    /// @return True if substr is found in str, false otherwise
+    static bool contains(const std::string& str, const std::string& substr) noexcept;
+    
+    /// @brief Extract file extension from a filename
+    /// @param filename The filename to process
+    /// @return The file extension including the dot, or empty string if no extension
+    static std::string get_file_extension(const std::string& filename) noexcept;
+    
+    /// @brief Check if a string ends with a specific suffix
+    /// @param str The string to check
+    /// @param suffix The suffix to check for
+    /// @return True if str ends with suffix, false otherwise
+    static bool ends_with(const std::string& str, const std::string& suffix) noexcept;
+    
+    /// @brief Split a string by delimiter
+    /// @param str The string to split
+    /// @param delimiter The delimiter to split by
+    /// @return Vector of split substrings
+    static std::vector<std::string> split(const std::string& str, char delimiter) noexcept;
+
     /// @brief Strip specific characters from the beginning and end of a string view
     /// @param s The string view to strip characters from
     /// @param to_strip_from_s The character to strip
