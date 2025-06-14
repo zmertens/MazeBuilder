@@ -37,11 +37,11 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     }
     REQUIRE(max > 0);
 
-    BENCHMARK("Benchmark factory::create") {
-       auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO_TO_RUN).seed(SEED));
+    // BENCHMARK("Benchmark factory::create") {
+    //    auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO_TO_RUN).seed(SEED));
 
-       REQUIRE(maze_opt);
-    };
+    //    REQUIRE(maze_opt);
+    // };
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {

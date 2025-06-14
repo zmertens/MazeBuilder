@@ -98,8 +98,7 @@ int main(int argc, char* argv[]) {
             if (!success) {
                 cerr << "Batch processing failed." << endl;
                 return EXIT_FAILURE;
-            }
-        } else {
+            }        } else {
             // Process a single maze with the configuration
             mazes::batch_processor processor;
             bool success = processor.process_single(maze_args.get(), output_file_str);
