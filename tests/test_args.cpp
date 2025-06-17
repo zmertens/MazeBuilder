@@ -303,3 +303,99 @@ TEST_CASE("Args parse with argc/argv", "[parse argc argv]") {
         REQUIRE(args_handler.get("-j").value() == "input.json");
     }
 }
+
+// Add this test case to specifically test the short-form argument parsing issue
+TEST_CASE("Args correctly parses and accesses short-form arguments", "[short form args]") {
+    args args_handler{};
+
+    SECTION("Short form with spaces and accessor testing") {
+        // Test the specific case "-r 10 -c 5"
+        vector<string> args_vec = { "-r", "10", "-c", "5" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+        
+        // Verify we can access values using all forms of keys
+        // First check short form with dash
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+        
+        // Check long form with dashes
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+        REQUIRE(args_handler.get("--columns").has_value());
+        REQUIRE(args_handler.get("--columns").value() == "5");
+        
+        // Check form without dashes
+        REQUIRE(args_handler.get("rows").has_value());
+        REQUIRE(args_handler.get("rows").value() == "10");
+        REQUIRE(args_handler.get("columns").has_value());
+        REQUIRE(args_handler.get("columns").value() == "5");
+    }
+
+    SECTION("Short form as string") {
+        // Test the string version of command line
+        string args_str = "-r 10 -c 5";
+        REQUIRE(args_handler.parse(cref(args_str)));
+        
+        // Verify using short form
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+        
+        // Also verify long form equivalents
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+        REQUIRE(args_handler.get("--columns").has_value());
+        REQUIRE(args_handler.get("--columns").value() == "5");
+    }
+
+    SECTION("Short form with argc/argv") {
+        // Test with argc/argv which is how it would be called in a real program
+        char* test_argv[] = {
+            (char*)"program",
+            (char*)"-r", (char*)"10",
+            (char*)"-c", (char*)"5",
+            nullptr
+        };
+        int test_argc = 5;
+        
+        REQUIRE(args_handler.parse(test_argc, test_argv));
+        
+        // Check all forms of access
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+        
+        // Check that get() returns a map containing all the values
+        const auto& map = args_handler.get();
+        REQUIRE(map.find("-r") != map.end());
+        REQUIRE(map.at("-r") == "10");
+        REQUIRE(map.find("-c") != map.end());
+        REQUIRE(map.at("-c") == "5");
+        
+        // Check long form access
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+    }
+    
+    SECTION("Mixed short/long form arguments") {
+        // Test with mixed short and long form
+        vector<string> args_vec = { "-r", "10", "--columns", "5" };
+        REQUIRE(args_handler.parse(cref(args_vec)));
+        
+        // Should be able to access with any form
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("--columns").has_value());
+        REQUIRE(args_handler.get("--columns").value() == "5");
+        
+        // Check cross-access (short/long)
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+    }
+}

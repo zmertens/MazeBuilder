@@ -231,8 +231,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                         args_map[cleanKey] = value;
                         pimpl->args_map[cleanKey] = value;
                     }
-                }
-                // Check for -o value or --option value format
+                }                // Check for -o value or --option value format
                 else if (i + 1 < arguments.size() && arguments[i + 1][0] != '-') {
                     value = arguments[i + 1];
                     // Store with both forms
@@ -248,6 +247,29 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                         std::string cleanKey = key.substr(1);
                         args_map[cleanKey] = value;
                         pimpl->args_map[cleanKey] = value;
+                        
+                        // For common short options, also set the long form
+                        if (cleanKey == "r") {
+                            args_map["--rows"] = value;
+                            pimpl->args_map["--rows"] = value;
+                            args_map["rows"] = value;
+                            pimpl->args_map["rows"] = value;
+                        } else if (cleanKey == "c") {
+                            args_map["--columns"] = value;
+                            pimpl->args_map["--columns"] = value;
+                            args_map["columns"] = value;
+                            pimpl->args_map["columns"] = value;
+                        } else if (cleanKey == "s") {
+                            args_map["--seed"] = value;
+                            pimpl->args_map["--seed"] = value;
+                            args_map["seed"] = value;
+                            pimpl->args_map["seed"] = value;
+                        } else if (cleanKey == "o") {
+                            args_map["--output"] = value;
+                            pimpl->args_map["--output"] = value;
+                            args_map["output"] = value;
+                            pimpl->args_map["output"] = value;
+                        }
                     }
                     
                     // Skip the value in the next iteration
@@ -281,26 +303,77 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             for (const auto& option : pimpl->cli_app.get_options()) {
                 if (option->count() > 0) {
                     std::vector<std::string> results = option->results();
+                    if (results.empty()) continue;
+                    
+                    // Get the value for this option
+                    std::string value = results[0];
+                    
+                    // Get all long and short names for this option
+                    std::vector<std::string> long_names;
+                    std::vector<std::string> short_names;
+                    
+                    for (const auto& lname : option->get_lnames()) {
+                        long_names.push_back(lname);
+                    }
+                    
+                    for (const auto& sname : option->get_snames()) {
+                        short_names.push_back(sname);
+                    }
                     
                     // For options with long names
-                    for (const auto& lname : option->get_lnames()) {
-                        std::string key = "--" + lname;
-                        if (args_map.find(key) == args_map.end() && !results.empty()) {
-                            args_map[key] = results[0];
-                            pimpl->args_map[key] = results[0];
-                            args_map[lname] = results[0];  // Store without dashes too
-                            pimpl->args_map[lname] = results[0];
-                        }
+                    for (const auto& lname : long_names) {
+                        std::string key_with_dash = "--" + lname;
+                        std::string key_without_dash = lname;
+                        
+                        // Always update both maps
+                        args_map[key_with_dash] = value;
+                        pimpl->args_map[key_with_dash] = value;
+                        args_map[key_without_dash] = value;
+                        pimpl->args_map[key_without_dash] = value;
                     }
                     
                     // For options with short names
-                    for (const auto& sname : option->get_snames()) {
-                        std::string key = "-" + sname;
-                        if (args_map.find(key) == args_map.end() && !results.empty()) {
-                            args_map[key] = results[0];
-                            pimpl->args_map[key] = results[0];
-                            args_map[sname] = results[0];  // Store without dashes too
-                            pimpl->args_map[sname] = results[0];
+                    for (const auto& sname : short_names) {
+                        std::string key_with_dash = "-" + sname;
+                        std::string key_without_dash = sname;
+                        
+                        // Always update both maps
+                        args_map[key_with_dash] = value;
+                        pimpl->args_map[key_with_dash] = value;
+                        args_map[key_without_dash] = value;
+                        pimpl->args_map[key_without_dash] = value;
+                        
+                        // Associate short options with their long form equivalents
+                        // This ensures that -r is also accessible as --rows
+                        if (sname == "r" && std::find(long_names.begin(), long_names.end(), "rows") != long_names.end()) {
+                            args_map["--rows"] = value;
+                            pimpl->args_map["--rows"] = value;
+                            args_map["rows"] = value;
+                            pimpl->args_map["rows"] = value;
+                        }
+                        else if (sname == "c" && std::find(long_names.begin(), long_names.end(), "columns") != long_names.end()) {
+                            args_map["--columns"] = value;
+                            pimpl->args_map["--columns"] = value;
+                            args_map["columns"] = value;
+                            pimpl->args_map["columns"] = value;
+                        }
+                        else if (sname == "s" && std::find(long_names.begin(), long_names.end(), "seed") != long_names.end()) {
+                            args_map["--seed"] = value;
+                            pimpl->args_map["--seed"] = value;
+                            args_map["seed"] = value;
+                            pimpl->args_map["seed"] = value;
+                        }
+                        else if (sname == "d" && std::find(long_names.begin(), long_names.end(), "distances") != long_names.end()) {
+                            args_map["--distances"] = value;
+                            pimpl->args_map["--distances"] = value;
+                            args_map["distances"] = value;
+                            pimpl->args_map["distances"] = value;
+                        }
+                        else if (sname == "o" && std::find(long_names.begin(), long_names.end(), "output") != long_names.end()) {
+                            args_map["--output"] = value;
+                            pimpl->args_map["--output"] = value;
+                            args_map["output"] = value;
+                            pimpl->args_map["output"] = value;
                         }
                     }
                 }
@@ -533,26 +606,77 @@ bool args::parse(int argc, char** argv) noexcept {
             for (const auto& option : pimpl->cli_app.get_options()) {
                 if (option->count() > 0) {
                     std::vector<std::string> results = option->results();
+                    if (results.empty()) continue;
+                    
+                    // Get the value for this option
+                    std::string value = results[0];
+                    
+                    // Get all long and short names for this option
+                    std::vector<std::string> long_names;
+                    std::vector<std::string> short_names;
+                    
+                    for (const auto& lname : option->get_lnames()) {
+                        long_names.push_back(lname);
+                    }
+                    
+                    for (const auto& sname : option->get_snames()) {
+                        short_names.push_back(sname);
+                    }
                     
                     // For options with long names
-                    for (const auto& lname : option->get_lnames()) {
-                        std::string key = "--" + lname;
-                        if (args_map.find(key) == args_map.end() && !results.empty()) {
-                            args_map[key] = results[0];
-                            pimpl->args_map[key] = results[0];
-                            args_map[lname] = results[0];  // Store without dashes too
-                            pimpl->args_map[lname] = results[0];
-                        }
+                    for (const auto& lname : long_names) {
+                        std::string key_with_dash = "--" + lname;
+                        std::string key_without_dash = lname;
+                        
+                        // Always update both maps
+                        args_map[key_with_dash] = value;
+                        pimpl->args_map[key_with_dash] = value;
+                        args_map[key_without_dash] = value;
+                        pimpl->args_map[key_without_dash] = value;
                     }
                     
                     // For options with short names
-                    for (const auto& sname : option->get_snames()) {
-                        std::string key = "-" + sname;
-                        if (args_map.find(key) == args_map.end() && !results.empty()) {
-                            args_map[key] = results[0];
-                            pimpl->args_map[key] = results[0];
-                            args_map[sname] = results[0];  // Store without dashes too
-                            pimpl->args_map[sname] = results[0];
+                    for (const auto& sname : short_names) {
+                        std::string key_with_dash = "-" + sname;
+                        std::string key_without_dash = sname;
+                        
+                        // Always update both maps
+                        args_map[key_with_dash] = value;
+                        pimpl->args_map[key_with_dash] = value;
+                        args_map[key_without_dash] = value;
+                        pimpl->args_map[key_without_dash] = value;
+                        
+                        // Associate short options with their long form equivalents
+                        // This ensures that -r is also accessible as --rows
+                        if (sname == "r" && std::find(long_names.begin(), long_names.end(), "rows") != long_names.end()) {
+                            args_map["--rows"] = value;
+                            pimpl->args_map["--rows"] = value;
+                            args_map["rows"] = value;
+                            pimpl->args_map["rows"] = value;
+                        }
+                        else if (sname == "c" && std::find(long_names.begin(), long_names.end(), "columns") != long_names.end()) {
+                            args_map["--columns"] = value;
+                            pimpl->args_map["--columns"] = value;
+                            args_map["columns"] = value;
+                            pimpl->args_map["columns"] = value;
+                        }
+                        else if (sname == "s" && std::find(long_names.begin(), long_names.end(), "seed") != long_names.end()) {
+                            args_map["--seed"] = value;
+                            pimpl->args_map["--seed"] = value;
+                            args_map["seed"] = value;
+                            pimpl->args_map["seed"] = value;
+                        }
+                        else if (sname == "d" && std::find(long_names.begin(), long_names.end(), "distances") != long_names.end()) {
+                            args_map["--distances"] = value;
+                            pimpl->args_map["--distances"] = value;
+                            args_map["distances"] = value;
+                            pimpl->args_map["distances"] = value;
+                        }
+                        else if (sname == "o" && std::find(long_names.begin(), long_names.end(), "output") != long_names.end()) {
+                            args_map["--output"] = value;
+                            pimpl->args_map["--output"] = value;
+                            args_map["output"] = value;
+                            pimpl->args_map["output"] = value;
                         }
                     }
                 }
