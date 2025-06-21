@@ -13,12 +13,12 @@ namespace mazes {
 class maze;
 class lab;
 
-/// @file stringz.h
+/// @file string_view_utils.h
 
-/// @class stringz
+/// @class string_view_utils
 /// @brief String helper class
 /// @details This class provides methods to convert mazes into string representations
-class stringz {
+class string_view_utils {
 public:
 
     /// @brief Compute the 3D geometries of a maze

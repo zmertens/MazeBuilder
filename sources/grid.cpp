@@ -1,5 +1,9 @@
 #include <MazeBuilder/grid.h>
 
+
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/lab.h>
+
 #include <algorithm>
 #include <functional>
 #include <random>
@@ -7,9 +11,6 @@
 #include <string>
 #include <tuple>
 #include <vector>
-
-#include <MazeBuilder/cell.h>
-#include <MazeBuilder/lab.h>
 
 #if defined(MAZE_DEBUG)
 #include <iostream>
@@ -109,10 +110,7 @@ void grid::configure(std::vector<int> const& indices) noexcept {
 #endif
     }
 
-    sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
-
-        return c1->get_index() < c2->get_index();
-        });
+    this->sort(ref(cells));
 
     this->configure_cells(std::ref(cells));
 
@@ -143,6 +141,7 @@ std::shared_ptr<cell> grid::get_neighbor(const std::shared_ptr<cell>& c, Directi
     }
 
     int neighbor_index = it_dir->second;
+
     return search(neighbor_index);
 }
 
@@ -288,6 +287,7 @@ std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexc
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
+
     return this->m_dimensions;
 }
 
@@ -301,14 +301,24 @@ int grid::num_cells() const noexcept {
     return static_cast<unsigned int>(m_cells.size());
 }
 
-// Populate the vector of cells from the BST using natural ordering
-void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+std::vector<std::shared_ptr<cell>> grid::get_cells() const noexcept {
 
-    for (auto&& [_, c] : m_cells) {
+    std::vector<std::shared_ptr<cell>> cells;
+
+    cells.reserve(m_cells.size());
+
+    for (const auto& [_, c] : m_cells) {
+
         cells.emplace_back(c);
     }
 
-    sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
+    return cells;
+}
+
+// Populate the vector of cells from the BST using natural ordering
+void grid::sort(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
+
+    std::sort(cells.begin(), cells.end(), [](auto c1, auto c2) {
 
         return c1->get_index() < c2->get_index();
         });
@@ -316,10 +326,22 @@ void grid::to_vec(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 
 // Get the contents of a cell for this type of grid
 std::string grid::contents_of(std::shared_ptr<cell> const& c) const noexcept {
-    return { " " };
+
+    return " ";
 }
 
 // Get the background color for this type of grid
 std::uint32_t grid::background_color_for(std::shared_ptr<cell> const& c) const noexcept {
+
     return { 0xFFFFFFFF };
+}
+
+grid_operations& grid::operations() noexcept {
+
+    return *this;
+}
+
+const grid_operations& grid::operations() const noexcept {
+
+    return *this;
 }

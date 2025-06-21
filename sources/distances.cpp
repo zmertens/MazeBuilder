@@ -1,5 +1,7 @@
 #include <MazeBuilder/distances.h>
-#include <MazeBuilder/grid.h>
+
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid_interface.h>
 
 #include <deque>
 
@@ -34,7 +36,7 @@ bool distances::contains(int32_t index) const noexcept {
 /// @param goal_index 
 /// @param g 
 /// @return 
-std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g) const noexcept {
+std::shared_ptr<distances> distances::path_to(std::unique_ptr<grid_interface> const& g, int32_t goal_index) const noexcept {
     // Create a new distances object to store the path
     auto path = std::make_shared<distances>(m_root_index);
 
@@ -68,50 +70,50 @@ std::shared_ptr<distances> distances::path_to(int32_t goal_index, const grid& g)
         q.pop_front();
 
         // Retrieve the current cell
-        auto current_cell = g.search(current_index);
-        if (!current_cell) {
-#if defined(MAZE_DEBUG)
-            std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
-#endif
-            continue;
-        }
+//        auto current_cell = g.search(current_index);
+//        if (!current_cell) {
+//#if defined(MAZE_DEBUG)
+//            std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
+//#endif
+//            continue;
+//        }
 
         // Process each neighbor that has a passage (linked cells)
-        auto neighbors = g.get_neighbors(current_cell);
-        for (const auto& neighbor : neighbors) {
-            if (!neighbor) continue;
+        //auto neighbors = g.get_neighbors(current_cell);
+        //for (const auto& neighbor : neighbors) {
+        //    if (!neighbor) continue;
 
-            // Only follow passages that exist (cells that are linked)
-            if (!current_cell->is_linked(neighbor)) {
-                continue;
-            }
+        //    // Only follow passages that exist (cells that are linked)
+        //    if (!current_cell->is_linked(neighbor)) {
+        //        continue;
+        //    }
 
-            int32_t neighbor_index = neighbor->get_index();
+        //    int32_t neighbor_index = neighbor->get_index();
 
-            // Skip if already visited
-            if (parent.find(neighbor_index) != parent.cend()) {
-                continue;
-            }
+        //    // Skip if already visited
+        //    if (parent.find(neighbor_index) != parent.cend()) {
+        //        continue;
+        //    }
 
-            // Mark the parent
-            parent[neighbor_index] = current_index;
-            q.push_back(neighbor_index);
+        //    // Mark the parent
+        //    parent[neighbor_index] = current_index;
+        //    q.push_back(neighbor_index);
 
-            // If we reach the root index, reconstruct the path
-            if (neighbor_index == m_root_index) {
-                int32_t step = m_root_index;
-                int distance = 0;
+        //    // If we reach the root index, reconstruct the path
+        //    if (neighbor_index == m_root_index) {
+        //        int32_t step = m_root_index;
+        //        int distance = 0;
 
-                // Build the path
-                while (step != -1) {
-                    path->set(step, distance);
-                    step = parent[step];
-                    distance += 1;
-                }
+        //        // Build the path
+        //        while (step != -1) {
+        //            path->set(step, distance);
+        //            step = parent[step];
+        //            distance += 1;
+        //        }
 
-                return path;
-            }
-        }
+        //        return path;
+        //    }
+        //}
     }
 
     return std::make_shared<distances>(m_root_index);

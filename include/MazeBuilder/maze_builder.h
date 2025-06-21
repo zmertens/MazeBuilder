@@ -20,11 +20,14 @@
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/maze.h>
+#include <MazeBuilder/objectify.h>
+#include <MazeBuilder/pixels.h>
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/singleton_base.h>
-#include <MazeBuilder/stringz.h>
+#include <MazeBuilder/stringify.h>
+#include <MazeBuilder/string_view_utils.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 #include <MazeBuilder/writer.h>
 

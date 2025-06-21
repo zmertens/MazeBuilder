@@ -1,26 +1,23 @@
 #ifndef COLORED_GRID_H
 #define COLORED_GRID_H
 
+#include <MazeBuilder/grid_interface.h>
+
 #include <cstdint>
 #include <memory>
 #include <optional>
 #include <vector>
 
-#include <MazeBuilder/grid.h>
-
 namespace mazes {
 
 class cell;
 class distances;
+class grid_operations;
 
 /// @file colored_grid.h
 /// @class colored_grid
 /// @brief Extension of the grid class to include color information
-class colored_grid : public grid {
-
-    friend class binary_tree;
-    friend class dfs;
-    friend class sidewinder;
+class colored_grid : public grid_interface {
 
 public:
 
@@ -30,20 +27,26 @@ public:
     /// @param levels The number of levels in the grid. Defaults to 1.
     explicit colored_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
-    void configure(const std::vector<int>& indices) noexcept override;
-
     /// @brief Retrieves the contents of a given cell, if available.
     /// @param c A shared pointer to the cell whose contents are to be retrieved.
-    /// @return An optional string containing the contents of the cell. If the cell has no contents, the optional will be empty.
+    /// @return If the cell has no contents, the contents are considered empty
     virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
 
     ///// @brief Retrieves the background color for a given cell, if available.
     ///// @param c A shared pointer to the cell for which the background color is to be retrieved.
-    ///// @return An optional containing the background color as a 32-bit unsigned integer, or an empty optional if no background color is available.
+    ///// @return An 32-bit unsigned integer containing the background color
     virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+
+    // Delegate to embedded grid
+    grid_operations& operations() noexcept override;
+
+    const grid_operations& operations() const noexcept override;
 	
 private:
+
     std::shared_ptr<distances> m_distances;
+
+    std::unique_ptr<grid_interface> m_grid;
 };
 
 }

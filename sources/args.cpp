@@ -1,7 +1,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/writer.h>
-#include <MazeBuilder/stringz.h>
+#include <MazeBuilder/string_view_utils.h>
 
 #include <string>
 #include <regex>
@@ -18,7 +18,7 @@ using namespace mazes;
 // Helper to improve JSON string detection
 bool detect_json_string(const std::string& input) {
     // Clean input for easier checking
-    std::string clean = stringz::trim(input);
+    std::string clean = string_view_utils::trim(input);
     
     // Check for backticks (JSON string indicator)
     if (clean.find('`') != std::string::npos) {
@@ -411,7 +411,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                 key = "--json";
             }
             
-            json_input = stringz::trim(json_input);
+            json_input = string_view_utils::trim(json_input);
             
             // Use our helper to detect if this is a string input
             bool is_string_input = detect_json_string(json_input);
@@ -419,7 +419,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
             // Clean up input if it's a string
             if (is_string_input) {
                 json_input.erase(std::remove(json_input.begin(), json_input.end(), '`'), json_input.end());
-                json_input = stringz::trim(json_input);
+                json_input = string_view_utils::trim(json_input);
             }
             
             // If we're processing a filename (not JSON string) and no output file has been specified,
@@ -455,7 +455,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
 
 bool args::parse(const std::string& arguments) noexcept {
     // Check if this is a JSON string directly
-    std::string trimmed = stringz::trim(arguments);
+    std::string trimmed = string_view_utils::trim(arguments);
     if (trimmed.find("-j `{") == 0 || trimmed.find("-j `[") == 0 || 
         trimmed.find("--json `{") == 0 || trimmed.find("--json `[") == 0 ||
         trimmed.find("--json=`{") == 0 || trimmed.find("--json=`[") == 0) {
@@ -477,7 +477,7 @@ bool args::parse(const std::string& arguments) noexcept {
         
         // Clean up backticks
         json_content.erase(std::remove(json_content.begin(), json_content.end(), '`'), json_content.end());
-        json_content = stringz::trim(json_content);
+        json_content = string_view_utils::trim(json_content);
         
         // Set the key in args_map
         args_map.clear();
@@ -699,7 +699,7 @@ bool args::parse(int argc, char** argv) noexcept {
                 key = "--json";
             }
             
-            json_input = stringz::trim(json_input);
+            json_input = string_view_utils::trim(json_input);
             
             // Use our helper to detect if this is a string input
             bool is_string_input = detect_json_string(json_input);
@@ -707,7 +707,7 @@ bool args::parse(int argc, char** argv) noexcept {
             // Clean up input if it's a string
             if (is_string_input) {
                 json_input.erase(std::remove(json_input.begin(), json_input.end(), '`'), json_input.end());
-                json_input = stringz::trim(json_input);
+                json_input = string_view_utils::trim(json_input);
             }
             
             return process_json_input(json_input, is_string_input, key);
@@ -915,7 +915,7 @@ bool args::add_flag(const std::string& flag_name, const std::string& description
 
 // Replace the trim method implementation
 std::string args::trim(const std::string& str) const noexcept {
-    return stringz::trim(str);
+    return string_view_utils::trim(str);
 }
 
 // Add implementation for generate_output_filename

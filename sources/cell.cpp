@@ -3,32 +3,38 @@
 #include <mutex>
 
 using namespace mazes;
-using namespace std;
 
 /// @brief 
 /// @param index 0
 cell::cell(std::int32_t index)
     : m_index{ index }
     , m_links{} {
+
 }
 
 // Destructor
 cell::~cell() {
+
     std::unique_lock<std::shared_mutex> lock(m_links_mutex);
+
     m_links.clear();
 }
 
 // Copy Constructor
 cell::cell(const cell& other)
     : m_index(other.m_index) {
+
     // Copy links
     std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
+
     m_links = other.m_links;
 }
 
 // Copy Assignment Operator
 cell& cell::operator=(const cell& other) {
+
     if (this == &other) {
+
         return *this;
     }
 
@@ -38,6 +44,7 @@ cell& cell::operator=(const cell& other) {
     // Copy links
     {
         std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
+
         m_links = other.m_links;
     }
 
@@ -47,14 +54,17 @@ cell& cell::operator=(const cell& other) {
 // Move Constructor
 cell::cell(cell&& other) noexcept
     : m_index(other.m_index) {
+
     // Move links
     std::unique_lock<std::shared_mutex> lock(other.m_links_mutex);
+
     m_links = std::move(other.m_links);
 }
 
 // Move Assignment Operator
 cell& cell::operator=(cell&& other) noexcept {
     if (this == &other) {
+
         return *this;
     }
 
@@ -64,14 +74,17 @@ cell& cell::operator=(cell&& other) noexcept {
     // Move links
     {
         std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
+
         m_links = std::move(other.m_links);
     }
 
     return *this;
 }
 
-bool cell::has_key(const shared_ptr<cell>& c) {
+bool cell::has_key(const std::shared_ptr<cell>& c) {
+
     std::lock_guard<std::shared_mutex> lock(m_links_mutex);
+
     for (const auto& [weak_cell, _] : m_links) {
         if (auto shared_cell = weak_cell.lock()) {
             if (shared_cell == c) {
@@ -104,7 +117,10 @@ void cell::cleanup_links() {
 }
 
 void cell::add_link(const std::shared_ptr<cell>& other) {
-    if (!other) return;
+    if (!other) {
+
+        return;
+    }
 
     std::unique_lock<std::shared_mutex> lock(m_links_mutex);
     m_links.insert_or_assign(std::weak_ptr<cell>(other), true);
@@ -121,7 +137,10 @@ void cell::add_link(const std::shared_ptr<cell>& other) {
 }
 
 void cell::remove_link(const std::shared_ptr<cell>& other) {
-    if (!other) return;
+    if (!other) {
+
+        return;
+    }
 
     std::unique_lock<std::shared_mutex> lock(m_links_mutex);
     m_links.erase(std::weak_ptr<cell>(other));
@@ -151,7 +170,8 @@ std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const {
     return shared_links;
 }
 
-bool cell::is_linked(const shared_ptr<cell>& c) {
+bool cell::is_linked(const std::shared_ptr<cell>& c) {
+
     return has_key(c);
 }
 

@@ -9,12 +9,13 @@
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/randomizer.h>
 
+#include <functional>
+#include <sstream>
+#include <vector>
+
 #if defined(MAZE_DEBUG)
 #include <iostream>
 #endif
-
-#include <sstream>
-#include <vector>
 
 using namespace mazes;
 
@@ -33,6 +34,7 @@ std::optional<std::unique_ptr<maze>> factory::create_with_rows_columns(unsigned 
 }
 
 std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
+
     using namespace std;
 
     auto g = create_grid(cref(config));
@@ -47,14 +49,8 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     auto shared_rng = make_shared<randomizer>(rng);
     auto shared_config = make_shared<const configurator>(config);
 
-    // Get the raw pointer but keep ownership in g
-    auto* grid_ptr = dynamic_cast<grid*>(g.value().get());
-    if (!grid_ptr) {
-        return nullptr;
-    }
-
     auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns());
-    grid_ptr->configure(cref(random_ints));
+    //grid_ptr->configure(cref(random_ints));
 
     auto success = false;
 
@@ -62,45 +58,60 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
     // Algorithm implementations...
     case algo::BINARY_TREE: {
         static binary_tree bt;
-        success = bt.run(grid_ptr, std::ref(*shared_rng));
+        success = bt.run(cref(g.value()), std::ref(*shared_rng));
         break;
     }
     case algo::SIDEWINDER: {
         static sidewinder sw;
-        success = sw.run(grid_ptr, std::ref(*shared_rng));
+        success = sw.run(cref(g.value()), std::ref(*shared_rng));
         break;
     }
     case algo::DFS: {
         static dfs d;
-        success = d.run(grid_ptr, std::ref(*shared_rng));
+        success = d.run(cref(g.value()), std::ref(*shared_rng));
         break;
     }
     default:
         return nullptr;
     }
 
-    // If the grid is a distance grid, calculate distances
-    if (auto distance_grid_ptr = dynamic_cast<distance_grid*>(grid_ptr); success && config.distances()) {
-        distance_grid_ptr->calculate_distances(grid_ptr->num_cells() - 1, 0);
+    if (success && config.distances()) {
+        // Use operations to get a distance grid and calculate distances
+        auto& ops = g.value()->operations();
+        if (auto dist_grid = dynamic_cast<distance_grid*>(g.value().get())) {
+            dist_grid->calculate_distances(ops.num_cells() - 1, 0);
+        }
     }
+
+    // Also update the string representation
+    if (success) {
+        // Create the maze using the grid and config
+        stringstream ss;
+        //ss << *(g.value().get());
+        //result = make_unique<maze>(cref(config), ss.str());
+    }
+
+    // Use operations to clear the cells
+    g.value()->operations().clear_cells();
 
     std::unique_ptr<maze> result = nullptr;
     if (success) {
         // Create the maze using the grid and config
         stringstream ss;
-        ss << *(g.value().get());
+        //ss << *(g.value().get());
         result = make_unique<maze>(cref(config), ss.str());
     }
 
     // Explicitly clean up the grid before returning
-    if (grid_ptr) {
-        grid_ptr->clear_cells();
-    }
+    //if (grid_ptr) {
+    //    grid_ptr->clear_cells();
+    //}
 
     return result;
 }
 
 std::optional<std::unique_ptr<grid_interface>> factory::create_grid(configurator const& config) noexcept {
+
     using namespace std;
 
     unique_ptr<grid_interface> g = nullptr;

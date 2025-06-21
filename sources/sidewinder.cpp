@@ -1,13 +1,13 @@
 #include <MazeBuilder/sidewinder.h>
 
-#include <functional>
-#include <vector>
-
 #include <MazeBuilder/cell.h>
-#include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/randomizer.h>
+
+#include <functional>
+#include <vector>
 
 using namespace mazes;
 
@@ -16,37 +16,46 @@ using namespace mazes;
 /// @param g the grid to generate the maze on, and manipulate the cells
 /// @param get_int
 /// @param rng
-bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
+bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+
     using namespace std;
 
-    if (!g) return false;
+    if (!g) {
 
-    auto g_ptr = dynamic_cast<grid*>(g);
-    if (!g_ptr) return false;
+        return false;
+    }
 
-    auto [ROWS, COLUMNS, _] = g_ptr->get_dimensions();
-    vector<shared_ptr<cell>> cells;
-    g_ptr->to_vec(ref(cells));
+    const auto& grid_ops = g->operations();
+
+    auto [rows, columns, _] = grid_ops.get_dimensions();
+
+    vector<shared_ptr<cell>> cells = grid_ops.get_cells();
+    grid_ops.sort(ref(cells));
 
     // Group cells by row for processing
     vector<vector<shared_ptr<cell>>> grid_by_rows;
-    grid_by_rows.resize(ROWS);
+    grid_by_rows.resize(rows);
 
     for (size_t i = 0; i < cells.size(); ++i) {
-        unsigned int row = i / COLUMNS;
-        if (row < ROWS) {
+        unsigned int row = i / columns;
+        if (row < rows) {
             grid_by_rows[row].push_back(cells[i]);
         }
     }
 
     // Process each row
-    for (unsigned int row = 0; row < ROWS; ++row) {
+    for (unsigned int row = 0; row < rows; ++row) {
+
         vector<shared_ptr<cell>> run;
 
-        for (unsigned int col = 0; col < COLUMNS; ++col) {
+        for (unsigned int col = 0; col < columns; ++col) {
+
             // Get current cell
-            size_t index = row * COLUMNS + col;
-            if (index >= cells.size()) continue;
+            size_t index = row * columns + col;
+            if (index >= cells.size()) {
+
+                continue;
+            }
 
             auto cell = cells[index];
             if (!cell) continue;
@@ -54,7 +63,7 @@ bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
             // Add current cell to the run
             run.push_back(cell);
 
-            bool at_eastern_boundary = (col == COLUMNS - 1);
+            bool at_eastern_boundary = (col == columns - 1);
             bool at_northern_boundary = (row == 0);
 
             // Should we close out this run?
@@ -70,7 +79,7 @@ bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
                     auto random_cell = run[random_index];
 
                     if (random_cell) {
-                        auto north_cell = g_ptr->get_north(random_cell);
+                        auto north_cell = grid_ops.get_north(random_cell);
                         if (north_cell) {
                             lab::link(random_cell, north_cell, true);
                         }
@@ -79,11 +88,13 @@ bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
 
                 // Clear the run to start a new one
                 run.clear();
-            }
-            // If not closing and not at eastern boundary, link east
-            else if (!at_eastern_boundary) {
-                auto east_cell = g_ptr->get_east(cell);
+            } else if (!at_eastern_boundary) {
+                // If not closing and not at eastern boundary, link east
+
+                auto east_cell = grid_ops.get_east(cell);
+
                 if (east_cell) {
+
                     lab::link(cell, east_cell, true);
                 }
             }

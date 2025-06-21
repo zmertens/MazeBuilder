@@ -25,24 +25,23 @@ public:
     /// @param high
     /// @return 
     std::vector<int> get_num_ints_incl(int low, int high) noexcept {
+        // Handle invalid ranges
         if (low > high) {
             return {};
         }
 
+        // Calculate the range size
+        int rangeSize = high - low + 1;
+        
         // Generate a vector of integers within the specified range
         std::vector<int> numbers;
-        numbers.reserve(high);
+        numbers.reserve(rangeSize);
         for (int i = low; i <= high; ++i) {
             numbers.emplace_back(i);
         }
 
         // Shuffle the vector using the random number generator
         std::shuffle(numbers.begin(), numbers.end(), rng_device);
-
-        // If the range contains more numbers than requested, resize the vector
-        if (numbers.size() > high) {
-            numbers.resize(high);
-        }
 
         return numbers;
     }
@@ -116,6 +115,7 @@ void randomizer::seed(unsigned long long seed) noexcept {
 /// @param high The upper bound of the range (inclusive).
 /// @return A random integer between the specified low and high bounds (inclusive).
 int randomizer::get_int_incl(int low, int high) noexcept {
+
     return this->m_impl->get_int_incl(low, high);
 }
 
@@ -125,5 +125,6 @@ int randomizer::get_int_incl(int low, int high) noexcept {
 /// @param high 1
 /// @return 
 std::vector<int> randomizer::get_num_ints_incl(int low, int high) noexcept {
+
     return this->m_impl->get_num_ints_incl(low, high);
 }

@@ -1,17 +1,23 @@
 #ifndef DISTANCES_H
 #define DISTANCES_H
 
+#include <cstdint>
+#include <memory>
 #include <unordered_map>
 #include <vector>
-#include <memory>
-#include <cstdint>
 
 namespace mazes {
 
-class grid;
+class grid_interface;
 
+/// @file distances.h
+/// @class distances
+/// @brief A class that manages distances associated with cells in a grid.
+/// @details This class provides functionality to initialize distances from a root cell,
 class distances {
+
 public:
+
     /// @brief Constructor that initializes the distances object with a given root index.
     /// @param root_index The index of the root cell used to initialize the distances object.
     explicit distances(int32_t root_index);
@@ -38,7 +44,7 @@ public:
     /// @param goal_index The index of the goal cell.
     /// @param grid A reference to the grid object for retrieving cell pointers.
     /// @return A shared pointer to a distances object representing the path.
-    std::shared_ptr<distances> path_to(int32_t goal_index, const grid& grid) const noexcept;
+    std::shared_ptr<distances> path_to(std::unique_ptr<grid_interface> const& g, int32_t goal_index) const noexcept;
 
     /// @brief Computes the maximum distance and cell index in a distances object.
     /// @return A pair containing the index of the cell with the maximum distance and the distance value.
@@ -49,8 +55,10 @@ public:
     void collect_keys(std::vector<int32_t>& indices) const noexcept;
 
 private:
-    int32_t m_root_index;
+
     std::unordered_map<int32_t, int> m_cells;
+
+    int32_t m_root_index;
 }; // class distances
 
 } // namespace mazes

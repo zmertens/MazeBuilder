@@ -16,9 +16,12 @@ set(MAZE_BUILDER_CORE_SRCS
     json_helper.cpp
     lab.cpp
     maze.cpp
+    objectify.cpp
+    pixels.cpp
     randomizer.cpp
     sidewinder.cpp
-    stringz.cpp
+    string_view_utils.cpp
+    stringify.cpp
     wavefront_object_helper.cpp
     writer.cpp)
 

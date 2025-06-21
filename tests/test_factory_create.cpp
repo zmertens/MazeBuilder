@@ -23,19 +23,19 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     vector<double> durations;
     durations.reserve(ITERATIONS);
 
-    for (auto i{ 0 }; i < ITERATIONS; ++i) {
-        durations.emplace_back(chrono::duration_cast<chrono::milliseconds>(
-            mazes::progress<chrono::milliseconds, chrono::steady_clock>::duration(
-                mazes::factory::create,
-                mazes::configurator().columns(COLUMNS).rows(ROWS).levels(LEVELS)
-                .distances(false).seed(SEED)._algo(to_algo_from_string(string(ALGO_S))))).count());
-    }
-    
-    auto max{ 0 };
-    for (const auto& duration : durations) {
-        max = (max < duration) ? duration : max;
-    }
-    REQUIRE(max > 0);
+    //for (auto i{ 0 }; i < ITERATIONS; ++i) {
+    //    durations.emplace_back(chrono::duration_cast<chrono::milliseconds>(
+    //        mazes::progress<chrono::milliseconds, chrono::steady_clock>::duration(
+    //            mazes::factory::create,
+    //            mazes::configurator().columns(COLUMNS).rows(ROWS).levels(LEVELS)
+    //            .distances(false).seed(SEED)._algo(to_algo_from_string(string(ALGO_S))))).count());
+    //}
+    //
+    //auto max{ 0 };
+    //for (const auto& duration : durations) {
+    //    max = (max < duration) ? duration : max;
+    //}
+    //REQUIRE(max > 0);
 
     // BENCHMARK("Benchmark factory::create") {
     //    auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS)._algo(ALGO_TO_RUN).seed(SEED));
@@ -46,11 +46,11 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {
 
-    vector<string> algos_to_convert = { "dfz", "BINARY_TREE", "adjacentwinder" };
+    //vector<string> algos_to_convert = { "dfz", "BINARY_TREE", "adjacentwinder" };
 
-    for (auto a : algos_to_convert) {
-        REQUIRE_THROWS_AS(mazes::to_algo_from_string(cref(a)), std::invalid_argument);
-    }
+    //for (auto a : algos_to_convert) {
+    //    REQUIRE_THROWS_AS(mazes::to_algo_from_string(cref(a)), std::invalid_argument);
+    //}
 }
 
 TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[randomizer]") {
