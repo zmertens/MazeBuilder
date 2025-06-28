@@ -17,8 +17,11 @@ class grid_operations {
 
 public:
 
+    /// @brief Destroys the grid_operations object and releases any associated resources.
     virtual ~grid_operations() = default;
 
+    /// @brief Retrieves the dimensions as a tuple of three unsigned integers.
+    /// @return A tuple containing three unsigned integers representing the dimensions.
     virtual std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept = 0;
 
     /// @brief Get neighbor by the cell's respective location
@@ -54,6 +57,8 @@ public:
     /// @return
     virtual std::shared_ptr<cell> search(int index) const noexcept = 0;
 
+    /// @brief Retrieves a collection of cell objects.
+    /// @return A vector containing shared pointers to cell objects.
     virtual std::vector<std::shared_ptr<cell>> get_cells() const noexcept = 0;
 
     /// @brief Get the count of cells in the grid
@@ -63,17 +68,14 @@ public:
     /// @brief Cleanup cells by cleaning up links within cells
     virtual void clear_cells() noexcept = 0;
 
-    /// @brief Configure the grid's cells' neighbors
-    /// @param indices 
-    /// @return 
-    virtual void configure(const std::vector<int>& indices) noexcept = 0;
+    /// @brief Set the cells in the grid
+    /// @param cells Vector of cells to set
+    /// @return True if the cells were successfully set, false otherwise
+    virtual bool set_cells(const std::vector<std::shared_ptr<cell>>& cells) noexcept = 0;
 
-private:
+    virtual void set_str(std::string const& str) noexcept = 0;
 
-    /// @brief Configure cells
-    /// @param cells 
-    virtual void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept = 0;
-
+    virtual std::string get_str() const noexcept = 0;
 };
 
 } // namespace mazes

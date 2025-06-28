@@ -1,21 +1,20 @@
 #include <MazeBuilder/factory.h>
 
 #include <MazeBuilder/binary_tree.h>
-#include <MazeBuilder/sidewinder.h>
-#include <MazeBuilder/dfs.h>
-#include <MazeBuilder/grid.h>
+#include <MazeBuilder/cell_factory.h>
 #include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/dfs.h>
 #include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid.h>
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/sidewinder.h>
+#include <MazeBuilder/stringify.h>
 
 #include <functional>
+#include <iostream>
 #include <sstream>
 #include <vector>
-
-#if defined(MAZE_DEBUG)
-#include <iostream>
-#endif
 
 using namespace mazes;
 
@@ -27,35 +26,46 @@ std::optional<std::unique_ptr<maze>> factory::create_with_rows_columns(unsigned 
     using namespace std;
 
     configurator config;
-    config.rows(rows).columns(columns).levels(1).distances(false).seed(0)._algo(algo::DFS);
-    config._output(output::STDOUT).block_id(-1);
+    config.rows(rows).columns(columns).levels(1).distances(false).seed(0).algo_id(algo::DFS);
+    config.output_id(output::STDOUT).block_id(-1);
 
     return create(config);
 }
 
 std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
-
     using namespace std;
 
+    // Create the grid
     auto g = create_grid(cref(config));
-
     if (!g.has_value()) {
         return nullptr;
     }
 
-    // Create weak references from shared_ptr's
+    // Set up randomizer
     randomizer rng;
     rng.seed(config.seed());
     auto shared_rng = make_shared<randomizer>(rng);
-    auto shared_config = make_shared<const configurator>(config);
 
-    auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns());
-    //grid_ptr->configure(cref(random_ints));
+    // Get dimensions from grid
+    const auto& ops = g.value()->operations();
+    auto dimensions = ops.get_dimensions();
 
+    // Create cells using the cell_factory
+    static cell_factory cell_maker;
+    auto cells = cell_maker.create_cells(dimensions);
+    
+    // Get random indices for configuration
+    auto random_ints = rng.get_num_ints_incl(0, config.rows() * config.columns() - 1);
+    
+    // Configure cells with the cell_factory
+    cell_maker.configure(cells, dimensions, random_ints);
+    
+    // Set the configured cells in the grid
+    g.value()->operations().set_cells(cells);
+
+    // Run algorithm on the grid
     auto success = false;
-
-    switch (shared_config->_algo()) {
-    // Algorithm implementations...
+    switch (config.algo_id()) {
     case algo::BINARY_TREE: {
         static binary_tree bt;
         success = bt.run(cref(g.value()), std::ref(*shared_rng));
@@ -75,49 +85,49 @@ std::unique_ptr<maze> factory::create(configurator const& config) noexcept {
         return nullptr;
     }
 
+    // Calculate distances if needed
     if (success && config.distances()) {
         // Use operations to get a distance grid and calculate distances
-        auto& ops = g.value()->operations();
         if (auto dist_grid = dynamic_cast<distance_grid*>(g.value().get())) {
             dist_grid->calculate_distances(ops.num_cells() - 1, 0);
         }
     }
 
-    // Also update the string representation
+    // Get string representation of the maze
+    string maze_str;
     if (success) {
-        // Create the maze using the grid and config
-        stringstream ss;
-        //ss << *(g.value().get());
-        //result = make_unique<maze>(cref(config), ss.str());
+        // Use stringz::stringify instead of the broken stringify class
+        auto temp_maze = make_unique<maze>(cref(config), "");
+        mazes::stringify str_tool;
+        success = str_tool.run(g.value(), *shared_rng);
+        maze_str = g.value()->operations().get_str();
     }
 
-    // Use operations to clear the cells
+    // Clean up and create the maze
     g.value()->operations().clear_cells();
-
-    std::unique_ptr<maze> result = nullptr;
+    
+    unique_ptr<maze> result = nullptr;
     if (success) {
-        // Create the maze using the grid and config
-        stringstream ss;
-        //ss << *(g.value().get());
-        result = make_unique<maze>(cref(config), ss.str());
+        result = make_unique<maze>(cref(config), maze_str);
     }
 
-    // Explicitly clean up the grid before returning
-    //if (grid_ptr) {
-    //    grid_ptr->clear_cells();
-    //}
+    if (!success) {
 
+        cerr << "Failed to create maze with the given configuration." << endl;
+
+        return nullptr;
+    }
+    
     return result;
 }
 
 std::optional<std::unique_ptr<grid_interface>> factory::create_grid(configurator const& config) noexcept {
-
     using namespace std;
 
     unique_ptr<grid_interface> g = nullptr;
 
     if (config.distances()) {
-        if (config._output() == output::PNG || config._output() == output::JPEG) {
+        if (config.output_id() == output::PNG || config.output_id() == output::JPEG) {
 
             g = make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
         } else {

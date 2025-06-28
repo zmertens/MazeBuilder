@@ -2,6 +2,7 @@
 #define COLORED_GRID_H
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid.h> // Include grid explicitly
 
 #include <cstdint>
 #include <memory>
@@ -12,7 +13,7 @@ namespace mazes {
 
 class cell;
 class distances;
-class grid_operations;
+class grid_operations;  
 
 /// @file colored_grid.h
 /// @class colored_grid
@@ -32,20 +33,20 @@ public:
     /// @return If the cell has no contents, the contents are considered empty
     virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
 
-    ///// @brief Retrieves the background color for a given cell, if available.
-    ///// @param c A shared pointer to the cell for which the background color is to be retrieved.
-    ///// @return An 32-bit unsigned integer containing the background color
+    /// @brief Retrieves the background color for a given cell, if available.
+    /// @param c A shared pointer to the cell for which the background color is to be retrieved.
+    /// @return An 32-bit unsigned integer containing the background color
     virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
 
     // Delegate to embedded grid
     grid_operations& operations() noexcept override;
 
     const grid_operations& operations() const noexcept override;
-	
-private:
 
+private:
     std::shared_ptr<distances> m_distances;
 
+    // Change from grid_interface to grid since we need grid's implementation of operations()
     std::unique_ptr<grid_interface> m_grid;
 };
 

@@ -1,7 +1,10 @@
 #include <MazeBuilder/stringify.h>
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
+
+#include <sstream>
 
 using namespace mazes;
 
@@ -11,77 +14,90 @@ using namespace mazes;
 /// @return 
 bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
 
-    //auto [rows, columns, _] = g.get_dimensions();
+    if (!g) {
 
-    //// First sort cells by row then column
-    //std::vector<std::shared_ptr<cell>> cells;
-    //cells.reserve(rows * columns);
+        return false;
+    }
 
-    //// populate the cells from the grid
-    //g.to_vec(std::ref(cells));
+    std::stringstream ss;
+    auto& ops = g->operations();
 
-    //// ---+
-    //static constexpr auto barrier = { BARRIER2, BARRIER2, BARRIER2, BARRIER2, BARRIER2, CORNER };
-    //static const std::string wall_plus_corner = "-----+";
+    // Get all cells and dimensions
+    auto cells = ops.get_cells();
+    auto dimensions = ops.get_dimensions();
+    auto [rows, columns, levels] = dimensions;
 
-    //std::stringstream output;
-    //output << CORNER;
+    // Generate ASCII representation
+    // Top border
+    ss << "+";
+    for (unsigned int c = 0; c < columns; ++c) {
+        ss << "---+";
+    }
+    ss << "\n";
 
-    //for (auto i{ 0u }; i < columns; i++) {
-    //    output << wall_plus_corner;
-    //}
-    //output << "\n";
+    // For each row
+    for (unsigned int r = 0; r < rows; ++r) {
+        std::string top_line = "|";
+        std::string bottom_line = "+";
 
-    //auto row_counter{ 0u }, column_counter{ 0u };
-    //auto cell_iter = cells.cbegin();
+        // For each column
+        for (unsigned int c = 0; c < columns; ++c) {
+            int cell_index = r * columns + c;
+            auto cell_ptr = ops.search(cell_index);
 
-    //while (row_counter < rows) {
-    //    std::stringstream top_builder, bottom_builder;
-    //    top_builder << BARRIER1;
-    //    bottom_builder << CORNER;
+            // Cell content (from g's contents_of method)
+            std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
+            // Pad content to 3 characters
+            while (content.length() < 3) {
+                content = " " + content;
+            }
 
-    //    while (column_counter < columns && cell_iter != cells.cend()) {
+            top_line += content;
 
-    //        // 5 spaces in body for single-digit number to hold base36 values
-    //        static const std::string vertical_barrier_str{ BARRIER1 };
+            // East wall
+            auto east_neighbor = ops.get_east(cell_ptr);
+            bool linked_east = false;
 
-    //        auto val = g.contents_of(std::cref(*cell_iter));
-    //        std::string body = "";
-    //        switch (val.size()) {
-    //        case 1: body = "  " + val + "  "; break;
-    //        case 2: body = " " + val + "  "; break;
-    //        case 3: body = " " + val + " "; break;
-    //        case 4: body = " " + val; break;
-    //            // case 1 is default
-    //        default: body = "  " + val + "  "; break;
-    //        }
+            if (cell_ptr && east_neighbor) {
+                auto links = cell_ptr->get_links();
+                for (const auto& [linked_cell, is_linked] : links) {
+                    if (is_linked) {
+                        auto locked = linked_cell;
+                        if (locked && locked->get_index() == east_neighbor->get_index()) {
+                            linked_east = true;
+                            break;
+                        }
+                    }
+                }
+            }
 
-    //        // Use the grid to get neighbors instead of calling methods on the cell directly
-    //        auto current_cell = *cell_iter;
-    //        auto east_neighbor = g.get_east(current_cell);
-    //        auto south_neighbor = g.get_south(current_cell);
+            top_line += linked_east ? " " : "|";
 
-    //        bool has_east_link = east_neighbor && current_cell->is_linked(east_neighbor);
-    //        bool has_south_link = south_neighbor && current_cell->is_linked(south_neighbor);
+            // South wall
+            auto south_neighbor = ops.get_south(cell_ptr);
+            bool linked_south = false;
 
-    //        auto east_boundary = has_east_link ? " " : vertical_barrier_str;
-    //        auto south_boundary = has_south_link ? "     " : wall_plus_corner.substr(0, wall_plus_corner.size() - 1);
+            if (cell_ptr && south_neighbor) {
+                auto links = cell_ptr->get_links();
+                for (const auto& [linked_cell, is_linked] : links) {
+                    if (is_linked) {
+                        auto locked = linked_cell;
+                        if (locked && locked->get_index() == south_neighbor->get_index()) {
+                            linked_south = true;
+                            break;
+                        }
+                    }
+                }
+            }
 
-    //        top_builder << body << east_boundary;
-    //        bottom_builder << south_boundary << "+";
+            bottom_line += linked_south ? "   " : "---";
+            bottom_line += "+";
+        }
 
-    //        ++cell_iter;
-    //        ++column_counter;
-    //    }
+        ss << top_line << "\n" << bottom_line << "\n";
+    }
 
-    //    column_counter = 0;
-    //    ++row_counter;
+    ops.set_str(ss.str());
 
-    //    output << top_builder.str() << "\n" << bottom_builder.str() << "\n";
-    //} // while
-
-    //os << output.str() << "\n";
-
-    //return os;
-    return false;
+    return true;
 } // run

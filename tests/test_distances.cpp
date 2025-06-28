@@ -115,7 +115,7 @@ TEST_CASE("Distances collect keys", "[distances]") {
 
 TEST_CASE("Distances path_to method edge cases", "[distances]") {
     auto g = std::make_shared<mazes::grid>(3, 3, 1);
-    g->configure({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
+    // g->configure({ 0, 1, 2, 3, 4, 5, 6, 7, 8 });
 
     auto cell0 = g->search(0);
     auto cell1 = g->search(1);

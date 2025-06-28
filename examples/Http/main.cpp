@@ -70,14 +70,15 @@ void process_commands(std::deque<char>& commands, bool& is_running) {
             }
 
             // Create the maze
-            auto next_maze_ptr = mazes::factory::create(mazes::configurator().rows(rows).columns(columns).levels(height).seed(seed)._algo(mt));
+            auto next_maze_ptr = mazes::factory::create(
+                mazes::configurator().rows(rows).columns(columns).levels(height).seed(seed).algo_id(mt));
 
             if (!next_maze_ptr) {
                 cerr << "Error creating maze: " << endl;
                 break;
             }
 
-            auto next_maze_ptr_s = mazes::stringz::stringify(cref(next_maze_ptr));
+            auto next_maze_ptr_s = "";//mazes::stringz::stringify(cref(next_maze_ptr));
 
             unordered_map<string, string> my_json_map;
             my_json_map["rows"] = to_string(rows);

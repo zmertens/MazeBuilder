@@ -19,7 +19,7 @@ else()
   set(THREADS_PREFER_PTHREAD_FLAG ON)
 endif()
 
-project(MazeBuilder VERSION 6.3.5 LANGUAGES C CXX)
+project(MazeBuilder VERSION 6.7.5 LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 

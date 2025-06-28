@@ -790,7 +790,7 @@ bool Physics::run() const noexcept {
     AudioHelper audioHelper{cref(generateSound)};
 
     // Use the new strip_json_quotes method to properly handle the JSON string values
-    auto resourceLoadingStrView = mazes::stringz::strip_json_quotes(resourceMap["icon_image_path"]);
+    auto resourceLoadingStrView = "";//mazes::stringz::strip_json_quotes(resourceMap["icon_image_path"]);
 
     const auto iconPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
     SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
@@ -802,7 +802,7 @@ bool Physics::run() const noexcept {
     }
 
     // Setup SDL audio device with properly stripped JSON value
-    resourceLoadingStrView = mazes::stringz::strip_json_quotes(resourceMap["loading_sound_path"]);
+    resourceLoadingStrView = "";//mazes::stringz::strip_json_quotes(resourceMap["loading_sound_path"]);
 
     const auto loadingPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
     if (!sdlHelper.loadWAV(loadingPath.c_str())) {
@@ -1275,7 +1275,7 @@ void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, in
         return;
     }
 
-    auto s = mazes::stringz::stringify(cref(m_ptr.value()));
+    auto s = "";// mazes::stringz::stringify(cref(m_ptr.value()));
 
     persistentMazeStr = s;
     

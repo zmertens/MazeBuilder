@@ -1,6 +1,5 @@
 #include <MazeBuilder/grid.h>
 
-
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/lab.h>
 
@@ -76,52 +75,6 @@ grid::~grid() {
     m_calculate_cell_index = {};
 }
 
-void grid::configure(std::vector<int> const& indices) noexcept {
-    using namespace std;
-
-    if (m_configured) {
-
-        return;
-    }
-
-    vector<shared_ptr<cell>> cells;
-    cells.reserve(indices.size());
-
-    int row{ 0 }, column{ 0 }, index{ 0 }, last_cell_count{ 0 };
-
-    shared_ptr<cell> new_node = {};
-
-    for (auto itr = indices.cbegin(); itr != indices.cend(); ++itr) {
-
-        index = *itr;
-
-        new_node = make_shared<cell>(index);
-
-        cells.emplace_back(new_node);
-
-#if defined(MAZE_DEBUG)
-        auto new_count = static_cast<int>(cells.size());
-        if (new_count == last_cell_count) {
-
-            cout << "Cell insertion failed at count: " << new_count << endl;
-
-            break;
-        }
-#endif
-    }
-
-    this->sort(ref(cells));
-
-    this->configure_cells(std::ref(cells));
-
-    for (const auto& c : cells) {
-        m_cells.emplace(c->get_index(), c);
-    }
-
-    // Mark as configured
-    m_configured = true;
-}
-
 std::shared_ptr<cell> grid::get_neighbor(const std::shared_ptr<cell>& c, Direction dir) const noexcept {
     if (!c) return nullptr;
 
@@ -159,17 +112,17 @@ void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, const std
     // Set the reverse direction WITHOUT calling set_neighbor recursively
     Direction reverse_dir;
     switch (dir) {
-    case Direction::North:
-        reverse_dir = Direction::South;
+    case Direction::NORTH:
+        reverse_dir = Direction::SOUTH;
         break;
-    case Direction::South:
-        reverse_dir = Direction::North;
+    case Direction::SOUTH:
+        reverse_dir = Direction::NORTH;
         break;
-    case Direction::East:
-        reverse_dir = Direction::West;
+    case Direction::EAST:
+        reverse_dir = Direction::WEST;
         break;
-    case Direction::West:
-        reverse_dir = Direction::East;
+    case Direction::WEST:
+        reverse_dir = Direction::EAST;
         break;
     default:
         return; // Unknown direction
@@ -183,9 +136,9 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(const std::shared_ptr<cel
     std::vector<std::shared_ptr<cell>> neighbors;
     if (!c) return neighbors;
 
-    neighbors.reserve(static_cast<size_t>(Direction::Count));
+    neighbors.reserve(static_cast<size_t>(Direction::COUNT));
 
-    for (size_t i = 0; i < static_cast<size_t>(Direction::Count); ++i) {
+    for (size_t i = 0; i < static_cast<size_t>(Direction::COUNT); ++i) {
         Direction dir = static_cast<Direction>(i);
         if (auto neighbor = get_neighbor(c, dir)) {
             neighbors.push_back(neighbor);
@@ -193,50 +146,6 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(const std::shared_ptr<cel
     }
 
     return neighbors;
-}
-
-void grid::configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept {
-    using namespace std;
-    auto [ROWS, COLUMNS, _] = this->m_dimensions;
-
-    // Clear existing topology
-    {
-        std::lock_guard<std::mutex> lock(m_topology_mutex);
-        m_topology.clear();
-    }
-
-    for (unsigned int row = 0; row < ROWS; ++row) {
-        for (unsigned int col = 0; col < COLUMNS; ++col) {
-            int index = this->m_calculate_cell_index(row, col);
-
-            if (index >= static_cast<int>(cells.size())) {
-                return;
-            }
-
-            auto c = cells.at(index);
-
-            // We only need to set East and South neighbors
-            // North and West will be set automatically through the bidirectional mechanism
-
-            // Set east neighbor
-            if (col < COLUMNS - 1) {
-                auto east_index = this->m_calculate_cell_index(row, col + 1);
-                if (east_index >= 0 && east_index < static_cast<int>(cells.size())) {
-                    auto east_cell = cells.at(east_index);
-                    set_neighbor(c, Direction::East, east_cell);
-                }
-            }
-
-            // Set south neighbor
-            if (row < ROWS - 1) {
-                auto south_index = this->m_calculate_cell_index(row + 1, col);
-                if (south_index >= 0 && south_index < static_cast<int>(cells.size())) {
-                    auto south_cell = cells.at(south_index);
-                    set_neighbor(c, Direction::South, south_cell);
-                }
-            }
-        }
-    }
 }
 
 void grid::clear_cells() noexcept {
@@ -271,19 +180,19 @@ void grid::clear_cells() noexcept {
 }
 
 std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::North);
+    return get_neighbor(c, Direction::NORTH);
 }
 
 std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::South);
+    return get_neighbor(c, Direction::SOUTH);
 }
 
 std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::East);
+    return get_neighbor(c, Direction::EAST);
 }
 
 std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::West);
+    return get_neighbor(c, Direction::WEST);
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
@@ -344,4 +253,63 @@ grid_operations& grid::operations() noexcept {
 const grid_operations& grid::operations() const noexcept {
 
     return *this;
+}
+
+bool grid::set_cells(const std::vector<std::shared_ptr<cell>>& cells) noexcept {
+    // Clear existing cells
+    m_cells.clear();
+    m_topology.clear();
+    
+    // Add the cells to the grid
+    for (const auto& cell_ptr : cells) {
+        if (cell_ptr) {
+            m_cells[cell_ptr->get_index()] = cell_ptr;
+        }
+    }
+    
+    // Build topology based on spatial relationships
+    auto [rows, columns, levels] = m_dimensions;
+    
+    for (unsigned int l = 0; l < levels; ++l) {
+        for (unsigned int r = 0; r < rows; ++r) {
+            for (unsigned int c = 0; c < columns; ++c) {
+                int cell_index = l * (rows * columns) + r * columns + c;
+                std::unordered_map<Direction, int> neighbor_indices;
+                
+                // North neighbor
+                if (r > 0) {
+                    neighbor_indices[Direction::NORTH] = l * (rows * columns) + (r - 1) * columns + c;
+                }
+                
+                // South neighbor
+                if (r < rows - 1) {
+                    neighbor_indices[Direction::SOUTH] = l * (rows * columns) + (r + 1) * columns + c;
+                }
+                
+                // East neighbor
+                if (c < columns - 1) {
+                    neighbor_indices[Direction::EAST] = l * (rows * columns) + r * columns + (c + 1);
+                }
+                
+                // West neighbor
+                if (c > 0) {
+                    neighbor_indices[Direction::WEST] = l * (rows * columns) + r * columns + (c - 1);
+                }
+                
+                m_topology[cell_index] = neighbor_indices;
+            }
+        }
+    }
+    
+    m_configured = true;
+    return true;
+}
+
+void grid::set_str(std::string const& str) noexcept {
+    this->m_str = str;
+}
+
+std::string grid::get_str() const noexcept {
+    
+    return this->m_str;
 }

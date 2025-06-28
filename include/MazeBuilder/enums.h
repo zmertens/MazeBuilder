@@ -116,11 +116,11 @@ namespace mazes {
 
     /// @brief Directional neighbors for grid topology
     enum class Direction : std::uint8_t {
-        North = 0,
-        South = 1,
-        East = 2,
-        West = 3,
-        Count
+        NORTH = 0,
+        SOUTH = 1,
+        EAST = 2,
+        WEST = 3,
+        COUNT
     };
 } // namespace
 

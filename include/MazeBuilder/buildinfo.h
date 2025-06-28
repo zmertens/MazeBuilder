@@ -6,9 +6,9 @@
 namespace mazes {
 
 struct build_info {
-    static inline const std::string CommitSHA = "'dea6126'";
-    static inline const std::string Timestamp = "2025-05-31T12:54:28";
-    static inline const std::string Version = "6.3.5";
+    static inline const std::string CommitSHA = "'1061001'";
+    static inline const std::string Timestamp = "2025-06-28T14:08:06";
+    static inline const std::string Version = "6.7.5";
 };
 
 }

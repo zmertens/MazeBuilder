@@ -160,7 +160,7 @@ std::string batch_processor::generate_maze(int seed, const std::string& algo_str
         
         maze_ptr next_maze_ptr = mazes::factory::create(
             mazes::configurator().columns(columns).rows(rows).levels(levels)
-            .distances(distances).seed(seed)._algo(maze_type)
+            .distances(distances).seed(seed).algo_id(maze_type)
             .block_id(BLOCK_ID));
             
         duration = clock.elapsed<chrono::milliseconds>();
@@ -169,7 +169,8 @@ std::string batch_processor::generate_maze(int seed, const std::string& algo_str
             throw runtime_error("Failed to create maze");
         }
         
-        auto temp_s = mazes::stringz::stringify(next_maze_ptr.value());
+        // Get the string representation from the maze
+        std::string temp_s{ next_maze_ptr.value()->str() };
         
         if (encodes) {
             mazes::base64_helper my_base64;
@@ -211,9 +212,9 @@ bool batch_processor::output_maze(const std::string& maze_str,
             auto pixels_w = 0, pixels_h = 0;
             pixels.reserve(rows * columns * STRIDE);
             if (distances) {
-                mazes::stringz::to_pixels_colored(maze_str, pixels, pixels_w, pixels_h, STRIDE);
+                // mazes::stringz::to_pixels_colored(maze_str, pixels, pixels_w, pixels_h, STRIDE);
             } else {
-                mazes::stringz::to_pixels(maze_str, pixels, pixels_w, pixels_h, STRIDE);
+                // mazes::stringz::to_pixels(maze_str, pixels, pixels_w, pixels_h, STRIDE);
             }
             success = my_writer.write_png(output_file, pixels, pixels_w, pixels_h, STRIDE);
             break;
@@ -224,9 +225,9 @@ bool batch_processor::output_maze(const std::string& maze_str,
             auto pixels_w = 0, pixels_h = 0;
             pixels.reserve(rows * columns * STRIDE);
             if (distances) {
-                mazes::stringz::to_pixels_colored(maze_str, pixels, pixels_w, pixels_h, STRIDE);
+                // mazes::stringz::to_pixels_colored(maze_str, pixels, pixels_w, pixels_h, STRIDE);
             } else {
-                mazes::stringz::to_pixels(maze_str, pixels, pixels_w, pixels_h, STRIDE);
+                // mazes::stringz::to_pixels(maze_str, pixels, pixels_w, pixels_h, STRIDE);
             }
             success = my_writer.write_jpeg(output_file, pixels, pixels_w, pixels_h, STRIDE);
             break;

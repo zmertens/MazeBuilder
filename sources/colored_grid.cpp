@@ -13,7 +13,6 @@
 #endif
 
 using namespace mazes;
-using namespace std;
 
 /// @brief 
 /// @param rows 1
@@ -21,7 +20,7 @@ using namespace std;
 /// @param levels 1
 colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int levels)
     : m_grid{ std::make_unique<grid>(rows, cols, levels) }
-    , m_distances(make_shared<distances>(rows * cols)) {
+    , m_distances{ std::make_shared<distances>(rows * cols) } {
 
 }
 
@@ -84,7 +83,7 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c)
         return m_grid->background_color_for(cref(c));
     }
 
-	const auto& d = this->m_distances->path_to(cref(m_grid), c->get_index());
+	const auto& d = this->m_distances->path_to(m_grid, c->get_index());
 
 	if (!d) {
 

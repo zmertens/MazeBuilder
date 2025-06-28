@@ -79,7 +79,7 @@ std::string cli::process_command_line(const mazes::args& a) const noexcept {
         .columns(columns)
         .seed(seed)
         .distances(distances)
-        ._algo(to_algo_from_string(algo_str))
+        .algo_id(to_algo_from_string(algo_str))
     );
     
     return maze_ptr->str().data();

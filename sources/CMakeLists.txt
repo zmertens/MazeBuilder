@@ -7,6 +7,7 @@ set(MAZE_BUILDER_CORE_SRCS
     base64_helper.cpp
     binary_tree.cpp
     cell.cpp
+    cell_factory.cpp
     colored_grid.cpp
     dfs.cpp
     distance_grid.cpp

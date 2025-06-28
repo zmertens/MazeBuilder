@@ -125,16 +125,16 @@ public:
     /// @brief Cleanup cells by cleaning up links within cells
     virtual void clear_cells() noexcept override;
 
-    /// @brief Configure the grid's cells' neighbors
-    /// @param indices 
-    /// @return 
-    virtual void configure(const std::vector<int>& indices) noexcept override;
+    /// @brief Set cells and build topology from them
+    /// @param cells Vector of pre-configured cells
+    /// @return true if successful, false otherwise
+    virtual bool set_cells(const std::vector<std::shared_ptr<cell>>& cells) noexcept override;
+
+    virtual void set_str(std::string const& str) noexcept override;
+
+    virtual std::string get_str() const noexcept override;
 
 private:
-
-    /// @brief Configure cells
-    /// @param cells 
-    virtual void configure_cells(std::vector<std::shared_ptr<cell>>& cells) noexcept override;
 
     /// @brief Calculate the flat index for a 2D grid
     std::function<int(unsigned int, unsigned int)> m_calculate_cell_index;
@@ -149,6 +149,8 @@ private:
     std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
 
     std::atomic<bool> m_configured;
+
+    std::string m_str;
 }; // class
 
 } // namespace mazes
