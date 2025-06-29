@@ -6,15 +6,15 @@
 #include <MazeBuilder/grid_interface.h>
 
 #if defined(MAZE_DEBUG)
-#include <sstream>
 #include <iostream>
 #endif
 
+#include <algorithm>
 #include <cctype>
 #include <random>
+#include <sstream>
 #include <tuple>
 #include <unordered_set>
-#include <algorithm>
 
 using namespace mazes;
 
