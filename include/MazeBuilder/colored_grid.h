@@ -2,25 +2,24 @@
 #define COLORED_GRID_H
 
 #include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/grid.h> // Include grid explicitly
-
-#include <cstdint>
-#include <memory>
-#include <optional>
-#include <vector>
 
 namespace mazes {
 
 class cell;
 class distances;
-class grid_operations;  
+class grid_operations;
 
-/// @file colored_grid.h
-/// @class colored_grid
-/// @brief Extension of the grid class to include color information
 class colored_grid : public grid_interface {
 
 public:
+
+    // Delete copy constructor and copy assignment operator to fix the static assertion failure  
+    colored_grid(const colored_grid&) = delete;
+    colored_grid& operator=(const colored_grid&) = delete;
+
+    // Explicitly define move constructor and move assignment operator  
+    colored_grid(colored_grid&&) noexcept = default;
+    colored_grid& operator=(colored_grid&&) noexcept = default;
 
     /// @brief Constructs a colored grid with specified dimensions.
     /// @param width The width of the grid. Defaults to 1.
@@ -50,5 +49,6 @@ private:
     std::unique_ptr<grid_interface> m_grid;
 };
 
-}
+} // namespace mazes
+
 #endif // COLORED_GRID_H

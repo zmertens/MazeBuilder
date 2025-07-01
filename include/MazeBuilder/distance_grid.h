@@ -3,10 +3,10 @@
 
 #include <MazeBuilder/grid_interface.h>
 
-#include <unordered_map>
-#include <string>
-#include <memory>
 #include <future>
+#include <memory>
+#include <string>
+#include <unordered_map>
 
 namespace mazes {
 
@@ -20,6 +20,14 @@ class grid_operations;
 /// @brief A grid that can calculate distances between cells
 class distance_grid : public grid_interface {
 public:
+
+    // Delete copy constructor and copy assignment operator to fix the static assertion failure  
+    distance_grid(const distance_grid&) = delete;
+    distance_grid& operator=(const distance_grid&) = delete;
+
+    // Explicitly define move constructor and move assignment operator  
+    distance_grid(distance_grid&&) noexcept = default;
+    distance_grid& operator=(distance_grid&&) noexcept = default;
 
 	explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 

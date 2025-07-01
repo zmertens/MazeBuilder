@@ -81,8 +81,9 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_S
 set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(STATUS ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
-    target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "MAZE_DEBUG")
+    set(MAZE_BUILDER_DEBUG_OPTION "MAZE_DEBUG")
+    message(INFO ": ${PROJECT_NAME} - ${CMAKE_BUILD_TYPE} enabled to use ${MAZE_BUILDER_DEBUG_OPTION} definition.")
+    target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${MAZE_BUILDER_DEBUG_OPTION})
 endif()
 
 # Shared build
