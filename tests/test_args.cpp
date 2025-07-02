@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/string_view_utils.h>
 
 using namespace std;
 using namespace mazes;
@@ -99,13 +100,13 @@ TEST_CASE("Args add options and flags", "[options and flags]") {
 TEST_CASE("Args method prints correctly", "[prints]") {
     args args_handler{};
     SECTION("Print empty args") {
-        auto s = args::to_str(args_handler);
+        auto s = string_view_utils::to_string(cref(args_handler));
         REQUIRE(s.empty());
     }
     SECTION("Print args") {
         vector<string> args_vec = { "-r", "10", "-c", "10", "-s", "2", "-d" };
         REQUIRE(args_handler.parse(cref(args_vec)));
-        auto s = args::to_str(args_handler);
+        auto s = string_view_utils::to_string(cref(args_handler));
         REQUIRE_FALSE(s.empty());
     }
 }
@@ -220,8 +221,8 @@ TEST_CASE("Args can handle a JSON arr of objects", "[json arr input]") {
         REQUIRE(args_handler.parse(cref(json_file)));
         REQUIRE(args_handler.has_array());
         
-        std::string str_output = args::to_str(args_handler);
-        REQUIRE(!str_output.empty());
+        auto s = string_view_utils::to_string(cref(args_handler));
+        REQUIRE(!s.empty());
     }
 }
 
@@ -397,5 +398,207 @@ TEST_CASE("Args correctly parses and accesses short-form arguments", "[short for
         REQUIRE(args_handler.get("--rows").value() == "10");
         REQUIRE(args_handler.get("-c").has_value());
         REQUIRE(args_handler.get("-c").value() == "5");
+    }
+}
+
+// Add this test case to verify the sliced array syntax for distances flag
+TEST_CASE("Args handles sliced array syntax for distances flag", "[sliced array distances]") {
+    args args_handler{};
+
+    SECTION("Distances with start and end cells specified") {
+        vector<string> args_vec = { "--distances=[0:5]" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Check that the original format is preserved
+        REQUIRE(args_handler.get("--distances").has_value());
+        REQUIRE(args_handler.get("--distances").value() == "[0:5]");
+        
+        // Check that the parsed start and end indices are available
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "0");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "5");
+    }
+    
+    SECTION("Distances with only start cell specified") {
+        vector<string> args_vec = { "-d", "[1:]" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Check original format
+        REQUIRE(args_handler.get("-d").has_value());
+        REQUIRE(args_handler.get("-d").value() == "[1:]");
+        
+        // Check parsed values
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "1");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "-1");
+    }
+    
+    SECTION("Distances with only end cell specified") {
+        vector<string> args_vec = { "--distances=[:10]" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Check original format
+        REQUIRE(args_handler.get("--distances").has_value());
+        REQUIRE(args_handler.get("--distances").value() == "[:10]");
+        
+        // Check parsed values
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "0");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "10");
+    }
+    
+    SECTION("Distances with mixed array syntax in other arguments") {
+        vector<string> args_vec = { "-r", "10", "-c", "5", "-d", "[3:7]", "-s", "42" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Check all arguments are preserved
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+        REQUIRE(args_handler.get("-s").has_value());
+        REQUIRE(args_handler.get("-s").value() == "42");
+        
+        // Check array syntax is handled correctly
+        REQUIRE(args_handler.get("-d").has_value());
+        REQUIRE(args_handler.get("-d").value() == "[3:7]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "3");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "7");
+    }
+}
+
+// Test the sliced array syntax with string input format
+TEST_CASE("Args handles sliced array syntax for distances in string arguments", "[sliced array string]") {
+    args args_handler{};
+
+    SECTION("String argument with sliced array syntax") {
+        string args_str = "-r 10 -c 5 -d [2:8] -s 100";
+        REQUIRE(args_handler.parse(args_str));
+        
+        // Check all arguments
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "5");
+        REQUIRE(args_handler.get("-s").has_value());
+        REQUIRE(args_handler.get("-s").value() == "100");
+        
+        // Check array syntax parsing
+        REQUIRE(args_handler.get("-d").has_value());
+        REQUIRE(args_handler.get("-d").value() == "[2:8]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "2");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "8");
+    }
+    
+    SECTION("String argument with equals sign and sliced array syntax") {
+        string args_str = "--rows=10 --columns=5 --distances=[4:12] --seed=100";
+        REQUIRE(args_handler.parse(args_str));
+        
+        // Check standard arguments
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+        REQUIRE(args_handler.get("--columns").has_value());
+        REQUIRE(args_handler.get("--columns").value() == "5");
+        REQUIRE(args_handler.get("--seed").has_value());
+        REQUIRE(args_handler.get("--seed").value() == "100");
+        
+        // Check array syntax parsing
+        REQUIRE(args_handler.get("--distances").has_value());
+        REQUIRE(args_handler.get("--distances").value() == "[4:12]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "4");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "12");
+    }
+}
+
+// Test sliced array syntax with argc/argv format
+TEST_CASE("Args handles sliced array syntax with argc/argv", "[sliced array argc argv]") {
+    args args_handler{};
+    
+    SECTION("Basic argc/argv with sliced array") {
+        char* test_argv[] = {
+            (char*)"program",
+            (char*)"-r", (char*)"10",
+            (char*)"-c", (char*)"15",
+            (char*)"-d", (char*)"[1:9]",
+            nullptr
+        };
+        int test_argc = 7;
+        
+        REQUIRE(args_handler.parse(test_argc, test_argv));
+        
+        // Verify standard args
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "15");
+        
+        // Verify array syntax parsing
+        REQUIRE(args_handler.get("-d").has_value());
+        REQUIRE(args_handler.get("-d").value() == "[1:9]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "1");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "9");
+    }
+    
+    SECTION("Argc/argv with equals sign and sliced array") {
+        char* test_argv[] = {
+            (char*)"program",
+            (char*)"--rows=10",
+            (char*)"--columns=15",
+            (char*)"--distances=[0:20]",
+            nullptr
+        };
+        int test_argc = 4;
+        
+        REQUIRE(args_handler.parse(test_argc, test_argv));
+        
+        // Verify array syntax parsing
+        REQUIRE(args_handler.get("--distances").has_value());
+        REQUIRE(args_handler.get("--distances").value() == "[0:20]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "0");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "20");
+    }
+}
+
+// Test with JSON input containing sliced array distances
+TEST_CASE("Args handles sliced array syntax in JSON input", "[sliced array json]") {
+    args args_handler{};
+    
+    SECTION("JSON object with sliced array distances") {
+        string valid_json = R"json(-j `{
+            "rows": 10,
+            "columns": 10,
+            "seed": 2,
+            "distances": "[5:15]",
+            "output": "1.txt"
+        }`)json";
+        
+        REQUIRE(args_handler.parse(valid_json));
+        
+        // Verify JSON fields
+        REQUIRE(args_handler.get("rows").has_value());
+        REQUIRE(args_handler.get("rows").value() == "10");
+        REQUIRE(args_handler.get("columns").has_value());
+        REQUIRE(args_handler.get("columns").value() == "10");
+        
+        // Verify the distances field is handled correctly
+        REQUIRE(args_handler.get("distances").has_value());
+        REQUIRE(args_handler.get("distances").value() == "[5:15]");
+        REQUIRE(args_handler.get("distances_start").has_value());
+        REQUIRE(args_handler.get("distances_start").value() == "5");
+        REQUIRE(args_handler.get("distances_end").has_value());
+        REQUIRE(args_handler.get("distances_end").value() == "15");
     }
 }

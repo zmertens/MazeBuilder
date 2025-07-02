@@ -24,13 +24,6 @@ distance_grid::distance_grid(unsigned int rows, unsigned int cols, unsigned int 
 
 }
 
-/// @brief Constructs a distance_grid object with specified dimensions and initializes the distance calculations.
-/// @return future to init task
-//void distance_grid::configure(const std::vector<int>& indices) noexcept {
-//
-//    grid::configure(cref(indices));
-//}
-
 std::string distance_grid::contents_of(std::shared_ptr<cell> const& c) const noexcept {
     if (m_distances && c) {
 

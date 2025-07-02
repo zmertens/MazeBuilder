@@ -6,10 +6,13 @@
 #include <string_view>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 #include <vector>
+#include <sstream>
 
 namespace mazes {
 
+class args;
 class maze;
 class lab;
 
@@ -96,6 +99,23 @@ public:
     /// @param s The string view potentially containing JSON quotes
     /// @return A string view with JSON quotes removed from both ends
     static std::string_view strip_json_quotes(const std::string_view& s) noexcept;
+
+
+    /// @brief Convert a map to a formatted string with each key-value pair on a line
+    /// @param m The map to convert
+    /// @return A formatted string representation of the map
+    static std::string to_string(std::unordered_map<std::string, std::string> const& m) noexcept;
+
+    // Add these prototypes before the template method
+    /// @brief Convert an args object to a string
+    /// @param a The args object to convert
+    /// @return A formatted string representation of the args
+    static std::string to_string(const args& a) noexcept;
+
+    /// @brief Convert a reference_wrapper of args to a string
+    /// @param a The reference_wrapper of args to convert
+    /// @return A formatted string representation of the args
+    static std::string to_string(const std::reference_wrapper<const args>& a) noexcept;
 
 }; // class
 } // namespace

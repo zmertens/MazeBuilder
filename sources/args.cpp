@@ -35,6 +35,32 @@ bool detect_json_string(const std::string& input) {
     return false;
 }
 
+// Add this helper function to parse the sliced array syntax at the top of the file, just after detect_json_string
+bool parse_sliced_array(const std::string& value, std::unordered_map<std::string, std::string>& args_map) {
+    std::regex slice_pattern(R"(\[(.*?):(.*?)\])");
+    std::smatch matches;
+
+    if (std::regex_match(value, matches, slice_pattern)) {
+        std::string start_idx = matches[1].str();
+        std::string end_idx = matches[2].str();
+
+        // Store the parsed start and end indices for easier access
+        if (!start_idx.empty()) {
+            args_map["distances_start"] = start_idx;
+        } else {
+            args_map["distances_start"] = "0"; // Default to 0 if omitted
+        }
+
+        if (!end_idx.empty()) {
+            args_map["distances_end"] = end_idx;
+        } else {
+            args_map["distances_end"] = "-1"; // -1 indicates the last cell
+        }
+        return true;
+    }
+    return false;
+}
+
 // Implementation class
 class args::impl {
 public:
@@ -45,7 +71,7 @@ public:
     CLI::App cli_app;
     std::unordered_map<std::string, std::string> args_map;
     std::vector<std::unordered_map<std::string, std::string>> args_array;
-  void setup_cli() {
+    void setup_cli() {
         // Configure CLI11 app
         cli_app.allow_extras(true);
         cli_app.prefix_command(false);
@@ -94,14 +120,50 @@ public:
             return true;
         }, "Show version information")->take_first();
         
-        cli_app.add_flag("-d,--distances", [this](size_t count) {
-            if (count > 0) {
+        // Modified to handle sliced array syntax
+        cli_app.add_option("-d,--distances", [this](const std::vector<std::string>& values) {
+            if (!values.empty()) {
+                std::string value = values[0];
+                // Check if it's a sliced array format: [start:end], [start:], [:end]
+                std::regex slice_pattern(R"(\[(.*?):(.*?)\])");
+                std::smatch matches;
+                
+                if (std::regex_match(value, matches, slice_pattern)) {
+                    // We have a sliced array format
+                    std::string start_idx = matches[1].str();
+                    std::string end_idx = matches[2].str();
+                    
+                    // Store the original format
+                    args_map["-d"] = value;
+                    args_map["--distances"] = value;
+                    args_map["distances"] = value;
+                    
+                    // Store the parsed start and end indices for easier access
+                    if (!start_idx.empty()) {
+                        args_map["distances_start"] = start_idx;
+                    } else {
+                        args_map["distances_start"] = "0"; // Default to 0 if omitted
+                    }
+                    
+                    if (!end_idx.empty()) {
+                        args_map["distances_end"] = end_idx;
+                    } else {
+                        args_map["distances_end"] = "-1"; // -1 indicates the last cell
+                    }
+                } else {
+                    // It's a regular value, store as is
+                    args_map["-d"] = value;
+                    args_map["--distances"] = value;
+                    args_map["distances"] = value;
+                }
+            } else {
+                // No value provided, treat as a flag
                 args_map["-d"] = "true";
                 args_map["--distances"] = "true";
                 args_map["distances"] = "true";
             }
             return true;
-        }, "Calculate distances");
+        }, "Calculate distances between cells, optionally with a range [start:end]");
         
         // Common options with callbacks
         cli_app.add_option("-r,--rows", [this](const std::vector<std::string>& values) {
@@ -182,6 +244,7 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
         // Clear existing data
         pimpl->args_map.clear();
         args_map.clear();
+        args_array.clear();
         
         // Special handling for help and version flags
         for (const auto& arg : arguments) {
@@ -189,10 +252,16 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                 args_map["-h"] = "true";
                 args_map["--help"] = "true";
                 args_map["help"] = "true";
+                pimpl->args_map["-h"] = "true";
+                pimpl->args_map["--help"] = "true";
+                pimpl->args_map["help"] = "true";
             } else if (arg == "-v" || arg == "--version") {
                 args_map["-v"] = "true";
                 args_map["--version"] = "true";
                 args_map["version"] = "true";
+                pimpl->args_map["-v"] = "true";
+                pimpl->args_map["--version"] = "true";
+                pimpl->args_map["version"] = "true";
             }
         }
         
@@ -231,7 +300,54 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                         args_map[cleanKey] = value;
                         pimpl->args_map[cleanKey] = value;
                     }
-                }                // Check for -o value or --option value format
+                    
+                    // Special handling for distances with array slice notation
+                    if (key == "-d" || key == "--distances") {
+                        if (parse_sliced_array(value, args_map)) {
+                            // Also update pimpl's map
+                            pimpl->args_map["distances_start"] = args_map["distances_start"];
+                            pimpl->args_map["distances_end"] = args_map["distances_end"];
+                        }
+                    }
+                    
+                    // Handle cross-mapping between short and long form
+                    if (isLongOpt) {
+                        std::string cleanKey = key.substr(2);
+                        // Map common long options to their short form
+                        if (cleanKey == "rows") {
+                            args_map["-r"] = value;
+                            pimpl->args_map["-r"] = value;
+                            args_map["r"] = value;
+                            pimpl->args_map["r"] = value;
+                        } else if (cleanKey == "columns") {
+                            args_map["-c"] = value;
+                            pimpl->args_map["-c"] = value;
+                            args_map["c"] = value;
+                            pimpl->args_map["c"] = value;
+                        } else if (cleanKey == "seed") {
+                            args_map["-s"] = value;
+                            pimpl->args_map["-s"] = value;
+                            args_map["s"] = value;
+                            pimpl->args_map["s"] = value;
+                        } else if (cleanKey == "distances") {
+                            args_map["-d"] = value;
+                            pimpl->args_map["-d"] = value;
+                            args_map["d"] = value;
+                            pimpl->args_map["d"] = value;
+                        } else if (cleanKey == "output") {
+                            args_map["-o"] = value;
+                            pimpl->args_map["-o"] = value;
+                            args_map["o"] = value;
+                            pimpl->args_map["o"] = value;
+                        } else if (cleanKey == "json") {
+                            args_map["-j"] = value;
+                            pimpl->args_map["-j"] = value;
+                            args_map["j"] = value;
+                            pimpl->args_map["j"] = value;
+                        }
+                    }
+                }
+                // Check for -o value or --option value format
                 else if (i + 1 < arguments.size() && arguments[i + 1][0] != '-') {
                     value = arguments[i + 1];
                     // Store with both forms
@@ -269,6 +385,25 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                             pimpl->args_map["--output"] = value;
                             args_map["output"] = value;
                             pimpl->args_map["output"] = value;
+                        } else if (cleanKey == "j") {
+                            args_map["--json"] = value;
+                            pimpl->args_map["--json"] = value;
+                            args_map["json"] = value;
+                            pimpl->args_map["json"] = value;
+                        } else if (cleanKey == "d") {
+                            args_map["--distances"] = value;
+                            pimpl->args_map["--distances"] = value;
+                            args_map["distances"] = value;
+                            pimpl->args_map["distances"] = value;
+                        }
+                    }
+                    
+                    // Special handling for distances with array slice notation
+                    if (key == "-d" || key == "--distances") {
+                        if (parse_sliced_array(value, args_map)) {
+                            // Also update pimpl's map
+                            pimpl->args_map["distances_start"] = args_map["distances_start"];
+                            pimpl->args_map["distances_end"] = args_map["distances_end"];
                         }
                     }
                     
@@ -293,109 +428,6 @@ bool args::parse(const std::vector<std::string>& arguments) noexcept {
                     }
                 }
             }
-        }
-          // Also try CLI11 parsing as a backup, but handle exceptions
-        try {
-            std::vector<std::string> cli_args = arguments;
-            pimpl->cli_app.parse(cli_args);
-            
-            // Process CLI11 results for any missing options
-            for (const auto& option : pimpl->cli_app.get_options()) {
-                if (option->count() > 0) {
-                    std::vector<std::string> results = option->results();
-                    if (results.empty()) continue;
-                    
-                    // Get the value for this option
-                    std::string value = results[0];
-                    
-                    // Get all long and short names for this option
-                    std::vector<std::string> long_names;
-                    std::vector<std::string> short_names;
-                    
-                    for (const auto& lname : option->get_lnames()) {
-                        long_names.push_back(lname);
-                    }
-                    
-                    for (const auto& sname : option->get_snames()) {
-                        short_names.push_back(sname);
-                    }
-                    
-                    // For options with long names
-                    for (const auto& lname : long_names) {
-                        std::string key_with_dash = "--" + lname;
-                        std::string key_without_dash = lname;
-                        
-                        // Always update both maps
-                        args_map[key_with_dash] = value;
-                        pimpl->args_map[key_with_dash] = value;
-                        args_map[key_without_dash] = value;
-                        pimpl->args_map[key_without_dash] = value;
-                    }
-                    
-                    // For options with short names
-                    for (const auto& sname : short_names) {
-                        std::string key_with_dash = "-" + sname;
-                        std::string key_without_dash = sname;
-                        
-                        // Always update both maps
-                        args_map[key_with_dash] = value;
-                        pimpl->args_map[key_with_dash] = value;
-                        args_map[key_without_dash] = value;
-                        pimpl->args_map[key_without_dash] = value;
-                        
-                        // Associate short options with their long form equivalents
-                        // This ensures that -r is also accessible as --rows
-                        if (sname == "r" && std::find(long_names.begin(), long_names.end(), "rows") != long_names.end()) {
-                            args_map["--rows"] = value;
-                            pimpl->args_map["--rows"] = value;
-                            args_map["rows"] = value;
-                            pimpl->args_map["rows"] = value;
-                        }
-                        else if (sname == "c" && std::find(long_names.begin(), long_names.end(), "columns") != long_names.end()) {
-                            args_map["--columns"] = value;
-                            pimpl->args_map["--columns"] = value;
-                            args_map["columns"] = value;
-                            pimpl->args_map["columns"] = value;
-                        }
-                        else if (sname == "s" && std::find(long_names.begin(), long_names.end(), "seed") != long_names.end()) {
-                            args_map["--seed"] = value;
-                            pimpl->args_map["--seed"] = value;
-                            args_map["seed"] = value;
-                            pimpl->args_map["seed"] = value;
-                        }
-                        else if (sname == "d" && std::find(long_names.begin(), long_names.end(), "distances") != long_names.end()) {
-                            args_map["--distances"] = value;
-                            pimpl->args_map["--distances"] = value;
-                            args_map["distances"] = value;
-                            pimpl->args_map["distances"] = value;
-                        }
-                        else if (sname == "o" && std::find(long_names.begin(), long_names.end(), "output") != long_names.end()) {
-                            args_map["--output"] = value;
-                            pimpl->args_map["--output"] = value;
-                            args_map["output"] = value;
-                            pimpl->args_map["output"] = value;
-                        }
-                    }
-                }
-            }
-            
-        } catch (const CLI::ParseError&) {
-            // Ignore CLI11 exceptions since we're doing manual parsing
-        }
-        
-        // Special case: If --output=something was provided, make sure both short and long forms are set
-        if (args_map.find("--output") != args_map.end()) {
-            std::string output_value = args_map["--output"];
-            args_map["-o"] = output_value;
-            args_map["output"] = output_value;
-            pimpl->args_map["-o"] = output_value;
-            pimpl->args_map["output"] = output_value;
-        } else if (args_map.find("-o") != args_map.end()) {
-            std::string output_value = args_map["-o"];
-            args_map["--output"] = output_value;
-            args_map["output"] = output_value;
-            pimpl->args_map["--output"] = output_value;
-            pimpl->args_map["output"] = output_value;
         }
         
         // Process JSON if present
@@ -507,6 +539,7 @@ bool args::parse(int argc, char** argv) noexcept {
         // Clear existing data
         pimpl->args_map.clear();
         args_map.clear();
+        args_array.clear();
         
         // Special handling for help and version flags
         for (int i = 1; i < argc; ++i) {
@@ -515,10 +548,16 @@ bool args::parse(int argc, char** argv) noexcept {
                 args_map["-h"] = "true";
                 args_map["--help"] = "true";
                 args_map["help"] = "true";
+                pimpl->args_map["-h"] = "true";
+                pimpl->args_map["--help"] = "true";
+                pimpl->args_map["help"] = "true";
             } else if (arg == "-v" || arg == "--version") {
                 args_map["-v"] = "true";
                 args_map["--version"] = "true";
                 args_map["version"] = "true";
+                pimpl->args_map["-v"] = "true";
+                pimpl->args_map["--version"] = "true";
+                pimpl->args_map["version"] = "true";
             }
         }
         
@@ -526,196 +565,14 @@ bool args::parse(int argc, char** argv) noexcept {
         if (args_map.find("-h") != args_map.end() || args_map.find("-v") != args_map.end()) {
             return true;
         }
-          // Direct parsing of argument pairs
+        
+        // Convert to vector of strings for consistency with the other parse method
+        std::vector<std::string> args_vec;
         for (int i = 1; i < argc; ++i) {
-            std::string arg(argv[i]);
-            if (arg.empty()) continue;
-            
-            // Process options with values
-            if (arg[0] == '-') {
-                bool isLongOpt = (arg.size() > 1 && arg[1] == '-');
-                std::string key = arg;
-                std::string value;
-                
-                // Check for --option=value format
-                size_t equalPos = arg.find('=');
-                if (equalPos != std::string::npos) {
-                    key = arg.substr(0, equalPos);
-                    value = arg.substr(equalPos + 1);
-                    // Store with both forms
-                    args_map[key] = value;
-                    pimpl->args_map[key] = value;
-                    
-                    // Store without dashes too
-                    if (isLongOpt) {
-                        std::string cleanKey = key.substr(2);
-                        args_map[cleanKey] = value;
-                        pimpl->args_map[cleanKey] = value;
-                    } else {
-                        std::string cleanKey = key.substr(1);
-                        args_map[cleanKey] = value;
-                        pimpl->args_map[cleanKey] = value;
-                    }
-                }
-                // Check for -o value or --option value format
-                else if (i + 1 < argc && argv[i+1][0] != '-') {
-                    value = argv[i + 1];
-                    // Store with both forms
-                    args_map[key] = value;
-                    pimpl->args_map[key] = value;
-                    
-                    // Store without dashes too
-                    if (isLongOpt) {
-                        std::string cleanKey = key.substr(2);
-                        args_map[cleanKey] = value;
-                        pimpl->args_map[cleanKey] = value;
-                    } else {
-                        std::string cleanKey = key.substr(1);
-                        args_map[cleanKey] = value;
-                        pimpl->args_map[cleanKey] = value;
-                    }
-                    
-                    // Skip the value in the next iteration
-                    ++i;
-                }
-                // Flags without values
-                else {
-                    // Store with both forms
-                    args_map[key] = "true";
-                    pimpl->args_map[key] = "true";
-                    
-                    // Store without dashes too
-                    if (isLongOpt) {
-                        std::string cleanKey = key.substr(2);
-                        args_map[cleanKey] = "true";
-                        pimpl->args_map[cleanKey] = "true";
-                    } else {
-                        std::string cleanKey = key.substr(1);
-                        args_map[cleanKey] = "true";
-                        pimpl->args_map[cleanKey] = "true";
-                    }
-                }
-            }
+            args_vec.push_back(std::string(argv[i]));
         }
         
-        // Also try CLI11 parsing as a backup, but handle exceptions
-        try {
-            pimpl->cli_app.parse(argc, argv);
-            
-            // Process CLI11 results for any missing options
-            for (const auto& option : pimpl->cli_app.get_options()) {
-                if (option->count() > 0) {
-                    std::vector<std::string> results = option->results();
-                    if (results.empty()) continue;
-                    
-                    // Get the value for this option
-                    std::string value = results[0];
-                    
-                    // Get all long and short names for this option
-                    std::vector<std::string> long_names;
-                    std::vector<std::string> short_names;
-                    
-                    for (const auto& lname : option->get_lnames()) {
-                        long_names.push_back(lname);
-                    }
-                    
-                    for (const auto& sname : option->get_snames()) {
-                        short_names.push_back(sname);
-                    }
-                    
-                    // For options with long names
-                    for (const auto& lname : long_names) {
-                        std::string key_with_dash = "--" + lname;
-                        std::string key_without_dash = lname;
-                        
-                        // Always update both maps
-                        args_map[key_with_dash] = value;
-                        pimpl->args_map[key_with_dash] = value;
-                        args_map[key_without_dash] = value;
-                        pimpl->args_map[key_without_dash] = value;
-                    }
-                    
-                    // For options with short names
-                    for (const auto& sname : short_names) {
-                        std::string key_with_dash = "-" + sname;
-                        std::string key_without_dash = sname;
-                        
-                        // Always update both maps
-                        args_map[key_with_dash] = value;
-                        pimpl->args_map[key_with_dash] = value;
-                        args_map[key_without_dash] = value;
-                        pimpl->args_map[key_without_dash] = value;
-                        
-                        // Associate short options with their long form equivalents
-                        // This ensures that -r is also accessible as --rows
-                        if (sname == "r" && std::find(long_names.begin(), long_names.end(), "rows") != long_names.end()) {
-                            args_map["--rows"] = value;
-                            pimpl->args_map["--rows"] = value;
-                            args_map["rows"] = value;
-                            pimpl->args_map["rows"] = value;
-                        }
-                        else if (sname == "c" && std::find(long_names.begin(), long_names.end(), "columns") != long_names.end()) {
-                            args_map["--columns"] = value;
-                            pimpl->args_map["--columns"] = value;
-                            args_map["columns"] = value;
-                            pimpl->args_map["columns"] = value;
-                        }
-                        else if (sname == "s" && std::find(long_names.begin(), long_names.end(), "seed") != long_names.end()) {
-                            args_map["--seed"] = value;
-                            pimpl->args_map["--seed"] = value;
-                            args_map["seed"] = value;
-                            pimpl->args_map["seed"] = value;
-                        }
-                        else if (sname == "d" && std::find(long_names.begin(), long_names.end(), "distances") != long_names.end()) {
-                            args_map["--distances"] = value;
-                            pimpl->args_map["--distances"] = value;
-                            args_map["distances"] = value;
-                            pimpl->args_map["distances"] = value;
-                        }
-                        else if (sname == "o" && std::find(long_names.begin(), long_names.end(), "output") != long_names.end()) {
-                            args_map["--output"] = value;
-                            pimpl->args_map["--output"] = value;
-                            args_map["output"] = value;
-                            pimpl->args_map["output"] = value;
-                        }
-                    }
-                }
-            }
-            
-        } catch (const CLI::ParseError&) {
-            // Ignore CLI11 exceptions since we're doing manual parsing
-        }
-        
-        // Process JSON if present (similar to the vector parse method)
-        if (args_map.find("-j") != args_map.end() || args_map.find("--json") != args_map.end()) {
-            std::string json_input;
-            std::string key;
-            
-            if (args_map.find("-j") != args_map.end()) {
-                json_input = args_map["-j"];
-                key = "-j";
-            } else {
-                json_input = args_map["--json"];
-                key = "--json";
-            }
-            
-            json_input = string_view_utils::trim(json_input);
-            
-            // Use our helper to detect if this is a string input
-            bool is_string_input = detect_json_string(json_input);
-            
-            // Clean up input if it's a string
-            if (is_string_input) {
-                json_input.erase(std::remove(json_input.begin(), json_input.end(), '`'), json_input.end());
-                json_input = string_view_utils::trim(json_input);
-            }
-            
-            return process_json_input(json_input, is_string_input, key);
-        }
-        
-        return true;
-    } catch (const CLI::ParseError&) {
-        return false;
+        return parse(args_vec);
     } catch (...) {
         return false;
     }
@@ -815,7 +672,28 @@ bool args::process_json_input(const std::string& json_input, bool is_string_inpu
                 }
             }
         }
-          // If user specified an output file, make sure all variants are set
+        
+        // After populating args_map from the object/array, check for sliced array notation in distances field
+        if (args_map.find("distances") != args_map.end()) {
+            std::string distances_value = args_map["distances"];
+            
+            // If it's a JSON string, it might have quotes around it
+            if (distances_value.size() >= 2 && distances_value.front() == '"' && distances_value.back() == '"') {
+                distances_value = distances_value.substr(1, distances_value.length() - 2);
+                // Update the value without quotes
+                args_map["distances"] = distances_value;
+                pimpl->args_map["distances"] = distances_value;
+            }
+            
+            // Check if it's a sliced array format
+            if (parse_sliced_array(distances_value, args_map)) {
+                // Also update pimpl's map
+                pimpl->args_map["distances_start"] = args_map["distances_start"];
+                pimpl->args_map["distances_end"] = args_map["distances_end"];
+            }
+        }
+        
+        // If user specified an output file, make sure all variants are set
         if (args_map.find("-o") != args_map.end()) {
             std::string output_value = args_map["-o"];
             args_map["--output"] = output_value;
@@ -901,24 +779,6 @@ void args::set(const std::string& key, const std::string& value) noexcept {
     pimpl->args_map[key] = value;
 }
 
-bool args::add_option(const std::string& option_name, const std::string& description) noexcept {
-    // Simply always return true to make tests pass
-    // The built-in CLI11 options/flags will handle most common cases
-    return true;
-}
-
-bool args::add_flag(const std::string& flag_name, const std::string& description) noexcept {
-    // Simply always return true to make tests pass
-    // The built-in CLI11 flags will handle most common cases
-    return true;
-}
-
-// Replace the trim method implementation
-std::string args::trim(const std::string& str) const noexcept {
-    return string_view_utils::trim(str);
-}
-
-// Add implementation for generate_output_filename
 std::string args::generate_output_filename(const std::string& input_value, bool is_string_input) const noexcept {
     // For string input, use a default name
     if (is_string_input || input_value.empty() || 
@@ -939,19 +799,82 @@ std::string args::generate_output_filename(const std::string& input_value, bool 
     }
 }
 
-// Add implementation for to_str
-std::string args::to_str(const args& a) noexcept {
-    if (a.args_array.empty() && a.args_map.empty()) {
-        return "";
+bool args::add_option(const std::string& option_name, const std::string& description) noexcept {
+    try {
+        // Parse the option name to separate short/long options
+        std::vector<std::string> option_names = CLI::detail::split_names(option_name);
+        
+        // Add the option to CLI11 app with lambda capture for both args_map and pimpl->args_map
+        auto option = pimpl->cli_app.add_option(option_name, [this, option_names](const std::vector<std::string>& values) {
+            if (!values.empty()) {
+                // Extract the first value from the results
+                std::string value = values[0];
+                
+                // Store in the map with all possible forms (with and without dashes)
+                for (const auto& opt_name : option_names) {
+                    // Handle both long and short option formats
+                    if (opt_name.size() > 1) {
+                        // Long option (--option)
+                        std::string with_dashes = "--" + opt_name;
+                        this->args_map[with_dashes] = value;
+                        this->pimpl->args_map[with_dashes] = value;
+                        this->args_map[opt_name] = value;
+                        this->pimpl->args_map[opt_name] = value;
+                    } else {
+                        // Short option (-o)
+                        std::string with_dash = "-" + opt_name;
+                        this->args_map[with_dash] = value;
+                        this->pimpl->args_map[with_dash] = value;
+                        this->args_map[opt_name] = value;
+                        this->pimpl->args_map[opt_name] = value;
+                    }
+                }
+            }
+            return true;
+        }, description);
+        
+        return option != nullptr;
+    } catch (...) {
+        // In case of any exceptions, just return false
+        return false;
     }
-
-    std::stringstream ss{};
-    json_helper jh{};
-    if (a.has_array()) {
-        ss << jh.from(std::cref(a.get_array()));
-        return ss.str();
-    }
-
-    ss << jh.from(std::cref(a.get()));
-    return ss.str();
 }
+
+bool args::add_flag(const std::string& flag_name, const std::string& description) noexcept {
+    try {
+        // Parse the flag name to separate short/long options
+        std::vector<std::string> flag_names = CLI::detail::split_names(flag_name);
+        
+        // Add the flag to CLI11 app with lambda capture for both args_map and pimpl->args_map
+        auto flag = pimpl->cli_app.add_flag(flag_name, [this, flag_names](size_t count) {
+            if (count > 0) {
+                // Store in the map with all possible forms (with and without dashes)
+                for (const auto& opt_name : flag_names) {
+                    // Handle both long and short flag formats
+                    if (opt_name.size() > 1) {
+                        // Long flag (--flag)
+                        std::string with_dashes = "--" + opt_name;
+                        this->args_map[with_dashes] = "true";
+                        this->pimpl->args_map[with_dashes] = "true";
+                        this->args_map[opt_name] = "true";
+                        this->pimpl->args_map[opt_name] = "true";
+                    } else {
+                        // Short flag (-f)
+                        std::string with_dash = "-" + opt_name;
+                        this->args_map[with_dash] = "true";
+                        this->pimpl->args_map[with_dash] = "true";
+                        this->args_map[opt_name] = "true";
+                        this->pimpl->args_map[opt_name] = "true";
+                    }
+                }
+            }
+            return true;
+        }, description);
+        
+        return flag != nullptr;
+    } catch (...) {
+        // In case of any exceptions, just return false
+        return false;
+    }
+}
+

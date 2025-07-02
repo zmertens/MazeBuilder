@@ -87,10 +87,6 @@ public:
     /// @return True if the flag was successfully added
     bool add_flag(const std::string& flag_name, const std::string& description) noexcept;
 
-    /// @brief Convert arguments to JSON string
-    /// @return JSON string representation of all arguments
-    static std::string to_str(const args& a) noexcept;
-
 private:
     /// @brief Remove whitespace from a string
     /// @param str The string to trim

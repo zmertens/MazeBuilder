@@ -1,5 +1,6 @@
 #include <MazeBuilder/string_view_utils.h>
 
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/maze.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/enums.h>
@@ -115,3 +116,46 @@ std::vector<std::string> string_view_utils::split(const std::string& str, char d
     }
     return tokens;
 }
+
+std::string string_view_utils::to_string(std::unordered_map<std::string, std::string> const& m) noexcept {
+
+    std::vector<std::string> entries;
+    for (const auto& [key, value] : m) {
+
+        std::string entry = "\"" + std::string(key) + ": " + std::string(value) + "\"";
+
+        entries.push_back(entry);
+    }
+
+    if (entries.empty()) {
+
+        return "[]";
+    }
+
+    std::string result = "[";
+    for (size_t i = 0; i < entries.size(); ++i) {
+
+        result += entries[i];
+
+        if (i < entries.size() - 1) {
+
+            result += ", ";
+        }
+    }
+    result += "]";
+
+    return result;
+}
+
+// Add a specific overload for args class
+std::string string_view_utils::to_string(const args& a) noexcept {
+    // Use the existing to_string for unordered_map by getting the args_map from the args object
+    return to_string(a.get());
+}
+
+// Add a specific overload for reference_wrapper<const args>
+std::string string_view_utils::to_string(const std::reference_wrapper<const args>& a) noexcept {
+    // Use the existing to_string for unordered_map by getting the args_map from the args object
+    return to_string(a.get().get());
+}
+
