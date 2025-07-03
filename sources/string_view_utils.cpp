@@ -105,6 +105,22 @@ bool string_view_utils::ends_with(const std::string& str, const std::string& suf
     return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
 }
 
+std::string_view string_view_utils::find_first_of(const std::string_view& s, const std::string_view& chars) noexcept {
+
+    if (s.empty() || chars.empty()) {
+
+        return {};
+    }
+    
+    auto pos = s.find_first_of(chars);
+    if (pos == std::string_view::npos) {
+
+        return {};
+    }
+    
+    return s.substr(pos, 1);
+}
+
 std::vector<std::string> string_view_utils::split(const std::string& str, char delimiter) noexcept {
     std::vector<std::string> tokens;
     std::stringstream ss(str);
@@ -117,45 +133,33 @@ std::vector<std::string> string_view_utils::split(const std::string& str, char d
     return tokens;
 }
 
+// Fix the implementation for the map version to be compatible with the args version
 std::string string_view_utils::to_string(std::unordered_map<std::string, std::string> const& m) noexcept {
-
-    std::vector<std::string> entries;
+    // Check if the map is empty
+    if (m.empty()) {
+        return "";
+    }
+    
+    std::ostringstream oss;
+    
+    // Build a filtered map to avoid duplicate entries with different forms of the same key
+    std::unordered_map<std::string, std::string> filtered_map;
     for (const auto& [key, value] : m) {
-
-        std::string entry = "\"" + std::string(key) + ": " + std::string(value) + "\"";
-
-        entries.push_back(entry);
-    }
-
-    if (entries.empty()) {
-
-        return "[]";
-    }
-
-    std::string result = "[";
-    for (size_t i = 0; i < entries.size(); ++i) {
-
-        result += entries[i];
-
-        if (i < entries.size() - 1) {
-
-            result += ", ";
+        // Only include keys without dashes to avoid duplicates
+        if (!key.empty() && key[0] != '-') {
+            filtered_map[key] = value;
         }
     }
-    result += "]";
-
-    return result;
+    
+    // If there are no non-dashed keys, return empty string
+    if (filtered_map.empty()) {
+        return "";
+    }
+    
+    // Serialize the filtered map
+    for (const auto& [key, value] : filtered_map) {
+        oss << key << ": " << value << "\n";
+    }
+    
+    return oss.str();
 }
-
-// Add a specific overload for args class
-std::string string_view_utils::to_string(const args& a) noexcept {
-    // Use the existing to_string for unordered_map by getting the args_map from the args object
-    return to_string(a.get());
-}
-
-// Add a specific overload for reference_wrapper<const args>
-std::string string_view_utils::to_string(const std::reference_wrapper<const args>& a) noexcept {
-    // Use the existing to_string for unordered_map by getting the args_map from the args object
-    return to_string(a.get().get());
-}
-

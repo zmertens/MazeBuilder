@@ -82,6 +82,12 @@ public:
     /// @param suffix The suffix to check for
     /// @return True if str ends with suffix, false otherwise
     static bool ends_with(const std::string& str, const std::string& suffix) noexcept;
+
+    /// @brief Find the first occurrence of any character from a set in a string view
+    /// @param s The string view to search in
+    /// @param chars The set of characters to search for
+    /// @return A string view starting from the first occurrence of any character in chars, or the end of s if none found
+    static std::string_view find_first_of(const std::string_view& s, const std::string_view& chars) noexcept;
     
     /// @brief Split a string by delimiter
     /// @param str The string to split

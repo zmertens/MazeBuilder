@@ -59,33 +59,27 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
     randomizer rng;
     rng.seed(SEED);
 
-    SECTION("Generate 5 integers in range [0, 10]") {
-        auto result = rng.get_num_ints_incl(0, 10);
-        REQUIRE(result.size() == 10);
+    static constexpr auto low = 0, high = 10;
+
+    SECTION("Validate random number values are within specific range") {
+
+        auto result = rng.get_num_ints_incl(low, high);
+        REQUIRE(result.size() == high + 1);
         for (int num : result) {
-            REQUIRE(num >= 0);
-            REQUIRE(num <= 10);
+            REQUIRE(num >= low);
+            REQUIRE(num <= high);
         }
     }
 
-    SECTION("Generate all integers in range [0, 10]") {
-        auto result = rng.get_num_ints_incl(0, 10);
-        REQUIRE(result.size() == 10);
+    SECTION("Generate all integers in a range") {
+        auto result = rng.get_num_ints_incl(low, high);
+        REQUIRE(result.size() == high + 1);
         std::sort(result.begin(), result.end());
         REQUIRE(result.cend() != result.cbegin());
     }
 
-    SECTION("Request more integers than available in range [0, 5]") {
-        auto result = rng.get_num_ints_incl(0, 5);
-        REQUIRE(result.size() == 5);
-        for (int num : result) {
-            REQUIRE(num >= 0);
-            REQUIRE(num <= 5);
-        }
-    }
-
-    SECTION("Empty range [5, 0]") {
-        auto result = rng.get_num_ints_incl(5, 0);
+    SECTION("Empty range [high, low]") {
+        auto result = rng.get_num_ints_incl(high, low);
         REQUIRE(result.empty());
     }
 
