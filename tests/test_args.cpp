@@ -9,7 +9,18 @@
 using namespace std;
 using namespace mazes;
 
+TEST_CASE("Args static checks", "[args static checks]") {
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::args>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::args>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::args>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::args>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::args>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::args>::value);
+}
+
 TEST_CASE("Args parses correctly", "[good parses]") {
+
     args args_handler{};
 
     SECTION("Help requested") {
@@ -78,22 +89,52 @@ TEST_CASE("Args parses correctly", "[good parses]") {
 TEST_CASE("Args add options and flags", "[options and flags]") {
     args args_handler{};
     
-    SECTION("Add option") {
-        REQUIRE(args_handler.add_option("-r,--rows", "Number of rows in the maze"));
+    SECTION("Add new option") {
+        // Test adding a new option that doesn't already exist
+        REQUIRE(args_handler.add_option("-x,--extra", "Extra test option"));
+        vector<string> args_vec = { "--extra", "test_value" };
+        REQUIRE(args_handler.parse(args_vec));
+        auto val = args_handler.get("--extra");
+        REQUIRE(val.has_value());
+        REQUIRE(val.value() == "test_value");
+    }
+    
+    SECTION("Add new flag") {
+        // Test adding a new flag that doesn't already exist
+        REQUIRE(args_handler.add_flag("-f,--flag", "Test flag"));
+        vector<string> args_vec = { "--flag" };
+        REQUIRE(args_handler.parse(args_vec));
+        auto val = args_handler.get("--flag");
+        REQUIRE(val.has_value());
+        REQUIRE(val.value() == "true");
+    }
+    
+    SECTION("Test existing rows option") {
+        // Test that the existing rows option works (already added in setup_cli)
         vector<string> args_vec = { "--rows", "15" };
         REQUIRE(args_handler.parse(args_vec));
         auto val = args_handler.get("--rows");
         REQUIRE(val.has_value());
         REQUIRE(val.value() == "15");
+        // Also check alternate access methods
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "15");
+        REQUIRE(args_handler.get("rows").has_value());
+        REQUIRE(args_handler.get("rows").value() == "15");
     }
     
-    SECTION("Add flag") {
-        REQUIRE(args_handler.add_flag("-d,--distances", "Calculate distances"));
+    SECTION("Test existing distances flag") {
+        // Test that the existing distances option works (already added in setup_cli)
         vector<string> args_vec = { "--distances" };
         REQUIRE(args_handler.parse(args_vec));
         auto val = args_handler.get("--distances");
         REQUIRE(val.has_value());
         REQUIRE(val.value() == "true");
+        // Also check alternate access methods
+        REQUIRE(args_handler.get("-d").has_value());
+        REQUIRE(args_handler.get("-d").value() == "true");
+        REQUIRE(args_handler.get("distances").has_value());
+        REQUIRE(args_handler.get("distances").value() == "true");
     }
 }
 

@@ -16,10 +16,31 @@ namespace mazes {
 /// @details Uses PIMPL pattern to wrap CLI11 functionality with additional JSON support
 class args final {
 public:
-    // Add constructor declaration
+    /// @brief Default constructor
+    /// @details Initializes the CLI11 app and sets up common options
     args() noexcept;
 
+    /// @brief Destructor
+    /// @details Cleans up the internal implementation pointer
     ~args();
+
+    /// @brief Copy constructor
+    /// @param other The other args object to copy from
+    args(const args& other);
+
+    /// @brief Copy assignment operator
+    /// @param other The other args object to copy from
+    /// @return Reference to this object
+    args& operator=(const args& other);
+
+    /// @brief Move constructor
+    /// @param other The other args object to move from
+    args(args&& other) noexcept = default;
+
+    /// @brief Move assignment operator
+    /// @param other The other args object to move from
+    /// @return Reference to this object
+    args& operator=(args&& other) noexcept = default;
 
     /// @brief Parse program arguments from a vector of strings
     /// @param arguments Command-line arguments
@@ -49,17 +70,17 @@ public:
     /// @return Reference to the internal arguments map
     const std::unordered_map<std::string, std::string>& get() const noexcept;
 
-    /// @brief Add an option with a callback
-    /// @param option_name The name of the option (e.g., "-o, --output")
-    /// @param description Description of the option
+    /// @brief Add a new option to the CLI parser
+    /// @param flags Command line flags (e.g., "-x,--extra")
+    /// @param description Help description for the option
     /// @return True if the option was successfully added
-    bool add_option(const std::string& option_name, const std::string& description) noexcept;
+    bool add_option(const std::string& flags, const std::string& description) noexcept;
 
-    /// @brief Add a flag option (boolean)
-    /// @param flag_name The name of the flag (e.g., "-v, --verbose")
-    /// @param description Description of the flag
+    /// @brief Add a new flag to the CLI parser
+    /// @param flags Command line flags (e.g., "-f,--flag")
+    /// @param description Help description for the flag
     /// @return True if the flag was successfully added
-    bool add_flag(const std::string& flag_name, const std::string& description) noexcept;
+    bool add_flag(const std::string& flags, const std::string& description) noexcept;
 
 private:
     // String constants for command-line arguments

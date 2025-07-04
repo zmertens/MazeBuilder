@@ -90,24 +90,24 @@ int main(int argc, char* argv[]) {
         }
         
         // Check if we're dealing with batch processing
-        if (maze_args.has_array()) {
-            // Process all configurations in the array
-            mazes::batch_processor processor;
-            bool success = processor.process_batch(maze_args.get_array(), output_file_str);
+        // if (maze_args.has_array()) {
+        //     // Process all configurations in the array
+        //     mazes::batch_processor processor;
+        //     bool success = processor.process_batch(maze_args.get_array(), output_file_str);
             
-            if (!success) {
-                cerr << "Batch processing failed." << endl;
-                return EXIT_FAILURE;
-            }        } else {
-            // Process a single maze with the configuration
-            mazes::batch_processor processor;
-            bool success = processor.process_single(maze_args.get(), output_file_str);
+        //     if (!success) {
+        //         cerr << "Batch processing failed." << endl;
+        //         return EXIT_FAILURE;
+        //     }        } else {
+        //     // Process a single maze with the configuration
+        //     mazes::batch_processor processor;
+        //     bool success = processor.process_single(maze_args.get(), output_file_str);
             
-            if (!success) {
-                cerr << "Maze processing failed." << endl;
-                return EXIT_FAILURE;
-            }
-        }
+        //     if (!success) {
+        //         cerr << "Maze processing failed." << endl;
+        //         return EXIT_FAILURE;
+        //     }
+        // }
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl;
         return EXIT_FAILURE;
