@@ -61,7 +61,7 @@ private:
 
 	std::shared_ptr<distances> m_distances;
 
-    std::unique_ptr<grid> m_grid;
+    std::unique_ptr<grid_interface> m_grid;
 
 	std::string to_base36(int value) const;
 };

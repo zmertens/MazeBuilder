@@ -49,6 +49,55 @@ public:
     // Our internal storage maps for compatibility
     std::unordered_map<std::string, std::string> args_map;
     std::vector<std::unordered_map<std::string, std::string>> args_array;
+    
+    // Helper method to add argument variants for consistency
+    void add_argument_variants(const std::string& key, const std::string& value) {
+        args_map[key] = value;
+        
+        // Add variants with different prefixes for backwards compatibility
+        if (key == "rows" || key == "r") {
+            args_map[args::ROW_FLAG_STR] = value;
+            args_map[args::ROW_OPTION_STR] = value;
+            args_map[args::ROW_WORD_STR] = value;
+        } else if (key == "columns" || key == "c") {
+            args_map[args::COLUMN_FLAG_STR] = value;
+            args_map[args::COLUMN_OPTION_STR] = value;
+            args_map[args::COLUMN_WORD_STR] = value;
+        } else if (key == "seed" || key == "s") {
+            args_map[args::SEED_FLAG_STR] = value;
+            args_map[args::SEED_OPTION_STR] = value;
+            args_map[args::SEED_WORD_STR] = value;
+        } else if (key == "output" || key == "o") {
+            args_map[args::OUTPUT_FLAG_STR] = value;
+            args_map[args::OUTPUT_OPTION_STR] = value;
+            args_map[args::OUTPUT_WORD_STR] = value;
+        } else if (key == "json" || key == "j") {
+            args_map[args::JSON_FLAG_STR] = value;
+            args_map[args::JSON_OPTION_STR] = value;
+            args_map[args::JSON_WORD_STR] = value;
+        } else if (key == "distances" || key == "d") {
+            args_map[args::DISTANCES_FLAG_STR] = value;
+            args_map[args::DISTANCES_OPTION_STR] = value;
+            args_map[args::DISTANCES_WORD_STR] = value;
+        } else if (key == "algo") {
+            args_map[args::ALGO_OPTION_STR] = value;
+            args_map[args::ALGO_WORD_STR] = value;
+        } else if (key == "help" || key == "h") {
+            args_map[args::HELP_FLAG_STR] = value;
+            args_map[args::HELP_OPTION_STR] = value;
+            args_map[args::HELP_WORD_STR] = value;
+        } else if (key == "version" || key == "v") {
+            args_map[args::VERSION_FLAG_STR] = value;
+            args_map[args::VERSION_OPTION_STR] = value;
+            args_map[args::VERSION_WORD_STR] = value;
+        } else {
+            // For other keys, just add dash variants if they don't have them
+            if (!key.empty() && key[0] != '-') {
+                args_map["-" + key] = value;
+                args_map["--" + key] = value;
+            }
+        }
+    }
 
     void setup_cli() {
         // Configure CLI11 app following best practices
@@ -97,48 +146,37 @@ public:
         // Handle JSON inputs
         if (!json_inputs.empty()) {
             std::string value = json_inputs.back(); // Use last value
-            args_map[args::JSON_FLAG_STR] = value;
-            args_map[args::JSON_OPTION_STR] = value;
-            args_map[args::JSON_WORD_STR] = value;
+            add_argument_variants("json", value);
         }
         
         // Handle output files
         if (!output_files.empty()) {
             std::string value = output_files.back();
-            args_map[args::OUTPUT_FLAG_STR] = value;
-            args_map[args::OUTPUT_OPTION_STR] = value;
-            args_map[args::OUTPUT_WORD_STR] = value;
+            add_argument_variants("output", value);
         }
         
         // Handle rows
         if (!rows_values.empty()) {
             std::string value = std::to_string(rows_values.back());
-            args_map[args::ROW_FLAG_STR] = value;
-            args_map[args::ROW_OPTION_STR] = value;
-            args_map[args::ROW_WORD_STR] = value;
+            add_argument_variants("rows", value);
         }
         
         // Handle columns
         if (!columns_values.empty()) {
             std::string value = std::to_string(columns_values.back());
-            args_map[args::COLUMN_FLAG_STR] = value;
-            args_map[args::COLUMN_OPTION_STR] = value;
-            args_map[args::COLUMN_WORD_STR] = value;
+            add_argument_variants("columns", value);
         }
         
         // Handle seed
         if (!seed_values.empty()) {
             std::string value = std::to_string(seed_values.back());
-            args_map[args::SEED_FLAG_STR] = value;
-            args_map[args::SEED_OPTION_STR] = value;
-            args_map[args::SEED_WORD_STR] = value;
+            add_argument_variants("seed", value);
         }
         
         // Handle algorithm
         if (!algo_values.empty()) {
             std::string value = algo_values.back();
-            args_map[args::ALGO_OPTION_STR] = value;
-            args_map[args::ALGO_WORD_STR] = value;
+            add_argument_variants("algo", value);
         }
         
         // Handle distances (special case with sliced array parsing)
@@ -151,56 +189,36 @@ public:
                 value = "[" + value + "]";
             }
             
-            args_map[args::DISTANCES_FLAG_STR] = value;
-            args_map[args::DISTANCES_OPTION_STR] = value;
-            args_map[args::DISTANCES_WORD_STR] = value;
+            add_argument_variants("distances", value);
             
             // Parse sliced array syntax
             parse_sliced_array(value);
         } else if (distances_flag || cli_app.count("-d") || cli_app.count("--distances")) {
             // Flag form without value
-            args_map[args::DISTANCES_FLAG_STR] = args::TRUE_VALUE;
-            args_map[args::DISTANCES_OPTION_STR] = args::TRUE_VALUE;
-            args_map[args::DISTANCES_WORD_STR] = args::TRUE_VALUE;
+            add_argument_variants("distances", args::TRUE_VALUE);
         }
         
         // Handle flags
         if (help_flag) {
-            args_map[args::HELP_FLAG_STR] = args::TRUE_VALUE;
-            args_map[args::HELP_OPTION_STR] = args::TRUE_VALUE;
-            args_map[args::HELP_WORD_STR] = args::TRUE_VALUE;
+            add_argument_variants("help", args::TRUE_VALUE);
         }
         
         if (version_flag) {
-            args_map[args::VERSION_FLAG_STR] = args::TRUE_VALUE;
-            args_map[args::VERSION_OPTION_STR] = args::TRUE_VALUE;
-            args_map[args::VERSION_WORD_STR] = args::TRUE_VALUE;
+            add_argument_variants("version", args::TRUE_VALUE);
         }
         
         // Handle dynamically added options
         for (const auto& [flag_name, values] : dynamic_options) {
             if (!values.empty()) {
                 std::string value = values.back(); // Use last value
-                args_map[flag_name] = value;
-                
-                // If flag doesn't start with -, add variants
-                if (!flag_name.empty() && flag_name[0] != '-') {
-                    args_map["-" + flag_name] = value;
-                    args_map["--" + flag_name] = value;
-                }
+                add_argument_variants(flag_name, value);
             }
         }
         
         // Handle dynamically added flags
         for (const auto& [flag_name, flag_value] : dynamic_flags) {
             if (flag_value) {
-                args_map[flag_name] = args::TRUE_VALUE;
-                
-                // If flag doesn't start with -, add variants
-                if (!flag_name.empty() && flag_name[0] != '-') {
-                    args_map["-" + flag_name] = args::TRUE_VALUE;
-                    args_map["--" + flag_name] = args::TRUE_VALUE;
-                }
+                add_argument_variants(flag_name, args::TRUE_VALUE);
             }
         }
     }
@@ -440,34 +458,52 @@ bool args::process_json_input(const std::string& json_input, bool is_string_inpu
 
         // Handle string input (JSON string) vs file input
         if (is_string_input) {
-            // Try to parse as an array first
-            if (jh.from_array(refined_json, pimpl->args_array)) {
-                // Successfully parsed as array
-                result = true;
-                // Also populate args_map with first item for easy access
-                if (!pimpl->args_array.empty()) {
-                    for (const auto& kv : pimpl->args_array[0]) {
-                        std::string value = kv.second;
-                        
-                        // Remove quotes from JSON string values if present
-                        if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
-                            value = value.substr(1, value.size() - 2);
+            // Check if it looks like a JSON array (starts with [ and ends with ])
+            std::string trimmed = refined_json;
+            // Trim whitespace
+            size_t start = trimmed.find_first_not_of(" \t\r\n");
+            size_t end = trimmed.find_last_not_of(" \t\r\n");
+            if (start != std::string::npos && end != std::string::npos) {
+                trimmed = trimmed.substr(start, end - start + 1);
+            }
+            
+            if (trimmed.size() >= 2 && trimmed.front() == '[' && trimmed.back() == ']') {
+                // Try to parse as an array first
+                if (jh.from_array(refined_json, pimpl->args_array)) {
+                    // Successfully parsed as array
+                    result = true;
+                    // Also populate args_map with first item for easy access
+                    if (!pimpl->args_array.empty()) {
+                        pimpl->args_map.clear();
+                        for (const auto& kv : pimpl->args_array[0]) {
+                            std::string value = kv.second;
+                            
+                            // Remove quotes from JSON string values if present
+                            if (value.size() >= 2 && value.front() == '"' && value.back() == '"') {
+                                value = value.substr(1, value.size() - 2);
+                            }
+                            
+                            pimpl->add_argument_variants(kv.first, value);
                         }
-                        
-                        pimpl->args_map[kv.first] = value;
-                        
-                        // Also add with dashed forms for consistency
-                        pimpl->args_map["-" + kv.first] = value;
-                        pimpl->args_map["--" + kv.first] = value;
                     }
+                } else {
+                    // Array parsing failed, set result to false to fall through to object parsing
+                    result = false;
                 }
-            } else {
+            }
+            
+            // If array parsing failed or it doesn't look like an array, try object parsing
+            if (!result) {
                 // Try standard object parsing
                 std::unordered_map<std::string, std::string> temp_map;
                 result = jh.from(refined_json, temp_map);
                 
                 if (result) {
-                    // Copy to args_map and add dashed versions
+                    // Clear args_array since we have a single configuration
+                    pimpl->args_array.clear();
+                    
+                    // Copy to args_map using helper method
+                    pimpl->args_map.clear();
                     for (const auto& kv : temp_map) {
                         std::string value = kv.second;
                         
@@ -476,13 +512,7 @@ bool args::process_json_input(const std::string& json_input, bool is_string_inpu
                             value = value.substr(1, value.size() - 2);
                         }
                         
-                        pimpl->args_map[kv.first] = value;
-                        
-                        if (kv.first[0] != '-') {
-                            // Add dashed versions if original doesn't have them
-                            pimpl->args_map["-" + kv.first] = value;
-                            pimpl->args_map["--" + kv.first] = value;
-                        }
+                        pimpl->add_argument_variants(kv.first, value);
                     }
                 }
             }
@@ -702,6 +732,68 @@ const std::unordered_map<std::string, std::string>& args::get() const noexcept {
     // Return a static empty map if pimpl is null
     static const std::unordered_map<std::string, std::string> empty_map;
     return empty_map;
+}
+
+// Check if we have multiple configurations (from JSON array)
+bool args::has_multiple_configurations() const noexcept {
+    return pimpl && pimpl->args_array.size() > 1;
+}
+
+// Get the number of configurations stored
+size_t args::get_configuration_count() const noexcept {
+    if (!pimpl) {
+        return 0;
+    }
+    
+    // If we have array data, return its size, otherwise return 1 if we have args_map data
+    if (!pimpl->args_array.empty()) {
+        return pimpl->args_array.size();
+    } else if (!pimpl->args_map.empty()) {
+        return 1;
+    }
+    
+    return 0;
+}
+
+// Get configuration by index (0-based)
+std::optional<std::unordered_map<std::string, std::string>> args::get_configuration(size_t index) const noexcept {
+    if (!pimpl) {
+        return std::nullopt;
+    }
+    
+    // If we have array data, use it
+    if (!pimpl->args_array.empty()) {
+        if (index < pimpl->args_array.size()) {
+            return pimpl->args_array[index];
+        }
+        return std::nullopt;
+    }
+    
+    // Otherwise, if we have single configuration and index is 0
+    if (index == 0 && !pimpl->args_map.empty()) {
+        return pimpl->args_map;
+    }
+    
+    return std::nullopt;
+}
+
+// Get all configurations as a vector
+std::vector<std::unordered_map<std::string, std::string>> args::get_all_configurations() const noexcept {
+    if (!pimpl) {
+        return {};
+    }
+    
+    // If we have array data, return it
+    if (!pimpl->args_array.empty()) {
+        return pimpl->args_array;
+    }
+    
+    // Otherwise, return single configuration as a vector
+    if (!pimpl->args_map.empty()) {
+        return {pimpl->args_map};
+    }
+    
+    return {};
 }
 
 // Add option to CLI - for dynamically adding new options

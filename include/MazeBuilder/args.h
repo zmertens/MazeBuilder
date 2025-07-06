@@ -16,73 +16,6 @@ namespace mazes {
 /// @details Uses PIMPL pattern to wrap CLI11 functionality with additional JSON support
 class args final {
 public:
-    /// @brief Default constructor
-    /// @details Initializes the CLI11 app and sets up common options
-    args() noexcept;
-
-    /// @brief Destructor
-    /// @details Cleans up the internal implementation pointer
-    ~args();
-
-    /// @brief Copy constructor
-    /// @param other The other args object to copy from
-    args(const args& other);
-
-    /// @brief Copy assignment operator
-    /// @param other The other args object to copy from
-    /// @return Reference to this object
-    args& operator=(const args& other);
-
-    /// @brief Move constructor
-    /// @param other The other args object to move from
-    args(args&& other) noexcept = default;
-
-    /// @brief Move assignment operator
-    /// @param other The other args object to move from
-    /// @return Reference to this object
-    args& operator=(args&& other) noexcept = default;
-
-    /// @brief Parse program arguments from a vector of strings
-    /// @param arguments Command-line arguments
-    /// @return True if parsing was successful
-    bool parse(const std::vector<std::string>& arguments) noexcept;
-
-    /// @brief Parse program arguments from a string
-    /// @param arguments Space-delimited command-line arguments
-    /// @return True if parsing was successful
-    bool parse(const std::string& arguments) noexcept;
-    
-    /// @brief Parse program arguments from argc/argv
-    /// @param argc Argument count
-    /// @param argv Argument values
-    /// @return True if parsing was successful
-    bool parse(int argc, char** argv) noexcept;
-
-    /// @brief Clear the arguments map
-    void clear() noexcept;
-
-    /// @brief Get a value from the args map
-    /// @param key The key to look up 
-    /// @return The value if found, std::nullopt otherwise
-    std::optional<std::string> get(const std::string& key) const noexcept;
-
-    /// @brief Get entire args map
-    /// @return Reference to the internal arguments map
-    const std::unordered_map<std::string, std::string>& get() const noexcept;
-
-    /// @brief Add a new option to the CLI parser
-    /// @param flags Command line flags (e.g., "-x,--extra")
-    /// @param description Help description for the option
-    /// @return True if the option was successfully added
-    bool add_option(const std::string& flags, const std::string& description) noexcept;
-
-    /// @brief Add a new flag to the CLI parser
-    /// @param flags Command line flags (e.g., "-f,--flag")
-    /// @param description Help description for the flag
-    /// @return True if the flag was successfully added
-    bool add_flag(const std::string& flags, const std::string& description) noexcept;
-
-private:
     // String constants for command-line arguments
     // Row/column related constants
     static constexpr const char* ROW_FLAG_STR = "-r";
@@ -142,6 +75,91 @@ private:
     
     // Special values
     static constexpr const char* TRUE_VALUE = "true";
+
+    /// @brief Default constructor
+    /// @details Initializes the CLI11 app and sets up common options
+    args() noexcept;
+
+    /// @brief Destructor
+    /// @details Cleans up the internal implementation pointer
+    ~args();
+
+    /// @brief Copy constructor
+    /// @param other The other args object to copy from
+    args(const args& other);
+
+    /// @brief Copy assignment operator
+    /// @param other The other args object to copy from
+    /// @return Reference to this object
+    args& operator=(const args& other);
+
+    /// @brief Move constructor
+    /// @param other The other args object to move from
+    args(args&& other) noexcept = default;
+
+    /// @brief Move assignment operator
+    /// @param other The other args object to move from
+    /// @return Reference to this object
+    args& operator=(args&& other) noexcept = default;
+
+    /// @brief Parse program arguments from a vector of strings
+    /// @param arguments Command-line arguments
+    /// @return True if parsing was successful
+    bool parse(const std::vector<std::string>& arguments) noexcept;
+
+    /// @brief Parse program arguments from a string
+    /// @param arguments Space-delimited command-line arguments
+    /// @return True if parsing was successful
+    bool parse(const std::string& arguments) noexcept;
+    
+    /// @brief Parse program arguments from argc/argv
+    /// @param argc Argument count
+    /// @param argv Argument values
+    /// @return True if parsing was successful
+    bool parse(int argc, char** argv) noexcept;
+
+    /// @brief Clear the arguments map
+    void clear() noexcept;
+
+    /// @brief Get a value from the args map
+    /// @param key The key to look up 
+    /// @return The value if found, std::nullopt otherwise
+    std::optional<std::string> get(const std::string& key) const noexcept;
+
+    /// @brief Get entire args map
+    /// @return Reference to the internal arguments map
+    const std::unordered_map<std::string, std::string>& get() const noexcept;
+
+    /// @brief Check if we have multiple configurations (from JSON array)
+    /// @return True if multiple configurations are stored
+    bool has_multiple_configurations() const noexcept;
+
+    /// @brief Get the number of configurations stored
+    /// @return Number of configurations (1 for single config, >1 for arrays)
+    size_t get_configuration_count() const noexcept;
+
+    /// @brief Get configuration by index (0-based)
+    /// @param index The index of the configuration to retrieve
+    /// @return Configuration map if index is valid, std::nullopt otherwise
+    std::optional<std::unordered_map<std::string, std::string>> get_configuration(size_t index) const noexcept;
+
+    /// @brief Get all configurations as a vector
+    /// @return Vector of configuration maps
+    std::vector<std::unordered_map<std::string, std::string>> get_all_configurations() const noexcept;
+
+    /// @brief Add a new option to the CLI parser
+    /// @param flags Command line flags (e.g., "-x,--extra")
+    /// @param description Help description for the option
+    /// @return True if the option was successfully added
+    bool add_option(const std::string& flags, const std::string& description) noexcept;
+
+    /// @brief Add a new flag to the CLI parser
+    /// @param flags Command line flags (e.g., "-f,--flag")
+    /// @param description Help description for the flag
+    /// @return True if the flag was successfully added
+    bool add_flag(const std::string& flags, const std::string& description) noexcept;
+
+private:
 
     /// @brief Parse a sliced array string into individual elements
     /// @param value The sliced array string (e.g., "[1:10]") with inclusive bounds

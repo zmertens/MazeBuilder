@@ -65,35 +65,38 @@ std::string distance_grid::to_base36(int value) const {
 /// @param end_index 
 void distance_grid::calculate_distances(int start_index, int end_index) noexcept {
 
-//    try {
-//        auto start_cell = m_grid->search(start_index);
-//        auto end_cell = m_grid->search(end_index);
-//
-//        if (!start_cell || !end_cell) {
-//
-//            throw std::runtime_error("Invalid start or end cell index.");
-//        }
-//
-//        m_distances = std::make_shared<distances>(start_cell->get_index());
-//
-//        if (!m_distances) {
-//
-//            throw std::runtime_error("Failed to create distances object.");
-//        }
-//
-//        m_distances = m_distances->path_to(end_cell->get_index(), *this);
-//
-//        if (!m_distances) {
-//
-//            throw std::runtime_error("Failed to get path to goal.");
-//        }
-//
-//    } catch (const std::exception& e) {
-//
-//#if defined(MAZE_DEBUG)
-//        std::cerr << "Exception in distance_grid::calculate_distances: " << e.what() << std::endl;
-//#endif
-    //}
+   try {
+        const auto& grid_ops = m_grid->operations();
+
+        auto start_cell = grid_ops.search(start_index);
+        auto end_cell = grid_ops.search(end_index);
+
+        if (!start_cell || !end_cell) {
+
+            throw std::runtime_error("Invalid start or end cell index.");
+        }
+
+        m_distances = std::make_shared<distances>(start_cell->get_index());
+
+        if (!m_distances) {
+
+            throw std::runtime_error("Failed to create distances object.");
+        }
+
+        m_distances = m_distances->path_to(this->m_grid, end_cell->get_index());
+
+        if (!m_distances) {
+
+            throw std::runtime_error("Failed to get path to goal.");
+        }
+
+   } catch (const std::exception& e) {
+
+#if defined(MAZE_DEBUG)
+
+       std::cerr << "Exception in calculating distances: " << e.what() << std::endl;
+#endif
+    }
 }
 
 std::shared_ptr<distances> distance_grid::get_distances() const noexcept {

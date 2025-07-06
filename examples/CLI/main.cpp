@@ -14,6 +14,8 @@
 #include "cli.h"
 #include "batch_processor.h"
 
+static std::string MAZE_BUILDER_VERSION = "maze_builder\t" + mazes::VERSION;
+
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
@@ -31,8 +33,6 @@ EMSCRIPTEN_BINDINGS(cli_module) {
 
 #endif // EMSCRIPTEN_BINDINGS
 
-static std::string MAZE_BUILDER_VERSION = "maze_builder\t" + mazes::VERSION;
-
 int main(int argc, char* argv[]) {
 
     using namespace std;
@@ -42,9 +42,7 @@ int main(int argc, char* argv[]) {
 #endif
 
     static const std::string MAZE_BUILDER_HELP = MAZE_BUILDER_VERSION + "\n" + \
-        "Usages: app.exe [OPTION(S)]... [OUTPUT]\n" \
-        "Generates mazes and exports to different formats\n" \
-        "Options: case-sensitive, long options must use '=' combination\n" \
+        "Description: Generates mazes in different string forms\n" \
         "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" \
         "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" \
         "\t-a, --algo         [dfs] [sidewinder], [binary_tree]\n" \
@@ -81,33 +79,32 @@ int main(int argc, char* argv[]) {
     }
 
     try {
-        // Get output file path
-        string output_file_str = "stdout";
-        if (maze_args.get("-o").has_value()) {
-            output_file_str = maze_args.get("-o").value();
-        } else if (maze_args.get("--output").has_value()) {
-            output_file_str = maze_args.get("--output").value();
+
+        auto config = maze_args.get_configuration(0);
+        if (config.has_value()) {
+            std::cout << "   Configuration ready for batch processing:\n";
+            
+            // This is how batch_processor.extract_params() would access the config
+            auto it = config->find(mazes::args::ROW_WORD_STR);
+            if (it != config->end()) {
+                std::cout << "   Found rows: " << it->second << "\n";
+            }
+
+            it = config->find(mazes::args::COLUMN_WORD_STR);
+            if (it != config->end()) {
+                std::cout << "   Found columns: " << it->second << "\n";
+            }
+
+            it = config->find(mazes::args::SEED_WORD_STR);
+            if (it != config->end()) {
+                std::cout << "   Found seed: " << it->second << "\n";
+            }
+
+            it = config->find(mazes::args::ALGO_WORD_STR);
+            if (it != config->end()) {
+                std::cout << "   Found algo: " << it->second << "\n";
+            }
         }
-        
-        // Check if we're dealing with batch processing
-        // if (maze_args.has_array()) {
-        //     // Process all configurations in the array
-        //     mazes::batch_processor processor;
-        //     bool success = processor.process_batch(maze_args.get_array(), output_file_str);
-            
-        //     if (!success) {
-        //         cerr << "Batch processing failed." << endl;
-        //         return EXIT_FAILURE;
-        //     }        } else {
-        //     // Process a single maze with the configuration
-        //     mazes::batch_processor processor;
-        //     bool success = processor.process_single(maze_args.get(), output_file_str);
-            
-        //     if (!success) {
-        //         cerr << "Maze processing failed." << endl;
-        //         return EXIT_FAILURE;
-        //     }
-        // }
     } catch (std::exception& ex) {
         std::cerr << ex.what() << std::endl;
         return EXIT_FAILURE;
