@@ -47,7 +47,8 @@ int main(int argc, char* argv[]) {
         "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" \
         "\t-a, --algo         [dfs] [sidewinder], [binary_tree]\n" \
         "\t-c, --columns      columns\n" \
-        "\t-d, --distances    show distances using base36 numbers\n" \
+        "\t-d, --distances    show distances with start, end positions\n" \
+        "\t                   ex: -d [0:10] or --distances=[1:]\n" \
         "\t-e, --encode       encode maze to base64 string\n" \
         "\t-h, --help         display this help message\n" \
         "\t-j, --json         run with arguments in JSON format\n" \
@@ -84,7 +85,6 @@ int main(int argc, char* argv[]) {
         if (config.has_value()) {
             std::cout << "   Configuration ready for batch processing:\n";
             
-            // This is how batch_processor.extract_params() would access the config
             auto it = config->find(mazes::args::ROW_WORD_STR);
             if (it != config->end()) {
                 std::cout << "   Found rows: " << it->second << "\n";
@@ -103,6 +103,11 @@ int main(int argc, char* argv[]) {
             it = config->find(mazes::args::ALGO_WORD_STR);
             if (it != config->end()) {
                 std::cout << "   Found algo: " << it->second << "\n";
+            }
+
+            it = config->find(mazes::args::OUTPUT_WORD_STR);
+            if (it != config->end()) {
+                std::cout << "   Found output: " << it->second << "\n";
             }
         }
     } catch (std::exception& ex) {
