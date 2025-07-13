@@ -1,6 +1,7 @@
 #ifndef CONFIGURATOR_H
 #define CONFIGURATOR_H
 
+#include <limits>
 #include <string>
 
 #include <MazeBuilder/enums.h>
