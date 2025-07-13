@@ -4,9 +4,9 @@
 set(EXE_NAME "mazebuildercli")
 
 set(CLI_SOURCES
-    main.cpp
     cli.cpp
-    batch_processor.cpp
+    main.cpp
+    parser.cpp
 )
 
 if(EMSCRIPTEN)

@@ -9,8 +9,9 @@ namespace mazes {
 
 /// @file configurator.h
 /// @class configurator
-/// @brief Configuration class for grids
+/// @brief Configuration class for arguments
 class configurator {
+    
 public:
     
     /// @brief Set the number of rows
@@ -41,7 +42,7 @@ public:
     /// @param algorithm The algorithm to use
     /// @return A reference to this configurator
     configurator& algo_id(algo algorithm) noexcept {
-        m_algo = algorithm;
+        m_algo_id = algorithm;
         return *this;
     }
 
@@ -73,7 +74,23 @@ public:
     /// @param output The output ID
     /// @return A reference to this configurator
     configurator& output_id(output output) noexcept {
-        m_output = output;
+        m_output_id = output;
+        return *this;
+    }
+
+    /// @brief Set the help message
+    /// @param help The help message
+    /// @return A reference to this configurator
+    configurator& help(std::string help) noexcept {
+        m_help = std::move(help);
+        return *this;
+    }
+
+    /// @brief Set the version string
+    /// @param version The version string
+    /// @return A reference to this configurator
+    configurator& version(std::string version) noexcept {
+        m_version = std::move(version);
         return *this;
     }
 
@@ -91,7 +108,7 @@ public:
 
     /// @brief Get the maze generation algorithm
     /// @return The algorithm used for maze generation
-    algo algo_id() const noexcept { return m_algo; }
+    algo algo_id() const noexcept { return m_algo_id; }
 
     /// @brief Get the block ID
     /// @return The block ID
@@ -107,9 +124,18 @@ public:
 
     /// @brief Get the output ID
     /// @return The output ID
-    output output_id() const noexcept { return m_output; }
+    output output_id() const noexcept { return m_output_id; }
+
+    /// @brief Get the help message
+    /// @return The help message
+    const std::string& help() const noexcept { return m_help; }
+
+    /// @brief Get the version string
+    /// @return The version string
+    const std::string& version() const noexcept { return m_version; }
 
 private:
+
     unsigned int m_rows;
 
     unsigned int m_columns;
@@ -118,13 +144,17 @@ private:
 
     int m_block_id;
 
-    algo m_algo;
+    algo m_algo_id;
 
     unsigned int m_seed;
 
     bool m_distances;
 
-    output m_output;
+    output m_output_id;
+
+    std::string m_help;
+
+    std::string m_version;
 };
 
 } // namespace

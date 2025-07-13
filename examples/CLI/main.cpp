@@ -1,26 +1,23 @@
-#include <random>
-#include <memory>
-#include <exception>
-#include <iostream>
-#include <sstream>
-#include <algorithm>
-#include <string>
-#include <vector>
-#include <list>
-#include <iomanip>
+/// @file main.cpp
+// @brief Main entry point for the maze builder CLI application
+// @details This application generates mazes based on command line arguments
+// @details It supports various algorithms and output formats
+// @details The application can also be compiled to WebAssembly for use in web applications
+// @author zmertens
 
-#include <MazeBuilder/maze_builder.h>
+#include <iostream>
+#include <functional>
+#include <stdexcept>
+#include <vector>
 
 #include "cli.h"
-#include "batch_processor.h"
-
-static std::string MAZE_BUILDER_VERSION = "maze_builder\t" + mazes::VERSION;
 
 #if defined(__EMSCRIPTEN__)
+
 #include <emscripten/bind.h>
 
-// This is necessary due to emscripten's handling of templates
 std::shared_ptr<cli> get() {
+
     return mazes::singleton_base<cli>::instance();
 }
 
@@ -28,94 +25,42 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::function("get", &get, emscripten::allow_raw_pointers());
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("std::shared_ptr<cli>")
-        .function("stringify_from_dimens", &cli::stringify_from_dimens);
+        .function("run", &cli::run);
 }
 
 #endif // EMSCRIPTEN_BINDINGS
 
 int main(int argc, char* argv[]) {
 
-    using namespace std;
+#if defined(__EMSCRIPTEN__)
 
-#if defined(MAZE_DEBUG)
-    MAZE_BUILDER_VERSION += " - DEBUG";
+    return EXIT_SUCCESS;
 #endif
 
-    static const std::string MAZE_BUILDER_HELP = MAZE_BUILDER_VERSION + "\n" + \
-        "Description: Generates mazes in different string forms\n" \
-        "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" \
-        "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" \
-        "\t-a, --algo         [dfs] [sidewinder], [binary_tree]\n" \
-        "\t-c, --columns      columns\n" \
-        "\t-d, --distances    show distances with start, end positions\n" \
-        "\t                   ex: -d [0:10] or --distances=[1:]\n" \
-        "\t-e, --encode       encode maze to base64 string\n" \
-        "\t-h, --help         display this help message\n" \
-        "\t-j, --json         run with arguments in JSON format\n" \
-        "\t                   supports both single objects and arrays of objects\n" \
-        "\t-s, --seed         seed for the mt19937 generator\n" \
-        "\t-r, --rows         rows\n" \
-        "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" \
-        "\t-v, --version      display program version\n";
-
-#if !defined(__EMSCRIPTEN__)
+    using namespace std;
 
     // Copy command arguments and skip the program name
     vector<string> args_vec{ argv + 1, argv + argc };
 
-    mazes::args maze_args{ };
-    if (!maze_args.parse(args_vec)) {
-        cerr << "Invalid arguments, parsing failed." << endl;
-        return EXIT_FAILURE;
-    }
-
-    if (maze_args.get("-h").has_value() || maze_args.get("--help").has_value()) {
-        cout << MAZE_BUILDER_HELP << endl;
-        return EXIT_SUCCESS;
-    }
-
-    if (maze_args.get("-v").has_value() || maze_args.get("--version").has_value()) {
-        cout << MAZE_BUILDER_VERSION << endl;
-        return EXIT_SUCCESS;
-    }
-
     try {
 
-        auto config = maze_args.get_configuration(0);
-        if (config.has_value()) {
-            std::cout << "   Configuration ready for batch processing:\n";
-            
-            auto it = config->find(mazes::args::ROW_WORD_STR);
-            if (it != config->end()) {
-                std::cout << "   Found rows: " << it->second << "\n";
-            }
+        cli my_cli;
 
-            it = config->find(mazes::args::COLUMN_WORD_STR);
-            if (it != config->end()) {
-                std::cout << "   Found columns: " << it->second << "\n";
-            }
+        if (auto str = my_cli.convert(cref(args_vec)); !str.empty()) {
 
-            it = config->find(mazes::args::SEED_WORD_STR);
-            if (it != config->end()) {
-                std::cout << "   Found seed: " << it->second << "\n";
-            }
+            cout << str << endl;
+        } else {
 
-            it = config->find(mazes::args::ALGO_WORD_STR);
-            if (it != config->end()) {
-                std::cout << "   Found algo: " << it->second << "\n";
-            }
-
-            it = config->find(mazes::args::OUTPUT_WORD_STR);
-            if (it != config->end()) {
-                std::cout << "   Found output: " << it->second << "\n";
-            }
+            throw runtime_error("Failed to parse command line arguments.");
         }
+
+
     } catch (std::exception& ex) {
+
         std::cerr << ex.what() << std::endl;
+
         return EXIT_FAILURE;
     }
-
-#endif // EMSCRIPTEN
 
     return EXIT_SUCCESS;
 } // main

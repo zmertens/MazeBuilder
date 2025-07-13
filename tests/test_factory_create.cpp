@@ -23,10 +23,12 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     vector<double> durations;
     durations.reserve(ITERATIONS);
 
+    grid_factory factory1;
+
     for (auto i{ 0 }; i < ITERATIONS; ++i) {
         durations.emplace_back(chrono::duration_cast<chrono::milliseconds>(
             mazes::progress<chrono::milliseconds, chrono::steady_clock>::duration(
-                mazes::factory::create,
+                [&factory1](auto config) { return factory1.create(config); },
                 mazes::configurator().columns(COLUMNS).rows(ROWS).levels(LEVELS)
                 .distances(false).seed(SEED).algo_id(to_algo_from_string(string(ALGO_S))))).count());
     }
@@ -38,8 +40,11 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     REQUIRE(max > 0);
 
 #if defined(MAZE_BENCHMARK)
+    
     BENCHMARK("Benchmark factory::create") {
-    auto maze_opt = factory::create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+    
+    grid_factory factory;
+    auto maze_opt = factory.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
 
     REQUIRE(maze_opt);
     };

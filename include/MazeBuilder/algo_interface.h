@@ -13,16 +13,18 @@ class randomizer;
 
 /// @file algo_interface.h
 /// @class algo_interface
-/// @brief Interface for the maze generation algorithms
-/// @details This interface provides a method for generating a maze
-/// @details Uses a strategy design pattern
+/// @brief Interface for runnable algorithms
+/// @details Uses the strategy design pattern
 class algo_interface {
+    
 public:
-    /// @brief Interface method that algorithms implement to generate a maze
+    /// @brief Interface method that algorithms must implement
     /// @param g 
     /// @param rng
     /// @return 
     virtual bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept = 0;
+
+    virtual ~algo_interface() = default;
 };
 }
 #endif // ALGO_INTERFACE_H

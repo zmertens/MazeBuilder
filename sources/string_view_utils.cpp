@@ -1,12 +1,11 @@
 #include <MazeBuilder/string_view_utils.h>
 
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/maze.h>
-#include <MazeBuilder/lab.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 
 #if defined(MAZE_DEBUG)
+
 #include <iostream>
 #endif
 
@@ -48,6 +47,7 @@ std::string_view string_view_utils::strip_json_quotes(const std::string_view& s)
     
     // Debug print to see the exact string content
 #if defined(MAZE_DEBUG)
+
     std::cout << "Original string: [" << s << "]" << std::endl;
 #endif
     

@@ -16,8 +16,17 @@ namespace mazes {
 /// @details Uses PIMPL pattern to wrap CLI11 functionality with additional JSON support
 class args final {
 public:
-    // String constants for command-line arguments
-    // Row/column related constants
+
+    static constexpr const char* ALGO_ID_FLAG_STR = "-a";
+    static constexpr const char* ALGO_ID_OPTION_STR = "--algo";
+    static constexpr const char* ALGO_ID_WORD_STR = "algo";
+    static constexpr const char* ALGO_ID_SHORT_STR = "a";
+
+    static constexpr const char* BLOCK_ID_FLAG_STR = "-b";
+    static constexpr const char* BLOCK_ID_OPTION_STR = "--block";
+    static constexpr const char* BLOCK_ID_WORD_STR = "block";
+    static constexpr const char* BLOCK_ID_SHORT_STR = "b";
+
     static constexpr const char* ROW_FLAG_STR = "-r";
     static constexpr const char* ROW_OPTION_STR = "--rows";
     static constexpr const char* ROW_WORD_STR = "rows";
@@ -27,6 +36,11 @@ public:
     static constexpr const char* COLUMN_OPTION_STR = "--columns";
     static constexpr const char* COLUMN_WORD_STR = "columns";
     static constexpr const char* COLUMN_SHORT_STR = "c";
+
+    static constexpr const char* LEVEL_FLAG_STR = "-l";
+    static constexpr const char* LEVEL_OPTION_STR = "--levels";
+    static constexpr const char* LEVEL_WORD_STR = "levels";
+    static constexpr const char* LEVEL_SHORT_STR = "l";
     
     // JSON related constants
     static constexpr const char* JSON_FLAG_STR = "-j";
@@ -35,10 +49,10 @@ public:
     static constexpr const char* JSON_SHORT_STR = "j";
     
     // Output related constants
-    static constexpr const char* OUTPUT_FLAG_STR = "-o";
-    static constexpr const char* OUTPUT_OPTION_STR = "--output";
-    static constexpr const char* OUTPUT_WORD_STR = "output";
-    static constexpr const char* OUTPUT_SHORT_STR = "o";
+    static constexpr const char* OUTPUT_ID_FLAG_STR = "-o";
+    static constexpr const char* OUTPUT_ID_OPTION_STR = "--output";
+    static constexpr const char* OUTPUT_ID_WORD_STR = "output";
+    static constexpr const char* OUTPUT_ID_SHORT_STR = "o";
     static constexpr const char* DEFAULT_OUTPUT_FILENAME = "output.json";
     
     // Seed related constants
@@ -68,10 +82,6 @@ public:
     static constexpr const char* VERSION_OPTION_STR = "--version";
     static constexpr const char* VERSION_WORD_STR = "version";
     static constexpr const char* VERSION_SHORT_STR = "v";
-    
-    // Algorithm related constants
-    static constexpr const char* ALGO_OPTION_STR = "--algo";
-    static constexpr const char* ALGO_WORD_STR = "algo";
     
     // Special values
     static constexpr const char* TRUE_VALUE = "true";

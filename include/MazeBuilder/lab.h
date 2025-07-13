@@ -1,10 +1,12 @@
 #ifndef LAB_H
 #define LAB_H
 
+#include <memory>
 #include <optional>
-#include <utility>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 #include <MazeBuilder/hash_funcs.h>
 
@@ -12,7 +14,7 @@
 namespace mazes {
 
 class cell;
-class maze;
+class configurator;
 
 /// @file lab.h
 
@@ -61,7 +63,17 @@ public:
     /// @param c2 A shared pointer to the second cell object.
     /// @param bidi A boolean flag indicating if the unlink should be bidirectional. Defaults to true.
     static void unlink(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi = true) noexcept;
+
+    /// @brief Sets neighbors for a collection of cells based on the provided indices.
+    /// @param config The configurator containing maze configuration parameters.
+    /// @param indices A vector of indices representing the cells to set neighbors for.
+    /// @param cells_to_set A vector of cell objects to set neighbors for.
+    /// @details This function uses the configurator to determine the maze structure and sets neighbors accordingly.
+    static void set_neighbors(configurator const& config, const std::vector<int>& indices, std::vector<std::shared_ptr<cell>>& cells_to_set) noexcept;
 private:
+
+    int calculate_cell_index(unsigned int row, unsigned int col, unsigned int level, unsigned int rows, unsigned int columns) const noexcept;
+
 
     using pqmap = std::unordered_map<std::pair<int, int>, std::tuple<int, int, int, int>, pair_hash>;
     pqmap m_p_q;

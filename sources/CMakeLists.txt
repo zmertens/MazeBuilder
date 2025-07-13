@@ -7,16 +7,14 @@ set(MAZE_BUILDER_CORE_SRCS
     base64_helper.cpp
     binary_tree.cpp
     cell.cpp
-    cell_factory.cpp
     colored_grid.cpp
     dfs.cpp
     distance_grid.cpp
     distances.cpp
-    factory.cpp
     grid.cpp
+    grid_factory.cpp
     json_helper.cpp
     lab.cpp
-    maze.cpp
     objectify.cpp
     pixels.cpp
     randomizer.cpp

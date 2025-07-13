@@ -68,9 +68,9 @@ public:
             args_map[args::SEED_OPTION_STR] = value;
             args_map[args::SEED_WORD_STR] = value;
         } else if (key == "output" || key == "o") {
-            args_map[args::OUTPUT_FLAG_STR] = value;
-            args_map[args::OUTPUT_OPTION_STR] = value;
-            args_map[args::OUTPUT_WORD_STR] = value;
+            args_map[args::OUTPUT_ID_FLAG_STR] = value;
+            args_map[args::OUTPUT_ID_OPTION_STR] = value;
+            args_map[args::OUTPUT_ID_WORD_STR] = value;
         } else if (key == "json" || key == "j") {
             args_map[args::JSON_FLAG_STR] = value;
             args_map[args::JSON_OPTION_STR] = value;
@@ -80,8 +80,8 @@ public:
             args_map[args::DISTANCES_OPTION_STR] = value;
             args_map[args::DISTANCES_WORD_STR] = value;
         } else if (key == "algo") {
-            args_map[args::ALGO_OPTION_STR] = value;
-            args_map[args::ALGO_WORD_STR] = value;
+            args_map[args::ALGO_ID_OPTION_STR] = value;
+            args_map[args::ALGO_ID_WORD_STR] = value;
         } else if (key == "help" || key == "h") {
             args_map[args::HELP_FLAG_STR] = value;
             args_map[args::HELP_OPTION_STR] = value;
@@ -535,14 +535,14 @@ bool args::process_json_input(const std::string& json_input, bool is_string_inpu
             }
             
             // Only set output if it's not already specified
-            if (pimpl->args_map.find(OUTPUT_WORD_STR) == pimpl->args_map.end() &&
-                pimpl->args_map.find(OUTPUT_OPTION_STR) == pimpl->args_map.end() &&
-                pimpl->args_map.find(OUTPUT_FLAG_STR) == pimpl->args_map.end()) {
+            if (pimpl->args_map.find(OUTPUT_ID_WORD_STR) == pimpl->args_map.end() &&
+                pimpl->args_map.find(OUTPUT_ID_OPTION_STR) == pimpl->args_map.end() &&
+                pimpl->args_map.find(OUTPUT_ID_FLAG_STR) == pimpl->args_map.end()) {
                 
-                pimpl->args_map[OUTPUT_WORD_STR] = output_filename;
-                pimpl->args_map[OUTPUT_OPTION_STR] = output_filename;
-                pimpl->args_map[OUTPUT_FLAG_STR] = output_filename;
-                pimpl->args_map["-" + std::string(OUTPUT_WORD_STR)] = output_filename;
+                pimpl->args_map[OUTPUT_ID_WORD_STR] = output_filename;
+                pimpl->args_map[OUTPUT_ID_OPTION_STR] = output_filename;
+                pimpl->args_map[OUTPUT_ID_FLAG_STR] = output_filename;
+                pimpl->args_map["-" + std::string(OUTPUT_ID_WORD_STR)] = output_filename;
             }
             
             // Set placeholder values for JSON file parsing tests
@@ -600,25 +600,25 @@ bool args::process_json_input(const std::string& json_input, bool is_string_inpu
         }
         
         // If user specified an output file, make sure all variants are set
-        if (pimpl->args_map.find(OUTPUT_FLAG_STR) != pimpl->args_map.end()) {
-            std::string output_value = pimpl->args_map[OUTPUT_FLAG_STR];
-            pimpl->args_map[OUTPUT_OPTION_STR] = output_value;
-            pimpl->args_map[OUTPUT_WORD_STR] = output_value;
-        } else if (pimpl->args_map.find(OUTPUT_OPTION_STR) != pimpl->args_map.end()) {
-            std::string output_value = pimpl->args_map[OUTPUT_OPTION_STR];
-            pimpl->args_map[OUTPUT_FLAG_STR] = output_value;
-            pimpl->args_map[OUTPUT_WORD_STR] = output_value;
-        } else if (pimpl->args_map.find(OUTPUT_WORD_STR) != pimpl->args_map.end()) {
-            std::string output_value = pimpl->args_map[OUTPUT_WORD_STR];
-            pimpl->args_map[OUTPUT_FLAG_STR] = output_value;
-            pimpl->args_map[OUTPUT_OPTION_STR] = output_value;
+        if (pimpl->args_map.find(OUTPUT_ID_FLAG_STR) != pimpl->args_map.end()) {
+            std::string output_value = pimpl->args_map[OUTPUT_ID_FLAG_STR];
+            pimpl->args_map[OUTPUT_ID_OPTION_STR] = output_value;
+            pimpl->args_map[OUTPUT_ID_WORD_STR] = output_value;
+        } else if (pimpl->args_map.find(OUTPUT_ID_OPTION_STR) != pimpl->args_map.end()) {
+            std::string output_value = pimpl->args_map[OUTPUT_ID_OPTION_STR];
+            pimpl->args_map[OUTPUT_ID_FLAG_STR] = output_value;
+            pimpl->args_map[OUTPUT_ID_WORD_STR] = output_value;
+        } else if (pimpl->args_map.find(OUTPUT_ID_WORD_STR) != pimpl->args_map.end()) {
+            std::string output_value = pimpl->args_map[OUTPUT_ID_WORD_STR];
+            pimpl->args_map[OUTPUT_ID_FLAG_STR] = output_value;
+            pimpl->args_map[OUTPUT_ID_OPTION_STR] = output_value;
         }
         // Auto-generate output filename if not already specified
         else if (result) {
             std::string output_name = generate_output_filename(json_input, is_string_input);
-            pimpl->args_map[OUTPUT_WORD_STR] = output_name; 
-            pimpl->args_map[OUTPUT_FLAG_STR] = output_name;
-            pimpl->args_map[OUTPUT_OPTION_STR] = output_name;
+            pimpl->args_map[OUTPUT_ID_WORD_STR] = output_name; 
+            pimpl->args_map[OUTPUT_ID_FLAG_STR] = output_name;
+            pimpl->args_map[OUTPUT_ID_OPTION_STR] = output_name;
         }
         
         // Store the json input source in the args_map

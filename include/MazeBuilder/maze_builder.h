@@ -15,11 +15,10 @@
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/distances.h>
 #include <MazeBuilder/enums.h>
-#include <MazeBuilder/factory.h>
 #include <MazeBuilder/grid.h>
+#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/lab.h>
-#include <MazeBuilder/maze.h>
 #include <MazeBuilder/objectify.h>
 #include <MazeBuilder/pixels.h>
 #include <MazeBuilder/progress.h>

@@ -1268,12 +1268,12 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
 
 // Generate a new level
 void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const {
-    auto m_ptr = mazes::factory::create_with_rows_columns(INIT_MAZE_ROWS, INIT_MAZE_COLS);
-    if (!m_ptr.has_value()) {
+    // auto m_ptr = mazes::factory::create_with_rows_columns(INIT_MAZE_ROWS, INIT_MAZE_COLS);
+    // if (!m_ptr.has_value()) {
     
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze\n");
-        return;
-    }
+    //     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze\n");
+    //     return;
+    // }
 
     auto s = "";// mazes::stringz::stringify(cref(m_ptr.value()));
 
