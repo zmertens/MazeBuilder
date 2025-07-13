@@ -25,7 +25,7 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::function("get", &get, emscripten::allow_raw_pointers());
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("std::shared_ptr<cli>")
-        .function("run", &cli::run);
+        .function("convert", &cli::convert);
 }
 
 #endif // EMSCRIPTEN_BINDINGS
