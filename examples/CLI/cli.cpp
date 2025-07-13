@@ -18,34 +18,46 @@
 
 const std::string cli::DEBUG_STR = "DEBUG";
 
-std::string cli::CLI_VERSION_STR = mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ") ";
+// Use functions to avoid static initialization order fiasco
+static std::string get_cli_version_str() {
+    return mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ")";
+}
 
-std::string cli::CLI_HELP_STR = cli::CLI_TITLE_STR + "\n" + \
-    "Description: Generates mazes and outputs into string formats\n" \
-    "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" \
-    "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" \
-    "\t-a, --algo         binary_tree, dfs, sidewinder\n" \
-    "\t-c, --columns      columns\n" \
-    "\t-d, --distances    show distances with start, end positions\n" \
-    "\t                   ex: -d [0:10] or --distances=[1:]\n" \
-    "\t-e, --encode       encode maze to base64 string\n" \
-    "\t-h, --help         display this help message\n" \
-    "\t-j, --json         run with arguments in JSON format\n" \
-    "\t                   supports both single objects and arrays of objects\n" \
-    "\t-s, --seed         seed for the mt19937 generator\n" \
-    "\t-r, --rows         rows\n" \
-    "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" \
-    "\t-v, --version      display program version\n";
+static std::string get_cli_title_str() {
+    return "mazebuildercli v" + get_cli_version_str();
+}
 
-std::string cli::CLI_TITLE_STR = "mazebuildercli v" + cli::CLI_VERSION_STR;
+static std::string get_cli_help_str() {
+    return get_cli_title_str() + "\n" + 
+        "Description: Generates mazes and outputs into string formats\n" 
+        "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" 
+        "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" 
+        "\t-a, --algo         binary_tree, dfs, sidewinder\n" 
+        "\t-c, --columns      columns\n" 
+        "\t-d, --distances    show distances with start, end positions\n" 
+        "\t                   ex: -d [0:10] or --distances=[1:]\n" 
+        "\t-e, --encode       encode maze to base64 string\n" 
+        "\t-h, --help         display this help message\n" 
+        "\t-j, --json         run with arguments in JSON format\n" 
+        "\t                   supports both single objects and arrays of objects\n" 
+        "\t-s, --seed         seed for the mt19937 generator\n" 
+        "\t-r, --rows         rows\n" 
+        "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" 
+        "\t-v, --version      display program version\n";
+}
+
+// Lazy initialization using function statics
+std::string cli::CLI_VERSION_STR = get_cli_version_str();
+std::string cli::CLI_TITLE_STR = get_cli_title_str();
+std::string cli::CLI_HELP_STR = get_cli_help_str();
 
 std::string cli::convert(std::vector<std::string> const& args_vec) const noexcept {
 
     using namespace std;
 
 #if defined(MAZE_DEBUG)
-
-    CLI_VERSION_STR += "- " + DEBUG_STR;
+    // Note: Don't modify static variables at runtime in a const noexcept function
+    std::string debug_version = CLI_VERSION_STR + " - " + DEBUG_STR;
 #endif
 
     try {
@@ -64,7 +76,11 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
             return CLI_HELP_STR;
         } else if (!config.version().empty()) {
 
+#if defined(MAZE_DEBUG)
+            return debug_version;
+#else
             return CLI_VERSION_STR;
+#endif
         }
 
         mazes::grid_factory factory;

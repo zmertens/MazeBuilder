@@ -42,26 +42,22 @@ int main(int argc, char* argv[]) {
     // Copy command arguments and skip the program name
     vector<string> args_vec{ argv + 1, argv + argc };
 
-    // Debug: print the arguments we received
-    cerr << "DEBUG: Received " << args_vec.size() << " arguments:" << endl;
-    for (size_t i = 0; i < args_vec.size(); ++i) {
-        cerr << "  args[" << i << "] = \"" << args_vec[i] << "\"" << endl;
-    }
-
     try {
 
         cli my_cli;
 
-        if (auto str = my_cli.convert(cref(args_vec)); !str.empty()) {
+        auto str = my_cli.convert(cref(args_vec));
+        
+        if (!str.empty()) {
 
             cout << str << endl;
         } else {
-
+            // This should trigger the catch block at line 58
             throw runtime_error("Failed to parse command line arguments.");
         }
 
 
-    } catch (std::exception& ex) {
+    } catch (const std::exception& ex) {
 
         std::cerr << ex.what() << std::endl;
 

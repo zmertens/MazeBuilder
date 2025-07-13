@@ -6,7 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 
-bool parser::parse(std::vector<std::string> const& args, mazes::configurator& config) const noexcept {
+bool parser::parse(std::vector<std::string> const& args, mazes::configurator& config) const {
     
     using namespace std;
 

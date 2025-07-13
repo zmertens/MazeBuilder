@@ -9,7 +9,7 @@
 class parser {
 
 public:
-    bool parse(std::vector<std::string> const& args, mazes::configurator& config) const noexcept;
+    bool parse(std::vector<std::string> const& args, mazes::configurator& config) const;
 
 private:
 
