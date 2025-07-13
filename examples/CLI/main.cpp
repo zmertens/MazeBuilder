@@ -42,6 +42,12 @@ int main(int argc, char* argv[]) {
     // Copy command arguments and skip the program name
     vector<string> args_vec{ argv + 1, argv + argc };
 
+    // Debug: print the arguments we received
+    cerr << "DEBUG: Received " << args_vec.size() << " arguments:" << endl;
+    for (size_t i = 0; i < args_vec.size(); ++i) {
+        cerr << "  args[" << i << "] = \"" << args_vec[i] << "\"" << endl;
+    }
+
     try {
 
         cli my_cli;

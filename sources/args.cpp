@@ -79,7 +79,8 @@ public:
             args_map[args::DISTANCES_FLAG_STR] = value;
             args_map[args::DISTANCES_OPTION_STR] = value;
             args_map[args::DISTANCES_WORD_STR] = value;
-        } else if (key == "algo") {
+        } else if (key == "algo" || key == "a") {
+            args_map[args::ALGO_ID_FLAG_STR] = value;
             args_map[args::ALGO_ID_OPTION_STR] = value;
             args_map[args::ALGO_ID_WORD_STR] = value;
         } else if (key == "help" || key == "h") {
@@ -125,7 +126,7 @@ public:
         cli_app.add_option("-s,--seed", seed_values, "Random seed for maze generation")
             ->capture_default_str();
             
-        cli_app.add_option("--algo", algo_values, "Algorithm to use for maze generation")
+        cli_app.add_option("-a,--algo", algo_values, "Algorithm to use for maze generation")
             ->capture_default_str();
             
         // Special handling for distances which can be flag or option with sliced array syntax

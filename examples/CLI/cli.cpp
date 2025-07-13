@@ -20,11 +20,6 @@ const std::string cli::DEBUG_STR = "DEBUG";
 
 std::string cli::CLI_VERSION_STR = mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ") ";
 
-#if defined(MAZE_DEBUG)
-
-    cli::CLI_VERSION_STR += "- " + DEBUG_STR;
-#endif
-
 std::string cli::CLI_HELP_STR = cli::CLI_TITLE_STR + "\n" + \
     "Description: Generates mazes and outputs into string formats\n" \
     "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" \
@@ -47,6 +42,11 @@ std::string cli::CLI_TITLE_STR = "mazebuildercli v" + cli::CLI_VERSION_STR;
 std::string cli::convert(std::vector<std::string> const& args_vec) const noexcept {
 
     using namespace std;
+
+#if defined(MAZE_DEBUG)
+
+    CLI_VERSION_STR += "- " + DEBUG_STR;
+#endif
 
     try {
 

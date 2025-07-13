@@ -223,7 +223,7 @@ TEST_CASE("Args can handle a JSON arr of objects", "[json arr input]") {
         // const auto& arr = args_handler.get_array();
         // REQUIRE(arr.size() == 2);
         
-        // Check first config
+        // // Check first config
         // REQUIRE(arr[0].find("rows") != arr[0].end());
         // REQUIRE(arr[0].find("columns") != arr[0].end());
         // REQUIRE(arr[0].find("levels") != arr[0].end());
@@ -692,5 +692,108 @@ TEST_CASE("Args unified data structure approach", "[unified args]") {
         auto rows = args_handler.get(args::ROW_WORD_STR);
         REQUIRE(rows.has_value());
         REQUIRE(rows.value() == "7");
+    }
+}
+
+// Add this test case to specifically test the algorithm argument parsing issue
+TEST_CASE("Args correctly parses algorithm arguments", "[algo args]") {
+    args args_handler{};
+
+    SECTION("Algorithm short form with -a") {
+        // Test the specific case that was failing: "-a sidewinder"
+        vector<string> args_vec = { "-a", "sidewinder" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Verify we can access the algorithm value using all forms
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "sidewinder");
+        REQUIRE(args_handler.get("--algo").has_value());
+        REQUIRE(args_handler.get("--algo").value() == "sidewinder");
+        REQUIRE(args_handler.get("algo").has_value());
+        REQUIRE(args_handler.get("algo").value() == "sidewinder");
+    }
+
+    SECTION("Algorithm long form with --algo") {
+        vector<string> args_vec = { "--algo", "binary_tree" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Verify we can access the algorithm value using all forms
+        REQUIRE(args_handler.get("--algo").has_value());
+        REQUIRE(args_handler.get("--algo").value() == "binary_tree");
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "binary_tree");
+        REQUIRE(args_handler.get("algo").has_value());
+        REQUIRE(args_handler.get("algo").value() == "binary_tree");
+    }
+
+    SECTION("Algorithm with equals sign") {
+        vector<string> args_vec = { "--algo=dfs" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Verify we can access the algorithm value
+        REQUIRE(args_handler.get("--algo").has_value());
+        REQUIRE(args_handler.get("--algo").value() == "dfs");
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "dfs");
+        REQUIRE(args_handler.get("algo").has_value());
+        REQUIRE(args_handler.get("algo").value() == "dfs");
+    }
+
+    SECTION("Complex command with algorithm") {
+        // Test the complete command that was causing issues
+        vector<string> args_vec = { "-r", "10", "-c", "10", "-a", "sidewinder" };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Verify all arguments are parsed correctly
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "10");
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "sidewinder");
+        
+        // Cross-check that long forms work too
+        REQUIRE(args_handler.get("--rows").has_value());
+        REQUIRE(args_handler.get("--rows").value() == "10");
+        REQUIRE(args_handler.get("--columns").has_value());
+        REQUIRE(args_handler.get("--columns").value() == "10");
+        REQUIRE(args_handler.get("--algo").has_value());
+        REQUIRE(args_handler.get("--algo").value() == "sidewinder");
+    }
+
+    SECTION("String parsing with algorithm") {
+        // Test as a single string like would be entered at command line
+        string args_str = "-r 10 -c 10 -a sidewinder";
+        REQUIRE(args_handler.parse(args_str));
+        
+        // Verify all arguments are parsed correctly
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "10");
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "sidewinder");
+    }
+
+    SECTION("argc/argv with algorithm") {
+        // Test with argc/argv as would be passed to main()
+        char* test_argv[] = {
+            (char*)"program",
+            (char*)"-r", (char*)"10",
+            (char*)"-c", (char*)"10", 
+            (char*)"-a", (char*)"sidewinder",
+            nullptr
+        };
+        int test_argc = 7;
+        
+        REQUIRE(args_handler.parse(test_argc, test_argv));
+        
+        // Verify all arguments are parsed correctly
+        REQUIRE(args_handler.get("-r").has_value());
+        REQUIRE(args_handler.get("-r").value() == "10");
+        REQUIRE(args_handler.get("-c").has_value());
+        REQUIRE(args_handler.get("-c").value() == "10");
+        REQUIRE(args_handler.get("-a").has_value());
+        REQUIRE(args_handler.get("-a").value() == "sidewinder");
     }
 }

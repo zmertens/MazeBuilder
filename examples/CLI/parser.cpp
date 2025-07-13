@@ -65,10 +65,27 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
             throw runtime_error("Failed to parse command line arguments.");
         }
 
-        // Copy parsed arguments to config object
-        for (const auto& [key, value] : my_args.get()) {
-
-            set_config(key, value);
+        // Only process the "word" form of each argument to avoid duplicate processing
+        // and unrecognized key errors
+        static const std::vector<std::string> word_keys = {
+            mazes::args::HELP_WORD_STR,
+            mazes::args::VERSION_WORD_STR,
+            mazes::args::ROW_WORD_STR,
+            mazes::args::COLUMN_WORD_STR,
+            mazes::args::LEVEL_WORD_STR,
+            mazes::args::ALGO_ID_WORD_STR,
+            mazes::args::SEED_WORD_STR,
+            mazes::args::BLOCK_ID_WORD_STR,
+            mazes::args::DISTANCES_WORD_STR,
+            mazes::args::OUTPUT_ID_WORD_STR
+        };
+        
+        // Process only the expected word keys to avoid processing duplicate entries
+        for (const auto& key : word_keys) {
+            auto value_opt = my_args.get(key);
+            if (value_opt.has_value()) {
+                set_config(key, value_opt.value());
+            }
         }
 
     } catch (const std::exception& ex) {
