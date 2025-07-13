@@ -47,9 +47,9 @@ public:
     virtual std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
 
     // Delegate to embedded grid
-    grid_operations& operations() noexcept override;
+    virtual grid_operations& operations() noexcept override;
 
-    const grid_operations& operations() const noexcept;
+    virtual const grid_operations& operations() const noexcept override;
 
     /// @brief Calculates distances for a range of indices.
     /// @param start_index The starting index of the range (inclusive).

@@ -26,6 +26,8 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("std::shared_ptr<cli>")
         .function("convert", &cli::convert);
+
+    emscripten::register_vector<std::string>("std::vector<std::string>");
 }
 
 #endif // EMSCRIPTEN_BINDINGS

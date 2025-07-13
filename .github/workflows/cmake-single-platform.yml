@@ -28,7 +28,7 @@ jobs:
         sudo apt-get install -y mesa-common-dev mesa-utils libgl1-mesa-dev libx11-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev
         sudo apt-get install -y libfreetype6-dev libudev-dev libopenal-dev libflac-dev libogg-dev libvorbis-dev
         sudo apt-get install -y cppcheck valgrind doxygen graphviz
-        sudo apt-get install -y libunwind-dev libunwind8
+        sudo apt-get install -y pkg-config libunwind-dev libunwind8
 
     # Step to download Emsdk
     - name: Download Emsdk
