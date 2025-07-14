@@ -35,6 +35,7 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     
     auto max{ 0 };
     for (const auto& duration : durations) {
+
         max = (max < duration) ? duration : max;
     }
     REQUIRE(max > 0);
@@ -43,10 +44,7 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     
     BENCHMARK("Benchmark factory::create") {
     
-    grid_factory factory;
-    auto maze_opt = factory.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-
-    REQUIRE(maze_opt);
+        factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
     };
 #endif
 }

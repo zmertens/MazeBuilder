@@ -25,11 +25,6 @@ class cell;
 /// @brief General purpose grid class for 2D maze generation
 class grid : public grid_interface, public grid_operations {
 
-    /// @brief Friend classes
-    friend class binary_tree;
-    friend class dfs;
-    friend class sidewinder;
-
 public:
 
     /// @brief 

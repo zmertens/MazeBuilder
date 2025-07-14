@@ -16,24 +16,35 @@ namespace mazes {
 class configurator {
     
 public:
-    
+
+    static constexpr auto DEFAULT_ROWS = 10u;
+
+    static constexpr auto DEFAULT_COLUMNS = 10u;
+
+    static constexpr auto DEFAULT_LEVELS = 1u;
+
+    static constexpr auto DEFAULT_BLOCK_ID = 0;
+
+    static constexpr auto DEFAULT_ALGO_ID = algo::BINARY_TREE;
+
+    static constexpr auto DEFAULT_SEED = 0u;
+
+    static constexpr auto DEFAULT_OUTPUT_ID = output::PLAIN_TEXT;
+
+    static constexpr auto DEFAULT_DISTANCES = false;
+
+    static constexpr auto MAX_ROWS = 10000u;
+
+    static constexpr auto MAX_COLUMNS = 10000u;
+
+    static constexpr auto MAX_LEVELS = 1000u;
+
     /// @brief Default constructor - initializes all values to safe defaults
     /// @details Provides reasonable default values to prevent uninitialized memory access
     /// @note Default values: rows=10, columns=10, levels=1, algo=BINARY_TREE, etc.
-    configurator() noexcept 
-        : m_rows{10}                           // Default 10x10 grid
-        , m_columns{10}
-        , m_levels{1}                          // Default single level (2D maze)
-        , m_block_id{0}                        // Default block ID
-        , m_algo_id{algo::BINARY_TREE}         // Default algorithm
-        , m_seed{0}                            // Default seed (will use random)
-        , m_distances{false}                   // Default no distance calculations
-        , m_output_id{output::PLAIN_TEXT}      // Default text output
-        , m_help{}                             // Empty help string
-        , m_version{}                          // Empty version string
-    {
-        // All members explicitly initialized in member initializer list
-        // This prevents uninitialized memory access that was causing infinite loops
+    configurator() noexcept {
+
+        reset_to_defaults();
     }
 
     /// @brief Copy constructor
@@ -63,7 +74,7 @@ public:
     /// @warning Values > 10000 will be clamped to prevent memory issues
     configurator& rows(unsigned int rows) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
-        m_rows = (rows == 0) ? 1 : (rows > 10000) ? 10000 : rows;
+        m_rows = (rows == 0) ? 1 : (rows > MAX_ROWS) ? MAX_ROWS : rows;
         return *this;
     }
 
@@ -73,7 +84,7 @@ public:
     /// @warning Values > 10000 will be clamped to prevent memory issues
     configurator& columns(unsigned int columns) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
-        m_columns = (columns == 0) ? 1 : (columns > 10000) ? 10000 : columns;
+        m_columns = (columns == 0) ? 1 : (columns > MAX_COLUMNS) ? MAX_COLUMNS : columns;
         return *this;
     }
 
@@ -85,7 +96,7 @@ public:
     configurator& levels(unsigned int levels) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
         // Levels are more memory-intensive than rows/columns, so lower limit
-        m_levels = (levels == 0) ? 1 : (levels > 1000) ? 1000 : levels;
+        m_levels = (levels == 0) ? 1 : (levels > MAX_LEVELS) ? MAX_LEVELS : levels;
         return *this;
     }
 
@@ -189,19 +200,22 @@ public:
     /// @return True if all values are valid, false if any are problematic
     /// @details Checks for potential infinite loop conditions and memory issues
     bool is_valid() const noexcept {
+
         // Check for zero dimensions (would cause infinite loops or divisions by zero)
         if (m_rows == 0 || m_columns == 0 || m_levels == 0) {
+
             return false;
         }
         
         // Check for excessive dimensions (would cause memory exhaustion)
-        const unsigned int MAX_DIMENSION = 10000;
-        if (m_rows > MAX_DIMENSION || m_columns > MAX_DIMENSION || m_levels > 1000) {
+        if (m_rows > MAX_ROWS || m_columns > MAX_COLUMNS || m_levels > MAX_LEVELS) {
+
             return false;
         }
         
         // Check for potential overflow in total cell calculation
-        const auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void*);
+        constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void*);
+
         if (static_cast<size_t>(m_rows) * m_columns * m_levels > max_cells) {
             return false;
         }
@@ -212,39 +226,40 @@ public:
     /// @brief Reset all values to safe defaults
     /// @details Useful for clearing potentially corrupted configuration
     void reset_to_defaults() noexcept {
-        m_rows = 10;
-        m_columns = 10; 
-        m_levels = 1;
-        m_block_id = 0;
-        m_algo_id = algo::BINARY_TREE;
-        m_seed = 0;
-        m_distances = false;
-        m_output_id = output::PLAIN_TEXT;
+
+        m_rows = DEFAULT_ROWS;
+        m_columns = DEFAULT_COLUMNS; 
+        m_levels = DEFAULT_LEVELS;
+        m_block_id = DEFAULT_BLOCK_ID;
+        m_algo_id = DEFAULT_ALGO_ID;
+        m_seed = DEFAULT_SEED;
+        m_distances = DEFAULT_DISTANCES;
+        m_output_id = DEFAULT_OUTPUT_ID;
         m_help.clear();
         m_version.clear();
     }
 
 private:
 
-    unsigned int m_rows;        ///< Number of rows in the maze grid (>= 1, <= 10000)
+    unsigned int m_rows;
 
-    unsigned int m_columns;     ///< Number of columns in the maze grid (>= 1, <= 10000)
+    unsigned int m_columns;
 
-    unsigned int m_levels;      ///< Number of levels in the maze (>= 1, <= 1000, typically 1 for 2D)
+    unsigned int m_levels;
 
-    int m_block_id;            ///< Block identifier for maze generation
+    int m_block_id;
 
-    algo m_algo_id;            ///< Algorithm to use for maze generation
+    algo m_algo_id;
 
-    unsigned int m_seed;       ///< Random seed (0 = use random seed)
+    unsigned int m_seed;
 
-    bool m_distances;          ///< Whether to calculate distances in maze
+    bool m_distances;
 
-    output m_output_id;        ///< Output format for generated maze
+    output m_output_id;
 
-    std::string m_help;        ///< Help message text
+    std::string m_help;
 
-    std::string m_version;     ///< Version information
+    std::string m_version;
 };
 
 } // namespace

@@ -75,79 +75,6 @@ grid::~grid() {
     m_calculate_cell_index = {};
 }
 
-std::shared_ptr<cell> grid::get_neighbor(const std::shared_ptr<cell>& c, Direction dir) const noexcept {
-    if (!c) return nullptr;
-
-    int cell_index = c->get_index();
-
-    std::lock_guard<std::mutex> lock(m_topology_mutex);
-
-    auto it_cell = m_topology.find(cell_index);
-    if (it_cell == m_topology.end()) {
-        return nullptr;
-    }
-
-    auto& dir_map = it_cell->second;
-    auto it_dir = dir_map.find(dir);
-    if (it_dir == dir_map.end()) {
-        return nullptr;
-    }
-
-    int neighbor_index = it_dir->second;
-
-    return search(neighbor_index);
-}
-
-void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, const std::shared_ptr<cell>& neighbor) noexcept {
-    if (!c || !neighbor) return;
-
-    int cell_index = c->get_index();
-    int neighbor_index = neighbor->get_index();
-
-    std::lock_guard<std::mutex> lock(m_topology_mutex);
-
-    // Set the primary direction
-    m_topology[cell_index][dir] = neighbor_index;
-
-    // Set the reverse direction WITHOUT calling set_neighbor recursively
-    Direction reverse_dir;
-    switch (dir) {
-    case Direction::NORTH:
-        reverse_dir = Direction::SOUTH;
-        break;
-    case Direction::SOUTH:
-        reverse_dir = Direction::NORTH;
-        break;
-    case Direction::EAST:
-        reverse_dir = Direction::WEST;
-        break;
-    case Direction::WEST:
-        reverse_dir = Direction::EAST;
-        break;
-    default:
-        return; // Unknown direction
-    }
-
-    // Directly set the reverse mapping in the topology map
-    m_topology[neighbor_index][reverse_dir] = cell_index;
-}
-
-std::vector<std::shared_ptr<cell>> grid::get_neighbors(const std::shared_ptr<cell>& c) const noexcept {
-    std::vector<std::shared_ptr<cell>> neighbors;
-    if (!c) return neighbors;
-
-    neighbors.reserve(static_cast<size_t>(Direction::COUNT));
-
-    for (size_t i = 0; i < static_cast<size_t>(Direction::COUNT); ++i) {
-        Direction dir = static_cast<Direction>(i);
-        if (auto neighbor = get_neighbor(c, dir)) {
-            neighbors.push_back(neighbor);
-        }
-    }
-
-    return neighbors;
-}
-
 void grid::clear_cells() noexcept {
     // First, clear topology information
     {
@@ -177,22 +104,6 @@ void grid::clear_cells() noexcept {
 
     // Complete reset - swap with an empty map to ensure memory is released
     std::unordered_map<int, std::shared_ptr<cell>>().swap(m_cells);
-}
-
-std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::NORTH);
-}
-
-std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::SOUTH);
-}
-
-std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::EAST);
-}
-
-std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept {
-    return get_neighbor(c, Direction::WEST);
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept {
@@ -312,4 +223,84 @@ void grid::set_str(std::string const& str) noexcept {
 std::string grid::get_str() const noexcept {
     
     return this->m_str;
+}
+
+// Implementation of missing virtual methods from grid_operations
+
+std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, Direction dir) const noexcept {
+    if (!c) {
+        return nullptr;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_topology_mutex);
+    auto cell_it = m_topology.find(c->get_index());
+    if (cell_it == m_topology.end()) {
+        return nullptr;
+    }
+    
+    auto neighbor_it = cell_it->second.find(dir);
+    if (neighbor_it == cell_it->second.end()) {
+        return nullptr;
+    }
+    
+    return search(neighbor_it->second);
+}
+
+std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> const& c) const noexcept {
+    std::vector<std::shared_ptr<cell>> neighbors;
+    
+    if (!c) {
+        return neighbors;
+    }
+    
+    // Get neighbors in all four directions
+    if (auto north = get_neighbor(c, Direction::NORTH)) {
+        neighbors.push_back(north);
+    }
+    if (auto south = get_neighbor(c, Direction::SOUTH)) {
+        neighbors.push_back(south);
+    }
+    if (auto east = get_neighbor(c, Direction::EAST)) {
+        neighbors.push_back(east);
+    }
+    if (auto west = get_neighbor(c, Direction::WEST)) {
+        neighbors.push_back(west);
+    }
+    
+    return neighbors;
+}
+
+void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, std::shared_ptr<cell> const& neighbor) noexcept {
+    if (!c) {
+        return;
+    }
+    
+    std::lock_guard<std::mutex> lock(m_topology_mutex);
+    
+    if (neighbor) {
+        m_topology[c->get_index()][dir] = neighbor->get_index();
+    } else {
+        // Remove the neighbor relationship
+        auto cell_it = m_topology.find(c->get_index());
+        if (cell_it != m_topology.end()) {
+            cell_it->second.erase(dir);
+        }
+    }
+}
+
+// Convenience methods for accessing neighbors
+std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::NORTH);
+}
+
+std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::SOUTH);
+}
+
+std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::EAST);
+}
+
+std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept {
+    return get_neighbor(c, Direction::WEST);
 }
