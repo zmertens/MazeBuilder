@@ -2,7 +2,9 @@
 
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/dfs.h>
+#include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
@@ -13,6 +15,9 @@
 #include <functional>
 #include <iostream>
 #include <stdexcept>
+
+// Temporarily force debug output to help with debugging
+#define MAZE_DEBUG 1
 
 #include "parser.h"
 
@@ -71,6 +76,12 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
             throw std::runtime_error("Failed to parse command line arguments.");
         }
 
+#if defined(MAZE_DEBUG)
+        std::cerr << "Debug: Parsed config - distances: " << (config.distances() ? "true" : "false")
+                 << ", start: " << config.distances_start() 
+                 << ", end: " << config.distances_end() << std::endl;
+#endif
+
         if (!config.help().empty()) {
 
             return CLI_HELP_STR;
@@ -87,9 +98,17 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         std::unique_ptr<mazes::grid_interface> product = factory.create(cref(config));
 
+#if defined(MAZE_DEBUG)
+        if (auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(product.get())) {
+            std::cerr << "Debug: Created distance_grid successfully" << std::endl;
+        } else {
+            std::cerr << "Debug: Created regular grid (not distance_grid)" << std::endl;
+        }
+#endif
+
         mazes::randomizer rng;
 
-        apply(cref(product), ref(rng), config.algo_id());
+        apply(cref(product), ref(rng), config.algo_id(), config);
 
         mazes::stringify maze_stringify;
 
@@ -113,8 +132,10 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
 /// @brief Apply an algorithm to the grid
 /// @param g 
+/// @param rng
 /// @param a 
-void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a) const noexcept {
+/// @param config
+void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a, const mazes::configurator& config) const noexcept {
 
     using namespace std;
 
@@ -156,6 +177,50 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
         if (!success) {
 
             throw std::runtime_error("Failed to run algorithm: " + mazes::to_string_from_algo(a));
+        }
+
+        // Calculate distances after maze generation if requested
+        if (config.distances()) {
+#if defined(MAZE_DEBUG)
+            std::cerr << "Debug: Distance calculation requested. Start: " << config.distances_start() 
+                     << ", End: " << config.distances_end() << std::endl;
+#endif
+            // Try to cast to distance_grid to call calculate_distances
+            if (auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(g.get())) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Debug: Successfully cast to distance_grid" << std::endl;
+#endif
+                int start_idx = config.distances_start();
+                int end_idx = config.distances_end();
+                
+                // If end index is -1 (default), use the last cell
+                if (end_idx == -1) {
+                    end_idx = (config.rows() * config.columns()) - 1;
+                }
+                
+                // Ensure indices are within valid range
+                int max_cell_index = (config.rows() * config.columns()) - 1;
+                start_idx = std::max(0, std::min(start_idx, max_cell_index));
+                end_idx = std::max(0, std::min(end_idx, max_cell_index));
+                
+#if defined(MAZE_DEBUG)
+                std::cerr << "Debug: Calling calculate_distances with start=" << start_idx 
+                         << ", end=" << end_idx << std::endl;
+#endif
+                distance_grid_ptr->calculate_distances(start_idx, end_idx);
+#if defined(MAZE_DEBUG)
+                auto distances = distance_grid_ptr->get_distances();
+                if (distances) {
+                    std::cerr << "Debug: Distances object created successfully" << std::endl;
+                } else {
+                    std::cerr << "Debug: Failed to create distances object" << std::endl;
+                }
+#endif
+            } else {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Debug: Failed to cast to distance_grid" << std::endl;
+#endif
+            }
         }
 
     } catch (const std::exception& ex) {

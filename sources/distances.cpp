@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 
 #include <deque>
 
@@ -40,82 +41,98 @@ std::shared_ptr<distances> distances::path_to(std::unique_ptr<grid_interface> co
     // Create a new distances object to store the path
     auto path = std::make_shared<distances>(m_root_index);
 
-    // If the goal index is the same as the root index, return an empty path
+    // If the goal index is the same as the root index, return path with just the root
     if (goal_index == m_root_index) {
         return path;
     }
 
-    path->set(m_root_index, 0);
-
     // Parent map to reconstruct the path
     std::unordered_map<int32_t, int32_t> parent;
+    std::unordered_map<int32_t, bool> visited;
 
     // BFS queue
     std::deque<int32_t> q;
-    q.push_back(goal_index);
-    parent[goal_index] = -1;
+    q.push_back(m_root_index);
+    visited[m_root_index] = true;
+    parent[m_root_index] = -1;
 
     static constexpr auto MAX_ITERATIONS = 1000000;
     auto current_iteration = 0;
 
-    while (!q.empty()) {
+    try {
+        // Get the grid operations interface
+        auto& ops = g->operations();
+
+        while (!q.empty()) {
 #if defined(MAZE_DEBUG)
-        if (current_iteration++ > MAX_ITERATIONS) {
-            std::cerr << "Error: BFS exceeded maximum iterations." << std::endl;
-            return path;
-        }
+            if (current_iteration++ > MAX_ITERATIONS) {
+                std::cerr << "Error: BFS exceeded maximum iterations." << std::endl;
+                return path;
+            }
 #endif
 
-        int32_t current_index = q.front();
-        q.pop_front();
+            int32_t current_index = q.front();
+            q.pop_front();
 
-        // Retrieve the current cell
-//        auto current_cell = g.search(current_index);
-//        if (!current_cell) {
-//#if defined(MAZE_DEBUG)
-//            std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
-//#endif
-//            continue;
-//        }
+            // If we reached the goal, reconstruct the path
+            if (current_index == goal_index) {
+                // Reconstruct path from goal to root
+                std::vector<int32_t> path_indices;
+                int32_t step = goal_index;
+                
+                while (step != -1) {
+                    path_indices.push_back(step);
+                    step = parent[step];
+                }
 
-        // Process each neighbor that has a passage (linked cells)
-        //auto neighbors = g.get_neighbors(current_cell);
-        //for (const auto& neighbor : neighbors) {
-        //    if (!neighbor) continue;
+                // Set distances in the path (distance 0 for root, increasing towards goal)
+                for (size_t i = 0; i < path_indices.size(); ++i) {
+                    int distance = static_cast<int>(path_indices.size() - 1 - i);
+                    path->set(path_indices[i], distance);
+                }
 
-        //    // Only follow passages that exist (cells that are linked)
-        //    if (!current_cell->is_linked(neighbor)) {
-        //        continue;
-        //    }
+                return path;
+            }
 
-        //    int32_t neighbor_index = neighbor->get_index();
+            // Retrieve the current cell
+            auto current_cell = ops.search(current_index);
+            if (!current_cell) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
+#endif
+                continue;
+            }
 
-        //    // Skip if already visited
-        //    if (parent.find(neighbor_index) != parent.cend()) {
-        //        continue;
-        //    }
+            // Process each neighbor that has a passage (linked cells)
+            auto neighbors = ops.get_neighbors(current_cell);
+            for (const auto& neighbor : neighbors) {
+                if (!neighbor) continue;
 
-        //    // Mark the parent
-        //    parent[neighbor_index] = current_index;
-        //    q.push_back(neighbor_index);
+                int32_t neighbor_index = neighbor->get_index();
 
-        //    // If we reach the root index, reconstruct the path
-        //    if (neighbor_index == m_root_index) {
-        //        int32_t step = m_root_index;
-        //        int distance = 0;
+                // Skip if already visited
+                if (visited.find(neighbor_index) != visited.end()) {
+                    continue;
+                }
 
-        //        // Build the path
-        //        while (step != -1) {
-        //            path->set(step, distance);
-        //            step = parent[step];
-        //            distance += 1;
-        //        }
+                // Only follow passages that exist (cells that are linked)
+                if (!current_cell->is_linked(neighbor)) {
+                    continue;
+                }
 
-        //        return path;
-        //    }
-        //}
+                // Mark as visited and add to queue
+                visited[neighbor_index] = true;
+                parent[neighbor_index] = current_index;
+                q.push_back(neighbor_index);
+            }
+        }
+    } catch (const std::exception& e) {
+#if defined(MAZE_DEBUG)
+        std::cerr << "Exception in path_to: " << e.what() << std::endl;
+#endif
     }
 
+    // No path found, return empty path
     return std::make_shared<distances>(m_root_index);
 }
 

@@ -15,6 +15,10 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/singleton_base.h>
 
+namespace mazes {
+    class configurator;
+}
+
 class cli final :  mazes::singleton_base<cli> {
 
     friend class mazes::singleton_base<cli>;
@@ -23,7 +27,7 @@ public:
     
 private:
 
-    void apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a) const noexcept;
+    void apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a, const mazes::configurator& config) const noexcept;
 
     static const std::string DEBUG_STR;
 

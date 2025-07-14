@@ -16,6 +16,9 @@
 #include <sstream>
 #include <vector>
 
+// Temporarily force debug output
+#define MAZE_DEBUG 1
+
 using namespace mazes;
 
 std::unique_ptr<grid_interface> grid_factory::create(configurator const& config) const noexcept {
@@ -56,15 +59,27 @@ std::optional<std::unique_ptr<grid_interface>> grid_factory::create_grid(configu
 
     unique_ptr<grid_interface> g = nullptr;
 
+#if defined(MAZE_DEBUG)
+    std::cerr << "Debug: create_grid - distances=" << (config.distances() ? "true" : "false") 
+             << ", output=" << static_cast<int>(config.output_id()) << std::endl;
+#endif
+
     if (config.distances()) {
         if (config.output_id() == output::PNG || config.output_id() == output::JPEG) {
-
+#if defined(MAZE_DEBUG)
+            std::cerr << "Debug: Creating colored_grid" << std::endl;
+#endif
             g = make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
         } else {
-
+#if defined(MAZE_DEBUG)
+            std::cerr << "Debug: Creating distance_grid" << std::endl;
+#endif
             g = make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
         }
     } else {
+#if defined(MAZE_DEBUG)
+        std::cerr << "Debug: Creating regular grid" << std::endl;
+#endif
         g = make_unique<grid>(config.rows(), config.columns(), config.levels());
     }
 

@@ -6,6 +6,9 @@
 #include <iostream>
 #include <stdexcept>
 
+// Temporarily force debug output
+#define MAZE_DEBUG 1
+
 bool parser::parse(std::vector<std::string> const& args, mazes::configurator& config) const {
     
     using namespace std;
@@ -39,8 +42,22 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
 
             config.block_id(stoi(value));
         } else if (key == args::DISTANCES_WORD_STR) {
+            // If distances key is present, enable distances
+            // The value could be "true" for flag form, or "[start:end]" for range form
+            if (value == args::TRUE_VALUE) {
+                config.distances(true);
+            } else if (!value.empty()) {
+                // Any non-empty value (like "[0:5]") should enable distances
+                config.distances(true);
+            } else {
+                config.distances(false);
+            }
+        } else if (key == args::DISTANCES_START_STR) {
 
-            config.distances(value == args::TRUE_VALUE);
+            config.distances_start(stoi(value));
+        } else if (key == args::DISTANCES_END_STR) {
+
+            config.distances_end(stoi(value));
         } else if (key == args::OUTPUT_ID_WORD_STR) {
 
             if (value.empty()) {
@@ -77,6 +94,8 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
             mazes::args::SEED_WORD_STR,
             mazes::args::BLOCK_ID_WORD_STR,
             mazes::args::DISTANCES_WORD_STR,
+            mazes::args::DISTANCES_START_STR,
+            mazes::args::DISTANCES_END_STR,
             mazes::args::OUTPUT_ID_WORD_STR
         };
         
@@ -84,6 +103,9 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
         for (const auto& key : word_keys) {
             auto value_opt = my_args.get(key);
             if (value_opt.has_value()) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Debug: Found key='" << key << "' value='" << value_opt.value() << "'" << std::endl;
+#endif
                 set_config(key, value_opt.value());
             }
         }

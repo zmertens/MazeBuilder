@@ -33,6 +33,10 @@ public:
 
     static constexpr auto DEFAULT_DISTANCES = false;
 
+    static constexpr auto DEFAULT_DISTANCES_START = 0;
+
+    static constexpr auto DEFAULT_DISTANCES_END = -1;
+
     static constexpr auto MAX_ROWS = 10000u;
 
     static constexpr auto MAX_COLUMNS = 10000u;
@@ -132,6 +136,22 @@ public:
         return *this;
     }
 
+    /// @brief Set the distance start index
+    /// @param start_index The starting cell index for distance calculation
+    /// @return A reference to this configurator
+    configurator& distances_start(int start_index) noexcept {
+        m_distances_start = start_index;
+        return *this;
+    }
+
+    /// @brief Set the distance end index
+    /// @param end_index The ending cell index for distance calculation
+    /// @return A reference to this configurator
+    configurator& distances_end(int end_index) noexcept {
+        m_distances_end = end_index;
+        return *this;
+    }
+
     /// @brief Set the output ID
     /// @param output The output ID
     /// @return A reference to this configurator
@@ -184,6 +204,14 @@ public:
     /// @return True if distances are calculated, false otherwise
     bool distances() const noexcept { return m_distances; }
 
+    /// @brief Get the distance start index
+    /// @return The starting cell index for distance calculation
+    int distances_start() const noexcept { return m_distances_start; }
+
+    /// @brief Get the distance end index
+    /// @return The ending cell index for distance calculation
+    int distances_end() const noexcept { return m_distances_end; }
+
     /// @brief Get the output ID
     /// @return The output ID
     output output_id() const noexcept { return m_output_id; }
@@ -234,6 +262,8 @@ public:
         m_algo_id = DEFAULT_ALGO_ID;
         m_seed = DEFAULT_SEED;
         m_distances = DEFAULT_DISTANCES;
+        m_distances_start = DEFAULT_DISTANCES_START;
+        m_distances_end = DEFAULT_DISTANCES_END;
         m_output_id = DEFAULT_OUTPUT_ID;
         m_help.clear();
         m_version.clear();
@@ -254,6 +284,10 @@ private:
     unsigned int m_seed;
 
     bool m_distances;
+
+    int m_distances_start;
+
+    int m_distances_end;
 
     output m_output_id;
 
