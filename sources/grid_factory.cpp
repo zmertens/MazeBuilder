@@ -16,9 +16,6 @@
 #include <sstream>
 #include <vector>
 
-// Temporarily force debug output
-#define MAZE_DEBUG 1
-
 using namespace mazes;
 
 std::unique_ptr<grid_interface> grid_factory::create(configurator const& config) const noexcept {
