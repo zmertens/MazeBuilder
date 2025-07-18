@@ -76,6 +76,22 @@ public:
     virtual void set_str(std::string const& str) noexcept = 0;
 
     virtual std::string get_str() const noexcept = 0;
+
+    /// @brief Get the vertices for wavefront object file generation
+    /// @return A vector of vertices as tuples (x, y, z, w)
+    virtual std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept = 0;
+
+    /// @brief Set the vertices for wavefront object file generation
+    /// @param vertices A vector of vertices as tuples (x, y, z, w)
+    virtual void set_vertices(const std::vector<std::tuple<int, int, int, int>>& vertices) noexcept = 0;
+
+    /// @brief Get the faces for wavefront object file generation
+    /// @return A vector of faces, where each face is a vector of vertex indices
+    virtual std::vector<std::vector<std::uint32_t>> get_faces() const noexcept = 0;
+
+    /// @brief Set the faces for wavefront object file generation
+    /// @param faces A vector of faces, where each face is a vector of vertex indices
+    virtual void set_faces(const std::vector<std::vector<std::uint32_t>>& faces) noexcept = 0;
 };
 
 } // namespace mazes

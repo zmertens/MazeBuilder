@@ -11,6 +11,8 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/stringify.h>
+#include <MazeBuilder/objectify.h>
+#include <MazeBuilder/wavefront_object_helper.h>
 
 #include <functional>
 #include <iostream>
@@ -111,11 +113,33 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         apply(cref(product), ref(rng), config.algo_id(), config);
 
-        mazes::stringify maze_stringify;
+        // Check if we need to generate Wavefront OBJ output
+        if (config.output_id() == mazes::output::WAVEFRONT_OBJECT_FILE) {
+            // First, get the string representation for parsing
+            mazes::stringify maze_stringify;
+            if (!maze_stringify.run(cref(product), ref(rng))) {
+                throw std::runtime_error("Failed to stringify maze for objectify processing.");
+            }
+            
+            // Generate 3D object data
+            mazes::objectify maze_objectify;
+            if (!maze_objectify.run(cref(product), ref(rng))) {
+                throw std::runtime_error("Failed to generate 3D object data.");
+            }
 
-        if (!maze_stringify.run(cref(product), ref(rng))) {
-
-            throw std::runtime_error("Failed to stringify maze.");
+            // Convert to Wavefront OBJ format
+            mazes::wavefront_object_helper obj_helper;
+            auto vertices = product->operations().get_vertices();
+            auto faces = product->operations().get_faces();
+            
+            std::string obj_str = obj_helper.to_wavefront_object_str(vertices, faces);
+            product->operations().set_str(obj_str);
+        } else {
+            // Use the regular stringify process
+            mazes::stringify maze_stringify;
+            if (!maze_stringify.run(cref(product), ref(rng))) {
+                throw std::runtime_error("Failed to stringify maze.");
+            }
         }
 
         return product->operations().get_str();

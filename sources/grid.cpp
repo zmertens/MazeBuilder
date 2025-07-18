@@ -304,3 +304,27 @@ std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexc
 std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept {
     return get_neighbor(c, Direction::WEST);
 }
+
+/// @brief Get the vertices for wavefront object file generation
+/// @return A vector of vertices as tuples (x, y, z, w)
+std::vector<std::tuple<int, int, int, int>> grid::get_vertices() const noexcept {
+    return m_vertices;
+}
+
+/// @brief Set the vertices for wavefront object file generation
+/// @param vertices A vector of vertices as tuples (x, y, z, w)
+void grid::set_vertices(const std::vector<std::tuple<int, int, int, int>>& vertices) noexcept {
+    m_vertices = vertices;
+}
+
+/// @brief Get the faces for wavefront object file generation
+/// @return A vector of faces, where each face is a vector of vertex indices
+std::vector<std::vector<std::uint32_t>> grid::get_faces() const noexcept {
+    return m_faces;
+}
+
+/// @brief Set the faces for wavefront object file generation
+/// @param faces A vector of faces, where each face is a vector of vertex indices
+void grid::set_faces(const std::vector<std::vector<std::uint32_t>>& faces) noexcept {
+    m_faces = faces;
+}
