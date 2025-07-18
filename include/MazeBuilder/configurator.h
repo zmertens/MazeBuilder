@@ -160,6 +160,14 @@ public:
         return *this;
     }
 
+    /// @brief Set the output filename
+    /// @param filename The output filename
+    /// @return A reference to this configurator
+    configurator& output_filename(std::string filename) noexcept {
+        m_output_filename = std::move(filename);
+        return *this;
+    }
+
     /// @brief Set the help message
     /// @param help The help message
     /// @return A reference to this configurator
@@ -216,6 +224,10 @@ public:
     /// @return The output ID
     output output_id() const noexcept { return m_output_id; }
 
+    /// @brief Get the output filename
+    /// @return The output filename
+    const std::string& output_filename() const noexcept { return m_output_filename; }
+
     /// @brief Get the help message
     /// @return The help message
     const std::string& help() const noexcept { return m_help; }
@@ -265,6 +277,7 @@ public:
         m_distances_start = DEFAULT_DISTANCES_START;
         m_distances_end = DEFAULT_DISTANCES_END;
         m_output_id = DEFAULT_OUTPUT_ID;
+        m_output_filename.clear();
         m_help.clear();
         m_version.clear();
     }
@@ -290,6 +303,8 @@ private:
     int m_distances_end;
 
     output m_output_id;
+
+    std::string m_output_filename;
 
     std::string m_help;
 

@@ -16,9 +16,6 @@
 #include <iostream>
 #include <stdexcept>
 
-// Temporarily force debug output to help with debugging
-#define MAZE_DEBUG 1
-
 #include "parser.h"
 
 const std::string cli::DEBUG_STR = "DEBUG";
@@ -76,10 +73,14 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
             throw std::runtime_error("Failed to parse command line arguments.");
         }
 
+        // Store the configuration for later access
+        m_last_config = std::make_shared<mazes::configurator>(config);
+
 #if defined(MAZE_DEBUG)
         std::cerr << "Debug: Parsed config - distances: " << (config.distances() ? "true" : "false")
                  << ", start: " << config.distances_start() 
-                 << ", end: " << config.distances_end() << std::endl;
+                 << ", end: " << config.distances_end() 
+                 << ", output_filename: " << config.output_filename() << std::endl;
 #endif
 
         if (!config.help().empty()) {
@@ -129,6 +130,12 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
         return "";
     }
 } // convert
+
+/// @brief Get the configuration from the last convert call
+/// @return The configuration object, or nullptr if no valid configuration exists
+std::shared_ptr<mazes::configurator> cli::get_config() const noexcept {
+    return m_last_config;
+}
 
 /// @brief Apply an algorithm to the grid
 /// @param g 

@@ -71,6 +71,11 @@ public:
             args_map[args::OUTPUT_ID_FLAG_STR] = value;
             args_map[args::OUTPUT_ID_OPTION_STR] = value;
             args_map[args::OUTPUT_ID_WORD_STR] = value;
+            // Also set the output filename variant
+            args_map[args::OUTPUT_FILENAME_WORD_STR] = value;
+        } else if (key == "output_filename") {
+            args_map[args::OUTPUT_FILENAME_WORD_STR] = value;
+            args_map[args::OUTPUT_ID_WORD_STR] = value;
         } else if (key == "json" || key == "j") {
             args_map[args::JSON_FLAG_STR] = value;
             args_map[args::JSON_OPTION_STR] = value;

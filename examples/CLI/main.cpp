@@ -10,6 +10,10 @@
 #include <stdexcept>
 #include <vector>
 
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/enums.h>
+#include <MazeBuilder/writer.h>
+
 #include "cli.h"
 
 #if defined(__EMSCRIPTEN__)
@@ -50,14 +54,54 @@ int main(int argc, char* argv[]) {
 
         auto str = my_cli.convert(cref(args_vec));
         
-        if (!str.empty()) {
+        if (str.empty()) {
 
-            cout << str << endl;
-        } else {
-            // This should trigger the catch block at line 58
             throw runtime_error("Failed to parse command line arguments.");
         }
 
+        // Get the configuration to determine output handling
+        auto config = my_cli.get_config();
+        
+        if (config) {
+
+            mazes::writer writer;
+
+            bool write_success = false;
+            
+            // Check if we have a specific output filename
+            if (!config->output_filename().empty()) {
+
+                if (mazes::to_output_from_string(config->output_filename()) == mazes::output::STDOUT) {
+
+                    // Write to stdout
+                    write_success = writer.write(cout, str);
+                } else {
+
+                    // Write to file
+                    write_success = writer.write_file(config->output_filename(), str);
+                }
+            } else {
+
+                // No specific filename, check output type
+                if (config->output_id() == mazes::output::STDOUT) {
+
+                    write_success = writer.write(cout, str);
+                } else {
+
+                    // Default to stdout if no specific output handling
+                    write_success = writer.write(cout, str);
+                }
+            }
+            
+            if (!write_success) {
+
+                throw runtime_error("Failed to write output.");
+            }
+        } else {
+
+            // No configuration available, just write to stdout
+            cout << str << endl;
+        }
 
     } catch (const std::exception& ex) {
 

@@ -55,6 +55,9 @@ public:
     static constexpr const char* OUTPUT_ID_SHORT_STR = "o";
     static constexpr const char* DEFAULT_OUTPUT_FILENAME = "output.json";
     
+    // Output filename related constants
+    static constexpr const char* OUTPUT_FILENAME_WORD_STR = "output_filename";
+    
     // Seed related constants
     static constexpr const char* SEED_FLAG_STR = "-s";
     static constexpr const char* SEED_OPTION_STR = "--seed";
