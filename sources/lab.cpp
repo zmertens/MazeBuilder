@@ -7,14 +7,12 @@
 
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 #include <unordered_map>
 #include <vector>
-
-#if defined(MAZE_DEBUG)
-#include <iostream>
-#endif
 
 using namespace mazes;
 
@@ -168,7 +166,7 @@ void lab::set_neighbors(configurator const& config, const std::vector<int>& indi
             // Only apply reordering if all indices were valid
             if (reordered_cells.size() == cells_to_set.size()) {
 
-                cells_to_set = move(reordered_cells);
+                cells_to_set = std::move(reordered_cells);
             }
         } catch (const exception& ex) {
 

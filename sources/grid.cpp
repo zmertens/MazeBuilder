@@ -153,7 +153,7 @@ std::string grid::contents_of(std::shared_ptr<cell> const& c) const noexcept {
 // Get the background color for this type of grid
 std::uint32_t grid::background_color_for(std::shared_ptr<cell> const& c) const noexcept {
 
-    return { 0xFFFFFFFF };
+    return 0xFFFFFFFF;
 }
 
 grid_operations& grid::operations() noexcept {
