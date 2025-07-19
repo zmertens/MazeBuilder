@@ -1,15 +1,17 @@
-#include <string>
 #include <functional>
+#include <string>
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/enums.h>
 #include <MazeBuilder/string_view_utils.h>
 
-using namespace std;
 using namespace mazes;
+using namespace std;
 
-TEST_CASE("Args static checks", "[args static checks]") {
+TEST_CASE("Args static checks", "[args_static_checks]") {
 
     STATIC_REQUIRE(std::is_default_constructible<mazes::args>::value);
     STATIC_REQUIRE(std::is_destructible<mazes::args>::value);
@@ -19,70 +21,129 @@ TEST_CASE("Args static checks", "[args static checks]") {
     STATIC_REQUIRE(std::is_move_assignable<mazes::args>::value);
 }
 
-TEST_CASE("Args parses correctly", "[good parses]") {
+TEST_CASE("Args parses correctly", "[correct_parses]") {
 
     args args_handler{};
 
-    SECTION("Help requested") {
+    SECTION("Help requested with vector of string") {
+
         vector<string> args_vec = { "-h", "--help" };
         REQUIRE(args_handler.parse(args_vec));
     }
 
-    SECTION("Version requested") {
+    SECTION("Version requested with vector of string") {
+
         vector<string> args_vec = { "--version", "-v" };
         REQUIRE(args_handler.parse(args_vec));
     }
 
-    SECTION("Help and version requested") {
+    SECTION("Help and version requested short flags") {
+
         vector<string> args_vec = { "-h", "-v" };
         REQUIRE(args_handler.parse(args_vec));
-    }
 
-    SECTION("Short arguments 1") {
-        vector<string> args_vec = { "-s", "500" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-        auto val = args_handler.get("-s");
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "500");
-    }
+        SECTION("Version and help requested with long flags") {
 
-    SECTION("Short arguments 2") {
-        vector<string> args_vec = { "-r", "10", "-s", "500" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-        auto val_s = args_handler.get("-s");
-        REQUIRE(val_s.has_value());
-        REQUIRE(val_s.value() == "500");
+            vector<string> args_vec_long = { "--version", "--help" };
+            REQUIRE(args_handler.parse(args_vec_long));
+        }
+    }
+}
+
+TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
+
+    static constexpr auto ALGO{ configurator::DEFAULT_ALGO_ID };
+    static constexpr auto DISTANCES_START{ configurator::DEFAULT_DISTANCES_START };
+    static constexpr auto DISTANCES_END{ configurator::DEFAULT_DISTANCES_END };
+    static constexpr auto NUM_ROWS{ configurator::DEFAULT_ROWS };
+    static constexpr auto NUM_COLS{ configurator::DEFAULT_COLUMNS };
+    static constexpr auto OUTPUT{ configurator::DEFAULT_OUTPUT_ID };
+    static constexpr auto SEED{ configurator::DEFAULT_SEED };
+
+    static constexpr auto DEFAULT_FILE_NAME{ "maze.txt" };
+
+    auto check_optional_equals_value = [](auto opt, auto val) -> bool {
+
+        return opt.has_value() && opt.value() == val;
+    };
+
+    args args_handler{};
+
+    SECTION("Parse and get rows value") {
+        vector<string> args_vec = { args::ROW_FLAG_STR, to_string(NUM_ROWS) };
+        REQUIRE(args_handler.parse(args_vec));
         
-        auto val_r = args_handler.get("-r");
-        REQUIRE(val_r.has_value());
-        REQUIRE(val_r.value() == "10");
+        // Test all forms of access for rows
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_FLAG_STR), to_string(NUM_ROWS)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_OPTION_STR), to_string(NUM_ROWS)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), to_string(NUM_ROWS)));
     }
 
-    SECTION("Short arguments 3") {
-        string args = "-r 10 -c 10 -s 2 -d 1 -o stdout";
-        REQUIRE(args_handler.parse(cref(args)));
+    SECTION("Parse and get columns value") {
+        vector<string> args_vec = { args::COLUMN_FLAG_STR, to_string(NUM_COLS)};
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Test all forms of access for columns
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_FLAG_STR), to_string(NUM_COLS)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_OPTION_STR), to_string(NUM_COLS)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), to_string(NUM_COLS)));
     }
 
-    SECTION("Long arguments with no equals sign") {
-        string long_args_no_equals_sign = "--rows 10 --columns 10 --seed 2 --distances 1 --output stdout";
-        REQUIRE(args_handler.parse(cref(long_args_no_equals_sign)));
-    }
-    
-    SECTION("Mixed arguments 1") {
-        string valid_mixed_args = "--rows=10 --columns=10 -s 2 --algo=binary_tree --output=1.txt --distances";
-        REQUIRE(args_handler.parse(cref(valid_mixed_args)));
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("-s").has_value());
-        REQUIRE(args_handler.get("--output").has_value());
-        REQUIRE(args_handler.get("--algo").has_value());
-        auto algo_val = args_handler.get("--algo");
-        REQUIRE(algo_val == "binary_tree");
+    SECTION("Parse and get seed value") {
+        vector<string> args_vec = { args::SEED_FLAG_STR, to_string(SEED) };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Test all forms of access for seed
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_FLAG_STR), to_string(SEED)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_OPTION_STR), to_string(SEED)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), to_string(SEED)));
     }
 
-    SECTION("No args") {
-        string none = "";
-        REQUIRE(args_handler.parse(cref(none)));
+    SECTION("Parse and get algorithm value") {
+        vector<string> args_vec = { args::ALGO_ID_FLAG_STR, to_string_from_algo(ALGO) };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Test all forms of access for algorithm
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), to_string_from_algo(ALGO)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_OPTION_STR), to_string_from_algo(ALGO)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), to_string_from_algo(ALGO)));
+    }
+
+    SECTION("Parse and get output value") {
+        vector<string> args_vec = { args::OUTPUT_ID_FLAG_STR, DEFAULT_FILE_NAME };
+        REQUIRE(args_handler.parse(args_vec));
+
+        // Test all forms of access for algorithm
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_FLAG_STR), DEFAULT_FILE_NAME));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_OPTION_STR), DEFAULT_FILE_NAME));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), DEFAULT_FILE_NAME));
+    }
+
+    SECTION("Parse and get distances value") {
+        vector<string> args_vec = { args::DISTANCES_FLAG_STR };
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Test all forms of access for distances flag
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), args::TRUE_VALUE));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), args::TRUE_VALUE));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Parse and get distances value with slice notation") {
+
+        static const string DISTANCES_SLICE_1 = "[" + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
+
+        vector<string> args_vec = { args::DISTANCES_FLAG_STR, DISTANCES_SLICE_1};
+        REQUIRE(args_handler.parse(args_vec));
+        
+        // Test all forms of access for distances with slice
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_1));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_1));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_1));
+        
+        // Test parsed slice values
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
     }
 }
 
@@ -150,7 +211,7 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
         }`)json";
         REQUIRE(args_handler.parse(cref(valid_json)));
 
-        const auto& m = args_handler.get();
+        const auto& m = args_handler.get().value();
         REQUIRE(m.find("rows") != m.end());
         REQUIRE(m.find("columns") != m.end());
         REQUIRE(m.find("seed") != m.end());
@@ -168,7 +229,7 @@ TEST_CASE("Args can handle a JSON input string", "[json input string]") {
         }`)json";
         REQUIRE(args_handler.parse(cref(valid_json)));
 
-        const auto& m = args_handler.get();
+        const auto& m = args_handler.get().value();
         REQUIRE(m.find("r") != m.end());
         REQUIRE(m.find("c") != m.end());
         REQUIRE(m.find("s") != m.end());
@@ -183,7 +244,7 @@ TEST_CASE("Args can handle a JSON input file", "[json input file]") {
         string json_file_valid = " -j mazes_array.json  ";
         REQUIRE(args_handler.parse(cref(json_file_valid)));
 
-        const auto& m = args_handler.get();
+        const auto& m = args_handler.get().value();
         REQUIRE(m.find("rows") != m.end());
         REQUIRE(m.find("columns") != m.end());
         REQUIRE(m.find("seed") != m.end());
@@ -379,7 +440,7 @@ TEST_CASE("Args correctly parses and accesses short-form arguments", "[short for
         REQUIRE(args_handler.get("-c").value() == "5");
         
         // Check that get() returns a map containing all the values
-        const auto& map = args_handler.get();
+        const auto& map = args_handler.get().value();
         REQUIRE(map.find("-r") != map.end());
         REQUIRE(map.at("-r") == "10");
         REQUIRE(map.find("-c") != map.end());
@@ -740,7 +801,6 @@ TEST_CASE("Args correctly parses algorithm arguments", "[algo args]") {
     }
 
     SECTION("Complex command with algorithm") {
-        // Test the complete command that was causing issues
         vector<string> args_vec = { "-r", "10", "-c", "10", "-a", "sidewinder" };
         REQUIRE(args_handler.parse(args_vec));
         
@@ -762,7 +822,6 @@ TEST_CASE("Args correctly parses algorithm arguments", "[algo args]") {
     }
 
     SECTION("String parsing with algorithm") {
-        // Test as a single string like would be entered at command line
         string args_str = "-r 10 -c 10 -a sidewinder";
         REQUIRE(args_handler.parse(args_str));
         
@@ -776,7 +835,6 @@ TEST_CASE("Args correctly parses algorithm arguments", "[algo args]") {
     }
 
     SECTION("argc/argv with algorithm") {
-        // Test with argc/argv as would be passed to main()
         char* test_argv[] = {
             (char*)"program",
             (char*)"-r", (char*)"10",

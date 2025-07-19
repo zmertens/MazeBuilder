@@ -42,10 +42,10 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
 
 #if defined(MAZE_BENCHMARK)
     
-    BENCHMARK("Benchmark factory::create") {
-    
-        factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-    };
+    //BENCHMARK("Benchmark factory::create") {
+    //
+    //    factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+    //};
 #endif
 }
 

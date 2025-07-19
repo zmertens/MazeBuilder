@@ -1,4 +1,5 @@
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/string_view_utils.h>
 
@@ -242,13 +243,13 @@ private:
             if (!start_idx.empty()) {
                 args_map[args::DISTANCES_START_STR] = start_idx;
             } else {
-                args_map[args::DISTANCES_START_STR] = args::DISTANCES_DEFAULT_START;
+                args_map[args::DISTANCES_START_STR] = std::to_string(configurator::DEFAULT_DISTANCES_START);
             }
 
             if (!end_idx.empty()) {
                 args_map[args::DISTANCES_END_STR] = end_idx;
             } else {
-                args_map[args::DISTANCES_END_STR] = args::DISTANCES_DEFAULT_END;
+                args_map[args::DISTANCES_END_STR] = std::to_string(configurator::DEFAULT_DISTANCES_END);
             }
         }
     }
@@ -681,13 +682,13 @@ bool args::parse_sliced_array(const std::string& value, std::unordered_map<std::
         if (!start_idx.empty()) {
             args_map[args::DISTANCES_START_STR] = start_idx;
         } else {
-            args_map[args::DISTANCES_START_STR] = args::DISTANCES_DEFAULT_START; // Default to 0 if omitted
+            args_map[args::DISTANCES_START_STR] = std::to_string(configurator::DEFAULT_DISTANCES_START);
         }
 
         if (!end_idx.empty()) {
             args_map[args::DISTANCES_END_STR] = end_idx;
         } else {
-            args_map[args::DISTANCES_END_STR] = args::DISTANCES_DEFAULT_END; // -1 indicates the last cell
+            args_map[args::DISTANCES_END_STR] = std::to_string(configurator::DEFAULT_DISTANCES_END);
         }
         return true;
     }
@@ -730,7 +731,7 @@ std::optional<std::string> args::get(const std::string& key) const noexcept {
 }
 
 // Get entire args map
-const std::unordered_map<std::string, std::string>& args::get() const noexcept {
+const std::optional<std::unordered_map<std::string, std::string>>& args::get() const noexcept {
     if (pimpl) {
         return pimpl->args_map;
     }
