@@ -727,11 +727,12 @@ std::optional<std::string> args::get(const std::string& key) const noexcept {
     if (it != pimpl->args_map.end()) {
         return it->second;
     }
+
     return std::nullopt;
 }
 
 // Get entire args map
-const std::optional<std::unordered_map<std::string, std::string>>& args::get() const noexcept {
+std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
     if (pimpl) {
         return pimpl->args_map;
     }
@@ -878,3 +879,4 @@ bool args::add_flag(const std::string& flags, const std::string& description) no
         return false;
     }
 }
+

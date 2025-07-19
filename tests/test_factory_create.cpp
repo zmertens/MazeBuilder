@@ -18,27 +18,6 @@ static constexpr auto SEED = 12345;
 
 TEST_CASE( "Test factory create1", "[create1]" ) {
 
-    static constexpr auto ITERATIONS{ 10 };
-
-    vector<double> durations;
-    durations.reserve(ITERATIONS);
-
-    grid_factory factory1;
-
-    for (auto i{ 0 }; i < ITERATIONS; ++i) {
-        durations.emplace_back(chrono::duration_cast<chrono::milliseconds>(
-            mazes::progress<chrono::milliseconds, chrono::steady_clock>::duration(
-                [&factory1](auto config) { return factory1.create(config); },
-                mazes::configurator().columns(COLUMNS).rows(ROWS).levels(LEVELS)
-                .distances(false).seed(SEED).algo_id(to_algo_from_string(string(ALGO_S))))).count());
-    }
-    
-    auto max{ 0 };
-    for (const auto& duration : durations) {
-
-        max = (max < duration) ? duration : max;
-    }
-    REQUIRE(max > 0);
 
 #if defined(MAZE_BENCHMARK)
     

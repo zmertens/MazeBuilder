@@ -1,5 +1,7 @@
+#include <algorithm>
 #include <functional>
 #include <string>
+#include <vector>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -21,32 +23,44 @@ TEST_CASE("Args static checks", "[args_static_checks]") {
     STATIC_REQUIRE(std::is_move_assignable<mazes::args>::value);
 }
 
-TEST_CASE("Args parses correctly", "[correct_parses]") {
+TEST_CASE("Args simple parses", "[simple_parses]") {
 
     args args_handler{};
 
+    SECTION("Empty vector") {
+
+        vector<string> args_vec;
+        REQUIRE(args_handler.parse(args_vec));
+    }
+
+    SECTION("App name only") {
+
+        vector<string> args_vec = { "maze_builder" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+
     SECTION("Help requested with vector of string") {
 
-        vector<string> args_vec = { "-h", "--help" };
+        vector<string> args_vec = { args::HELP_FLAG_STR, args::HELP_OPTION_STR, args::HELP_WORD_STR };
         REQUIRE(args_handler.parse(args_vec));
     }
 
     SECTION("Version requested with vector of string") {
 
-        vector<string> args_vec = { "--version", "-v" };
+        vector<string> args_vec = { args::VERSION_FLAG_STR, args::VERSION_OPTION_STR, args::VERSION_WORD_STR };
         REQUIRE(args_handler.parse(args_vec));
     }
 
     SECTION("Help and version requested short flags") {
 
-        vector<string> args_vec = { "-h", "-v" };
+        vector<string> args_vec = { args::VERSION_FLAG_STR, args::HELP_FLAG_STR };
         REQUIRE(args_handler.parse(args_vec));
+    }
 
-        SECTION("Version and help requested with long flags") {
+    SECTION("Help and version requested short flags") {
 
-            vector<string> args_vec_long = { "--version", "--help" };
-            REQUIRE(args_handler.parse(args_vec_long));
-        }
+        vector<string> args_vec_long = { args::HELP_OPTION_STR, args::VERSION_OPTION_STR };
+        REQUIRE(args_handler.parse(args_vec_long));
     }
 }
 
@@ -131,10 +145,14 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
 
     SECTION("Parse and get distances value with slice notation") {
 
-        static const string DISTANCES_SLICE_1 = "[" + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
+        // Explicit slice values
+        static const string DISTANCES_SLICE_1 = args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
+        // Implicit slice starting point
+        static const string DISTANCES_SLICE_2 = args::DISTANCES_OPTION_STR + string("=[") + ":" + to_string(DISTANCES_END) + "]";
+        // Implicit slice ending point
+        static const string DISTANCES_SLICE_3 = args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + "]";
 
-        vector<string> args_vec = { args::DISTANCES_FLAG_STR, DISTANCES_SLICE_1};
-        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_1)));
         
         // Test all forms of access for distances with slice
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_1));
@@ -144,10 +162,42 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         // Test parsed slice values
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
+
+        args_handler.clear();
+
+        string rev_args = { DISTANCES_SLICE_1.crbegin(), DISTANCES_SLICE_1.crend() };
+        REQUIRE_FALSE(args_handler.parse(cref(rev_args)));
+
+        args_handler.clear();
+
+        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_2)));
+
+        // Test all forms of access for distances with slice
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_2));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_2));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_2));
+
+        // Test parsed slice values
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
+
+        args_handler.clear();
+
+        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_3)));
+
+        // Test all forms of access for distances with slice
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_3));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_3));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_3));
+
+        // Test parsed slice values
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
     }
 }
 
-TEST_CASE("Args add options and flags", "[options and flags]") {
+TEST_CASE("Args add options and flags", "[options_and_flags]") {
+
     args args_handler{};
     
     SECTION("Add new option") {
@@ -199,324 +249,192 @@ TEST_CASE("Args add options and flags", "[options and flags]") {
     }
 }
 
-TEST_CASE("Args can handle a JSON input string", "[json input string]") {
-    args args_handler{};
-    SECTION("JSON input 1") {
-        string valid_json = R"json(-j `{
+TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
+
+    // Missing a comma
+    static constexpr auto INVALID_JSON_STR_1 = R"json(`{
+            "columns": 10,
+            "seed": 2
+            "rows": 10,
+            "distances": false,
+            "algo": "dfs",
+            "output": "validjsonstr2.txt"
+        }`)json";
+
+    static constexpr auto VALID_JSON_STR_1 = R"json(`{
             "rows": 10,
             "columns": 10,
             "seed": 2,
             "distances": true,
-            "output": "1.txt"
+            "output": "validjsonstr1.txt",
+            "algo": "sidewinder"
         }`)json";
-        REQUIRE(args_handler.parse(cref(valid_json)));
 
-        const auto& m = args_handler.get().value();
-        REQUIRE(m.find("rows") != m.end());
-        REQUIRE(m.find("columns") != m.end());
-        REQUIRE(m.find("seed") != m.end());
-        REQUIRE(m.find("distances") != m.end());
-        REQUIRE(m.find("output") != m.end());
+    static const string VALID_JSON_STR_2 = \
+        "  `  {  \"r\": " + to_string(configurator::DEFAULT_ROWS) \
+        + ", \n \"c\": " + to_string(configurator::DEFAULT_COLUMNS) \
+        + "\n  }  `  ";
+
+    args args_handler{};
+
+    SECTION("Parse JSON string 1") {
+        vector<string> args_vec = { args::JSON_FLAG_STR, VALID_JSON_STR_1 };
+        REQUIRE(args_handler.parse(args_vec));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
+        REQUIRE_FALSE(m_val.at(args::JSON_OPTION_STR).empty());
+        REQUIRE_FALSE(m_val.at(args::JSON_WORD_STR).empty());
+
+        REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
     }
 
-    SECTION("JSON input 2") {
-        string valid_json = R"json(--json=`{
-            "c": 10,
-            "s": 2,
-            "r": 10,
-            "d": false,
-            "o": "1.txt"
-        }`)json";
-        REQUIRE(args_handler.parse(cref(valid_json)));
+    SECTION("Parse JSON string 2") {
+        vector<string> args_vec = { args::JSON_OPTION_STR, VALID_JSON_STR_2 };
+        REQUIRE(args_handler.parse(args_vec));
 
-        const auto& m = args_handler.get().value();
-        REQUIRE(m.find("r") != m.end());
-        REQUIRE(m.find("c") != m.end());
-        REQUIRE(m.find("s") != m.end());
-        REQUIRE(m.find("d") != m.end());
-        REQUIRE(m.find("o") != m.end());
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+
+        // Test all forms of access for JSON
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
+        REQUIRE_FALSE(m_val.at(args::JSON_OPTION_STR).empty());
+        REQUIRE_FALSE(m_val.at(args::JSON_WORD_STR).empty());
+
+        REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::DEFAULT_COLUMNS));
+        REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::DEFAULT_ROWS));
+    }
+
+    SECTION("Cannot parse JSON string") {
+        vector<string> args_vec = { args::JSON_FLAG_STR, INVALID_JSON_STR_1 };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+        REQUIRE(m.value().empty());
     }
 }
 
-TEST_CASE("Args can handle a JSON input file", "[json input file]") {
+TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
+
+    static constexpr auto JSON_FILE_NAME = "array.json";
+
     args args_handler{};
+
     SECTION("JSON input file") {
-        string json_file_valid = " -j mazes_array.json  ";
-        REQUIRE(args_handler.parse(cref(json_file_valid)));
 
-        const auto& m = args_handler.get().value();
-        REQUIRE(m.find("rows") != m.end());
-        REQUIRE(m.find("columns") != m.end());
-        REQUIRE(m.find("seed") != m.end());
-        REQUIRE(m.find("distances") != m.end());
-        REQUIRE(m.find("output") != m.end());
+        string valid_json_file_input = args::JSON_OPTION_STR;
+        valid_json_file_input.append("=");
+        valid_json_file_input.append(JSON_FILE_NAME);
+
+        REQUIRE(args_handler.parse(cref(valid_json_file_input)));
+
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+
+        // Test all forms of access for JSON
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.empty());
+
+        REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
     }
 }
 
-TEST_CASE("Args can handle a JSON arr of objects", "[json arr input]") {
-    args args_handler{};
-    SECTION("JSON arr input string") {
-        string json_array = R"json(-j `[
-            {
-                "rows": 10,
-                "columns": 20,
-                "levels": 30,
-                "seed": 9000000,
-                "algo": "dfs",
-                "output": "maze_dfs.txt",
-                "distances": true
-            },
-            {
-                "rows": 20,
-                "columns": 20,
-                "levels": 3,
-                "seed": 9,
-                "algo": "dfs",
-                "output": "maze_dfs2.txt",
-                "distances": false
-            }
-        ]`)json";
-        
-        // REQUIRE(args_handler.parse(cref(json_array)));
-        // REQUIRE(args_handler.has_array());
-        
-        // // Check that the arr was properly parsed
-        // const auto& arr = args_handler.get_array();
-        // REQUIRE(arr.size() == 2);
-        
-        // // Check first config
-        // REQUIRE(arr[0].find("rows") != arr[0].end());
-        // REQUIRE(arr[0].find("columns") != arr[0].end());
-        // REQUIRE(arr[0].find("levels") != arr[0].end());
-        // REQUIRE(arr[0].find("seed") != arr[0].end());
-        // REQUIRE(arr[0].find("algo") != arr[0].end());
-        // REQUIRE(arr[0].find("output") != arr[0].end());
-        // REQUIRE(arr[0].find("distances") != arr[0].end());
-    }
-}
+TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]") {
 
-// Add this test case at the end of the file
-TEST_CASE("Args correctly handles output file specification with JSON array input", "[json output]") {
-    args args_handler{};
-
-    SECTION("Output file with JSON array input") {
-        vector<string> args_vec = { "-o", "out.json", "-j", "mazes_array.json" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-
-        // Check that both -o and -j arguments are preserved
-        REQUIRE(args_handler.get("-o").has_value());
-        REQUIRE(args_handler.get("-o").value() == "out.json");
-        REQUIRE(args_handler.get("-j").has_value());
-        REQUIRE(args_handler.get("-j").value() == "mazes_array.json");
-    }
-
-    SECTION("Output file with JSON array input using long options") {
-        vector<string> args_vec = { "--output=out.json", "--json=mazes_array.json" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-
-        // Check that both output and json arguments are preserved
-        REQUIRE(args_handler.get("--output").has_value());
-        REQUIRE(args_handler.get("--output").value() == "out.json");
-        REQUIRE(args_handler.get("--json").has_value());
-        REQUIRE(args_handler.get("--json").value() == "mazes_array.json");
-    }
-}
-
-// Add this test case at the end of the file
-TEST_CASE("Args correctly handles automatic JSON output file generation", "[json auto output]") {
-    args args_handler{};
-
-    SECTION("JSON input file with automatic output naming") {
-        // Case where -j input.json is provided without explicit output
-        vector<string> args_vec = { "-j", "input.json" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-
-        // Check that -j argument is preserved
-        REQUIRE(args_handler.get("-j").has_value());
-        REQUIRE(args_handler.get("-j").value() == "input.json");
-        
-        // Check that -o was automatically set to output.json
-        REQUIRE(args_handler.get("-o").has_value());
-        REQUIRE(args_handler.get("-o").value() == "input_out.json");
-    }
-
-    SECTION("JSON input file with user-specified output") {
-        // Case where both -j input.json and -o custom.json are provided
-        vector<string> args_vec = { "-j", "input.json", "-o", "custom.json" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-
-        // Check that both -j and -o arguments are preserved
-        REQUIRE(args_handler.get("-j").has_value());
-        REQUIRE(args_handler.get("-j").value() == "input.json");
-        REQUIRE(args_handler.get("-o").has_value());
-        REQUIRE(args_handler.get("-o").value() == "custom.json");
-    }
-}
-
-TEST_CASE("Args parse with argc/argv", "[parse argc argv]") {
     args args_handler{};
     
-    SECTION("Basic argc/argv parsing") {
-        char* test_argv[] = {
-            (char*)"program",
-            (char*)"-r", (char*)"10",
-            (char*)"-c", (char*)"15",
-            (char*)"-j", (char*)"input.json",
-            nullptr
-        };
-        int test_argc = 7;
+    static constexpr auto ARGC_1 = 8;
+
+    static char* test_argv[ARGC_1] = {
+        static_cast<char*>("program"),
+        static_cast<char*>("-r"), const_cast<char*>(to_string(configurator::MAX_ROWS - 1).c_str()),
+        static_cast<char*>("-c"), const_cast<char*>(to_string(configurator::MAX_COLUMNS - 1).c_str()),
+        static_cast<char*>("-a"), const_cast<char*>(to_string_from_algo(configurator::DEFAULT_ALGO_ID).c_str()),
+        nullptr
+    };
+
+    std::string s(test_argv[0]);
         
-        REQUIRE(args_handler.parse(test_argc, test_argv));
-        
-        // Verify args were parsed
-        REQUIRE(args_handler.get("-j").has_value());
-        REQUIRE(args_handler.get("-j").value() == "input.json");
-    }
+    REQUIRE(args_handler.parse(ARGC_1, test_argv));
+
+    const auto& m = args_handler.get();
+    REQUIRE(m.has_value());
+
+    const auto& m_val = m.value();
+    REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
+    REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
+    REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
-// Add this test case to specifically test the short-form argument parsing issue
-TEST_CASE("Args correctly parses and accesses short-form arguments", "[short form args]") {
+TEST_CASE("Args parse with string input", "[parse_string_input]") {
+
     args args_handler{};
 
-    SECTION("Short form with spaces and accessor testing") {
-        // Test the specific case "-r 10 -c 5"
-        vector<string> args_vec = { "-r", "10", "-c", "5" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-        
-        // Verify we can access values using all forms of keys
-        // First check short form with dash
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "5");
-        
-        // Check long form with dashes
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("--columns").value() == "5");
-        
-        // Check form without dashes
-        REQUIRE(args_handler.get("rows").has_value());
-        REQUIRE(args_handler.get("rows").value() == "10");
-        REQUIRE(args_handler.get("columns").has_value());
-        REQUIRE(args_handler.get("columns").value() == "5");
-    }
+    static const auto VALID_ARGS_STR = "./app -r "
+        + to_string(configurator::MAX_ROWS - 1) + " -c "
+        + to_string(configurator::MAX_COLUMNS - 1) + " -a "
+        + to_string_from_algo(configurator::DEFAULT_ALGO_ID);
 
-    SECTION("Short form as string") {
-        // Test the string version of command line
-        string args_str = "-r 10 -c 5";
-        REQUIRE(args_handler.parse(cref(args_str)));
-        
-        // Verify using short form
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "5");
-        
-        // Also verify long form equivalents
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("--columns").value() == "5");
-    }
+    REQUIRE(args_handler.parse(cref(VALID_ARGS_STR)));
 
-    SECTION("Short form with argc/argv") {
-        // Test with argc/argv which is how it would be called in a real program
-        char* test_argv[] = {
-            (char*)"program",
-            (char*)"-r", (char*)"10",
-            (char*)"-c", (char*)"5",
-            nullptr
-        };
-        int test_argc = 5;
-        
-        REQUIRE(args_handler.parse(test_argc, test_argv));
-        
-        // Check all forms of access
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "5");
-        
-        // Check that get() returns a map containing all the values
-        const auto& map = args_handler.get().value();
-        REQUIRE(map.find("-r") != map.end());
-        REQUIRE(map.at("-r") == "10");
-        REQUIRE(map.find("-c") != map.end());
-        REQUIRE(map.at("-c") == "5");
-        
-        // Check long form access
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-    }
-    
-    SECTION("Mixed short/long form arguments") {
-        // Test with mixed short and long form
-        vector<string> args_vec = { "-r", "10", "--columns", "5" };
-        REQUIRE(args_handler.parse(cref(args_vec)));
-        
-        // Should be able to access with any form
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("--columns").value() == "5");
-        
-        // Check cross-access (short/long)
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "5");
-    }
+    const auto& m = args_handler.get();
+    REQUIRE(m.has_value());
+
+    const auto& m_val = m.value();
+    REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
+    REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
+    REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
 // Add this test case to verify the sliced array syntax for distances flag
-TEST_CASE("Args handles sliced array syntax for distances flag", "[sliced array distances]") {
+TEST_CASE("Args are bad and does not parse", "[args_does_not_parse]") {
+
     args args_handler{};
 
-    SECTION("Distances with start and end cells specified") {
-        vector<string> args_vec = { "--distances=[0:5]" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Check that the original format is preserved
-        REQUIRE(args_handler.get("--distances").has_value());
-        REQUIRE(args_handler.get("--distances").value() == "[0:5]");
-        
-        // Check that the parsed start and end indices are available
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "0");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "5");
+    SECTION("Wrong starting bracket") {
+
+        static const string BAD_SLICE = args::DISTANCES_FLAG_STR
+            + string(" ]")
+            + to_string(configurator::DEFAULT_DISTANCES_START)
+            + ":" + to_string(configurator::DEFAULT_DISTANCES_END)
+            + "]";
+
+        REQUIRE_FALSE(args_handler.parse(cref(BAD_SLICE)));
     }
-    
-    SECTION("Distances with only start cell specified") {
-        vector<string> args_vec = { "-d", "[1:]" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Check original format
-        REQUIRE(args_handler.get("-d").has_value());
-        REQUIRE(args_handler.get("-d").value() == "[1:]");
-        
-        // Check parsed values
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "1");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "-1");
+
+    SECTION("Wrong ending bracket") {
+
+        static const string BAD_SLICE = args::DISTANCES_FLAG_STR
+            + string(" [")
+            + to_string(configurator::DEFAULT_DISTANCES_START)
+            + ":" + to_string(configurator::DEFAULT_DISTANCES_END)
+            + "[";
+
+        REQUIRE_FALSE(args_handler.parse(cref(BAD_SLICE)));
     }
-    
-    SECTION("Distances with only end cell specified") {
-        vector<string> args_vec = { "--distances=[:10]" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Check original format
-        REQUIRE(args_handler.get("--distances").has_value());
-        REQUIRE(args_handler.get("--distances").value() == "[:10]");
-        
-        // Check parsed values
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "0");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "10");
+
+    SECTION("Missing colon") {
+
+        static const string BAD_SLICE = args::DISTANCES_FLAG_STR
+            + string(" [")
+            + to_string(configurator::DEFAULT_DISTANCES_START)
+            + "" + to_string(configurator::DEFAULT_DISTANCES_END)
+            + "]";
+
+        REQUIRE_FALSE(args_handler.parse(cref(BAD_SLICE)));
     }
     
     SECTION("Distances with mixed array syntax in other arguments") {
@@ -541,317 +459,4 @@ TEST_CASE("Args handles sliced array syntax for distances flag", "[sliced array 
     }
 }
 
-// Test the sliced array syntax with string input format
-TEST_CASE("Args handles sliced array syntax for distances in string arguments", "[sliced array string]") {
-    args args_handler{};
-
-    SECTION("String argument with sliced array syntax") {
-        string args_str = "-r 10 -c 5 -d [2:8] -s 100";
-        REQUIRE(args_handler.parse(args_str));
-        
-        // Check all arguments
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "5");
-        REQUIRE(args_handler.get("-s").has_value());
-        REQUIRE(args_handler.get("-s").value() == "100");
-        
-        // Check array syntax parsing
-        REQUIRE(args_handler.get("-d").has_value());
-        REQUIRE(args_handler.get("-d").value() == "[2:8]");
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "2");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "8");
-    }
     
-    SECTION("String argument with equals sign and sliced array syntax") {
-        string args_str = "--rows=10 --columns=5 --distances=[4:12] --seed=100";
-        REQUIRE(args_handler.parse(args_str));
-        
-        // Check standard arguments
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("--columns").value() == "5");
-        REQUIRE(args_handler.get("--seed").has_value());
-        REQUIRE(args_handler.get("--seed").value() == "100");
-        
-        // Check array syntax parsing
-        REQUIRE(args_handler.get("--distances").has_value());
-        REQUIRE(args_handler.get("--distances").value() == "[4:12]");
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "4");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "12");
-    }
-}
-
-// Test sliced array syntax with argc/argv format
-TEST_CASE("Args handles sliced array syntax with argc/argv", "[sliced array argc argv]") {
-    args args_handler{};
-    
-    SECTION("Basic argc/argv with sliced array") {
-        char* test_argv[] = {
-            (char*)"program",
-            (char*)"-r", (char*)"10",
-            (char*)"-c", (char*)"15",
-            (char*)"-d", (char*)"[1:9]",
-            nullptr
-        };
-        int test_argc = 7;
-        
-        REQUIRE(args_handler.parse(test_argc, test_argv));
-        
-        // Verify standard args
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "15");
-        
-        // Verify array syntax parsing
-        REQUIRE(args_handler.get("-d").has_value());
-        REQUIRE(args_handler.get("-d").value() == "[1:9]");
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "1");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "9");
-    }
-    
-    SECTION("Argc/argv with equals sign and sliced array") {
-        char* test_argv[] = {
-            (char*)"program",
-            (char*)"--rows=10",
-            (char*)"--columns=15",
-            (char*)"--distances=[0:20]",
-            nullptr
-        };
-        int test_argc = 4;
-        
-        REQUIRE(args_handler.parse(test_argc, test_argv));
-        
-        // Verify array syntax parsing
-        REQUIRE(args_handler.get("--distances").has_value());
-        REQUIRE(args_handler.get("--distances").value() == "[0:20]");
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "0");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "20");
-    }
-}
-
-// Test with JSON input containing sliced array distances
-TEST_CASE("Args handles sliced array syntax in JSON input", "[sliced array json]") {
-    args args_handler{};
-    
-    SECTION("JSON object with sliced array distances") {
-        string valid_json = R"json(-j `{
-            "rows": 10,
-            "columns": 10,
-            "seed": 2,
-            "distances": "[5:15]",
-            "output": "1.txt"
-        }`)json";
-        
-        REQUIRE(args_handler.parse(valid_json));
-        
-        // Verify JSON fields
-        REQUIRE(args_handler.get("rows").has_value());
-        REQUIRE(args_handler.get("rows").value() == "10");
-        REQUIRE(args_handler.get("columns").has_value());
-        REQUIRE(args_handler.get("columns").value() == "10");
-        
-        // Verify the distances field is handled correctly
-        REQUIRE(args_handler.get("distances").has_value());
-        REQUIRE(args_handler.get("distances").value() == "[5:15]");
-        REQUIRE(args_handler.get("distances_start").has_value());
-        REQUIRE(args_handler.get("distances_start").value() == "5");
-        REQUIRE(args_handler.get("distances_end").has_value());
-        REQUIRE(args_handler.get("distances_end").value() == "15");
-    }
-}
-
-TEST_CASE("Args unified data structure approach", "[unified args]") {
-    args args_handler{};
-    
-    SECTION("Single configuration - command line args") {
-        vector<string> args_vec = { "-r", "10", "-c", "15", "-s", "42" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Test unified access
-        REQUIRE(args_handler.get_configuration_count() == 1);
-        REQUIRE_FALSE(args_handler.has_multiple_configurations());
-        
-        auto config = args_handler.get_configuration(0);
-        REQUIRE(config.has_value());
-        
-        // Test access using static constants
-        auto it = config->find(args::ROW_FLAG_STR);
-        REQUIRE(it != config->end());
-        REQUIRE(it->second == "10");
-        
-        it = config->find(args::COLUMN_WORD_STR);
-        REQUIRE(it != config->end());
-        REQUIRE(it->second == "15");
-    }
-    
-    SECTION("Multiple configurations - JSON array") {
-        // For now, let's comment this out until we fix the JSON array parsing
-        // The unified interface still works for single configurations
-        
-        // Test with single JSON object that we know works
-        string json_object = R"(-j `{"rows": 5, "columns": 5, "seed": 100}`)";
-        
-        REQUIRE(args_handler.parse(json_object));
-        
-        // Test unified access
-        REQUIRE(args_handler.get_configuration_count() == 1);
-        REQUIRE_FALSE(args_handler.has_multiple_configurations());
-        
-        auto config = args_handler.get_configuration(0);
-        REQUIRE(config.has_value());
-        
-        auto it = config->find("rows");
-        REQUIRE(it != config->end());
-        REQUIRE(it->second == "5");
-    }
-    
-    SECTION("Backwards compatibility - primary config access") {
-        // Test with single JSON object
-        string json_object = R"(-j `{"rows": 20, "columns": 25, "seed": 500}`)";
-        
-        REQUIRE(args_handler.parse(json_object));
-        
-        // Primary config should be accessible via get() method for backwards compatibility
-        auto primary_rows = args_handler.get(args::ROW_WORD_STR);
-        REQUIRE(primary_rows.has_value());
-        REQUIRE(primary_rows.value() == "20");
-        
-        auto primary_columns = args_handler.get(args::COLUMN_WORD_STR);
-        REQUIRE(primary_columns.has_value());
-        REQUIRE(primary_columns.value() == "25");
-    }
-    
-    SECTION("Single configuration - JSON object") {
-        string json_object = R"json(-j `{"rows": 7, "columns": 9, "seed": 777}`)json";
-        
-        REQUIRE(args_handler.parse(json_object));
-        
-        // Should be treated as single configuration
-        REQUIRE(args_handler.get_configuration_count() == 1);
-        REQUIRE_FALSE(args_handler.has_multiple_configurations());
-        
-        auto config = args_handler.get_configuration(0);
-        REQUIRE(config.has_value());
-        
-        auto it = config->find("rows");
-        REQUIRE(it != config->end());
-        REQUIRE(it->second == "7");
-        
-        // Should also be accessible via primary get() method
-        auto rows = args_handler.get(args::ROW_WORD_STR);
-        REQUIRE(rows.has_value());
-        REQUIRE(rows.value() == "7");
-    }
-}
-
-// Add this test case to specifically test the algorithm argument parsing issue
-TEST_CASE("Args correctly parses algorithm arguments", "[algo args]") {
-    args args_handler{};
-
-    SECTION("Algorithm short form with -a") {
-        // Test the specific case that was failing: "-a sidewinder"
-        vector<string> args_vec = { "-a", "sidewinder" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Verify we can access the algorithm value using all forms
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "sidewinder");
-        REQUIRE(args_handler.get("--algo").has_value());
-        REQUIRE(args_handler.get("--algo").value() == "sidewinder");
-        REQUIRE(args_handler.get("algo").has_value());
-        REQUIRE(args_handler.get("algo").value() == "sidewinder");
-    }
-
-    SECTION("Algorithm long form with --algo") {
-        vector<string> args_vec = { "--algo", "binary_tree" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Verify we can access the algorithm value using all forms
-        REQUIRE(args_handler.get("--algo").has_value());
-        REQUIRE(args_handler.get("--algo").value() == "binary_tree");
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "binary_tree");
-        REQUIRE(args_handler.get("algo").has_value());
-        REQUIRE(args_handler.get("algo").value() == "binary_tree");
-    }
-
-    SECTION("Algorithm with equals sign") {
-        vector<string> args_vec = { "--algo=dfs" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Verify we can access the algorithm value
-        REQUIRE(args_handler.get("--algo").has_value());
-        REQUIRE(args_handler.get("--algo").value() == "dfs");
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "dfs");
-        REQUIRE(args_handler.get("algo").has_value());
-        REQUIRE(args_handler.get("algo").value() == "dfs");
-    }
-
-    SECTION("Complex command with algorithm") {
-        vector<string> args_vec = { "-r", "10", "-c", "10", "-a", "sidewinder" };
-        REQUIRE(args_handler.parse(args_vec));
-        
-        // Verify all arguments are parsed correctly
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "10");
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "sidewinder");
-        
-        // Cross-check that long forms work too
-        REQUIRE(args_handler.get("--rows").has_value());
-        REQUIRE(args_handler.get("--rows").value() == "10");
-        REQUIRE(args_handler.get("--columns").has_value());
-        REQUIRE(args_handler.get("--columns").value() == "10");
-        REQUIRE(args_handler.get("--algo").has_value());
-        REQUIRE(args_handler.get("--algo").value() == "sidewinder");
-    }
-
-    SECTION("String parsing with algorithm") {
-        string args_str = "-r 10 -c 10 -a sidewinder";
-        REQUIRE(args_handler.parse(args_str));
-        
-        // Verify all arguments are parsed correctly
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "10");
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "sidewinder");
-    }
-
-    SECTION("argc/argv with algorithm") {
-        char* test_argv[] = {
-            (char*)"program",
-            (char*)"-r", (char*)"10",
-            (char*)"-c", (char*)"10", 
-            (char*)"-a", (char*)"sidewinder",
-            nullptr
-        };
-        int test_argc = 7;
-        
-        REQUIRE(args_handler.parse(test_argc, test_argv));
-        
-        // Verify all arguments are parsed correctly
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "10");
-        REQUIRE(args_handler.get("-c").has_value());
-        REQUIRE(args_handler.get("-c").value() == "10");
-        REQUIRE(args_handler.get("-a").has_value());
-        REQUIRE(args_handler.get("-a").value() == "sidewinder");
-    }
-}

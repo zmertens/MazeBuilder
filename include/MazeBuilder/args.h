@@ -127,8 +127,8 @@ public:
     std::optional<std::string> get(const std::string& key) const noexcept;
 
     /// @brief Get entire args map
-    /// @return Reference to the internal arguments map
-    const std::optional<std::unordered_map<std::string, std::string>>& get() const noexcept;
+    /// @return The internal arguments map or empty map if not valid
+    std::optional<std::unordered_map<std::string, std::string>> get() const noexcept;
 
     /// @brief Check if we have multiple configurations (from JSON array)
     /// @return True if multiple configurations are stored

@@ -42,6 +42,4 @@ else()
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         target_compile_definitions(${EXE_NAME} PRIVATE MAZE_DEBUG)
    endif()
-
-   file(COPY "${CMAKE_SOURCE_DIR}/tests/mazes_array.json" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 endif()
