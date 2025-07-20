@@ -2830,7 +2830,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                                 SDL_Log("Failed to create maze!");
                             }
 
-                            my_mazes.set_levels(gui->height);
+                            //my_mazes.set_levels(gui->height);
 
                             // Compute the geometry of the maze
                             vector<vector<uint32_t>> faces;
@@ -2872,7 +2872,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                         ImGui::EndDisabled();
                     }
 
-                    if (!my_mazes.empty()) {
+                    if (true) {
                         // Show last maze compute time
                         ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));

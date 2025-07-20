@@ -355,19 +355,22 @@ TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
 TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]") {
 
     args args_handler{};
-    
-    static constexpr auto ARGC_1 = 8;
+
+    static constexpr auto ARGC_1 = 7;
+
+    static const string rows_str = to_string(configurator::MAX_ROWS - 1);
+    static const string cols_str = to_string(configurator::MAX_COLUMNS - 1);
+    static const string algo_str = to_string_from_algo(configurator::DEFAULT_ALGO_ID);
 
     static char* test_argv[ARGC_1] = {
-        static_cast<char*>("program"),
-        static_cast<char*>("-r"), const_cast<char*>(to_string(configurator::MAX_ROWS - 1).c_str()),
-        static_cast<char*>("-c"), const_cast<char*>(to_string(configurator::MAX_COLUMNS - 1).c_str()),
-        static_cast<char*>("-a"), const_cast<char*>(to_string_from_algo(configurator::DEFAULT_ALGO_ID).c_str()),
-        nullptr
+        const_cast<char*>("program"),
+        const_cast<char*>("-r"), const_cast<char*>(rows_str.c_str()),
+        const_cast<char*>("-c"), const_cast<char*>(cols_str.c_str()),
+        const_cast<char*>("-a"), const_cast<char*>(algo_str.c_str())
     };
 
     std::string s(test_argv[0]);
-        
+
     REQUIRE(args_handler.parse(ARGC_1, test_argv));
 
     const auto& m = args_handler.get();

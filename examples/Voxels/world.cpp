@@ -32,14 +32,14 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, 
             static constexpr auto PLANT_HEIGHT_MAX = 2;
 
             // Maze
-            const auto& block = mazes.find(x, z);
-            if (block.has_value()) {
-                const auto& [rows, cols, levels, t] = block.value();
-                for (auto y = 0; y < levels + PLANT_HEIGHT_MAX + 1; y++) {
-                    func(rows, y, cols, t * flag, m);
-                }
-                continue;
-            }
+            //const auto& block = mazes.find(x, z);
+            //if (block.has_value()) {
+            //    const auto& [rows, cols, levels, t] = block.value();
+            //    for (auto y = 0; y < levels + PLANT_HEIGHT_MAX + 1; y++) {
+            //        func(rows, y, cols, t * flag, m);
+            //    }
+            //    continue;
+            //}
 
             // sand and grass terrain            
             for (int y = 0; y < PLANT_HEIGHT_MAX; y++) {
