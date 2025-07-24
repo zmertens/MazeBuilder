@@ -5,6 +5,7 @@
 #include <optional>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -46,7 +47,7 @@ public:
     static constexpr const char* OUTPUT_ID_FLAG_STR = "-o";
     static constexpr const char* OUTPUT_ID_OPTION_STR = "--output";
     static constexpr const char* OUTPUT_ID_WORD_STR = "output";
-    static constexpr const char* DEFAULT_OUTPUT_FILENAME = "output.json";
+    static constexpr const char* DEFAULT_OUTPUT_FILENAME = "maze.txt";
     
     // Output filename related constants
     static constexpr const char* OUTPUT_FILENAME_WORD_STR = "output_filename";
@@ -104,19 +105,22 @@ public:
 
     /// @brief Parse program arguments from a vector of strings
     /// @param arguments Command-line arguments
+    /// @param has_program_name_as_first_arg Whether the first argument is the program name
     /// @return True if parsing was successful
-    bool parse(const std::vector<std::string>& arguments) noexcept;
+    bool parse(const std::vector<std::string>& arguments, bool has_program_name_as_first_arg = false) noexcept;
 
     /// @brief Parse program arguments from a string
     /// @param arguments Space-delimited command-line arguments
+    /// @param has_program_name_as_first_arg Whether the first argument is the program name
     /// @return True if parsing was successful
-    bool parse(const std::string& arguments) noexcept;
+    bool parse(const std::string& arguments, bool has_program_name_as_first_arg = false) noexcept;
     
     /// @brief Parse program arguments from argc/argv
     /// @param argc Argument count
     /// @param argv Argument values
+    /// @param has_program_name_as_first_arg Whether the first argument is the program name
     /// @return True if parsing was successful
-    bool parse(int argc, char** argv) noexcept;
+    bool parse(int argc, char** argv, bool has_program_name_as_first_arg = false) noexcept;
 
     /// @brief Clear the arguments map
     void clear() noexcept;
@@ -130,55 +134,14 @@ public:
     /// @return The internal arguments map or empty map if not valid
     std::optional<std::unordered_map<std::string, std::string>> get() const noexcept;
 
-    /// @brief Check if we have multiple configurations (from JSON array)
-    /// @return True if multiple configurations are stored
-    bool has_multiple_configurations() const noexcept;
-
-    /// @brief Get the number of configurations stored
-    /// @return Number of configurations (1 for single config, >1 for arrays)
-    size_t get_configuration_count() const noexcept;
-
-    /// @brief Get configuration by index (0-based)
-    /// @param index The index of the configuration to retrieve
-    /// @return Configuration map if index is valid, std::nullopt otherwise
-    std::optional<std::unordered_map<std::string, std::string>> get_configuration(size_t index) const noexcept;
-
-    /// @brief Get all configurations as a vector
-    /// @return Vector of configuration maps
-    std::vector<std::unordered_map<std::string, std::string>> get_all_configurations() const noexcept;
-
-    /// @brief Add a new option to the CLI parser
-    /// @param flags Command line flags (e.g., "-x,--extra")
-    /// @param description Help description for the option
-    /// @return True if the option was successfully added
-    bool add_option(const std::string& flags, const std::string& description) noexcept;
-
-    /// @brief Add a new flag to the CLI parser
-    /// @param flags Command line flags (e.g., "-f,--flag")
-    /// @param description Help description for the flag
-    /// @return True if the flag was successfully added
-    bool add_flag(const std::string& flags, const std::string& description) noexcept;
-
 private:
 
-    /// @brief Parse a sliced array string into individual elements
-    /// @param value The sliced array string (e.g., "[1:10]") with inclusive bounds
-    /// @param args_map The map to populate with parsed values
-    /// @return True if parsing was successful
-    bool parse_sliced_array(const std::string& value, std::unordered_map<std::string, std::string>& args_map) noexcept;
-
-    /// @brief Generates an output filename based on input filename or default
-    /// @param input_value The input filename or JSON string
-    /// @param is_string_input Whether the input is a JSON string (true) or filename (false)
-    /// @return The generated output filename
-    std::string generate_output_filename(const std::string& input_value, bool is_string_input) const noexcept;
-    
     /// @brief Process JSON input from file or string
     /// @param json_input The JSON input
     /// @param is_string_input Whether it's a string or file
     /// @param key The command-line key used
     /// @return True if JSON was successfully processed
-    bool process_json_input(const std::string& json_input, bool is_string_input, const std::string& key) noexcept;
+    bool process_json_input(std::string_view json_input) noexcept;
     
     // Private implementation class (PIMPL idiom)
     class impl;

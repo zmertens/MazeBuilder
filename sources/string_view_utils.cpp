@@ -15,14 +15,15 @@
 #include <sstream>
 #include <tuple>
 #include <unordered_set>
+#include <list>
 
 using namespace mazes;
 
 /// @brief Strip specific characters from the beginning and end of a string view
 /// @param s The string view to strip characters from
-/// @param to_strip_from_s The character to strip
+/// @param to_strip_from_s The character to strip " "
 /// @return A new string view with the specified characters removed from both ends
-std::string_view string_view_utils::strip(const std::string_view& s, char to_strip_from_s) noexcept {
+std::string_view string_view_utils::strip(const std::string_view& s, const std::string_view& to_strip_from_s) noexcept {
     if (s.empty()) {
         return s;
     }
@@ -35,55 +36,6 @@ std::string_view string_view_utils::strip(const std::string_view& s, char to_str
     }
     
     return s.substr(start, end - start + 1);
-}
-
-/// @brief Strip quotes from a JSON string value
-/// @param s The string view potentially containing JSON quotes
-/// @return A string view with JSON quotes removed from both ends
-std::string_view string_view_utils::strip_json_quotes(const std::string_view& s) noexcept {
-    if (s.empty()) {
-        return s;
-    }
-    
-    // Debug print to see the exact string content
-#if defined(MAZE_DEBUG)
-
-    std::cout << "Original string: [" << s << "]" << std::endl;
-#endif
-    
-    std::string_view result = s;
-    
-    // First remove any leading/trailing whitespace
-    auto start = result.find_first_not_of(" \t\n\r\"");
-    auto end = result.find_last_not_of(" \t\n\r\"");
-    
-    if (start == std::string_view::npos || end == std::string_view::npos) {
-        return result;
-    }
-    
-    result = result.substr(start, end - start + 1);
-    
-    // Now check if the trimmed string starts and ends with quotes
-    if (result.size() >= 2 && result.front() == '\"' && result.back() == '\"') {
-        result = result.substr(1, result.size() - 2);
-    }
-    
-    // Handle escaped quotes within the string if needed
-    // (This would require more complex parsing if the JSON has escaped quotes)
-    
-    return strip(result, '\"');
-}
-
-std::string string_view_utils::trim(const std::string& str) noexcept {
-    if (str.empty()) {
-        return str;
-    }
-    auto start = str.find_first_not_of(" \t\r\n");
-    if (start == std::string::npos) {
-        return "";
-    }
-    auto end = str.find_last_not_of(" \t\r\n");
-    return str.substr(start, end - start + 1);
 }
 
 bool string_view_utils::contains(const std::string& str, const std::string& substr) noexcept {
@@ -121,8 +73,12 @@ std::string_view string_view_utils::find_first_of(const std::string_view& s, con
     return s.substr(pos, 1);
 }
 
-std::vector<std::string> string_view_utils::split(const std::string& str, char delimiter) noexcept {
-    std::vector<std::string> tokens;
+/// @brief Split a string by a delimiter
+/// @param str 
+/// @param delimiter ' '
+/// @return 
+std::list<std::string> string_view_utils::split(const std::string& str, char delimiter) noexcept {
+    std::list<std::string> tokens;
     std::stringstream ss(str);
     std::string token;
     while (std::getline(ss, token, delimiter)) {
@@ -131,6 +87,44 @@ std::vector<std::string> string_view_utils::split(const std::string& str, char d
         }
     }
     return tokens;
+}
+
+/// @brief Split a string_view by a delimiter
+/// @param sv 
+/// @param delim " "
+/// @return 
+std::list<std::string_view> string_view_utils::split(const std::string_view& sv, const std::string_view& delim) noexcept {
+    std::list<std::string_view> result;
+    
+    if (sv.empty()) {
+        return result;
+    }
+    
+    if (delim.empty()) {
+        result.push_back(sv);
+        return result;
+    }
+    
+    size_t start = 0;
+    size_t found = sv.find(delim, start);
+    
+    while (found != std::string_view::npos) {
+        // Add the part before the delimiter
+        if (found > start) {
+            result.push_back(sv.substr(start, found - start));
+        }
+        
+        // Move past the delimiter
+        start = found + delim.length();
+        found = sv.find(delim, start);
+    }
+    
+    // Add the remaining part after the last delimiter
+    if (start < sv.length()) {
+        result.push_back(sv.substr(start));
+    }
+    
+    return result;
 }
 
 // Fix the implementation for the map version to be compatible with the args version

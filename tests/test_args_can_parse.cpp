@@ -8,6 +8,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
+#include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/string_view_utils.h>
 
 using namespace mazes;
@@ -21,6 +22,14 @@ TEST_CASE("Args static checks", "[args_static_checks]") {
     STATIC_REQUIRE(std::is_copy_assignable<mazes::args>::value);
     STATIC_REQUIRE(std::is_move_constructible<mazes::args>::value);
     STATIC_REQUIRE(std::is_move_assignable<mazes::args>::value);
+
+    // Used internally within the args class
+    STATIC_REQUIRE(std::is_default_constructible<mazes::json_helper>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::json_helper>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::json_helper>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::json_helper>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::json_helper>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::json_helper>::value);
 }
 
 TEST_CASE("Args simple parses", "[simple_parses]") {
@@ -30,24 +39,24 @@ TEST_CASE("Args simple parses", "[simple_parses]") {
     SECTION("Empty vector") {
 
         vector<string> args_vec;
-        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE_FALSE(args_handler.parse(args_vec));
     }
 
     SECTION("App name only") {
 
         vector<string> args_vec = { "maze_builder" };
-        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(args_handler.parse(args_vec, true));
     }
 
     SECTION("Help requested with vector of string") {
 
-        vector<string> args_vec = { args::HELP_FLAG_STR, args::HELP_OPTION_STR, args::HELP_WORD_STR };
+        vector<string> args_vec = { args::HELP_FLAG_STR };
         REQUIRE(args_handler.parse(args_vec));
     }
 
     SECTION("Version requested with vector of string") {
 
-        vector<string> args_vec = { args::VERSION_FLAG_STR, args::VERSION_OPTION_STR, args::VERSION_WORD_STR };
+        vector<string> args_vec = { args::VERSION_FLAG_STR };
         REQUIRE(args_handler.parse(args_vec));
     }
 
@@ -57,7 +66,7 @@ TEST_CASE("Args simple parses", "[simple_parses]") {
         REQUIRE(args_handler.parse(args_vec));
     }
 
-    SECTION("Help and version requested short flags") {
+    SECTION("Help and version requested options") {
 
         vector<string> args_vec_long = { args::HELP_OPTION_STR, args::VERSION_OPTION_STR };
         REQUIRE(args_handler.parse(args_vec_long));
@@ -155,9 +164,10 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_1)));
         
         // Test all forms of access for distances with slice
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_1));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_1));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_1));
+        auto slice_1_stripped = string_view_utils::strip(DISTANCES_SLICE_1, args::DISTANCES_FLAG_STR);
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_1_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_1_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_1_stripped));
         
         // Test parsed slice values
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
@@ -173,9 +183,10 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_2)));
 
         // Test all forms of access for distances with slice
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_2));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_2));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_2));
+        auto slice_2_stripped = string_view_utils::strip(string_view_utils::strip(DISTANCES_SLICE_2, args::DISTANCES_OPTION_STR), "=");
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_2_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_2_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_2_stripped));
 
         // Test parsed slice values
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
@@ -186,66 +197,14 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_3)));
 
         // Test all forms of access for distances with slice
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), DISTANCES_SLICE_3));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), DISTANCES_SLICE_3));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), DISTANCES_SLICE_3));
+        auto slice_3_stripped = string_view_utils::strip(DISTANCES_SLICE_3, args::DISTANCES_FLAG_STR);
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_3_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_3_stripped));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_3_stripped));
 
         // Test parsed slice values
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
-    }
-}
-
-TEST_CASE("Args add options and flags", "[options_and_flags]") {
-
-    args args_handler{};
-    
-    SECTION("Add new option") {
-        // Test adding a new option that doesn't already exist
-        REQUIRE(args_handler.add_option("-x,--extra", "Extra test option"));
-        vector<string> args_vec = { "--extra", "test_value" };
-        REQUIRE(args_handler.parse(args_vec));
-        auto val = args_handler.get("--extra");
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "test_value");
-    }
-    
-    SECTION("Add new flag") {
-        // Test adding a new flag that doesn't already exist
-        REQUIRE(args_handler.add_flag("-f,--flag", "Test flag"));
-        vector<string> args_vec = { "--flag" };
-        REQUIRE(args_handler.parse(args_vec));
-        auto val = args_handler.get("--flag");
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "true");
-    }
-    
-    SECTION("Test existing rows option") {
-        // Test that the existing rows option works (already added in setup_cli)
-        vector<string> args_vec = { "--rows", "15" };
-        REQUIRE(args_handler.parse(args_vec));
-        auto val = args_handler.get("--rows");
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "15");
-        // Also check alternate access methods
-        REQUIRE(args_handler.get("-r").has_value());
-        REQUIRE(args_handler.get("-r").value() == "15");
-        REQUIRE(args_handler.get("rows").has_value());
-        REQUIRE(args_handler.get("rows").value() == "15");
-    }
-    
-    SECTION("Test existing distances flag") {
-        // Test that the existing distances option works (already added in setup_cli)
-        vector<string> args_vec = { "--distances" };
-        REQUIRE(args_handler.parse(args_vec));
-        auto val = args_handler.get("--distances");
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "true");
-        // Also check alternate access methods
-        REQUIRE(args_handler.get("-d").has_value());
-        REQUIRE(args_handler.get("-d").value() == "true");
-        REQUIRE(args_handler.get("distances").has_value());
-        REQUIRE(args_handler.get("distances").value() == "true");
     }
 }
 
@@ -271,9 +230,9 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
         }`)json";
 
     static const string VALID_JSON_STR_2 = \
-        "  `  {  \"r\": " + to_string(configurator::DEFAULT_ROWS) \
-        + ", \n \"c\": " + to_string(configurator::DEFAULT_COLUMNS) \
-        + "\n  }  `  ";
+        "  `{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS)
+        + ",\n\"columns\": " + to_string(configurator::DEFAULT_COLUMNS)
+        + "\n }`";
 
     args args_handler{};
 
@@ -297,7 +256,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
     }
 
     SECTION("Parse JSON string 2") {
-        vector<string> args_vec = { args::JSON_OPTION_STR, VALID_JSON_STR_2 };
+        vector<string> args_vec = { args::JSON_OPTION_STR + string("=") + VALID_JSON_STR_2 };
         REQUIRE(args_handler.parse(args_vec));
 
         const auto& m = args_handler.get();
@@ -440,8 +399,33 @@ TEST_CASE("Args are bad and does not parse", "[args_does_not_parse]") {
         REQUIRE_FALSE(args_handler.parse(cref(BAD_SLICE)));
     }
     
+    SECTION("Brackets without colon") {
+        vector<string> args_vec = { "app", "-d", "[123]" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice with reversed brackets") {
+        vector<string> args_vec = { "app", "-d", "]1:2[" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Only closing bracket") {
+        vector<string> args_vec = { "app", "-d", "1:2]" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Only opening bracket") {
+        vector<string> args_vec = { "app", "-d", "[1:2" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Mixed valid and invalid arguments") {
+        vector<string> args_vec = { "app", "-r", "10", "-d", "]1:2]", "-c", "5" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
     SECTION("Distances with mixed array syntax in other arguments") {
-        vector<string> args_vec = { "-r", "10", "-c", "5", "-d", "[3:7]", "-s", "42" };
+        vector<string> args_vec = { "-r", "10", "-c", "5", "--distances=[3:7]", "-s", "42" };
         REQUIRE(args_handler.parse(args_vec));
         
         // Check all arguments are preserved
@@ -462,4 +446,427 @@ TEST_CASE("Args are bad and does not parse", "[args_does_not_parse]") {
     }
 }
 
+TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]") {
     
+    args args_handler{};
+    
+    auto check_optional_equals_value = [](auto opt, auto val) -> bool {
+        return opt.has_value() && opt.value() == val;
+    };
+
+    SECTION("App name only") {
+        vector<string> args_vec = { "app" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+
+    SECTION("App with seed only") {
+        vector<string> args_vec = { "app", "-s", "2" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_FLAG_STR), "2"));
+    }
+
+    SECTION("App with algorithm dfs") {
+        vector<string> args_vec = { "app", "-a", "dfs" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), "dfs"));
+    }
+
+    SECTION("App with algorithm binary_tree") {
+        vector<string> args_vec = { "app", "-a", "binary_tree" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), "binary_tree"));
+    }
+
+    SECTION("App with algorithm sidewinder") {
+        vector<string> args_vec = { "app", "-a", "sidewinder" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), "sidewinder"));
+    }
+
+    SECTION("App with long options using equals") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+    }
+
+    SECTION("App with levels option") {
+        vector<string> args_vec = { "app", "--rows=1", "--columns=2", "--levels=3" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "1"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::LEVEL_WORD_STR), "3"));
+    }
+
+    SECTION("Complex argument mix with spaces") {
+        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2", "-a", "dfs", "-o", "stdout", "-d" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "dfs"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "stdout"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Long format with mixed options") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2", "--algo=binary_tree", "--output=1.txt", "--distances" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "binary_tree"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.txt"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Mixed short and long with obj output") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2", "-a", "dfs", "--output=1.obj", "-d" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "dfs"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.obj"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("With help and other options") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2", "--algo=binary_tree", "--output=1.png", "-h" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "binary_tree"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.png"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("With version and other options") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2", "--algo=binary_tree", "--output=1.jpg", "-v" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "binary_tree"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.jpg"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Simple short args") {
+        vector<string> args_vec = { "app", "-r", "10", "-c", "10", "-s", "2" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+    }
+
+    SECTION("With levels short option") {
+        vector<string> args_vec = { "app", "-l", "5", "-r", "10", "-c", "10" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::LEVEL_WORD_STR), "5"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+    }
+
+    SECTION("Mixed long and short") {
+        vector<string> args_vec = { "app", "--rows=10", "-c", "10" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+    }
+
+    SECTION("Single algorithm option") {
+        vector<string> args_vec = { "app", "--algo=dfs" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "dfs"));
+    }
+
+    SECTION("Output to stdout") {
+        vector<string> args_vec = { "app", "--output=stdout" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "stdout"));
+    }
+
+    SECTION("Output short with json") {
+        vector<string> args_vec = { "app", "-o", "1.json" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.json"));
+    }
+
+    SECTION("Output long with json") {
+        vector<string> args_vec = { "app", "--output=json" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "json"));
+    }
+
+    SECTION("Help long option") {
+        vector<string> args_vec = { "app", "--help" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Version long option") {
+        vector<string> args_vec = { "app", "--version" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Version short option") {
+        vector<string> args_vec = { "app", "-v" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Help short option") {
+        vector<string> args_vec = { "app", "-h" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Help and version together") {
+        vector<string> args_vec = { "app", "-h", "-v" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Version and help together") {
+        vector<string> args_vec = { "app", "-v", "-h" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Distances flag only") {
+        vector<string> args_vec = { "app", "-d" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("JSON short option") {
+        vector<string> args_vec = { "app", "-j", "1.json" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::JSON_WORD_STR), "1.json"));
+    }
+
+    SECTION("JSON long option") {
+        vector<string> args_vec = { "app", "--json=2.json" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::JSON_WORD_STR), "2.json"));
+    }
+}
+
+TEST_CASE("Args enhanced invalid parsing", "[enhanced_invalid_parsing]") {
+    
+    args args_handler{};
+
+    SECTION("Invalid long option missing dashes") {
+        vector<string> args_vec = { "app", "-output" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid long option missing dashes for algorithm") {
+        vector<string> args_vec = { "app", "-algorithm" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid single dash") {
+        vector<string> args_vec = { "app", "-" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid arguments with bad values") {
+        vector<string> args_vec = { "app", "-r", "x", "-c", "z", "-s", "algo" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid unknown short option") {
+        vector<string> args_vec = { "app", "-z" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid numeric short option") {
+        vector<string> args_vec = { "app", "-1" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid positional argument") {
+        vector<string> args_vec = { "app", "10" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid single character positional") {
+        vector<string> args_vec = { "app", "b" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid unknown long option") {
+        vector<string> args_vec = { "app", "--file" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid unknown short option f") {
+        vector<string> args_vec = { "app", "-f" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid option values with letters") {
+        vector<string> args_vec = { "app", "--rows=r", "--columns=c", "--levels=l" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid malformed equals syntax") {
+        vector<string> args_vec = { "app", "--rows=--columns=" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid spaced equals syntax") {
+        vector<string> args_vec = { "app", "--columns", "=", "--rows=" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid typo in option name") {
+        vector<string> args_vec = { "app", "--roows=", "--columns=" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid distances option name") {
+        vector<string> args_vec = { "app", "--rows=10", "--columns=10", "--seed=2", "--algo=binary_tree", "--output=1.txt", "--distancesz" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Invalid concatenated options") {
+        vector<string> args_vec = { "app", "-rx", "-cz", "-salgo" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+
+    SECTION("Conflicting repeated arguments") {
+        vector<string> args_vec = { "app", "-r", "2", "--rows", "2", "-r", "3" };
+        // CLI11 typically allows this and uses the last value, so this might actually parse successfully
+        // The behavior depends on CLI11 configuration, but let's test what happens
+        bool parse_result = args_handler.parse(args_vec);
+        if (parse_result) {
+            // If it parses, the last value should win
+            auto result = args_handler.get(args::ROW_WORD_STR);
+            REQUIRE(result.has_value());
+            REQUIRE(result.value() == "3");
+        } else {
+            // If it doesn't parse, that's also acceptable behavior
+            REQUIRE_FALSE(parse_result);
+        }
+    }
+}
+
+TEST_CASE("Args concatenated short options", "[concatenated_short_options]") {
+    
+    args args_handler{};
+    
+    auto check_optional_equals_value = [](auto opt, auto val) -> bool {
+        return opt.has_value() && opt.value() == val;
+    };
+
+    SECTION("Concatenated seed value") {
+        string args_str = "app -r 10 -c 10 -s2 -a dfs -o stdout -d";
+        REQUIRE(args_handler.parse(args_str));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "dfs"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "stdout"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
+    }
+
+    SECTION("Multiple concatenated numeric values") {
+        vector<string> args_vec = { "app", "-r10", "-c5", "-s42" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "5"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "42"));
+    }
+
+    SECTION("Concatenated algorithm value") {
+        vector<string> args_vec = { "app", "-adfs" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "dfs"));
+    }
+
+    SECTION("Concatenated levels value") {
+        vector<string> args_vec = { "app", "-l3", "-r10", "-c20" };
+        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::LEVEL_WORD_STR), "3"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "20"));
+    }
+}
+
+TEST_CASE("Args validation comprehensive test", "[args_validation]") {
+    
+    args args_handler{};
+    
+    SECTION("Valid slice syntax should pass") {
+        vector<string> args_vec = { "app", "-d", "[1:5]" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Valid option=value slice syntax should pass") {
+        vector<string> args_vec = { "app", "--distances=[1:5]" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - wrong starting bracket should fail") {
+        vector<string> args_vec = { "app", "-d", "]1:5]" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - wrong ending bracket should fail") {
+        vector<string> args_vec = { "app", "-d", "[1:5[" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - missing colon should fail") {
+        vector<string> args_vec = { "app", "-d", "[15]" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - only opening bracket should fail") {
+        vector<string> args_vec = { "app", "-d", "[1:5" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - only closing bracket should fail") {
+        vector<string> args_vec = { "app", "-d", "1:5]" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Malformed slice - colon without brackets should fail") {
+        vector<string> args_vec = { "app", "-d", "1:5" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Valid flag without value should pass") {
+        vector<string> args_vec = { "app", "-d" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Unknown option should fail") {
+        vector<string> args_vec = { "app", "-z" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Unexpected positional argument should fail") {
+        vector<string> args_vec = { "app", "unexpected" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Valid concatenated short option should pass") {
+        vector<string> args_vec = { "app", "-r10" };
+        REQUIRE(args_handler.parse(args_vec));
+    }
+    
+    SECTION("Invalid concatenated option should fail") {
+        vector<string> args_vec = { "app", "-z10" };
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+}

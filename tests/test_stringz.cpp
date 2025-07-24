@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/benchmark/catch_benchmark.hpp>
 
+#include <list>
 #include <memory>
 #include <random>
 #include <type_traits>
@@ -9,6 +10,76 @@
 
 using namespace mazes;
 using namespace std;
+
+TEST_CASE("string_view_utils::split works correctly", "[string_view_utils]") {
+
+    SECTION("Split with bracket delimiter") {
+
+        std::string_view example = "-d[0:-1]";
+        auto result = string_view_utils::split(example, "[");
+        
+        REQUIRE(result.size() == 2);
+        auto it = result.begin();
+        REQUIRE(*it == "-d");
+        ++it;
+        REQUIRE(*it == "0:-1]");
+    }
+    
+    SECTION("Split with default space delimiter") {
+
+        std::string_view example = "hello world test";
+        auto result = string_view_utils::split(example);
+        
+        REQUIRE(result.size() == 3);
+        auto it = result.begin();
+        REQUIRE(*it == "hello");
+        ++it;
+        REQUIRE(*it == "world");
+        ++it;
+        REQUIRE(*it == "test");
+    }
+    
+    SECTION("Split with custom delimiter") {
+        std::string_view example = "one,two,three";
+        auto result = string_view_utils::split(example, ",");
+        
+        REQUIRE(result.size() == 3);
+        auto it = result.begin();
+        REQUIRE(*it == "one");
+        ++it;
+        REQUIRE(*it == "two");
+        ++it;
+        REQUIRE(*it == "three");
+    }
+    
+    SECTION("Split with multi-character delimiter") {
+        std::string_view example = "one::two::three";
+        auto result = string_view_utils::split(example, "::");
+        
+        REQUIRE(result.size() == 3);
+        auto it = result.begin();
+        REQUIRE(*it == "one");
+        ++it;
+        REQUIRE(*it == "two");
+        ++it;
+        REQUIRE(*it == "three");
+    }
+    
+    SECTION("Split empty string") {
+        std::string_view example = "";
+        auto result = string_view_utils::split(example, ",");
+        
+        REQUIRE(result.empty());
+    }
+    
+    SECTION("Split with no delimiter found") {
+        std::string_view example = "nodlimiterhere";
+        auto result = string_view_utils::split(example, ",");
+        
+        REQUIRE(result.size() == 1);
+        REQUIRE(*result.begin() == "nodlimiterhere");
+    }
+}
 
 TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
 
