@@ -78,7 +78,7 @@ public:
     static constexpr const char* TRUE_VALUE = "true";
 
     /// @brief Default constructor
-    /// @details Initializes the CLI11 app and sets up common options
+    /// @details Initializes the implementation pointer
     args() noexcept;
 
     /// @brief Destructor

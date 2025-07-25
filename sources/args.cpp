@@ -21,15 +21,36 @@ using namespace mazes;
 // Implementation class using CLI11 best practices
 class args::impl {
 
-private:
-
-    static constexpr auto DEFAULT_CLI_IMPLEMENTATION_NAME = "CLI11_MB";
-
 public:
     impl() : cli_app(DEFAULT_CLI_IMPLEMENTATION_NAME) {
         setup_cli();
     }
     
+    // Our internal storage maps for compatibility
+    std::unordered_map<std::string, std::string> args_map;
+
+    // Direct variable bindings for CLI11
+    std::vector<std::string> json_inputs;
+    std::vector<std::string> output_files;
+    std::vector<int> rows_values;
+    std::vector<int> columns_values;
+    std::vector<int> levels_values;
+    std::vector<int> seed_values;
+    std::vector<std::string> algo_values;
+    std::vector<std::string> distances_values;
+
+    // Flag tracking
+    bool help_flag = false;
+    bool version_flag = false;
+    bool distances_flag = false;
+
+    // CLI11 app
+    CLI::App cli_app;
+
+private:
+    static constexpr auto DEFAULT_CLI_IMPLEMENTATION_NAME = "CLI11_MB";
+
+public:
     // Helper method to add argument variants for storing flags, options, and words
     void add_argument_variants(std::string_view key, std::string_view value) {
         
@@ -319,12 +340,16 @@ public:
         if (!json_inputs.empty()) {
             std::string value = json_inputs.back();
             add_argument_variants(args::JSON_WORD_STR, value);
-            // Process JSON if it's a string (starts with `)
-            if (value.front() == '`') {
-                process_json_string(value);
+            
+            // Strip whitespace to determine if it's a JSON string vs file
+            std::string trimmed_value = std::string(string_view_utils::strip(value));
+            
+            // Process JSON if it's a string (starts with ` after trimming)
+            if (!trimmed_value.empty() && trimmed_value.front() == '`') {
+                process_json_string_internal(value);
             } else {
                 // Assume it's a file and process file-based JSON
-                process_json_file(value);
+                process_json_file_internal(value);
             }
         }
         
@@ -394,73 +419,8 @@ public:
         }
     } // populate_args_map
 
-    void clear() noexcept {
-        args_map.clear();
-
-        // Clear vectors in impl
-        json_inputs.clear();
-        output_files.clear();
-        rows_values.clear();
-        columns_values.clear();
-        levels_values.clear();
-        seed_values.clear();
-        algo_values.clear();
-        distances_values.clear();
-
-        // Reset flags
-        help_flag = false;
-        version_flag = false;
-        distances_flag = false;
-    }
-
-    // Our internal storage maps for compatibility
-    std::unordered_map<std::string, std::string> args_map;
-
-    // Direct variable bindings for CLI11
-    std::vector<std::string> json_inputs;
-    std::vector<std::string> output_files;
-    std::vector<int> rows_values;
-    std::vector<int> columns_values;
-    std::vector<int> levels_values;
-    std::vector<int> seed_values;
-    std::vector<std::string> algo_values;
-    std::vector<std::string> distances_values;
-
-    // Flag tracking
-    bool help_flag = false;
-    bool version_flag = false;
-    bool distances_flag = false;
-
-    // Public method for external access to slice parsing
-    void parse_sliced_array(const std::string& value) {
-        std::regex slice_pattern(R"(\[(.*?):(.*?)\])");
-        std::smatch matches;
-
-        if (std::regex_match(value, matches, slice_pattern)) {
-            std::string start_idx = matches[1].str();
-            std::string end_idx = matches[2].str();
-
-            // Store the parsed start and end indices
-            if (!start_idx.empty()) {
-                args_map[args::DISTANCES_START_STR] = start_idx;
-            } else {
-                args_map[args::DISTANCES_START_STR] = std::to_string(configurator::DEFAULT_DISTANCES_START);
-            }
-
-            if (!end_idx.empty()) {
-                args_map[args::DISTANCES_END_STR] = end_idx;
-            } else {
-                args_map[args::DISTANCES_END_STR] = std::to_string(configurator::DEFAULT_DISTANCES_END);
-            }
-        }
-    }
-
-private:
-    // CLI11 app
-    CLI::App cli_app;
-
-    // Process JSON string input
-    void process_json_string(const std::string& json_str) {
+    // Internal JSON processing methods for use in populate_args_map
+    void process_json_string_internal(const std::string& json_str) {
         try {
             // Remove backticks and parse JSON
             std::string clean_json = json_str;
@@ -518,8 +478,8 @@ private:
         }
     }
     
-    // Process JSON file input
-    void process_json_file(const std::string& filename) {
+    // Internal JSON file processing for use in populate_args_map
+    void process_json_file_internal(const std::string& filename) {
         try {
             json_helper jh{};
             std::unordered_map<std::string, std::string> parsed_json;
@@ -561,7 +521,60 @@ private:
             // JSON file parsing failed, leave as is - the JSON flag will still be stored
         }
     }
-};
+
+    // Process JSON string input (now uses the internal method)
+    void process_json_string(const std::string& json_str) {
+        process_json_string_internal(json_str);
+    }
+    
+    // Process JSON file input (now uses the internal method)  
+    void process_json_file(const std::string& filename) {
+        process_json_file_internal(filename);
+    }
+
+    void clear() noexcept {
+        args_map.clear();
+
+        // Clear vectors in impl
+        json_inputs.clear();
+        output_files.clear();
+        rows_values.clear();
+        columns_values.clear();
+        levels_values.clear();
+        seed_values.clear();
+        algo_values.clear();
+        distances_values.clear();
+
+        // Reset flags
+        help_flag = false;
+        version_flag = false;
+        distances_flag = false;
+    }
+
+    // Public method for external access to slice parsing
+    void parse_sliced_array(const std::string& value) {
+        std::regex slice_pattern(R"(\[(.*?):(.*?)\])");
+        std::smatch matches;
+
+        if (std::regex_match(value, matches, slice_pattern)) {
+            std::string start_idx = matches[1].str();
+            std::string end_idx = matches[2].str();
+
+            // Store the parsed start and end indices
+            if (!start_idx.empty()) {
+                args_map[args::DISTANCES_START_STR] = start_idx;
+            } else {
+                args_map[args::DISTANCES_START_STR] = std::to_string(configurator::DEFAULT_DISTANCES_START);
+            }
+
+            if (!end_idx.empty()) {
+                args_map[args::DISTANCES_END_STR] = end_idx;
+            } else {
+                args_map[args::DISTANCES_END_STR] = std::to_string(configurator::DEFAULT_DISTANCES_END);
+            }
+        }
+    }
+}; // impl
 
 args::args() noexcept : pimpl{ std::make_unique<impl>() } {
 }
@@ -613,6 +626,51 @@ args& args::operator=(const args& other) {
     }
     
     return *this;
+}
+
+void args::clear() noexcept {
+    if (pimpl) {
+        pimpl->args_map.clear();
+
+        // Clear vectors in impl
+        pimpl->json_inputs.clear();
+        pimpl->levels_values.clear();
+        pimpl->output_files.clear();
+        pimpl->rows_values.clear();
+        pimpl->columns_values.clear();
+        pimpl->seed_values.clear();
+        pimpl->algo_values.clear();
+        pimpl->distances_values.clear();
+
+        // Reset flags
+        pimpl->help_flag = false;
+        pimpl->version_flag = false;
+        pimpl->distances_flag = false;
+    }
+}
+
+// Get a value from the args map by key
+std::optional<std::string> args::get(const std::string& key) const noexcept {
+    if (pimpl) {
+
+        auto it = pimpl->args_map.find(key);
+        if (it != pimpl->args_map.end()) {
+
+            return it->second;
+        }
+    }
+
+    return std::nullopt;
+}
+
+// Get entire args map
+std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
+    if (pimpl) {
+
+        return std::make_optional(pimpl->args_map);
+    }
+
+    return std::nullopt;
 }
 
 // MAIN PARSE METHOD - All other parse methods funnel into this one
@@ -734,106 +792,5 @@ bool args::parse(int argc, char** argv, bool has_program_name_as_first_arg) noex
 
         return false;
     }
-}
-
-bool args::process_json_input(std::string_view json_input) noexcept {
-
-    try {
-        json_helper jh{};
-        std::unordered_map<std::string, std::string> parsed_json;
-        
-        // Convert string_view to string for json_helper
-        std::string json_str{json_input};
-        
-        // Remove backticks if present
-        if (json_str.front() == '`' && json_str.back() == '`') {
-            json_str = json_str.substr(1, json_str.length() - 2);
-        }
-        
-        // Try to parse as JSON string first, then as a file if that fails
-        bool parsed = jh.from(json_str, parsed_json);
-        if (!parsed) {
-            // Try loading as a file
-            parsed = jh.load(json_str, parsed_json);
-        }
-        
-        if (parsed && pimpl) {
-            // Successfully parsed JSON, now add the values to args_map
-            for (const auto& [key, value] : parsed_json) {
-                // Map JSON keys to argument keys and add using add_argument_variants
-                if (key == "rows") {
-                    pimpl->add_argument_variants(args::ROW_WORD_STR, value);
-                } else if (key == "columns") {
-                    pimpl->add_argument_variants(args::COLUMN_WORD_STR, value);
-                } else if (key == "levels") {
-                    pimpl->add_argument_variants(args::LEVEL_WORD_STR, value);
-                } else if (key == "seed") {
-                    pimpl->add_argument_variants(args::SEED_WORD_STR, value);
-                } else if (key == "algo") {
-                    pimpl->add_argument_variants(args::ALGO_ID_WORD_STR, value);
-                } else if (key == "output") {
-                    pimpl->add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-                } else if (key == "distances") {
-                    // Handle boolean distances field
-                    if (value == "true" || value == "1") {
-                        pimpl->add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                    } else if (value == "false" || value == "0") {
-                        // Don't add distances if it's false
-                    } else {
-                        // Might be a slice notation as a string
-                        pimpl->add_argument_variants(args::DISTANCES_WORD_STR, value);
-                        pimpl->parse_sliced_array(value);
-                    }
-                } else {
-                    // Store unknown JSON keys as-is
-                    pimpl->args_map[key] = value;
-                }
-            }
-            return true;
-        }
-
-    } catch (std::exception& ex) {
-
-        std::cerr << "Error processing JSON input: " << ex.what() << std::endl;
-
-        return false;
-    }
-
-    return false;  // JSON parsing failed
-}
-
-// Clear the arguments map
-void args::clear() noexcept {
-
-    if (pimpl) {
-
-        pimpl->clear();
-    }
-}
-
-// Get a value from the args map by key
-std::optional<std::string> args::get(const std::string& key) const noexcept {
-    if (pimpl) {
-
-        auto it = pimpl->args_map.find(key);
-        if (it != pimpl->args_map.end()) {
-
-            return it->second;
-        }
-    }
-
-    return std::nullopt;
-}
-
-// Get entire args map
-std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
-    if (pimpl) {
-
-        return pimpl->args_map;
-    }
-    
-    // Return a static empty map if pimpl is null
-    static const std::unordered_map<std::string, std::string> empty_map;
-    return empty_map;
 }
 
