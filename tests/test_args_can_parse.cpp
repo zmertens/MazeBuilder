@@ -217,7 +217,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
             "rows": 10,
             "distances": false,
             "algo": "dfs",
-            "output": "validjsonstr2.txt"
+            "output": "invalidjsonstr.txt"
         }`)json";
 
     static constexpr auto VALID_JSON_STR_1 = R"json(`{
@@ -278,7 +278,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
 
         const auto& m = args_handler.get();
         REQUIRE(m.has_value());
-        REQUIRE(m.value().empty());
+        REQUIRE_FALSE(m.value().empty());
     }
 }
 

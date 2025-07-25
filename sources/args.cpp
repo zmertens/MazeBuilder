@@ -307,17 +307,25 @@ public:
         
         try {
             cli_app.parse(argc, argv);
+
+            populate_args_map();
+
         } catch (const CLI::ParseError& e) {
             // Handle help and version requests gracefully
             if (e.get_exit_code() == 0) {
                 populate_args_map();
                 return true;
             }
-            return false;  // Return false for actual parse errors
+
+            return false;
+        } catch (const std::exception& e) {
+
+            // Catch any other exceptions and return false
+            std::cerr << "Error parsing arguments: " << e.what() << std::endl;
+
+            return false;
         }
         
-        // Populate our internal args_map after parsing
-        populate_args_map();
         return true;
     }
 
@@ -346,10 +354,16 @@ public:
             
             // Process JSON if it's a string (starts with ` after trimming)
             if (!trimmed_value.empty() && trimmed_value.front() == '`') {
-                process_json_string_internal(value);
+                if (!process_json_string(value)) {
+
+                    throw std::runtime_error("Invalid JSON input: " + value);
+                }
             } else {
                 // Assume it's a file and process file-based JSON
-                process_json_file_internal(value);
+                if (!process_json_file(value)) {
+
+                    throw std::runtime_error("Failed to load JSON file: " + value);
+                }
             }
         }
         
@@ -420,7 +434,7 @@ public:
     } // populate_args_map
 
     // Internal JSON processing methods for use in populate_args_map
-    void process_json_string_internal(const std::string& json_str) {
+    bool process_json_string(const std::string& json_str) {
         try {
             // Remove backticks and parse JSON
             std::string clean_json = json_str;
@@ -439,47 +453,52 @@ public:
             // Use json_helper to parse the cleaned JSON string
             json_helper jh{};
             std::unordered_map<std::string, std::string> parsed_json;
-            
-            if (jh.from(clean_json, parsed_json)) {
-                // Successfully parsed JSON, now add the values to args_map
-                for (const auto& [key, value] : parsed_json) {
-                    // Map JSON keys to argument keys and add using add_argument_variants
-                    if (key == "rows") {
-                        add_argument_variants(args::ROW_WORD_STR, value);
-                    } else if (key == "columns") {
-                        add_argument_variants(args::COLUMN_WORD_STR, value);
-                    } else if (key == "levels") {
-                        add_argument_variants(args::LEVEL_WORD_STR, value);
-                    } else if (key == "seed") {
-                        add_argument_variants(args::SEED_WORD_STR, value);
-                    } else if (key == "algo") {
-                        add_argument_variants(args::ALGO_ID_WORD_STR, value);
-                    } else if (key == "output") {
-                        add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-                    } else if (key == "distances") {
-                        // Handle boolean distances field
-                        if (value == "true" || value == "1") {
-                            add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                        } else if (value == "false" || value == "0") {
-                            // Don't add distances if it's false
-                        } else {
-                            // Might be a slice notation as a string
-                            add_argument_variants(args::DISTANCES_WORD_STR, value);
-                            parse_sliced_array(value);
-                        }
+
+            if (!jh.from(clean_json, parsed_json)) {
+
+                return false;
+            }
+
+            for (const auto& [key, value] : parsed_json) {
+                // Map JSON keys to argument keys and add using add_argument_variants
+                if (key == "rows") {
+                    add_argument_variants(args::ROW_WORD_STR, value);
+                } else if (key == "columns") {
+                    add_argument_variants(args::COLUMN_WORD_STR, value);
+                } else if (key == "levels") {
+                    add_argument_variants(args::LEVEL_WORD_STR, value);
+                } else if (key == "seed") {
+                    add_argument_variants(args::SEED_WORD_STR, value);
+                } else if (key == "algo") {
+                    add_argument_variants(args::ALGO_ID_WORD_STR, value);
+                } else if (key == "output") {
+                    add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
+                } else if (key == "distances") {
+                    // Handle boolean distances field
+                    if (value == "true" || value == "1") {
+                        add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
+                    } else if (value == "false" || value == "0") {
+                        // Don't add distances if it's false
                     } else {
-                        // Store unknown JSON keys as-is
-                        args_map[key] = value;
+                        // Might be a slice notation as a string
+                        add_argument_variants(args::DISTANCES_WORD_STR, value);
+                        parse_sliced_array(value);
                     }
+                } else {
+                    // Store unknown JSON keys as-is
+                    args_map[key] = value;
                 }
             }
         } catch (const std::exception&) {
-            // JSON parsing failed, leave as is - the JSON flag will still be stored
+
+            return false;
         }
+
+        return true;
     }
     
     // Internal JSON file processing for use in populate_args_map
-    void process_json_file_internal(const std::string& filename) {
+    bool process_json_file(const std::string& filename) {
         try {
             json_helper jh{};
             std::unordered_map<std::string, std::string> parsed_json;
@@ -518,18 +537,11 @@ public:
                 }
             }
         } catch (const std::exception&) {
-            // JSON file parsing failed, leave as is - the JSON flag will still be stored
-        }
-    }
 
-    // Process JSON string input (now uses the internal method)
-    void process_json_string(const std::string& json_str) {
-        process_json_string_internal(json_str);
-    }
-    
-    // Process JSON file input (now uses the internal method)  
-    void process_json_file(const std::string& filename) {
-        process_json_file_internal(filename);
+            return false;
+        }
+
+        return true;
     }
 
     void clear() noexcept {
@@ -630,22 +642,8 @@ args& args::operator=(const args& other) {
 
 void args::clear() noexcept {
     if (pimpl) {
-        pimpl->args_map.clear();
 
-        // Clear vectors in impl
-        pimpl->json_inputs.clear();
-        pimpl->levels_values.clear();
-        pimpl->output_files.clear();
-        pimpl->rows_values.clear();
-        pimpl->columns_values.clear();
-        pimpl->seed_values.clear();
-        pimpl->algo_values.clear();
-        pimpl->distances_values.clear();
-
-        // Reset flags
-        pimpl->help_flag = false;
-        pimpl->version_flag = false;
-        pimpl->distances_flag = false;
+        pimpl->clear();
     }
 }
 
@@ -735,6 +733,8 @@ bool args::parse(const std::vector<std::string>& arguments, bool has_program_nam
 
         std::cerr << "Arguments parsing error: " << e.what() << std::endl;
 
+        this->clear();
+
         return false;
     }
 }
@@ -757,6 +757,8 @@ bool args::parse(const std::string& arguments, bool has_program_name_as_first_ar
     } catch (const std::exception& e) {
 
         std::cerr << "Error parsing string arguments: " << e.what() << std::endl;
+
+        this->clear();
 
         return false;
     }
@@ -789,6 +791,8 @@ bool args::parse(int argc, char** argv, bool has_program_name_as_first_arg) noex
     } catch (std::exception&) {
 
         std::cerr << "Error parsing argc/argv arguments:\n" << argc << "\n" << argv << std::endl;
+
+        this->clear();
 
         return false;
     }
