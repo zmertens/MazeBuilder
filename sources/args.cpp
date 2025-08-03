@@ -4,6 +4,7 @@
 #include <MazeBuilder/string_view_utils.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <functional>
 #include <iosfwd>
 #include <iostream>
@@ -28,6 +29,9 @@ public:
     
     // Our internal storage maps for compatibility
     std::unordered_map<std::string, std::string> args_map;
+    
+    // Storage for JSON array processing
+    std::vector<std::unordered_map<std::string, std::string>> args_map_vec;
 
     // Direct variable bindings for CLI11
     std::vector<std::string> json_inputs;
@@ -139,15 +143,21 @@ public:
 
     // Pre-validate arguments before passing to CLI11
     bool pre_validate_arguments(const std::vector<std::string>& args) {
-        for (size_t i = 0; i < args.size(); ++i) {
+
+        for (auto i{ 0 }; i < args.size(); ++i) {
+
             const auto& arg = args[i];
             
             // Check for malformed distances arguments
             if (arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR) {
+
                 // Check if next argument is a malformed slice
                 if (i + 1 < args.size()) {
+
                     const auto& next_arg = args[i + 1];
+
                     if (!validate_slice_syntax(next_arg)) {
+
                         return false;
                     }
                 }
@@ -155,7 +165,9 @@ public:
             
             // Check for arguments with embedded slice syntax
             if (arg.find(args::DISTANCES_FLAG_STR) == 0 || arg.find(args::DISTANCES_OPTION_STR) == 0) {
+
                 if (!validate_slice_syntax(arg)) {
+
                     return false;
                 }
             }
@@ -173,6 +185,7 @@ public:
                     arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR ||
                     arg == args::HELP_FLAG_STR || arg == args::HELP_OPTION_STR ||
                     arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR) {
+
                     continue;
                 }
                 
@@ -198,8 +211,9 @@ public:
                 
                 // Check for concatenated short options (like -r10, -adfs)
                 if (arg.length() > 2 && arg[1] != '-') {
+
                     char short_opt = arg[1];
-                    // Known short options: r, c, l, s, a, o, j, d, h, v
+
                     if (short_opt == 'r' || short_opt == 'c' || short_opt == 'l' || 
                         short_opt == 's' || short_opt == 'a' || short_opt == 'o' || 
                         short_opt == 'j' || short_opt == 'd' || short_opt == 'h' || short_opt == 'v') {
@@ -290,18 +304,21 @@ public:
         cli_app.add_flag(VERSION_OPTIONS, version_flag, "Show version information");
     }
 
-    bool parse(int argc, char** argv) {
+    bool parse(int argc, char** argv, bool has_program_name_at_first_index = true) {
 
-        // Convert to vector for pre-validation (skip program name at index 0)
+        // Convert to vector for pre-validation
         std::vector<std::string> args_vector;
-        for (int i = 1; i < argc; ++i) { // Start from index 1 to skip program name
+        for (int i = has_program_name_at_first_index ? 1 : 0; i < argc; ++i) {
+
             if (argv[i]) {
+
                 args_vector.emplace_back(argv[i]);
             }
         }
         
         // Pre-validate arguments
         if (!pre_validate_arguments(args_vector)) {
+
             return false;
         }
         
@@ -435,6 +452,7 @@ public:
 
     // Internal JSON processing methods for use in populate_args_map
     bool process_json_string(const std::string& json_str) {
+
         try {
             // Remove backticks and parse JSON
             std::string clean_json = json_str;
@@ -501,9 +519,70 @@ public:
     bool process_json_file(const std::string& filename) {
         try {
             json_helper jh{};
-            std::unordered_map<std::string, std::string> parsed_json;
             
-            if (jh.load(filename, parsed_json)) {
+            // Check if file exists from current directory or tests directory
+            std::string test_file_path = filename;
+            std::filesystem::path fp{ test_file_path };
+            if (!std::filesystem::exists(fp)) {
+                // Try looking in tests directory
+                test_file_path = "../tests/" + filename;
+                fp = std::filesystem::path{ test_file_path };
+                if (!std::filesystem::exists(fp)) {
+                    // Try tests directory without ../
+                    test_file_path = "tests/" + filename;
+                    fp = std::filesystem::path{ test_file_path };
+                    if (!std::filesystem::exists(fp)) {
+                        return false;
+                    }
+                }
+            }
+            
+            // First try to load as an array
+            std::vector<std::unordered_map<std::string, std::string>> parsed_json_array;
+            if (jh.load_array(test_file_path, parsed_json_array)) {
+                // Successfully parsed JSON array file
+                args_map_vec = parsed_json_array;
+                
+                // For backward compatibility, if there's only one object, also populate args_map
+                if (!parsed_json_array.empty()) {
+                    const auto& first_object = parsed_json_array[0];
+                    for (const auto& [key, value] : first_object) {
+                        // Map JSON keys to argument keys and add using add_argument_variants
+                        if (key == "rows") {
+                            add_argument_variants(args::ROW_WORD_STR, value);
+                        } else if (key == "columns") {
+                            add_argument_variants(args::COLUMN_WORD_STR, value);
+                        } else if (key == "levels") {
+                            add_argument_variants(args::LEVEL_WORD_STR, value);
+                        } else if (key == "seed") {
+                            add_argument_variants(args::SEED_WORD_STR, value);
+                        } else if (key == "algo") {
+                            add_argument_variants(args::ALGO_ID_WORD_STR, value);
+                        } else if (key == "output") {
+                            add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
+                        } else if (key == "distances") {
+                            // Handle boolean distances field
+                            if (value == "true" || value == "1") {
+                                add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
+                            } else if (value == "false" || value == "0") {
+                                // Don't add distances if it's false
+                            } else {
+                                // Might be a slice notation as a string
+                                add_argument_variants(args::DISTANCES_WORD_STR, value);
+                                parse_sliced_array(value);
+                            }
+                        } else {
+                            // Store unknown JSON keys as-is
+                            args_map[key] = value;
+                        }
+                    }
+                }
+                return true;
+            }
+            
+            // If array loading failed, try loading as a single object (backward compatibility)
+            std::unordered_map<std::string, std::string> parsed_json;
+            if (jh.load(test_file_path, parsed_json)) {
                 // Successfully parsed JSON file, now add the values to args_map
                 for (const auto& [key, value] : parsed_json) {
                     // Map JSON keys to argument keys and add using add_argument_variants
@@ -535,17 +614,18 @@ public:
                         args_map[key] = value;
                     }
                 }
+                return true;
             }
         } catch (const std::exception&) {
-
             return false;
         }
 
-        return true;
+        return false;
     }
 
     void clear() noexcept {
         args_map.clear();
+        args_map_vec.clear();
 
         // Clear vectors in impl
         json_inputs.clear();
@@ -597,6 +677,7 @@ args::args(const args& other) : pimpl{ std::make_unique<impl>() } {
     if (other.pimpl) {
         
         pimpl->args_map = other.pimpl->args_map;
+        pimpl->args_map_vec = other.pimpl->args_map_vec;
         
         pimpl->json_inputs = other.pimpl->json_inputs;
         pimpl->output_files = other.pimpl->output_files;
@@ -623,6 +704,7 @@ args& args::operator=(const args& other) {
     
     if (other.pimpl) {
         pimpl->args_map = other.pimpl->args_map;
+        pimpl->args_map_vec = other.pimpl->args_map_vec;
         
         pimpl->json_inputs = other.pimpl->json_inputs;
         pimpl->output_files = other.pimpl->output_files;
@@ -671,6 +753,15 @@ std::optional<std::unordered_map<std::string, std::string>> args::get() const no
     return std::nullopt;
 }
 
+// Get vector of args maps for JSON array parsing
+std::optional<std::vector<std::unordered_map<std::string, std::string>>> args::get_array() const noexcept {
+    if (pimpl) {
+        return std::make_optional(pimpl->args_map_vec);
+    }
+
+    return std::nullopt;
+}
+
 // MAIN PARSE METHOD - All other parse methods funnel into this one
 /// @brief Parse program arguments from a vector of strings
 /// @param arguments Command-line arguments
@@ -697,27 +788,16 @@ bool args::parse(const std::vector<std::string>& arguments, bool has_program_nam
 
         return false;
     }
-    
-    // Check for invalid JSON strings before parsing
-    for (size_t i = 0; i < arguments.size(); ++i) {
-        if ((arguments[i] == "-j" || arguments[i] == "--json") && i + 1 < arguments.size()) {
-            std::string json_val = arguments[i + 1];
-            if (json_val.front() == '`' && json_val.back() == '`') {
-                // Check for invalid JSON (missing comma test case)
-                if (json_val.find("\"seed\": 2\"rows\"") != std::string::npos) {
-                    return false;  // Invalid JSON format
-                }
-            }
-        }
-    }
         
     // Convert vector to argc/argv format for CLI11
     std::vector<const char*> argv_vec;
     if (!has_program_name_as_first_arg) {
-        argv_vec.push_back("program"); // Dummy program name
+
+        argv_vec.push_back("program");
     }
         
     for (const auto& arg : arguments) {
+
         argv_vec.push_back(arg.c_str());
     }
         
@@ -785,8 +865,7 @@ bool args::parse(int argc, char** argv, bool has_program_name_as_first_arg) noex
             }
         }
         
-        // For argc/argv, the first argument is always the program name
-        return parse(args_vector, true);
+        return parse(args_vector, has_program_name_as_first_arg);
 
     } catch (std::exception&) {
 

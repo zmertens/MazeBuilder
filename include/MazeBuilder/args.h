@@ -134,6 +134,10 @@ public:
     /// @return The internal arguments map or empty map if not valid
     std::optional<std::unordered_map<std::string, std::string>> get() const noexcept;
 
+    /// @brief Get vector of args maps for JSON array parsing
+    /// @return The internal arguments map vector or empty vector if not valid
+    std::optional<std::vector<std::unordered_map<std::string, std::string>>> get_array() const noexcept;
+
 private:
 
     /// @brief Process JSON input from file or string

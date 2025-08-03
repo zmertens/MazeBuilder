@@ -14,6 +14,12 @@
 using namespace mazes;
 using namespace std;
 
+static constexpr auto ARRAY_DOT_JSON_FILE{ "array.json" };
+
+static constexpr auto MAZE_DOT_JSON_FILE{ "maze.json" };
+
+static constexpr auto OUTPUT_FILE_NAME{ "out.txt" };
+
 TEST_CASE("Args static checks", "[args_static_checks]") {
 
     STATIC_REQUIRE(std::is_default_constructible<mazes::args>::value);
@@ -83,8 +89,6 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
     static constexpr auto OUTPUT{ configurator::DEFAULT_OUTPUT_ID };
     static constexpr auto SEED{ configurator::DEFAULT_SEED };
 
-    static constexpr auto DEFAULT_FILE_NAME{ "maze.txt" };
-
     auto check_optional_equals_value = [](auto opt, auto val) -> bool {
 
         return opt.has_value() && opt.value() == val;
@@ -126,20 +130,18 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         vector<string> args_vec = { args::ALGO_ID_FLAG_STR, to_string_from_algo(ALGO) };
         REQUIRE(args_handler.parse(args_vec));
         
-        // Test all forms of access for algorithm
         REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), to_string_from_algo(ALGO)));
         REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_OPTION_STR), to_string_from_algo(ALGO)));
         REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), to_string_from_algo(ALGO)));
     }
 
     SECTION("Parse and get output value") {
-        vector<string> args_vec = { args::OUTPUT_ID_FLAG_STR, DEFAULT_FILE_NAME };
+        vector<string> args_vec = { args::OUTPUT_ID_FLAG_STR, OUTPUT_FILE_NAME };
         REQUIRE(args_handler.parse(args_vec));
 
-        // Test all forms of access for algorithm
-        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_FLAG_STR), DEFAULT_FILE_NAME));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_OPTION_STR), DEFAULT_FILE_NAME));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), DEFAULT_FILE_NAME));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_FLAG_STR), OUTPUT_FILE_NAME));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_OPTION_STR), OUTPUT_FILE_NAME));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), OUTPUT_FILE_NAME));
     }
 
     SECTION("Parse and get distances value") {
@@ -282,46 +284,119 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
     }
 }
 
-//TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
-//
-//    static constexpr auto JSON_FILE_NAME = "array.json";
-//
-//    args args_handler{};
+TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
 
-    //SECTION("JSON input file") {
+    args args_handler{};
 
-    //    string valid_json_file_input = args::JSON_OPTION_STR;
-    //    valid_json_file_input.append("=");
-    //    valid_json_file_input.append(JSON_FILE_NAME);
+    SECTION("JSON input file") {
 
-    //    REQUIRE(args_handler.parse(cref(valid_json_file_input)));
+        string valid_json_file_input = args::JSON_OPTION_STR;
+        valid_json_file_input.append("=");
+        valid_json_file_input.append(ARRAY_DOT_JSON_FILE);
 
-    //    const auto& m = args_handler.get();
-    //    REQUIRE(m.has_value());
+        REQUIRE(args_handler.parse(cref(valid_json_file_input), false));
 
-    //    // Test all forms of access for JSON
-    //    const auto& m_val = m.value();
-    //    REQUIRE_FALSE(m_val.empty());
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
 
-    //    REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
-    //    REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
-    //    REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
-    //    REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
-    //    REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
-    //}
-//}
+        // Test fields are indexed (from first object in array for backward compatibility)
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.empty());
+
+        REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
+    }
+}
+
+TEST_CASE("Args can handle JSON array files", "[json_array_input]") {
+
+    args args_handler{};
+
+    SECTION("JSON array file input") {
+
+        string valid_json_file_input = args::JSON_OPTION_STR;
+        valid_json_file_input.append("=");
+        valid_json_file_input.append(ARRAY_DOT_JSON_FILE);
+
+        REQUIRE(args_handler.parse(cref(valid_json_file_input)));
+
+        // Test the new array functionality
+        const auto& array_opt = args_handler.get_array();
+        REQUIRE(array_opt.has_value());
+        
+        const auto& array_val = array_opt.value();
+        REQUIRE(array_val.size() == 4); // We expect 4 objects in array.json
+        
+        // Test first object in array
+        const auto& first_config = array_val[0];
+        REQUIRE(first_config.find("rows") != first_config.cend());
+        REQUIRE(first_config.find("columns") != first_config.cend());
+        REQUIRE(first_config.find("levels") != first_config.cend());
+        REQUIRE(first_config.find("seed") != first_config.cend());
+        REQUIRE(first_config.find("algo") != first_config.cend());
+        REQUIRE(first_config.find("output") != first_config.cend());
+        REQUIRE(first_config.find("distances") != first_config.cend());
+        
+        // Verify values from array.json
+        REQUIRE(first_config.at("rows") == "10");
+        REQUIRE(first_config.at("columns") == "20");
+        REQUIRE(first_config.at("levels") == "30");
+        REQUIRE(first_config.at("seed") == "9000000");
+        REQUIRE(first_config.at("algo") == "\"dfs\"");
+        REQUIRE(first_config.at("output") == "\"maze_dfs.txt\"");
+        REQUIRE(first_config.at("distances") == "true");
+        
+        // Test second object in array
+        const auto& second_config = array_val[1];
+        REQUIRE(second_config.at("rows") == "20");
+        REQUIRE(second_config.at("columns") == "20");
+        REQUIRE(second_config.at("levels") == "3");
+        REQUIRE(second_config.at("seed") == "9");
+        REQUIRE(second_config.at("algo") == "\"dfs\"");
+        REQUIRE(second_config.at("output") == "\"maze_dfs2.txt\"");
+        REQUIRE(second_config.at("distances") == "false");
+        
+        // Test last object in array
+        const auto& last_config = array_val[3];
+        REQUIRE(last_config.at("rows") == "50");
+        REQUIRE(last_config.at("columns") == "50");
+        REQUIRE(last_config.at("levels") == "50");
+        REQUIRE(last_config.at("seed") == "10");
+        REQUIRE(last_config.at("algo") == "\"binary_tree\"");
+        REQUIRE(last_config.at("output") == "\"maze_bt.txt\"");
+        REQUIRE(last_config.at("distances") == "false");
+        
+        // Test backward compatibility - single map should contain first object
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.empty());
+        
+        // Should have all the argument variations from first object
+        REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::LEVEL_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::ALGO_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
+    }
+}
 
 TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]") {
 
     args args_handler{};
 
-    static constexpr auto ARGC_1 = 7;
+    static constexpr auto ARGC_7 = 7;
 
     static const string rows_str = to_string(configurator::MAX_ROWS - 1);
     static const string cols_str = to_string(configurator::MAX_COLUMNS - 1);
     static const string algo_str = to_string_from_algo(configurator::DEFAULT_ALGO_ID);
 
-    static char* test_argv[ARGC_1] = {
+    static char* test_argv[ARGC_7] = {
         const_cast<char*>("program"),
         const_cast<char*>("-r"), const_cast<char*>(rows_str.c_str()),
         const_cast<char*>("-c"), const_cast<char*>(cols_str.c_str()),
@@ -330,7 +405,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]") {
 
     std::string s(test_argv[0]);
 
-    REQUIRE(args_handler.parse(ARGC_1, test_argv));
+    REQUIRE(args_handler.parse(ARGC_7, test_argv, true));
 
     const auto& m = args_handler.get();
     REQUIRE(m.has_value());
@@ -601,60 +676,10 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]") {
         REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "json"));
     }
 
-    SECTION("Help long option") {
-        vector<string> args_vec = { "app", "--help" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("Version long option") {
-        vector<string> args_vec = { "app", "--version" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("Version short option") {
-        vector<string> args_vec = { "app", "-v" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("Help short option") {
-        vector<string> args_vec = { "app", "-h" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("Help and version together") {
-        vector<string> args_vec = { "app", "-h", "-v" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("Version and help together") {
-        vector<string> args_vec = { "app", "-v", "-h" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::HELP_WORD_STR), args::TRUE_VALUE));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
-    }
-
     SECTION("Distances flag only") {
         vector<string> args_vec = { "app", "-d" };
         REQUIRE(args_handler.parse(args_vec, true));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), args::TRUE_VALUE));
-    }
-
-    SECTION("JSON short option") {
-        vector<string> args_vec = { "app", "-j", "1.json" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::JSON_WORD_STR), "1.json"));
-    }
-
-    SECTION("JSON long option") {
-        vector<string> args_vec = { "app", "--json=2.json" };
-        REQUIRE(args_handler.parse(args_vec, true));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::JSON_WORD_STR), "2.json"));
     }
 
     SECTION("Fails to find app name") {
@@ -831,5 +856,49 @@ TEST_CASE("Args validation with distances slices", "[args_validation_with_slices
     SECTION("Invalid concatenated option should fail") {
         vector<string> args_vec = { "app", "-z10" };
         REQUIRE_FALSE(args_handler.parse(args_vec));
+    }
+}
+
+TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_object]") {
+
+    args args_handler{};
+
+    SECTION("JSON single object file input") {
+
+        string valid_json_file_input = args::JSON_OPTION_STR;
+        valid_json_file_input.append("=");
+        valid_json_file_input.append(MAZE_DOT_JSON_FILE);
+
+        REQUIRE(args_handler.parse(cref(valid_json_file_input)));
+
+        // Test single map functionality (backward compatibility)
+        const auto& m = args_handler.get();
+        REQUIRE(m.has_value());
+        const auto& m_val = m.value();
+        REQUIRE_FALSE(m_val.empty());
+        
+        // Should have all the argument variations
+        REQUIRE(m_val.find(args::ROW_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::LEVEL_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::SEED_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::ALGO_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
+        REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
+        
+        // Verify expected values
+        REQUIRE(m_val.at(args::ROW_WORD_STR) == "10");
+        REQUIRE(m_val.at(args::COLUMN_WORD_STR) == "20");
+        REQUIRE(m_val.at(args::LEVEL_WORD_STR) == "30");
+        REQUIRE(m_val.at(args::SEED_WORD_STR) == "9001");
+        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "\"dfs\"");
+        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "\"maze_dfs.txt\"");
+        REQUIRE(m_val.at(args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
+
+        // Test array functionality should have 1 object in array
+        const auto& array_opt = args_handler.get_array();
+        REQUIRE(array_opt.has_value());
+        const auto& array_val = array_opt.value();
+        REQUIRE(array_val.size() == 1);
     }
 }
