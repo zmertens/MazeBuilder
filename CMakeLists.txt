@@ -5,20 +5,6 @@ cmake_policy(SET CMP0058 NEW)
 # Prefers to use GLVND (OpenGL Vendor Neutral Dispatch) libraries for OpenGL.
 cmake_policy(SET CMP0072 NEW)
 
-# The following thread-related commands must be before project()
-if(WIN32)
-  # Use native Win32 threads on Windows
-  set(CMAKE_USE_WIN32_THREADS_INIT ON)
-  set(CMAKE_USE_PTHREADS_INIT OFF)
-else()
-  # Use pthreads on Unix-like systems
-  set(CMAKE_THREAD_LIBS_INIT "-pthread")
-  set(CMAKE_HAVE_THREADS_LIBRARY 1)
-  set(CMAKE_USE_WIN32_THREADS_INIT OFF)
-  set(CMAKE_USE_PTHREADS_INIT ON)
-  set(THREADS_PREFER_PTHREAD_FLAG ON)
-endif()
-
 project(MazeBuilder VERSION 6.7.6 LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
