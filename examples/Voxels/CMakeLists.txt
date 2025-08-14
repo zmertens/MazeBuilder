@@ -44,16 +44,18 @@ if(EMSCRIPTEN)
         target_link_options(${VOXELS_EXE} PRIVATE "SHELL:-O3")
     endif()
 else()
+
     message(INFO ": Building ${VOXELS_EXE} examples for the Desktop!")
 
     add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
     target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
     target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_17)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/glad/include)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/deps/dearimgui)
-    target_include_directories(${VOXELS_EXE} PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    
+    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
+    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
+    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/glad/include>)
+    target_compile_definitions(${VOXELS_EXE} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
+
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")

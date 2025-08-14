@@ -2,7 +2,10 @@
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/grid_factory.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/randomizer.h>
 
 #include <algorithm>
 #include <chrono>
@@ -20,11 +23,14 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
 
 
 #if defined(MAZE_BENCHMARK)
-    
-    //BENCHMARK("Benchmark factory::create") {
-    //
-    //    factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-    //};
+
+    grid_factory factory1{};
+
+    BENCHMARK("Benchmark factory::create") {
+
+        [[maybe_unused]]
+        auto g = factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+    };
 #endif
 }
 

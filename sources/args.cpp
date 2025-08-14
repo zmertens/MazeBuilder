@@ -351,8 +351,7 @@ public:
         args_map.clear();
         
         // Store any extra arguments (like app names) as positional arguments
-        auto extras = cli_app.remaining();
-        if (!extras.empty()) {
+        if (auto extras{ cli_app.remaining() }; !extras.empty()) {
             // Store the first extra as the app name
             add_argument_variants("app", extras[0]);
             // Store any other extras

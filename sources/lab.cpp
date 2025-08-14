@@ -168,9 +168,8 @@ void lab::set_neighbors(configurator const& config, const std::vector<int>& indi
 
                 cells_to_set = std::move(reordered_cells);
             }
-        } catch (const exception& ex) {
+        } catch (const exception&) {
 
-            cerr << "Reordering failed: " << ex.what() << endl;
             // Continue with original order if reordering fails
         }
     } // !indices.empty()

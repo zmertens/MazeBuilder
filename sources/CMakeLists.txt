@@ -24,12 +24,6 @@ set(MAZE_BUILDER_CORE_SRCS
     wavefront_object_helper.cpp
     writer.cpp)
 
-# Use these features on the Web only
-if(EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
-endif()
-
 if(MAZE_BUILDER_COVERAGE)
     message(STATUS "Building ${PROJECT_NAME} with code coverage")
     
@@ -56,33 +50,26 @@ if(MAZE_BUILDER_COVERAGE)
         # The AddCppCheck function is designed for actual library/executable targets
         # AddCppCheck(${MAZE_BUILDER_LIB_OUT}_obj)
     endif()
-    
-    if(CMAKE_COMPILER_IS_GNUCXX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-    endif()
+
+    list(APPEND BASE_COMPILE_FLAGS "$<$<OR:$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:--coverage>")
+
 endif()
+
+list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
+list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../deps)
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_17)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
 
-file(GLOB MAZE_BUILDER_HEADERS "${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h")
-# Requires CMake 3.28
-#target_sources(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(MAZE_BUILDER_DEBUG_OPTION "MAZE_DEBUG")
-    message(INFO ": ${PROJECT_NAME} - ${CMAKE_BUILD_TYPE} enabled to use ${MAZE_BUILDER_DEBUG_OPTION} definition.")
-    target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${MAZE_BUILDER_DEBUG_OPTION})
-endif()
+target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 
 # Shared build
 if(NOT EMSCRIPTEN)

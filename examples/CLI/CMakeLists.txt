@@ -33,13 +33,13 @@ if(EMSCRIPTEN)
    endif()
 
 else()
+
     message(INFO ": Building ${EXE_NAME} for the Desktop!")
+
     add_executable(${EXE_NAME} ${CLI_SOURCES})
     target_link_libraries(${EXE_NAME} ${MAZE_BUILDER_CORE_LIB}_static)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_17)
-    target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../include)
+    target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+    target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_definitions(${EXE_NAME} PRIVATE MAZE_DEBUG)
-   endif()
 endif()
