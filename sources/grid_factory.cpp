@@ -13,73 +13,192 @@
 
 #include <functional>
 #include <iostream>
+#include <mutex>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 using namespace mazes;
 
-std::unique_ptr<grid_interface> grid_factory::create(configurator const& config) const noexcept {
+grid_factory::grid_factory() {
+    register_default_creators();
+}
 
-    using namespace std;
+bool grid_factory::register_creator(const std::string& key, grid_creator_t creator) {
+    if (key.empty() || !creator) {
+        return false;
+    }
 
-    auto g = create_grid(cref(config));
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    
+    // Check if key already exists
+    if (m_creators.find(key) != m_creators.end()) {
+        return false;
+    }
 
-    if (!g.has_value()) {
+    m_creators[key] = std::move(creator);
+    return true;
+}
 
+bool grid_factory::unregister_creator(const std::string& key) {
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    
+    auto it = m_creators.find(key);
+    if (it != m_creators.end()) {
+        m_creators.erase(it);
+        return true;
+    }
+    return false;
+}
+
+bool grid_factory::is_registered(const std::string& key) const {
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    return m_creators.find(key) != m_creators.end();
+}
+
+std::unique_ptr<grid_interface> grid_factory::create(const std::string& key, const configurator& config) const {
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    
+    auto it = m_creators.find(key);
+    if (it == m_creators.end()) {
         return nullptr;
     }
 
-    // Set up randomizer
-    randomizer rng;
-    rng.seed(config.seed());
+    try {
+        auto grid = it->second(config);
+        
+        if (!grid) {
+            return nullptr;
+        }
 
-    // Get dimensions from grid
-    auto&& ops = g.value()->operations();
+        // Set up randomizer
+        randomizer rng;
+        rng.seed(config.seed());
 
-    // Generate indices for configuration
-    auto indices = rng.get_num_ints_incl(0, config.rows() * config.columns() - 1);
+        // Get dimensions from grid
+        auto&& ops = grid->operations();
 
-    // Prepare cells
-    vector<shared_ptr<cell>> cells_to_set;
-    cells_to_set.reserve(config.rows() * config.columns());
+        // Generate indices for configuration
+        auto indices = rng.get_num_ints_incl(0, config.rows() * config.columns() - 1);
 
-    lab::set_neighbors(cref(config), cref(indices), ref(cells_to_set));
+        // Prepare cells
+        std::vector<std::shared_ptr<cell>> cells_to_set;
+        cells_to_set.reserve(config.rows() * config.columns());
 
-    // Set the configured cells in the grid
-    ops.set_cells(cref(cells_to_set));
+        lab::set_neighbors(std::cref(config), std::cref(indices), std::ref(cells_to_set));
 
-    return std::move(g.value());
+        // Set the configured cells in the grid
+        ops.set_cells(std::cref(cells_to_set));
+
+        return grid;
+    }
+    catch (const std::exception&) {
+        // Log error in debug mode
+#if defined(MAZE_DEBUG)
+        std::cerr << "Error: Failed to create grid with key: " << key << std::endl;
+#endif
+        return nullptr;
+    }
 }
 
-std::optional<std::unique_ptr<grid_interface>> grid_factory::create_grid(configurator const& config) noexcept {
-    using namespace std;
+std::unique_ptr<grid_interface> grid_factory::create(const configurator& config) const noexcept {
+    try {
+        // Determine the appropriate grid type based on configuration
+        std::string grid_type = determine_grid_type_from_config(config);
+        
+        return create(grid_type, config);
+    }
+    catch (const std::exception&) {
+        // In case of any error, return nullptr for backwards compatibility
+#if defined(MAZE_DEBUG)
+        std::cerr << "Error: Failed to create grid using default logic" << std::endl;
+#endif
+        return nullptr;
+    }
+}
 
-    unique_ptr<grid_interface> g = nullptr;
+std::vector<std::string> grid_factory::get_registered_keys() const {
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    
+    std::vector<std::string> keys;
+    keys.reserve(m_creators.size());
+    
+    for (const auto& pair : m_creators) {
+        keys.push_back(pair.first);
+    }
+    
+    return keys;
+}
+
+void grid_factory::clear() {
+    std::lock_guard<std::mutex> lock(m_creators_mutex);
+    m_creators.clear();
+    
+    // Re-register defaults after clearing
+    register_default_creators();
+}
+
+void grid_factory::register_default_creators() {
+    // Note: This method is called from constructor and clear(), 
+    // so we don't need to lock here as the caller handles it or it's during construction
+
+    // Register basic grid creator
+    m_creators["grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+    };
+
+    // Register distance grid creator
+    m_creators["distance_grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        return std::make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+    };
+
+    // Register colored grid creator
+    m_creators["colored_grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        return std::make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
+    };
+
+    // Register convenience creators based on output type
+    m_creators["image_grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        if (config.distances()) {
+            return std::make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
+        } else {
+            return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+        }
+    };
+
+    m_creators["text_grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        if (config.distances()) {
+            return std::make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+        } else {
+            return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+        }
+    };
+}
+
+std::string grid_factory::determine_grid_type_from_config(const configurator& config) const {
 
 #if defined(MAZE_DEBUG)
-    std::cerr << "Debug: create_grid - distances=" << (config.distances() ? "true" : "false") 
+    std::cerr << "Debug: determine_grid_type_from_config - distances=" << (config.distances() ? "true" : "false") 
              << ", output=" << static_cast<int>(config.output_id()) << std::endl;
 #endif
 
     if (config.distances()) {
         if (config.output_id() == output::PNG || config.output_id() == output::JPEG) {
 #if defined(MAZE_DEBUG)
-            std::cerr << "Debug: Creating colored_grid" << std::endl;
+            std::cerr << "Debug: Selecting colored_grid" << std::endl;
 #endif
-            g = make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
+            return "colored_grid";
         } else {
 #if defined(MAZE_DEBUG)
-            std::cerr << "Debug: Creating distance_grid" << std::endl;
+            std::cerr << "Debug: Selecting distance_grid" << std::endl;
 #endif
-            g = make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
+            return "distance_grid";
         }
     } else {
 #if defined(MAZE_DEBUG)
-        std::cerr << "Debug: Creating regular grid" << std::endl;
+        std::cerr << "Debug: Selecting regular grid" << std::endl;
 #endif
-        g = make_unique<grid>(config.rows(), config.columns(), config.levels());
+        return "grid";
     }
-
-    return make_optional(std::move(g));
 }
 
