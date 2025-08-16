@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/maze_adapter.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <sstream>
@@ -15,7 +16,6 @@ using namespace mazes;
 bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
 
     if (!g) {
-
         return false;
     }
 
@@ -23,6 +23,10 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) c
     auto& ops = g->operations();
 
     auto [rows, columns, levels] = ops.get_dimensions();
+
+    // Get all cells using maze_adapter
+    auto all_cells = ops.get_cells();
+    maze_adapter maze_view(all_cells);
 
     // Generate ASCII representation
     // Top border
@@ -40,7 +44,10 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) c
         // For each column
         for (unsigned int c = 0; c < columns; ++c) {
             int cell_index = r * columns + c;
-            auto cell_ptr = ops.search(cell_index);
+            
+            // Use maze_adapter to find the cell
+            auto cell_it = maze_view.find(cell_index);
+            auto cell_ptr = (cell_it != maze_view.end()) ? *cell_it : nullptr;
 
             // Cell content (from g's contents_of method)
             std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
