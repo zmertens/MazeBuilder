@@ -22,10 +22,7 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) c
     std::stringstream ss;
     auto& ops = g->operations();
 
-    // Get all cells and dimensions
-    auto cells = ops.get_cells();
-    auto dimensions = ops.get_dimensions();
-    auto [rows, columns, levels] = dimensions;
+    auto [rows, columns, levels] = ops.get_dimensions();
 
     // Generate ASCII representation
     // Top border

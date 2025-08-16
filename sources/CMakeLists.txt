@@ -15,6 +15,7 @@ set(MAZE_BUILDER_CORE_SRCS
     grid_factory.cpp
     json_helper.cpp
     lab.cpp
+    maze_adapter.cpp
     objectify.cpp
     pixels.cpp
     randomizer.cpp
