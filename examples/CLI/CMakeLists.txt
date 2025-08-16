@@ -1,5 +1,3 @@
-
-
 # Set the name of the executable
 set(EXE_NAME "mazebuildercli")
 
@@ -11,26 +9,20 @@ set(CLI_SOURCES
 
 if(EMSCRIPTEN)
 
-   message(INFO ": Building ${EXE_NAME} for the Web!")
-
-   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
+    message(INFO ": Building ${EXE_NAME} for the Web!")
     
-   # Set the output file
-   add_executable(${EXE_NAME} ${CLI_SOURCES})
-
-   set_target_properties(${EXE_NAME} PROPERTIES SUFFIX ".js" LINK_FLAGS "-lembind")
-   target_link_options(${EXE_NAME} PRIVATE --emit-tsd "$<TARGET_FILE_DIR:${EXE_NAME}>/${EXE_NAME}.d.ts")
-   target_link_libraries(${EXE_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static)
-   target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
-   target_link_options(${EXE_NAME} PRIVATE "SHELL: -s WASM=1 -s MODULARIZE=1 -s ASYNCIFY")
-
-   if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        target_link_options(${EXE_NAME} PRIVATE "SHELL:-O3")
-   else()
-        target_link_options(${EXE_NAME} PRIVATE "SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2")
-        target_compile_definitions(${EXE_NAME} PRIVATE MAZE_DEBUG)
-   endif()
+    # Set the output file
+    add_executable(${EXE_NAME} ${CLI_SOURCES})
+    set_target_properties(${EXE_NAME} PROPERTIES SUFFIX ".js" LINK_FLAGS "-lembind")
+    target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
+    target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
+    target_compile_options(${EXE_NAME} PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
+    target_link_options(${EXE_NAME} PRIVATE --emit-tsd "$<TARGET_FILE_DIR:${EXE_NAME}>/${EXE_NAME}.d.ts")
+    target_link_libraries(${EXE_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static)
+    target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
+    target_link_options(${EXE_NAME} PRIVATE "SHELL: -s WASM=1 -s MODULARIZE=1 -s ASYNCIFY")
+    target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map>")
+    target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
 
 else()
 
@@ -38,7 +30,7 @@ else()
 
     add_executable(${EXE_NAME} ${CLI_SOURCES})
     target_link_libraries(${EXE_NAME} ${MAZE_BUILDER_CORE_LIB}_static)
-    target_compile_features(${EXE_NAME} PRIVATE cxx_std_17)
+    target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
     target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
     target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 
