@@ -29,7 +29,7 @@ namespace mazes {
     /// @brief Convert an output enum to a string
     /// @param o
     /// @return 
-    static std::string to_string_from_outputs(output o) {
+    inline std::string to_string_from_outputs(output o) {
         switch (o) {
         case output::PLAIN_TEXT:
             return "txt";
@@ -51,7 +51,7 @@ namespace mazes {
     /// @brief Convert a string to an output enum
     /// @param o
     /// @return
-    static output to_output_from_string(const std::string& o) {
+    inline output to_output_from_string(const std::string& o) {
         if (o.compare("txt") == 0) {
             return output::PLAIN_TEXT;
         } else if (o.compare("text") == 0) {
@@ -86,7 +86,7 @@ namespace mazes {
     /// @brief Convert the algo enum to a string
     /// @param a
     /// @return string
-    static std::string to_string_from_algo(algo a) {
+    inline std::string to_string_from_algo(algo a) {
         switch (a) {
         case algo::BINARY_TREE:
             return "binary_tree";
@@ -102,7 +102,7 @@ namespace mazes {
     /// @brief Convert a string to an algo enum
     /// @param a
     /// @return algo
-    static algo to_algo_from_string(const std::string& a) {
+    inline algo to_algo_from_string(const std::string& a) {
         if (a.compare("binary_tree") == 0) {
             return algo::BINARY_TREE;
         } else if (a.compare("sidewinder") == 0) {

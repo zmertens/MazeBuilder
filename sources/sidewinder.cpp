@@ -37,7 +37,7 @@ bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) 
     grid_by_rows.resize(rows);
 
     for (size_t i = 0; i < cells.size(); ++i) {
-        unsigned int row = i / columns;
+        unsigned int row = static_cast<unsigned int>(i) / columns;
         if (row < rows) {
             grid_by_rows[row].push_back(cells[i]);
         }
@@ -75,7 +75,7 @@ bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) 
                 // Select a random cell from the run to connect northward
                 // (unless we're at the northern boundary)
                 if (!at_northern_boundary) {
-                    size_t random_index = rng(0, run.size() - 1);
+                    size_t random_index = rng(0, static_cast<int>(run.size()) - 1);
                     auto random_cell = run[random_index];
 
                     if (random_cell) {

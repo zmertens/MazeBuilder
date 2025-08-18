@@ -1,6 +1,12 @@
 include(BuildInfo)
 
-set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
+set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
+
+# Don't include this source file in Visual Studio projects
+set_source_files_properties(${CPP_BASE64_SRCS} PROPERTIES 
+    VS_TOOL_OVERRIDE "None"
+    HEADER_FILE_ONLY FALSE
+)
 
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
@@ -57,12 +63,14 @@ if(MAZE_BUILDER_COVERAGE)
 endif()
 
 list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
-#list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
+list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
+# Add STB as a system include to suppress warnings
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
 target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
 

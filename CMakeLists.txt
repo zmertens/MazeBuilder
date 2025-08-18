@@ -5,7 +5,7 @@ cmake_policy(SET CMP0058 NEW)
 # Prefers to use GLVND (OpenGL Vendor Neutral Dispatch) libraries for OpenGL.
 cmake_policy(SET CMP0072 NEW)
 
-project(MazeBuilder VERSION 6.7.6 LANGUAGES C CXX)
+project(MazeBuilder VERSION 7.0.1 LANGUAGES C CXX)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 

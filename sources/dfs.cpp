@@ -50,7 +50,7 @@ bool dfs::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const n
         if (unvisited_neighbors.empty()) {
             stack_of_cells.pop();
         } else {
-            const auto& random_index = rng(0, unvisited_neighbors.size() - 1);
+            const auto& random_index = rng(0, static_cast<int>(unvisited_neighbors.size()) - 1);
             const auto& neighbor = unvisited_neighbors.at(random_index);
 
             // Use the lab class for linking

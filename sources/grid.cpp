@@ -181,12 +181,12 @@ void grid::sort(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
 }
 
 // Get the contents of a cell for this type of grid
-std::string grid::contents_of(std::shared_ptr<cell> const& c) const noexcept {
+std::string grid::contents_of([[maybe_unused]] std::shared_ptr<cell> const& c) const noexcept {
     return " ";
 }
 
 // Get the background color for this type of grid
-std::uint32_t grid::background_color_for(std::shared_ptr<cell> const& c) const noexcept {
+std::uint32_t grid::background_color_for([[maybe_unused]] std::shared_ptr<cell> const& c) const noexcept {
     return 0xFFFFFFFF;
 }
 

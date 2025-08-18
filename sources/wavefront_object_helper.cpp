@@ -25,10 +25,10 @@ public:
         ss << "# maze builder " << build_info::Version << "-" << build_info::CommitSHA << "\n";
 
         // Keep track of writing progress
-        int total_verts = static_cast<int>(vertices.size());
-        int total_faces = static_cast<int>(faces.size());
+        //int total_verts = static_cast<int>(vertices.size());
+        //int total_faces = static_cast<int>(faces.size());
 
-        int t = total_verts + total_faces;
+        //int t = total_verts + total_faces;
         int c = 0;
         // Write vertices
         for (const auto& vertex : vertices) {

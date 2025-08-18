@@ -9,7 +9,7 @@ using namespace mazes;
 /// @param g
 /// @param rng
 /// @return 
-bool pixels::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+bool pixels::run([[maybe_unused]] std::unique_ptr<grid_interface> const& g, [[maybe_unused]] randomizer & rng) const noexcept {
     return false;
   /*  void string_view_utils::pixels(const std::unique_ptr<maze>&m,
         std::vector<std::tuple<int, int, int, int>>&vertices,
