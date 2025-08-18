@@ -1,0 +1,10 @@
+{
+    "title": "maze builder :: physics",
+    "version": "0.1",
+    "description": "A simple maze builder with an in-house physics engine",
+    "author": "zmertens",
+    "license": "MIT",
+    "generate": "generate.ogg",
+    "loading_sound_path": "loading.wav",
+    "icon_image_path": "icon.bmp"
+}

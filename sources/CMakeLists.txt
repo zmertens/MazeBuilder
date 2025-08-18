@@ -11,60 +11,67 @@ set(MAZE_BUILDER_CORE_SRCS
     dfs.cpp
     distance_grid.cpp
     distances.cpp
-    factory.cpp
     grid.cpp
+    grid_factory.cpp
     json_helper.cpp
     lab.cpp
-    maze.cpp
+    maze_adapter.cpp
+    objectify.cpp
+    pixels.cpp
     randomizer.cpp
     sidewinder.cpp
-    stringz.cpp
+    string_view_utils.cpp
+    stringify.cpp
     wavefront_object_helper.cpp
     writer.cpp)
 
-# Use these features on the Web only
-if(EMSCRIPTEN)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
+if(MAZE_BUILDER_COVERAGE)
+    message(STATUS "Building ${PROJECT_NAME} with code coverage")
+    
+    # Include CppCheck module first
+    include(CppCheck)
+    
+    # Find cppcheck executable
+    find_program(CPPCHECK_EXECUTABLE cppcheck)
+    if(NOT CPPCHECK_EXECUTABLE)
+        message(WARNING "cppcheck not found, static analysis will be skipped")
+    else()
+        message(STATUS "Found CppCheck: ${CPPCHECK_EXECUTABLE}")
+        
+        # Create the custom target with proper executable reference
+        set(RUN_CPPCHECK "run_cppcheck")
+        add_custom_target(${RUN_CPPCHECK}
+            COMMAND ${CPPCHECK_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
+            --output-file=cppcheck.xml ${MAZE_BUILDER_CORE_SRCS}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
+        )
+        
+        # No need to call AddCppCheck on the custom target
+        # The AddCppCheck function is designed for actual library/executable targets
+        # AddCppCheck(${MAZE_BUILDER_LIB_OUT}_obj)
+    endif()
+
+    list(APPEND BASE_COMPILE_FLAGS "$<$<OR:$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:--coverage>")
+
 endif()
 
-if(MAZE_BUILDER_COVERAGE)
-    message(INFO ": Building ${PROJECT_NAME} with code coverage")
-    set(RUN_CPPCHECK "run_cppcheck")
-    include(CppCheck)
-    message(INFO ": Found CppCheck: ${CPPCHECK_EXECUTABLE}")
-    add_custom_target(${RUN_CPPCHECK}
-        COMMAND ${CPPCHECK_EXECUTABLE} --enable=all --inconclusive --quiet --xml --xml-version=2
-        --output-file=cppcheck.xml ${MAZE_BUILDER_CORE_SRCS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-        COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
-    )
-    AddCppCheck(${RUN_CPPCHECK})
-    if(CMAKE_COMPILER_IS_GNUCXX)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-    endif()
-endif()
+list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
+#list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../deps)
-target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_17)
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
+target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
+target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
 
-file(GLOB MAZE_BUILDER_HEADERS "${CMAKE_SOURCE_DIR}/include/MazeBuilder/*.h")
-# Requires CMake 3.28
-#target_sources(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC FILE_SET HEADERS BASE_DIRS "${CMAKE_SOURCE_DIR}/include" FILES ${MAZE_BUILDER_HEADERS})
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../include)
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-    message(INFO ": ${CMAKE_BUILD_TYPE} - enabled ${PROJECT_NAME} to use -DMAZE_DEBUG flag.")
-    target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "MAZE_DEBUG")
-endif()
+target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 
 # Shared build
 if(NOT EMSCRIPTEN)

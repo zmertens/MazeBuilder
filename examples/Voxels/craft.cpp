@@ -2363,7 +2363,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open, compute the maze first
 */
-bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) const noexcept {
+bool craft::run(mazes::randomizer& rng) const noexcept {
 
     if (!SDL_SetAppMetadata("Maze builder with voxels", mazes::VERSION.c_str(), ZACHS_GH_REPO)) {
         return SDL_APP_FAILURE;
@@ -2821,23 +2821,23 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                             prog.reset();
                             prog.start();
 
-                            auto next_maze_ptr = mazes::factory::create(
-                                mazes::configurator().columns(gui->columns).rows(gui->rows).levels(gui->height)
-                                .distances(false).seed(gui->seed)._algo(my_maze_type)
-                                .block_id(items[model->item_index]));
+                            auto next_maze_ptr = nullptr; //= mazes::factory::create(
+                            //     mazes::configurator().columns(gui->columns).rows(gui->rows).levels(gui->height)
+                            //     .distances(false).seed(gui->seed).algo_id(my_maze_type)
+                            //     .block_id(items[model->item_index]));
 
-                            if (!next_maze_ptr.has_value()) {
+                            if (!true) {
                                 SDL_Log("Failed to create maze!");
                             }
 
-                            my_mazes.set_levels(gui->height);
+                            //my_mazes.set_levels(gui->height);
 
                             // Compute the geometry of the maze
                             vector<vector<uint32_t>> faces;
                             std::vector<std::tuple<int, int, int, int>> vertices;
-                            auto s = mazes::stringz::stringify(next_maze_ptr.value());
-                            mazes::stringz::objectify(cref(next_maze_ptr.value()), ref(vertices), ref(faces), s);
-                            mazes::stringz::objectify(ref(my_mazes), s);
+                            auto s = "adad";//next_maze_ptr->str();
+                            // mazes::stringz::objectify(cref(next_maze_ptr), ref(vertices), ref(faces), s);
+                            // mazes::stringz::objectify(ref(my_mazes), s);
                             mazes::wavefront_object_helper woh{};
                             auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
 
@@ -2872,7 +2872,7 @@ bool craft::run(const std::function<int(int, int)>& get_int, std::mt19937& rng) 
                         ImGui::EndDisabled();
                     }
 
-                    if (!my_mazes.empty()) {
+                    if (true) {
                         // Show last maze compute time
                         ImGui::NewLine();
                         ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.14f, 0.26f, 0.90f, 1.0f));

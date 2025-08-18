@@ -1,115 +1,158 @@
 #include <MazeBuilder/distances.h>
 
-#include <iterator>
-#include <queue>
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
+
+#include <deque>
+
+#if defined(MAZE_DEBUG)
+#include <iostream>
+#endif
 
 using namespace mazes;
-using namespace std;
 
-distances::distances(std::shared_ptr<cell> root) : m_root(root), m_cells({}) {
-    // Distance from root to root is 0
-    m_cells.insert_or_assign(root, 0);
+distances::distances(int32_t root_index)
+    : m_root_index(root_index) {
+    m_cells.insert_or_assign(root_index, 0);
+}
 
-    // Initialize distances for linked cells
-    const auto& links = root->get_links();
-    for (const auto& [linked_cell, _] : links) {
+int& distances::operator[](int32_t index) noexcept {
+    return m_cells[index];
+}
 
-        // Default distance for linked cells
-        m_cells.insert_or_assign(linked_cell, 1);
+const int& distances::operator[](int32_t index) const noexcept {
+    return m_cells.at(index);
+}
+
+void distances::set(int32_t index, int distance) noexcept {
+    m_cells[index] = distance;
+}
+
+bool distances::contains(int32_t index) const noexcept {
+    return m_cells.find(index) != m_cells.end();
+}
+
+/// @brief Implementation of breadth-first search
+/// @param goal_index 
+/// @param g 
+/// @return 
+std::shared_ptr<distances> distances::path_to(std::unique_ptr<grid_interface> const& g, int32_t goal_index) const noexcept {
+    // Create a new distances object to store the path
+    auto path = std::make_shared<distances>(m_root_index);
+
+    // If the goal index is the same as the root index, return path with just the root
+    if (goal_index == m_root_index) {
+        return path;
     }
-}
 
-void distances::set(std::shared_ptr<cell> cell, int distance) noexcept {
-    m_cells.insert_or_assign(cell, distance);
-}
+    // Parent map to reconstruct the path
+    std::unordered_map<int32_t, int32_t> parent;
+    std::unordered_map<int32_t, bool> visited;
 
-bool distances::contains(const std::shared_ptr<cell>& cell) const noexcept {
-	return m_cells.find(cell) != m_cells.cend();
-}
+    // BFS queue
+    std::deque<int32_t> q;
+    q.push_back(m_root_index);
+    visited[m_root_index] = true;
+    parent[m_root_index] = -1;
 
-/// @brief Computes the shortest path to a goal cell within a distances object.
-/// @param goal A shared pointer to the goal cell for which the path is to be computed.
-/// @return A shared pointer to a distances object representing the path to the goal cell, or nullptr if the path cannot be found.
-std::shared_ptr<distances> distances::path_to(std::shared_ptr<cell> goal) const noexcept {
-    if (!goal || !contains(goal)) {
+    static constexpr auto MAX_ITERATIONS = 1000000;
+    auto current_iteration = 0;
 
-        return nullptr;
-    }
+    try {
+        // Get the grid operations interface
+        auto& ops = g->operations();
 
-    auto breadcrumbs = std::make_shared<distances>(m_root);
-    auto current = goal;
+        while (!q.empty()) {
+#if defined(MAZE_DEBUG)
+            if (current_iteration++ > MAX_ITERATIONS) {
+                std::cerr << "Error: BFS exceeded maximum iterations." << std::endl;
+                return path;
+            }
+#endif
 
-    breadcrumbs->set(current, m_cells.at(current));
+            int32_t current_index = q.front();
+            q.pop_front();
 
-    while (current != m_root) {
+            // If we reached the goal, reconstruct the path
+            if (current_index == goal_index) {
+                // Reconstruct path from goal to root
+                std::vector<int32_t> path_indices;
+                int32_t step = goal_index;
+                
+                while (step != -1) {
+                    path_indices.push_back(step);
+                    step = parent[step];
+                }
 
-        auto found{ false };
+                // Set distances in the path (distance 0 for root, increasing towards goal)
+                for (size_t i = 0; i < path_indices.size(); ++i) {
+                    int distance = static_cast<int>(path_indices.size() - 1 - i);
+                    path->set(path_indices[i], distance);
+                }
 
-        auto neighbors = current->get_links();
+                return path;
+            }
 
-        for (const auto& [neighbor, _] : neighbors) {
-            if (m_cells.at(neighbor) < m_cells.at(current)) {
-                breadcrumbs->set(neighbor, m_cells.at(neighbor));
-                current = neighbor;
-                found = true;
-                break;
+            // Retrieve the current cell
+            auto current_cell = ops.search(current_index);
+            if (!current_cell) {
+#if defined(MAZE_DEBUG)
+                std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
+#endif
+                continue;
+            }
+
+            // Process each neighbor that has a passage (linked cells)
+            auto neighbors = ops.get_neighbors(current_cell);
+            for (const auto& neighbor : neighbors) {
+                if (!neighbor) continue;
+
+                int32_t neighbor_index = neighbor->get_index();
+
+                // Skip if already visited
+                if (visited.find(neighbor_index) != visited.end()) {
+                    continue;
+                }
+
+                // Only follow passages that exist (cells that are linked)
+                if (!current_cell->is_linked(neighbor)) {
+                    continue;
+                }
+
+                // Mark as visited and add to queue
+                visited[neighbor_index] = true;
+                parent[neighbor_index] = current_index;
+                q.push_back(neighbor_index);
             }
         }
-
-        if (!found) {
-            return nullptr;
-        }
+    } catch (const std::exception& e) {
+#if defined(MAZE_DEBUG)
+        std::cerr << "Exception in path_to: " << e.what() << std::endl;
+#endif
     }
 
-    return breadcrumbs;
+    // No path found, return empty path
+    return std::make_shared<distances>(m_root_index);
 }
 
-std::pair<std::shared_ptr<cell>, int> distances::max() const noexcept {
+std::pair<int32_t, int> distances::max() const noexcept {
+    int32_t max_index = m_root_index;
     int max_distance = 0;
-    std::shared_ptr<cell> max_cell = m_root;
-    for (const auto& [c, d] : m_cells) {
-        if (d > max_distance) {
-            max_cell = c;
-            max_distance = d;
-        }
-    }
-    return { max_cell, max_distance };
-}
 
-void distances::collect_keys(std::vector<std::shared_ptr<cell>>& cells) const noexcept {
-    for (const auto& [c, _] : m_cells) {
-        cells.push_back(c);
-    }
-}
-
-std::shared_ptr<distances> distances::dist() const noexcept {
-    using namespace std;
-
-    if (!m_root) {
-
-        return nullptr;
-    }
-
-    auto d = make_shared<distances>(m_root);
-
-    queue<shared_ptr<cell>> frontier;
-    frontier.push(m_root);
-    d->set(m_root, 0);
-    // apply shortest path algorithm
-    while (!frontier.empty()) {
-
-        auto current = frontier.front();
-        frontier.pop();
-        auto current_distance = d->operator[](current);
-        for (const auto& neighbor : current->get_neighbors()) {
-
-            if (!d->contains(neighbor)) {
-                d->set(neighbor, d->operator[](current) + 1);
-                frontier.push(neighbor);
-            }
+    for (const auto& [index, distance] : m_cells) {
+        if (distance > max_distance) {
+            max_index = index;
+            max_distance = distance;
         }
     }
 
-    return d;
+    return { max_index, max_distance };
+}
+
+void distances::collect_keys(std::vector<int32_t>& indices) const noexcept {
+    indices.clear();
+    for (const auto& [index, _] : m_cells) {
+        indices.push_back(index);
+    }
 }

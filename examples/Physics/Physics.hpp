@@ -1,32 +1,36 @@
-#ifndef SNAKE_HPP
-#define SNAKE_HPP
+#ifndef PHYSICS_HPP
+#define PHYSICS_HPP
 
 #include <string>
 #include <memory>
+#include <vector>
+#include <unordered_map>
+#include <functional>
 
-class Physics {
+#include <MazeBuilder/singleton_base.h>
+
+struct SDL_Renderer;
+
+class Physics : public mazes::singleton_base<Physics> {
+    friend class mazes::singleton_base<Physics>;
 public:
     Physics(const std::string& title, const std::string& version, int w, int h);
     ~Physics();
 
-    // Delete copy constructor and copy assignment operator
-    Physics(const Physics&) = delete;
-    Physics& operator=(const Physics&) = delete;
-
-    // Default move constructor and move assignment operator
-    Physics(Physics&&) = default;
-    Physics& operator=(Physics&&) = default;
-
     bool run() const noexcept;
 
-    // Singleton pattern
-    static std::shared_ptr<Physics> get_instance(const std::string& title, const std::string& version, int w, int h) {
-        static std::shared_ptr<Physics> instance = std::make_shared<Physics>(cref(title), std::cref(version), w, h);
-        return instance;
-    }
 private:
+    // Physics and collision processing
+    void processPhysicsCollisions() const;
+    void updatePhysicsObjects() const;
+       
+    // Rendering methods
+    void drawPhysicsObjects(SDL_Renderer* renderer) const;
+    void drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const;
+    void generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const;
+
     struct PhysicsImpl;
     std::unique_ptr<PhysicsImpl> m_impl;
 };
 
-#endif
+#endif // PHYSICS_HPP

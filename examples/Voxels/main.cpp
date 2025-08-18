@@ -26,11 +26,7 @@ int main(int argc, char* argv[]) {
 
     using namespace std;
 
-    std::mt19937 rng_engine{ static_cast<unsigned long>(100) };
-    auto get_int = [&rng_engine](int low, int high) -> int {
-        uniform_int_distribution<int> dist {low, high};
-        return dist(rng_engine);
-    };
+    mazes::randomizer rng;
 
     try {
 
@@ -38,8 +34,8 @@ int main(int argc, char* argv[]) {
         // Run the SDL app
         static constexpr int window_w = 800, window_h = 600;
         string my_title { "Maze Builder 🔧" };
-        auto&& maze_builder_3D = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
-        success = maze_builder_3D->run(std::cref(get_int), std::ref(rng_engine));
+        auto&& voxel_engine = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
+        success = voxel_engine->run(std::ref(rng));
         if (!success) {
             std::cerr << "ERROR: Running SDL app failed." << std::endl;
         }

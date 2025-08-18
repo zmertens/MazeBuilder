@@ -1,27 +1,25 @@
 #ifndef COLORED_GRID_H
 #define COLORED_GRID_H
 
-#include <memory>
-#include <cstdint>
-#include <vector>
-#include <optional>
-
-#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid_interface.h>
 
 namespace mazes {
 
 class cell;
+class distances;
+class grid_operations;
 
-/// @file colored_grid.h
-/// @class colored_grid
-/// @brief Extension of the grid class to include color information
-class colored_grid : public distance_grid {
-    
+class colored_grid : public grid_interface {
+
 public:
-    
-    friend class binary_tree;
-    friend class dfs;
-    friend class sidewinder;
+
+    // Delete copy constructor and copy assignment operator to fix the static assertion failure  
+    colored_grid(const colored_grid&) = delete;
+    colored_grid& operator=(const colored_grid&) = delete;
+
+    // Explicitly define move constructor and move assignment operator  
+    colored_grid(colored_grid&&) noexcept = default;
+    colored_grid& operator=(colored_grid&&) noexcept = default;
 
     /// @brief Constructs a colored grid with specified dimensions.
     /// @param width The width of the grid. Defaults to 1.
@@ -31,16 +29,26 @@ public:
 
     /// @brief Retrieves the contents of a given cell, if available.
     /// @param c A shared pointer to the cell whose contents are to be retrieved.
-    /// @return An optional string containing the contents of the cell. If the cell has no contents, the optional will be empty.
-    virtual std::optional<std::string> contents_of(const std::shared_ptr<cell>& c) const noexcept override;
+    /// @return If the cell has no contents, the contents are considered empty
+    virtual std::string contents_of(const std::shared_ptr<cell>& c) const noexcept override;
 
     /// @brief Retrieves the background color for a given cell, if available.
     /// @param c A shared pointer to the cell for which the background color is to be retrieved.
-    /// @return An optional containing the background color as a 32-bit unsigned integer, or an empty optional if no background color is available.
-    virtual std::optional<std::uint32_t> background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
-	
+    /// @return An 32-bit unsigned integer containing the background color
+    virtual std::uint32_t background_color_for(const std::shared_ptr<cell>& c) const noexcept override;
+
+    // Delegate to embedded grid
+    grid_operations& operations() noexcept override;
+
+    const grid_operations& operations() const noexcept override;
+
 private:
+    std::shared_ptr<distances> m_distances;
+
+    // Change from grid_interface to grid since we need grid's implementation of operations()
+    std::unique_ptr<grid_interface> m_grid;
 };
 
-}
+} // namespace mazes
+
 #endif // COLORED_GRID_H

@@ -1,29 +1,29 @@
-#ifndef SIDEWINDER_HPP
-#define SIDEWINDER_HPP
+#ifndef SIDEWINDER_H
+#define SIDEWINDER_H
 
 #include <MazeBuilder/algo_interface.h>
 
-#include <functional>
 #include <memory>
-#include <random>
 
 namespace mazes {
 
 class grid_interface;
+class randomizer;
 
 /// @file sidewinder.h
 /// @class sidewinder
 /// @brief Sidewinder algorithm for generating mazes
 class sidewinder : public algo_interface {
-    public:
+
+public:
+
     /// @brief Implement the sidewinder maze generation algorithm
     /// @param g 
-    /// @param get_int 
-    /// @param rng 
+    /// @param rng
     /// @return success or failure
-    bool run(std::unique_ptr<grid_interface> const& g, const std::function<int(int, int)>& get_int, const std::mt19937& rng) const noexcept override;
+    bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept override;
 };
 
 }
 
-#endif // SIDEWINDER_HPP
+#endif // SIDEWINDER_H

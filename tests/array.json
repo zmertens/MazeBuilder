@@ -1,0 +1,38 @@
+[
+    {
+        "rows": 10,
+        "columns": 20,
+        "levels": 30,
+        "seed": 9000000,
+        "algo": "dfs",
+        "output": "maze_dfs.txt",
+        "distances": true
+    },
+    {
+        "rows": 20,
+        "columns": 20,
+        "levels": 3,
+        "seed": 9,
+        "algo": "dfs",
+        "output": "maze_dfs2.txt",
+        "distances": false
+    },
+    {
+        "rows": 200,
+        "columns": 100,
+        "levels": 1,
+        "seed": 42,
+        "algo": "sidewinder",
+        "output": "maze_sidewinder.txt",
+        "distances": false
+    },
+    {
+        "rows": 50,
+        "columns": 50,
+        "levels": 50,
+        "seed": 10,
+        "algo": "binary_tree",
+        "output": "maze_bt.txt",
+        "distances": false
+    }
+]

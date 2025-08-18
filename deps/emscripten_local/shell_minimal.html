@@ -88,7 +88,7 @@
         postRun: [],
         onRuntimeInitialized: function () {
           Module.setStatus("Polling events...");
-          craft = Module.craft.get_instance("Maze Builder - LOCAL", "", 600, 480);
+          craft = Module.get();
           startPolling();
         },
         print: (function () {
@@ -179,7 +179,7 @@
       function startPolling() {
         const intervalId = setInterval(function () {
           if (craft) {
-            tempStr = craft.mazes();
+            tempStr = '';
             if (tempStr.length > 0 && tempStr.length !== lastStrLength) {
               lastStrLength = tempStr.length;
               currentJSON = JSON.parse(tempStr);
