@@ -8,6 +8,7 @@
 #include <iostream>
 #include <functional>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <MazeBuilder/configurator.h>
@@ -26,12 +27,12 @@ std::shared_ptr<cli> get() {
 }
 
 EMSCRIPTEN_BINDINGS(cli_module) {
-    emscripten::function("get", &get, emscripten::allow_raw_pointers());
+    emscripten::function("get", &get);
     emscripten::class_<cli>("cli")
-        .smart_ptr<std::shared_ptr<cli>>("std::shared_ptr<cli>")
-        .function("convert", &cli::convert);
+        .smart_ptr<std::shared_ptr<cli>>("shared_ptr<cli>")
+        .function("convert", &cli::convert, emscripten::allow_raw_pointers());
 
-    emscripten::register_vector<std::string>("std::vector<std::string>");
+    emscripten::register_vector<std::string>("StringVector");
 }
 
 #endif // EMSCRIPTEN_BINDINGS

@@ -2,8 +2,7 @@
 
 # Maze Builder
 
-Create and customize mazes on multiple platforms and languages.
-An example of an output string generated from the command-line interface is shown here:
+Create and customize mazes on multiple platforms and languages. An example output string is shown here:
 
 ```text
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -29,13 +28,13 @@ An example of an output string generated from the command-line interface is show
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 ```
 
----
+## Data Formats
 
-## Output Formats
+This library provides support for different export formats like Wavefront object, JSON, and plain text or stdout.
 
-The library provides multiple output formats like Wavefront object, PNG and JPEG images, JSON, and plain text or stdout.
+A provided command-line example produces JSON output using these arguments: 
 
-Here's an example of the command-line program producing JSON output: `mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
+`mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
 
 ```json
 {
@@ -43,24 +42,23 @@ Here's an example of the command-line program producing JSON output: `mazebuilde
   "columns": 5,
   "seed": 2,
   "algo": "dfs",
-  "distances": false,
-  "str": "+---+---+---+---+---+\n
-          |           |       |\n
-          +   +---+   +---+   +\n
-          |       |           |\n
-          +---+---+---+---+---+\n"
+  "output": "+---+---+---+---+---+\n
+             |           |       |\n
+             +   +---+   +---+   +\n
+             |       |           |\n
+             +---+---+---+---+---+\n"
 }
 ```
 
 ---
 
-## Examples
+# Examples
 
-### Command-Line Interface
+## Command-Line Interface (CLI)
 
-The command-line interface example allows maze building functionality at the terminal.
+This example lets you build mazes with all the functionality of the computer terminal.
 
-Run the `binary_tree` algorithm with long arguments:
+Run the `binary_tree` algorithm with long arguments and make a Wavefront object maze:
 
 ```sh
 mazebuildercli.exe --rows=25 --columns=25 --seed=42 --algo=binary_tree --output=bt.obj
@@ -72,47 +70,66 @@ Run the `dfs` algorithm with short arguments:
 mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o dfs.obj
 ```
 
-### API 
+Get some help and print to standard output:
+```sh
+mazebuildercli.exe --help
+```
 
-Use the C++ API in a modern C++ program:
+## C++ API 
+
+Interface with the C++ API in a modern C++ program:
 
 ```cpp
     #include <iostream>
+	#include <memory>
+	#include <optional>
     
+	// Get all the headers from Maze Builder
     #include <MazeBuilder/maze_builder.h>
 
-    void main() {
-        auto rows{10}, cols{10};
+    int main() {
+        
+		using maze_ptr = std::optional<std::unique_ptr<mazes::grid_interface>>;
+		
+		auto rows{10}, cols{10};
 
-        auto m = mazes::factory::create_q(rows, cols);
+        maze_ptr m = mazes::grid_factory::create(rows, cols);
+		
+		mazes::stringify stringify_tool{};
+		
+        auto success = stringify.run(m.value_or(std::make_unique<grid>{}), {})
 
-        auto s = mazes::stringz::stringify(m);
-
-        std::cout << s << std::endl;
+        std::cout << std::format("output: {}", m->operations->get_str()) << std::endl;
 
         return 0;
     }
+
 ```
 
-### Web Interface - Voxels
+## Voxels
 
 ![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
 
-Provided is a web interface in a voxel world that enables interactive maze generation.
+The web interface is set in a 3D voxel world and enables interactive maze generation and downloads of Wavefront object files.
 
 [Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
 The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script.
-Once the provided script is running, then open the browser to `http://localhost:8000`.
+Once the script is running, open the browser to `http://localhost:8000`.
 
-### Http
+## HTTP Network
 
-The HTTP example allows for distributed maze building and sharing.
-The network endpoint is configurable with the included JSON input files.
+  - User can connect with [Corners](https://github.com/zmertens/Corners), the maze building service
+  - Console menu with easy navigation
+  - Create JSON data with the menu and send through HTTP protocol to [Corners](https://github.com/zmertens/Corners)
 
-### Physics
+## Physics
 
-The physics example is a full-fledged video game. Pick balls and bounce against maze walls, breaking and colliding, and navigating to exit cells.
+  - Simple scoring system that includes maintaining a string of highlighted bricks
+  - Balls interact with the bricks and break them after repeated bounces
+  - Updated event handling (mouse, touch, keyboard)
+  - Maintains high scores via a network connection with [Corners](https://github.com/zmertens/Corners) or locally on harddrive
+  - Spatialized sound effects in 2D
 
 ---
 
@@ -120,10 +137,11 @@ The physics example is a full-fledged video game. Pick balls and bounce against 
 
 [CMake 3.2](https://cmake.org) or greater is required.
 The examples and tests require external dependencies which can be grabbed from the Internet:
-  - box2d
-  - catch2
-  - SDL
-  - SFML
+
+  - [box2d](https://box2d.org/documentation/hello.html)
+  - [catch2](https://github.com/catchorg/Catch2)
+  - [SDL](https://github.com/libsdl-org/SDL)
+  - [SFML](https://github.com/SFML/SFML)
 
 Use the following CMake options to configure the project:
 
@@ -135,13 +153,12 @@ Use the following CMake options to configure the project:
 | MAZE_BUILDER_TESTS | OFF | Build with testing using `Catch2`. |
 | MAZE_BUILDER_DOCS | OFF | Build the docs using `doxygen`. |
 | MAZE_BUILDER_MEMCHECK | OFF | Build with `Valgrind` and `Memcheck` support. |
-| CMAKE_TOOLCHAIN_FILE | `cmake` | Building with a specific toolchain. Useful for [`Emscripten`](#cmake-web-builds) builds. |
 
 ---
 
 ### Build Commands
 
-Configure it: `cmake -GNinja -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
+Configure it with [Ninja](https://ninja-build.org/) generator: `cmake -G"Ninja Multi-Config" -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
 
 Build it: `cmake --build build-examples --config Release`
 
@@ -152,7 +169,7 @@ The shared and static files have different naming conventions depending on the p
 | -------- | ---- | ---- |
 | Windows | `mazebuildercore_static.lib` | `mazebuildercore_shared.dll` |
 | Linux | `libmazebuildercore_static.a` | `libmazebuildercore_shared.so` |
-| MacOS | | |
+| MacOS | `libmazebuildercore_static.a` | `libmazebuildercore_shared.dylib` |
 
 ---
 
@@ -167,7 +184,7 @@ Run the tests: `ctest --test-dir build-tests/tests --verbose -C Debug`
 
 ### Configure for the Web
 
-Configure examples for the browser using [Emscripten](https://emscripten.org/) and their toolchain file.
+Configure the examples for the Web using [Emscripten](https://emscripten.org/) and their toolchain file (or `emcmake`).
 
 ```sh
 cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
@@ -187,13 +204,6 @@ The Python script `solver.py` plays with the maze generation by loading PNG file
 
 ---
 
-## More Learning Resources
+#### Helpful Resources on Mazes
 
- - [box2d](https://box2d.org/documentation/hello.html)
- - [catch2](https://github.com/catchorg/Catch2)
- - [craft](https://github.com/fogleman/Craft)
- - [Dear ImGui](https://github.com/ocornut/imgui)
- - [this README and these docs](https://zmertens.github.io/mazebuilder.github.io/index.html)
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
- - [SDL](https://github.com/libsdl-org/SDL)
- - [SFML](https://github.com/SFML/SFML)
