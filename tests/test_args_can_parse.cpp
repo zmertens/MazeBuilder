@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <format>
 #include <functional>
 #include <string>
 #include <vector>
@@ -291,7 +290,8 @@ TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
 
     SECTION("JSON input file") {
 
-        string valid_json_file_input = format("{}={}", args::JSON_OPTION_STR, ARRAY_DOT_JSON_FILE);
+        //string valid_json_file_input = format("{}={}", args::JSON_OPTION_STR, ARRAY_DOT_JSON_FILE);
+        string valid_json_file_input = args::JSON_OPTION_STR + string("=") + ARRAY_DOT_JSON_FILE;
 
         REQUIRE(args_handler.parse(cref(valid_json_file_input), false));
 

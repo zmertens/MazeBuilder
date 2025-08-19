@@ -59,7 +59,7 @@ public:
             }
 
             return true;
-        } catch (const std::exception& e) {
+        } catch (...) {
             return false;
         }
     }
@@ -108,7 +108,7 @@ public:
             }
             
             return true;
-        } catch (const std::exception& e) {
+        } catch (...) {
             return false;
         }
     }

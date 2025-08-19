@@ -18,7 +18,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
-#include <format>
+//#include <format>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -130,7 +130,7 @@ struct Physics::PhysicsImpl {
          // Good scaling factor for visibility
         pixelsPerMeter = 40.0f;
 
-        auto s = std::format("{}", std::string("hi"));
+        //auto s = std::format("{}", std::string("hi"));
     }
     
     // Convert screen coordinates to physics world coordinates
