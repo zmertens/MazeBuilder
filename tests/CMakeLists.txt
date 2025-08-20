@@ -41,4 +41,7 @@ if(MAZE_BUILDER_MEMCHECK)
 	AddValgrind(${MAZE_BUILDER_TESTS_EXE})
 	include(Memcheck)
 	AddMemcheck(${MAZE_BUILDER_TESTS_EXE})
+
+        target_link_options(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:Debug>:-g>")
 endif()
+

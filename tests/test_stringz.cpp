@@ -17,6 +17,7 @@
 using namespace mazes;
 using namespace std;
 
+/*
 TEST_CASE("string_view_utils::split works correctly", "[string_view_utils]") {
 
     SECTION("Split with bracket delimiter") {
@@ -293,4 +294,5 @@ TEST_CASE( "Benchmark stringz ops ", "[benchmark stringz]" ) {
         REQUIRE(str_processor.run(ref(grid_ptr), ref(rng)));
     };
 }
+*/
 

@@ -62,6 +62,7 @@ if(MAZE_BUILDER_COVERAGE)
 
 endif()
 
+list(APPEND BASE_COMPILE_FLAGS "$<$<OR:$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:GNU>>:-pthread>")
 list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
 list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
@@ -72,7 +73,7 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFA
 # Add STB as a system include to suppress warnings
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
-target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
+target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS})
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)

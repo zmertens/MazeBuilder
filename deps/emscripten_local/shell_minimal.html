@@ -88,7 +88,7 @@
         postRun: [],
         onRuntimeInitialized: function () {
           Module.setStatus("Polling events...");
-          craft = Module.get();
+          craft = Module.craft.get();
           startPolling();
         },
         print: (function () {
