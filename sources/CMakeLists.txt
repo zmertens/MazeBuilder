@@ -26,8 +26,8 @@ set(MAZE_BUILDER_CORE_SRCS
     pixels.cpp
     randomizer.cpp
     sidewinder.cpp
-    string_view_utils.cpp
     stringify.cpp
+    string_utils.cpp
     wavefront_object_helper.cpp
     writer.cpp)
 

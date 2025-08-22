@@ -177,27 +177,17 @@ void grid_factory::register_default_creators() {
 
 std::string grid_factory::determine_grid_type_from_config(const configurator& config) const {
 
-#if defined(MAZE_DEBUG)
-    std::cerr << "Debug: determine_grid_type_from_config - distances=" << (config.distances() ? "true" : "false") 
-             << ", output=" << static_cast<int>(config.output_id()) << std::endl;
-#endif
-
     if (config.distances()) {
+
         if (config.output_id() == output::PNG || config.output_id() == output::JPEG) {
-#if defined(MAZE_DEBUG)
-            std::cerr << "Debug: Selecting colored_grid" << std::endl;
-#endif
+
             return "colored_grid";
         } else {
-#if defined(MAZE_DEBUG)
-            std::cerr << "Debug: Selecting distance_grid" << std::endl;
-#endif
+
             return "distance_grid";
         }
     } else {
-#if defined(MAZE_DEBUG)
-        std::cerr << "Debug: Selecting regular grid" << std::endl;
-#endif
+
         return "grid";
     }
 }

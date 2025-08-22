@@ -1,7 +1,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
-#include <MazeBuilder/string_view_utils.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -366,7 +366,7 @@ public:
             add_argument_variants(args::JSON_WORD_STR, value);
             
             // Strip whitespace to determine if it's a JSON string vs file
-            std::string trimmed_value = std::string(string_view_utils::strip(value));
+            std::string trimmed_value = string_utils::stripWhitespace(value);
             
             // Process JSON if it's a string (starts with ` after trimming)
             if (!trimmed_value.empty() && trimmed_value.front() == '`') {
@@ -452,12 +452,13 @@ public:
     // Internal JSON processing methods for use in populate_args_map
     bool process_json_string(const std::string& json_str) {
 
+        using namespace std;
+
         try {
             // Remove backticks and parse JSON
-            std::string clean_json = json_str;
             
             // Strip whitespace first
-            clean_json = string_view_utils::strip(clean_json);
+            string clean_json = string_utils::stripWhitespace(cref(json_str));
             
             // Remove backticks if present
             if (!clean_json.empty() && clean_json.front() == '`' && clean_json.back() == '`') {
@@ -465,7 +466,7 @@ public:
             }
             
             // Strip whitespace again after removing backticks
-            clean_json = string_view_utils::strip(clean_json);
+            clean_json = string_utils::stripWhitespace(clean_json);
             
             // Use json_helper to parse the cleaned JSON string
             json_helper jh{};

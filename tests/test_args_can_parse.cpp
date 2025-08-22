@@ -9,7 +9,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/json_helper.h>
-#include <MazeBuilder/string_view_utils.h>
+#include <MazeBuilder/string_utils.h>
 
 using namespace mazes;
 using namespace std;
@@ -166,7 +166,7 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_1)));
         
         // Test all forms of access for distances with slice
-        auto slice_1_stripped = string_view_utils::strip(DISTANCES_SLICE_1, args::DISTANCES_FLAG_STR);
+        auto slice_1_stripped = DISTANCES_SLICE_1.substr(DISTANCES_SLICE_1.find(args::DISTANCES_FLAG_STR) + strlen(args::DISTANCES_FLAG_STR));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_1_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_1_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_1_stripped));
@@ -185,7 +185,23 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_2)));
 
         // Test all forms of access for distances with slice
-        auto slice_2_stripped = string_view_utils::strip(string_view_utils::strip(DISTANCES_SLICE_2, args::DISTANCES_OPTION_STR), "=");
+        std::vector<std::string> temp_split_parts;
+        std::string option_str(args::DISTANCES_OPTION_STR);
+        string_utils::strsplit(DISTANCES_SLICE_2, temp_split_parts, option_str);
+        
+        std::string temp_stripped;
+        if (temp_split_parts.size() > 1) {
+            temp_stripped = temp_split_parts[1];  // Take the part after the option
+        }
+        
+        std::vector<std::string> final_split_parts;
+        string_utils::strsplit(temp_stripped, final_split_parts, '=');
+        
+        std::string slice_2_stripped;
+        if (final_split_parts.size() > 1) {
+            slice_2_stripped = final_split_parts[1];  // Take the part after the equals
+        }
+        
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_2_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_2_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_2_stripped));
@@ -199,7 +215,15 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_3)));
 
         // Test all forms of access for distances with slice
-        auto slice_3_stripped = string_view_utils::strip(DISTANCES_SLICE_3, args::DISTANCES_FLAG_STR);
+        std::vector<std::string> split_parts_3;
+        std::string flag_str_3(args::DISTANCES_FLAG_STR);
+        string_utils::strsplit(DISTANCES_SLICE_3, split_parts_3, flag_str_3);
+        
+        std::string slice_3_stripped;
+        if (split_parts_3.size() > 1) {
+            slice_3_stripped = split_parts_3[1];  // Take the part after the flag
+        }
+        
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_3_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_3_stripped));
         REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_3_stripped));

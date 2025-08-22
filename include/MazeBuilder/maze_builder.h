@@ -26,7 +26,7 @@
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/stringify.h>
-#include <MazeBuilder/string_view_utils.h>
+#include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 #include <MazeBuilder/writer.h>
 

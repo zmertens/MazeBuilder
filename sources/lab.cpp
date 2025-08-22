@@ -3,7 +3,6 @@
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
-#include <MazeBuilder/string_view_utils.h>
 
 #include <cstdint>
 #include <functional>
