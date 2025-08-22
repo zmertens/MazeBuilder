@@ -22,7 +22,7 @@ if(MAZE_BUILDER_EXAMPLES)
         ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
     if(EMSCRIPTEN)
-        message(STATUS "Building examples for the Web!")
+        message(INFO ": Building examples for the Web!")
 
         # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
         if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -98,7 +98,7 @@ if(MAZE_BUILDER_EXAMPLES)
         FetchGitRepo(SFML ${SFML_REPO_URL} almostv3)
 
     else(EMSCRIPTEN)
-        message(STATUS "Building examples for the Desktop!")
+        message(INFO ": Building examples for the Desktop!")
         
         # Find threads normally for desktop builds
         find_package(Threads REQUIRED)

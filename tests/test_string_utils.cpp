@@ -191,7 +191,6 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
         REQUIRE(result.size() == 2);
         REQUIRE(result[0] == vector<char>{'h', 'e', 'l', 'l', 'o'});
         REQUIRE(result[1] == vector<char>{'w', 'o', 'r', 'l', 'd'});
-        REQUIRE(result[2].empty());  // Empty last part
     }
     
     SECTION("Template split with deque output container") {

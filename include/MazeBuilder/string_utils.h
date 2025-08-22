@@ -21,7 +21,7 @@ namespace mazes {
 /// @class string_utils
 /// @brief String helper class
 /// @details This class provides common string manipulation utilities
-/// https://github.com/PacktPublishing/CPP-20-STL-Cookbook/blob/main/chap11/split.cpp for reference
+/// @related https://github.com/PacktPublishing/CPP-20-STL-Cookbook/blob/main/chap11/split.cpp
 class string_utils {
 public:
     
@@ -111,10 +111,13 @@ public:
                 
                 // Handle string vs other containers
                 if constexpr (is_same_v<SliceContainer, string>) {
+
                     dest_elm += *slice;
                 } else if constexpr (has_push_back<SliceContainer>::value) {
+
                     dest_elm.push_back(*slice);
                 } else {
+
                     // For types without push_back, provide a helpful error
                     static_assert(is_same_v<SliceContainer, string> || has_push_back<SliceContainer>::value, 
                         "SliceContainer must be std::string or have a push_back method");
@@ -123,6 +126,7 @@ public:
             }
             
             dest.push_back(dest_elm);
+
             if(slice == end_it) {
                 
                 return end_it;
@@ -135,19 +139,27 @@ public:
 
     /// @brief Default equality predicate for split functions
     static constexpr auto eq = [](const auto& el, const auto& sep) -> bool {
+
+        using std::is_convertible_v;
+        using std::is_same_v;
+
         using ElType = std::decay_t<decltype(el)>;
         using SepType = std::decay_t<decltype(sep)>;
-        
-        if constexpr (std::is_same_v<ElType, SepType>) {
+
+        if constexpr (is_same_v<ElType, SepType>) {
+
             return el == sep;
-        } else if constexpr (std::is_convertible_v<ElType, SepType>) {
+        } else if constexpr (is_convertible_v<ElType, SepType>) {
+
             return static_cast<SepType>(el) == sep;
-        } else if constexpr (std::is_convertible_v<SepType, ElType>) {
+        } else if constexpr (is_convertible_v<SepType, ElType>) {
+
             return el == static_cast<ElType>(sep);
         } else {
+
             return false;
         }
-    };
+        };
 
     /// @brief Generic split function with default equality predicate
     /// @tparam It Iterator type
@@ -177,6 +189,7 @@ public:
         return dest;
     }
 
+
     /// @brief Checks if a character is a whitespace character.
     /// @tparam T The type of the character to check.
     /// @param c The character to check for whitespace.
@@ -184,17 +197,24 @@ public:
     template<typename T>
     static bool isWhitespace(const T& c) {
 
-        constexpr const T whitespace[]{ " \t\r\n\v\f" };
+        using std::is_same_v;
+        using std::string_view;
 
-        for (const T& wsc : whitespace) {
+        // Use std::string_view for safer character comparison
+        constexpr string_view whitespace_chars = " \t\r\n\v\f";
 
-            if (c == wsc) {
-
-                return true;
-            }
+        // For character types, convert to char for comparison
+        if constexpr (is_same_v<T, char>) {
+            return whitespace_chars.find(c) != string_view::npos;
+        } else {
+            // For other types, do individual comparisons
+            return c == static_cast<T>(' ') || 
+                    c == static_cast<T>('\t') || 
+                    c == static_cast<T>('\r') || 
+                    c == static_cast<T>('\n') || 
+                    c == static_cast<T>('\v') || 
+                    c == static_cast<T>('\f');
         }
-
-        return false;
     }
 
     /// @brief Removes consecutive whitespace characters from a string, leaving only single whitespace between non-whitespace characters.
@@ -202,9 +222,12 @@ public:
     /// @return A new string with consecutive whitespace characters replaced by a single whitespace.
     static std::string stripWhitespace(const std::string& s) {
 
-        std::string outputString{ s };
+        using std::string;
+        using std::unique;
 
-        auto its = std::unique(outputString.begin(), outputString.end(),
+        string outputString{ s };
+
+        auto its = unique(outputString.begin(), outputString.end(),
             [](const auto& a, const auto& b) {
 
                 return isWhitespace(a) && isWhitespace(b);

@@ -12,10 +12,13 @@
 #include <unordered_set>
 #include <list>
 
+#include <fmt/format.h>
+
 using namespace mazes;
 
 
 bool string_utils::contains(const std::string& str, const std::string& substr) noexcept {
+
     return str.find(substr) != std::string::npos;
 }
 

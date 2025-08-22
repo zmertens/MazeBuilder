@@ -16,7 +16,7 @@ endif()
 
 enable_testing()
 
-message(INFO ": Building ${PROJECT_NAME} tests")
+message(INFO ": Building tests")
 
 set(MAZE_BUILDER_TESTS_EXE "mazebuildertests")
 

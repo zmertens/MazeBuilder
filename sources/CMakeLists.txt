@@ -66,6 +66,17 @@ list(APPEND BASE_COMPILE_FLAGS "$<$<OR:$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPI
 list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
 list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
+# Dependencies
+message(INFO ": Fetching fmt library...")
+include(FetchContent)
+# fmt version 10.2.1
+FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG e69e5f977d458f2650bb346dadf2ad30c5320281)
+# Configure fmt options before making it available
+set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
+set(FMT_TEST OFF CACHE BOOL "" FORCE)
+set(FMT_DOC OFF CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(fmt)
+
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
@@ -74,6 +85,7 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFA
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
 target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS})
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
@@ -84,17 +96,17 @@ target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUA
 
 # Shared build
 if(NOT EMSCRIPTEN)
-    add_library(${MAZE_BUILDER_CORE_LIB}_shared SHARED)
-    target_link_libraries(${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_LIB_OUT}_obj)
+    add_library(${MAZE_BUILDER_LIB_OUT}_shared SHARED)
+    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 endif()
 
 # Static build
-add_library(${MAZE_BUILDER_CORE_LIB}_static STATIC)
-target_link_libraries(${MAZE_BUILDER_CORE_LIB}_static ${MAZE_BUILDER_LIB_OUT}_obj)
+add_library(${MAZE_BUILDER_LIB_OUT}_static STATIC)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 
 # Installation
 include(GNUInstallDirs)
-#install(TARGETS ${MAZE_BUILDER_LIB_OUT} ${MAZE_BUILDER_CORE_LIB}_shared ${MAZE_BUILDER_CORE_LIB}_static
+#install(TARGETS ${MAZE_BUILDER_LIB_OUT} ${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_static
 #  EXPORT MazeBuilderLibrary
 #  ARCHIVE COMPONENT development
 #  LIBRARY COMPONENT runtime

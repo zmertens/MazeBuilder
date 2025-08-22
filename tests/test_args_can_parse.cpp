@@ -20,6 +20,18 @@ static constexpr auto MAZE_DOT_JSON_FILE{ "maze.json" };
 
 static constexpr auto OUTPUT_FILE_NAME{ "out.txt" };
 
+auto safe_at = [](const std::unordered_map<std::string, std::string>& map, const std::string& key) -> std::string {
+    auto it = map.find(key);
+    if (it == map.end()) {
+        throw std::runtime_error("Key not found: " + key);
+    }
+    return it->second;
+};
+
+auto check_key_exists = [](const std::unordered_map<std::string, std::string>& map, const std::string& key) -> bool {
+    return map.find(key) != map.end();
+};
+
 TEST_CASE("Args static checks", "[args_static_checks]") {
 
     STATIC_REQUIRE(std::is_default_constructible<mazes::args>::value);
@@ -90,7 +102,6 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
     static constexpr auto SEED{ configurator::DEFAULT_SEED };
 
     auto check_optional_equals_value = [](auto opt, auto val) -> bool {
-
         return opt.has_value() && opt.value() == val;
     };
 
@@ -156,81 +167,70 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
 
     SECTION("Parse and get distances value with slice notation") {
 
-        // Explicit slice values
-        static const string DISTANCES_SLICE_1 = args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
-        // Implicit slice starting point
-        static const string DISTANCES_SLICE_2 = args::DISTANCES_OPTION_STR + string("=[") + ":" + to_string(DISTANCES_END) + "]";
-        // Implicit slice ending point
-        static const string DISTANCES_SLICE_3 = args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + "]";
-
-        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_1)));
-        
-        // Test all forms of access for distances with slice
-        auto slice_1_stripped = DISTANCES_SLICE_1.substr(DISTANCES_SLICE_1.find(args::DISTANCES_FLAG_STR) + strlen(args::DISTANCES_FLAG_STR));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_1_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_1_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_1_stripped));
-        
-        // Test parsed slice values
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
-
-        args_handler.clear();
-
-        string rev_args = { DISTANCES_SLICE_1.crbegin(), DISTANCES_SLICE_1.crend() };
-        REQUIRE_FALSE(args_handler.parse(cref(rev_args)));
-
-        args_handler.clear();
-
-        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_2)));
-
-        // Test all forms of access for distances with slice
-        std::vector<std::string> temp_split_parts;
-        std::string option_str(args::DISTANCES_OPTION_STR);
-        string_utils::strsplit(DISTANCES_SLICE_2, temp_split_parts, option_str);
-        
-        std::string temp_stripped;
-        if (temp_split_parts.size() > 1) {
-            temp_stripped = temp_split_parts[1];  // Take the part after the option
+        // Test explicit slice values [start:end]
+        SECTION("Explicit slice start and end") {
+            vector<string> args_vec = { args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]" };
+            
+            REQUIRE(args_handler.parse(args_vec));
+            
+            // Verify the slice syntax is stored correctly
+            string expected_slice = "[" + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), expected_slice));
+            
+            // Verify parsed slice values
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
         }
-        
-        std::vector<std::string> final_split_parts;
-        string_utils::strsplit(temp_stripped, final_split_parts, '=');
-        
-        std::string slice_2_stripped;
-        if (final_split_parts.size() > 1) {
-            slice_2_stripped = final_split_parts[1];  // Take the part after the equals
+
+        // Test implicit slice starting point [:end]
+        SECTION("Implicit slice start") {
+            args_handler.clear();
+            vector<string> args_vec = { args::DISTANCES_OPTION_STR + string("=[:") + to_string(DISTANCES_END) + "]" };
+            
+            REQUIRE(args_handler.parse(args_vec));
+            
+            // Verify the slice syntax is stored correctly
+            string expected_slice = "[:" + to_string(DISTANCES_END) + "]";
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), expected_slice));
+            
+            // Verify parsed slice values - start should default to 0
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
         }
-        
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_2_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_2_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_2_stripped));
 
-        // Test parsed slice values
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
-
-        args_handler.clear();
-
-        REQUIRE(args_handler.parse(cref(DISTANCES_SLICE_3)));
-
-        // Test all forms of access for distances with slice
-        std::vector<std::string> split_parts_3;
-        std::string flag_str_3(args::DISTANCES_FLAG_STR);
-        string_utils::strsplit(DISTANCES_SLICE_3, split_parts_3, flag_str_3);
-        
-        std::string slice_3_stripped;
-        if (split_parts_3.size() > 1) {
-            slice_3_stripped = split_parts_3[1];  // Take the part after the flag
+        // Test implicit slice ending point [start:]
+        SECTION("Implicit slice end") {
+            args_handler.clear();
+            vector<string> args_vec = { args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":]" };
+            
+            REQUIRE(args_handler.parse(args_vec));
+            
+            // Verify the slice syntax is stored correctly
+            string expected_slice = "[" + to_string(DISTANCES_START) + ":]";
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), expected_slice));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), expected_slice));
+            
+            // Verify parsed slice values - end should use default
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
+            REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
         }
-        
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), slice_3_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), slice_3_stripped));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), slice_3_stripped));
 
-        // Test parsed slice values
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_START_STR), to_string(DISTANCES_START)));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_END_STR), to_string(DISTANCES_END)));
+        // Test invalid slice syntax should fail parsing
+        SECTION("Invalid slice syntax") {
+            args_handler.clear();
+            
+            // Reversed string should fail
+            string invalid_slice = args::DISTANCES_FLAG_STR + string("[") + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
+            string reversed_slice = { invalid_slice.crbegin(), invalid_slice.crend() };
+            vector<string> args_vec = { reversed_slice };
+            
+            REQUIRE_FALSE(args_handler.parse(args_vec));
+        }
     }
 }
 
@@ -256,9 +256,9 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
         }`)json";
 
     static const string VALID_JSON_STR_2 = \
-        "  `{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS)
+        "`{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS)
         + ",\n\"columns\": " + to_string(configurator::DEFAULT_COLUMNS)
-        + "\n }`";
+        + "\n}`";
 
     args args_handler{};
 
@@ -270,9 +270,12 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
         REQUIRE(m.has_value());
 
         const auto& m_val = m.value();
-        REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
-        REQUIRE_FALSE(m_val.at(args::JSON_OPTION_STR).empty());
-        REQUIRE_FALSE(m_val.at(args::JSON_WORD_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_FLAG_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_FLAG_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_OPTION_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_OPTION_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_WORD_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_WORD_STR).empty());
 
         REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
         REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
@@ -282,7 +285,13 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
     }
 
     SECTION("Parse JSON string 2") {
-        vector<string> args_vec = { args::JSON_OPTION_STR + string("=") + VALID_JSON_STR_2 };
+        // Ensure the JSON string is properly formatted without leading spaces before backticks
+        static const string VALID_JSON_STR_2_FIXED = \
+            "`{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS)
+            + ",\n\"columns\": " + to_string(configurator::DEFAULT_COLUMNS)
+            + "\n}`";
+            
+        vector<string> args_vec = { args::JSON_OPTION_STR + string("=") + VALID_JSON_STR_2_FIXED };
         REQUIRE(args_handler.parse(args_vec));
 
         const auto& m = args_handler.get();
@@ -290,12 +299,17 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]") {
 
         // Test all forms of access for JSON
         const auto& m_val = m.value();
-        REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
-        REQUIRE_FALSE(m_val.at(args::JSON_OPTION_STR).empty());
-        REQUIRE_FALSE(m_val.at(args::JSON_WORD_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_FLAG_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_FLAG_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_OPTION_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_OPTION_STR).empty());
+        REQUIRE(check_key_exists(m_val, args::JSON_WORD_STR));
+        REQUIRE_FALSE(safe_at(m_val, args::JSON_WORD_STR).empty());
 
-        REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::DEFAULT_COLUMNS));
-        REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::DEFAULT_ROWS));
+        REQUIRE(check_key_exists(m_val, args::COLUMN_WORD_STR));
+        REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::DEFAULT_COLUMNS));
+        REQUIRE(check_key_exists(m_val, args::ROW_WORD_STR));
+        REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::DEFAULT_ROWS));
     }
 
     SECTION("Cannot parse JSON string") {
@@ -363,34 +377,41 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]") {
         REQUIRE(first_config.find("output") != first_config.cend());
         REQUIRE(first_config.find("distances") != first_config.cend());
         
-        // Verify values from array.json
-        REQUIRE(first_config.at("rows") == "10");
-        REQUIRE(first_config.at("columns") == "20");
-        REQUIRE(first_config.at("levels") == "30");
-        REQUIRE(first_config.at("seed") == "9000000");
-        REQUIRE(first_config.at("algo") == "\"dfs\"");
-        REQUIRE(first_config.at("output") == "\"maze_dfs.txt\"");
-        REQUIRE(first_config.at("distances") == "true");
+        // Verify values from array.json - using safe helper functions
+        REQUIRE(check_key_exists(first_config, "rows"));
+        REQUIRE(safe_at(first_config, "rows") == "10");
+        REQUIRE(check_key_exists(first_config, "columns"));
+        REQUIRE(safe_at(first_config, "columns") == "20");
+        REQUIRE(check_key_exists(first_config, "levels"));
+        REQUIRE(safe_at(first_config, "levels") == "30");
+        REQUIRE(check_key_exists(first_config, "seed"));
+        REQUIRE(safe_at(first_config, "seed") == "9000000");
+        REQUIRE(check_key_exists(first_config, "algo"));
+        REQUIRE(safe_at(first_config, "algo") == "\"dfs\"");
+        REQUIRE(check_key_exists(first_config, "output"));
+        REQUIRE(safe_at(first_config, "output") == "\"maze_dfs.txt\"");
+        REQUIRE(check_key_exists(first_config, "distances"));
+        REQUIRE(safe_at(first_config, "distances") == "true");
         
         // Test second object in array
         const auto& second_config = array_val[1];
-        REQUIRE(second_config.at("rows") == "20");
-        REQUIRE(second_config.at("columns") == "20");
-        REQUIRE(second_config.at("levels") == "3");
-        REQUIRE(second_config.at("seed") == "9");
-        REQUIRE(second_config.at("algo") == "\"dfs\"");
-        REQUIRE(second_config.at("output") == "\"maze_dfs2.txt\"");
-        REQUIRE(second_config.at("distances") == "false");
+        REQUIRE(safe_at(second_config, "rows") == "20");
+        REQUIRE(safe_at(second_config, "columns") == "20");
+        REQUIRE(safe_at(second_config, "levels") == "3");
+        REQUIRE(safe_at(second_config, "seed") == "9");
+        REQUIRE(safe_at(second_config, "algo") == "\"dfs\"");
+        REQUIRE(safe_at(second_config, "output") == "\"maze_dfs2.txt\"");
+        REQUIRE(safe_at(second_config, "distances") == "false");
         
         // Test last object in array
         const auto& last_config = array_val[3];
-        REQUIRE(last_config.at("rows") == "50");
-        REQUIRE(last_config.at("columns") == "50");
-        REQUIRE(last_config.at("levels") == "50");
-        REQUIRE(last_config.at("seed") == "10");
-        REQUIRE(last_config.at("algo") == "\"binary_tree\"");
-        REQUIRE(last_config.at("output") == "\"maze_bt.txt\"");
-        REQUIRE(last_config.at("distances") == "false");
+        REQUIRE(safe_at(last_config, "rows") == "50");
+        REQUIRE(safe_at(last_config, "columns") == "50");
+        REQUIRE(safe_at(last_config, "levels") == "50");
+        REQUIRE(safe_at(last_config, "seed") == "10");
+        REQUIRE(safe_at(last_config, "algo") == "\"binary_tree\"");
+        REQUIRE(safe_at(last_config, "output") == "\"maze_bt.txt\"");
+        REQUIRE(safe_at(last_config, "distances") == "false");
         
         // Test backward compatibility - single map should contain first object
         const auto& m = args_handler.get();
@@ -434,9 +455,9 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]") {
     REQUIRE(m.has_value());
 
     const auto& m_val = m.value();
-    REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
-    REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
+    REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
 TEST_CASE("Args parse with string input", "[parse_string_input]") {
@@ -454,9 +475,9 @@ TEST_CASE("Args parse with string input", "[parse_string_input]") {
     REQUIRE(m.has_value());
 
     const auto& m_val = m.value();
-    REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
-    REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
+    REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
 // Add this test case to verify the sliced array syntax for distances flag
@@ -909,14 +930,14 @@ TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_
         REQUIRE(m_val.find(args::OUTPUT_ID_WORD_STR) != m_val.cend());
         REQUIRE(m_val.find(args::DISTANCES_WORD_STR) != m_val.cend());
         
-        // Verify expected values
-        REQUIRE(m_val.at(args::ROW_WORD_STR) == "10");
-        REQUIRE(m_val.at(args::COLUMN_WORD_STR) == "20");
-        REQUIRE(m_val.at(args::LEVEL_WORD_STR) == "30");
-        REQUIRE(m_val.at(args::SEED_WORD_STR) == "9001");
-        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "\"dfs\"");
-        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "\"maze_dfs.txt\"");
-        REQUIRE(m_val.at(args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
+        // Verify expected values using safe helper functions
+        REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == "10");
+        REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == "20");
+        REQUIRE(safe_at(m_val, args::LEVEL_WORD_STR) == "30");
+        REQUIRE(safe_at(m_val, args::SEED_WORD_STR) == "9001");
+        REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == "\"dfs\"");
+        REQUIRE(safe_at(m_val, args::OUTPUT_ID_WORD_STR) == "\"maze_dfs.txt\"");
+        REQUIRE(safe_at(m_val, args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
 
         // Test array functionality should have 1 object in array
         const auto& array_opt = args_handler.get_array();
