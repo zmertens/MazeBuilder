@@ -68,6 +68,10 @@ list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 
 # Dependencies
 message(INFO ": Fetching fmt library...")
+
+# Set position independent code globally for all targets
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 include(FetchContent)
 # fmt version 11.2.0
 FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 40626af88bd7df9a5fb80be7b25ac85b122d6c21)

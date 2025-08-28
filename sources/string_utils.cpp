@@ -97,7 +97,7 @@ std::list<std::string_view> string_utils::split(const std::string_view& sv, cons
 
 // Template wrapper functions for fmt::format using perfect forwarding and variadic arguments
 template<typename... Args>
-static std::string string_utils::format(std::string_view format_str, const Args&... args) noexcept {
+std::string string_utils::format(std::string_view format_str, const Args&... args) noexcept {
 
     return fmt::vformat(format_str, fmt::make_format_args(args...));
 }
