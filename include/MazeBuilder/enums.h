@@ -3,75 +3,110 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <stdexcept>
 
 /// @file enums.h
-/// @brief Enumerations for the maze builder program
+/// @brief Enumerations and utilities for the maze builder program
 
 namespace mazes {
 
     /// @brief Character representations of walls and barriers in the maze
-    static constexpr auto BARRIER1 = '|';
-    static constexpr auto BARRIER2 = '-';
-    static constexpr auto CORNER = '+';
+    enum class barriers : char {
 
-    /// @brief Enum class for output types
-    enum class output : unsigned int {
+        HORIZONTAL = '-',
+
+        VERTICAL = '|',
+
+        CORNER = '+',
+
+        SINGLE_SPACE = ' '
+    };
+
+    /// @brief Enum class for output_format types
+    enum class output_format : unsigned int {
+
         PLAIN_TEXT = 0,
+
         JSON = 1,
+
         WAVEFRONT_OBJECT_FILE = 2,
+
         PNG = 3,
+
         JPEG = 4,
+
         STDOUT = 5,
+
         TOTAL = 6
     };
 
-    /// @brief Convert an output enum to a string
+    /// @brief Convert an output_format enum to a string
     /// @param o
     /// @return 
-    inline std::string to_string_from_outputs(output o) {
-        switch (o) {
-        case output::PLAIN_TEXT:
+    inline std::string_view to_string_from_output_format(output_format of) {
+
+        switch (of) {
+
+        case output_format::PLAIN_TEXT:
+
             return "txt";
-        case output::JSON:
+        case output_format::JSON:
+
             return "json";
-        case output::WAVEFRONT_OBJECT_FILE:
+        case output_format::WAVEFRONT_OBJECT_FILE:
+
             return "obj";
-        case output::PNG:
+        case output_format::PNG:
+
             return "png";
-        case output::JPEG:
+        case output_format::JPEG:
+
             return "jpeg";
-        case output::STDOUT:
+        case output_format::STDOUT:
+
             return "stdout";
         default:
-            throw std::invalid_argument("Invalid output: " + std::to_string(static_cast<unsigned int>(o)));
+
+            throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
         }
     };
 
-    /// @brief Convert a string to an output enum
+    /// @brief Convert a string to an output_format enum
     /// @param o
     /// @return
-    inline output to_output_from_string(const std::string& o) {
-        if (o.compare("txt") == 0) {
-            return output::PLAIN_TEXT;
-        } else if (o.compare("text") == 0) {
-            return output::PLAIN_TEXT;
-        } else if (o.compare("json") == 0) {
-            return output::JSON;
-        } else if (o.compare("obj") == 0) {
-            return output::WAVEFRONT_OBJECT_FILE;
-        } else if (o.compare("object") == 0) {
-            return output::WAVEFRONT_OBJECT_FILE;
-        } else if (o.compare("png") == 0) {
-            return output::PNG;
-        } else if (o.compare("jpeg") == 0) {
-            return output::JPEG;
-        } else if (o.compare("jpg") == 0) {
-            return output::JPEG;
-        } else if (o.compare("stdout") == 0) {
-            return output::STDOUT;
+    inline output_format to_output_format_from_string(std::string_view sv) {
+        
+        if (sv.compare("txt") == 0) {
+
+            return output_format::PLAIN_TEXT;
+        } else if (sv.compare("text") == 0) {
+
+            return output_format::PLAIN_TEXT;
+        } else if (sv.compare("json") == 0) {
+
+            return output_format::JSON;
+        } else if (sv.compare("obj") == 0) {
+
+            return output_format::WAVEFRONT_OBJECT_FILE;
+        } else if (sv.compare("object") == 0) {
+
+            return output_format::WAVEFRONT_OBJECT_FILE;
+        } else if (sv.compare("png") == 0) {
+
+            return output_format::PNG;
+        } else if (sv.compare("jpeg") == 0) {
+
+            return output_format::JPEG;
+        } else if (sv.compare("jpg") == 0) {
+
+            return output_format::JPEG;
+        } else if (sv.compare("stdout") == 0) {
+
+            return output_format::STDOUT;
         } else {
-            throw std::invalid_argument("Invalid output: " + o);
+
+            throw std::invalid_argument("Invalid output_format: " + std::string{ sv });
         }
     };
 

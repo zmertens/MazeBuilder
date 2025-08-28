@@ -70,33 +70,33 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
             if (value.find('.') != string::npos || value.find('/') != string::npos || 
                 value.find('\\') != string::npos || value == "stdout") {
                 // This looks like a filename or special output (stdout)
-                config.output_filename(value);
+                config.output_format_filename(value);
                 
                 // Try to infer format from filename extension
                 if (value == "stdout") {
-                    config.output_id(output::STDOUT);
+                    config.output_format_id(output_format::STDOUT);
                 } else {
                     size_t dot_pos = value.find_last_of('.');
                     if (dot_pos != string::npos) {
                         string extension = value.substr(dot_pos + 1);
                         try {
-                            config.output_id(to_output_from_string(extension));
+                            config.output_format_id(to_output_format_from_string(extension));
                         } catch (const invalid_argument&) {
                             // If extension isn't recognized, default to plain text
-                            config.output_id(output::PLAIN_TEXT);
+                            config.output_format_id(output_format::PLAIN_TEXT);
                         }
                     } else {
                         // No extension, default to plain text
-                        config.output_id(output::PLAIN_TEXT);
+                        config.output_format_id(output_format::PLAIN_TEXT);
                     }
                 }
             } else {
                 // This looks like a format specifier
-                config.output_id(to_output_from_string(value));
+                config.output_format_id(to_output_format_from_string(value));
             }
         } else if (key == args::OUTPUT_FILENAME_WORD_STR) {
 
-            config.output_filename(value);
+            config.output_format_filename(value);
         }
         else {
 

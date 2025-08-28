@@ -21,15 +21,15 @@ class grid_operations;
 class distance_grid : public grid_interface {
 public:
 
-    // Delete copy constructor and copy assignment operator to fix the static assertion failure  
+    explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
+
     distance_grid(const distance_grid&) = delete;
+
     distance_grid& operator=(const distance_grid&) = delete;
 
-    // Explicitly define move constructor and move assignment operator  
     distance_grid(distance_grid&&) noexcept = default;
-    distance_grid& operator=(distance_grid&&) noexcept = default;
 
-	explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
+    distance_grid& operator=(distance_grid&&) noexcept = default;
 
     /// @brief 
     /// @param indices 
@@ -59,11 +59,11 @@ public:
     std::shared_ptr<distances> get_distances() const noexcept;
 private:
 
+    std::string to_base36(int value) const;
+
 	std::shared_ptr<distances> m_distances;
 
     std::unique_ptr<grid_interface> m_grid;
-
-	std::string to_base36(int value) const;
 };
 }
 

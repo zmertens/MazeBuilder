@@ -29,7 +29,7 @@ public:
 
     static constexpr auto DEFAULT_SEED = 0u;
 
-    static constexpr auto DEFAULT_OUTPUT_ID = output::PLAIN_TEXT;
+    static constexpr auto DEFAULT_OUTPUT_ID = output_format::PLAIN_TEXT;
 
     static constexpr auto DEFAULT_DISTANCES = false;
 
@@ -152,19 +152,19 @@ public:
         return *this;
     }
 
-    /// @brief Set the output ID
-    /// @param output The output ID
+    /// @brief Set the output_format ID
+    /// @param output_format The output_format ID
     /// @return A reference to this configurator
-    configurator& output_id(output output) noexcept {
-        m_output_id = output;
+    configurator& output_format_id(output_format output_format) noexcept {
+        m_output_format_id = output_format;
         return *this;
     }
 
-    /// @brief Set the output filename
-    /// @param filename The output filename
+    /// @brief Set the output_format filename
+    /// @param filename The output_format filename
     /// @return A reference to this configurator
-    configurator& output_filename(std::string filename) noexcept {
-        m_output_filename = std::move(filename);
+    configurator& output_format_filename(std::string filename) noexcept {
+        m_output_format_filename = std::move(filename);
         return *this;
     }
 
@@ -220,13 +220,13 @@ public:
     /// @return The ending cell index for distance calculation
     int distances_end() const noexcept { return m_distances_end; }
 
-    /// @brief Get the output ID
-    /// @return The output ID
-    output output_id() const noexcept { return m_output_id; }
+    /// @brief Get the output_format ID
+    /// @return The output_format ID
+    output_format output_format_id() const noexcept { return m_output_format_id; }
 
-    /// @brief Get the output filename
-    /// @return The output filename
-    const std::string& output_filename() const noexcept { return m_output_filename; }
+    /// @brief Get the output_format filename
+    /// @return The output_format filename
+    const std::string& output_format_filename() const noexcept { return m_output_format_filename; }
 
     /// @brief Get the help message
     /// @return The help message
@@ -276,8 +276,8 @@ public:
         m_distances = DEFAULT_DISTANCES;
         m_distances_start = DEFAULT_DISTANCES_START;
         m_distances_end = DEFAULT_DISTANCES_END;
-        m_output_id = DEFAULT_OUTPUT_ID;
-        m_output_filename.clear();
+        m_output_format_id = DEFAULT_OUTPUT_ID;
+        m_output_format_filename.clear();
         m_help.clear();
         m_version.clear();
     }
@@ -302,9 +302,9 @@ private:
 
     int m_distances_end;
 
-    output m_output_id;
+    output_format m_output_format_id;
 
-    std::string m_output_filename;
+    std::string m_output_format_filename;
 
     std::string m_help;
 

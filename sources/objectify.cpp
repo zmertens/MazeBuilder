@@ -92,7 +92,9 @@ bool objectify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] r
         }
 
         // Create blocks for wall characters
-        if (sv[i] == CORNER || sv[i] == BARRIER1 || sv[i] == BARRIER2) {
+        if (sv[i] == static_cast<char>(barriers::CORNER) || 
+            sv[i] == static_cast<char>(barriers::HORIZONTAL) || 
+            sv[i] == static_cast<char>(barriers::VERTICAL)) {
             static constexpr auto block_size = 1;
             for (auto h = 0; h < static_cast<int>(std::get<2>(dimensions)); ++h) {
                 add_block(row_x, col_z, h, 0, block_size); // w=0 for now, could use block_id from config

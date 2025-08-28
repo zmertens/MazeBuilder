@@ -73,20 +73,20 @@ int main(int argc, char* argv[]) {
         bool write_success = false;
             
         // Check if we have a specific output filename
-        if (!config->output_filename().empty()) {
+        if (!config->output_format_filename().empty()) {
 
-            if (config->output_filename() == "stdout") {
+            if (config->output_format_filename() == "stdout") {
 
                 // Write to stdout
                 write_success = writer.write(cout, str);
             } else {
 
                 // Write to file
-                write_success = writer.write_file(config->output_filename(), str);
+                write_success = writer.write_file(config->output_format_filename(), str);
             }
         } else {
             // No specific filename, check output type
-            if (config->output_id() == mazes::output::STDOUT) {
+            if (config->output_format_id() == mazes::output_format::STDOUT) {
 
                 write_success = writer.write(cout, str);
             } else {

@@ -82,7 +82,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
         std::cerr << "Debug: Parsed config - distances: " << (config.distances() ? "true" : "false")
                  << ", start: " << config.distances_start() 
                  << ", end: " << config.distances_end() 
-                 << ", output_filename: " << config.output_filename() << std::endl;
+                 << ", output_filename: " << config.output_format_filename() << std::endl;
 #endif
 
         if (!config.help().empty()) {
@@ -114,7 +114,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
         apply(cref(product), ref(rng), config.algo_id(), config);
 
         // Check if we need to generate Wavefront OBJ output
-        if (config.output_id() == mazes::output::WAVEFRONT_OBJECT_FILE) {
+        if (config.output_format_id() == mazes::output_format::WAVEFRONT_OBJECT_FILE) {
             // First, get the string representation for parsing
             mazes::stringify maze_stringify;
             if (!maze_stringify.run(cref(product), ref(rng))) {

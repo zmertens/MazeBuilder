@@ -83,6 +83,8 @@ add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_B
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
 # Add STB as a system include to suppress warnings
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
+# Add compile definition to disable problematic FMT_STRING usage
+target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE FMT_STRING_ALIAS=0)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
 target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS})
 target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)

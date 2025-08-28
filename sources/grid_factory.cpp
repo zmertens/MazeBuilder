@@ -157,7 +157,7 @@ void grid_factory::register_default_creators() {
         return std::make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
     };
 
-    // Register convenience creators based on output type
+    // Register convenience creators based on output_format type
     m_creators["image_grid"] = [](const configurator& config) -> std::unique_ptr<grid_interface> {
         if (config.distances()) {
             return std::make_unique<colored_grid>(config.rows(), config.columns(), config.levels());
@@ -179,7 +179,7 @@ std::string grid_factory::determine_grid_type_from_config(const configurator& co
 
     if (config.distances()) {
 
-        if (config.output_id() == output::PNG || config.output_id() == output::JPEG) {
+        if (config.output_format_id() == output_format::PNG || config.output_format_id() == output_format::JPEG) {
 
             return "colored_grid";
         } else {

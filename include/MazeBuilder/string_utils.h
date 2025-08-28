@@ -72,25 +72,26 @@ public:
     static std::string to_string(std::unordered_map<std::string, std::string> const& m) noexcept;
 
     // Template-based split functions
-    
-    // Helper trait to detect if a type has push_back method
+
+    // Helper trait to detect if a type has push_back method - local to this function
     template<typename T, typename = void>
     struct has_push_back : std::false_type {};
-    
+
     template<typename T>
     struct has_push_back<T, std::void_t<decltype(std::declval<T>().push_back(std::declval<typename T::value_type>()))>> : std::true_type {};
 
-    /// @brief Generic split function with custom predicate
-    /// @tparam It Iterator type
-    /// @tparam Oc Output container type
-    /// @tparam V Value type
-    /// @tparam Pred Predicate type
-    /// @param it Start iterator
-    /// @param end_it End iterator
-    /// @param dest Output container
-    /// @param sep Separator value
-    /// @param f Predicate function to test for separator
-    /// @return Iterator to end position
+
+    /// @brief Splits a range into slices based on a separator and stores the results in a destination container.
+    /// @tparam It Type of the iterator for the input range.
+    /// @tparam Oc Type of the output container that will store the slices.
+    /// @tparam V Type of the separator value.
+    /// @tparam Pred Type of the predicate function used to compare elements to the separator.
+    /// @param it Iterator pointing to the beginning of the range to split.
+    /// @param end_it Iterator pointing to the end of the range to split.
+    /// @param dest Destination container where the resulting slices will be stored.
+    /// @param sep Separator value used to determine where to split the range.
+    /// @param f Predicate function that determines if an element matches the separator.
+    /// @return Iterator pointing to the position after the last processed element, or end_it if the entire range was processed.
     template<typename It, typename Oc, typename V, typename Pred>
     static It split(It it, const It end_it, Oc& dest, const V& sep, Pred f) {
 
@@ -105,10 +106,10 @@ public:
 
             auto slice{ it };
 
-            while(slice != end_it) {
+            while (slice != end_it) {
 
-                if(f(*slice, sep)) break;
-                
+                if (f(*slice, sep)) break;
+
                 // Handle string vs other containers
                 if constexpr (is_same_v<SliceContainer, string>) {
 
@@ -119,19 +120,19 @@ public:
                 } else {
 
                     // For types without push_back, provide a helpful error
-                    static_assert(is_same_v<SliceContainer, string> || has_push_back<SliceContainer>::value, 
+                    static_assert(is_same_v<SliceContainer, string> || has_push_back<SliceContainer>::value,
                         "SliceContainer must be std::string or have a push_back method");
                 }
                 ++slice;
             }
-            
+
             dest.push_back(dest_elm);
 
-            if(slice == end_it) {
-                
+            if (slice == end_it) {
+
                 return end_it;
             }
-            
+
             it = ++slice;
         }
         return it;
@@ -241,6 +242,7 @@ public:
     }
 
 }; // class
+
 } // namespace
 
 #endif // STRING_UTILS_H
