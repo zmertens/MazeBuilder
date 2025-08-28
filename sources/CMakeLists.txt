@@ -69,8 +69,8 @@ list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:MSVC>:/W4;/WX>")
 # Dependencies
 message(INFO ": Fetching fmt library...")
 include(FetchContent)
-# fmt version 10.2.1
-FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG e69e5f977d458f2650bb346dadf2ad30c5320281)
+# fmt version 11.2.0
+FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 40626af88bd7df9a5fb80be7b25ac85b122d6c21)
 # Configure fmt options before making it available
 set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
 set(FMT_TEST OFF CACHE BOOL "" FORCE)
