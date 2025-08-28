@@ -66,11 +66,6 @@ public:
     /// @return A new string view with the specified characters removed from both ends
     static std::string_view strip(const std::string_view& s, const std::string_view& to_strip_from_s = " ") noexcept;
 
-    /// @brief Convert a map to a formatted string with each key-value pair on a line
-    /// @param m The map to convert
-    /// @return A formatted string representation of the map
-    static std::string to_string(std::unordered_map<std::string, std::string> const& m) noexcept;
-
     // Template-based split functions
 
     // Helper trait to detect if a type has push_back method - local to this function
@@ -240,6 +235,14 @@ public:
 
         return outputString;
     }
+   
+    /// @brief Simple wrapper for fmt::format using runtime format strings (string_view)
+    /// @tparam Args Types of the arguments to format
+    /// @param format_str Format string as string_view
+    /// @param args Arguments to format
+    /// @return Formatted string
+    template<typename... Args>
+    static std::string format(std::string_view format_str, const Args&... args) noexcept;
 
 }; // class
 

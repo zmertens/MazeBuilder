@@ -22,8 +22,9 @@
 
 const std::string cli::DEBUG_STR = "DEBUG";
 
-// Use functions to avoid static initialization order fiasco
+// Use functions to avoid static initialization order mismatches
 static std::string get_cli_version_str() {
+
     return mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ")";
 }
 

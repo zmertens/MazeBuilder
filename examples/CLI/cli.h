@@ -1,7 +1,7 @@
 /// @file cli.h
 /// @class cli
 /// @brief Command-line interface for the maze builder application
-/// @details This class implements the algo_interface and provides a way to run maze generation algorithms
+/// @details This class provides a way to generate mazes by parsing command line arguments
 
 #ifndef CLI_H
 #define CLI_H

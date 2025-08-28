@@ -155,6 +155,7 @@ json_helper& json_helper::operator=(const json_helper& other) {
 /// @param pretty_print 4
 /// @return 
 std::string json_helper::from(const std::unordered_map<std::string, std::string>& map, int pretty_print) const noexcept {
+
     return this->impl->dump_s(std::cref(map), pretty_print);
 }
 
@@ -163,21 +164,26 @@ std::string json_helper::from(const std::unordered_map<std::string, std::string>
 /// @param pretty_print 4
 /// @return 
 std::string json_helper::from(const std::vector<std::unordered_map<std::string, std::string>>& arr, int pretty_print) const noexcept {
+
     return this->impl->dump_s(std::cref(arr), pretty_print);
 }
 
 bool json_helper::from(const std::string& s, std::unordered_map<std::string, std::string>& m) const noexcept {
+
     return this->impl->from(std::cref(s), std::ref(m));
 }
 
 bool json_helper::load(const std::string& filename, std::unordered_map<std::string, std::string>& m) const noexcept {
+
     return this->impl->load(std::cref(filename), std::ref(m));
 }
 
 bool json_helper::from_array(const std::string& s, std::vector<std::unordered_map<std::string, std::string>>& vm) const noexcept {
+
     return this->impl->from_array(std::cref(s), std::ref(vm));
 }
 
 bool json_helper::load_array(const std::string& filename, std::vector<std::unordered_map<std::string, std::string>>& vm) const noexcept {
+
     return this->impl->load_array(std::cref(filename), std::ref(vm));
 }

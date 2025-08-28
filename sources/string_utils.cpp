@@ -53,37 +53,6 @@ std::string_view string_utils::find_first_of(const std::string_view& s, const st
     return s.substr(pos, 1);
 }
 
-// Fix the implementation for the map version to be compatible with the args version
-std::string string_utils::to_string(std::unordered_map<std::string, std::string> const& m) noexcept {
-    // Check if the map is empty
-    if (m.empty()) {
-        return "";
-    }
-    
-    std::ostringstream oss;
-    
-    // Build a filtered map to avoid duplicate entries with different forms of the same key
-    std::unordered_map<std::string, std::string> filtered_map;
-    for (const auto& [key, value] : m) {
-        // Only include keys without dashes to avoid duplicates
-        if (!key.empty() && key[0] != '-') {
-            filtered_map[key] = value;
-        }
-    }
-    
-    // If there are no non-dashed keys, return empty string
-    if (filtered_map.empty()) {
-        return "";
-    }
-    
-    // Serialize the filtered map
-    for (const auto& [key, value] : filtered_map) {
-        oss << key << ": " << value << "\n";
-    }
-    
-    return oss.str();
-}
-
 std::list<std::string> string_utils::split(const std::string& str, char delimiter) noexcept {
     std::list<std::string> result;
     std::stringstream ss(str);
@@ -123,4 +92,67 @@ std::list<std::string_view> string_utils::split(const std::string_view& sv, cons
     }
     
     return result;
+}
+
+
+// Template wrapper functions for fmt::format using perfect forwarding and variadic arguments
+template<typename... Args>
+static std::string string_utils::format(std::string_view format_str, const Args&... args) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(args...));
+}
+
+// Explicit specializations
+template<>
+std::string string_utils::format<>(std::string_view format_str) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args());
+}
+
+template<>
+std::string string_utils::format<int>(std::string_view format_str, const int& arg) noexcept {
+    
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
+std::string string_utils::format<int, int>(std::string_view format_str, const int& arg1, const int& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
+}
+
+template<>
+std::string string_utils::format<int, float>(std::string_view format_str, const int& arg1, const float& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
+}
+
+template<>
+std::string string_utils::format<int, int, float>(std::string_view format_str, const int& arg, const int& arg2, const float& arg3) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
+}
+
+template<>
+std::string string_utils::format<float>(std::string_view format_str, const float& arg) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
+std::string string_utils::format<float, float>(std::string_view format_str, const float& arg1, const float& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
+}
+
+template<>
+std::string string_utils::format<std::string>(std::string_view format_str, const std::string& arg) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
+std::string string_utils::format<std::string_view>(std::string_view format_str, const std::string_view& arg) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
 }

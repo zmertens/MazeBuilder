@@ -34,6 +34,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with custom predicate") {
+
         string test_string = "1a2a3a4";
         vector<vector<char>> result;
         
@@ -51,6 +52,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("strsplit with string and vector<string>") {
+
         string input = "apple|banana|cherry";
         vector<string> result;
         
@@ -63,6 +65,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("strsplit with vector of integers") {
+
         vector<int> input = {1, 9, 2, 9, 3, 9, 4};
         vector<vector<int>> result;
         
@@ -76,6 +79,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with empty input") {
+
         string empty_string = "";
         vector<vector<char>> result;
         
@@ -86,6 +90,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with no separators") {
+
         string test_string = "noseparators";
         vector<vector<char>> result;
         
@@ -97,6 +102,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with consecutive separators") {
+
         string test_string = "a,,b,,c";
         vector<vector<char>> result;
         
@@ -111,6 +117,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with list output container") {
+
         string test_string = "x-y-z";
         list<vector<char>> result;
         
@@ -126,6 +133,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("strsplit with string_view input") {
+
         string_view input = "data:info:value";
         vector<string> result;
         
@@ -138,6 +146,7 @@ TEST_CASE("string_utils template split functions", "[string_utils template_split
     }
     
     SECTION("Template split with numeric predicate") {
+
         vector<int> numbers = {10, 5, 20, 5, 30, 5, 40};
         vector<vector<int>> result;
         
@@ -161,6 +170,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     using namespace std;
 
     SECTION("Template split with single character input") {
+
         string single_char = "a";
         vector<vector<char>> result;
         
@@ -171,6 +181,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("Template split starting with separator") {
+
         string test_string = ",hello,world";
         vector<vector<char>> result;
         
@@ -183,6 +194,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("Template split ending with separator") {
+
         string test_string = "hello,world,";
         vector<vector<char>> result;
         
@@ -194,6 +206,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("Template split with deque output container") {
+
         string test_string = "a;b;c;d";
         deque<vector<char>> result;
         
@@ -207,6 +220,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("strsplit compatibility with existing split functionality") {
+
         // Test that template functions can complement existing functions
         string test_input = "alpha,beta,gamma";
         
@@ -225,6 +239,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("Template split with complex custom predicate") {
+
         string test_string = "1a2A3a4A5";
         vector<vector<char>> result;
         
@@ -244,6 +259,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("Template split return iterator value") {
+
         string test_string = "one,two,three";
         vector<vector<char>> result;
         
@@ -254,6 +270,7 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
     }
     
     SECTION("strsplit with string containing maze-like characters") {
+
         // Test compatibility with maze building context
         string maze_chars = "+|-+|-+";
         vector<string> result;
@@ -273,6 +290,7 @@ TEST_CASE("string_utils template split practical examples", "[string_utils pract
     using namespace std;
 
     SECTION("Parse maze coordinates using template split") {
+
         // Example: parsing coordinate pairs like "1,2;3,4;5,6"
         string coord_string = "1,2;3,4;5,6";
         vector<string> coord_pairs;
@@ -286,38 +304,10 @@ TEST_CASE("string_utils template split practical examples", "[string_utils pract
         
         // Further split each coordinate pair
         for (const auto& pair : coord_pairs) {
+
             vector<string> coords;
             string_utils::strsplit(pair, coords, ',');
             REQUIRE(coords.size() == 2);
-            // Could convert to integers here for actual coordinate processing
-        }
-    }
-    
-    SECTION("Parse configuration strings using template functions") {
-        // Example: parsing key=value pairs like "rows=10;cols=5;seed=42"
-        string config_string = "rows=10;cols=5;seed=42";
-        vector<string> config_pairs;
-        
-        string_utils::strsplit(config_string, config_pairs, ';');
-        
-        REQUIRE(config_pairs.size() == 3);
-        
-        // Verify each key=value pair can be further processed
-        for (const auto& pair : config_pairs) {
-            vector<string> key_value;
-            string_utils::strsplit(pair, key_value, '=');
-            REQUIRE(key_value.size() == 2);
-            
-            // if (pair.starts_with("rows")) {
-            //     REQUIRE(key_value[0] == "rows");
-            //     REQUIRE(key_value[1] == "10");
-            // } else if (pair.starts_with("cols")) {
-            //     REQUIRE(key_value[0] == "cols");
-            //     REQUIRE(key_value[1] == "5");
-            // } else if (pair.starts_with("seed")) {
-            //     REQUIRE(key_value[0] == "seed");
-            //     REQUIRE(key_value[1] == "42");
-            // }
         }
     }
     
@@ -338,5 +328,96 @@ TEST_CASE("string_utils template split practical examples", "[string_utils pract
             REQUIRE_FALSE(algo.empty());
             REQUIRE(algo.find_first_not_of("abcdefghijklmnopqrstuvwxyz_") == string::npos);
         }
+    }
+}
+
+TEST_CASE("string_utils format wrapper functions", "[string_utils_format]") {
+
+    using namespace mazes;
+    using namespace std;
+
+    SECTION("Format with single int argument") {
+        string result = string_utils::format("{}", 42);
+        REQUIRE(result == "42");
+    }
+
+    SECTION("Format with single float argument") {
+        string result = string_utils::format("{:.2f}", 3.14159f);
+        REQUIRE(result == "3.14");
+    }
+
+    SECTION("Format with two int arguments") {
+        string result = string_utils::format("{}, {}", 10, 20);
+        REQUIRE(result == "10, 20");
+    }
+
+    SECTION("Format with int and float arguments") {
+        string result = string_utils::format("Value: {}, Rate: {:.1f}", 100, 2.5f);
+        REQUIRE(result == "Value: 100, Rate: 2.5");
+    }
+
+    SECTION("Format with two float arguments") {
+        string result = string_utils::format("x: {:.1f}, y: {:.1f}", 1.2f, 3.4f);
+        REQUIRE(result == "x: 1.2, y: 3.4");
+    }
+
+    SECTION("Format with string_view format string") {
+        string_view format_str = "Number: {}";
+        string result = string_utils::format(format_str, 999);
+        REQUIRE(result == "Number: 999");
+    }
+
+    SECTION("Format with const char* format string") {
+        const char* format_str = "Float: {:.3f}";
+        string result = string_utils::format(format_str, 2.71828f);
+        REQUIRE(result == "Float: 2.718");
+    }
+
+    SECTION("Format with complex format string") {
+        string result = string_utils::format("Coords: ({}, {}), Distance: {:.2f}", 5, 10, 7.07f);
+        REQUIRE(result == "Coords: (5, 10), Distance: 7.07");
+    }
+
+    SECTION("Format with zero arguments") {
+        string result = string_utils::format("Hello World"sv);
+        REQUIRE(result == "Hello World");
+    }
+
+    SECTION("Format with lvalue references") {
+        int x = 42;
+        float y = 3.14f;
+        string result = string_utils::format("x={}, y={:.1f}", x, y);
+        REQUIRE(result == "x=42, y=3.1");
+    }
+}
+
+TEST_CASE("string_utils format wrapper edge cases", "[string_utils_format_edge]") {
+
+    using namespace mazes;
+    using namespace std;
+
+    SECTION("Format with empty format string") {
+        string result = string_utils::format(""sv);
+        REQUIRE(result == "");
+    }
+
+    SECTION("Format with special characters") {
+        string result = string_utils::format("Special: {}", 123);
+        REQUIRE(result == "Special: 123");
+    }
+
+    SECTION("Format with negative numbers") {
+        string result = string_utils::format("{}, {:.1f}", -42, -3.14f);
+        REQUIRE(result == "-42, -3.1");
+    }
+
+    SECTION("Format with zero values") {
+        string result = string_utils::format("{}, {:.1f}", 0, 0.0f);
+        REQUIRE(result == "0, 0.0");
+    }
+
+    SECTION("Format with large numbers") {
+        string result = string_utils::format("{}, {:.0f}", 1000000, 1234567.89f);
+        REQUIRE(result == "1000000, 1234568");
     }
 }
