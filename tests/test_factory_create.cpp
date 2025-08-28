@@ -173,7 +173,7 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
         REQUIRE(grid2 != nullptr);
 
         // With distances and image output
-        config.output_id(output::PNG);
+        config.output_format_id(output_format::PNG);
         auto grid3 = factory.create(config);
         REQUIRE(grid3 != nullptr);
     }

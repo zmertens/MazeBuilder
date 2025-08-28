@@ -67,14 +67,13 @@ std::string distance_grid::to_base36(int value) const {
 /// @brief 
 /// @param start_index 
 /// @param end_index 
-void distance_grid::calculate_distances(int start_index, int) noexcept {
+void distance_grid::calculate_distances(int start_index, int end_index) noexcept {
 
    try {
         const auto& grid_ops = m_grid->operations();
 
         auto start_cell = grid_ops.search(start_index);
         if (!start_cell) {
-
             throw std::runtime_error("Invalid start cell index.");
         }
 
@@ -84,7 +83,8 @@ void distance_grid::calculate_distances(int start_index, int) noexcept {
             throw std::runtime_error("Failed to create distances object.");
         }
 
-        // Calculate distances from start cell to all reachable cells using BFS
+        // Calculate distances from start cell to reachable cells using BFS
+        // Respect the end_index range if specified
         std::unordered_map<int32_t, bool> visited;
         std::deque<int32_t> queue;
         
@@ -100,6 +100,11 @@ void distance_grid::calculate_distances(int start_index, int) noexcept {
             if (!current_cell) continue;
             
             int current_distance = (*m_distances)[current_index];
+            
+            // If end_index is specified (not -1) and we've reached it, stop processing
+            if (end_index != -1 && current_distance >= (end_index - start_index)) {
+                continue;
+            }
             
             // Get all neighbors
             auto neighbors = grid_ops.get_neighbors(current_cell);
@@ -118,9 +123,16 @@ void distance_grid::calculate_distances(int start_index, int) noexcept {
                     continue;
                 }
                 
+                int next_distance = current_distance + 1;
+                
+                // If end_index is specified, don't exceed the distance range
+                if (end_index != -1 && next_distance > (end_index - start_index)) {
+                    continue;
+                }
+                
                 // Mark as visited and set distance
                 visited[neighbor_index] = true;
-                m_distances->set(neighbor_index, current_distance + 1);
+                m_distances->set(neighbor_index, next_distance);
                 queue.push_back(neighbor_index);
             }
         }
