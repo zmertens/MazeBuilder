@@ -122,8 +122,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]") {
         
         // Link the same cells multiple times
         lab::link(cell1, cell2);
-        lab::link(cell1, cell2); // Should not cause issues
-        lab::link(cell1, cell2); // Should not cause issues
+        lab::link(cell1, cell2);
+        lab::link(cell1, cell2);
         
         // Should still be linked correctly
         REQUIRE(cell1->is_linked(cell2));
@@ -144,7 +144,7 @@ TEST_CASE("Lab set neighbors and verify links", "[neighbors]") {
         configurator config;
         config.rows(2).columns(2).levels(1);
         
-        std::vector<int> indices; // Empty indices for sequential order
+        std::vector<int> indices;
         std::vector<std::shared_ptr<cell>> cells;
         
         lab::set_neighbors(config, indices, cells);
@@ -154,8 +154,9 @@ TEST_CASE("Lab set neighbors and verify links", "[neighbors]") {
         
         // Verify all cells exist and have correct indices
         for (size_t i = 0; i < cells.size(); ++i) {
-            REQUIRE(cells[i] != nullptr);
-            REQUIRE(cells[i]->get_index() == static_cast<int32_t>(i));
+
+            REQUIRE(cells.at(i) != nullptr);
+            REQUIRE(cells.at(i)->get_index() == static_cast<int32_t>(i));
         }
         
         // Test specific neighbor relationships

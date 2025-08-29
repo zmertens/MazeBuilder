@@ -3,26 +3,47 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/grid_factory.h>
+#include <MazeBuilder/factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/stringify.h>
 
 #include <algorithm>
 #include <chrono>
+#include <functional>
+#include <iostream>
 #include <vector>
 
 using namespace mazes;
 using namespace std;
 
-static constexpr auto ROWS = 50, COLUMNS = 50, LEVELS = 10;
+static constexpr auto ROWS = 10, COLUMNS = 5, LEVELS = 1;
+
 static constexpr auto ALGO_TO_RUN = algo::DFS;
-static constexpr auto ALGO_S = "dfs";
+
 static constexpr auto SEED = 12345;
+
+TEST_CASE("Workflow static checks", "[workflow_static_checks]") {
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::factory>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible<mazes::factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable<mazes::factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_constructible<mazes::factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_assignable<mazes::factory>::value);
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::randomizer>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::randomizer>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::randomizer>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::randomizer>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::randomizer>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::randomizer>::value);
+}
 
 TEST_CASE( "Test factory create1", "[create1]" ) {
 
-    grid_factory factory1{};
+    factory factory1{};
 
 #if defined(MAZE_BENCHMARK)
 
@@ -40,17 +61,59 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
     }
 
     SECTION("Create grid with factory - new registration method") {
+
+        static const string PRODUCT_NAME_1 = "test_grid";
         
         // Register a custom creator
-        factory1.register_creator("test_grid", [](const configurator& config) -> std::unique_ptr<grid_interface> {
+        factory1.register_creator(PRODUCT_NAME_1, [](const configurator& config) -> std::unique_ptr<grid_interface> {
             return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
         });
 
         // Create using the registered key
-        auto g = factory1.create("test_grid", configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+        auto g = factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
         REQUIRE(g != nullptr);
     }
 #endif
+}
+
+TEST_CASE("Test full workflow", "[full workflow]") {
+
+    factory g_factory{};
+
+    auto g = g_factory.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+
+    randomizer rndmzr{};
+
+    stringify stringifier{};
+
+    REQUIRE(stringifier.run(g, rndmzr));
+
+    if (auto casted_grid = dynamic_cast<grid*>(g.get()); casted_grid != nullptr) {
+
+        cout << casted_grid->operations().get_str() << endl;
+
+        REQUIRE_FALSE(casted_grid->operations().get_str().empty());
+    } else {
+
+        FAIL("Failed to cast to grid");
+    }
+    
+}
+
+TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
+
+    factory g_factory{};
+
+    // Test with a large grid that should be rejected by stringify
+    auto g = g_factory.create(configurator().rows(200).columns(200).levels(1).algo_id(ALGO_TO_RUN).seed(SEED));
+
+    randomizer rndmzr{};
+
+    stringify stringifier{};
+
+    // This should return false due to size limit
+    REQUIRE_FALSE(stringifier.run(g, rndmzr));
+    
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {
@@ -99,7 +162,7 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
 
 TEST_CASE("Grid factory registration", "[factory registration]") {
 
-    grid_factory factory;
+    factory factory;
 
     SECTION("Default creators are registered") {
         auto keys = factory.get_registered_keys();

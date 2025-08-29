@@ -8,6 +8,8 @@ set_source_files_properties(${CPP_BASE64_SRCS} PROPERTIES
     HEADER_FILE_ONLY FALSE
 )
 
+message(INFO ": Configuring ${PROJECT_NAME} v${MAZE_BUILDER_VERSION}")
+
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
     base64_helper.cpp
@@ -18,7 +20,7 @@ set(MAZE_BUILDER_CORE_SRCS
     distance_grid.cpp
     distances.cpp
     grid.cpp
-    grid_factory.cpp
+    factory.cpp
     json_helper.cpp
     lab.cpp
     maze_adapter.cpp
@@ -84,21 +86,19 @@ FetchContent_MakeAvailable(fmt)
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
-# Add STB as a system include to suppress warnings
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 # Add compile definition to disable problematic FMT_STRING usage
+target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE FMT_STRING_ALIAS=0)
 target_compile_features(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE cxx_std_20)
 target_compile_options(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE ${BASE_COMPILE_FLAGS})
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
+# Add STB as a system include to suppress warnings
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
+target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
-
-target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-set_target_properties(${MAZE_BUILDER_LIB_OUT}_obj PROPERTIES POSITION_INDEPENDENT_CODE 1)
-target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
 
 # Shared build
 if(NOT EMSCRIPTEN)

@@ -40,31 +40,34 @@ public:
     randomizer& operator=(randomizer&& other) noexcept;
 
     /// @brief Generates a random integer within a specified range.
-    /// @param low The lower bound of the range (inclusive).
-    /// @param high The upper bound of the range (inclusive).
+    /// @param low The lower bound of the integer (inclusive).
+    /// @param high The upper bound of the integer (inclusive).
     /// @return A random integer between the specified range [low, high].
-    int get_int_incl(int low, int high) noexcept;
+    int get_int(int low = 0, int high = 1) noexcept;
 
-    /// @brief Generates a random vector of integers with an optional range
-    /// @param low The lower bound of the range (inclusive).
-    /// @param high The upper bound of the range (inclusive).
-    /// @return 
-    std::vector<int> get_num_ints_incl(int low = 0, int high = 1) noexcept;
+    /// @brief Generates a shuffled vector of all integers in the specified range
+    /// @param low The lower bound of the integer(s) (inclusive).
+    /// @param high The upper bound of the integer(s) (inclusive).
+    /// @param count The number of random integers to generate
+    /// @return A vector containing all integers in [low, high] in random order
+    std::vector<int> get_vector_ints(int low = 0, int high = 1, int count = 1) noexcept;
 
     /// @brief Seeds the random number generator with the given seed value.
     /// @param seed The seed value to initialize the random number generator.
     void seed(unsigned long long seed = 0) noexcept;
 
     /// @brief Gets a random integer within a specified range.
-    /// @param low 
-    /// @param high 
-    /// @return 
+    /// @param low The lower bound of the integer (inclusive).
+    /// @param high The upper bound of the integer (inclusive).
+    /// @return A random integer within the specified range.
     int operator()(int low, int high) noexcept {
-        return get_int_incl(low, high);
+
+        return get_int(low, high);
     }
 
 private:
     class randomizer_impl;
+    
     std::unique_ptr<randomizer_impl> m_impl;
 };
 

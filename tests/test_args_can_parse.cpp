@@ -21,14 +21,19 @@ static constexpr auto MAZE_DOT_JSON_FILE{ "maze.json" };
 static constexpr auto OUTPUT_FILE_NAME{ "out.txt" };
 
 auto safe_at = [](const std::unordered_map<std::string, std::string>& map, const std::string& key) -> std::string {
+
     auto it = map.find(key);
+
     if (it == map.end()) {
+
         throw std::runtime_error("Key not found: " + key);
     }
+
     return it->second;
 };
 
 auto check_key_exists = [](const std::unordered_map<std::string, std::string>& map, const std::string& key) -> bool {
+
     return map.find(key) != map.end();
 };
 

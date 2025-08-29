@@ -16,7 +16,7 @@
 #include <MazeBuilder/distances.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid.h>
-#include <MazeBuilder/grid_factory.h>
+#include <MazeBuilder/factory.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/objectify.h>

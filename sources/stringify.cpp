@@ -6,6 +6,7 @@
 #include <MazeBuilder/randomizer.h>
 
 #include <sstream>
+#include <iostream>
 
 using namespace mazes;
 
@@ -24,8 +25,27 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] r
 
     auto [rows, columns, levels] = ops.get_dimensions();
 
+    // Safety check for excessively large grids to prevent performance issues
+    const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
+    const size_t max_reasonable_cells = 10000; // Reasonable limit for text output
+    
+    if (total_cells > max_reasonable_cells) {
+#if defined(MAZE_DEBUG)
+        std::cerr << "stringify::run - Grid too large (" << total_cells << " cells), max recommended: " << max_reasonable_cells << std::endl;
+#endif
+        return false;
+    }
+
     // Get all cells using maze_adapter
     auto all_cells = ops.get_cells();
+    
+    if (all_cells.empty()) {
+#if defined(MAZE_DEBUG)
+        std::cerr << "stringify::run - No cells in grid" << std::endl;
+#endif
+        return false;
+    }
+    
     maze_adapter maze_view(all_cells);
 
     // Generate ASCII representation
@@ -51,6 +71,12 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] r
 
             // Cell content (from g's contents_of method)
             std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
+            
+            // SAFETY CHECK: Prevent infinite loop in content padding
+            if (content.length() > 10) {
+                content = content.substr(0, 3); // Truncate if too long
+            }
+            
             // Pad content to 3 characters
             while (content.length() < 3) {
                 content = " " + content;
@@ -64,7 +90,19 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] r
 
             if (cell_ptr && east_neighbor) {
                 auto links = cell_ptr->get_links();
+                
+                // Safety check: limit the number of links to check
+                size_t link_count = 0;
+                const size_t max_links = 100; // Reasonable upper bound
+                
                 for (const auto& [linked_cell, is_linked] : links) {
+                    if (++link_count > max_links) {
+#if defined(MAZE_DEBUG)
+                        std::cerr << "stringify::run - Too many links in cell, breaking" << std::endl;
+#endif
+                        break;
+                    }
+                    
                     if (is_linked) {
                         auto locked = linked_cell;
                         if (locked && locked->get_index() == east_neighbor->get_index()) {
@@ -83,7 +121,19 @@ bool stringify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] r
 
             if (cell_ptr && south_neighbor) {
                 auto links = cell_ptr->get_links();
+                
+                // Safety check: limit the number of links to check
+                size_t link_count = 0;
+                const size_t max_links = 100; // Reasonable upper bound
+                
                 for (const auto& [linked_cell, is_linked] : links) {
+                    if (++link_count > max_links) {
+#if defined(MAZE_DEBUG)
+                        std::cerr << "stringify::run - Too many links in cell, breaking" << std::endl;
+#endif
+                        break;
+                    }
+                    
                     if (is_linked) {
                         auto locked = linked_cell;
                         if (locked && locked->get_index() == south_neighbor->get_index()) {
