@@ -133,8 +133,8 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
 
     SECTION("Validate random number values are within specific range") {
 
-        auto result = rng.get_num_ints_incl(low, high);
-        REQUIRE(result.size() == high + 1);
+        auto result = rng.get_vector_ints(low, high - 1, high);
+        REQUIRE(result.size() == high);
         for (int num : result) {
             REQUIRE(num >= low);
             REQUIRE(num <= high);
@@ -142,19 +142,19 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
     }
 
     SECTION("Generate all integers in a range") {
-        auto result = rng.get_num_ints_incl(low, high);
-        REQUIRE(result.size() == high + 1);
+        auto result = rng.get_vector_ints(low, high, 2);
+        REQUIRE(result.size() == 2);
         std::sort(result.begin(), result.end());
         REQUIRE(result.cend() != result.cbegin());
     }
 
     SECTION("Empty range [high, low]") {
-        auto result = rng.get_num_ints_incl(high, low);
+        auto result = rng.get_vector_ints(high, low);
         REQUIRE(result.empty());
     }
 
     SECTION("Zero integers requested") {
-        auto result = rng.get_num_ints_incl(0, -1);
+        auto result = rng.get_vector_ints(0, -1);
         REQUIRE(result.empty());
     }
 }
