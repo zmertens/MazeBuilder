@@ -16,49 +16,65 @@
 
 using namespace mazes;
 
-
 bool string_utils::contains(const std::string& str, const std::string& substr) noexcept {
 
     return str.find(substr) != std::string::npos;
 }
 
 std::string string_utils::get_file_extension(const std::string& filename) noexcept {
+    
     auto pos = filename.find_last_of(".");
+
     if (pos == std::string::npos) {
+
         return "";
     }
+
     return filename.substr(pos);
 }
 
 bool string_utils::ends_with(const std::string& str, const std::string& suffix) noexcept {
+
     if (str.length() < suffix.length()) {
+
         return false;
     }
+
     return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
 }
 
-std::string_view string_utils::find_first_of(const std::string_view& s, const std::string_view& chars) noexcept {
+bool string_utils::find(std::string_view sv, char c) noexcept {
 
-    if (s.empty() || chars.empty()) {
+    return sv.find(c) != std::string_view::npos;
+}
+
+std::string_view string_utils::find_first_of(const std::string_view& sv, const std::string_view& chars) noexcept {
+
+    if (sv.empty() || chars.empty()) {
 
         return {};
     }
-    
-    auto pos = s.find_first_of(chars);
+
+    auto pos = sv.find_first_of(chars);
+
     if (pos == std::string_view::npos) {
 
         return {};
     }
     
-    return s.substr(pos, 1);
+    return sv.substr(pos, 1);
 }
 
 std::list<std::string> string_utils::split(const std::string& str, char delimiter) noexcept {
+    
     std::list<std::string> result;
+    
     std::stringstream ss(str);
+
     std::string token;
     
     while (std::getline(ss, token, delimiter)) {
+
         result.push_back(token);
     }
     
@@ -66,27 +82,36 @@ std::list<std::string> string_utils::split(const std::string& str, char delimite
 }
 
 std::list<std::string_view> string_utils::split(const std::string_view& sv, const std::string_view& delim) noexcept {
+    
     std::list<std::string_view> result;
     
     if (sv.empty()) {
+
         return result;
     }
     
     size_t start = 0;
+
     size_t pos = sv.find(delim);
     
     while (pos != std::string_view::npos) {
+
         if (pos > start) {
+
             result.push_back(sv.substr(start, pos - start));
         }
+
         start = pos + delim.length();
+
         pos = sv.find(delim, start);
     }
     
     // Add the last part
     if (start < sv.length()) {
+
         result.push_back(sv.substr(start));
     } else if (start == sv.length() && !sv.empty()) {
+
         // Handle the case where the string ends with the delimiter
         result.push_back(std::string_view{});
     }
@@ -146,6 +171,12 @@ std::string string_utils::format<float, float>(std::string_view format_str, cons
 }
 
 template<>
+std::string string_utils::format<const char*>(std::string_view format_str, const char* const& arg) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
 std::string string_utils::format<std::string>(std::string_view format_str, const std::string& arg) noexcept {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
@@ -155,4 +186,28 @@ template<>
 std::string string_utils::format<std::string_view>(std::string_view format_str, const std::string_view& arg) noexcept {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
+std::string string_utils::format<std::string_view>(std::string_view format_str, const std::string_view& arg1, const std::string_view& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
+}
+
+template<>
+std::string string_utils::format<const char*, const char*>(std::string_view format_str, const char* const& arg1, const char* const& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
+}
+
+template<>
+std::string string_utils::format<size_t>(std::string_view format_str, const size_t& arg) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template<>
+std::string string_utils::format<std::string, const char*>(std::string_view format_str, const std::string& arg1, const char* const& arg2) noexcept {
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
 }

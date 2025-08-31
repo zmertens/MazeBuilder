@@ -570,6 +570,92 @@ TEST_CASE("Args are bad and does not parse", "[args_does_not_parse]") {
     }
 }
 
+TEST_CASE("Args validate_slice_syntax behavior", "[validate_slice_syntax]") {
+    
+    args args_handler{};
+    
+    // Note: validate_slice_syntax is a private method, so we test it indirectly through parse()
+    // by providing slice syntax in distances arguments
+    
+    SECTION("Valid slice syntax that should return true") {
+        
+        SECTION("Basic positive numbers [123:321]") {
+            vector<string> args_vec = { "app", "-d", "[123:321]" };
+            // This should parse successfully if validate_slice_syntax returns true
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Single digits [1:2]") {
+            vector<string> args_vec = { "app", "-d", "[1:2]" };
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Empty end part [0:]") {
+            vector<string> args_vec = { "app", "-d", "[0:]" };
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Two digit numbers [10:7]") {
+            vector<string> args_vec = { "app", "-d", "[10:7]" };
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+    }
+    
+    SECTION("Invalid slice syntax that should return false") {
+        
+        SECTION("Negative numbers [0:-1]") {
+            vector<string> args_vec = { "app", "-d", "[0:-1]" };
+            // This should fail to parse if validate_slice_syntax returns false for negative numbers
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Negative start [:-1]") {
+            vector<string> args_vec = { "app", "-d", "[:-1]" };
+            // This should fail to parse if validate_slice_syntax returns false for negative numbers
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Missing brackets start") {
+            vector<string> args_vec = { "app", "-d", "1:2]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Missing brackets end") {
+            vector<string> args_vec = { "app", "-d", "[1:2" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Non-numeric content") {
+            vector<string> args_vec = { "app", "-d", "[abc:def]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Mixed valid and invalid") {
+            vector<string> args_vec = { "app", "-d", "[1:abc]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+    }
+    
+    SECTION("Edge cases") {
+        
+        SECTION("Empty brackets [:] ") {
+            vector<string> args_vec = { "app", "-d", "[:]" };
+            // Should work since empty strings pass all_of check
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Zero values [0:0]") {
+            vector<string> args_vec = { "app", "-d", "[0:0]" };
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Reverse order but valid [321:123]") {
+            vector<string> args_vec = { "app", "-d", "[321:123]" };
+            REQUIRE(args_handler.parse(args_vec, true));
+        }
+    }
+}
+
 TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]") {
     
     args args_handler{};

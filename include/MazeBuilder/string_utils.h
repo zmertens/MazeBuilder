@@ -42,6 +42,12 @@ public:
     /// @return True if str ends with suffix, false otherwise
     static bool ends_with(const std::string& str, const std::string& suffix) noexcept;
 
+    /// @brief Find a character in a string_view
+    /// @param sv The string_view to search in
+    /// @param c The character to search for
+    /// @return True if c is found in sv, false otherwise
+    static bool find(std::string_view sv, char c) noexcept;
+
     /// @brief Find the first occurrence of any character from a set in a string view
     /// @param s The string view to search in
     /// @param chars The set of characters to search for

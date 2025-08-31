@@ -18,64 +18,66 @@ namespace mazes {
 class args final {
 public:
 
-    static constexpr const char* ALGO_ID_FLAG_STR = "-a";
-    static constexpr const char* ALGO_ID_OPTION_STR = "--algo";
-    static constexpr const char* ALGO_ID_WORD_STR = "algo";
+    static constexpr const auto APP_KEY = "app";
 
-    static constexpr const char* BLOCK_ID_FLAG_STR = "-b";
-    static constexpr const char* BLOCK_ID_OPTION_STR = "--block";
-    static constexpr const char* BLOCK_ID_WORD_STR = "block";
+    static constexpr const auto ALGO_ID_FLAG_STR = "-a";
+    static constexpr const auto ALGO_ID_OPTION_STR = "--algo";
+    static constexpr const auto ALGO_ID_WORD_STR = "algo";
 
-    static constexpr const char* ROW_FLAG_STR = "-r";
-    static constexpr const char* ROW_OPTION_STR = "--rows";
-    static constexpr const char* ROW_WORD_STR = "rows";
+    static constexpr const auto BLOCK_ID_FLAG_STR = "-b";
+    static constexpr const auto BLOCK_ID_OPTION_STR = "--block";
+    static constexpr const auto BLOCK_ID_WORD_STR = "block";
+
+    static constexpr const auto ROW_FLAG_STR = "-r";
+    static constexpr const auto ROW_OPTION_STR = "--rows";
+    static constexpr const auto ROW_WORD_STR = "rows";
     
-    static constexpr const char* COLUMN_FLAG_STR = "-c";
-    static constexpr const char* COLUMN_OPTION_STR = "--columns";
-    static constexpr const char* COLUMN_WORD_STR = "columns";
+    static constexpr const auto COLUMN_FLAG_STR = "-c";
+    static constexpr const auto COLUMN_OPTION_STR = "--columns";
+    static constexpr const auto COLUMN_WORD_STR = "columns";
 
-    static constexpr const char* LEVEL_FLAG_STR = "-l";
-    static constexpr const char* LEVEL_OPTION_STR = "--levels";
-    static constexpr const char* LEVEL_WORD_STR = "levels";
+    static constexpr const auto LEVEL_FLAG_STR = "-l";
+    static constexpr const auto LEVEL_OPTION_STR = "--levels";
+    static constexpr const auto LEVEL_WORD_STR = "levels";
     
     // JSON related constants
-    static constexpr const char* JSON_FLAG_STR = "-j";
-    static constexpr const char* JSON_OPTION_STR = "--json";
-    static constexpr const char* JSON_WORD_STR = "json";
+    static constexpr const auto JSON_FLAG_STR = "-j";
+    static constexpr const auto JSON_OPTION_STR = "--json";
+    static constexpr const auto JSON_WORD_STR = "json";
     
     // Output related constants
-    static constexpr const char* OUTPUT_ID_FLAG_STR = "-o";
-    static constexpr const char* OUTPUT_ID_OPTION_STR = "--output";
-    static constexpr const char* OUTPUT_ID_WORD_STR = "output";
-    static constexpr const char* DEFAULT_OUTPUT_FILENAME = "maze.txt";
+    static constexpr const auto OUTPUT_ID_FLAG_STR = "-o";
+    static constexpr const auto OUTPUT_ID_OPTION_STR = "--output";
+    static constexpr const auto OUTPUT_ID_WORD_STR = "output";
+    static constexpr const auto DEFAULT_OUTPUT_FILENAME = "maze.txt";
     
     // Output filename related constants
-    static constexpr const char* OUTPUT_FILENAME_WORD_STR = "output_filename";
+    static constexpr const auto OUTPUT_FILENAME_WORD_STR = "output_filename";
     
     // Seed related constants
-    static constexpr const char* SEED_FLAG_STR = "-s";
-    static constexpr const char* SEED_OPTION_STR = "--seed";
-    static constexpr const char* SEED_WORD_STR = "seed";
+    static constexpr const auto SEED_FLAG_STR = "-s";
+    static constexpr const auto SEED_OPTION_STR = "--seed";
+    static constexpr const auto SEED_WORD_STR = "seed";
     
     // Distances related constants
-    static constexpr const char* DISTANCES_FLAG_STR = "-d";
-    static constexpr const char* DISTANCES_OPTION_STR = "--distances";
-    static constexpr const char* DISTANCES_WORD_STR = "distances";
-    static constexpr const char* DISTANCES_START_STR = "distances_start";
-    static constexpr const char* DISTANCES_END_STR = "distances_end";
+    static constexpr const auto DISTANCES_FLAG_STR = "-d";
+    static constexpr const auto DISTANCES_OPTION_STR = "--distances";
+    static constexpr const auto DISTANCES_WORD_STR = "distances";
+    static constexpr const auto DISTANCES_START_STR = "distances_start";
+    static constexpr const auto DISTANCES_END_STR = "distances_end";
     
     // Help related constants
-    static constexpr const char* HELP_FLAG_STR = "-h";
-    static constexpr const char* HELP_OPTION_STR = "--help";
-    static constexpr const char* HELP_WORD_STR = "help";
+    static constexpr const auto HELP_FLAG_STR = "-h";
+    static constexpr const auto HELP_OPTION_STR = "--help";
+    static constexpr const auto HELP_WORD_STR = "help";
     
     // Version related constants
-    static constexpr const char* VERSION_FLAG_STR = "-v";
-    static constexpr const char* VERSION_OPTION_STR = "--version";
-    static constexpr const char* VERSION_WORD_STR = "version";
+    static constexpr const auto VERSION_FLAG_STR = "-v";
+    static constexpr const auto VERSION_OPTION_STR = "--version";
+    static constexpr const auto VERSION_WORD_STR = "version";
     
     // Special values
-    static constexpr const char* TRUE_VALUE = "true";
+    static constexpr const auto TRUE_VALUE = "true";
 
     /// @brief Default constructor
     /// @details Initializes the implementation pointer
@@ -125,16 +127,16 @@ public:
     /// @brief Clear the arguments map
     void clear() noexcept;
 
-    /// @brief Get a value from the args map
+    /// @brief Get a value from the args map (from front)
     /// @param key The key to look up 
     /// @return The value if found, std::nullopt otherwise
     std::optional<std::string> get(const std::string& key) const noexcept;
 
-    /// @brief Get entire args map
+    /// @brief Get entire args map (from front)
     /// @return The internal arguments map or empty map if not valid
     std::optional<std::unordered_map<std::string, std::string>> get() const noexcept;
 
-    /// @brief Get vector of args maps for JSON array parsing
+    /// @brief Get vector of args maps (useful for JSON parsing with array of objects)
     /// @return The internal arguments map vector or empty vector if not valid
     std::optional<std::vector<std::unordered_map<std::string, std::string>>> get_array() const noexcept;
 

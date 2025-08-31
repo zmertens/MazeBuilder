@@ -79,16 +79,19 @@ std::unique_ptr<grid_interface> factory::create(const std::string& key, const co
         // Get dimensions from grid
         auto&& ops = grid->operations();
 
-        // Generate indices for configuration
+        // Generate indices for configuration  
         auto indices = rng.get_vector_ints(0, config.rows() * config.columns(), config.rows() * config.columns() - 1);
 
-        // Prepare cells
+        // Prepare cells without any links - the maze algorithm will create the links
         std::vector<std::shared_ptr<cell>> cells_to_set;
         cells_to_set.reserve(config.rows() * config.columns());
 
-        lab::set_neighbors(std::cref(config), std::cref(indices), std::ref(cells_to_set));
+        // Create cells with sequential indices (no neighbor links yet)
+        for (size_t i = 0; i < config.rows() * config.columns(); ++i) {
+            cells_to_set.push_back(std::make_shared<cell>(static_cast<int32_t>(i)));
+        }
 
-        // Set the configured cells in the grid
+        // Set the cells in the grid - this will set up neighbor topology but no links
         ops.set_cells(std::cref(cells_to_set));
 
         return grid;
