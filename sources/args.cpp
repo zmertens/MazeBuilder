@@ -60,68 +60,73 @@ public:
 
         using namespace std;
 
-        unordered_map<string, string> local_args_map;
+        // Ensure we have at least one map for command-line arguments
+        if (this->arguments.empty()) {
+            this->arguments.emplace_back();
+        }
+
+        // Get reference to the current (last) map - this will be the command-line args map
+        // or the last JSON object map
+        auto& current_map = this->arguments.back();
         
         if (key == args::ROW_WORD_STR) {
 
-            local_args_map[args::ROW_FLAG_STR] = value;
-            local_args_map[args::ROW_OPTION_STR] = value;
-            local_args_map[args::ROW_WORD_STR] = value;
+            current_map[args::ROW_FLAG_STR] = value;
+            current_map[args::ROW_OPTION_STR] = value;
+            current_map[args::ROW_WORD_STR] = value;
         } else if (key == args::COLUMN_WORD_STR) {
 
-            local_args_map[args::COLUMN_FLAG_STR] = value;
-            local_args_map[args::COLUMN_OPTION_STR] = value;
-            local_args_map[args::COLUMN_WORD_STR] = value;
+            current_map[args::COLUMN_FLAG_STR] = value;
+            current_map[args::COLUMN_OPTION_STR] = value;
+            current_map[args::COLUMN_WORD_STR] = value;
         } else if (key == args::LEVEL_WORD_STR) {
 
-            local_args_map[args::LEVEL_FLAG_STR] = value;
-            local_args_map[args::LEVEL_OPTION_STR] = value;
-            local_args_map[args::LEVEL_WORD_STR] = value;
+            current_map[args::LEVEL_FLAG_STR] = value;
+            current_map[args::LEVEL_OPTION_STR] = value;
+            current_map[args::LEVEL_WORD_STR] = value;
         } else if (key == args::SEED_WORD_STR) {
 
-            local_args_map[args::SEED_FLAG_STR] = value;
-            local_args_map[args::SEED_OPTION_STR] = value;
-            local_args_map[args::SEED_WORD_STR] = value;
+            current_map[args::SEED_FLAG_STR] = value;
+            current_map[args::SEED_OPTION_STR] = value;
+            current_map[args::SEED_WORD_STR] = value;
         } else if (key == args::OUTPUT_ID_WORD_STR) {
 
-            local_args_map[args::OUTPUT_ID_FLAG_STR] = value;
-            local_args_map[args::OUTPUT_ID_OPTION_STR] = value;
-            local_args_map[args::OUTPUT_ID_WORD_STR] = value;
+            current_map[args::OUTPUT_ID_FLAG_STR] = value;
+            current_map[args::OUTPUT_ID_OPTION_STR] = value;
+            current_map[args::OUTPUT_ID_WORD_STR] = value;
         } else if (key == args::JSON_WORD_STR) {
 
-            local_args_map[args::JSON_FLAG_STR] = value;
-            local_args_map[args::JSON_OPTION_STR] = value;
-            local_args_map[args::JSON_WORD_STR] = value;
+            current_map[args::JSON_FLAG_STR] = value;
+            current_map[args::JSON_OPTION_STR] = value;
+            current_map[args::JSON_WORD_STR] = value;
         } else if (key == args::DISTANCES_WORD_STR) {
 
-            local_args_map[args::DISTANCES_FLAG_STR] = value;
-            local_args_map[args::DISTANCES_OPTION_STR] = value;
-            local_args_map[args::DISTANCES_WORD_STR] = value;
+            current_map[args::DISTANCES_FLAG_STR] = value;
+            current_map[args::DISTANCES_OPTION_STR] = value;
+            current_map[args::DISTANCES_WORD_STR] = value;
         } else if (key == args::ALGO_ID_WORD_STR) {
 
-            local_args_map[args::ALGO_ID_FLAG_STR] = value;
-            local_args_map[args::ALGO_ID_OPTION_STR] = value;
-            local_args_map[args::ALGO_ID_WORD_STR] = value;
+            current_map[args::ALGO_ID_FLAG_STR] = value;
+            current_map[args::ALGO_ID_OPTION_STR] = value;
+            current_map[args::ALGO_ID_WORD_STR] = value;
         } else if (key == args::HELP_WORD_STR) {
 
-            local_args_map[args::HELP_FLAG_STR] = value;
-            local_args_map[args::HELP_OPTION_STR] = value;
-            local_args_map[args::HELP_WORD_STR] = value;
+            current_map[args::HELP_FLAG_STR] = value;
+            current_map[args::HELP_OPTION_STR] = value;
+            current_map[args::HELP_WORD_STR] = value;
         } else if (key == args::VERSION_WORD_STR) {
 
-            local_args_map[args::VERSION_FLAG_STR] = value;
-            local_args_map[args::VERSION_OPTION_STR] = value;
-            local_args_map[args::VERSION_WORD_STR] = value;
+            current_map[args::VERSION_FLAG_STR] = value;
+            current_map[args::VERSION_OPTION_STR] = value;
+            current_map[args::VERSION_WORD_STR] = value;
         } else {
 
             // For other keys, store as-is (like app name)
             if (!key.empty() && !(key[0] == '.' || key[0] == '/' || key[0] == '-')) {
 
-                local_args_map.insert_or_assign(string{ key }, value);
+                current_map.insert_or_assign(string{ key }, value);
             }
         }
-
-        this->arguments.emplace_back(std::move(local_args_map));
     }
 
     // Validate slice syntax before processing
@@ -396,6 +401,9 @@ public:
         using namespace std;
 
         this->arguments.clear();
+        
+        // Create the initial map for command-line arguments
+        this->arguments.emplace_back();
 
         // Store any extra arguments (like app names) as positional arguments
         if (auto extras{ cli_app.remaining() }; !extras.empty()) {
@@ -416,7 +424,7 @@ public:
                 add_argument_variants(args::JSON_WORD_STR, value);
                 
                 // Strip whitespace to determine if it's a JSON string vs file
-                auto trimmed_value = string_utils::stripWhitespace(value);
+                auto trimmed_value = string_utils::strip_whitespace(value);
                 
                 // Process JSON if it's a string (starts with ` after trimming)
                 if (!trimmed_value.empty() && trimmed_value.front() == '`') {
@@ -485,6 +493,8 @@ public:
         }
         
         // Handle distances (special case with sliced array parsing)
+        bool distances_specified = cli_app.count(args::DISTANCES_FLAG_STR) || cli_app.count(args::DISTANCES_OPTION_STR);
+        
         if (!distances_values.empty()) {
             if (auto value = distances_values.back(); !value.empty()) {
 
@@ -500,12 +510,12 @@ public:
                 // Parse sliced array syntax
                 parse_sliced_array(value);
                
-            } else if (distances_flag || cli_app.count(args::DISTANCES_FLAG_STR) || cli_app.count(args::DISTANCES_OPTION_STR)) {
+            } else if (distances_specified) {
 
                 // Flag form without value
                 add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
             }
-        } else if (distances_flag || cli_app.count(args::DISTANCES_FLAG_STR) || cli_app.count(args::DISTANCES_OPTION_STR)) {
+        } else if (distances_specified) {
 
             // Flag form without value
             add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
@@ -523,6 +533,57 @@ public:
         }
     } // populate_args_map
 
+    // Helper method to add JSON values to the current map
+    void add_json_values_to_current_map(const std::unordered_map<std::string, std::string>& json_map) {
+
+        using namespace std;
+
+        for (const auto& [key, value] : json_map) {
+            // Map JSON keys to argument keys and add using add_argument_variants
+            if (key == args::ROW_WORD_STR) {
+
+                add_argument_variants(args::ROW_WORD_STR, value);
+            } else if (key == args::COLUMN_WORD_STR) {
+
+                add_argument_variants(args::COLUMN_WORD_STR, value);
+            } else if (key == args::LEVEL_WORD_STR) {
+
+                add_argument_variants(args::LEVEL_WORD_STR, value);
+            } else if (key == args::SEED_WORD_STR) {
+
+                add_argument_variants(args::SEED_WORD_STR, value);
+            } else if (key == args::ALGO_ID_WORD_STR) {
+
+                add_argument_variants(args::ALGO_ID_WORD_STR, value);
+            } else if (key == args::OUTPUT_ID_WORD_STR) {
+
+                add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
+            } else if (key == args::DISTANCES_WORD_STR) {
+
+                // Handle boolean distances field
+                if (value == args::TRUE_VALUE) {
+
+                    add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
+                } else if (value != args::TRUE_VALUE) {
+
+                    // Don't add distances if it's false
+                } else {
+
+                    // Might be a slice notation as a string
+                    add_argument_variants(args::DISTANCES_WORD_STR, value);
+                    parse_sliced_array(value);
+                }
+            } else {
+                
+                // Store unknown JSON keys directly in the current map
+                if (this->arguments.empty()) {
+                    this->arguments.emplace_back();
+                }
+                this->arguments.back().insert_or_assign(key, value);
+            }
+        }
+    }
+
     // Internal JSON processing methods for use in populate_args_map
     bool process_json_string(const std::string& json_str) {
 
@@ -531,7 +592,7 @@ public:
         try {
 
             // Remove backticks and parse JSON
-            if (auto clean_json = string_utils::stripWhitespace(cref(json_str)); !clean_json.empty() 
+            if (auto clean_json = string_utils::strip_whitespace(cref(json_str)); !clean_json.empty() 
                 && clean_json.front() == '`' && clean_json.back() == '`') {
 
                 clean_json = clean_json.substr(1, clean_json.length() - 2);
@@ -546,48 +607,8 @@ public:
                     return false;
                 }
 
-                for (const auto& [key, value] : parsed_json) {
-                    // Map JSON keys to argument keys and add using add_argument_variants
-                    if (key == args::ROW_WORD_STR) {
-
-                        add_argument_variants(args::ROW_WORD_STR, value);
-                    } else if (key == args::COLUMN_WORD_STR) {
-
-                        add_argument_variants(args::COLUMN_WORD_STR, value);
-                    } else if (key == args::LEVEL_WORD_STR) {
-
-                        add_argument_variants(args::LEVEL_WORD_STR, value);
-                    } else if (key == args::SEED_WORD_STR) {
-
-                        add_argument_variants(args::SEED_WORD_STR, value);
-                    } else if (key == args::ALGO_ID_WORD_STR) {
-
-                        add_argument_variants(args::ALGO_ID_WORD_STR, value);
-                    } else if (key == args::OUTPUT_ID_WORD_STR) {
-
-                        add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-                    } else if (key == args::DISTANCES_WORD_STR) {
-
-                        // Handle boolean distances field
-                        if (value == args::TRUE_VALUE) {
-
-                            add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                        } else if (value != args::TRUE_VALUE) {
-
-                            // Don't add distances if it's false
-                        } else {
-
-                            // Might be a slice notation as a string
-                            add_argument_variants(args::DISTANCES_WORD_STR, value);
-
-                            parse_sliced_array(value);
-                        }
-                    } else {
-
-                        // Store unknown JSON keys as-is
-                        arguments.emplace_back().insert_or_assign(key, value);
-                    }
-                }
+                // Add JSON values to the current map (merge with command-line args)
+                add_json_values_to_current_map(parsed_json);
             }
         } catch (const std::exception&) {
 
@@ -621,49 +642,11 @@ public:
 
             if (jh.load_array(cref(test_file_path), ref(parsed_json_array))) {
                 
-                // For backward compatibility, if there's only one object, also populate args_map
-
-                if (const auto& first_object = parsed_json_array[0]; !parsed_json_array.empty()) {
-
-                    for (const auto& [key, value] : first_object) {
-                        // Map JSON keys to argument keys and add using add_argument_variants
-                        if (key == args::ROW_WORD_STR) {
-
-                            add_argument_variants(args::ROW_WORD_STR, value);
-                        } else if (key == args::COLUMN_WORD_STR) {
-
-                            add_argument_variants(args::COLUMN_WORD_STR, value);
-                        } else if (key == args::LEVEL_WORD_STR) {
-
-                            add_argument_variants(args::LEVEL_WORD_STR, value);
-                        } else if (key == args::SEED_WORD_STR) {
-
-                            add_argument_variants(args::SEED_WORD_STR, value);
-                        } else if (key == args::ALGO_ID_WORD_STR) {
-
-                            add_argument_variants(args::ALGO_ID_WORD_STR, value);
-                        } else if (key == args::OUTPUT_ID_WORD_STR) {
-
-                            add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-                        } else if (key == args::DISTANCES_WORD_STR) {
-
-                            // Handle boolean distances field
-                            if (value == args::TRUE_VALUE) {
-                                add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                            } else if (value != args::TRUE_VALUE) {
-
-                                // Don't add distances if it's false
-                            } else {
-                                // Might be a slice notation as a string
-                                add_argument_variants(args::DISTANCES_WORD_STR, value);
-                                parse_sliced_array(value);
-                            }
-                        } else {
-                            
-                            // Store unknown JSON keys as-is
-                            this->arguments.emplace_back().insert_or_assign(key, value);
-                        }
-                    }
+                // For JSON arrays, each object becomes a separate map
+                for (const auto& json_object : parsed_json_array) {
+                    // Add a new map to the arguments vector for each JSON object
+                    this->arguments.emplace_back();
+                    add_json_values_to_current_map(json_object);
                 }
 
                 return true;
@@ -674,46 +657,8 @@ public:
 
             if (jh.load(cref(test_file_path), ref(parsed_json))) {
 
-                // Successfully parsed JSON file, now add the values to args_map
-                for (const auto& [key, value] : parsed_json) {
-                    // Map JSON keys to argument keys and add using add_argument_variants
-                    if (key == args::ROW_WORD_STR) {
-
-                        add_argument_variants(args::ROW_WORD_STR, value);
-                    } else if (key == args::COLUMN_WORD_STR) {
-
-                        add_argument_variants(args::COLUMN_WORD_STR, value);
-                    } else if (key == args::LEVEL_WORD_STR) {
-
-                        add_argument_variants(args::LEVEL_WORD_STR, value);
-                    } else if (key == args::SEED_WORD_STR) {
-
-                        add_argument_variants(args::SEED_WORD_STR, value);
-                    } else if (key == args::ALGO_ID_WORD_STR) {
-
-                        add_argument_variants(args::ALGO_ID_WORD_STR, value);
-                    } else if (key == args::OUTPUT_ID_WORD_STR) {
-
-                        add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-                    } else if (key == args::DISTANCES_WORD_STR) {
-
-                        // Handle boolean distances field
-                        if (value == args::TRUE_VALUE) {
-                            add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                        } else if (value != args::TRUE_VALUE) {
-
-                            // Don't add distances if it's false
-                        } else {
-                            // Might be a slice notation as a string
-                            add_argument_variants(args::DISTANCES_WORD_STR, value);
-                            parse_sliced_array(value);
-                        }
-                    } else {
-                        
-                        // Store unknown JSON keys as-is
-                        this->arguments.emplace_back().insert_or_assign(key, value);
-                    }
-                }
+                // For single JSON objects, merge into the current map
+                add_json_values_to_current_map(parsed_json);
 
                 return true;
             } // load
@@ -763,17 +708,25 @@ public:
             // Store the parsed start and end indices
             if (!start_idx.empty()) {
 
-                arguments.emplace_back().insert_or_assign(args::DISTANCES_START_STR, start_idx);
+                if (!arguments.empty()) {
+                    arguments.back().insert_or_assign(args::DISTANCES_START_STR, start_idx);
+                }
             } else {
-                arguments.emplace_back().insert_or_assign(args::DISTANCES_START_STR, std::to_string(configurator::DEFAULT_DISTANCES_START));
+                if (!arguments.empty()) {
+                    arguments.back().insert_or_assign(args::DISTANCES_START_STR, std::to_string(configurator::DEFAULT_DISTANCES_START));
+                }
             }
 
             if (!end_idx.empty()) {
 
-                arguments.emplace_back().insert_or_assign(args::DISTANCES_END_STR, end_idx);
+                if (!arguments.empty()) {
+                    arguments.back().insert_or_assign(args::DISTANCES_END_STR, end_idx);
+                }
             } else {
 
-                arguments.emplace_back().insert_or_assign(args::DISTANCES_END_STR, std::to_string(configurator::DEFAULT_DISTANCES_END));
+                if (!arguments.empty()) {
+                    arguments.back().insert_or_assign(args::DISTANCES_END_STR, std::to_string(configurator::DEFAULT_DISTANCES_END));
+                }
             }
 
             return true;
@@ -849,6 +802,7 @@ void args::clear() noexcept {
 std::optional<std::string> args::get(const std::string& key) const noexcept {
 
     if (pimpl->arguments.empty()) {
+        
         return std::nullopt;
     }
 
@@ -901,6 +855,9 @@ bool args::parse(const std::vector<std::string>& arguments, bool has_program_nam
 
         // Convert vector to argc/argv format for internal parser
         vector<const char*> argv_vec;
+        
+        // CLI11 expects argv[0] to be the program name, so add a dummy one
+        argv_vec.push_back("program");
             
         for (const auto& arg : validation_args) {
 
@@ -911,11 +868,12 @@ bool args::parse(const std::vector<std::string>& arguments, bool has_program_nam
         const char** argv = argv_vec.data();
         
         // Special case: if we removed the program name and have no arguments left,
-        // CLI11 might have issues with argc=0. In this case, we know it's just 
+        // CLI11 might have issues with argc=1 (just program name). In this case, we know it's just 
         // the app name, so we can directly populate and return success.
-        if (has_program_name_as_first_arg && argc == 0) {
+        if (has_program_name_as_first_arg && argc == 1) {
             // Only app name was provided, populate it directly
             pimpl->arguments.clear();
+            pimpl->arguments.emplace_back();
             pimpl->add_argument_variants(args::APP_KEY, arguments.front());
             return true;
         }
@@ -923,7 +881,7 @@ bool args::parse(const std::vector<std::string>& arguments, bool has_program_nam
         // Use CLI11 to parse
         try {
 
-            return this->pimpl->parse(argc, const_cast<char**>(argv), false);
+            return this->pimpl->parse(argc, const_cast<char**>(argv), true);
 
         } catch (const std::exception& e) {
 

@@ -222,7 +222,7 @@ public:
     /// @brief Removes consecutive whitespace characters from a string, leaving only single whitespace between non-whitespace characters.
     /// @param s The input string from which to strip consecutive whitespace.
     /// @return A new string with consecutive whitespace characters replaced by a single whitespace.
-    static std::string stripWhitespace(const std::string& s) {
+    static std::string strip_whitespace(const std::string& s) {
 
         using std::string;
         using std::unique;
