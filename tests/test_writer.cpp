@@ -8,16 +8,16 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <MazeBuilder/writer.h>
 #include <MazeBuilder/enums.h>
+#include <MazeBuilder/io_utils.h>
 
 using namespace std;
 using namespace mazes;
 
-TEST_CASE("Writer can process good text file names", "[good text filenames]") {
-	writer my_writer;
+TEST_CASE("io_utils can process good text file names", "[good text filenames]") {
+	io_utils my_writer;
 
-    // Good file names that the writer can determine what type to write per the extension
+    // Good file names that the io_utils can determine what type to write per the extension
 	vector<string> good_filenames{ "1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg" };
 
 	for (const auto& gf : good_filenames) {
@@ -25,8 +25,8 @@ TEST_CASE("Writer can process good text file names", "[good text filenames]") {
 	}
 }
 
-TEST_CASE("Writer can process bad file names", "[bad filenames]") {
-    writer my_writer;
+TEST_CASE("io_utils can process bad file names", "[bad filenames]") {
+    io_utils my_writer;
 
     vector<string> more_filenames{ "1-text", "2.plain_text", "3plain_txt", "4.objected", "5.objobj", "6obj", "a.ping", "pong" };
 
@@ -40,8 +40,8 @@ TEST_CASE("Writer can process bad file names", "[bad filenames]") {
     }
 }
 
-TEST_CASE("Writer writes data to file successfully", "[writer writes]") {
-    mazes::writer w;
+TEST_CASE("io_utils writes data to file successfully", "[io_utils writes]") {
+    mazes::io_utils w;
     std::string filename = "test_file.txt";
     std::string data = "Hello, world!";
 
@@ -58,8 +58,8 @@ TEST_CASE("Writer writes data to file successfully", "[writer writes]") {
     std::remove(filename.c_str());
 }
 
-TEST_CASE("Writer writes data to stdout successfully", "[writer to stdout]") {
-    mazes::writer w;
+TEST_CASE("io_utils writes data to stdout successfully", "[io_utils to stdout]") {
+    mazes::io_utils w;
     std::string data = "Hello, world!";
     std::ostringstream oss;
 

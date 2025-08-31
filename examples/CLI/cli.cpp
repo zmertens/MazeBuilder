@@ -5,7 +5,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/dfs.h>
 #include <MazeBuilder/distance_grid.h>
-#include <MazeBuilder/factory.h>
+#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
@@ -98,7 +98,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 #endif
         }
 
-        mazes::factory factory;
+        mazes::grid_factory factory;
 
         std::unique_ptr<mazes::grid_interface> product = factory.create(cref(config));
 

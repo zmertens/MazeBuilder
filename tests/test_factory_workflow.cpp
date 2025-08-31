@@ -3,7 +3,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/factory.h>
+#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/randomizer.h>
@@ -26,12 +26,12 @@ static constexpr auto SEED = 12345;
 
 TEST_CASE("Workflow static checks", "[workflow_static_checks]") {
 
-    STATIC_REQUIRE(std::is_default_constructible<mazes::factory>::value);
-    STATIC_REQUIRE(std::is_destructible<mazes::factory>::value);
-    STATIC_REQUIRE_FALSE(std::is_copy_constructible<mazes::factory>::value);
-    STATIC_REQUIRE_FALSE(std::is_copy_assignable<mazes::factory>::value);
-    STATIC_REQUIRE_FALSE(std::is_move_constructible<mazes::factory>::value);
-    STATIC_REQUIRE_FALSE(std::is_move_assignable<mazes::factory>::value);
+    STATIC_REQUIRE(std::is_default_constructible<mazes::grid_factory>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::grid_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible<mazes::grid_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable<mazes::grid_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_constructible<mazes::grid_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_assignable<mazes::grid_factory>::value);
 
     STATIC_REQUIRE(std::is_default_constructible<mazes::randomizer>::value);
     STATIC_REQUIRE(std::is_destructible<mazes::randomizer>::value);
@@ -41,26 +41,26 @@ TEST_CASE("Workflow static checks", "[workflow_static_checks]") {
     STATIC_REQUIRE(std::is_move_assignable<mazes::randomizer>::value);
 }
 
-TEST_CASE( "Test factory create1", "[create1]" ) {
+TEST_CASE( "Test grid_factory create1", "[create1]" ) {
 
-    factory factory1{};
+    grid_factory factory1{};
 
 #if defined(MAZE_BENCHMARK)
 
-    BENCHMARK("Benchmark factory::create") {
+    BENCHMARK("Benchmark grid_factory::create") {
 
         [[maybe_unused]]
         auto g = factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
     };
 #else
 
-    SECTION("Create grid with factory - backward compatibility") {
+    SECTION("Create grid with grid_factory - backward compatibility") {
 
         auto g = factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
         REQUIRE(g != nullptr);
     }
 
-    SECTION("Create grid with factory - new registration method") {
+    SECTION("Create grid with grid_factory - new registration method") {
 
         static const string PRODUCT_NAME_1 = "test_grid";
         
@@ -78,7 +78,7 @@ TEST_CASE( "Test factory create1", "[create1]" ) {
 
 TEST_CASE("Test full workflow", "[full workflow]") {
 
-    factory g_factory{};
+    grid_factory g_factory{};
 
     auto g = g_factory.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
 
@@ -102,7 +102,7 @@ TEST_CASE("Test full workflow", "[full workflow]") {
 
 TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
 
-    factory g_factory{};
+    grid_factory g_factory{};
 
     // Test with a large grid that should be rejected by stringify
     auto g = g_factory.create(configurator().rows(200).columns(200).levels(1).algo_id(ALGO_TO_RUN).seed(SEED));
@@ -160,17 +160,17 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
 }
 
 
-TEST_CASE("Grid factory registration", "[factory registration]") {
+TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
 
-    factory factory;
+    grid_factory grid_factory;
 
     SECTION("Default creators are registered") {
-        auto keys = factory.get_registered_keys();
+        auto keys = grid_factory.get_registered_keys();
         REQUIRE(keys.size() >= 3); // At least grid, distance_grid, colored_grid
 
-        REQUIRE(factory.is_registered("grid"));
-        REQUIRE(factory.is_registered("distance_grid"));
-        REQUIRE(factory.is_registered("colored_grid"));
+        REQUIRE(grid_factory.is_registered("grid"));
+        REQUIRE(grid_factory.is_registered("distance_grid"));
+        REQUIRE(grid_factory.is_registered("colored_grid"));
     }
 
     SECTION("Can register custom creator") {
@@ -178,24 +178,24 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
             return std::make_unique<grid>(config.rows() * 2, config.columns() * 2, config.levels());
             };
 
-        REQUIRE(factory.register_creator("custom_grid", custom_creator));
-        REQUIRE(factory.is_registered("custom_grid"));
+        REQUIRE(grid_factory.register_creator("custom_grid", custom_creator));
+        REQUIRE(grid_factory.is_registered("custom_grid"));
 
         // Cannot register same key twice
-        REQUIRE_FALSE(factory.register_creator("custom_grid", custom_creator));
+        REQUIRE_FALSE(grid_factory.register_creator("custom_grid", custom_creator));
     }
 
     SECTION("Can create grid using registered key") {
         configurator config;
         config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
 
-        auto grid = factory.create("grid", config);
+        auto grid = grid_factory.create("grid", config);
         REQUIRE(grid != nullptr);
 
-        auto distance_grid = factory.create("distance_grid", config);
+        auto distance_grid = grid_factory.create("distance_grid", config);
         REQUIRE(distance_grid != nullptr);
 
-        auto colored_grid = factory.create("colored_grid", config);
+        auto colored_grid = grid_factory.create("colored_grid", config);
         REQUIRE(colored_grid != nullptr);
     }
 
@@ -203,7 +203,7 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
         configurator config;
         config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
 
-        auto grid = factory.create("non_existent_key", config);
+        auto grid = grid_factory.create("non_existent_key", config);
         REQUIRE(grid == nullptr);
     }
 
@@ -212,14 +212,14 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
             return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
             };
 
-        REQUIRE(factory.register_creator("temp_grid", custom_creator));
-        REQUIRE(factory.is_registered("temp_grid"));
+        REQUIRE(grid_factory.register_creator("temp_grid", custom_creator));
+        REQUIRE(grid_factory.is_registered("temp_grid"));
 
-        REQUIRE(factory.unregister_creator("temp_grid"));
-        REQUIRE_FALSE(factory.is_registered("temp_grid"));
+        REQUIRE(grid_factory.unregister_creator("temp_grid"));
+        REQUIRE_FALSE(grid_factory.is_registered("temp_grid"));
 
         // Cannot unregister non-existent key
-        REQUIRE_FALSE(factory.unregister_creator("temp_grid"));
+        REQUIRE_FALSE(grid_factory.unregister_creator("temp_grid"));
     }
 
     SECTION("Backward compatibility - create with config only") {
@@ -227,17 +227,17 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
         config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
 
         // Default behavior without distances
-        auto grid1 = factory.create(config);
+        auto grid1 = grid_factory.create(config);
         REQUIRE(grid1 != nullptr);
 
         // With distances but text output
         config.distances(true);
-        auto grid2 = factory.create(config);
+        auto grid2 = grid_factory.create(config);
         REQUIRE(grid2 != nullptr);
 
         // With distances and image output
         config.output_format_id(output_format::PNG);
-        auto grid3 = factory.create(config);
+        auto grid3 = grid_factory.create(config);
         REQUIRE(grid3 != nullptr);
     }
 
@@ -246,13 +246,13 @@ TEST_CASE("Grid factory registration", "[factory registration]") {
             return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
             };
 
-        factory.register_creator("temp_grid", custom_creator);
-        REQUIRE(factory.is_registered("temp_grid"));
+        grid_factory.register_creator("temp_grid", custom_creator);
+        REQUIRE(grid_factory.is_registered("temp_grid"));
 
-        factory.clear();
+        grid_factory.clear();
 
-        REQUIRE_FALSE(factory.is_registered("temp_grid"));
-        REQUIRE(factory.is_registered("grid")); // Defaults are re-registered
+        REQUIRE_FALSE(grid_factory.is_registered("temp_grid"));
+        REQUIRE(grid_factory.is_registered("grid")); // Defaults are re-registered
     }
 }
 

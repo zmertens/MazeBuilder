@@ -16,7 +16,7 @@
 #include <MazeBuilder/distances.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid.h>
-#include <MazeBuilder/factory.h>
+#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/objectify.h>
@@ -28,7 +28,7 @@
 #include <MazeBuilder/stringify.h>
 #include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/wavefront_object_helper.h>
-#include <MazeBuilder/writer.h>
+#include <MazeBuilder/io_utils.h>
 
 namespace mazes {
 

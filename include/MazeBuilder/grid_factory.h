@@ -1,5 +1,5 @@
-#ifndef FACTORY_H
-#define FACTORY_H
+#ifndef GRID_FACTORY_H
+#define GRID_FACTORY_H
 
 #include <functional>
 #include <memory>
@@ -15,28 +15,28 @@ namespace mazes {
 class configurator;
 class grid_interface;
 
-/// @file factory.h
-/// @class factory
-/// @brief Modern grid factory with registration capabilities
+/// @file grid_factory.h
+/// @class grid_factory
+/// @brief Modern grid grid_factory with registration capabilities
 /// @details Provides a way to create grids using registered function objects
 /// Thread-safe registration and creation of grid instances
-class factory : public factory_interface {
+class grid_factory : public factory_interface {
 
 public:
 
     /// @brief Default constructor
-    factory();
+    grid_factory();
 
     /// @brief Destructor
-    ~factory() override = default;
+    ~grid_factory() override = default;
 
     // Delete copy constructor and assignment for thread safety
-    factory(const factory&) = delete;
-    factory& operator=(const factory&) = delete;
+    grid_factory(const grid_factory&) = delete;
+    grid_factory& operator=(const grid_factory&) = delete;
 
     // Allow move operations
-    factory(factory&&) noexcept = default;
-    factory& operator=(factory&&) noexcept = default;
+    grid_factory(grid_factory&&) noexcept = default;
+    grid_factory& operator=(grid_factory&&) noexcept = default;
 
     /// @brief Register a grid creator function with a unique identifier
     /// @param key Unique identifier for the grid type
@@ -89,4 +89,4 @@ private:
 
 } // namespace mazes
 
-#endif // FACTORY_H
+#endif // GRID_FACTORY_H

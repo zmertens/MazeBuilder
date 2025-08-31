@@ -1,4 +1,4 @@
-#include <MazeBuilder/writer.h>
+#include <MazeBuilder/io_utils.h>
 
 #include <filesystem>
 #include <fstream>
@@ -19,7 +19,7 @@ using namespace mazes;
 /// @param h 100
 /// @param stride 4
 /// @return 
-bool writer::write_png(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
+bool io_utils::write_png(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
 
     return (0 != stbi_write_png(filename.c_str(), w, h, stride, data.data(), w * stride));
 }
@@ -31,7 +31,7 @@ bool writer::write_png(const std::string& filename, const std::vector<std::uint8
 /// @param h 100
 /// @param stride 4
 /// @return 
-bool writer::write_jpeg(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
+bool io_utils::write_jpeg(const std::string& filename, const std::vector<std::uint8_t>& data, unsigned int w, unsigned int h, unsigned int stride) const noexcept {
 
     return (0 != stbi_write_jpg(filename.c_str(), w, h, stride, data.data(), w * stride));
 }
@@ -40,7 +40,7 @@ bool writer::write_jpeg(const std::string& filename, const std::vector<std::uint
 /// @param filename 
 /// @param data 
 /// @return 
-bool writer::write_file(const std::string& filename, const std::string& data) const noexcept {
+bool io_utils::write_file(const std::string& filename, const std::string& data) const noexcept {
     using namespace std;
 
     filesystem::path data_path{ filename };
@@ -58,7 +58,7 @@ bool writer::write_file(const std::string& filename, const std::string& data) co
     return out_writer.good();
 }
 
-bool writer::write(std::ostream& oss, const std::string& data) const noexcept {
+bool io_utils::write(std::ostream& oss, const std::string& data) const noexcept {
     using namespace std;
 
     oss << data << "\n";

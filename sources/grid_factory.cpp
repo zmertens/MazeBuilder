@@ -1,4 +1,4 @@
-#include <MazeBuilder/factory.h>
+#include <MazeBuilder/grid_factory.h>
 
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/colored_grid.h>
@@ -20,12 +20,12 @@
 
 using namespace mazes;
 
-factory::factory() {
+grid_factory::grid_factory() {
 
     register_default_creators();
 }
 
-bool factory::register_creator(const std::string& key, grid_creator_t creator) {
+bool grid_factory::register_creator(const std::string& key, grid_creator_t creator) {
     if (key.empty() || !creator) {
         return false;
     }
@@ -41,7 +41,7 @@ bool factory::register_creator(const std::string& key, grid_creator_t creator) {
     return true;
 }
 
-bool factory::unregister_creator(const std::string& key) {
+bool grid_factory::unregister_creator(const std::string& key) {
     std::lock_guard<std::mutex> lock(m_creators_mutex);
     
     auto it = m_creators.find(key);
@@ -52,12 +52,12 @@ bool factory::unregister_creator(const std::string& key) {
     return false;
 }
 
-bool factory::is_registered(const std::string& key) const {
+bool grid_factory::is_registered(const std::string& key) const {
     std::lock_guard<std::mutex> lock(m_creators_mutex);
     return m_creators.find(key) != m_creators.end();
 }
 
-std::unique_ptr<grid_interface> factory::create(const std::string& key, const configurator& config) const {
+std::unique_ptr<grid_interface> grid_factory::create(const std::string& key, const configurator& config) const {
     std::lock_guard<std::mutex> lock(m_creators_mutex);
     
     auto it = m_creators.find(key);
@@ -105,7 +105,7 @@ std::unique_ptr<grid_interface> factory::create(const std::string& key, const co
     }
 }
 
-std::unique_ptr<grid_interface> factory::create(const configurator& config) const noexcept {
+std::unique_ptr<grid_interface> grid_factory::create(const configurator& config) const noexcept {
 
     try {
 
@@ -123,7 +123,7 @@ std::unique_ptr<grid_interface> factory::create(const configurator& config) cons
     }
 }
 
-std::vector<std::string> factory::get_registered_keys() const {
+std::vector<std::string> grid_factory::get_registered_keys() const {
     std::lock_guard<std::mutex> lock(m_creators_mutex);
     
     std::vector<std::string> keys;
@@ -136,7 +136,7 @@ std::vector<std::string> factory::get_registered_keys() const {
     return keys;
 }
 
-void factory::clear() {
+void grid_factory::clear() {
     std::lock_guard<std::mutex> lock(m_creators_mutex);
     m_creators.clear();
     
@@ -144,7 +144,7 @@ void factory::clear() {
     register_default_creators();
 }
 
-void factory::register_default_creators() {
+void grid_factory::register_default_creators() {
     // Note: This method is called from constructor and clear(), 
     // so we don't need to lock here as the caller handles it or it's during construction
 
@@ -181,7 +181,7 @@ void factory::register_default_creators() {
     };
 }
 
-std::string factory::determine_grid_type_from_config(const configurator& config) const {
+std::string grid_factory::determine_grid_type_from_config(const configurator& config) const {
 
     if (config.distances()) {
 

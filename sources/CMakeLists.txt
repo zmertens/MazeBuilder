@@ -20,7 +20,8 @@ set(MAZE_BUILDER_CORE_SRCS
     distance_grid.cpp
     distances.cpp
     grid.cpp
-    factory.cpp
+    grid_factory.cpp
+    io_utils.cpp
     json_helper.cpp
     lab.cpp
     maze_adapter.cpp
@@ -30,8 +31,7 @@ set(MAZE_BUILDER_CORE_SRCS
     sidewinder.cpp
     stringify.cpp
     string_utils.cpp
-    wavefront_object_helper.cpp
-    writer.cpp)
+    wavefront_object_helper.cpp)
 
 if(MAZE_BUILDER_COVERAGE)
     message(STATUS "Building ${PROJECT_NAME} with code coverage")

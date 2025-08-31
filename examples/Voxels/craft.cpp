@@ -2843,7 +2843,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
 #if !defined(__EMSCRIPTEN__)
                             // Write immediately if not on the web
-                            mazes::writer writer{};
+                            mazes::io_utils writer{};
                             writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
 #if defined(MAZE_DEBUG)
                             SDL_Log("Writing to file... %s\n", gui->outfile);

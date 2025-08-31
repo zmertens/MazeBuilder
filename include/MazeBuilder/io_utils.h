@@ -1,5 +1,5 @@
-#ifndef WRITER_H
-#define WRITER_H
+#ifndef IO_UTILS_H
+#define IO_UTILS_H
 
 #include <string>
 #include <vector>
@@ -7,12 +7,12 @@
 
 namespace mazes {
 
-/// @file writer.h
+/// @file io_utils.h
 /// @brief Handles writing to files, stdout, and images
 
-/// @class writer
+/// @class io_utils
 /// @brief Handles file writing for text, stdout, images, and object files
-class writer {
+class io_utils {
 public:
 
     /// @brief Write pixels to a PNG file
@@ -44,8 +44,8 @@ public:
     /// @param data 
     /// @return 
     bool write_file(const std::string& filename, const std::string& data) const noexcept;
-}; // writer
+}; // io_utils
 
 }
 
-#endif // WRITER_H
+#endif // IO_UTILS_H

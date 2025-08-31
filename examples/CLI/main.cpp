@@ -13,7 +13,7 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
-#include <MazeBuilder/writer.h>
+#include <MazeBuilder/io_utils.h>
 
 #include "cli.h"
 
@@ -68,9 +68,9 @@ int main(int argc, char* argv[]) {
             throw logic_error("No valid configuration found after parsing arguments.\nResult:\n" + str);
         }
 
-        mazes::writer writer;
+        mazes::io_utils writer{};
 
-        bool write_success = false;
+        bool write_success{false};
             
         // Check if we have a specific output filename
         if (!config->output_format_filename().empty()) {
