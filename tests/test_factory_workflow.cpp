@@ -3,6 +3,7 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid.h>
@@ -13,6 +14,8 @@
 #include <chrono>
 #include <functional>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <vector>
 
 using namespace mazes;
@@ -50,15 +53,9 @@ TEST_CASE( "Test grid_factory create1", "[create1]" ) {
     BENCHMARK("Benchmark grid_factory::create") {
 
         [[maybe_unused]]
-        auto g = factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+        auto g = factory1.create("unused", configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
     };
 #else
-
-    SECTION("Create grid with grid_factory - backward compatibility") {
-
-        auto g = factory1.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-        REQUIRE(g != nullptr);
-    }
 
     SECTION("Create grid with grid_factory - new registration method") {
 
@@ -80,15 +77,22 @@ TEST_CASE("Test full workflow", "[full workflow]") {
 
     grid_factory g_factory{};
 
-    auto g = g_factory.create(configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+    auto key{"key"};
+
+    g_factory.register_creator(key, [](const configurator& config) -> std::unique_ptr<grid_interface> {
+
+        return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+    });
+
+    auto g = g_factory.create(key, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
 
     randomizer rndmzr{};
 
     stringify stringifier{};
 
-    REQUIRE(stringifier.run(g, rndmzr));
+    REQUIRE(stringifier.run(g.value(), rndmzr));
 
-    if (auto casted_grid = dynamic_cast<grid*>(g.get()); casted_grid != nullptr) {
+    if (auto casted_grid = dynamic_cast<grid*>(g.value().get()); casted_grid != nullptr) {
 
         cout << casted_grid->operations().get_str() << endl;
 
@@ -104,15 +108,22 @@ TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
 
     grid_factory g_factory{};
 
+    auto key{"key"};
+
+    g_factory.register_creator(key, [](const configurator& config) -> std::unique_ptr<grid_interface> {
+
+        return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+    });
+
     // Test with a large grid that should be rejected by stringify
-    auto g = g_factory.create(configurator().rows(200).columns(200).levels(1).algo_id(ALGO_TO_RUN).seed(SEED));
+    auto g = g_factory.create(key, configurator().rows(200).columns(200).levels(1).algo_id(ALGO_TO_RUN).seed(SEED));
 
     randomizer rndmzr{};
 
     stringify stringifier{};
 
     // This should return false due to size limit
-    REQUIRE_FALSE(stringifier.run(g, rndmzr));
+    REQUIRE_FALSE(stringifier.run(g.value(), rndmzr));
     
 }
 
@@ -175,6 +186,7 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
 
     SECTION("Can register custom creator") {
         auto custom_creator = [](const configurator& config) -> std::unique_ptr<grid_interface> {
+
             return std::make_unique<grid>(config.rows() * 2, config.columns() * 2, config.levels());
             };
 
@@ -183,6 +195,19 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
 
         // Cannot register same key twice
         REQUIRE_FALSE(grid_factory.register_creator("custom_grid", custom_creator));
+    }
+
+    SECTION("Can register custom creator with distances") {
+        auto custom_creator = [](const auto& config) -> auto {
+
+            return std::make_unique<distance_grid>(config.rows() * 2, config.columns() * 2, config.levels());
+            };
+
+        REQUIRE(grid_factory.register_creator("distance_grid", custom_creator));
+        REQUIRE(grid_factory.is_registered("distance_grid"));
+
+        // Cannot register same key twice
+        REQUIRE_FALSE(grid_factory.register_creator("distance_grid", custom_creator));
     }
 
     SECTION("Can create grid using registered key") {
@@ -227,17 +252,17 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
         config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
 
         // Default behavior without distances
-        auto grid1 = grid_factory.create(config);
+        auto grid1 = grid_factory.create("test", config);
         REQUIRE(grid1 != nullptr);
 
         // With distances but text output
         config.distances(true);
-        auto grid2 = grid_factory.create(config);
+        auto grid2 = grid_factory.create("test", config);
         REQUIRE(grid2 != nullptr);
 
         // With distances and image output
         config.output_format_id(output_format::PNG);
-        auto grid3 = grid_factory.create(config);
+        auto grid3 = grid_factory.create("test", config);
         REQUIRE(grid3 != nullptr);
     }
 

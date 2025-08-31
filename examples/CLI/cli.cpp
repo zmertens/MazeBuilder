@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 
 #include "parser.h"
@@ -100,50 +101,52 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         mazes::grid_factory factory;
 
-        std::unique_ptr<mazes::grid_interface> product = factory.create(cref(config));
+        factory.register_creator("temp", [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface> {
 
-#if defined(MAZE_DEBUG)
-        if (auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(product.get())) {
-            std::cerr << "Debug: Created distance_grid successfully" << std::endl;
-        } else {
-            std::cerr << "Debug: Created regular grid (not distance_grid)" << std::endl;
+            return std::make_unique<mazes::distance_grid>(config.rows(), config.columns(), config.levels());
+        });
+
+        if (auto product = factory.create("temp", config); product.has_value()) {
+
+            mazes::randomizer rng;
+
+            apply(product.value(), rng, config.algo_id(), config);
+
+            // Check if we need to generate Wavefront OBJ output
+            if (config.output_format_id() == mazes::output_format::WAVEFRONT_OBJECT_FILE) {
+                // First, get the string representation for parsing
+                mazes::stringify maze_stringify;
+                if (!maze_stringify.run(product.value(), rng)) {
+
+                    throw std::runtime_error("Failed to stringify maze for objectify processing.");
+                }
+                
+                // Generate 3D object data
+                mazes::objectify maze_objectify;
+                if (!maze_objectify.run(product.value(), rng)) {
+
+                    throw std::runtime_error("Failed to generate 3D object data.");
+                }
+
+                // Convert to Wavefront OBJ format
+                mazes::wavefront_object_helper obj_helper;
+                auto vertices = product.value()->operations().get_vertices();
+                auto faces = product.value()->operations().get_faces();
+
+                std::string obj_str = obj_helper.to_wavefront_object_str(vertices, faces);
+                product.value()->operations().set_str(obj_str);
+            } else {
+
+                // Use the regular stringify process
+                mazes::stringify maze_stringify;
+                if (!maze_stringify.run(product.value(), rng)) {
+
+                    throw std::runtime_error("Failed to stringify maze.");
+                }
+            }
+
+            return product.value()->operations().get_str();
         }
-#endif
-
-        mazes::randomizer rng;
-
-        apply(cref(product), ref(rng), config.algo_id(), config);
-
-        // Check if we need to generate Wavefront OBJ output
-        if (config.output_format_id() == mazes::output_format::WAVEFRONT_OBJECT_FILE) {
-            // First, get the string representation for parsing
-            mazes::stringify maze_stringify;
-            if (!maze_stringify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to stringify maze for objectify processing.");
-            }
-            
-            // Generate 3D object data
-            mazes::objectify maze_objectify;
-            if (!maze_objectify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to generate 3D object data.");
-            }
-
-            // Convert to Wavefront OBJ format
-            mazes::wavefront_object_helper obj_helper;
-            auto vertices = product->operations().get_vertices();
-            auto faces = product->operations().get_faces();
-            
-            std::string obj_str = obj_helper.to_wavefront_object_str(vertices, faces);
-            product->operations().set_str(obj_str);
-        } else {
-            // Use the regular stringify process
-            mazes::stringify maze_stringify;
-            if (!maze_stringify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to stringify maze.");
-            }
-        }
-
-        return product->operations().get_str();
 
     } catch (const std::exception& ex) {
 
@@ -151,9 +154,9 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         std::cerr << "CLI Error: " << ex.what() << std::endl;
 #endif
-
-        return "";
     }
+
+    return "";
 } // convert
 
 /// @brief Get the configuration from the last convert call
