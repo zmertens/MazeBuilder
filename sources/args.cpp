@@ -134,30 +134,56 @@ public:
 
         using namespace std;
 
-        if (auto splits = string_utils::split(input, ':'); !splits.empty()) {
+        // Empty input is valid (flag without value)
+        if (input.empty()) {
+            return true;
+        }
 
-            for (auto split_itr{splits.cbegin()}; split_itr != splits.cend(); ++split_itr) {
-
-                if (split_itr->at(0) != '[') {
-
-                    return false;
-                }
-
-                if (split_itr->at(split_itr->length() - 1) != ']') {
-
-                    return false;
-                }
-
-                // Verify that every entry between brackets is a non-negative number
-                auto content = split_itr->substr(1, split_itr->length() - 2);
-
-                if (!all_of(content.cbegin(), content.cend(), ::isdigit) || content.empty()) {
-
-                    return false;
-                }
+        // Check if it contains slice-like characters
+        bool has_bracket_open = input.find('[') != string::npos;
+        bool has_bracket_close = input.find(']') != string::npos;
+        bool has_colon = input.find(':') != string::npos;
+        
+        // If it has any slice-like characters, it must be proper slice syntax
+        if (has_bracket_open || has_bracket_close || has_colon) {
+            // Must have proper slice format: starts with [, ends with ], contains exactly one :
+            if (input.front() != '[' || input.back() != ']' || input.find(':') == string::npos) {
+                return false;
             }
+            
+            // Extract content between brackets
+            auto content = input.substr(1, input.length() - 2);
+            
+            // Split by colon to get start and end parts
+            auto colon_pos = content.find(':');
+            if (colon_pos == string::npos) {
+                return false; // Must have colon for slice syntax
+            }
+            
+            // Ensure there's only one colon
+            if (content.find(':', colon_pos + 1) != string::npos) {
+                return false; // Multiple colons not allowed
+            }
+
+            auto start_part = content.substr(0, colon_pos);
+            auto end_part = content.substr(colon_pos + 1);
+
+            // Each part can be empty (implicit start/end) or contain only digits (with optional minus sign)
+            auto is_valid_part = [](const std::string& part) {
+                if (part.empty()) {
+                    return true;
+                }
+                
+                // Check if it's a valid integer (can start with minus)
+                auto start_pos = (part.front() == '-') ? 1 : 0;
+                return start_pos < part.length() && 
+                       all_of(part.cbegin() + start_pos, part.cend(), ::isdigit);
+            };
+
+            return is_valid_part(start_part) && is_valid_part(end_part);
         }
         
+        // If it doesn't contain any slice-like characters, it's valid (could be another option)
         return true;
     }
 
@@ -173,14 +199,16 @@ public:
             // Check for malformed distances arguments
             if (arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR) {
 
-                // Check if next argument is a malformed slice
+                // Check if next argument exists and looks like a slice
                 if (i + 1 < args.size()) {
 
                     const auto& next_arg = args[i + 1];
 
-                    if (!validate_slice_syntax(next_arg)) {
-
-                        return false;
+                    // Only validate slice syntax if the next argument contains slice-like characters
+                    if (!next_arg.empty() && (next_arg.find('[') != string::npos || next_arg.find(']') != string::npos || next_arg.find(':') != string::npos)) {
+                        if (!validate_slice_syntax(next_arg)) {
+                            return false;
+                        }
                     }
                 }
             }
@@ -188,8 +216,21 @@ public:
             // Check for arguments with embedded slice syntax
             if (arg.find(args::DISTANCES_FLAG_STR) == 0 || arg.find(args::DISTANCES_OPTION_STR) == 0) {
 
-                if (!validate_slice_syntax(arg)) {
+                // Extract the slice part from the argument
+                string slice_part;
+                
+                if (arg.find(args::DISTANCES_FLAG_STR) == 0) {
+                    // For flag format like "-d[0:10]"
+                    slice_part = arg.substr(string(args::DISTANCES_FLAG_STR).length());
+                } else if (arg.find(args::DISTANCES_OPTION_STR) == 0) {
+                    // For option format like "--distances=[:10]"
+                    auto equals_pos = arg.find('=');
+                    if (equals_pos != string::npos && equals_pos + 1 < arg.length()) {
+                        slice_part = arg.substr(equals_pos + 1);
+                    }
+                }
 
+                if (!validate_slice_syntax(slice_part)) {
                     return false;
                 }
             }
@@ -505,10 +546,23 @@ public:
                     value = "[" + value + "]";
                 }
                 
-                add_argument_variants(args::DISTANCES_WORD_STR, value);
-                
-                // Parse sliced array syntax
+                // Parse sliced array syntax first to get normalized values
                 parse_sliced_array(value);
+                
+                // Create normalized slice from parsed values if slice syntax was used
+                if (value.find(':') != string::npos) {
+                    auto start_val = arguments.back().find(args::DISTANCES_START_STR);
+                    auto end_val = arguments.back().find(args::DISTANCES_END_STR);
+                    
+                    if (start_val != arguments.back().end() && end_val != arguments.back().end()) {
+                        string normalized_slice = "[" + start_val->second + ":" + end_val->second + "]";
+                        add_argument_variants(args::DISTANCES_WORD_STR, normalized_slice);
+                    } else {
+                        add_argument_variants(args::DISTANCES_WORD_STR, value);
+                    }
+                } else {
+                    add_argument_variants(args::DISTANCES_WORD_STR, value);
+                }
                
             } else if (distances_specified) {
 
@@ -695,7 +749,7 @@ public:
 
         using namespace std;
 
-        regex slice_pattern(R"(\[(.*?):(.*?)\])");
+        regex slice_pattern(R"(\[(\d*):(-?\d*)\])");
 
         smatch matches;
 
@@ -798,7 +852,7 @@ void args::clear() noexcept {
     }
 }
 
-// Get a value from the args map by key
+// Get a value from the args map by key (greedy , grabs first match)
 std::optional<std::string> args::get(const std::string& key) const noexcept {
 
     if (pimpl->arguments.empty()) {
@@ -806,18 +860,23 @@ std::optional<std::string> args::get(const std::string& key) const noexcept {
         return std::nullopt;
     }
 
-    if (auto it = pimpl->arguments.front().find(key); it != pimpl->arguments.front().end()) {
+    // Search through all maps in the vector, starting with the first (command-line args)
+    for (const auto& map : pimpl->arguments) {
 
-        return it->second;
+        if (auto it = map.find(key); it != map.end()) {
+
+            return it->second;
+        }
     }
 
     return std::nullopt;
 }
 
-// Get entire args map
+// Get an entire args map from the front
 std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
     
     if (pimpl->arguments.empty()) {
+
         return std::nullopt;
     }
     

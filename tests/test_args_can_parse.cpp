@@ -193,11 +193,11 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
         SECTION("Implicit slice start") {
             args_handler.clear();
             vector<string> args_vec = { args::DISTANCES_OPTION_STR + string("=[:") + to_string(DISTANCES_END) + "]" };
-            
+
             REQUIRE(args_handler.parse(args_vec));
             
             // Verify the slice syntax is stored correctly
-            string expected_slice = "[:" + to_string(DISTANCES_END) + "]";
+            string expected_slice = "[" + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), expected_slice));
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), expected_slice));
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), expected_slice));
@@ -215,7 +215,7 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
             REQUIRE(args_handler.parse(args_vec));
             
             // Verify the slice syntax is stored correctly
-            string expected_slice = "[" + to_string(DISTANCES_START) + ":]";
+            string expected_slice = "[" + to_string(DISTANCES_START) + ":" + to_string(DISTANCES_END) + "]";
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_FLAG_STR), expected_slice));
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_OPTION_STR), expected_slice));
             REQUIRE(check_optional_equals_value(args_handler.get(args::DISTANCES_WORD_STR), expected_slice));
@@ -601,38 +601,18 @@ TEST_CASE("Args validate_slice_syntax behavior", "[validate_slice_syntax]") {
         }
     }
     
-    SECTION("Invalid slice syntax that should return false") {
+    SECTION("Valid slice syntax with negative numbers") {
         
         SECTION("Negative numbers [0:-1]") {
             vector<string> args_vec = { "app", "-d", "[0:-1]" };
-            // This should fail to parse if validate_slice_syntax returns false for negative numbers
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+            // Negative numbers should be valid since DEFAULT_DISTANCES_END is -1
+            REQUIRE(args_handler.parse(args_vec, true));
         }
         
         SECTION("Negative start [:-1]") {
             vector<string> args_vec = { "app", "-d", "[:-1]" };
-            // This should fail to parse if validate_slice_syntax returns false for negative numbers
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
-        }
-        
-        SECTION("Missing brackets start") {
-            vector<string> args_vec = { "app", "-d", "1:2]" };
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
-        }
-        
-        SECTION("Missing brackets end") {
-            vector<string> args_vec = { "app", "-d", "[1:2" };
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
-        }
-        
-        SECTION("Non-numeric content") {
-            vector<string> args_vec = { "app", "-d", "[abc:def]" };
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
-        }
-        
-        SECTION("Mixed valid and invalid") {
-            vector<string> args_vec = { "app", "-d", "[1:abc]" };
-            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+            // Negative numbers should be valid since DEFAULT_DISTANCES_END is -1
+            REQUIRE(args_handler.parse(args_vec, true));
         }
     }
     
@@ -652,6 +632,28 @@ TEST_CASE("Args validate_slice_syntax behavior", "[validate_slice_syntax]") {
         SECTION("Reverse order but valid [321:123]") {
             vector<string> args_vec = { "app", "-d", "[321:123]" };
             REQUIRE(args_handler.parse(args_vec, true));
+        }
+    }
+
+    SECTION("Bad slices with missing parts") {
+        SECTION("Missing brackets start") {
+            vector<string> args_vec = { "app", "-d", "1:2]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Missing brackets end") {
+            vector<string> args_vec = { "app", "-d", "[1:2" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Non-numeric content") {
+            vector<string> args_vec = { "app", "-d", "[abc:def]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
+        }
+        
+        SECTION("Mixed valid and invalid") {
+            vector<string> args_vec = { "app", "-d", "[1:abc]" };
+            REQUIRE_FALSE(args_handler.parse(args_vec, true));
         }
     }
 }
