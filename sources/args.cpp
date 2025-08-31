@@ -519,10 +519,9 @@ public:
         
         // Handle seed
         if (!seed_values.empty()) {
-            if (auto value = seed_values.back()) {
-
-                add_argument_variants(args::SEED_WORD_STR, to_string(value));
-            }
+            
+            // Seed can be 0, so don't use it as a boolean condition
+            add_argument_variants(args::SEED_WORD_STR, to_string(seed_values.back()));
         }
         
         // Handle algorithm
@@ -618,9 +617,10 @@ public:
                 if (value == args::TRUE_VALUE) {
 
                     add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                } else if (value != args::TRUE_VALUE) {
+                } else if (value == args::FALSE_VALUE) {
 
-                    // Don't add distances if it's false
+                    // Store false value for distances
+                    add_argument_variants(args::DISTANCES_WORD_STR, args::FALSE_VALUE);
                 } else {
 
                     // Might be a slice notation as a string
@@ -696,7 +696,9 @@ public:
 
             if (jh.load_array(cref(test_file_path), ref(parsed_json_array))) {
                 
-                // For JSON arrays, each object becomes a separate map
+                // For JSON arrays, replace the command-line arguments with JSON objects
+                // Clear existing arguments and create maps for each JSON object
+                this->arguments.clear();
                 for (const auto& json_object : parsed_json_array) {
                     // Add a new map to the arguments vector for each JSON object
                     this->arguments.emplace_back();

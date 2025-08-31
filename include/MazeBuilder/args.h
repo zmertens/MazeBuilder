@@ -78,6 +78,7 @@ public:
     
     // Special values
     static constexpr const auto TRUE_VALUE = "true";
+    static constexpr const auto FALSE_VALUE = "false";
 
     /// @brief Default constructor
     /// @details Initializes the implementation pointer

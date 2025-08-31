@@ -133,8 +133,8 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]") {
     }
 
     SECTION("Parse and get seed value") {
-        vector<string> args_vec = { args::SEED_FLAG_STR, to_string(SEED) };
-        REQUIRE(args_handler.parse(args_vec));
+        vector<string> args_vec = { "app", args::SEED_FLAG_STR, to_string(SEED) };
+        REQUIRE(args_handler.parse(args_vec, true));
         
         // Test all forms of access for seed
         REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_FLAG_STR), to_string(SEED)));
@@ -333,8 +333,7 @@ TEST_CASE("Args can handle a JSON file input", "[json_file_input]") {
 
     SECTION("JSON input file") {
 
-        //string valid_json_file_input = format("{}={}", args::JSON_OPTION_STR, ARRAY_DOT_JSON_FILE);
-        string valid_json_file_input = args::JSON_OPTION_STR + string("=") + ARRAY_DOT_JSON_FILE;
+        string valid_json_file_input = string_utils::format("{}={}", args::JSON_OPTION_STR, ARRAY_DOT_JSON_FILE);
 
         REQUIRE(args_handler.parse(cref(valid_json_file_input), false));
 
@@ -369,8 +368,9 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]") {
         const auto& array_opt = args_handler.get_array();
         REQUIRE(array_opt.has_value());
         
+        // We expect 4 objects in array.json
         const auto& array_val = array_opt.value();
-        REQUIRE(array_val.size() == 4); // We expect 4 objects in array.json
+        REQUIRE(array_val.size() == 4);
         
         // Test first object in array
         const auto& first_config = array_val[0];
@@ -396,7 +396,7 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]") {
         REQUIRE(check_key_exists(first_config, "output"));
         REQUIRE(safe_at(first_config, "output") == "\"maze_dfs.txt\"");
         REQUIRE(check_key_exists(first_config, "distances"));
-        REQUIRE(safe_at(first_config, "distances") == "true");
+        REQUIRE(safe_at(first_config, "distances") == args::TRUE_VALUE);
         
         // Test second object in array
         const auto& second_config = array_val[1];
@@ -406,7 +406,7 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]") {
         REQUIRE(safe_at(second_config, "seed") == "9");
         REQUIRE(safe_at(second_config, "algo") == "\"dfs\"");
         REQUIRE(safe_at(second_config, "output") == "\"maze_dfs2.txt\"");
-        REQUIRE(safe_at(second_config, "distances") == "false");
+        REQUIRE(safe_at(second_config, "distances") == args::FALSE_VALUE);
         
         // Test last object in array
         const auto& last_config = array_val[3];
@@ -1002,9 +1002,7 @@ TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_
 
     SECTION("JSON single object file input") {
 
-        string valid_json_file_input = args::JSON_OPTION_STR;
-        valid_json_file_input.append("=");
-        valid_json_file_input.append(MAZE_DOT_JSON_FILE);
+        string valid_json_file_input = string_utils::format("{}={}", args::JSON_OPTION_STR, MAZE_DOT_JSON_FILE);
 
         REQUIRE(args_handler.parse(cref(valid_json_file_input)));
 
