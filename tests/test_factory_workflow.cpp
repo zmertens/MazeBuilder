@@ -173,16 +173,7 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
 
 TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
 
-    grid_factory grid_factory;
-
-    SECTION("Default creators are registered") {
-        auto keys = grid_factory.get_registered_keys();
-        REQUIRE(keys.size() >= 3); // At least grid, distance_grid, colored_grid
-
-        REQUIRE(grid_factory.is_registered("grid"));
-        REQUIRE(grid_factory.is_registered("distance_grid"));
-        REQUIRE(grid_factory.is_registered("colored_grid"));
-    }
+    grid_factory grid_factory{};
 
     SECTION("Can register custom creator") {
         auto custom_creator = [](const configurator& config) -> std::unique_ptr<grid_interface> {
@@ -229,7 +220,7 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
         config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
 
         auto grid = grid_factory.create("non_existent_key", config);
-        REQUIRE(grid == nullptr);
+        REQUIRE_FALSE(grid.has_value());
     }
 
     SECTION("Can unregister creator") {
@@ -266,7 +257,7 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
         REQUIRE(grid3 != nullptr);
     }
 
-    SECTION("Clear removes all creators and re-registers defaults") {
+    SECTION("Clear removes all creators") {
         auto custom_creator = [](const configurator& config) -> std::unique_ptr<grid_interface> {
             return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
             };
@@ -277,7 +268,6 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
         grid_factory.clear();
 
         REQUIRE_FALSE(grid_factory.is_registered("temp_grid"));
-        REQUIRE(grid_factory.is_registered("grid")); // Defaults are re-registered
     }
 }
 

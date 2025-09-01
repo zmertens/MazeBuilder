@@ -65,61 +65,6 @@ std::string_view string_utils::find_first_of(const std::string_view& sv, const s
     return sv.substr(pos, 1);
 }
 
-std::list<std::string> string_utils::split(const std::string& str, char delimiter) noexcept {
-    
-    std::list<std::string> result;
-    
-    std::stringstream ss(str);
-
-    std::string token;
-    
-    while (std::getline(ss, token, delimiter)) {
-
-        result.push_back(token);
-    }
-    
-    return result;
-}
-
-std::list<std::string_view> string_utils::split(const std::string_view& sv, const std::string_view& delim) noexcept {
-    
-    std::list<std::string_view> result;
-    
-    if (sv.empty()) {
-
-        return result;
-    }
-    
-    size_t start = 0;
-
-    size_t pos = sv.find(delim);
-    
-    while (pos != std::string_view::npos) {
-
-        if (pos > start) {
-
-            result.push_back(sv.substr(start, pos - start));
-        }
-
-        start = pos + delim.length();
-
-        pos = sv.find(delim, start);
-    }
-    
-    // Add the last part
-    if (start < sv.length()) {
-
-        result.push_back(sv.substr(start));
-    } else if (start == sv.length() && !sv.empty()) {
-
-        // Handle the case where the string ends with the delimiter
-        result.push_back(std::string_view{});
-    }
-    
-    return result;
-}
-
-
 // Template wrapper functions for fmt::format using perfect forwarding and variadic arguments
 template<typename... Args>
 std::string string_utils::format(std::string_view format_str, const Args&... args) noexcept {

@@ -225,15 +225,16 @@ TEST_CASE("string_utils template split edge cases and compatibility", "[string_u
         string test_input = "alpha,beta,gamma";
         
         // Using existing split function
-        auto existing_result = string_utils::split(test_input, ',');
+        list<string> results;
+        string_utils::split(test_input.cbegin(), test_input.cend(), results, ',');
         
         // Using new template strsplit function
         vector<string> template_result;
         string_utils::strsplit(test_input, template_result, ',');
         
         // Compare results - convert list to vector for comparison
-        vector<string> existing_as_vector(existing_result.begin(), existing_result.end());
-        
+        vector<string> existing_as_vector(results.cbegin(), results.cend());
+
         REQUIRE(existing_as_vector.size() == template_result.size());
         REQUIRE(existing_as_vector == template_result);
     }

@@ -53,18 +53,6 @@ public:
     /// @param chars The set of characters to search for
     /// @return A string view starting from the first occurrence of any character in chars, or the end of s if none found
     static std::string_view find_first_of(const std::string_view& s, const std::string_view& chars) noexcept;
-    
-    /// @brief Split a string by delimiter
-    /// @param str The string to split
-    /// @param delimiter The delimiter to split by
-    /// @return List of split substrings
-    static std::list<std::string> split(const std::string& str, char delimiter = ' ') noexcept;
-
-    /// @brief Split a string_view by delimiter
-    /// @param sv The string_view to split
-    /// @param delim The delimiter to split by (defaults to space)
-    /// @return List of string_view parts
-    static std::list<std::string_view> split(const std::string_view& sv, const std::string_view& delim = " ") noexcept;
 
     /// @brief Strip specific characters from the beginning and end of a string view
     /// @param s The string view to strip characters from
@@ -72,8 +60,7 @@ public:
     /// @return A new string view with the specified characters removed from both ends
     static std::string_view strip(const std::string_view& s, const std::string_view& to_strip_from_s = " ") noexcept;
 
-    // Template-based split functions
-
+private:
     // Helper trait to detect if a type has push_back method - local to this function
     template<typename T, typename = void>
     struct has_push_back : std::false_type {};
@@ -81,6 +68,31 @@ public:
     template<typename T>
     struct has_push_back<T, std::void_t<decltype(std::declval<T>().push_back(std::declval<typename T::value_type>()))>> : std::true_type {};
 
+    /// @brief Default equality predicate for split functions
+    static constexpr auto eq = [](const auto& el, const auto& sep) -> bool {
+
+        using std::is_convertible_v;
+        using std::is_same_v;
+
+        using ElType = std::decay_t<decltype(el)>;
+        using SepType = std::decay_t<decltype(sep)>;
+
+        if constexpr (is_same_v<ElType, SepType>) {
+
+            return el == sep;
+        } else if constexpr (is_convertible_v<ElType, SepType>) {
+
+            return static_cast<SepType>(el) == sep;
+        } else if constexpr (is_convertible_v<SepType, ElType>) {
+
+            return el == static_cast<ElType>(sep);
+        } else {
+
+            return false;
+        }
+        };
+
+public:
 
     /// @brief Splits a range into slices based on a separator and stores the results in a destination container.
     /// @tparam It Type of the iterator for the input range.
@@ -139,30 +151,6 @@ public:
         return it;
     }
 
-    /// @brief Default equality predicate for split functions
-    static constexpr auto eq = [](const auto& el, const auto& sep) -> bool {
-
-        using std::is_convertible_v;
-        using std::is_same_v;
-
-        using ElType = std::decay_t<decltype(el)>;
-        using SepType = std::decay_t<decltype(sep)>;
-
-        if constexpr (is_same_v<ElType, SepType>) {
-
-            return el == sep;
-        } else if constexpr (is_convertible_v<ElType, SepType>) {
-
-            return static_cast<SepType>(el) == sep;
-        } else if constexpr (is_convertible_v<SepType, ElType>) {
-
-            return el == static_cast<ElType>(sep);
-        } else {
-
-            return false;
-        }
-        };
-
     /// @brief Generic split function with default equality predicate
     /// @tparam It Iterator type
     /// @tparam Oc Output container type
@@ -174,6 +162,7 @@ public:
     /// @return Iterator to end position
     template<typename It, typename Oc, typename V>
     static It split(It it, const It end_it, Oc& dest, const V& sep) {
+
         return split(it, end_it, dest, sep, eq);
     }
 
@@ -187,7 +176,9 @@ public:
     /// @return Reference to output container
     template<typename Cin, typename Cout, typename V>
     static Cout& strsplit(const Cin& str, Cout& dest, const V& sep) {
+
         split(str.begin(), str.end(), dest, sep, eq);
+
         return dest;
     }
 
@@ -197,7 +188,7 @@ public:
     /// @param c The character to check for whitespace.
     /// @return True if the character is a whitespace character; otherwise, false.
     template<typename T>
-    static bool isWhitespace(const T& c) {
+    static bool is_whitespace(const T& c) {
 
         using std::is_same_v;
         using std::string_view;
@@ -232,7 +223,7 @@ public:
         auto its = unique(outputString.begin(), outputString.end(),
             [](const auto& a, const auto& b) {
 
-                return isWhitespace(a) && isWhitespace(b);
+                return is_whitespace(a) && is_whitespace(b);
             });
 
         outputString.erase(its, outputString.end());
