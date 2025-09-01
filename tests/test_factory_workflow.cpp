@@ -90,7 +90,7 @@ TEST_CASE("Test full workflow", "[full workflow]") {
 
     stringify stringifier{};
 
-    REQUIRE(stringifier.run(g.value(), rndmzr));
+    REQUIRE(stringifier.run(g.value().get(), rndmzr));
 
     if (auto casted_grid = dynamic_cast<grid*>(g.value().get()); casted_grid != nullptr) {
 
@@ -123,8 +123,8 @@ TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
     stringify stringifier{};
 
     // This should return false due to size limit
-    REQUIRE_FALSE(stringifier.run(g.value(), rndmzr));
-    
+    REQUIRE_FALSE(stringifier.run(g.value().get(), rndmzr));
+
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {

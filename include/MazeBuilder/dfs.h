@@ -3,13 +3,8 @@
 
 #include <MazeBuilder/algo_interface.h>
 
-#include <memory>
-#include <vector>
-
 namespace mazes {
 
-class cell;
-class grid;
 class grid_interface;
 class randomizer;
 
@@ -23,7 +18,7 @@ public:
     /// @param g
     /// @param rng
     /// @return success or failure
-    virtual bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept override;
+    virtual bool run(grid_interface* g, randomizer& rng) const noexcept override;
 
 };
 

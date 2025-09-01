@@ -16,7 +16,7 @@ using namespace mazes;
 /// @param g the grid to generate the maze on, and manipulate the cells
 /// @param get_int
 /// @param rng
-bool sidewinder::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
 
     using namespace std;
 

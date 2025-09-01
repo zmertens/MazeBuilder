@@ -38,17 +38,17 @@ static std::string get_cli_help_str() {
         "Description: Generates mazes and outputs into string formats\n" 
         "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" 
         "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" 
+        "Note: Commands are case-sensitive!"
         "\t-a, --algo         binary_tree, dfs, sidewinder\n" 
         "\t-c, --columns      columns\n" 
-        "\t-d, --distances    show distances with start, end positions\n" 
-        "\t                   ex: -d [0:10] or --distances=[1:]\n" 
+        "\t-d, --distances    show distances in sliced array format; ex: '[0:1]'\n" 
         "\t-e, --encode       encode maze to base64 string\n" 
         "\t-h, --help         display this help message\n" 
         "\t-j, --json         run with arguments in JSON format\n" 
         "\t                   supports both single objects and arrays of objects\n" 
         "\t-s, --seed         seed for the mt19937 generator\n" 
         "\t-r, --rows         rows\n" 
-        "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" 
+        "\t-o, --output       txt, text, json, obj, object, stdout\n" 
         "\t-v, --version      display program version\n";
 }
 
@@ -116,14 +116,14 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
             if (config.output_format_id() == mazes::output_format::WAVEFRONT_OBJECT_FILE) {
                 // First, get the string representation for parsing
                 mazes::stringify maze_stringify;
-                if (!maze_stringify.run(product.value(), rng)) {
+                if (!maze_stringify.run(product.value().get(), rng)) {
 
                     throw std::runtime_error("Failed to stringify maze for objectify processing.");
                 }
                 
                 // Generate 3D object data
                 mazes::objectify maze_objectify;
-                if (!maze_objectify.run(product.value(), rng)) {
+                if (!maze_objectify.run(product.value().get(), rng)) {
 
                     throw std::runtime_error("Failed to generate 3D object data.");
                 }
@@ -139,7 +139,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
                 // Use the regular stringify process
                 mazes::stringify maze_stringify;
-                if (!maze_stringify.run(product.value(), rng)) {
+                if (!maze_stringify.run(product.value().get(), rng)) {
 
                     throw std::runtime_error("Failed to stringify maze.");
                 }
@@ -184,7 +184,7 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::binary_tree bt;
 
-            success = bt.run(cref(g), ref(rng));
+            success = bt.run(g.get(), ref(rng));
 
             break;
         }
@@ -192,7 +192,7 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::sidewinder sw;
 
-            success = sw.run(cref(g), ref(rng));
+            success = sw.run(g.get(), ref(rng));
 
             break;
         }
@@ -200,7 +200,7 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::dfs d;
 
-            success = d.run(cref(g), ref(rng));
+            success = d.run(g.get(), ref(rng));
 
             break;
         }

@@ -3,11 +3,14 @@
 
 #include <string_view>
 
+namespace mazes {
+
 struct maze_view {
 
     std::string_view data;
 
-	std::string_view v;
 };
+
+} // namespace mazes
 
 #endif // MAZE_VIEW

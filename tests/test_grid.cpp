@@ -12,7 +12,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/colored_grid.h>
 #include <MazeBuilder/distance_grid.h>
@@ -45,7 +44,12 @@ TEST_CASE("Static Assert grid", "[grid static asserts]") {
     STATIC_REQUIRE(std::is_move_constructible<mazes::grid>::value);
     STATIC_REQUIRE(std::is_move_assignable<mazes::grid>::value);
 
-
+    STATIC_REQUIRE(std::is_default_constructible<mazes::cell>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::cell>::value);
+    STATIC_REQUIRE(std::is_copy_constructible<mazes::cell>::value);
+    STATIC_REQUIRE(std::is_copy_assignable<mazes::cell>::value);
+    STATIC_REQUIRE(std::is_move_constructible<mazes::cell>::value);
+    STATIC_REQUIRE(std::is_move_assignable<mazes::cell>::value);
 }
 
 TEST_CASE( "Test grid dimensions", "[grid dimensions]" ) {

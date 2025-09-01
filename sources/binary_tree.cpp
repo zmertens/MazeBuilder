@@ -18,7 +18,7 @@ using namespace mazes;
 /// @param g
 /// @param rng
 /// @return 
-bool binary_tree::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+bool binary_tree::run(grid_interface* g, randomizer& rng) const noexcept {
 
     using namespace std;
 

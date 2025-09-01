@@ -14,7 +14,7 @@ using namespace mazes;
 /// @param g
 /// @param rng
 /// @return 
-bool stringify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] randomizer& rng) const noexcept {
+bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const noexcept {
 
     if (!g) {
         return false;

@@ -1,10 +1,6 @@
 #ifndef ALGO_INTERFACE_H
 #define ALGO_INTERFACE_H
 
-#include <functional>
-#include <memory>
-#include <random>
-
 /// @brief Namespace for the maze builder
 namespace mazes {
 
@@ -14,7 +10,7 @@ class randomizer;
 /// @file algo_interface.h
 /// @class algo_interface
 /// @brief Interface for runnable algorithms
-/// @details Uses the strategy design pattern
+/// @details Helps enforce the strategy design pattern
 class algo_interface {
     
 public:
@@ -22,7 +18,7 @@ public:
     /// @param g 
     /// @param rng
     /// @return 
-    virtual bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept = 0;
+    virtual bool run(grid_interface* g, randomizer& rng) const noexcept = 0;
 
     virtual ~algo_interface() = default;
 };

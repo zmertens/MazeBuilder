@@ -16,7 +16,7 @@ using namespace mazes;
 /// @param g the grid to generate the maze on
 /// @param rng the randomizer to use for selecting neighbors
 /// @return
-bool dfs::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
 
     using namespace std;
 

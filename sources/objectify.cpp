@@ -16,7 +16,7 @@ using namespace mazes;
 /// @param g The grid interface
 /// @param rng Random number generator (unused but required by interface)
 /// @return True if successful, false otherwise
-bool objectify::run(std::unique_ptr<grid_interface> const& g, [[maybe_unused]] randomizer& rng) const noexcept {
+bool objectify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const noexcept {
 
     using namespace std;
 
