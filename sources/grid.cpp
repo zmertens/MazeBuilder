@@ -136,28 +136,58 @@ std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() cons
 }
 
 std::shared_ptr<cell> grid::search(int index) const noexcept {
-    // Use maze_adapter for search operations
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
+    // First check if cell already exists
+    auto cell_it = m_cells.find(index);
+    if (cell_it != m_cells.end()) {
+        return cell_it->second;
+    }
     
-    auto it = m_maze_adapter.find(index);
-    return (it != m_maze_adapter.end()) ? *it : nullptr;
+    // Lazy creation: create cell on-demand if it's within valid bounds
+    auto [rows, columns, levels] = m_dimensions;
+    int max_index = static_cast<int>(rows * columns * levels);
+    
+    if (index >= 0 && index < max_index) {
+        // Create the cell on-demand
+        auto new_cell = std::make_shared<cell>(index);
+        
+        // Store it in the map (const_cast is safe here for lazy initialization)
+        const_cast<grid*>(this)->m_cells[index] = new_cell;
+        
+        // Update maze adapter lazily
+        std::lock_guard<std::mutex> lock(m_adapter_mutex);
+        const_cast<grid*>(this)->update_maze_adapter();
+        
+        return new_cell;
+    }
+    
+    return nullptr;
 }
 
 int grid::num_cells() const noexcept {
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
-    return static_cast<int>(m_maze_adapter.size());
+    // Return the number of actually created cells, not the potential total
+    return static_cast<int>(m_cells.size());
 }
 
 std::vector<std::shared_ptr<cell>> grid::get_cells() const noexcept {
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
-    
+    // For large grids, this could be memory intensive
+    // Only return actually created cells, not all potential cells
     std::vector<std::shared_ptr<cell>> cells;
-    cells.reserve(m_maze_adapter.size());
+    cells.reserve(m_cells.size());
 
-    for (const auto& cell_ptr : m_maze_adapter) {
+    // Sort by index to maintain consistent ordering
+    std::vector<std::pair<int, std::shared_ptr<cell>>> indexed_cells;
+    indexed_cells.reserve(m_cells.size());
+    
+    for (const auto& [index, cell_ptr] : m_cells) {
+        indexed_cells.emplace_back(index, cell_ptr);
+    }
+    
+    std::sort(indexed_cells.begin(), indexed_cells.end(),
+        [](const auto& a, const auto& b) {
+            return a.first < b.first;
+        });
+    
+    for (const auto& [index, cell_ptr] : indexed_cells) {
         cells.emplace_back(cell_ptr);
     }
 
@@ -269,18 +299,43 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, Directi
         return nullptr;
     }
     
-    std::lock_guard<std::mutex> lock(m_topology_mutex);
-    auto cell_it = m_topology.find(c->get_index());
-    if (cell_it == m_topology.end()) {
-        return nullptr;
+    // Calculate neighbor index on-demand instead of pre-computing topology
+    auto [rows, columns, levels] = m_dimensions;
+    int current_index = c->get_index();
+    
+    // Calculate 3D coordinates from index
+    int level = current_index / (rows * columns);
+    int remaining = current_index % (rows * columns);
+    int row = remaining / columns;
+    int col = remaining % columns;
+    
+    int neighbor_index = -1;
+    
+    switch (dir) {
+        case Direction::NORTH:
+            if (row > 0) {
+                neighbor_index = level * (rows * columns) + (row - 1) * columns + col;
+            }
+            break;
+        case Direction::SOUTH:
+            if (row < static_cast<int>(rows) - 1) {
+                neighbor_index = level * (rows * columns) + (row + 1) * columns + col;
+            }
+            break;
+        case Direction::EAST:
+            if (col < static_cast<int>(columns) - 1) {
+                neighbor_index = level * (rows * columns) + row * columns + (col + 1);
+            }
+            break;
+        case Direction::WEST:
+            if (col > 0) {
+                neighbor_index = level * (rows * columns) + row * columns + (col - 1);
+            }
+            break;
     }
     
-    auto neighbor_it = cell_it->second.find(dir);
-    if (neighbor_it == cell_it->second.end()) {
-        return nullptr;
-    }
-    
-    return search(neighbor_it->second);
+    // Return the neighbor (will be created lazily if it doesn't exist)
+    return (neighbor_index >= 0) ? search(neighbor_index) : nullptr;
 }
 
 std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> const& c) const noexcept {

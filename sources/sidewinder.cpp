@@ -29,35 +29,20 @@ bool sidewinder::run(grid_interface* g, randomizer& rng) const noexcept {
 
     auto [rows, columns, _] = grid_ops.get_dimensions();
 
-    vector<shared_ptr<cell>> cells = grid_ops.get_cells();
-    grid_ops.sort(ref(cells));
-
-    // Group cells by row for processing
-    vector<vector<shared_ptr<cell>>> grid_by_rows;
-    grid_by_rows.resize(rows);
-
-    for (size_t i = 0; i < cells.size(); ++i) {
-        unsigned int row = static_cast<unsigned int>(i) / columns;
-        if (row < rows) {
-            grid_by_rows[row].push_back(cells[i]);
-        }
-    }
-
-    // Process each row
+    // Iterator-based approach: process cells row by row without materializing all cells
+    // This is much more memory efficient for large grids
+    
     for (unsigned int row = 0; row < rows; ++row) {
 
-        vector<shared_ptr<cell>> run;
+        vector<shared_ptr<cell>> run;  // Current run of cells
 
         for (unsigned int col = 0; col < columns; ++col) {
 
-            // Get current cell
-            size_t index = row * columns + col;
-            if (index >= cells.size()) {
-
-                continue;
-            }
-
-            auto cell = cells[index];
+            // Calculate cell index for current position
+            int cell_index = static_cast<int>(row * columns + col);
+            
+            // Get cell (will be created lazily if it doesn't exist)
+            auto cell = grid_ops.search(cell_index);
             if (!cell) continue;
 
             // Add current cell to the run

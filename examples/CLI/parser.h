@@ -11,6 +11,7 @@ class parser {
 public:
     bool parse(std::vector<std::string> const& args, mazes::configurator& config) const;
 
+    std::optional<std::string> get() const noexcept;
 private:
 
 };

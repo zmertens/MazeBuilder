@@ -71,21 +71,24 @@ std::optional<std::unique_ptr<grid_interface>> grid_factory::create(const std::s
                 throw new std::runtime_error(string_utils::format("Creator for key {} returned nullptr", key));
             }
 
-            // Get dimensions from grid
             auto&& ops = grid->operations();
 
-            // Prepare cells without any links - the maze algorithm will create the links
-            std::vector<std::shared_ptr<cell>> cells_linked_with_neighbors;
-            cells_linked_with_neighbors.reserve(config.rows() * config.columns());
+            // For large grids, avoid creating all cells upfront to prevent memory issues
+            // Cells will be created lazily when accessed via search() method
+            size_t total_cells = config.rows() * config.columns() * config.levels();
+            
+            if (total_cells <= 1000) {  // Small grids: create upfront for performance
+                std::vector<std::shared_ptr<cell>> cells_linked_with_neighbors;
+                cells_linked_with_neighbors.reserve(total_cells);
 
-            // Create cells with sequential indices (no neighbor links yet)
-            for (size_t i = 0; i < config.rows() * config.columns(); ++i) {
-
-                cells_linked_with_neighbors.emplace_back(std::make_shared<cell>(static_cast<int32_t>(i)));
+                for (size_t i = 0; i < total_cells; ++i) {
+                    cells_linked_with_neighbors.emplace_back(std::make_shared<cell>(static_cast<int32_t>(i)));
+                }
+                
+                ops.set_cells(std::cref(cells_linked_with_neighbors));
             }
-
-            // Set the cells in the grid - this will set up neighbor topology but no links
-            ops.set_cells(std::cref(cells_linked_with_neighbors));
+            // For larger grids: cells will be created lazily via search() method
+            // This dramatically reduces memory footprint for large grids
 
             return grid;
         } catch (const std::exception& ex) {
@@ -93,7 +96,7 @@ std::optional<std::unique_ptr<grid_interface>> grid_factory::create(const std::s
             std::cout << string_utils::format("Create grid failed with error message {}, is key registered? {}", ex.what(), std::to_string(is_registered(key))) << std::endl;
         } catch (...) {
 
-            std::cout << "Create grid failed with unknown error, is key registered? " << std::to_string(is_registered(key)) << std::endl;
+            std::cout << "Create grid failed with unknown error, is key registered? {}" << std::to_string(is_registered(key)) << std::endl;
         }
     } // if
 

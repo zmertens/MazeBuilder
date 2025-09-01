@@ -22,7 +22,17 @@ bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
 
     const auto& grid_ops = g->operations();
 
-    auto start = grid_ops.search(rng(0, grid_ops.num_cells() - 1));
+    // For large grids with lazy cell creation, we need to calculate total potential cells
+    auto [rows, columns, levels] = grid_ops.get_dimensions();
+    int total_possible_cells = static_cast<int>(rows * columns * levels);
+    
+    if (total_possible_cells <= 0) {
+        return false;
+    }
+
+    // Start with a random cell index, cell will be created lazily
+    int start_index = rng(0, total_possible_cells - 1);
+    auto start = grid_ops.search(start_index);
 
     if (!start) {
         return false;

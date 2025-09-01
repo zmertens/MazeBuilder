@@ -1,5 +1,6 @@
 #include "cli.h"
 
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/configurator.h>
@@ -68,6 +69,22 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
     try {
 
+        if (auto need_help = find_if(args_vec.begin(), args_vec.end(), [](const std::string& arg) {
+                return arg == mazes::args::HELP_FLAG_STR || arg == mazes::args::HELP_OPTION_STR || arg == mazes::args::HELP_WORD_STR;
+            }); need_help != args_vec.end()) {
+
+            return CLI_HELP_STR;
+        } else if (auto need_version = find_if(args_vec.begin(), args_vec.end(), [](const std::string& arg) {
+                return arg == mazes::args::VERSION_FLAG_STR || arg == mazes::args::VERSION_OPTION_STR || arg == mazes::args::VERSION_WORD_STR;
+            }); need_version != args_vec.end()) {
+
+#if defined(MAZE_DEBUG)
+            return debug_version;
+#else
+            return CLI_VERSION_STR;
+#endif
+        }
+
         parser my_parser;
 
         mazes::configurator config;
@@ -79,25 +96,6 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         // Store the configuration for later access
         m_last_config = std::make_shared<mazes::configurator>(config);
-
-#if defined(MAZE_DEBUG)
-        std::cerr << "Debug: Parsed config - distances: " << (config.distances() ? "true" : "false")
-                 << ", start: " << config.distances_start() 
-                 << ", end: " << config.distances_end() 
-                 << ", output_filename: " << config.output_format_filename() << std::endl;
-#endif
-
-        if (!config.help().empty()) {
-
-            return CLI_HELP_STR;
-        } else if (!config.version().empty()) {
-
-#if defined(MAZE_DEBUG)
-            return debug_version;
-#else
-            return CLI_VERSION_STR;
-#endif
-        }
 
         mazes::grid_factory factory;
 

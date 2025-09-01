@@ -14,13 +14,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
 
         using namespace mazes;
 
-        if (key == args::HELP_WORD_STR) {
-
-            config.help(value);
-        } else if (key == args::VERSION_WORD_STR) {
-
-            config.version(value);
-        } else if (key == args::ROW_WORD_STR) {
+        if (key == args::ROW_WORD_STR) {
 
             config.rows(stoi(value));
         } else if (key == args::COLUMN_WORD_STR) {

@@ -2,6 +2,7 @@
 #define CONFIGURATOR_H
 
 #include <limits>
+#include <optional>
 #include <string>
 
 #include <MazeBuilder/enums.h>
@@ -12,7 +13,6 @@ namespace mazes {
 /// @class configurator
 /// @brief Configuration class for arguments
 /// @details This class stores maze generation parameters with safe default values
-/// @warning Always use the constructor or setter methods to ensure proper initialization
 class configurator {
     
 public:
@@ -37,45 +37,16 @@ public:
 
     static constexpr auto DEFAULT_DISTANCES_END = -1;
 
-    static constexpr auto MAX_ROWS = 10000u;
+    static constexpr auto MAX_ROWS = 100u;
 
-    static constexpr auto MAX_COLUMNS = 10000u;
+    static constexpr auto MAX_COLUMNS = 100u;
 
-    static constexpr auto MAX_LEVELS = 1000u;
-
-    /// @brief Default constructor - initializes all values to safe defaults
-    /// @details Provides reasonable default values to prevent uninitialized memory access
-    /// @note Default values: rows=10, columns=10, levels=1, algo=BINARY_TREE, etc.
-    configurator() noexcept {
-
-        reset_to_defaults();
-    }
-
-    /// @brief Copy constructor
-    /// @param other The configurator object to copy from
-    configurator(const configurator& other) noexcept = default;
-
-    /// @brief Move constructor  
-    /// @param other The configurator object to move from
-    configurator(configurator&& other) noexcept = default;
-
-    /// @brief Copy assignment operator
-    /// @param other The configurator object to copy from
-    /// @return Reference to this configurator
-    configurator& operator=(const configurator& other) noexcept = default;
-
-    /// @brief Move assignment operator
-    /// @param other The configurator object to move from  
-    /// @return Reference to this configurator
-    configurator& operator=(configurator&& other) noexcept = default;
-
-    /// @brief Destructor
-    ~configurator() noexcept = default;
+    static constexpr auto MAX_LEVELS = 10u;
     
     /// @brief Set the number of rows
     /// @param rows The number of rows (must be > 0, will be clamped to reasonable limits)
     /// @return A reference to this configurator
-    /// @warning Values > 10000 will be clamped to prevent memory issues
+    /// @warning Values be clamped to prevent memory issues
     configurator& rows(unsigned int rows) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
         m_rows = (rows == 0) ? 1 : (rows > MAX_ROWS) ? MAX_ROWS : rows;
@@ -85,7 +56,7 @@ public:
     /// @brief Set the number of columns
     /// @param columns The number of columns (must be > 0, will be clamped to reasonable limits)
     /// @return A reference to this configurator
-    /// @warning Values > 10000 will be clamped to prevent memory issues
+    /// @warning Values will be clamped to prevent memory issues
     configurator& columns(unsigned int columns) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
         m_columns = (columns == 0) ? 1 : (columns > MAX_COLUMNS) ? MAX_COLUMNS : columns;
@@ -95,7 +66,7 @@ public:
     /// @brief Set the number of levels
     /// @param levels The number of levels (must be > 0, will be clamped to reasonable limits)
     /// @return A reference to this configurator
-    /// @warning Values > 1000 will be clamped to prevent memory issues
+    /// @warning Values will be clamped to prevent memory issues
     /// @note Most mazes are 2D (levels=1), 3D mazes should use moderate level counts
     configurator& levels(unsigned int levels) noexcept {
         // Clamp to reasonable limits to prevent infinite loops and memory issues
@@ -168,73 +139,49 @@ public:
         return *this;
     }
 
-    /// @brief Set the help message
-    /// @param help The help message
-    /// @return A reference to this configurator
-    configurator& help(std::string help) noexcept {
-        m_help = std::move(help);
-        return *this;
-    }
-
-    /// @brief Set the version string
-    /// @param version The version string
-    /// @return A reference to this configurator
-    configurator& version(std::string version) noexcept {
-        m_version = std::move(version);
-        return *this;
-    }
-
     /// @brief Get the number of rows
     /// @return The number of rows (guaranteed to be > 0)
-    unsigned int rows() const noexcept { return m_rows; }
+    unsigned int rows() const noexcept { return m_rows.value_or(DEFAULT_ROWS); }
 
     /// @brief Get the number of columns  
     /// @return The number of columns (guaranteed to be > 0)
-    unsigned int columns() const noexcept { return m_columns; }
+    unsigned int columns() const noexcept { return m_columns.value_or(DEFAULT_COLUMNS); }
 
     /// @brief Get the number of levels
     /// @return The number of levels (guaranteed to be > 0)
-    unsigned int levels() const noexcept { return m_levels; }
+    unsigned int levels() const noexcept { return m_levels.value_or(DEFAULT_LEVELS); }
 
     /// @brief Get the maze generation algorithm
     /// @return The algorithm used for maze generation
-    algo algo_id() const noexcept { return m_algo_id; }
+    algo algo_id() const noexcept { return m_algo_id.value_or(DEFAULT_ALGO_ID); }
 
     /// @brief Get the block ID
     /// @return The block ID
-    int block_id() const noexcept { return m_block_id; }
+    int block_id() const noexcept { return m_block_id.value_or(DEFAULT_BLOCK_ID); }
 
     /// @brief Get the random seed
     /// @return The random seed
-    unsigned int seed() const noexcept { return m_seed; }
+    unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED); }
 
     /// @brief Check if distances are calculated
     /// @return True if distances are calculated, false otherwise
-    bool distances() const noexcept { return m_distances; }
+    bool distances() const noexcept { return m_distances.value_or(DEFAULT_DISTANCES); }
 
     /// @brief Get the distance start index
     /// @return The starting cell index for distance calculation
-    int distances_start() const noexcept { return m_distances_start; }
+    int distances_start() const noexcept { return m_distances_start.value_or(DEFAULT_DISTANCES_START); }
 
     /// @brief Get the distance end index
     /// @return The ending cell index for distance calculation
-    int distances_end() const noexcept { return m_distances_end; }
+    int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
 
     /// @brief Get the output_format ID
     /// @return The output_format ID
-    output_format output_format_id() const noexcept { return m_output_format_id; }
+    output_format output_format_id() const noexcept { return m_output_format_id.value_or(DEFAULT_OUTPUT_ID); }
 
     /// @brief Get the output_format filename
     /// @return The output_format filename
-    const std::string& output_format_filename() const noexcept { return m_output_format_filename; }
-
-    /// @brief Get the help message
-    /// @return The help message
-    const std::string& help() const noexcept { return m_help; }
-
-    /// @brief Get the version string
-    /// @return The version string
-    const std::string& version() const noexcept { return m_version; }
+    const std::string& output_format_filename() const noexcept { return m_output_format_filename.value_or("output.txt"); }
 
     /// @brief Validate all configuration values are within safe limits
     /// @return True if all values are valid, false if any are problematic
@@ -256,59 +203,37 @@ public:
         // Check for potential overflow in total cell calculation
         constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void*);
 
-        if (static_cast<size_t>(m_rows) * m_columns * m_levels > max_cells) {
+        if (static_cast<size_t>(m_rows.value()) * m_columns.value() * m_levels.value() > max_cells) {
+            // Potential overflow detected
             return false;
         }
         
         return true;
     }
 
-    /// @brief Reset all values to safe defaults
-    /// @details Useful for clearing potentially corrupted configuration
-    void reset_to_defaults() noexcept {
-
-        m_rows = DEFAULT_ROWS;
-        m_columns = DEFAULT_COLUMNS; 
-        m_levels = DEFAULT_LEVELS;
-        m_block_id = DEFAULT_BLOCK_ID;
-        m_algo_id = DEFAULT_ALGO_ID;
-        m_seed = DEFAULT_SEED;
-        m_distances = DEFAULT_DISTANCES;
-        m_distances_start = DEFAULT_DISTANCES_START;
-        m_distances_end = DEFAULT_DISTANCES_END;
-        m_output_format_id = DEFAULT_OUTPUT_ID;
-        m_output_format_filename.clear();
-        m_help.clear();
-        m_version.clear();
-    }
-
 private:
 
-    unsigned int m_rows;
+    std::optional<unsigned int> m_rows;
 
-    unsigned int m_columns;
+    std::optional<unsigned int> m_columns;
 
-    unsigned int m_levels;
+    std::optional<unsigned int> m_levels;
 
-    int m_block_id;
+    std::optional<int> m_block_id;
 
-    algo m_algo_id;
+    std::optional<algo> m_algo_id;
 
-    unsigned int m_seed;
+    std::optional<unsigned int> m_seed;
 
-    bool m_distances;
+    std::optional<bool> m_distances;
 
-    int m_distances_start;
+    std::optional<int> m_distances_start;
 
-    int m_distances_end;
+    std::optional<int> m_distances_end;
 
-    output_format m_output_format_id;
+    std::optional<output_format> m_output_format_id;
 
-    std::string m_output_format_filename;
-
-    std::string m_help;
-
-    std::string m_version;
+    std::optional<std::string> m_output_format_filename;
 };
 
 } // namespace

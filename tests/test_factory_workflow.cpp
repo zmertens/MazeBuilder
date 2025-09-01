@@ -115,14 +115,39 @@ TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
         return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
     });
 
-    // Test with a large grid that should be rejected by stringify
-    auto g = g_factory.create(key, configurator().rows(200).columns(200).levels(1).algo_id(ALGO_TO_RUN).seed(SEED));
+    auto g = g_factory.create(key, configurator()
+        .rows(configurator::MAX_ROWS)
+        .columns(configurator::MAX_COLUMNS)
+        .levels(configurator::MAX_LEVELS)
+        .algo_id(ALGO_TO_RUN)
+        .seed(SEED));
+
+    // Verify the grid was created successfully
+    REQUIRE(g.has_value());
+    
+    // Verify dimensions are correct
+    auto [rows, cols, levels] = g.value()->operations().get_dimensions();
+    REQUIRE(rows == configurator::MAX_ROWS);
+    REQUIRE(cols == configurator::MAX_COLUMNS);
+    REQUIRE(levels == configurator::MAX_LEVELS);
+    
+    // With lazy evaluation, initially no cells should be created
+    REQUIRE(g.value()->operations().num_cells() == 0);
+    
+    // Access a specific cell should create it lazily
+    auto test_cell = g.value()->operations().search(1000);
+    REQUIRE(test_cell != nullptr);
+    REQUIRE(test_cell->get_index() == 1000);
+    
+    // Now we should have at least one cell
+    REQUIRE(g.value()->operations().num_cells() > 0);
+    REQUIRE(g.value()->operations().num_cells() < 100000); // Much less than total possible
 
     randomizer rndmzr{};
 
     stringify stringifier{};
 
-    // This should return false due to size limit
+    // Test memory boundaries within stringify - should fail due to size limit
     REQUIRE_FALSE(stringifier.run(g.value().get(), rndmzr));
 
 }

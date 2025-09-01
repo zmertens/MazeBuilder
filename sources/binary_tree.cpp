@@ -24,17 +24,24 @@ bool binary_tree::run(grid_interface* g, randomizer& rng) const noexcept {
 
     const auto& grid_ops = g->operations();
 
-    // Process each node from the map
-    for (const auto& c : grid_ops.get_cells()) {
-        
-        if (!c) {
+    // Use iterator-based approach instead of get_cells() for large grid efficiency
+    auto [rows, columns, levels] = grid_ops.get_dimensions();
+    
+    // Process each cell position without materializing all cells
+    for (unsigned int level = 0; level < levels; ++level) {
+        for (unsigned int row = 0; row < rows; ++row) {
+            for (unsigned int col = 0; col < columns; ++col) {
+                
+                int cell_index = static_cast<int>(level * (rows * columns) + row * columns + col);
+                auto c = grid_ops.search(cell_index);
+                
+                if (!c) {
+                    continue;
+                }
 
-            continue;
-        }
+                std::vector<std::shared_ptr<cell>> neighbors;
 
-        std::vector<std::shared_ptr<cell>> neighbors;
-
-        auto north_cell = grid_ops.get_north(cref(c));
+                auto north_cell = grid_ops.get_north(cref(c));
         
         if (north_cell) {
 
@@ -57,7 +64,9 @@ bool binary_tree::run(grid_interface* g, randomizer& rng) const noexcept {
                 lab::link(c, neighbor, true);
             }
         }
-    }
+            } // end col loop
+        } // end row loop
+    } // end level loop
 
     return true;
 }
