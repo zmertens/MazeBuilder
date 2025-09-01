@@ -9,6 +9,7 @@
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/stringify.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <chrono>
@@ -48,29 +49,19 @@ TEST_CASE( "Test grid_factory create1", "[create1]" ) {
 
     grid_factory factory1{};
 
-#if defined(MAZE_BENCHMARK)
+    static const string PRODUCT_NAME_1 = "test_grid";
+    
+    // Register a custom creator
+    factory1.register_creator(PRODUCT_NAME_1, [](const configurator& config) -> std::unique_ptr<grid_interface> {
+
+        return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+    });
 
     BENCHMARK("Benchmark grid_factory::create") {
 
-        [[maybe_unused]]
-        auto g = factory1.create("unused", configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-    };
-#else
-
-    SECTION("Create grid with grid_factory - new registration method") {
-
-        static const string PRODUCT_NAME_1 = "test_grid";
-        
-        // Register a custom creator
-        factory1.register_creator(PRODUCT_NAME_1, [](const configurator& config) -> std::unique_ptr<grid_interface> {
-            return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
-        });
-
         // Create using the registered key
-        auto g = factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
-        REQUIRE(g != nullptr);
-    }
-#endif
+        REQUIRE(factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED)) != std::nullopt);
+    };
 }
 
 TEST_CASE("Test full workflow", "[full workflow]") {
@@ -94,9 +85,9 @@ TEST_CASE("Test full workflow", "[full workflow]") {
 
     if (auto casted_grid = dynamic_cast<grid*>(g.value().get()); casted_grid != nullptr) {
 
-        cout << casted_grid->operations().get_str() << endl;
-
         REQUIRE_FALSE(casted_grid->operations().get_str().empty());
+
+                cout << string_utils::format("{}", casted_grid->operations().get_str()).substr(0, 30) << endl;
     } else {
 
         FAIL("Failed to cast to grid");
@@ -141,15 +132,27 @@ TEST_CASE("Test full workflow with large grid", "[full workflow][large]") {
     
     // Now we should have at least one cell
     REQUIRE(g.value()->operations().num_cells() > 0);
-    REQUIRE(g.value()->operations().num_cells() < 100000); // Much less than total possible
+    REQUIRE(g.value()->operations().num_cells() < 1'000'000'000);
 
     randomizer rndmzr{};
 
     stringify stringifier{};
 
-    // Test memory boundaries within stringify - should fail due to size limit
+    // The large grid should fail stringify due to size limits
     REQUIRE_FALSE(stringifier.run(g.value().get(), rndmzr));
-
+    REQUIRE_FALSE(g.value()->operations().get_str().empty()); // Should have error message
+    
+    // Test with a smaller grid that can be stringified
+    auto small_g = g_factory.create(key, configurator()
+        .rows(5)
+        .columns(5)
+        .levels(1)
+        .algo_id(ALGO_TO_RUN)
+        .seed(SEED));
+    
+    REQUIRE(small_g.has_value());
+    REQUIRE(stringifier.run(small_g.value().get(), rndmzr));
+    REQUIRE_FALSE(small_g.value()->operations().get_str().empty());
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]") {

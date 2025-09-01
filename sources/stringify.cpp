@@ -1,12 +1,13 @@
 #include <MazeBuilder/stringify.h>
 
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/maze_adapter.h>
 #include <MazeBuilder/randomizer.h>
 
-#include <sstream>
 #include <iostream>
+#include <sstream>
 
 using namespace mazes;
 
@@ -17,6 +18,7 @@ using namespace mazes;
 bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const noexcept {
 
     if (!g) {
+
         return false;
     }
 
@@ -33,20 +35,9 @@ bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
 #if defined(MAZE_DEBUG)
         std::cerr << "stringify::run - Grid too large (" << total_cells << " cells), max recommended: " << max_reasonable_cells << std::endl;
 #endif
+        ops.set_str("Grid too large to stringify reasonably.");
         return false;
     }
-
-    // Get all cells using maze_adapter
-    auto all_cells = ops.get_cells();
-    
-    if (all_cells.empty()) {
-#if defined(MAZE_DEBUG)
-        std::cerr << "stringify::run - No cells in grid" << std::endl;
-#endif
-        return false;
-    }
-    
-    maze_adapter maze_view(all_cells);
 
     // Generate ASCII representation
     // Top border
@@ -65,9 +56,8 @@ bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
         for (unsigned int c = 0; c < columns; ++c) {
             int cell_index = r * columns + c;
             
-            // Use maze_adapter to find the cell
-            auto cell_it = maze_view.find(cell_index);
-            auto cell_ptr = (cell_it != maze_view.end()) ? *cell_it : nullptr;
+            // Get cell on-demand (will be created lazily if needed)
+            auto cell_ptr = ops.search(cell_index);
 
             // Cell content (from g's contents_of method)
             std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
@@ -97,9 +87,6 @@ bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
                 
                 for (const auto& [linked_cell, is_linked] : links) {
                     if (++link_count > max_links) {
-#if defined(MAZE_DEBUG)
-                        std::cerr << "stringify::run - Too many links in cell, breaking" << std::endl;
-#endif
                         break;
                     }
                     
@@ -128,9 +115,6 @@ bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
                 
                 for (const auto& [linked_cell, is_linked] : links) {
                     if (++link_count > max_links) {
-#if defined(MAZE_DEBUG)
-                        std::cerr << "stringify::run - Too many links in cell, breaking" << std::endl;
-#endif
                         break;
                     }
                     
@@ -149,9 +133,7 @@ bool stringify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
         }
 
         ss << top_line << "\n" << bottom_line << "\n";
-    }
-
-    ops.set_str(ss.str());
+    }    ops.set_str(ss.str());
 
     return true;
 } // run
