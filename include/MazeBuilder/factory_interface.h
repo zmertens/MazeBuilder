@@ -58,11 +58,13 @@ public:
     virtual ~factory_interface() = default;
 };
 
-// Forward declaration for grid_interface
+// Forward declaration for interfaces
 class grid_interface;
+class maze_interface;
 
-/// @brief Type alias for grid factory interface
+/// @brief Type aliases for factory implementations
 using grid_factory_interface = factory_interface<grid_interface>;
+using maze_factory_interface = factory_interface<maze_interface>;
 
 } // namespace mazes
 

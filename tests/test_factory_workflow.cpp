@@ -4,9 +4,13 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/dfs.h>
+#include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/grid.h>
+#include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/maze_factory.h>
+#include <MazeBuilder/maze_str.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/stringify.h>
 #include <MazeBuilder/string_utils.h>
@@ -198,7 +202,6 @@ TEST_CASE("randomizer::get_num_ints generates correct number of integers", "[ran
     }
 }
 
-
 TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
 
     grid_factory grid_factory{};
@@ -206,7 +209,7 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
     SECTION("Can register custom creator") {
         auto custom_creator = [](const configurator& config) -> std::unique_ptr<grid_interface> {
 
-            return std::make_unique<grid>(config.rows() * 2, config.columns() * 2, config.levels());
+            return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
             };
 
         REQUIRE(grid_factory.register_creator("custom_grid", custom_creator));
@@ -219,7 +222,7 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
     SECTION("Can register custom creator with distances") {
         auto custom_creator = [](const auto& config) -> auto {
 
-            return std::make_unique<distance_grid>(config.rows() * 2, config.columns() * 2, config.levels());
+            return std::make_unique<distance_grid>(config.rows(), config.columns(), config.levels());
             };
 
         REQUIRE(grid_factory.register_creator("distance_grid", custom_creator));
@@ -299,5 +302,56 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]") {
     }
 }
 
+TEST_CASE("Maze maze_factory registration", "[maze_factory workflow]") {
 
+    maze_factory maze_factory{};
 
+    configurator config;
+    config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED);
+
+    auto custom_creator = [](const configurator& config) -> std::unique_ptr<maze_interface> {
+
+        if (auto igrid = std::make_unique<grid>(config.rows(), config.columns(), config.levels())) {
+
+            auto&& ops = igrid->operations();
+
+            size_t total_cells = config.rows() * config.columns() * config.levels();
+            
+            if (total_cells <= 1000) {
+                std::vector<std::shared_ptr<cell>> cells_linked_with_neighbors;
+                cells_linked_with_neighbors.reserve(total_cells);
+
+                for (size_t i = 0; i < total_cells; ++i) {
+                    cells_linked_with_neighbors.emplace_back(std::make_shared<cell>(static_cast<int32_t>(i)));
+                }
+            
+                ops.set_cells(std::cref(cells_linked_with_neighbors));
+            }
+            
+            dfs _dfs{};
+
+            randomizer rng{};
+
+            rng.seed(config.seed());
+
+            if (auto success = _dfs.run(igrid.get(), ref(rng))) {
+            
+                stringify _stringifier;
+
+                _stringifier.run(igrid.get(), ref(rng));
+
+                return make_unique<maze_str>(ops.get_str());
+            }
+        }
+
+        return nullptr;
+    };
+
+    REQUIRE(maze_factory.register_creator("custom_maze", custom_creator));
+    REQUIRE(maze_factory.is_registered("custom_maze"));
+
+    // Cannot register same key twice
+    REQUIRE_FALSE(maze_factory.register_creator("custom_maze", custom_creator));
+
+    cout << maze_factory.create("custom_maze", config).value()->maze() << endl;
+}

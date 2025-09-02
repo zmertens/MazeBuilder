@@ -13,7 +13,7 @@ namespace mazes {
 /// @class configurator
 /// @brief Configuration class for arguments
 /// @details This class stores maze generation parameters with safe default values
-class configurator {
+class configurator final {
     
 public:
 
