@@ -11,6 +11,7 @@
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_str.h>
+#include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/stringify.h>
 #include <MazeBuilder/string_utils.h>
@@ -31,7 +32,7 @@ using namespace std;
 
 static constexpr auto ROWS = 10, COLUMNS = 5, LEVELS = 1;
 
-static constexpr auto ALGO_TO_RUN = algo::DFS;
+static constexpr auto ALGO_DFS = algo::DFS;
 
 static constexpr auto SEED = 12345;
 
@@ -47,28 +48,81 @@ struct pcout : public stringstream
     }
 };
 
-static string create(const char *s)
+// Helper function to create maze and return str
+static string create(const configurator &config)
 {
-    pcout{} << "3s CREATE " << quoted(s) << '\n';
-    this_thread::sleep_for(3s);
-    return {s};
+    auto grid_creator = [](const configurator &config) -> std::unique_ptr<grid_interface>
+    {
+        return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
+    };
+
+    auto maze_creator = [grid_creator](const configurator &config) -> std::unique_ptr<maze_interface>
+    {
+        if (config.algo_id() != algo::DFS)
+        {
+            return nullptr;
+        }
+
+        grid_factory gf{};
+
+        if (!gf.is_registered("g1"))
+        {
+
+            REQUIRE(gf.register_creator("g1", grid_creator));
+        }
+
+        if (auto igrid = gf.create("g1", cref(config)); igrid.has_value())
+        {
+            static dfs _dfs{};
+
+            static randomizer rng{};
+
+            rng.seed(config.seed());
+
+            auto &&igridimpl = igrid.value();
+
+            if (auto success = _dfs.run(igridimpl.get(), ref(rng)))
+            {
+                static stringify _stringifier;
+
+                _stringifier.run(igridimpl.get(), ref(rng));
+
+                return make_unique<maze_str>(igridimpl->operations().get_str());
+            }
+        }
+
+        return nullptr;
+    };
+
+    string s{};
+
+    auto duration = progress<>::duration([&config, maze_creator, &s]() -> bool
+                                         {
+
+        maze_factory mf{};
+
+        if (!mf.is_registered("custom_maze")) {
+
+            REQUIRE(mf.register_creator("custom_maze", maze_creator));
+        }
+
+        auto maze_optional = mf.create("custom_maze", cref(config));
+
+        REQUIRE(maze_optional.has_value());
+
+        s = maze_optional.value()->maze();
+        
+        return !s.empty(); });
+
+    pcout{} << duration.count() << " ms" << endl;
+
+    return s;
 }
 
 static string concat(const string &a, const string &b)
 {
-    pcout{} << "5s CONCAT "
-            << quoted(a) << " "
-            << quoted(b) << '\n';
-    this_thread::sleep_for(5s);
+
     return a + b;
-}
-
-static string twice(const string &s)
-{
-
-    pcout{} << "3s TWICE  " << quoted(s) << '\n';
-    this_thread::sleep_for(3s);
-    return s + s;
 }
 
 template <typename F>
@@ -137,7 +191,7 @@ TEST_CASE("Test grid_factory create1", "[create1]")
     {
 
         // Create using the registered key
-        REQUIRE(factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED)) != std::nullopt);
+        REQUIRE(factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_DFS).seed(SEED)) != std::nullopt);
     };
 }
 
@@ -151,7 +205,7 @@ TEST_CASE("Test full workflow", "[full workflow]")
     g_factory.register_creator(key, [](const configurator &config) -> std::unique_ptr<grid_interface>
                                { return std::make_unique<grid>(config.rows(), config.columns(), config.levels()); });
 
-    auto g = g_factory.create(key, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_TO_RUN).seed(SEED));
+    auto g = g_factory.create(key, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_DFS).seed(SEED));
 
     randomizer rndmzr{};
 
@@ -163,8 +217,6 @@ TEST_CASE("Test full workflow", "[full workflow]")
     {
 
         REQUIRE_FALSE(casted_grid->operations().get_str().empty());
-
-        cout << string_utils::format("{}", casted_grid->operations().get_str()).substr(0, 30) << endl;
     }
     else
     {
@@ -187,12 +239,11 @@ TEST_CASE("Test full workflow with large grid", "[full workflow][large]")
                                        .rows(configurator::MAX_ROWS)
                                        .columns(configurator::MAX_COLUMNS)
                                        .levels(configurator::MAX_LEVELS)
-                                       .algo_id(ALGO_TO_RUN)
+                                       .algo_id(ALGO_DFS)
                                        .seed(SEED));
 
     // Verify the grid was created successfully
     REQUIRE(g.has_value());
-
 }
 
 TEST_CASE("Invalid args when converting algo string", "[invalid args]")
@@ -356,78 +407,38 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]")
     }
 }
 
-TEST_CASE("Maze maze_factory registration", "[maze_factory workflow]")
-{
-
-    maze_factory maze_factory{};
-
-    configurator config;
-    config.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED).distances(true);
-
-    auto maze_creator = [](const configurator &config) -> std::unique_ptr<maze_interface>
-    {
-        grid_factory gf{};
-
-        auto grid_creator = [](const configurator &config) -> std::unique_ptr<grid_interface>
-        {
-            return std::make_unique<grid>(config.rows(), config.columns(), config.levels());
-        };
-
-        REQUIRE(gf.register_creator("g1", grid_creator));
-
-        if (auto igrid = gf.create("g1", config); igrid.has_value())
-        {
-
-            dfs _dfs{};
-
-            randomizer rng{};
-
-            rng.seed(config.seed());
-
-            auto &&igridimpl = igrid.value();
-
-            if (auto success = _dfs.run(igridimpl.get(), ref(rng)))
-            {
-
-                stringify _stringifier;
-
-                _stringifier.run(igridimpl.get(), ref(rng));
-
-                return make_unique<maze_str>(igridimpl->operations().get_str());
-            }
-        }
-
-        return nullptr;
-    };
-
-    REQUIRE(maze_factory.register_creator("custom_maze", maze_creator));
-    REQUIRE(maze_factory.is_registered("custom_maze"));
-
-    // Cannot register same key twice
-    REQUIRE_FALSE(maze_factory.register_creator("custom_maze", maze_creator));
-
-    cout << maze_factory.create("custom_maze", config).value()->maze() << endl;
-}
-
 // Source material here
 // https://github.com/PacktPublishing/Cpp17-STL-Cookbook/blob/master/Chapter09/chains.cpp
-TEST_CASE("Test async unwrapping", "[async unwrap]")
+TEST_CASE("Maze maze_factory registration with async", "[maze_factory async workflow]")
 {
+    configurator config1{};
+    config1.rows(ROWS).columns(COLUMNS).levels(LEVELS).seed(SEED).distances(true).algo_id(ALGO_DFS);
+
+    configurator config2{};
+    config2.rows(COLUMNS).columns(ROWS).levels(LEVELS).seed(SEED).distances(true).algo_id(ALGO_DFS);
+
     auto pcreate(asynchronize(create));
     auto pconcat(async_adapter(concat));
-    auto ptwice(async_adapter(twice));
 
-    auto result(
-        pconcat(
-            ptwice(
-                pconcat(
-                    pcreate("foo "),
-                    pcreate("bar "))),
-            pconcat(
-                pcreate("this "),
-                pcreate("that "))));
+    auto result = pconcat(pcreate(cref(config2)), pconcat(pcreate(cref(config1)), pcreate(cref(config2))));
 
-    cout << "Setup done. Nothing executed yet.\n";
+    pcout{} << "Setup done. Nothing executed yet.\n";
 
-    cout << result().get() << '\n';
+    // Use structured bindings to capture both the maze and timing
+    auto [content, execution_time] = [&result]()
+    {
+        std::string maze_content;
+
+        auto duration = progress<>::duration([&result, &maze_content]() -> bool
+                                             {
+                                                 maze_content = result().get();
+                                                 return !maze_content.empty();
+                                             });
+
+        return std::make_tuple(std::move(maze_content), duration.count());
+    }();
+
+    REQUIRE_FALSE(content.empty());
+
+    pcout{} << "Async execution time: " << execution_time << " ms\n";
 }
