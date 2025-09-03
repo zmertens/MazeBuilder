@@ -3,12 +3,14 @@
 
 #include <MazeBuilder/algo_interface.h>
 
-namespace mazes {
+namespace mazes
+{
 
-class pixels : public algo_interface {
-public:
-    virtual bool run(grid_interface* g, randomizer& rng) const noexcept override;
-};
+    class pixels : public algo_interface
+    {
+    public:
+        virtual bool run(grid_interface *g, randomizer &rng) const noexcept override;
+    };
 }
 
 #endif // PIXELS_H

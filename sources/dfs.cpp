@@ -16,17 +16,19 @@ using namespace mazes;
 /// @param g the grid to generate the maze on
 /// @param rng the randomizer to use for selecting neighbors
 /// @return
-bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
+bool dfs::run(grid_interface *g, randomizer &rng) const noexcept
+{
 
     using namespace std;
 
-    const auto& grid_ops = g->operations();
+    const auto &grid_ops = g->operations();
 
     // For large grids with lazy cell creation, we need to calculate total potential cells
     auto [rows, columns, levels] = grid_ops.get_dimensions();
     int total_possible_cells = static_cast<int>(rows * columns * levels);
-    
-    if (total_possible_cells <= 0) {
+
+    if (total_possible_cells <= 0)
+    {
         return false;
     }
 
@@ -34,7 +36,8 @@ bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
     int start_index = rng(0, total_possible_cells - 1);
     auto start = grid_ops.search(start_index);
 
-    if (!start) {
+    if (!start)
+    {
         return false;
     }
 
@@ -44,7 +47,8 @@ bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
     stack_of_cells.push(start);
     visited_cells.insert(start);
 
-    while (!stack_of_cells.empty()) {
+    while (!stack_of_cells.empty())
+    {
         auto current_cell = stack_of_cells.top();
 
         auto current_neighbors = grid_ops.get_neighbors(current_cell);
@@ -53,15 +57,17 @@ bool dfs::run(grid_interface* g, randomizer& rng) const noexcept {
         vector<shared_ptr<cell>> unvisited_neighbors;
 
         copy_if(current_neighbors.begin(), current_neighbors.end(),
-            back_inserter(unvisited_neighbors), [&visited_cells](const auto& n) {
-                return n && visited_cells.find(n) == visited_cells.end();
-            });
+                back_inserter(unvisited_neighbors), [&visited_cells](const auto &n)
+                { return n && visited_cells.find(n) == visited_cells.end(); });
 
-        if (unvisited_neighbors.empty()) {
+        if (unvisited_neighbors.empty())
+        {
             stack_of_cells.pop();
-        } else {
-            const auto& random_index = rng(0, static_cast<int>(unvisited_neighbors.size()) - 1);
-            const auto& neighbor = unvisited_neighbors.at(random_index);
+        }
+        else
+        {
+            const auto &random_index = rng(0, static_cast<int>(unvisited_neighbors.size()) - 1);
+            const auto &neighbor = unvisited_neighbors.at(random_index);
 
             // Use the lab class for linking
             lab::link(current_cell, neighbor, true);

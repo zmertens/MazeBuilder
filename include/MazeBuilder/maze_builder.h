@@ -30,12 +30,12 @@
 #include <MazeBuilder/wavefront_object_helper.h>
 #include <MazeBuilder/io_utils.h>
 
-namespace mazes {
+namespace mazes
+{
 
-/// @brief Version string for the maze builder
-static const std::string VERSION = build_info::Version + "-" + build_info::CommitSHA;
+    /// @brief Version string for the maze builder
+    static const std::string VERSION = build_info::Version + "-" + build_info::CommitSHA;
 
 } // namespace
 
 #endif // MAZE_BUILDER_H
-

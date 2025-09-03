@@ -6,20 +6,25 @@
 #include <memory>
 #include <string>
 
-namespace mazes {
+namespace mazes
+{
 
-struct maze_str : public maze_interface {
+    /// @file maze_str.h
+    /// @struct maze_str
+    /// @brief String representation of a maze
+    struct maze_str : public maze_interface
+    {
 
-    std::string data;
+        std::string data;
 
-    explicit maze_str(std::string d) : data(std::move(d)) {}
+        explicit maze_str(std::string d) : data(std::move(d)) {}
 
-    std::string maze() const noexcept override {
+        std::string maze() const noexcept override
+        {
 
-        return data;
-    }
-
-};
+            return data;
+        }
+    };
 
 } // namespace mazes
 

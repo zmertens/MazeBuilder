@@ -8,14 +8,15 @@ using namespace mazes;
 /// @brief Provide a string representation of the grid
 /// @param g
 /// @param rng
-/// @return 
-bool pixels::run([[maybe_unused]] grid_interface* g, [[maybe_unused]] randomizer & rng) const noexcept {
+/// @return
+bool pixels::run([[maybe_unused]] grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+{
     return false;
-  /*  void string_view_utils::pixels(const std::unique_ptr<maze>&m,
-        std::vector<std::tuple<int, int, int, int>>&vertices,
-        std::vector<std::vector<std::uint32_t>>&faces,
-        std::string_view sv) noexcept {
-        using namespace std;*/
+    /*  void string_view_utils::pixels(const std::unique_ptr<maze>&m,
+          std::vector<std::tuple<int, int, int, int>>&vertices,
+          std::vector<std::vector<std::uint32_t>>&faces,
+          std::string_view sv) noexcept {
+          using namespace std;*/
 
     //    if (!m) {
     //        // Handle null maze pointer

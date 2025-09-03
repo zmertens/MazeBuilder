@@ -3,12 +3,14 @@
 
 #include <MazeBuilder/algo_interface.h>
 
-namespace mazes {
+namespace mazes
+{
 
-class stringify : public algo_interface {
-public:
-    virtual bool run(grid_interface* g, randomizer& rng) const noexcept override;
-};
+    class stringify : public algo_interface
+    {
+    public:
+        virtual bool run(grid_interface *g, randomizer &rng) const noexcept override;
+    };
 }
 
 #endif // STRINGIFY_H

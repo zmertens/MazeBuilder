@@ -16,26 +16,30 @@ using namespace mazes;
 /// @param g The grid interface
 /// @param rng Random number generator (unused but required by interface)
 /// @return True if successful, false otherwise
-bool objectify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const noexcept {
+bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+{
 
     using namespace std;
 
-    if (!g) {
+    if (!g)
+    {
         // Handle null grid
         return false;
     }
 
     // Get the grid operations to access dimensions and other methods
-    const auto& grid_ops = g->operations();
+    const auto &grid_ops = g->operations();
     auto dimensions = grid_ops.get_dimensions();
-    if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0) {
+    if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0)
+    {
         // Handle invalid dimensions
         return false;
     }
 
     // Get the string representation of the maze
     std::string str = grid_ops.get_str();
-    if (str.empty()) {
+    if (str.empty())
+    {
         return false;
     }
 
@@ -44,10 +48,11 @@ bool objectify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
     std::vector<std::vector<std::uint32_t>> faces;
 
     // Lambda to add a block (cube) at given position
-    auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size) {
+    auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size)
+    {
         // Calculate the base index for the new vertices (OBJ format is 1-indexed)
         std::uint32_t baseIndex = static_cast<std::uint32_t>(vertices.size() + 1);
-        
+
         // Define the 8 vertices of the cube
         vertices.emplace_back(x, y, z, w);
         vertices.emplace_back(x + block_size, y, z, w);
@@ -82,21 +87,25 @@ bool objectify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
     // Parse the string representation and create 3D blocks for walls
     int row_x = 0;
     int col_z = 0;
-    
+
     std::string_view sv(str);
-    for (size_t i = 0; i < sv.size(); ++i) {
-        if (sv[i] == '\n') {
+    for (size_t i = 0; i < sv.size(); ++i)
+    {
+        if (sv[i] == '\n')
+        {
             row_x++;
             col_z = 0;
             continue;
         }
 
         // Create blocks for wall characters
-        if (sv[i] == static_cast<char>(barriers::CORNER) || 
-            sv[i] == static_cast<char>(barriers::HORIZONTAL) || 
-            sv[i] == static_cast<char>(barriers::VERTICAL)) {
+        if (sv[i] == static_cast<char>(barriers::CORNER) ||
+            sv[i] == static_cast<char>(barriers::HORIZONTAL) ||
+            sv[i] == static_cast<char>(barriers::VERTICAL))
+        {
             static constexpr auto block_size = 1;
-            for (auto h = 0; h < static_cast<int>(std::get<2>(dimensions)); ++h) {
+            for (auto h = 0; h < static_cast<int>(std::get<2>(dimensions)); ++h)
+            {
                 add_block(row_x, col_z, h, 0, block_size); // w=0 for now, could use block_id from config
             }
         }
@@ -105,7 +114,7 @@ bool objectify::run(grid_interface* g, [[maybe_unused]] randomizer& rng) const n
 
     // Store the generated vertices and faces in the grid operations
     // Need to cast to non-const to call the setter methods
-    auto& mutable_grid_ops = const_cast<grid_operations&>(grid_ops);
+    auto &mutable_grid_ops = const_cast<grid_operations &>(grid_ops);
     mutable_grid_ops.set_vertices(vertices);
     mutable_grid_ops.set_faces(faces);
 

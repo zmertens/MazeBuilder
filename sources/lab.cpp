@@ -17,10 +17,12 @@ using namespace mazes;
 
 /// @brief Create a bidirectional or unidirectional link between two cells
 /// @param c1 First cell to link
-/// @param c2 Second cell to link  
+/// @param c2 Second cell to link
 /// @param bidi If true, creates bidirectional link; if false, only c1 links to c2
-void lab::link(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi) noexcept {
-    if (!c1 || !c2) {
+void lab::link(const std::shared_ptr<cell> &c1, const std::shared_ptr<cell> &c2, bool bidi) noexcept
+{
+    if (!c1 || !c2)
+    {
 
         return;
     }
@@ -29,7 +31,8 @@ void lab::link(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2,
     c1->add_link(c2);
 
     // If bidirectional, add c1 to c2's links
-    if (bidi) {
+    if (bidi)
+    {
 
         c2->add_link(c1);
     }
@@ -39,8 +42,10 @@ void lab::link(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2,
 /// @param c1 First cell to unlink
 /// @param c2 Second cell to unlink
 /// @param bidi If true, removes bidirectional link; if false, only removes c1's link to c2
-void lab::unlink(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c2, bool bidi) noexcept {
-    if (!c1 || !c2) {
+void lab::unlink(const std::shared_ptr<cell> &c1, const std::shared_ptr<cell> &c2, bool bidi) noexcept
+{
+    if (!c1 || !c2)
+    {
 
         return;
     }
@@ -49,7 +54,8 @@ void lab::unlink(const std::shared_ptr<cell>& c1, const std::shared_ptr<cell>& c
     c1->remove_link(c2);
 
     // If bidirectional, remove c1 from c2's links
-    if (bidi) {
+    if (bidi)
+    {
 
         c2->remove_link(c1);
     }

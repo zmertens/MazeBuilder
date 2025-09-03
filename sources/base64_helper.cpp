@@ -4,12 +4,14 @@
 
 using namespace mazes;
 
-std::string base64_helper::encode(std::string_view sv) noexcept {
+std::string base64_helper::encode(std::string_view sv) noexcept
+{
 
-    return base64_encode(std::string{ sv });
+    return base64_encode(std::string{sv});
 }
 
-std::string base64_helper::decode(std::string_view sv) noexcept {
+std::string base64_helper::decode(std::string_view sv) noexcept
+{
 
-    return base64_decode(std::string{ sv });
+    return base64_decode(std::string{sv});
 }
