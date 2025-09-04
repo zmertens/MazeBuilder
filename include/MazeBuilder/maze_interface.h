@@ -3,18 +3,20 @@
 
 #include <string>
 
-namespace mazes {
+namespace mazes
+{
 
-/// @file maze_interface.h
-/// @class maze_interface
-/// @brief Interface for the mazes
-class maze_interface {
+    /// @file maze_interface.h
+    /// @class maze_interface
+    /// @brief Interface for the mazes
+    class maze_interface
+    {
 
-public:
-    virtual ~maze_interface() = default;
+    public:
+        virtual ~maze_interface() = default;
 
-    virtual std::string maze() const noexcept = 0;
-}; // maze_interface
+        virtual std::string maze() const noexcept = 0;
+    }; // maze_interface
 
 } // namespace mazes
 

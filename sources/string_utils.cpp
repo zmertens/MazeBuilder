@@ -112,6 +112,34 @@ std::string string_utils::format<int, float>(std::string_view format_str, const 
 }
 
 template <>
+std::string string_utils::format<int, int, int>(std::string_view format_str, const int &arg, const int &arg2, const int& arg3) noexcept
+{
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
+}
+
+template <>
+std::string string_utils::format<unsigned int, int, int>(std::string_view format_str, const unsigned int &arg, const int &arg2, const int& arg3) noexcept
+{
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
+}
+
+template <>
+std::string string_utils::format<int, int, int, int>(std::string_view format_str, const int &arg, const int &arg2, const int& arg3, const int& arg4) noexcept
+{
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3, arg4));
+}
+
+template <>
+std::string string_utils::format<int, size_t, size_t, size_t>(std::string_view format_str, const int &arg, const size_t &arg2, const size_t &arg3, const size_t &arg4) noexcept
+{
+
+    return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3, arg4));
+}
+
+template <>
 std::string string_utils::format<int, int, float>(std::string_view format_str, const int &arg, const int &arg2, const float &arg3) noexcept
 {
 

@@ -17,12 +17,16 @@
 #include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <functional>
 #include <future>
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -36,6 +40,7 @@ static constexpr auto ALGO_DFS = algo::DFS;
 
 static constexpr auto SEED = 12345;
 
+// Provides standard out in async context
 struct pcout : public stringstream
 {
     static inline mutex cout_mutex;
@@ -114,7 +119,7 @@ static string create(const configurator &config)
         
         return !s.empty(); });
 
-    pcout{} << duration.count() << " ms" << endl;
+    // pcout{} << duration.count() << " ms" << endl;
 
     return s;
 }
@@ -158,6 +163,212 @@ static auto async_adapter(F f)
     };
 }
 
+class worker_concurrent
+{
+private:
+    struct work_item
+    {
+
+        unsigned int id;
+
+        std::string work_str;  // This will store the result of create() calls
+
+        std::vector<configurator> configs;  // Store the configs assigned to this worker
+
+        int start, count;
+
+        work_item(unsigned int id, std::vector<configurator> configs, int start, int count)
+            : id{id}, work_str{}, configs(std::move(configs)), start{start}, count{count}
+        {
+        }
+    };
+
+    std::condition_variable work_cond;
+
+    std::mutex work_mtx;
+
+    std::atomic<int> pending_work_count;
+
+    std::atomic<bool> should_exit;
+
+    std::deque<work_item> work_queue;
+
+    std::vector<std::thread> workers;
+
+    std::string* target_str_ptr;  // Pointer to the target string
+
+    std::mutex target_str_mutex;  // Mutex to protect target_str access
+
+public:
+    // Add constructor and destructor
+    worker_concurrent() : should_exit(false), pending_work_count(0), target_str_ptr(nullptr) {}
+
+    ~worker_concurrent()
+    {
+
+        cleanup();
+    }
+
+    // Initialize worker threads
+    void initThreads() noexcept
+    {
+
+        using namespace std;
+
+        auto thread_func = [](worker_concurrent *worker_ptr)
+        {
+
+            while (!worker_ptr->should_exit.load())
+            {
+                unique_lock<mutex> lock(worker_ptr->work_mtx);
+
+                worker_ptr->work_cond.wait(lock, [worker_ptr]
+                                           { return worker_ptr->should_exit.load() || !worker_ptr->work_queue.empty(); });
+
+                if (worker_ptr->should_exit.load())
+                {
+
+                    break;
+                }
+
+                // Ready to do work
+                if (!worker_ptr->work_queue.empty())
+                {
+
+                    auto temp_worker = std::move(worker_ptr->work_queue.front());
+
+                    worker_ptr->work_queue.pop_front();
+
+                    lock.unlock();
+
+                    worker_ptr->do_work(temp_worker);
+
+                    lock.lock();
+
+                    if (--worker_ptr->pending_work_count <= 0)
+                    {
+                        // pcout{} << string_utils::format("{}", target_str);  
+                        worker_ptr->work_cond.notify_one();
+                    }
+                }
+            } // while
+        }; // lambda
+
+        static constexpr auto NUM_WORKERS = 4;
+
+        // Create worker threads
+        for (auto w{0}; w < NUM_WORKERS; w++)
+        {
+
+            workers.emplace_back(thread_func, this);
+        }
+    }
+
+    void generate(const std::vector<configurator> &configs, std::string& target_str) noexcept
+    {
+
+        using namespace std;
+
+        if (configs.empty())
+        {
+
+            return;
+        }
+
+        // Set the target string pointer
+        target_str_ptr = &target_str;
+
+        {
+            unique_lock<std::mutex> lock(this->work_mtx);
+
+            work_queue.clear();
+
+            static constexpr auto BLOCK_COUNT = 4;
+
+            size_t items_per_worker = configs.size() / BLOCK_COUNT;
+            size_t remaining_items = configs.size() % BLOCK_COUNT;
+
+            size_t current_index = 0;
+
+            for (auto w{0}; w < BLOCK_COUNT; w++)
+            {
+                size_t start_index = current_index;
+                
+                // Distribute items evenly, with remainder distributed to first workers
+                size_t count = items_per_worker + (w < remaining_items ? 1 : 0);
+                
+                if (count > 0)
+                {
+                    // Extract configs for this worker
+                    std::vector<configurator> worker_configs;
+                    for (size_t i = start_index; i < start_index + count && i < configs.size(); ++i)
+                    {
+                        worker_configs.push_back(configs[i]);
+                    }
+
+                    work_queue.emplace_back(static_cast<unsigned int>(w), std::move(worker_configs), static_cast<int>(start_index), static_cast<int>(count));
+                }
+
+                current_index += count;
+            }
+
+            this->pending_work_count.store(static_cast<int>(work_queue.size()));
+        }
+
+        this->work_cond.notify_all();
+    } // generate
+
+    void wait_for_completion() noexcept
+    {
+        using namespace std;
+        
+        unique_lock<mutex> lock(work_mtx);
+        work_cond.wait(lock, [&] { return pending_work_count.load() <= 0; });
+    }
+
+    void do_work(work_item &item) noexcept
+    {
+        using namespace std;
+
+        for (const auto& config : item.configs)
+        {
+            item.work_str += create(cref(config));
+        }
+
+        // Append the worker's result to the shared target string
+        if (target_str_ptr && !item.work_str.empty())
+        {
+            lock_guard<mutex> lock(target_str_mutex);
+            *target_str_ptr += item.work_str;
+        }
+    }
+
+    void cleanup() noexcept
+    {
+        {
+            std::lock_guard<std::mutex> lock(work_mtx);
+
+            should_exit = true;
+
+            pending_work_count = 0;
+        }
+
+        work_cond.notify_all();
+
+        for (auto &t : workers)
+        {
+
+            if (t.joinable())
+            {
+
+                t.join();
+            }
+        }
+
+        workers.clear();
+    }
+};
+
 TEST_CASE("Workflow static checks", "[workflow_static_checks]")
 {
 
@@ -167,6 +378,13 @@ TEST_CASE("Workflow static checks", "[workflow_static_checks]")
     STATIC_REQUIRE_FALSE(std::is_copy_assignable<mazes::grid_factory>::value);
     STATIC_REQUIRE_FALSE(std::is_move_constructible<mazes::grid_factory>::value);
     STATIC_REQUIRE_FALSE(std::is_move_assignable<mazes::grid_factory>::value);
+
+    STATIC_REQUIRE(std::is_default_constructible<mazes::maze_factory>::value);
+    STATIC_REQUIRE(std::is_destructible<mazes::maze_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_constructible<mazes::maze_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_copy_assignable<mazes::maze_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_constructible<mazes::maze_factory>::value);
+    STATIC_REQUIRE_FALSE(std::is_move_assignable<mazes::maze_factory>::value);
 
     STATIC_REQUIRE(std::is_default_constructible<mazes::randomizer>::value);
     STATIC_REQUIRE(std::is_destructible<mazes::randomizer>::value);
@@ -187,12 +405,8 @@ TEST_CASE("Test grid_factory create1", "[create1]")
     factory1.register_creator(PRODUCT_NAME_1, [](const configurator &config) -> std::unique_ptr<grid_interface>
                               { return std::make_unique<grid>(config.rows(), config.columns(), config.levels()); });
 
-    BENCHMARK("Benchmark grid_factory::create")
-    {
-
-        // Create using the registered key
-        REQUIRE(factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_DFS).seed(SEED)) != std::nullopt);
-    };
+    // Create using the registered key
+    REQUIRE(factory1.create(PRODUCT_NAME_1, configurator().rows(ROWS).columns(COLUMNS).levels(LEVELS).algo_id(ALGO_DFS).seed(SEED)) != std::nullopt);
 }
 
 TEST_CASE("Test full workflow", "[full workflow]")
@@ -407,6 +621,8 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]")
     }
 }
 
+#if defined(MAZE_BENCHMARK)
+
 // Source material here
 // https://github.com/PacktPublishing/Cpp17-STL-Cookbook/blob/master/Chapter09/chains.cpp
 TEST_CASE("Maze maze_factory registration with async", "[maze_factory async workflow]")
@@ -422,23 +638,53 @@ TEST_CASE("Maze maze_factory registration with async", "[maze_factory async work
 
     auto result = pconcat(pcreate(cref(config2)), pconcat(pcreate(cref(config1)), pcreate(cref(config2))));
 
-    pcout{} << "Setup done. Nothing executed yet.\n";
-
-    // Use structured bindings to capture both the maze and timing
-    auto [content, execution_time] = [&result]()
+    BENCHMARK("Async concat")
     {
-        std::string maze_content;
+        // Use structured bindings to capture both the maze and timing
+        auto [content, execution_time] = [&result]()
+        {
+            std::string maze_content;
 
-        auto duration = progress<>::duration([&result, &maze_content]() -> bool
-                                             {
+            auto duration = progress<>::duration([&result, &maze_content]() -> bool
+                                                 {
                                                  maze_content = result().get();
-                                                 return !maze_content.empty();
-                                             });
+                                                 return !maze_content.empty(); });
 
-        return std::make_tuple(std::move(maze_content), duration.count());
-    }();
+            return std::make_tuple(std::move(maze_content), duration.count());
+        }();
 
-    REQUIRE_FALSE(content.empty());
+        REQUIRE_FALSE(content.empty());
+        REQUIRE_FALSE(execution_time == 0);
+    };
 
-    pcout{} << "Async execution time: " << execution_time << " ms\n";
+    BENCHMARK("Serial-executed create")
+    {
+        auto s1 = create(cref(config1));
+
+        auto s2 = create(cref(config2));
+
+        auto s3 = create(cref(config1));
+
+        auto concatenated = concat(concat(s1, s2), s3);
+
+        REQUIRE_FALSE(concatenated.empty());
+    };
+
+    worker_concurrent foreman{};
+
+    foreman.initThreads();
+
+    BENCHMARK("Worker threads execution")
+    {
+        std::vector<configurator> configs = {config1, config2, config1, config2, config1, config1, config2};
+
+        std::string target_str{};
+
+        foreman.generate(configs, target_str);
+
+        foreman.wait_for_completion();
+    };
+
+    foreman.cleanup();
 }
+#endif // MAZE_BENCHMARK
