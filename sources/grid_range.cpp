@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <stdexcept>
+#include <utility>
 
 using namespace mazes;
 
@@ -107,10 +108,15 @@ grid_range::grid_range(
     std::function<std::shared_ptr<cell>(int)> create_cells_func)
     : m_cells(cells)
     , m_dimensions(dimensions)
-    , m_start_index(std::max(0, start_index))
-    , m_end_index(std::min(end_index, max_valid_index()))
     , m_create_cells_func(create_cells_func)
 {
+    int max_index = max_valid_index();
+    
+    // Clamp start_index to valid range
+    m_start_index = std::max(0, std::min(start_index, max_index));
+    
+    // Clamp end_index to valid range, but ensure it's not less than start_index
+    m_end_index = std::max(m_start_index, std::min(end_index, max_index));
 }
 
 grid_iterator grid_range::begin()
@@ -148,13 +154,43 @@ bool grid_range::empty() const noexcept
 std::vector<std::shared_ptr<cell>> grid_range::to_vector() const
 {
     std::vector<std::shared_ptr<cell>> result;
-    result.reserve(size());
     
-    for (auto it = begin(); it != end(); ++it)
+    // For the full grid range, return all existing cells sorted by index
+    if (m_start_index == 0 && m_end_index == max_valid_index())
     {
-        if (auto cell_ptr = *it)
+        result.reserve(m_cells.size());
+        
+        // Create sorted vector of all existing cells
+        std::vector<std::pair<int, std::shared_ptr<cell>>> indexed_cells;
+        indexed_cells.reserve(m_cells.size());
+        
+        for (const auto& [index, cell_ptr] : m_cells)
+        {
+            if (cell_ptr)
+            {
+                indexed_cells.emplace_back(index, cell_ptr);
+            }
+        }
+        
+        std::sort(indexed_cells.begin(), indexed_cells.end(),
+                  [](const auto& a, const auto& b) { return a.first < b.first; });
+        
+        for (const auto& [index, cell_ptr] : indexed_cells)
         {
             result.push_back(cell_ptr);
+        }
+    }
+    else
+    {
+        // For subset ranges, iterate through the range
+        result.reserve(size());
+        
+        for (auto it = begin(); it != end(); ++it)
+        {
+            if (auto cell_ptr = *it)
+            {
+                result.push_back(cell_ptr);
+            }
         }
     }
     
@@ -181,16 +217,29 @@ void grid_range::clear()
 
 bool grid_range::set_from_vector(const std::vector<std::shared_ptr<cell>>& cells)
 {
-    // Clear existing cells in range first
-    clear();
+    // For full grid range, clear all existing cells first
+    if (m_start_index == 0 && m_end_index == max_valid_index())
+    {
+        m_cells.clear();
+    }
+    else
+    {
+        // For subset ranges, only clear cells within the range
+        clear();
+    }
     
-    // Add cells that fall within this range
+    // Add all provided cells
     for (const auto& cell_ptr : cells)
     {
         if (cell_ptr)
         {
             int index = cell_ptr->get_index();
-            if (index >= m_start_index && index < m_end_index)
+            // For full range, accept all cells; for subset, only cells in range
+            if (m_start_index == 0 && m_end_index == max_valid_index())
+            {
+                m_cells[index] = cell_ptr;
+            }
+            else if (index >= m_start_index && index < m_end_index)
             {
                 m_cells[index] = cell_ptr;
             }
