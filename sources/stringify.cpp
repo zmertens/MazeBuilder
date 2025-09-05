@@ -3,7 +3,6 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/maze_adapter.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <iostream>

@@ -5,7 +5,6 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/grid_range.h>
-#include <MazeBuilder/maze_adapter.h>
 
 #include <atomic>
 #include <cstdint>
@@ -30,13 +29,13 @@ namespace mazes
     {
 
     public:
-        /// @brief
-        /// @param r
-        /// @param c
-        /// @param l
-        explicit grid(unsigned int r = 1u, unsigned int c = 1u, unsigned int l = 1u);
+        /// @brief Construct a grid using unsigned integers
+        /// @param rows
+        /// @param columns
+        /// @param levels
+        explicit grid(unsigned int rows = 1u, unsigned int columns = 1u, unsigned int levels = 1u);
 
-        /// @brief
+        /// @brief Construct a grid using a tuple of unsigned integers
         /// @param dimens
         explicit grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens);
 
@@ -148,14 +147,6 @@ namespace mazes
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept override;
 
-        /// @brief Get the maze adapter for advanced cell operations
-        /// @return Const reference to the maze adapter
-        const maze_adapter &get_maze_adapter() const noexcept;
-
-        /// @brief Get a mutable maze adapter for advanced cell operations
-        /// @return Reference to the maze adapter
-        maze_adapter &get_maze_adapter() noexcept;
-
         // Range-based access methods
         /// @brief Get a range for all cells in the grid
         /// @return grid_range object for iterating over all cells
@@ -178,14 +169,7 @@ namespace mazes
         const grid_range cells(int start_index, int end_index) const;
 
     private:
-        /// @brief Calculate the flat index for a 2D grid
-        std::function<int(unsigned int, unsigned int)> m_calculate_cell_index;
-
         std::unordered_map<int, std::shared_ptr<cell>> m_cells;
-
-        /// @brief Maze adapter for efficient cell operations
-        mutable maze_adapter m_maze_adapter;
-        mutable std::mutex m_adapter_mutex;
 
         std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
 
@@ -194,16 +178,11 @@ namespace mazes
         mutable std::mutex m_topology_mutex;
         std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
 
-        std::atomic<bool> m_configured;
-
         std::string m_str;
 
-        // Wavefront object data
+        // 3D data
         std::vector<std::tuple<int, int, int, int>> m_vertices;
         std::vector<std::vector<std::uint32_t>> m_faces;
-
-        /// @brief Update the maze adapter with current cell data
-        void update_maze_adapter() const;
     };
 
 } // namespace mazes

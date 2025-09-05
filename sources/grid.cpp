@@ -1,9 +1,9 @@
 #include <MazeBuilder/grid.h>
 
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_range.h>
 #include <MazeBuilder/lab.h>
-#include <MazeBuilder/maze_adapter.h>
 
 #include <algorithm>
 #include <functional>
@@ -12,10 +12,6 @@
 #include <string>
 #include <tuple>
 #include <vector>
-
-#if defined(MAZE_DEBUG)
-#include <iostream>
-#endif
 
 using namespace mazes;
 
@@ -26,24 +22,22 @@ using namespace mazes;
 grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
     : grid::grid(std::make_tuple(rows, columns, height))
 {
+
 }
 
 /// @brief
 /// @param dimensions
 grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
-    : m_dimensions(dimens), m_calculate_cell_index{[this](auto row, auto col) -> int
-                                                   { return row * std::get<1>(this->m_dimensions) + col; }},
-      m_configured{false}
+    : m_dimensions(dimens)
 {
+
 }
 
 // Copy constructor
 grid::grid(const grid &other)
     : m_dimensions(other.m_dimensions)
 {
-    // Copy maze adapter if needed
-    std::lock_guard<std::mutex> lock(other.m_adapter_mutex);
-    m_maze_adapter = other.m_maze_adapter;
+
 }
 
 // Copy assignment operator
@@ -53,12 +47,8 @@ grid &grid::operator=(const grid &other)
     {
         return *this;
     }
-    m_dimensions = other.m_dimensions;
 
-    // Copy maze adapter
-    std::lock_guard<std::mutex> lock1(m_adapter_mutex);
-    std::lock_guard<std::mutex> lock2(other.m_adapter_mutex);
-    m_maze_adapter = other.m_maze_adapter;
+    m_dimensions = other.m_dimensions;
 
     return *this;
 }
@@ -67,9 +57,7 @@ grid &grid::operator=(const grid &other)
 grid::grid(grid &&other) noexcept
     : m_dimensions(other.m_dimensions)
 {
-    // Move maze adapter
-    std::lock_guard<std::mutex> lock(other.m_adapter_mutex);
-    m_maze_adapter = std::move(other.m_maze_adapter);
+
 }
 
 // Move assignment operator
@@ -79,12 +67,8 @@ grid &grid::operator=(grid &&other) noexcept
     {
         return *this;
     }
-    m_dimensions = other.m_dimensions;
 
-    // Move maze adapter
-    std::lock_guard<std::mutex> lock1(m_adapter_mutex);
-    std::lock_guard<std::mutex> lock2(other.m_adapter_mutex);
-    m_maze_adapter = std::move(other.m_maze_adapter);
+    m_dimensions = other.m_dimensions;
 
     return *this;
 }
@@ -92,16 +76,16 @@ grid &grid::operator=(grid &&other) noexcept
 // Destructor
 grid::~grid()
 {
+
     // First clean up cell references
     clear_cells();
 
-    m_configured = false;
-    m_dimensions = {0, 0, 0};
-    m_calculate_cell_index = {};
+    m_dimensions = {configurator::DEFAULT_ROWS, configurator::DEFAULT_COLUMNS, configurator::DEFAULT_LEVELS};
 }
 
 void grid::clear_cells() noexcept
 {
+
     // Clear topology first
     {
         std::lock_guard<std::mutex> lock(m_topology_mutex);
@@ -110,45 +94,21 @@ void grid::clear_cells() noexcept
 
     // Use range to clear all cells
     cells().clear();
-
-    // Clear the maze adapter
-    {
-        std::lock_guard<std::mutex> lock(m_adapter_mutex);
-        m_maze_adapter = maze_adapter{};
-    }
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
 {
+
     return this->m_dimensions;
 }
 
 std::shared_ptr<cell> grid::search(int index) const noexcept
 {
+
     // First check if cell already exists
-    auto cell_it = m_cells.find(index);
-    if (cell_it != m_cells.end())
+    if (auto cell_it = m_cells.find(index); cell_it != m_cells.cend())
     {
         return cell_it->second;
-    }
-
-    // Lazy creation: create cell on-demand if it's within valid bounds
-    auto [rows, columns, levels] = m_dimensions;
-    int max_index = static_cast<int>(rows * columns * levels);
-
-    if (index >= 0 && index < max_index)
-    {
-        // Create the cell on-demand
-        auto new_cell = std::make_shared<cell>(index);
-
-        // Store it in the map (const_cast is safe here for lazy initialization)
-        const_cast<grid *>(this)->m_cells[index] = new_cell;
-
-        // Update maze adapter lazily
-        std::lock_guard<std::mutex> lock(m_adapter_mutex);
-        const_cast<grid *>(this)->update_maze_adapter();
-
-        return new_cell;
     }
 
     return nullptr;
@@ -156,7 +116,7 @@ std::shared_ptr<cell> grid::search(int index) const noexcept
 
 int grid::num_cells() const noexcept
 {
-    // Return the number of actually created cells, not the potential total
+
     return static_cast<int>(m_cells.size());
 }
 
@@ -165,22 +125,15 @@ std::vector<std::shared_ptr<cell>> grid::get_cells() const noexcept
     return cells().to_vector();
 }
 
-// Populate the vector of cells from the maze_adapter using natural ordering
-void grid::sort(std::vector<std::shared_ptr<cell>> &cells) const noexcept
+void grid::sort([[maybe_unused]] std::vector<std::shared_ptr<cell>> &cells) const noexcept
 {
-    // Use maze_adapter's built-in sorting capability
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
+    using namespace std;
 
-    auto sorted_adapter = m_maze_adapter.sort_by_index();
-
-    cells.clear();
-    cells.reserve(sorted_adapter.size());
-
-    for (const auto &cell_ptr : sorted_adapter)
-    {
-        cells.emplace_back(cell_ptr);
-    }
+    // sort(cells.begin(), cells.end(),
+    //      [](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b)
+    //      {
+    //          return a->get_index() < b->get_index();
+    //      });
 }
 
 // Get the contents of a cell for this type of grid
@@ -209,14 +162,7 @@ bool grid::set_cells(const std::vector<std::shared_ptr<cell>> &cells) noexcept
 {
     // Use range to set cells and clear existing ones
     this->cells().set_from_vector(cells);
-    
-    // Update maze adapter
-    {
-        std::lock_guard<std::mutex> lock(m_adapter_mutex);
-        m_maze_adapter = maze_adapter(cells);
-    }
 
-    m_configured = true;
     return true;
 }
 
@@ -229,8 +175,6 @@ std::string grid::get_str() const noexcept
 {
     return this->m_str;
 }
-
-// Implementation of missing virtual methods from grid_operations
 
 std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, Direction dir) const noexcept
 {
@@ -384,57 +328,6 @@ std::vector<std::vector<std::uint32_t>> grid::get_faces() const noexcept
 void grid::set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept
 {
     m_faces = faces;
-}
-
-/// @brief Get the maze adapter for advanced cell operations
-/// @return Const reference to the maze adapter
-const maze_adapter &grid::get_maze_adapter() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
-    return m_maze_adapter;
-}
-
-/// @brief Get a mutable maze adapter for advanced cell operations
-/// @return Reference to the maze adapter
-maze_adapter &grid::get_maze_adapter() noexcept
-{
-    std::lock_guard<std::mutex> lock(m_adapter_mutex);
-    update_maze_adapter();
-    return m_maze_adapter;
-}
-
-/// @brief Update the maze adapter with current cell data
-void grid::update_maze_adapter() const
-{
-    // Convert cells map to vector for maze_adapter, sorted by index
-    std::vector<std::shared_ptr<cell>> cells_vector;
-    cells_vector.reserve(m_cells.size());
-
-    // Create a vector of pairs to sort by index
-    std::vector<std::pair<int, std::shared_ptr<cell>>> indexed_cells;
-    indexed_cells.reserve(m_cells.size());
-
-    for (const auto &[index, cell_ptr] : m_cells)
-    {
-        indexed_cells.emplace_back(index, cell_ptr);
-    }
-
-    // Sort by index to maintain consistent ordering
-    std::sort(indexed_cells.begin(), indexed_cells.end(),
-              [](const auto &a, const auto &b)
-              {
-                  return a.first < b.first;
-              });
-
-    // Extract the sorted cells
-    for (const auto &[index, cell_ptr] : indexed_cells)
-    {
-        cells_vector.emplace_back(cell_ptr);
-    }
-
-    // Update the maze adapter
-    m_maze_adapter = maze_adapter(std::move(cells_vector));
 }
 
 // Range-based access methods
