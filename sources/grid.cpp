@@ -1,6 +1,7 @@
 #include <MazeBuilder/grid.h>
 
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid_range.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/maze_adapter.h>
 
@@ -101,47 +102,20 @@ grid::~grid()
 
 void grid::clear_cells() noexcept
 {
-    // First, clear topology information
+    // Clear topology first
     {
         std::lock_guard<std::mutex> lock(m_topology_mutex);
         m_topology.clear();
     }
 
-    // Break all links between cells using maze_adapter
+    // Use range to clear all cells
+    cells().clear();
+
+    // Clear the maze adapter
     {
         std::lock_guard<std::mutex> lock(m_adapter_mutex);
-        if (!m_maze_adapter.empty())
-        {
-            for (const auto &cell_ptr : m_maze_adapter)
-            {
-                if (cell_ptr)
-                {
-                    // Unlink all links - this should remove all connections between cells
-                    auto links = cell_ptr->get_links();
-                    for (auto &[linked_cell, _] : links)
-                    {
-                        if (linked_cell)
-                        {
-                            // Use remove_link which doesn't try to modify the other cell's links
-                            cell_ptr->remove_link(linked_cell);
-                        }
-                    }
-
-                    // Extra cleanup
-                    cell_ptr->cleanup_links();
-                }
-            }
-        }
-
-        // Clear the maze adapter
         m_maze_adapter = maze_adapter{};
     }
-
-    // After breaking connections, clear the container
-    m_cells.clear();
-
-    // Complete reset - swap with an empty map to ensure memory is released
-    std::unordered_map<int, std::shared_ptr<cell>>().swap(m_cells);
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
@@ -188,32 +162,7 @@ int grid::num_cells() const noexcept
 
 std::vector<std::shared_ptr<cell>> grid::get_cells() const noexcept
 {
-    // For large grids, this could be memory intensive
-    // Only return actually created cells, not all potential cells
-    std::vector<std::shared_ptr<cell>> cells;
-    cells.reserve(m_cells.size());
-
-    // Sort by index to maintain consistent ordering
-    std::vector<std::pair<int, std::shared_ptr<cell>>> indexed_cells;
-    indexed_cells.reserve(m_cells.size());
-
-    for (const auto &[index, cell_ptr] : m_cells)
-    {
-        indexed_cells.emplace_back(index, cell_ptr);
-    }
-
-    std::sort(indexed_cells.begin(), indexed_cells.end(),
-              [](const auto &a, const auto &b)
-              {
-                  return a.first < b.first;
-              });
-
-    for (const auto &[index, cell_ptr] : indexed_cells)
-    {
-        cells.emplace_back(cell_ptr);
-    }
-
-    return cells;
+    return cells().to_vector();
 }
 
 // Populate the vector of cells from the maze_adapter using natural ordering
@@ -258,64 +207,13 @@ const grid_operations &grid::operations() const noexcept
 
 bool grid::set_cells(const std::vector<std::shared_ptr<cell>> &cells) noexcept
 {
-    // Clear existing cells
-    m_cells.clear();
-    m_topology.clear();
-
-    // Add the cells to the grid
-    for (const auto &cell_ptr : cells)
-    {
-        if (cell_ptr)
-        {
-            m_cells[cell_ptr->get_index()] = cell_ptr;
-        }
-    }
-
+    // Use range to set cells and clear existing ones
+    this->cells().set_from_vector(cells);
+    
     // Update maze adapter
     {
         std::lock_guard<std::mutex> lock(m_adapter_mutex);
         m_maze_adapter = maze_adapter(cells);
-    }
-
-    // Build topology based on spatial relationships
-    auto [rows, columns, levels] = m_dimensions;
-
-    for (unsigned int l = 0; l < levels; ++l)
-    {
-        for (unsigned int r = 0; r < rows; ++r)
-        {
-            for (unsigned int c = 0; c < columns; ++c)
-            {
-                int cell_index = l * (rows * columns) + r * columns + c;
-                std::unordered_map<Direction, int> neighbor_indices;
-
-                // North neighbor
-                if (r > 0)
-                {
-                    neighbor_indices[Direction::NORTH] = l * (rows * columns) + (r - 1) * columns + c;
-                }
-
-                // South neighbor
-                if (r < rows - 1)
-                {
-                    neighbor_indices[Direction::SOUTH] = l * (rows * columns) + (r + 1) * columns + c;
-                }
-
-                // East neighbor
-                if (c < columns - 1)
-                {
-                    neighbor_indices[Direction::EAST] = l * (rows * columns) + r * columns + (c + 1);
-                }
-
-                // West neighbor
-                if (c > 0)
-                {
-                    neighbor_indices[Direction::WEST] = l * (rows * columns) + r * columns + (c - 1);
-                }
-
-                m_topology[cell_index] = neighbor_indices;
-            }
-        }
     }
 
     m_configured = true;
@@ -537,4 +435,41 @@ void grid::update_maze_adapter() const
 
     // Update the maze adapter
     m_maze_adapter = maze_adapter(std::move(cells_vector));
+}
+
+// Range-based access methods
+grid_range grid::cells()
+{
+    auto create_func = [this](int index) -> std::shared_ptr<cell> {
+        auto new_cell = std::make_shared<cell>(index);
+        m_cells[index] = new_cell;
+        return new_cell;
+    };
+    
+    return grid_range(m_cells, m_dimensions, create_func);
+}
+
+grid_range grid::cells(int start_index, int end_index)
+{
+    auto create_func = [this](int index) -> std::shared_ptr<cell> {
+        auto new_cell = std::make_shared<cell>(index);
+        m_cells[index] = new_cell;
+        return new_cell;
+    };
+    
+    return grid_range(m_cells, m_dimensions, start_index, end_index, create_func);
+}
+
+const grid_range grid::cells() const
+{
+    // For const version, we don't provide a creation function
+    return grid_range(const_cast<std::unordered_map<int, std::shared_ptr<cell>>&>(m_cells), 
+                     m_dimensions, nullptr);
+}
+
+const grid_range grid::cells(int start_index, int end_index) const
+{
+    // For const version, we don't provide a creation function
+    return grid_range(const_cast<std::unordered_map<int, std::shared_ptr<cell>>&>(m_cells), 
+                     m_dimensions, start_index, end_index, nullptr);
 }

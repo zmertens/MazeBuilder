@@ -4,6 +4,7 @@
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/grid_range.h>
 #include <MazeBuilder/maze_adapter.h>
 
 #include <atomic>
@@ -154,6 +155,27 @@ namespace mazes
         /// @brief Get a mutable maze adapter for advanced cell operations
         /// @return Reference to the maze adapter
         maze_adapter &get_maze_adapter() noexcept;
+
+        // Range-based access methods
+        /// @brief Get a range for all cells in the grid
+        /// @return grid_range object for iterating over all cells
+        grid_range cells();
+
+        /// @brief Get a range for a subset of cells
+        /// @param start_index Starting index (inclusive)
+        /// @param end_index Ending index (exclusive)
+        /// @return grid_range object for iterating over specified range
+        grid_range cells(int start_index, int end_index);
+
+        /// @brief Get a const range for all cells in the grid
+        /// @return const grid_range object for iterating over all cells
+        const grid_range cells() const;
+
+        /// @brief Get a const range for a subset of cells
+        /// @param start_index Starting index (inclusive)
+        /// @param end_index Ending index (exclusive)
+        /// @return const grid_range object for iterating over specified range
+        const grid_range cells(int start_index, int end_index) const;
 
     private:
         /// @brief Calculate the flat index for a 2D grid
