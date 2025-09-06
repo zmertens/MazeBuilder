@@ -131,10 +131,11 @@ Once the script is running, open the browser to `http://localhost:8000`.
 
 [CMake](https://cmake.org) is used for project configuration.
 
-Examples and tests are external dependencies which can be grabbed from the Internet by CMake:
+Here are the external dependencies which can be grabbed from the Internet by CMake:
 
   - [box2d](https://box2d.org/documentation/hello.html)
   - [catch2](https://github.com/catchorg/Catch2)
+  - [fmt](https://fmt.dev/latest/index.html)
   - [SDL](https://libsdl.org)
   - [SFML](https://sfml-dev.org)
 
@@ -201,3 +202,4 @@ The Python script `solver.py` plays with the maze generation by loading PNG file
 #### Helpful Resources on Mazes
 
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
+

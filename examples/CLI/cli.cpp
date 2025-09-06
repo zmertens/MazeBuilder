@@ -27,7 +27,7 @@ const std::string cli::DEBUG_STR = "DEBUG";
 // Use functions to avoid static initialization order mismatches
 static std::string get_cli_version_str() {
 
-    return mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ")";
+    return mazes::buildinfo::Version + " (" + mazes::buildinfo::CommitSHA + ")";
 }
 
 static std::string get_cli_title_str() {
@@ -131,12 +131,15 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
                 auto vertices = product.value()->operations().get_vertices();
                 auto faces = product.value()->operations().get_faces();
 
-                std::string obj_str = obj_helper.to_wavefront_object_str(vertices, faces);
-                product.value()->operations().set_str(obj_str);
+                if (!obj_helper.run(product.value().get(), std::ref(rng))) {
+
+                    throw std::runtime_error("Failed to generate Wavefront OBJ data.");
+                }
             } else {
 
                 // Use the regular stringify process
                 mazes::stringify maze_stringify;
+                
                 if (!maze_stringify.run(product.value().get(), rng)) {
 
                     throw std::runtime_error("Failed to stringify maze.");

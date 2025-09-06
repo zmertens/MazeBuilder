@@ -2838,17 +2838,17 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                             auto s = "adad";//next_maze_ptr->str();
                             // mazes::stringz::objectify(cref(next_maze_ptr), ref(vertices), ref(faces), s);
                             // mazes::stringz::objectify(ref(my_mazes), s);
-                            mazes::wavefront_object_helper woh{};
-                            auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
+//                             mazes::wavefront_object_helper woh{};
+//                             auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
 
-#if !defined(__EMSCRIPTEN__)
-                            // Write immediately if not on the web
-                            mazes::io_utils writer{};
-                            writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
-#if defined(MAZE_DEBUG)
-                            SDL_Log("Writing to file... %s\n", gui->outfile);
-#endif
-#endif
+// #if !defined(__EMSCRIPTEN__)
+//                             // Write immediately if not on the web
+//                             mazes::io_utils writer{};
+//                             writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
+// #if defined(MAZE_DEBUG)
+//                             SDL_Log("Writing to file... %s\n", gui->outfile);
+// #endif
+// #endif
                             // The JSON data for the Web API - GET /mazes/
                             //this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                             // Resetting the model reloads the chunks - show the new maze

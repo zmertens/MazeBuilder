@@ -3,16 +3,19 @@
 
 #include <string>
 
-namespace mazes 
+/// @file buildinfo.h
+/// @brief Build information for the maze generation library
+/// @namespace mazes
+namespace mazes
 {
-
-    struct build_info
+    /// @brief Build information for the maze generation library
+    struct buildinfo
     {
-        static inline const std::string CommitSHA = "'6b77f2a'";
+        static inline const std::string CommitSHA = "'bfb23b1'";
 
-        static inline const std::string Timestamp = "2025-09-03T00:49:25";
+        static inline const std::string Timestamp = "2025-09-06T14:39:39";
         
-        static inline const std::string Version = "7.2.1";
+        static inline const std::string Version = "7.2.5";
     };
 
 }

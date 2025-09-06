@@ -47,14 +47,14 @@ namespace mazes
             return duration;
         }
 
-        /// @brief
+        /// @brief Start the progress
         void start() noexcept
         {
             std::lock_guard<std::mutex> lock(this->mtx);
             start_time = end_time = Clock::now();
         }
 
-        /// @brief
+        /// @brief Reset the progress
         void reset() noexcept
         {
             this->start();

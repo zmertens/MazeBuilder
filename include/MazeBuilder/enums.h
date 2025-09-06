@@ -103,11 +103,6 @@ namespace mazes
 
             return output_format::WAVEFRONT_OBJECT_FILE;
         }
-        else if (sv.compare("object") == 0)
-        {
-
-            return output_format::WAVEFRONT_OBJECT_FILE;
-        }
         else if (sv.compare("png") == 0)
         {
 

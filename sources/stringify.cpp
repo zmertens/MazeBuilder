@@ -4,9 +4,7 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
-
-#include <iostream>
-#include <sstream>
+#include <MazeBuilder/string_utils.h>
 
 using namespace mazes;
 
@@ -23,136 +21,136 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
         return false;
     }
 
-    std::stringstream ss;
-    auto &ops = g->operations();
+    std::string result{};
+    result.reserve(1024);
+
+    auto &&ops = g->operations();
 
     auto [rows, columns, levels] = ops.get_dimensions();
 
     // Safety check for excessively large grids to prevent performance issues
     const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
-    const size_t max_reasonable_cells = configurator::MAX_COLUMNS * configurator::MAX_ROWS * configurator::MAX_LEVELS;
+    static constexpr auto MAX_REASONABLE_CELLS = configurator::MAX_COLUMNS * configurator::MAX_ROWS * configurator::MAX_LEVELS + 1u;
 
-    if (total_cells > max_reasonable_cells)
+    if (total_cells > MAX_REASONABLE_CELLS)
     {
-#if defined(MAZE_DEBUG)
-        std::cerr << "stringify::run - Grid too large (" << total_cells << " cells), max recommended: " << max_reasonable_cells << std::endl;
-#endif
         ops.set_str("Grid too large to stringify reasonably.");
+
         return false;
     }
 
     // Generate ASCII representation
     // Top border
-    ss << "+";
-    for (unsigned int c = 0; c < columns; ++c)
+    result = string_utils::concat(result, "+");
+    for (auto c = 0u; c < columns; ++c)
     {
-        ss << "---+";
+        result = string_utils::concat(result, "---+");
     }
-    ss << "\n";
+    result = string_utils::concat(result, "\n");
 
     // For each row
-    for (unsigned int r = 0; r < rows; ++r)
+    for (auto r = 0u; r < rows; ++r)
     {
         std::string top_line = "|";
         std::string bottom_line = "+";
 
         // For each column
-        for (unsigned int c = 0; c < columns; ++c)
+        for (auto c = 0u; c < columns; ++c)
         {
-            int cell_index = r * columns + c;
-
             // Get cell on-demand (will be created lazily if needed)
-            auto cell_ptr = ops.search(cell_index);
-
-            // Cell content (from g's contents_of method)
-            std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
-
-            // SAFETY CHECK: Prevent infinite loop in content padding
-            if (content.length() > 10)
+            if (auto cell_ptr = ops.search(r * columns + c); cell_ptr != nullptr)
             {
-                content = content.substr(0, 3); // Truncate if too long
-            }
+                std::string content = g->contents_of(cell_ptr);
 
-            // Pad content to 3 characters
-            while (content.length() < 3)
-            {
-                content = " " + content;
-            }
-
-            top_line += content;
-
-            // East wall
-            auto east_neighbor = ops.get_east(cell_ptr);
-            bool linked_east = false;
-
-            if (cell_ptr && east_neighbor)
-            {
-                auto links = cell_ptr->get_links();
-
-                // Safety check: limit the number of links to check
-                size_t link_count = 0;
-                const size_t max_links = 100; // Reasonable upper bound
-
-                for (const auto &[linked_cell, is_linked] : links)
+                // Pad content to 3 characters
+                static constexpr auto pad_content = [](std::string &str)
                 {
-                    if (++link_count > max_links)
+                    while (str.length() < 5)
                     {
-                        break;
+                        str = " " + str;
                     }
+                };
+                pad_content(content);
 
-                    if (is_linked)
+                top_line += content;
+
+                static constexpr auto MAX_LINKS = 100u;
+                // Safety check: limit the number of links to check
+                auto link_count = 0;
+
+                // East wall
+                if (auto east_neighbor = ops.get_east(cell_ptr); east_neighbor != nullptr)
+                {
+                    bool linked_east = false;
+
+                    auto links = cell_ptr->get_links();
+
+                    for (const auto &[linked_cell, is_linked] : links)
                     {
-                        auto locked = linked_cell;
-                        if (locked && locked->get_index() == east_neighbor->get_index())
+                        if (++link_count > MAX_LINKS)
                         {
-                            linked_east = true;
-                            break;
+                            ops.set_str("Grid too large to stringify reasonably.");
+
+                            return false;
+                        }
+
+                        if (is_linked)
+                        {
+                            auto locked = linked_cell;
+                            if (locked && locked->get_index() == east_neighbor->get_index())
+                            {
+                                linked_east = true;
+                                break;
+                            }
                         }
                     }
+
+                    top_line += linked_east ? " " : "|";
                 }
-            }
 
-            top_line += linked_east ? " " : "|";
+                link_count = 0u;
 
-            // South wall
-            auto south_neighbor = ops.get_south(cell_ptr);
-            bool linked_south = false;
-
-            if (cell_ptr && south_neighbor)
-            {
-                auto links = cell_ptr->get_links();
-
-                // Safety check: limit the number of links to check
-                size_t link_count = 0;
-                const size_t max_links = 100; // Reasonable upper bound
-
-                for (const auto &[linked_cell, is_linked] : links)
+                // South wall
+                if (auto south_neighbor = ops.get_south(cell_ptr); south_neighbor != nullptr)
                 {
-                    if (++link_count > max_links)
-                    {
-                        break;
-                    }
+                    bool linked_south = false;
 
-                    if (is_linked)
+                    auto links = cell_ptr->get_links();
+
+                    for (const auto &[linked_cell, is_linked] : links)
                     {
-                        auto locked = linked_cell;
-                        if (locked && locked->get_index() == south_neighbor->get_index())
+                        if (++link_count > MAX_LINKS)
                         {
-                            linked_south = true;
-                            break;
+                            ops.set_str("Grid too large to stringify reasonably.");
+
+                            return false;
+                        }
+
+                        if (is_linked)
+                        {
+                            auto locked = linked_cell;
+                            if (locked && locked->get_index() == south_neighbor->get_index())
+                            {
+                                linked_south = true;
+                                break;
+                            }
                         }
                     }
+
+                    bottom_line += linked_south ? "   " : "---";
+                    bottom_line += "+";
                 }
             }
-
-            bottom_line += linked_south ? "   " : "---";
-            bottom_line += "+";
         }
 
-        ss << top_line << "\n"
-           << bottom_line << "\n";
+        
+        result = string_utils::concat(result, top_line);
+        result = string_utils::concat(result, "\n");
+        result = string_utils::concat(result, bottom_line);
+        result = string_utils::concat(result, "\n");
     }
-    ops.set_str(ss.str());
+
+    ops.set_str(result);
 
     return true;
 } // run
