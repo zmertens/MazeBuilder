@@ -8,7 +8,6 @@
 
 namespace mazes
 {
-
     /// @file json_helper.h
     /// @class json_helper
     /// @brief JSON helper class

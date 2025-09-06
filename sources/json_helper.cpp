@@ -122,6 +122,7 @@ public:
             for (const auto &obj : j)
             {
                 std::unordered_map<std::string, std::string> item_map;
+
                 for (auto it = obj.cbegin(); it != obj.cend(); ++it)
                 {
                     item_map[it.key()] = it.value().dump();
@@ -176,7 +177,9 @@ json_helper &json_helper::operator=(const json_helper &other)
     {
         return *this;
     }
+
     impl = std::make_unique<json_helper_impl>(*other.impl);
+
     return *this;
 }
 

@@ -30,9 +30,9 @@ Create and customize mazes on multiple platforms and languages. An example outpu
 
 ## Data Formats
 
-This library provides support for different export formats like Wavefront object, JSON, and plain text or stdout.
+The library provides support for different export formats like Wavefront object format, JSON, and plain text or stdout.
 
-A provided command-line example produces JSON output using these arguments: 
+There is an included example for parsing command-line arguments and creating JSON output:
 
 `mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
 
@@ -75,42 +75,38 @@ Get some help and print to standard output:
 mazebuildercli.exe --help
 ```
 
+**Commands are case-sensitive!**
+
 ## C++ API 
 
 Interface with the C++ API in a modern C++ program:
 
 ```cpp
-    #include <iostream>
-	#include <memory>
-	#include <optional>
+#include <iostream>
+#include <string>
     
-	// Get all the headers from Maze Builder
-    #include <MazeBuilder/maze_builder.h>
+// Get all the headers from Maze Builder
+#include <MazeBuilder/maze_builder.h>
 
-    int main() {
-        
-		using maze_ptr = std::optional<std::unique_ptr<mazes::grid_interface>>;
-		
-		auto rows{10}, cols{10};
+int main() {
+  
+  auto rows{10}, cols{10};
 
-        maze_ptr m = mazes::grid_factory::create(rows, cols);
-		
-		mazes::stringify stringify_tool{};
-		
-        auto success = stringify.run(m.value_or(std::make_unique<grid>{}), {})
+  auto maze_str = mazes::create(rows, cols);
 
-        std::cout << std::format("output: {}", m->operations->get_str()) << std::endl;
+  std::cout << mazes::string_utils::format("output: {}\n", maze_str);
 
-        return 0;
-    }
-
+  return 0;
+}
 ```
+
+---
 
 ## Voxels
 
 ![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
 
-The web interface is set in a 3D voxel world and enables interactive maze generation and downloads of Wavefront object files.
+  - The Voxels app is set in a 3D voxel world and enables interactive maze generation and downloading of Wavefront object files.
 
 [Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
@@ -119,9 +115,7 @@ Once the script is running, open the browser to `http://localhost:8000`.
 
 ## HTTP Network
 
-  - User can connect with [Corners](https://github.com/zmertens/Corners), the maze building service
-  - Console menu with easy navigation
-  - Create JSON data with the menu and send through HTTP protocol to [Corners](https://github.com/zmertens/Corners)
+  - User can connect with [Corners](https://github.com/zmertens/Corners), the maze building service, to create mazes
 
 ## Physics
 
@@ -135,24 +129,24 @@ Once the script is running, open the browser to `http://localhost:8000`.
 
 ## CMake Configuration and Testing
 
-[CMake 3.2](https://cmake.org) or greater is required.
-The examples and tests require external dependencies which can be grabbed from the Internet:
+[CMake](https://cmake.org) is used for project configuration.
+
+Examples and tests are external dependencies which can be grabbed from the Internet by CMake:
 
   - [box2d](https://box2d.org/documentation/hello.html)
   - [catch2](https://github.com/catchorg/Catch2)
-  - [SDL](https://github.com/libsdl-org/SDL)
-  - [SFML](https://github.com/SFML/SFML)
+  - [SDL](https://libsdl.org)
+  - [SFML](https://sfml-dev.org)
 
 Use the following CMake options to configure the project:
 
-
 | CMake Option | Default | Description |
 |--------------|---------|------------ |
-| MAZE_BUILDER_EXAMPLES | OFF | Build with project examples enabled. |
-| MAZE_BUILDER_COVERAGE | OFF | Build with code coverage using `CppCheck`. |
-| MAZE_BUILDER_TESTS | OFF | Build with testing using `Catch2`. |
-| MAZE_BUILDER_DOCS | OFF | Build the docs using `doxygen`. |
-| MAZE_BUILDER_MEMCHECK | OFF | Build with `Valgrind` and `Memcheck` support. |
+| MAZE_BUILDER_EXAMPLES | OFF | Build with project examples enabled |
+| MAZE_BUILDER_COVERAGE | OFF | Build with code coverage using `CppCheck` |
+| MAZE_BUILDER_TESTS | OFF | Build with testing using `Catch2` |
+| MAZE_BUILDER_DOCS | OFF | Build the docs using `doxygen` |
+| MAZE_BUILDER_MEMCHECK | OFF | Build with `Valgrind` and `Memcheck` support |
 
 ---
 

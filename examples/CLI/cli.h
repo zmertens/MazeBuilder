@@ -26,6 +26,10 @@ class cli final :  mazes::singleton_base<cli> {
 public:
 
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
+
+    std::string help() const noexcept;
+
+    std::string version() const noexcept;
     
     /// @brief Get the configuration from the last convert call
     /// @return The configuration object, or nullptr if no valid configuration exists

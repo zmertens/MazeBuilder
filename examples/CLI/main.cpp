@@ -30,7 +30,9 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::function("get", &get);
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("shared_ptr<cli>")
-        .function("convert", &cli::convert, emscripten::allow_raw_pointers());
+        .function("convert", &cli::convert)
+        .function("help", &cli::help)
+        .function("version", &cli::version);
 
     emscripten::register_vector<std::string>("StringVector");
 }

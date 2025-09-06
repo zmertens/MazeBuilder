@@ -157,6 +157,16 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
     return "";
 } // convert
 
+std::string cli::help() const noexcept {
+
+    return CLI_HELP_STR;
+}
+
+std::string cli::version() const noexcept {
+
+    return CLI_VERSION_STR;
+}
+
 /// @brief Get the configuration from the last convert call
 /// @return The configuration object, or nullptr if no valid configuration exists
 std::shared_ptr<mazes::configurator> cli::get_config() const noexcept {
