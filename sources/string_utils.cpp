@@ -16,6 +16,11 @@
 
 using namespace mazes;
 
+std::string string_utils::concat(const std::string &a, const std::string &b) noexcept
+{
+    return a + b;
+}
+
 bool string_utils::contains(const std::string &str, const std::string &substr) noexcept
 {
 

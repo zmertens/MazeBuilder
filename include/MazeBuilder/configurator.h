@@ -2,13 +2,18 @@
 #define CONFIGURATOR_H
 
 #include <limits>
+#include <memory>
 #include <optional>
 #include <string>
 
+#include <MazeBuilder/binary_tree.h>
+#include <MazeBuilder/dfs.h>
 #include <MazeBuilder/enums.h>
+#include <MazeBuilder/sidewinder.h>
 
 namespace mazes
 {
+    class algo_interface;
 
     /// @file configurator.h
     /// @class configurator
@@ -228,6 +233,30 @@ namespace mazes
             }
 
             return true;
+        }
+
+        /// @brief Determine the maze generation algorithm from the configuration
+        /// @param config The configurator containing the algorithm settings
+        /// @return A unique pointer to the selected algorithm interface
+        static std::optional<std::unique_ptr<algo_interface>> make_algo_from_config(const configurator &config)
+        {
+            if (config.algo_id() == algo::DFS)
+            {
+
+                return std::make_optional(std::make_unique<dfs>());
+            }
+            else if (config.algo_id() == algo::BINARY_TREE)
+            {
+
+                return std::make_optional(std::make_unique<binary_tree>());
+            }
+            else if (config.algo_id() == algo::SIDEWINDER)
+            {
+
+                return std::make_optional(std::make_unique<sidewinder>());
+            }
+
+            return std::nullopt;
         }
 
     private:

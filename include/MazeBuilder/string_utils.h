@@ -26,6 +26,13 @@ namespace mazes
     class string_utils
     {
     public:
+
+        /// @brief Combine and return two strings
+        /// @param a The first string
+        /// @param b The second string
+        /// @return The concatenated string
+        static std::string concat(const std::string &a, const std::string &b) noexcept;
+
         /// @brief Check if a string contains a substring
         /// @param str The string to search in
         /// @param substr The substring to search for
