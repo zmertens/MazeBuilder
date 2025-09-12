@@ -28,9 +28,9 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
     auto [rows, columns, levels] = ops.get_dimensions();
 
-    // Safety check for excessively large grids to prevent performance issues
-    const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
     static constexpr auto MAX_REASONABLE_CELLS = configurator::MAX_COLUMNS * configurator::MAX_ROWS * configurator::MAX_LEVELS + 1u;
+
+    const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
 
     if (total_cells > MAX_REASONABLE_CELLS)
     {
@@ -44,7 +44,7 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
     result = string_utils::concat(result, "+");
     for (auto c = 0u; c < columns; ++c)
     {
-        result = string_utils::concat(result, "---+");
+        result = string_utils::concat(result, "-----+");
     }
     result = string_utils::concat(result, "\n");
 
@@ -54,7 +54,6 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
         std::string top_line = "|";
         std::string bottom_line = "+";
 
-        // For each column
         for (auto c = 0u; c < columns; ++c)
         {
             // Get cell on-demand (will be created lazily if needed)
@@ -62,10 +61,11 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
             {
                 std::string content = g->contents_of(cell_ptr);
 
-                // Pad content to 3 characters
                 static constexpr auto pad_content = [](std::string &str)
                 {
-                    while (str.length() < 5)
+                    static constexpr auto MAX_CONTENT_LENGTH = 5u;
+
+                    while (str.length() < MAX_CONTENT_LENGTH)
                     {
                         str = " " + str;
                     }
@@ -74,76 +74,62 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
                 top_line += content;
 
-                static constexpr auto MAX_LINKS = 100u;
-                // Safety check: limit the number of links to check
-                auto link_count = 0;
-
-                // East wall
+                // East wall - FIXED: Always add a wall, check if it should be open
                 if (auto east_neighbor = ops.get_east(cell_ptr); east_neighbor != nullptr)
                 {
                     bool linked_east = false;
 
-                    auto links = cell_ptr->get_links();
-
-                    for (const auto &[linked_cell, is_linked] : links)
+                    for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
                     {
-                        if (++link_count > MAX_LINKS)
-                        {
-                            ops.set_str("Grid too large to stringify reasonably.");
-
-                            return false;
-                        }
-
-                        if (is_linked)
-                        {
-                            auto locked = linked_cell;
-                            if (locked && locked->get_index() == east_neighbor->get_index())
+                            if (is_linked && linked_cell->get_index() == east_neighbor->get_index())
                             {
                                 linked_east = true;
                                 break;
                             }
-                        }
+                     
                     }
 
                     top_line += linked_east ? " " : "|";
                 }
+                else
+                {
+                    // No east neighbor (rightmost column) - always add wall
+                    top_line += "|";
+                }
 
-                link_count = 0u;
-
-                // South wall
+                // South wall - FIXED: Always add bottom border for every cell
                 if (auto south_neighbor = ops.get_south(cell_ptr); south_neighbor != nullptr)
                 {
                     bool linked_south = false;
 
-                    auto links = cell_ptr->get_links();
-
-                    for (const auto &[linked_cell, is_linked] : links)
+                    for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
                     {
-                        if (++link_count > MAX_LINKS)
-                        {
-                            ops.set_str("Grid too large to stringify reasonably.");
-
-                            return false;
-                        }
-
-                        if (is_linked)
-                        {
-                            auto locked = linked_cell;
-                            if (locked && locked->get_index() == south_neighbor->get_index())
+                            if (is_linked && linked_cell->get_index() == south_neighbor->get_index())
                             {
                                 linked_south = true;
                                 break;
                             }
-                        }
+
                     }
 
-                    bottom_line += linked_south ? "   " : "---";
-                    bottom_line += "+";
+                    bottom_line += linked_south ? "     " : "-----";
                 }
+                else
+                {
+                    // No south neighbor (bottom row) - always add bottom wall
+                    bottom_line += "-----";
+                }
+
+                bottom_line += "+";
+            }
+            else
+            {
+                // Handle case where cell doesn't exist
+                top_line += "     |";
+                bottom_line += "-----+";
             }
         }
 
-        
         result = string_utils::concat(result, top_line);
         result = string_utils::concat(result, "\n");
         result = string_utils::concat(result, bottom_line);

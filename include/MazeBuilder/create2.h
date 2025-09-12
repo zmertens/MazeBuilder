@@ -220,7 +220,7 @@ namespace mazes
         };
     } // namespace details
 
-    std::string create2(const std::vector<configurator> &configs)
+    static inline std::string create2(const std::vector<configurator> &configs)
     {
         if (configs.empty())
         {

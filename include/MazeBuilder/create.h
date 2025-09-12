@@ -116,7 +116,7 @@ namespace mazes
 
 #if defined(MAZE_DEBUG)
 
-            pcout{} << string_utils::format("Creates string successfully with duration: {}\n", duration);
+            pcout{} << string_utils::format("Creates string successfully with duration: {}\n", duration.count());
 #endif // MAZE_DEBUG
 
             return s;
@@ -167,7 +167,7 @@ namespace mazes
 
     // Public API: Create maze from single configurator
     template <typename Config>
-    static std::string create(const Config &config)
+    static inline std::string create(const Config &config)
     {
         // Handle both direct configurator and reference_wrapper
         using DecayedConfig = std::decay_t<Config>;
@@ -194,7 +194,7 @@ namespace mazes
 
     // Public API: Create multiple mazes from multiple configurators
     template <typename... Configs>
-    static std::vector<std::string> create(const Configs &...configs)
+    static inline std::vector<std::string> create(const Configs &...configs)
     {
         static_assert(sizeof...(configs) > 1, "Use single parameter version for one configurator");
 

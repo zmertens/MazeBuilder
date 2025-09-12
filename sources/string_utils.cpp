@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <random>
 #include <sstream>
 #include <tuple>
@@ -96,11 +97,12 @@ std::string string_utils::format<>(std::string_view format_str) noexcept
 }
 
 template <>
-std::string string_utils::format<int>(std::string_view format_str, const int &arg) noexcept
+std::string string_utils::format<std::int32_t>(std::string_view format_str, const std::int32_t &arg) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
+
 
 template <>
 std::string string_utils::format<int, int>(std::string_view format_str, const int &arg1, const int &arg2) noexcept
@@ -220,3 +222,10 @@ std::string string_utils::format<const char *, std::string>(std::string_view for
 
     return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
 }
+
+template <>
+std::string string_utils::format<long long>(std::string_view format_str, const long long &arg) noexcept
+{
+    return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
