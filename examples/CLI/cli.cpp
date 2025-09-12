@@ -217,12 +217,12 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
         }
         default:
 
-            throw std::invalid_argument("Unsupported algorithm: " + mazes::to_string_from_algo(a));
+            throw std::invalid_argument("Unsupported algorithm: " + std::string{mazes::to_string_from_algo(a)});
         } // switch
 
         if (!success) {
 
-            throw std::runtime_error("Failed to run algorithm: " + mazes::to_string_from_algo(a));
+            throw std::runtime_error("Failed to run algorithm: " + std::string{mazes::to_string_from_algo(a)});
         }
 
         // Calculate distances after maze generation if requested

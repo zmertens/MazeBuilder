@@ -2670,7 +2670,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     }
 
     // Init some local vars for handling maze duties
-    list<string> algo_list;
+    list<string_view> algo_list;
     for (auto i{ static_cast<int>(algo::BINARY_TREE) }; i < static_cast<int>(algo::TOTAL); ++i) {
         algo_list.push_back(to_string_from_algo(static_cast<algo>(i)));
     }
@@ -2800,7 +2800,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                         if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
                             for (const auto& itr : algo_list) {
                                 bool is_selected = (itr == gui->algo);
-                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
+                                if (ImGui::Selectable(std::string{itr}.c_str(), is_selected)) {
                                     gui->algo = itr;
                                     my_maze_type = to_algo_from_string(itr);
                                 }

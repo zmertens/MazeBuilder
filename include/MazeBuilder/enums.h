@@ -142,15 +142,18 @@ namespace mazes
     /// @brief Convert the algo enum to a string
     /// @param a
     /// @return string
-    inline std::string to_string_from_algo(algo a)
+    inline std::string_view to_string_from_algo(algo a)
     {
         switch (a)
         {
         case algo::BINARY_TREE:
+
             return "binary_tree";
         case algo::SIDEWINDER:
+
             return "sidewinder";
         case algo::DFS:
+
             return "dfs";
         default:
             throw std::invalid_argument("Invalid algo: " + std::to_string(static_cast<unsigned int>(a)));
@@ -160,7 +163,7 @@ namespace mazes
     /// @brief Convert a string to an algo enum
     /// @param a
     /// @return algo
-    inline algo to_algo_from_string(const std::string &a)
+    inline algo to_algo_from_string(std::string_view a)
     {
         if (a.compare("binary_tree") == 0)
         {
@@ -176,7 +179,7 @@ namespace mazes
         }
         else
         {
-            throw std::invalid_argument("Invalid algo: " + a);
+            throw std::invalid_argument("Invalid algo: " + std::string{a});
         }
     };
 

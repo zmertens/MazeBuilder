@@ -70,9 +70,10 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
                         str = " " + str;
                     }
                 };
+                
                 pad_content(content);
 
-                top_line += content;
+                top_line = string_utils::concat(top_line, content);
 
                 // East wall - FIXED: Always add a wall, check if it should be open
                 if (auto east_neighbor = ops.get_east(cell_ptr); east_neighbor != nullptr)
@@ -81,12 +82,11 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
                     for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
                     {
-                            if (is_linked && linked_cell->get_index() == east_neighbor->get_index())
-                            {
-                                linked_east = true;
-                                break;
-                            }
-                     
+                        if (is_linked && linked_cell->get_index() == east_neighbor->get_index())
+                        {
+                            linked_east = true;
+                            break;
+                        }
                     }
 
                     top_line += linked_east ? " " : "|";
@@ -104,12 +104,11 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
                     for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
                     {
-                            if (is_linked && linked_cell->get_index() == south_neighbor->get_index())
-                            {
-                                linked_south = true;
-                                break;
-                            }
-
+                        if (is_linked && linked_cell->get_index() == south_neighbor->get_index())
+                        {
+                            linked_south = true;
+                            break;
+                        }
                     }
 
                     bottom_line += linked_south ? "     " : "-----";
