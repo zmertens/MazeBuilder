@@ -16,7 +16,7 @@ endif()
 
 enable_testing()
 
-message(INFO ": Building ${PROJECT_NAME} tests")
+message(INFO ": Building tests")
 
 set(MAZE_BUILDER_TESTS_EXE "mazebuildertests")
 
@@ -25,7 +25,7 @@ file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
 # These tests can use the Catch2-provided main
 add_executable(${MAZE_BUILDER_TESTS_EXE} ${TEST_FILES})
 add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_EXE})
-target_compile_features(${MAZE_BUILDER_TESTS_EXE} PRIVATE cxx_std_17)
+target_compile_features(${MAZE_BUILDER_TESTS_EXE} PRIVATE cxx_std_20)
 target_compile_definitions(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:RelWithDebInfo>:MAZE_BENCHMARK>")
 target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static Catch2::Catch2WithMain)
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
@@ -41,4 +41,7 @@ if(MAZE_BUILDER_MEMCHECK)
 	AddValgrind(${MAZE_BUILDER_TESTS_EXE})
 	include(Memcheck)
 	AddMemcheck(${MAZE_BUILDER_TESTS_EXE})
+
+        target_link_options(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:Debug>:-g>")
 endif()
+

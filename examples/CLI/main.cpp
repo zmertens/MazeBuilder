@@ -13,7 +13,7 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
-#include <MazeBuilder/writer.h>
+#include <MazeBuilder/io_utils.h>
 
 #include "cli.h"
 
@@ -30,7 +30,9 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::function("get", &get);
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("shared_ptr<cli>")
-        .function("convert", &cli::convert, emscripten::allow_raw_pointers());
+        .function("convert", &cli::convert)
+        .function("help", &cli::help)
+        .function("version", &cli::version);
 
     emscripten::register_vector<std::string>("StringVector");
 }
@@ -68,25 +70,25 @@ int main(int argc, char* argv[]) {
             throw logic_error("No valid configuration found after parsing arguments.\nResult:\n" + str);
         }
 
-        mazes::writer writer;
+        mazes::io_utils writer{};
 
-        bool write_success = false;
+        bool write_success{false};
             
         // Check if we have a specific output filename
-        if (!config->output_filename().empty()) {
+        if (!config->output_format_filename().empty()) {
 
-            if (config->output_filename() == "stdout") {
+            if (config->output_format_filename() == "stdout") {
 
                 // Write to stdout
                 write_success = writer.write(cout, str);
             } else {
 
                 // Write to file
-                write_success = writer.write_file(config->output_filename(), str);
+                write_success = writer.write_file(config->output_format_filename(), str);
             }
         } else {
             // No specific filename, check output type
-            if (config->output_id() == mazes::output::STDOUT) {
+            if (config->output_format_id() == mazes::output_format::STDOUT) {
 
                 write_success = writer.write(cout, str);
             } else {

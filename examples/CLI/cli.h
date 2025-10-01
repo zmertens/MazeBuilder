@@ -1,7 +1,7 @@
 /// @file cli.h
 /// @class cli
 /// @brief Command-line interface for the maze builder application
-/// @details This class implements the algo_interface and provides a way to run maze generation algorithms
+/// @details This class provides a way to generate mazes by parsing command line arguments
 
 #ifndef CLI_H
 #define CLI_H
@@ -26,6 +26,10 @@ class cli final :  mazes::singleton_base<cli> {
 public:
 
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
+
+    std::string help() const noexcept;
+
+    std::string version() const noexcept;
     
     /// @brief Get the configuration from the last convert call
     /// @return The configuration object, or nullptr if no valid configuration exists

@@ -1,107 +1,141 @@
 #include <MazeBuilder/stringify.h>
 
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/maze_adapter.h>
 #include <MazeBuilder/randomizer.h>
-
-#include <sstream>
+#include <MazeBuilder/string_utils.h>
 
 using namespace mazes;
 
 /// @brief Provide a string representation of the grid
 /// @param g
 /// @param rng
-/// @return 
-bool stringify::run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept {
+/// @return
+bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+{
 
-    if (!g) {
+    if (!g)
+    {
+
         return false;
     }
 
-    std::stringstream ss;
-    auto& ops = g->operations();
+    std::string result{};
+    result.reserve(1024);
+
+    auto &&ops = g->operations();
 
     auto [rows, columns, levels] = ops.get_dimensions();
 
-    // Get all cells using maze_adapter
-    auto all_cells = ops.get_cells();
-    maze_adapter maze_view(all_cells);
+    static constexpr auto MAX_REASONABLE_CELLS = configurator::MAX_COLUMNS * configurator::MAX_ROWS * configurator::MAX_LEVELS + 1u;
+
+    const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
+
+    if (total_cells > MAX_REASONABLE_CELLS)
+    {
+        ops.set_str("Grid too large to stringify reasonably.");
+
+        return false;
+    }
 
     // Generate ASCII representation
     // Top border
-    ss << "+";
-    for (unsigned int c = 0; c < columns; ++c) {
-        ss << "---+";
+    result = string_utils::concat(result, "+");
+    for (auto c = 0u; c < columns; ++c)
+    {
+        result = string_utils::concat(result, "-----+");
     }
-    ss << "\n";
+    result = string_utils::concat(result, "\n");
 
     // For each row
-    for (unsigned int r = 0; r < rows; ++r) {
+    for (auto r = 0u; r < rows; ++r)
+    {
         std::string top_line = "|";
         std::string bottom_line = "+";
 
-        // For each column
-        for (unsigned int c = 0; c < columns; ++c) {
-            int cell_index = r * columns + c;
-            
-            // Use maze_adapter to find the cell
-            auto cell_it = maze_view.find(cell_index);
-            auto cell_ptr = (cell_it != maze_view.end()) ? *cell_it : nullptr;
+        for (auto c = 0u; c < columns; ++c)
+        {
+            // Get cell on-demand (will be created lazily if needed)
+            if (auto cell_ptr = ops.search(r * columns + c); cell_ptr != nullptr)
+            {
+                std::string content = g->contents_of(cell_ptr);
 
-            // Cell content (from g's contents_of method)
-            std::string content = cell_ptr ? g->contents_of(cell_ptr) : " ";
-            // Pad content to 3 characters
-            while (content.length() < 3) {
-                content = " " + content;
-            }
+                static constexpr auto pad_content = [](std::string &str)
+                {
+                    static constexpr auto MAX_CONTENT_LENGTH = 5u;
 
-            top_line += content;
+                    while (str.length() < MAX_CONTENT_LENGTH)
+                    {
+                        str = " " + str;
+                    }
+                };
+                
+                pad_content(content);
 
-            // East wall
-            auto east_neighbor = ops.get_east(cell_ptr);
-            bool linked_east = false;
+                top_line = string_utils::concat(top_line, content);
 
-            if (cell_ptr && east_neighbor) {
-                auto links = cell_ptr->get_links();
-                for (const auto& [linked_cell, is_linked] : links) {
-                    if (is_linked) {
-                        auto locked = linked_cell;
-                        if (locked && locked->get_index() == east_neighbor->get_index()) {
+                // East wall - FIXED: Always add a wall, check if it should be open
+                if (auto east_neighbor = ops.get_east(cell_ptr); east_neighbor != nullptr)
+                {
+                    bool linked_east = false;
+
+                    for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
+                    {
+                        if (is_linked && linked_cell->get_index() == east_neighbor->get_index())
+                        {
                             linked_east = true;
                             break;
                         }
                     }
+
+                    top_line += linked_east ? " " : "|";
                 }
-            }
+                else
+                {
+                    // No east neighbor (rightmost column) - always add wall
+                    top_line += "|";
+                }
 
-            top_line += linked_east ? " " : "|";
+                // South wall - FIXED: Always add bottom border for every cell
+                if (auto south_neighbor = ops.get_south(cell_ptr); south_neighbor != nullptr)
+                {
+                    bool linked_south = false;
 
-            // South wall
-            auto south_neighbor = ops.get_south(cell_ptr);
-            bool linked_south = false;
-
-            if (cell_ptr && south_neighbor) {
-                auto links = cell_ptr->get_links();
-                for (const auto& [linked_cell, is_linked] : links) {
-                    if (is_linked) {
-                        auto locked = linked_cell;
-                        if (locked && locked->get_index() == south_neighbor->get_index()) {
+                    for (const auto &[linked_cell, is_linked] : cell_ptr->get_links())
+                    {
+                        if (is_linked && linked_cell->get_index() == south_neighbor->get_index())
+                        {
                             linked_south = true;
                             break;
                         }
                     }
-                }
-            }
 
-            bottom_line += linked_south ? "   " : "---";
-            bottom_line += "+";
+                    bottom_line += linked_south ? "     " : "-----";
+                }
+                else
+                {
+                    // No south neighbor (bottom row) - always add bottom wall
+                    bottom_line += "-----";
+                }
+
+                bottom_line += "+";
+            }
+            else
+            {
+                // Handle case where cell doesn't exist
+                top_line += "     |";
+                bottom_line += "-----+";
+            }
         }
 
-        ss << top_line << "\n" << bottom_line << "\n";
+        result = string_utils::concat(result, top_line);
+        result = string_utils::concat(result, "\n");
+        result = string_utils::concat(result, bottom_line);
+        result = string_utils::concat(result, "\n");
     }
 
-    ops.set_str(ss.str());
+    ops.set_str(result);
 
     return true;
 } // run

@@ -2670,7 +2670,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     }
 
     // Init some local vars for handling maze duties
-    list<string> algo_list;
+    list<string_view> algo_list;
     for (auto i{ static_cast<int>(algo::BINARY_TREE) }; i < static_cast<int>(algo::TOTAL); ++i) {
         algo_list.push_back(to_string_from_algo(static_cast<algo>(i)));
     }
@@ -2800,7 +2800,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                         if (ImGui::BeginCombo("algorithm", preview, combo_flags)) {
                             for (const auto& itr : algo_list) {
                                 bool is_selected = (itr == gui->algo);
-                                if (ImGui::Selectable(itr.c_str(), is_selected)) {
+                                if (ImGui::Selectable(std::string{itr}.c_str(), is_selected)) {
                                     gui->algo = itr;
                                     my_maze_type = to_algo_from_string(itr);
                                 }
@@ -2838,17 +2838,17 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                             auto s = "adad";//next_maze_ptr->str();
                             // mazes::stringz::objectify(cref(next_maze_ptr), ref(vertices), ref(faces), s);
                             // mazes::stringz::objectify(ref(my_mazes), s);
-                            mazes::wavefront_object_helper woh{};
-                            auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
+//                             mazes::wavefront_object_helper woh{};
+//                             auto wavefront_obj_str = woh.to_wavefront_object_str(cref(vertices), cref(faces));
 
-#if !defined(__EMSCRIPTEN__)
-                            // Write immediately if not on the web
-                            mazes::writer writer{};
-                            writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
-#if defined(MAZE_DEBUG)
-                            SDL_Log("Writing to file... %s\n", gui->outfile);
-#endif
-#endif
+// #if !defined(__EMSCRIPTEN__)
+//                             // Write immediately if not on the web
+//                             mazes::io_utils writer{};
+//                             writer.write_file(string(gui->outfile), cref(wavefront_obj_str));
+// #if defined(MAZE_DEBUG)
+//                             SDL_Log("Writing to file... %s\n", gui->outfile);
+// #endif
+// #endif
                             // The JSON data for the Web API - GET /mazes/
                             //this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                             // Resetting the model reloads the chunks - show the new maze

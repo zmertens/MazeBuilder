@@ -10,34 +10,38 @@
 using namespace mazes;
 using namespace std;
 
-TEST_CASE("Distances initialization and basic operations", "[distances]") {
+TEST_CASE("Distances initialization and basic operations", "[distances]")
+{
     // Initialize with root index 0
     distances dist(0);
 
-    SECTION("Root index has distance 0") {
+    SECTION("Root index has distance 0")
+    {
         REQUIRE(dist[0] == 0);
     }
 
-    SECTION("Set and retrieve distances") {
+    SECTION("Set and retrieve distances")
+    {
         dist.set(1, 5);
         REQUIRE(dist[1] == 5);
     }
 
-    SECTION("Check containment of indices") {
+    SECTION("Check containment of indices")
+    {
         dist.set(2, 10);
         REQUIRE(dist.contains(2));
         REQUIRE_FALSE(dist.contains(3));
     }
 }
 
-TEST_CASE("Finds the shortest path", "[shortest paths]") {
+TEST_CASE("Finds the shortest path", "[shortest paths]")
+{
     // Create a grid with clear dimensions
     unique_ptr<grid_interface> g = std::make_unique<mazes::grid>(3, 3, 1);
-
-   
 }
 
-TEST_CASE("Distances maximum distance calculation", "[distances]") {
+TEST_CASE("Distances maximum distance calculation", "[distances]")
+{
     distances dist(0);
     dist.set(1, 5);
     dist.set(2, 10);
@@ -49,7 +53,8 @@ TEST_CASE("Distances maximum distance calculation", "[distances]") {
     REQUIRE(max_distance == 10);
 }
 
-TEST_CASE("Distances collect keys", "[distances]") {
+TEST_CASE("Distances collect keys", "[distances]")
+{
     distances dist(0);
     dist.set(1, 5);
     dist.set(2, 10);
@@ -62,5 +67,3 @@ TEST_CASE("Distances collect keys", "[distances]") {
     REQUIRE(std::find(keys.begin(), keys.end(), 1) != keys.end());
     REQUIRE(std::find(keys.begin(), keys.end(), 2) != keys.end());
 }
-
-

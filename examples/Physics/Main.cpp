@@ -1,10 +1,4 @@
-/**
- * @brief Main entry for the Generator
- * @file Main.cpp
- *
- * Create a singleton instance of the Generator and run it
- *
- */
+// Basic application of Maze Builder as a level generator (with bouncing balls!)
 
 #include <iostream>
 #include <exception>

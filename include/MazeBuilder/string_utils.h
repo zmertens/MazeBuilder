@@ -1,0 +1,282 @@
+#ifndef STRING_UTILS_H
+#define STRING_UTILS_H
+
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <sstream>
+#include <string_view>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <unordered_map>
+#include <vector>
+
+namespace mazes
+{
+
+    /// @file string_utils.h
+
+    /// @class string_utils
+    /// @brief String helper class
+    /// @details This class provides common string manipulation utilities
+    /// @related https://github.com/PacktPublishing/CPP-20-STL-Cookbook/blob/main/chap11/split.cpp
+    class string_utils
+    {
+    public:
+
+        /// @brief Combine and return two strings
+        /// @param a The first string
+        /// @param b The second string
+        /// @return The concatenated string
+        static std::string concat(const std::string &a, const std::string &b) noexcept;
+
+        /// @brief Check if a string contains a substring
+        /// @param str The string to search in
+        /// @param substr The substring to search for
+        /// @return True if substr is found in str, false otherwise
+        static bool contains(const std::string &str, const std::string &substr) noexcept;
+
+        /// @brief Extract file extension from a filename
+        /// @param filename The filename to process
+        /// @return The file extension including the dot, or empty string if no extension
+        static std::string get_file_extension(const std::string &filename) noexcept;
+
+        /// @brief Check if a string ends with a specific suffix
+        /// @param str The string to check
+        /// @param suffix The suffix to check for
+        /// @return True if str ends with suffix, false otherwise
+        static bool ends_with(const std::string &str, const std::string &suffix) noexcept;
+
+        /// @brief Find a character in a string_view
+        /// @param sv The string_view to search in
+        /// @param c The character to search for
+        /// @return True if c is found in sv, false otherwise
+        static bool find(std::string_view sv, char c) noexcept;
+
+        /// @brief Find the first occurrence of any character from a set in a string view
+        /// @param s The string view to search in
+        /// @param chars The set of characters to search for
+        /// @return A string view starting from the first occurrence of any character in chars, or the end of s if none found
+        static std::string_view find_first_of(const std::string_view &s, const std::string_view &chars) noexcept;
+
+        /// @brief Strip specific characters from the beginning and end of a string view
+        /// @param s The string view to strip characters from
+        /// @param to_strip_from_s The character to strip
+        /// @return A new string view with the specified characters removed from both ends
+        static std::string_view strip(const std::string_view &s, const std::string_view &to_strip_from_s = " ") noexcept;
+
+    private:
+        // Helper trait to detect if a type has push_back method - local to this function
+        template <typename T, typename = void>
+        struct has_push_back : std::false_type
+        {
+        };
+
+        template <typename T>
+        struct has_push_back<T, std::void_t<decltype(std::declval<T>().push_back(std::declval<typename T::value_type>()))>> : std::true_type
+        {
+        };
+
+        /// @brief Default equality predicate for split functions
+        static constexpr auto eq = [](const auto &el, const auto &sep) -> bool
+        {
+            using std::is_convertible_v;
+            using std::is_same_v;
+
+            using ElType = std::decay_t<decltype(el)>;
+            using SepType = std::decay_t<decltype(sep)>;
+
+            if constexpr (is_same_v<ElType, SepType>)
+            {
+
+                return el == sep;
+            }
+            else if constexpr (is_convertible_v<ElType, SepType>)
+            {
+
+                return static_cast<SepType>(el) == sep;
+            }
+            else if constexpr (is_convertible_v<SepType, ElType>)
+            {
+
+                return el == static_cast<ElType>(sep);
+            }
+            else
+            {
+
+                return false;
+            }
+        };
+
+    public:
+        /// @brief Splits a range into slices based on a separator and stores the results in a destination container.
+        /// @tparam It Type of the iterator for the input range.
+        /// @tparam Oc Type of the output container that will store the slices.
+        /// @tparam V Type of the separator value.
+        /// @tparam Pred Type of the predicate function used to compare elements to the separator.
+        /// @param it Iterator pointing to the beginning of the range to split.
+        /// @param end_it Iterator pointing to the end of the range to split.
+        /// @param dest Destination container where the resulting slices will be stored.
+        /// @param sep Separator value used to determine where to split the range.
+        /// @param f Predicate function that determines if an element matches the separator.
+        /// @return Iterator pointing to the position after the last processed element, or end_it if the entire range was processed.
+        template <typename It, typename Oc, typename V, typename Pred>
+        static It split(It it, const It end_it, Oc &dest, const V &sep, Pred f)
+        {
+
+            using std::is_same_v;
+            using std::string;
+
+            using SliceContainer = typename Oc::value_type;
+
+            while (it != end_it)
+            {
+
+                SliceContainer dest_elm{};
+
+                auto slice{it};
+
+                while (slice != end_it)
+                {
+
+                    if (f(*slice, sep))
+                        break;
+
+                    // Handle string vs other containers
+                    if constexpr (is_same_v<SliceContainer, string>)
+                    {
+
+                        dest_elm += *slice;
+                    }
+                    else if constexpr (has_push_back<SliceContainer>::value)
+                    {
+
+                        dest_elm.push_back(*slice);
+                    }
+                    else
+                    {
+
+                        // For types without push_back, provide a helpful error
+                        static_assert(is_same_v<SliceContainer, string> || has_push_back<SliceContainer>::value,
+                                      "SliceContainer must be std::string or have a push_back method");
+                    }
+                    ++slice;
+                }
+
+                dest.push_back(dest_elm);
+
+                if (slice == end_it)
+                {
+
+                    return end_it;
+                }
+
+                it = ++slice;
+            }
+            return it;
+        }
+
+        /// @brief Generic split function with default equality predicate
+        /// @tparam It Iterator type
+        /// @tparam Oc Output container type
+        /// @tparam V Value type
+        /// @param it Start iterator
+        /// @param end_it End iterator
+        /// @param dest Output container
+        /// @param sep Separator value
+        /// @return Iterator to end position
+        template <typename It, typename Oc, typename V>
+        static It split(It it, const It end_it, Oc &dest, const V &sep)
+        {
+
+            return split(it, end_it, dest, sep, eq);
+        }
+
+        /// @brief High-level string split function using containers
+        /// @tparam Cin Input container type
+        /// @tparam Cout Output container type
+        /// @tparam V Value type
+        /// @param str Input container/string
+        /// @param dest Output container
+        /// @param sep Separator value
+        /// @return Reference to output container
+        template <typename Cin, typename Cout, typename V>
+        static Cout &strsplit(const Cin &str, Cout &dest, const V &sep)
+        {
+
+            split(str.begin(), str.end(), dest, sep, eq);
+
+            return dest;
+        }
+
+        /// @brief Checks if a character is a whitespace character.
+        /// @tparam T The type of the character to check.
+        /// @param c The character to check for whitespace.
+        /// @return True if the character is a whitespace character; otherwise, false.
+        template <typename T>
+        static bool is_whitespace(const T &c)
+        {
+
+            using std::is_same_v;
+            using std::string_view;
+
+            // Use std::string_view for safer character comparison
+            constexpr string_view whitespace_chars = " \t\r\n\v\f";
+
+            // For character types, convert to char for comparison
+            if constexpr (is_same_v<T, char>)
+            {
+                return whitespace_chars.find(c) != string_view::npos;
+            }
+            else
+            {
+                // For other types, do individual comparisons
+                return c == static_cast<T>(' ') ||
+                       c == static_cast<T>('\t') ||
+                       c == static_cast<T>('\r') ||
+                       c == static_cast<T>('\n') ||
+                       c == static_cast<T>('\v') ||
+                       c == static_cast<T>('\f');
+            }
+        }
+
+        /// @brief Removes consecutive whitespace characters from a string, leaving only single whitespace between non-whitespace characters.
+        /// @param s The input string from which to strip consecutive whitespace.
+        /// @return A new string with consecutive whitespace characters replaced by a single whitespace.
+        static std::string strip_whitespace(const std::string &s)
+        {
+
+            using std::string;
+            using std::unique;
+
+            string outputString{s};
+
+            auto its = unique(outputString.begin(), outputString.end(),
+                              [](const auto &a, const auto &b)
+                              {
+                                  return is_whitespace(a) && is_whitespace(b);
+                              });
+
+            outputString.erase(its, outputString.end());
+
+            outputString.shrink_to_fit();
+
+            return outputString;
+        }
+
+        /// @brief Simple wrapper for fmt::format using runtime format strings (string_view)
+        /// @tparam Args Types of the arguments to format
+        /// @param format_str Format string as string_view
+        /// @param args Arguments to format
+        /// @return Formatted string
+        template <typename... Args>
+        static std::string format(std::string_view format_str, const Args &...args) noexcept;
+
+    }; // class
+
+} // namespace
+
+#endif // STRING_UTILS_H

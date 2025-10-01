@@ -31,7 +31,7 @@ void print_menu() {
 #else
     std::cout << "\nHttp URL: " << WORKER_URL << std::endl;
 #endif
-    std::cout << "version: " << mazes::build_info::Version + "-" + mazes::build_info::CommitSHA << std::endl << std::endl;
+    std::cout << "version: " << mazes::buildinfo::Version + "-" + mazes::buildinfo::CommitSHA << std::endl << std::endl;
 }
 
 void process_commands(std::deque<char>& commands, bool& is_running) {

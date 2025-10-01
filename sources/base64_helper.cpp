@@ -4,35 +4,14 @@
 
 using namespace mazes;
 
-/// @brief Implementation class for the base64 helper
-class base64_helper::base64_helper_impl {
-public:
-    base64_helper_impl() = default;
+std::string base64_helper::encode(std::string_view sv) noexcept
+{
 
-    ~base64_helper_impl() = default;
-
-    std::string encode(const std::string& s) const noexcept {
-        return base64_encode(s);
-    }
-    
-    std::string decode(const std::string& s) const noexcept {
-        return base64_decode(s);
-    }
-};
-
-base64_helper::base64_helper() : impl{ std::make_unique<base64_helper_impl>() } {}
-
-base64_helper::~base64_helper() = default;
-
-base64_helper::base64_helper(const base64_helper& other) : impl(std::make_unique<base64_helper_impl>(*other.impl)) {
-
+    return base64_encode(std::string{sv});
 }
 
-std::string base64_helper::encode(const std::string& s) const noexcept {
-    return this->impl->encode(std::cref(s));
-}
+std::string base64_helper::decode(std::string_view sv) noexcept
+{
 
-
-std::string base64_helper::decode(const std::string& s) const noexcept {
-    return this->impl->decode(std::cref(s));
+    return base64_decode(std::string{sv});
 }

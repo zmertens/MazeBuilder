@@ -3,12 +3,14 @@
 
 #include <MazeBuilder/algo_interface.h>
 
-namespace mazes {
+namespace mazes
+{
 
-class objectify : public algo_interface {
-public:
-    virtual bool run(std::unique_ptr<grid_interface> const& g, randomizer& rng) const noexcept override;
-};
+    class objectify : public algo_interface
+    {
+    public:
+        virtual bool run(grid_interface *g, randomizer &rng) const noexcept override;
+    };
 }
 
 #endif // OBJECTIFY_H

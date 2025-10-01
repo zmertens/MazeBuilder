@@ -1,5 +1,6 @@
 #include "cli.h"
 
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/configurator.h>
@@ -16,15 +17,17 @@
 
 #include <functional>
 #include <iostream>
+#include <optional>
 #include <stdexcept>
 
 #include "parser.h"
 
 const std::string cli::DEBUG_STR = "DEBUG";
 
-// Use functions to avoid static initialization order fiasco
+// Use functions to avoid static initialization order mismatches
 static std::string get_cli_version_str() {
-    return mazes::build_info::Version + " (" + mazes::build_info::CommitSHA + ")";
+
+    return mazes::buildinfo::Version + " (" + mazes::buildinfo::CommitSHA + ")";
 }
 
 static std::string get_cli_title_str() {
@@ -36,17 +39,17 @@ static std::string get_cli_help_str() {
         "Description: Generates mazes and outputs into string formats\n" 
         "Example: app.exe -r 10 -c 10 -a binary_tree > out_maze.txt\n" 
         "Example: app.exe --rows=10 --columns=10 --algo=dfs -o out_maze.txt\n" 
+        "Note: Commands are case-sensitive!"
         "\t-a, --algo         binary_tree, dfs, sidewinder\n" 
         "\t-c, --columns      columns\n" 
-        "\t-d, --distances    show distances with start, end positions\n" 
-        "\t                   ex: -d [0:10] or --distances=[1:]\n" 
+        "\t-d, --distances    show distances in sliced array format; ex: '[0:1]'\n" 
         "\t-e, --encode       encode maze to base64 string\n" 
         "\t-h, --help         display this help message\n" 
         "\t-j, --json         run with arguments in JSON format\n" 
         "\t                   supports both single objects and arrays of objects\n" 
         "\t-s, --seed         seed for the mt19937 generator\n" 
         "\t-r, --rows         rows\n" 
-        "\t-o, --output       [txt|text] [json] [jpg|jpeg] [png] [obj|object] [stdout]\n" 
+        "\t-o, --output       txt, text, json, obj, object, stdout\n" 
         "\t-v, --version      display program version\n";
 }
 
@@ -66,6 +69,22 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
     try {
 
+        if (auto need_help = find_if(args_vec.begin(), args_vec.end(), [](const std::string& arg) {
+                return arg == mazes::args::HELP_FLAG_STR || arg == mazes::args::HELP_OPTION_STR || arg == mazes::args::HELP_WORD_STR;
+            }); need_help != args_vec.end()) {
+
+            return CLI_HELP_STR;
+        } else if (auto need_version = find_if(args_vec.begin(), args_vec.end(), [](const std::string& arg) {
+                return arg == mazes::args::VERSION_FLAG_STR || arg == mazes::args::VERSION_OPTION_STR || arg == mazes::args::VERSION_WORD_STR;
+            }); need_version != args_vec.end()) {
+
+#if defined(MAZE_DEBUG)
+            return debug_version;
+#else
+            return CLI_VERSION_STR;
+#endif
+        }
+
         parser my_parser;
 
         mazes::configurator config;
@@ -78,71 +97,57 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
         // Store the configuration for later access
         m_last_config = std::make_shared<mazes::configurator>(config);
 
-#if defined(MAZE_DEBUG)
-        std::cerr << "Debug: Parsed config - distances: " << (config.distances() ? "true" : "false")
-                 << ", start: " << config.distances_start() 
-                 << ", end: " << config.distances_end() 
-                 << ", output_filename: " << config.output_filename() << std::endl;
-#endif
-
-        if (!config.help().empty()) {
-
-            return CLI_HELP_STR;
-        } else if (!config.version().empty()) {
-
-#if defined(MAZE_DEBUG)
-            return debug_version;
-#else
-            return CLI_VERSION_STR;
-#endif
-        }
-
         mazes::grid_factory factory;
 
-        std::unique_ptr<mazes::grid_interface> product = factory.create(cref(config));
+        factory.register_creator("temp", [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface> {
 
-#if defined(MAZE_DEBUG)
-        if (auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(product.get())) {
-            std::cerr << "Debug: Created distance_grid successfully" << std::endl;
-        } else {
-            std::cerr << "Debug: Created regular grid (not distance_grid)" << std::endl;
+            return std::make_unique<mazes::distance_grid>(config.rows(), config.columns(), config.levels());
+        });
+
+        if (auto product = factory.create("temp", config); product.has_value()) {
+
+            mazes::randomizer rng;
+
+            apply(product.value(), rng, config.algo_id(), config);
+
+            // Check if we need to generate Wavefront OBJ output
+            if (config.output_format_id() == mazes::output_format::WAVEFRONT_OBJECT_FILE) {
+                // First, get the string representation for parsing
+                mazes::stringify maze_stringify;
+                if (!maze_stringify.run(product.value().get(), rng)) {
+
+                    throw std::runtime_error("Failed to stringify maze for objectify processing.");
+                }
+                
+                // Generate 3D object data
+                mazes::objectify maze_objectify;
+                if (!maze_objectify.run(product.value().get(), rng)) {
+
+                    throw std::runtime_error("Failed to generate 3D object data.");
+                }
+
+                // Convert to Wavefront OBJ format
+                mazes::wavefront_object_helper obj_helper;
+                auto vertices = product.value()->operations().get_vertices();
+                auto faces = product.value()->operations().get_faces();
+
+                if (!obj_helper.run(product.value().get(), std::ref(rng))) {
+
+                    throw std::runtime_error("Failed to generate Wavefront OBJ data.");
+                }
+            } else {
+
+                // Use the regular stringify process
+                mazes::stringify maze_stringify;
+                
+                if (!maze_stringify.run(product.value().get(), rng)) {
+
+                    throw std::runtime_error("Failed to stringify maze.");
+                }
+            }
+
+            return product.value()->operations().get_str();
         }
-#endif
-
-        mazes::randomizer rng;
-
-        apply(cref(product), ref(rng), config.algo_id(), config);
-
-        // Check if we need to generate Wavefront OBJ output
-        if (config.output_id() == mazes::output::WAVEFRONT_OBJECT_FILE) {
-            // First, get the string representation for parsing
-            mazes::stringify maze_stringify;
-            if (!maze_stringify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to stringify maze for objectify processing.");
-            }
-            
-            // Generate 3D object data
-            mazes::objectify maze_objectify;
-            if (!maze_objectify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to generate 3D object data.");
-            }
-
-            // Convert to Wavefront OBJ format
-            mazes::wavefront_object_helper obj_helper;
-            auto vertices = product->operations().get_vertices();
-            auto faces = product->operations().get_faces();
-            
-            std::string obj_str = obj_helper.to_wavefront_object_str(vertices, faces);
-            product->operations().set_str(obj_str);
-        } else {
-            // Use the regular stringify process
-            mazes::stringify maze_stringify;
-            if (!maze_stringify.run(cref(product), ref(rng))) {
-                throw std::runtime_error("Failed to stringify maze.");
-            }
-        }
-
-        return product->operations().get_str();
 
     } catch (const std::exception& ex) {
 
@@ -150,10 +155,20 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
         std::cerr << "CLI Error: " << ex.what() << std::endl;
 #endif
-
-        return "";
     }
+
+    return "";
 } // convert
+
+std::string cli::help() const noexcept {
+
+    return CLI_HELP_STR;
+}
+
+std::string cli::version() const noexcept {
+
+    return CLI_VERSION_STR;
+}
 
 /// @brief Get the configuration from the last convert call
 /// @return The configuration object, or nullptr if no valid configuration exists
@@ -180,7 +195,7 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::binary_tree bt;
 
-            success = bt.run(cref(g), ref(rng));
+            success = bt.run(g.get(), ref(rng));
 
             break;
         }
@@ -188,7 +203,7 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::sidewinder sw;
 
-            success = sw.run(cref(g), ref(rng));
+            success = sw.run(g.get(), ref(rng));
 
             break;
         }
@@ -196,18 +211,18 @@ void cli::apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomiz
 
             static mazes::dfs d;
 
-            success = d.run(cref(g), ref(rng));
+            success = d.run(g.get(), ref(rng));
 
             break;
         }
         default:
 
-            throw std::invalid_argument("Unsupported algorithm: " + mazes::to_string_from_algo(a));
+            throw std::invalid_argument("Unsupported algorithm: " + std::string{mazes::to_string_from_algo(a)});
         } // switch
 
         if (!success) {
 
-            throw std::runtime_error("Failed to run algorithm: " + mazes::to_string_from_algo(a));
+            throw std::runtime_error("Failed to run algorithm: " + std::string{mazes::to_string_from_algo(a)});
         }
 
         // Calculate distances after maze generation if requested
