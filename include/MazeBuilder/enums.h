@@ -47,7 +47,7 @@ namespace mazes
     /// @brief Convert an output_format enum to a string
     /// @param o
     /// @return
-    inline std::string_view to_string_from_output_format(output_format of)
+    inline std::string_view to_sv_from_output_format(output_format of)
     {
 
         switch (of)
@@ -80,15 +80,10 @@ namespace mazes
     /// @brief Convert a string to an output_format enum
     /// @param o
     /// @return
-    inline output_format to_output_format_from_string(std::string_view sv)
+    inline output_format to_output_format_from_sv(std::string_view sv)
     {
 
         if (sv.compare("txt") == 0)
-        {
-
-            return output_format::PLAIN_TEXT;
-        }
-        else if (sv.compare("text") == 0)
         {
 
             return output_format::PLAIN_TEXT;
@@ -142,7 +137,7 @@ namespace mazes
     /// @brief Convert the algo enum to a string
     /// @param a
     /// @return string
-    inline std::string_view to_string_from_algo(algo a)
+    inline std::string_view to_sv_from_algo(algo a)
     {
         switch (a)
         {
@@ -163,7 +158,7 @@ namespace mazes
     /// @brief Convert a string to an algo enum
     /// @param a
     /// @return algo
-    inline algo to_algo_from_string(std::string_view a)
+    inline algo to_algo_from_sv(std::string_view a)
     {
         if (a.compare("binary_tree") == 0)
         {

@@ -39,7 +39,7 @@ std::string string_utils::get_file_extension(const std::string &filename) noexce
         return "";
     }
 
-    return filename.substr(pos);
+    return filename.substr(pos + 1);
 }
 
 bool string_utils::ends_with(const std::string &str, const std::string &suffix) noexcept

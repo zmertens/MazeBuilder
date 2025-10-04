@@ -37,6 +37,8 @@ namespace mazes
 
         static constexpr auto DEFAULT_OUTPUT_ID = output_format::PLAIN_TEXT;
 
+        static constexpr auto DEFAULT_FILENAME = "";
+
         static constexpr auto DEFAULT_DISTANCES = false;
 
         static constexpr auto DEFAULT_DISTANCES_START = 0;
@@ -201,7 +203,7 @@ namespace mazes
 
         /// @brief Get the output_format filename
         /// @return The output_format filename
-        std::string output_format_filename() const noexcept { return m_output_format_filename.value_or("output.txt"); }
+        std::string output_format_filename() const noexcept { return m_output_format_filename.value_or(std::string{ DEFAULT_FILENAME }); }
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic

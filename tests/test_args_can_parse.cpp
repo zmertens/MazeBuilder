@@ -158,12 +158,12 @@ TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]")
 
     SECTION("Parse and get algorithm value")
     {
-        vector<string> args_vec = {args::ALGO_ID_FLAG_STR, std::string{to_string_from_algo(ALGO)}};
+        vector<string> args_vec = {args::ALGO_ID_FLAG_STR, std::string{to_sv_from_algo(ALGO)}};
         REQUIRE(args_handler.parse(args_vec));
 
-        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), to_string_from_algo(ALGO)));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_OPTION_STR), to_string_from_algo(ALGO)));
-        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), to_string_from_algo(ALGO)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), to_sv_from_algo(ALGO)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_OPTION_STR), to_sv_from_algo(ALGO)));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), to_sv_from_algo(ALGO)));
     }
 
     SECTION("Parse and get output value")
@@ -470,7 +470,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]")
 
     static const string rows_str = to_string(configurator::MAX_ROWS - 1);
     static const string cols_str = to_string(configurator::MAX_COLUMNS - 1);
-    static const string algo_str = std::string{to_string_from_algo(configurator::DEFAULT_ALGO_ID)};
+    static const string algo_str = std::string{to_sv_from_algo(configurator::DEFAULT_ALGO_ID)};
 
     static char *test_argv[ARGC_7] = {
         const_cast<char *>("program"),
@@ -488,7 +488,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]")
     const auto &m_val = m.value();
     REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
 TEST_CASE("Args parse with string input", "[parse_string_input]")
@@ -496,7 +496,7 @@ TEST_CASE("Args parse with string input", "[parse_string_input]")
 
     args args_handler{};
 
-    static const auto VALID_ARGS_STR = "./app -r " + to_string(configurator::MAX_ROWS - 1) + " -c " + to_string(configurator::MAX_COLUMNS - 1) + " -a " + std::string{to_string_from_algo(configurator::DEFAULT_ALGO_ID)};
+    static const auto VALID_ARGS_STR = "./app -r " + to_string(configurator::MAX_ROWS - 1) + " -c " + to_string(configurator::MAX_COLUMNS - 1) + " -a " + std::string{to_sv_from_algo(configurator::DEFAULT_ALGO_ID)};
 
     REQUIRE(args_handler.parse(cref(VALID_ARGS_STR), true));
 
@@ -506,7 +506,7 @@ TEST_CASE("Args parse with string input", "[parse_string_input]")
     const auto &m_val = m.value();
     REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_string_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(configurator::DEFAULT_ALGO_ID));
 }
 
 // Add this test case to verify the sliced array syntax for distances flag

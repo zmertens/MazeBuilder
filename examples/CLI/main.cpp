@@ -14,6 +14,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/io_utils.h>
+#include <MazeBuilder//string_utils.h>
 
 #include "cli.h"
 
@@ -31,6 +32,7 @@ EMSCRIPTEN_BINDINGS(cli_module) {
     emscripten::class_<cli>("cli")
         .smart_ptr<std::shared_ptr<cli>>("shared_ptr<cli>")
         .function("convert", &cli::convert)
+        .function("convert_as_base64", &cli::convert_as_base64)
         .function("help", &cli::help)
         .function("version", &cli::version);
 
@@ -55,59 +57,49 @@ int main(int argc, char* argv[]) {
 
         cli my_cli;
 
-        auto str = my_cli.convert(cref(args_vec));
-        
-        if (str.empty()) {
+        if (auto str = my_cli.convert(cref(args_vec)); !str.empty()) {
 
-            throw runtime_error("Failed to parse command line arguments.");
-        }
+            if (auto config = my_cli.get_config(); config != nullptr) {
 
-        // Get the configuration to determine output handling
-        auto config = my_cli.get_config();
-        
-        if (!config) {
+                mazes::io_utils writer{};
 
-            throw logic_error("No valid configuration found after parsing arguments.\nResult:\n" + str);
-        }
+                bool write_success{ false };
 
-        mazes::io_utils writer{};
+                // Check if we have a specific output filename
+                if (auto filename = config->output_format_filename(); !filename.empty()) {
 
-        bool write_success{false};
-            
-        // Check if we have a specific output filename
-        if (!config->output_format_filename().empty()) {
+                    if (mazes::to_output_format_from_sv(mazes::string_utils::get_file_extension(filename)) == mazes::output_format::STDOUT) {
 
-            if (config->output_format_filename() == "stdout") {
+                        // Write to stdout
+                        write_success = writer.write(cout, str);
+                    } else {
 
-                // Write to stdout
-                write_success = writer.write(cout, str);
+                        // Write to file
+                        write_success = writer.write_file(config->output_format_filename(), str);
+                    }
+                } else {
+
+                    write_success = writer.write(cout, str);
+                }
+
+                if (!write_success) {
+
+                    throw runtime_error("Failed to write output.");
+                }
             } else {
 
-                // Write to file
-                write_success = writer.write_file(config->output_format_filename(), str);
+                throw logic_error(str);
             }
         } else {
-            // No specific filename, check output type
-            if (config->output_format_id() == mazes::output_format::STDOUT) {
 
-                write_success = writer.write(cout, str);
-            } else {
-
-                // Default to stdout if no specific output handling
-                write_success = writer.write(cout, str);
-            }
-        }
-            
-        if (!write_success) {
-
-            throw runtime_error("Failed to write output.");
+            throw runtime_error(my_cli.help());
         }
 
     } catch (const std::exception& ex) {
 
         std::cerr << ex.what() << std::endl;
 
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 
     return EXIT_SUCCESS;

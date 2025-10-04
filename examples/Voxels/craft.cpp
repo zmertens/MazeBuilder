@@ -2672,11 +2672,11 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     // Init some local vars for handling maze duties
     list<string_view> algo_list;
     for (auto i{ static_cast<int>(algo::BINARY_TREE) }; i < static_cast<int>(algo::TOTAL); ++i) {
-        algo_list.push_back(to_string_from_algo(static_cast<algo>(i)));
+        algo_list.push_back(to_sv_from_algo(static_cast<algo>(i)));
     }
 
     // Make some references
-    auto my_maze_type = to_algo_from_string(algo_list.front());
+    auto my_maze_type = to_algo_from_sv(algo_list.front());
     auto&& gui = this->m_pimpl->m_gui;
     auto&& model = this->m_pimpl->m_model;
 
@@ -2802,7 +2802,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                                 bool is_selected = (itr == gui->algo);
                                 if (ImGui::Selectable(std::string{itr}.c_str(), is_selected)) {
                                     gui->algo = itr;
-                                    my_maze_type = to_algo_from_string(itr);
+                                    my_maze_type = to_algo_from_sv(itr);
                                 }
                                 // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                 if (is_selected)

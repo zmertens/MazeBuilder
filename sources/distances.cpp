@@ -64,92 +64,85 @@ std::shared_ptr<distances> distances::path_to(std::unique_ptr<grid_interface> co
     parent[m_root_index] = -1;
 
     static constexpr auto MAX_ITERATIONS = 1000000;
+#if defined(MAZE_DEBUG)
     auto current_iteration = 0;
+#endif
 
-    try
+    // Get the grid operations interface
+    auto &ops = g->operations();
+
+    while (!q.empty())
     {
-        // Get the grid operations interface
-        auto &ops = g->operations();
+#if defined(MAZE_DEBUG)
+        if (current_iteration++ > MAX_ITERATIONS)
+        {
+            std::cerr << "Error: path_to exceeded maximum iterations." << std::endl;
+            return path;
+        }
+#endif
 
-        while (!q.empty())
+        int32_t current_index = q.front();
+        q.pop_front();
+
+        // If we reached the goal, reconstruct the path
+        if (current_index == goal_index)
+        {
+            // Reconstruct path from goal to root
+            std::vector<int32_t> path_indices;
+            int32_t step = goal_index;
+
+            while (step != -1)
+            {
+                path_indices.push_back(step);
+                step = parent[step];
+            }
+
+            // Set distances in the path (distance 0 for root, increasing towards goal)
+            for (size_t i = 0; i < path_indices.size(); ++i)
+            {
+                int distance = static_cast<int>(path_indices.size() - 1 - i);
+                path->set(path_indices[i], distance);
+            }
+
+            return path;
+        }
+
+        // Retrieve the current cell
+        auto current_cell = ops.search(current_index);
+        if (!current_cell)
         {
 #if defined(MAZE_DEBUG)
-            if (current_iteration++ > MAX_ITERATIONS)
-            {
-                std::cerr << "Error: BFS exceeded maximum iterations." << std::endl;
-                return path;
-            }
+            std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
 #endif
+            continue;
+        }
 
-            int32_t current_index = q.front();
-            q.pop_front();
+        // Process each neighbor that has a passage (linked cells)
+        auto neighbors = ops.get_neighbors(current_cell);
+        for (const auto &neighbor : neighbors)
+        {
+            if (!neighbor)
+                continue;
 
-            // If we reached the goal, reconstruct the path
-            if (current_index == goal_index)
+            int32_t neighbor_index = neighbor->get_index();
+
+            // Skip if already visited
+            if (visited.find(neighbor_index) != visited.end())
             {
-                // Reconstruct path from goal to root
-                std::vector<int32_t> path_indices;
-                int32_t step = goal_index;
-
-                while (step != -1)
-                {
-                    path_indices.push_back(step);
-                    step = parent[step];
-                }
-
-                // Set distances in the path (distance 0 for root, increasing towards goal)
-                for (size_t i = 0; i < path_indices.size(); ++i)
-                {
-                    int distance = static_cast<int>(path_indices.size() - 1 - i);
-                    path->set(path_indices[i], distance);
-                }
-
-                return path;
-            }
-
-            // Retrieve the current cell
-            auto current_cell = ops.search(current_index);
-            if (!current_cell)
-            {
-#if defined(MAZE_DEBUG)
-                std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
-#endif
                 continue;
             }
 
-            // Process each neighbor that has a passage (linked cells)
-            auto neighbors = ops.get_neighbors(current_cell);
-            for (const auto &neighbor : neighbors)
+            // Only follow passages that exist (cells that are linked)
+            if (!current_cell->is_linked(neighbor))
             {
-                if (!neighbor)
-                    continue;
-
-                int32_t neighbor_index = neighbor->get_index();
-
-                // Skip if already visited
-                if (visited.find(neighbor_index) != visited.end())
-                {
-                    continue;
-                }
-
-                // Only follow passages that exist (cells that are linked)
-                if (!current_cell->is_linked(neighbor))
-                {
-                    continue;
-                }
-
-                // Mark as visited and add to queue
-                visited[neighbor_index] = true;
-                parent[neighbor_index] = current_index;
-                q.push_back(neighbor_index);
+                continue;
             }
+
+            // Mark as visited and add to queue
+            visited[neighbor_index] = true;
+            parent[neighbor_index] = current_index;
+            q.push_back(neighbor_index);
         }
-    }
-    catch (const std::exception &e)
-    {
-#if defined(MAZE_DEBUG)
-        std::cerr << "Exception in path_to: " << e.what() << std::endl;
-#endif
     }
 
     // No path found, return empty path
