@@ -13,6 +13,7 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
 #include <MazeBuilder/stringify.h>
+#include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/objectify.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 
@@ -26,12 +27,12 @@
 // Use functions to avoid static initialization order mismatches
 static std::string get_cli_version_str() {
 
-    return "mazebuilder v" + mazes::buildinfo::Version + " (" + mazes::buildinfo::CommitSHA + ")";
+    return mazes::string_utils::concat(mazes::string_utils::concat("mazebuilder v", mazes::buildinfo::Version), " - " + mazes::buildinfo::CommitSHA);
 }
 
 static std::string get_cli_title_str() {
 
-    return "mazebuilder v" + get_cli_version_str();
+    return get_cli_version_str();
 }
 
 static std::string get_cli_help_str() {
