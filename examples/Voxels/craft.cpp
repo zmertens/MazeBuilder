@@ -41,12 +41,20 @@
 
 #include <noise/noise.h>
 
-#include "craft_utils.h"
 #include "world.h"
 #include "cube.h"
 #include "db.h"
+#include "sign.h"
 #include "item.h"
+#include "map.h"
 #include "matrix.h"
+
+#include "craft_utils.h"
+#include "craft_types.h"
+#include "world_manager.h"
+#include "gl_types.h"
+#include "gl_buffer_manager.h"
+#include "gl_renderer.h"
 
 #include <MazeBuilder/maze_builder.h>
 

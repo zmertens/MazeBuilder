@@ -27,7 +27,6 @@
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/maze_factory.h>
 #include <MazeBuilder/maze_interface.h>
-#include <MazeBuilder/maze_str.h>
 #include <MazeBuilder/objectify.h>
 #include <MazeBuilder/pixels.h>
 #include <MazeBuilder/progress.h>

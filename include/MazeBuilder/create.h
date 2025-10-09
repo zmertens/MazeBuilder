@@ -10,10 +10,10 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid.h>
-#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_factory.h>
-#include <MazeBuilder/maze_interface.h>
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/maze_factory.h>
+#include <MazeBuilder/maze_interface.h>
 #include <MazeBuilder/maze_str.h>
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
