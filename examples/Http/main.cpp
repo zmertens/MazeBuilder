@@ -1,198 +1,109 @@
-#include <memory>
-#include <vector>
-#include <variant>
-#include <sstream>
-#include <iostream>
-#include <random>
-#include <functional>
-#include <deque>
+// Send HTTP Requests to create mazes
 
-#include <SFML/Network.hpp>
+#include <cstdlib>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include <MazeBuilder/maze_builder.h>
 
-static constexpr auto MB_MENU_MSG = R"help(
-    -- Maze Builder Menu --
-    1. Create a new maze
-    2. Get all mazes from the DB
-    3. Delete a maze by id
-    4. Print Menu Options
-    5. Show Example
-    6. Exit
-    )help";
+#include "terminal_gui.h"
 
-static constexpr auto WORKER_URL = "http://mb-worker.zach-mm035.workers.dev";
-static constexpr auto LOCAL_URL = "http://127.0.0.1";
+static constexpr auto USAGE_MSG = R"(
+Maze Builder HTTP Client - Terminal Interface - v0.1.0
 
-void print_menu() {
-    std::cout << MB_MENU_MSG;
-#if defined(MAZE_DEBUG)
-    std::cout << "\nHttp URL: " << LOCAL_URL << std::endl;
-#else
-    std::cout << "\nHttp URL: " << WORKER_URL << std::endl;
-#endif
-    std::cout << "version: " << mazes::buildinfo::Version + "-" + mazes::buildinfo::CommitSHA << std::endl << std::endl;
+Usage:
+  mazebuilderhttp <server_url>
+
+Arguments:
+  server_url    URL of the Corners server
+                Examples:
+                  http://localhost:3000 (for development)
+
+Description:
+  This application provides a terminal interface for interacting with the Corners
+  maze building server. Once started, you can use various commands to create mazes.
+
+  Available terminal commands:
+    mazebuilderhttp --help                     Show maze builder help
+    mazebuilderhttp --create -r 10 -c 10 -s 42 -a dfs
+                                              Create a new maze
+    ls                                        List available programs
+    find <pattern>                           Find programs matching pattern
+    help                                     Show terminal help
+    exit                                     Exit the application
+)";
+
+void print_usage() {
+
+    std::cout << USAGE_MSG << std::endl;
 }
 
-void process_commands(std::deque<char>& commands, bool& is_running) {
-    
-    using namespace std;
+bool is_valid_url(const std::string& url) {
 
-    mt19937 rng;
-    auto get_int = [&rng](auto low, auto high) {
-        std::uniform_int_distribution<int> dist(low, high);
-        return dist(rng);
-    };
-
-    auto process_char = [&is_running, &get_int, &rng](char ch) {
-#if defined(MAZE_DEBUG)
-        sf::Http http{ LOCAL_URL, 8787 };
-#else
-        sf::Http http{ WORKER_URL };
-#endif
-        sf::Http::Response response;
-
-        string users_maze_output{};
-
-        switch (ch) {
-            case '1': {
-            cout << "Creating new maze...\n";
-            cout << "Enter rows, columns, height, seed, and algorithm with a single space between: ";
-            int rows, columns, height, seed;
-            string algorithm;
-            // Get user input
-            cin >> rows >> columns >> height >> seed >> algorithm;
-            mazes::algo mt = mazes::to_algo_from_sv(algorithm);
-
-            if (mt == mazes::algo::TOTAL) {
-                cerr << "Unknown algorithm: " << algorithm << endl;
-                break;
-            }
-
-            // Create the maze
-            auto next_maze_ptr = nullptr; //mazes::factory::create(
-                // mazes::configurator().rows(rows).columns(columns).levels(height).seed(seed).algo_id(mt));
-
-            // if (!next_maze_ptr) {
-                // cerr << "Error creating maze: " << endl;
-                // break;
-            // }
-
-            auto next_maze_ptr_s = "";//mazes::stringz::stringify(cref(next_maze_ptr));
-
-            unordered_map<string, string> my_json_map;
-            my_json_map["rows"] = to_string(rows);
-            my_json_map["columns"] = to_string(columns);
-            my_json_map["levels"] = to_string(height);
-            my_json_map["seed"] = to_string(seed);
-            my_json_map["algo"] = algorithm;
-            my_json_map["str"] = next_maze_ptr_s;
-
-            mazes::json_helper jh{};
-            auto json_s = jh.from(cref(my_json_map));
-
-            static constexpr auto content_len = 2;
-
-            sf::Http::Request sf_post_request {"api/mazes", sf::Http::Request::Method::Post};
-            sf_post_request.setHttpVersion(1, 1);
-            sf_post_request.setBody(json_s);
-            sf_post_request.setField("Content-Type", "application/json");
-            sf_post_request.setField("Content-Length", to_string(content_len));
-
-            response = http.sendRequest(sf_post_request);
-            cout << "Response status: " << static_cast<int>(response.getStatus()) << " \nbody: " << response.getBody() << endl;
-            break;
-            } // case '1'
-            case '2': {
-            cout << "Getting all mazes from the DB...\n";
-            sf::Http::Request sf_get_request {"api/mazes", sf::Http::Request::Method::Get};
-            sf_get_request.setHttpVersion(1, 1);
-            response = http.sendRequest(sf_get_request);
-            if (response.getStatus() != sf::Http::Response::Status::Ok) {
-                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
-                break;
-            }
-            cout << "Response from server: " << response.getBody() << endl;
-            break;
-            } // case '2'
-            case '3': {
-            cout << "Enter id for maze to delete...\n";
-            int id = 0;
-            cin >> id;
-            sf::Http::Request sf_del_request {"api/mazes/" + to_string(id), sf::Http::Request::Method::Delete};
-            sf_del_request.setHttpVersion(1, 1);
-            response = http.sendRequest(sf_del_request);
-            if (response.getStatus() != sf::Http::Response::Status::Ok) {
-                cerr << "Error: " << static_cast<int>(response.getStatus()) << endl;
-                break;
-            }
-            cout << "Response from server: " << response.getBody() << endl;
-            break;
-            }
-            case '4':
-            print_menu();
-            break;
-            case '5': {
-            // Show example
-            cout << "Showing example maze builder...\n\n";
-            ostringstream option_1;
-            option_1 << "-- Enter rows, columns, height, seed, and algorithm with a single space between. --\n\n";
-            ostringstream example_user_input;
-            example_user_input << "Example (ignore [] brackets):\t[1 2 3 1 dfs]\n";
-            
-            cout << option_1.str() << example_user_input.str();
-            
-            break;
-            }
-            case '6':
-            cout << "Exiting Maze Builder...\n";
-            is_running = false;
-            break;
-            default:
-            cout << "Invalid option. Please try again.\n";
-            break;
-        } // switch
-        print_menu();
-    }; // lambda
-
-    while (!commands.empty()) {
-        if (auto ch = commands.front()) {
-            commands.pop_front();
-            process_char(ch);
-        }
-    }
+    // Basic URL validation - SFML Network doesn't support HTTPS
+    return url.find("http://") == 0 && url.find("https://") != 0;
 }
 
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
-int main()
+int main(int argc, char* argv[])
 {
     using namespace std;
 
-    float accumulator = 0.0;
-    static constexpr auto FIXED_TIMESTEP = 1.0f / 60.0f;
+    static constexpr auto TOTAL_ARG_COUNT = 2;
 
-    sf::Clock clock;
+    // Check command line arguments
+    if (argc != TOTAL_ARG_COUNT) {
 
-    print_menu();
+        std::cerr << "Error: Invalid number of arguments." << std::endl;
 
-    deque<char> commands;
-    bool is_running = true;
-    // Main game loop
-    while (is_running) {
-        // Input / Update
-        cin.clear();
-        if (auto ch = cin.get(); ch != '\n' && ch != EOF) {
-            commands.push_back(ch);
-        }
+        print_usage();
 
-        // Process commands
-        process_commands(commands, ref(is_running));
+        return EXIT_FAILURE;
     }
 
-    return 0;
-} // main
+    std::string server_url = argv[1];
+
+    // Handle help request
+    if (server_url == "--help" || server_url == "-h") {
+
+        print_usage();
+
+        return EXIT_SUCCESS;
+    }
+
+    // Validate URL
+    if (!is_valid_url(server_url)) {
+
+        std::cerr << "Error: Invalid server URL. Must start with http:// (https:// is not supported)." << std::endl;
+
+        print_usage();
+
+        return EXIT_FAILURE;
+    }
+
+    try {
+
+        // Create and initialize terminal GUI
+        terminal_gui gui{};
+
+        gui.initialize(server_url);
+
+        // Start the terminal interface
+        gui.run();
+
+    } catch (const std::exception& e) {
+
+        std::cerr << "Error: " << e.what() << std::endl;
+
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
 
 
 
