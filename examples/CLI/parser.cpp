@@ -25,7 +25,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
             config.levels(stoi(value));
         } else if (key == args::ALGO_ID_WORD_STR) {
 
-            config.algo_id(to_algo_from_string(value));
+            config.algo_id(to_algo_from_sv(value));
         } else if (key == args::SEED_WORD_STR) {
 
             config.seed(stoi(value));
@@ -74,7 +74,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
                     if (dot_pos != string::npos) {
                         string extension = value.substr(dot_pos + 1);
                         try {
-                            config.output_format_id(to_output_format_from_string(extension));
+                            config.output_format_id(to_output_format_from_sv(extension));
                         } catch (const invalid_argument&) {
                             // If extension isn't recognized, default to plain text
                             config.output_format_id(output_format::PLAIN_TEXT);
@@ -86,7 +86,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
                 }
             } else {
                 // This looks like a format specifier
-                config.output_format_id(to_output_format_from_string(value));
+                config.output_format_id(to_output_format_from_sv(value));
             }
         } else if (key == args::OUTPUT_FILENAME_WORD_STR) {
 
@@ -128,15 +128,14 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
         // Process only the expected word keys to avoid processing duplicate entries
         for (const auto& key : word_keys) {
 
-            auto value_opt = my_args.get(key);
-            if (value_opt.has_value()) {
+            if (auto value_opt = my_args.get(key);  value_opt.has_value()) {
+
+                set_config(key, value_opt.value());
 
 #if defined(MAZE_DEBUG)
 
                 std::cerr << "Debug: Found key='" << key << "' value='" << value_opt.value() << "'" << std::endl;
 #endif
-
-                set_config(key, value_opt.value());
             }
         }
 

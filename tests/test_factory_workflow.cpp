@@ -95,7 +95,7 @@ TEST_CASE("Invalid args when converting algo string", "[invalid args]")
 
     for (auto a : algos_to_convert)
     {
-        REQUIRE_THROWS_AS(mazes::to_algo_from_string(a), std::invalid_argument);
+        REQUIRE_THROWS_AS(mazes::to_algo_from_sv(a), std::invalid_argument);
     }
 }
 

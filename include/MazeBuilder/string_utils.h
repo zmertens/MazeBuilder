@@ -41,7 +41,7 @@ namespace mazes
 
         /// @brief Extract file extension from a filename
         /// @param filename The filename to process
-        /// @return The file extension including the dot, or empty string if no extension
+        /// @return The file extension, excluding the dot, or empty string if no extension
         static std::string get_file_extension(const std::string &filename) noexcept;
 
         /// @brief Check if a string ends with a specific suffix

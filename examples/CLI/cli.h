@@ -27,6 +27,8 @@ public:
 
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
 
+    std::string convert_as_base64(std::vector<std::string> const& args_vec) const noexcept;
+
     std::string help() const noexcept;
 
     std::string version() const noexcept;
@@ -39,16 +41,16 @@ private:
 
     void apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a, const mazes::configurator& config) const noexcept;
 
-    static const std::string DEBUG_STR;
+    static std::string debug_str;
 
-    static std::string CLI_HELP_STR;
+    static std::string help_str;
 
-    static std::string CLI_TITLE_STR;
+    static std::string title_str;
 
-    static std::string CLI_VERSION_STR;
+    static std::string version_str;
 
     // Store the last configuration
-    mutable std::shared_ptr<mazes::configurator> m_last_config;
+    mutable std::shared_ptr<mazes::configurator> m_config;
 
 };
 
