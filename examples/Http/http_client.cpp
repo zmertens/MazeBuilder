@@ -19,11 +19,16 @@ void http_client::parse_server_url() {
     std::regex url_regex(R"(^https?://([^:/]+)(?::(\d+))?(?:/.*)?$)");
     std::smatch matches;
 
+    std::cout << "DEBUG: Parsing URL: " << m_server_url << std::endl;
+
     if (std::regex_match(m_server_url, matches, url_regex)) {
         m_host = matches[1].str();
 
+        std::cout << "DEBUG: Regex matched. Host: " << m_host << std::endl;
+
         if (matches[2].matched) {
             m_port = static_cast<unsigned short>(std::stoi(matches[2].str()));
+            std::cout << "DEBUG: Port from URL: " << m_port << std::endl;
         } else {
             // Default ports
             if (m_server_url.find("https://") == 0) {
@@ -31,8 +36,10 @@ void http_client::parse_server_url() {
             } else {
                 m_port = 80;
             }
+            std::cout << "DEBUG: Using default port: " << m_port << std::endl;
         }
     } else {
+        std::cout << "DEBUG: Regex failed to match URL" << std::endl;
         // Fallback: treat the entire URL as host
         m_host = m_server_url;
         if (m_server_url.find("localhost") != std::string::npos ||
@@ -40,7 +47,10 @@ void http_client::parse_server_url() {
             // Default for local development
             m_port = 3000;
         }
+        std::cout << "DEBUG: Fallback - Host: " << m_host << ", Port: " << m_port << std::endl;
     }
+
+    std::cout << "DEBUG: Final parsed - Host: " << m_host << ", Port: " << m_port << std::endl;
 }
 
 std::string http_client::create_maze(int rows, int columns, int seed, const std::string& algorithm) {
@@ -86,9 +96,11 @@ std::string http_client::create_maze(int rows, int columns, int seed, const std:
         };
 
     try {
+        std::cout << "DEBUG: Connecting to " << m_host << ":" << m_port << std::endl;
         sf::Http http(m_host, m_port);
 
         std::string json_payload = create_json_payload(rows, columns, seed, algorithm);
+        std::cout << "DEBUG: JSON payload: " << json_payload << std::endl;
 
         sf::Http::Request request("/api/mazes/create", sf::Http::Request::Method::Post);
         request.setHttpVersion(1, 1);

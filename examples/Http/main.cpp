@@ -14,7 +14,7 @@ static constexpr auto USAGE_MSG = R"(
 Maze Builder HTTP Client - Terminal Interface - v0.1.0
 
 Usage:
-  mazebuilderhttp <server_url>
+  maze_client <server_url>
 
 Arguments:
   server_url    URL of the Corners server
@@ -26,8 +26,8 @@ Description:
   maze building server. Once started, you can use various commands to create mazes.
 
   Available terminal commands:
-    mazebuilderhttp --help                     Show maze builder help
-    mazebuilderhttp --create -r 10 -c 10 -s 42 -a dfs
+    maze_client --help                     Show maze builder help
+    maze_client --create -r 10 -c 10 -s 42 -a dfs
                                               Create a new maze
     ls                                        List available programs
     find <pattern>                           Find programs matching pattern
