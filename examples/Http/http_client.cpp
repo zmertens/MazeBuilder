@@ -15,20 +15,40 @@ http_client::http_client(const std::string& server_url)
 }
 
 void http_client::parse_server_url() {
+
+    using std::regex;
+    using std::smatch;
+    using std::string;
+    using std::stoi;
+    using std::ostringstream;
+    using std::cout;
+    using std::endl;
+
     // Parse URL to extract host and port
-    std::regex url_regex(R"(^https?://([^:/]+)(?::(\d+))?(?:/.*)?$)");
-    std::smatch matches;
+    regex url_regex(R"(^https?://([^:/]+)(?::(\d+))?(?:/.*)?$)");
+    smatch matches;
 
-    std::cout << "DEBUG: Parsing URL: " << m_server_url << std::endl;
+#if defined(MAZE_DEBUG)
 
-    if (std::regex_match(m_server_url, matches, url_regex)) {
+    cout << "DEBUG: Parsing URL: " << m_server_url << endl;
+#endif
+
+    if (regex_match(m_server_url, matches, url_regex)) {
         m_host = matches[1].str();
 
-        std::cout << "DEBUG: Regex matched. Host: " << m_host << std::endl;
+#if defined(MAZE_DEBUG)
+
+        cout << "DEBUG: Regex matched. Host: " << m_host << endl;
+#endif
 
         if (matches[2].matched) {
-            m_port = static_cast<unsigned short>(std::stoi(matches[2].str()));
-            std::cout << "DEBUG: Port from URL: " << m_port << std::endl;
+            m_port = static_cast<unsigned short>(stoi(matches[2].str()));
+
+#if defined(MAZE_DEBUG)
+
+            cout << "DEBUG: Port from URL: " << m_port << endl;
+#endif
+
         } else {
             // Default ports
             if (m_server_url.find("https://") == 0) {
@@ -36,24 +56,40 @@ void http_client::parse_server_url() {
             } else {
                 m_port = 80;
             }
-            std::cout << "DEBUG: Using default port: " << m_port << std::endl;
+
+#if defined(MAZE_DEBUG)
+
+            cout << "DEBUG: Using default port: " << m_port << endl;
+#endif
+
         }
     } else {
-        std::cout << "DEBUG: Regex failed to match URL" << std::endl;
+
+#if defined(MAZE_DEBUG)
+
+        cout << "DEBUG: Regex failed to match URL" << endl;
+#endif
+
         // Fallback: treat the entire URL as host
         m_host = m_server_url;
-        if (m_server_url.find("localhost") != std::string::npos ||
-            m_server_url.find("127.0.0.1") != std::string::npos) {
+        if (m_server_url.find("localhost") != string::npos ||
+            m_server_url.find("127.0.0.1") != string::npos) {
             // Default for local development
             m_port = 3000;
         }
-        std::cout << "DEBUG: Fallback - Host: " << m_host << ", Port: " << m_port << std::endl;
+#if defined(MAZE_DEBUG)
+
+        cout << "DEBUG: Fallback - Host: " << m_host << ", Port: " << m_port << endl;
+#endif
     }
 
-    std::cout << "DEBUG: Final parsed - Host: " << m_host << ", Port: " << m_port << std::endl;
+#if defined(MAZE_DEBUG)
+
+    cout << "DEBUG: Final parsed - Host: " << m_host << ", Port: " << m_port << endl;
+#endif
 }
 
-std::string http_client::create_maze(int rows, int columns, int seed, const std::string& algorithm) {
+std::string http_client::create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
 
     auto format_response = [](const sf::Http::Response& response) -> std::string {
 
@@ -86,9 +122,10 @@ std::string http_client::create_maze(int rows, int columns, int seed, const std:
         oss << std::endl;
 
         // Response body
-        std::string body = response.getBody();
-        if (!body.empty()) {
+        if (auto body{response.getBody()}; !body.empty()) {
+
             oss << "Response Body:" << std::endl;
+
             oss << body;
         }
 
@@ -96,11 +133,18 @@ std::string http_client::create_maze(int rows, int columns, int seed, const std:
         };
 
     try {
+#if defined(MAZE_DEBUG)
+
         std::cout << "DEBUG: Connecting to " << m_host << ":" << m_port << std::endl;
+#endif
+
         sf::Http http(m_host, m_port);
 
-        std::string json_payload = create_json_payload(rows, columns, seed, algorithm);
+        std::string json_payload = create_json_payload(rows, columns, seed, algorithm, distances);
+#if defined(MAZE_DEBUG)
+
         std::cout << "DEBUG: JSON payload: " << json_payload << std::endl;
+#endif
 
         sf::Http::Request request("/api/mazes/create", sf::Http::Request::Method::Post);
         request.setHttpVersion(1, 1);
@@ -116,7 +160,7 @@ std::string http_client::create_maze(int rows, int columns, int seed, const std:
     }
 }
 
-std::string http_client::create_json_payload(int rows, int columns, int seed, const std::string& algorithm) {
+std::string http_client::create_json_payload(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
     std::ostringstream oss;
     oss << "{"
         << "\"rows\":" << rows << ","
@@ -124,7 +168,8 @@ std::string http_client::create_json_payload(int rows, int columns, int seed, co
         << "\"levels\":1,"  // Default to 1 level for 2D mazes
         << "\"seed\":" << seed << ","
         << "\"algo\":\"" << algorithm << "\","
-        << "\"str\":\"\""  // Empty string for maze representation
+        << "\"distances\":\"" << distances << "\""
         << "}";
+
     return oss.str();
 }

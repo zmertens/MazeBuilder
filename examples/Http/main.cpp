@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include <MazeBuilder/maze_builder.h>
-
 #include "terminal_gui.h"
 
 static constexpr auto USAGE_MSG = R"(
@@ -27,12 +25,11 @@ Description:
 
   Available terminal commands:
     maze_client --help                     Show maze builder help
-    maze_client --create -r 10 -c 10 -s 42 -a dfs
-                                              Create a new maze
-    ls                                        List available programs
-    find <pattern>                           Find programs matching pattern
-    help                                     Show terminal help
-    exit                                     Exit the application
+    maze_client --create                   Create a new maze
+    ls                                     List available programs
+    find <pattern>                         Find programs matching pattern
+    help                                   Show terminal help
+    exit                                   Exit the application
 )";
 
 void print_usage() {

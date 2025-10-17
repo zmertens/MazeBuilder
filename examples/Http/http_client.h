@@ -16,7 +16,7 @@ public:
     /// @param seed Random seed
     /// @param algorithm Algorithm to use
     /// @return JSON response from server
-    std::string create_maze(int rows, int columns, int seed, const std::string& algorithm);
+    std::string create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances = {"[0:-1]"});
 
 private:
     /// @brief Parse server URL and extract host and port
@@ -28,7 +28,7 @@ private:
     /// @param seed Random seed
     /// @param algorithm Algorithm to use
     /// @return JSON string
-    std::string create_json_payload(int rows, int columns, int seed, const std::string& algorithm);
+    std::string create_json_payload(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances);
 
     std::string m_server_url;
     std::string m_host;
