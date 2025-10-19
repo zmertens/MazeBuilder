@@ -14,11 +14,12 @@
 
 #include "Physics.hpp"
 
+#include "cout_thread_safe.hpp"
+
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <deque>
-//#include <format>
 #include <functional>
 #include <iostream>
 #include <memory>
@@ -32,11 +33,15 @@
 #include <SDL3/SDL.h>
 #include <SFML/Audio.hpp>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
+
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/create.h>
+#include <MazeBuilder/json_helper.h>
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
@@ -49,8 +54,8 @@
 #include "World.hpp"
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
-static constexpr auto RESOURCE_PATH_PREFIX = "resources";
-static constexpr auto PHYSICS_JSON_PATH = "resources/physics.json";
+static const std::string RESOURCE_PATH_PREFIX = "resources";
+static const std::string PHYSICS_JSON_PATH = RESOURCE_PATH_PREFIX + "/physics.json";
 
 struct Physics::PhysicsImpl {
     
@@ -98,6 +103,13 @@ struct Physics::PhysicsImpl {
     SDLHelper sdlHelper;
     State state;
     WorkerConcurrent workerConcurrent;
+    
+    // Configuration loaded from physics.json
+    std::unordered_map<std::string, std::string> resourceMap;
+    
+    // Splash screen texture
+    SDL_Texture* splashTexture = nullptr;
+    int splashWidth = 0, splashHeight = 0;
 
     // Camera for coordinate transformations
     std::unique_ptr<OrthographicCamera> camera;
@@ -110,7 +122,12 @@ struct Physics::PhysicsImpl {
     }
 
     ~PhysicsImpl() {
-
+        // Clean up splash texture
+        if (splashTexture) {
+            SDL_DestroyTexture(splashTexture);
+            splashTexture = nullptr;
+        }
+        
         // Doing this here prevents issues when the app is launched and closed quickly
         workerConcurrent.generate("12345");
     }
@@ -131,6 +148,37 @@ struct Physics::PhysicsImpl {
         pixelsPerMeter = 40.0f;
 
         //auto s = std::format("{}", std::string("hi"));
+    }
+    
+    // Load an image file using stb_image and create an SDL texture
+    SDL_Texture* loadImageTexture(SDL_Renderer* renderer, const std::string& imagePath, int& width, int& height) {
+        int channels;
+        unsigned char* imageData = stbi_load(imagePath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        
+        if (!imageData) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load image: %s - %s\n", imagePath.c_str(), stbi_failure_reason());
+            return nullptr;
+        }
+        
+        // Create surface from image data (force RGBA format)
+        SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, imageData, width * 4);
+        if (!surface) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create surface: %s\n", SDL_GetError());
+            stbi_image_free(imageData);
+            return nullptr;
+        }
+        
+        // Create texture from surface
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+        if (!texture) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create texture: %s\n", SDL_GetError());
+        }
+        
+        // Clean up
+        SDL_DestroySurface(surface);
+        stbi_image_free(imageData);
+        
+        return texture;
     }
     
     // Convert screen coordinates to physics world coordinates
@@ -776,43 +824,86 @@ bool Physics::run() const noexcept {
     // Workers
     workers.initThreads();
 
-    unordered_map<string, string> resourceMap{};
+    // Load physics.json configuration
     mazes::json_helper jh{};
-    jh.load(PHYSICS_JSON_PATH,  ref(resourceMap));
+    if (!jh.load(PHYSICS_JSON_PATH, this->m_impl->resourceMap)) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load physics.json from: %s\n", PHYSICS_JSON_PATH);
+        return false;
+    }
+    
+    SDL_Log("Successfully loaded physics.json with %zu entries\n", this->m_impl->resourceMap.size());
+    
+    // Log loaded configuration for debugging
+    for (const auto& [key, value] : this->m_impl->resourceMap) {
+        SDL_Log("Config: %s = %s\n", key.c_str(), value.c_str());
+    }
 
-    const auto& generateSongName = resourceMap["generate"];
+    // Load audio resources using configuration
+    // Extract the actual filename from JSON string format (remove quotes and array brackets)
+    auto extractValue = [](const std::string& jsonStr) -> std::string {
+        // Handle array format like ["filename"]
+        if (jsonStr.front() == '[' && jsonStr.back() == ']') {
+            // Extract first element from array
+            size_t start = jsonStr.find('"');
+            size_t end = jsonStr.find('"', start + 1);
+            if (start != std::string::npos && end != std::string::npos) {
+                return jsonStr.substr(start + 1, end - start - 1);
+            }
+        }
+        // Handle simple string format with quotes
+        if (jsonStr.size() >= 2 && jsonStr.front() == '"' && jsonStr.back() == '"') {
+            return jsonStr.substr(1, jsonStr.size() - 2);
+        }
+        return jsonStr;
+    };
+    
+    const auto generateOggFile = extractValue(this->m_impl->resourceMap["music_ogg"]);
     sf::SoundBuffer generateSoundBuffer;
-    if (!generateSoundBuffer.loadFromFile("resources/generate.ogg")) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generateSongName.c_str());
+    const auto generatePath = std::string(RESOURCE_PATH_PREFIX) + "/" + generateOggFile;
+    if (!generateSoundBuffer.loadFromFile(generatePath)) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generatePath.c_str());
         return false;
     } else {
-        SDL_Log("Success loading sound file: %s\n", generateSongName.c_str());
+        SDL_Log("Success loading sound file: %s\n", generatePath.c_str());
     }
 
     unique_ptr<sf::Sound> generateSound = make_unique<sf::Sound>(generateSoundBuffer);
     AudioHelper audioHelper{cref(generateSound)};
 
-    // Use the new strip_json_quotes method to properly handle the JSON string values
-    auto resourceLoadingStrView = "";//mazes::stringz::strip_json_quotes(resourceMap["icon_image_path"]);
-
-    const auto iconPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
+    // Load and set window icon from configuration
+    const auto iconImageFile = extractValue(this->m_impl->resourceMap["icon_image"]);
+    const auto iconPath = std::string(RESOURCE_PATH_PREFIX) + "/" + iconImageFile;
     SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
     if (icon) {
         SDL_SetWindowIcon(sdlHelper.window, icon);
         SDL_DestroySurface(icon);
+        SDL_Log("Successfully loaded icon: %s\n", iconPath.c_str());
     } else {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s\n", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s\n", iconPath.c_str(), SDL_GetError());
     }
 
-    // Setup SDL audio device with properly stripped JSON value
-    resourceLoadingStrView = "";//mazes::stringz::strip_json_quotes(resourceMap["loading_sound_path"]);
-
-    const auto loadingPath = string(RESOURCE_PATH_PREFIX) + "/" + string(resourceLoadingStrView);
+    // Load WAV file from configuration
+    const auto loadingWavFile = extractValue(this->m_impl->resourceMap["music_wav"]);
+    const auto loadingPath = std::string(RESOURCE_PATH_PREFIX) + "/" + loadingWavFile;
     if (!sdlHelper.loadWAV(loadingPath.c_str())) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file: %s\n", loadingPath.c_str());
+    } else {
+        SDL_Log("Successfully loaded WAV file: %s\n", loadingPath.c_str());
     }
 
     sdlHelper.playAudioStream();
+    
+    // Load splash image from configuration
+    const auto splashImageFile = extractValue(this->m_impl->resourceMap["splash_image"]);
+    const auto splashImagePath = std::string(RESOURCE_PATH_PREFIX) + "/" + splashImageFile;
+    this->m_impl->splashTexture = this->m_impl->loadImageTexture(sdlHelper.renderer, splashImagePath, 
+                                                                 this->m_impl->splashWidth, this->m_impl->splashHeight);
+    if (this->m_impl->splashTexture) {
+        SDL_Log("Successfully loaded splash image: %s (%dx%d)\n", splashImagePath.c_str(), 
+                this->m_impl->splashWidth, this->m_impl->splashHeight);
+    } else {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash image: %s\n", splashImagePath.c_str());
+    }
     
     auto&& renderer = sdlHelper.renderer;
     SDL_SetRenderVSync(renderer, true);
@@ -879,6 +970,26 @@ bool Physics::run() const noexcept {
         // Clear the screen
         SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255); // Light gray background
         SDL_RenderClear(renderer);
+        
+        // Render splash screen if in SPLASH state
+        if (gState == State::SPLASH && this->m_impl->splashTexture) {
+            // Center the splash image on screen
+            int centerX = (display_w - this->m_impl->splashWidth) / 2;
+            int centerY = (display_h - this->m_impl->splashHeight) / 2;
+            
+            SDL_FRect splashRect = {
+                static_cast<float>(centerX),
+                static_cast<float>(centerY),
+                static_cast<float>(this->m_impl->splashWidth),
+                static_cast<float>(this->m_impl->splashHeight)
+            };
+            
+            SDL_RenderTexture(renderer, this->m_impl->splashTexture, nullptr, &splashRect);
+            
+            // Add a simple "Press any key to continue" text instruction
+            // For now, we'll just continue after a short delay or key press
+            // This can be enhanced later with proper text rendering
+        }
         
         // Generate new level if needed
         if (gState == State::UPLOADING_LEVEL) {

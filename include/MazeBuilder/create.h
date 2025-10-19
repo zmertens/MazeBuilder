@@ -2,7 +2,6 @@
 #define CREATE_H
 
 #include <future>
-#include <iostream>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -27,21 +26,6 @@ namespace mazes
     /// @namespace detail
     namespace detail
     {
-        // Source material here on async behavior
-        // https://github.com/PacktPublishing/Cpp17-STL-Cookbook/blob/master/Chapter09/chains.cpp
-        // Provides standard out in async context
-        struct pcout : public std::stringstream
-        {
-            static inline std::mutex cout_mutex;
-
-            ~pcout()
-            {
-                std::lock_guard<std::mutex> l{cout_mutex};
-                std::cout << rdbuf();
-                std::cout.flush();
-            }
-        };
-
         // Internal implementation - not intended for direct use
         static std::string create_single(const configurator &config)
         {
@@ -113,11 +97,6 @@ namespace mazes
                 }
 
                 return !s.empty(); });
-
-#if defined(MAZE_DEBUG)
-
-            pcout{} << string_utils::format("Creates string successfully with duration: {}\n", duration.count());
-#endif // MAZE_DEBUG
 
             return s;
         }

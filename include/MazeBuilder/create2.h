@@ -6,7 +6,6 @@
 
 #include <deque>
 #include <functional>
-#include <iostream>
 #include <mutex>
 #include <sstream>
 #include <string>

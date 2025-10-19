@@ -46,6 +46,12 @@ void SDLHelper::poll_events(State& state, std::unique_ptr<OrthographicCamera> co
     
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_KEY_DOWN) {
+            // Handle splash screen transition - any key press transitions from SPLASH to OPTIONS
+            if (state == State::SPLASH) {
+                state = State::UPLOADING_LEVEL; // Go to level generation then play
+                break;
+            }
+            
             if (e.key.scancode == SDL_SCANCODE_ESCAPE) {
                 state = State::DONE;
                 break;
