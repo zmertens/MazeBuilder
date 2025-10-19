@@ -41,10 +41,12 @@
 #include <dearimgui/backends/imgui_impl_opengl3.h>
 
 #include <MazeBuilder/create.h>
+#include <MazeBuilder/create2.h>
 #include <MazeBuilder/json_helper.h>
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
+#include "Maze.hpp"
 #include "OrthographicCamera.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
@@ -115,6 +117,14 @@ struct Physics::PhysicsImpl {
     std::unordered_map<int, char> distanceMap; // cell index -> base36 distance character
     SDL_Texture* mazeDistanceTexture = nullptr;
     int mazeWidth = 0, mazeHeight = 0;
+    
+    // Background maze generation
+    std::vector<std::string> generatedMazes; // Store 10 pre-generated mazes
+    std::future<std::vector<std::string>> mazeGenerationFuture; // Async maze generation
+    bool mazeGenerationStarted = false;
+    
+    // Current active maze
+    std::unique_ptr<Maze> currentMaze;
 
     // Camera for coordinate transformations
     std::unique_ptr<OrthographicCamera> camera;
@@ -626,6 +636,159 @@ struct Physics::PhysicsImpl {
         SDL_Log("Created distance texture: %dx%d", this->mazeWidth, this->mazeHeight);
     }
 
+    // Start background maze generation
+    void startBackgroundMazeGeneration() {
+        if (mazeGenerationStarted) {
+            return; // Already started
+        }
+        
+        mazeGenerationStarted = true;
+        
+        // Start async maze generation
+        mazeGenerationFuture = std::async(std::launch::async, [this]() -> std::vector<std::string> {
+            std::vector<mazes::configurator> configs;
+            
+            // Create 10 different maze configurations
+            for (int i = 0; i < 10; i++) {
+                mazes::configurator config;
+                config.rows(INIT_MAZE_ROWS)
+                      .columns(INIT_MAZE_COLS)
+                      .distances(true)  // Enable distance calculations
+                      .distances_start(0)
+                      .distances_end(-1)
+                      .seed(static_cast<unsigned int>(SDL_GetTicks() + i * 1000)); // Different seeds
+                
+                configs.push_back(config);
+            }
+            
+            // Use create2 for concurrent generation
+            return {mazes::create2(configs)};
+        });
+        
+        SDL_Log("Background maze generation started");
+    }
+
+    // Check if maze generation is complete and get results
+    bool checkMazeGeneration() {
+        if (!mazeGenerationStarted || !mazeGenerationFuture.valid()) {
+            return false;
+        }
+        
+        // Check if generation is complete
+        if (mazeGenerationFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+            try {
+                auto result = mazeGenerationFuture.get();
+                if (!result.empty()) {
+                    // Split the concatenated string into individual mazes
+                    // For now, just use the entire result as one maze
+                    generatedMazes = {result[0]};
+                    SDL_Log("Background maze generation completed with %zu mazes", generatedMazes.size());
+                    return true;
+                }
+            } catch (const std::exception& e) {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze generation failed: %s", e.what());
+            }
+        }
+        
+        return false; // Still generating
+    }
+
+    // Parse maze string to extract walls and cell colors
+
+    std::vector<Maze::MazeCell> parseMazeString(const std::string& mazeStr, int& rows, int& cols) {
+        std::vector<Maze::MazeCell> cells;
+        
+        if (mazeStr.empty()) {
+            return cells;
+        }
+        
+        // Parse the maze string to find cells and walls
+        std::vector<std::string> lines;
+        std::istringstream iss(mazeStr);
+        std::string line;
+        
+        while (std::getline(iss, line)) {
+            if (!line.empty()) {
+                lines.push_back(line);
+            }
+        }
+        
+        if (lines.empty()) {
+            return cells;
+        }
+        
+        // Calculate dimensions from the maze structure
+        rows = (lines.size() - 1) / 2;  // Every other line is a cell row
+        cols = 0;
+        
+        // Find the first cell line to count columns
+        for (size_t i = 1; i < lines.size(); i += 2) {
+            const std::string& cellLine = lines[i];
+            int colCount = 0;
+            for (size_t j = 1; j < cellLine.length(); j += 2) {
+                if (j < cellLine.length() && cellLine[j] != '|' && cellLine[j] != ' ') {
+                    colCount++;
+                }
+            }
+            cols = std::max(cols, colCount);
+            break;
+        }
+        
+        cells.resize(rows * cols);
+        
+        // Parse cells and their walls
+        int cellRow = 0;
+        for (size_t lineIdx = 1; lineIdx < lines.size() && cellRow < rows; lineIdx += 2) {
+            const std::string& cellLine = lines[lineIdx];
+            const std::string& topWallLine = (lineIdx > 0) ? lines[lineIdx - 1] : "";
+            const std::string& bottomWallLine = (lineIdx + 1 < lines.size()) ? lines[lineIdx + 1] : "";
+            
+            int cellCol = 0;
+            for (size_t charIdx = 1; charIdx < cellLine.length() && cellCol < cols; charIdx += 2) {
+                if (charIdx < cellLine.length()) {
+                    int cellIndex = cellRow * cols + cellCol;
+                    if (cellIndex < cells.size()) {
+                        Maze::MazeCell& cell = cells[cellIndex];
+                        cell.row = cellRow;
+                        cell.col = cellCol;
+                        
+                        // Extract color value
+                        char ch = cellLine[charIdx];
+                        if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
+                            cell.colorValue = ch;
+                        }
+                        
+                        // Check walls
+                        // Left wall
+                        if (charIdx > 0 && cellLine[charIdx - 1] == '|') {
+                            cell.hasLeftWall = true;
+                        }
+                        
+                        // Right wall
+                        if (charIdx + 1 < cellLine.length() && cellLine[charIdx + 1] == '|') {
+                            cell.hasRightWall = true;
+                        }
+                        
+                        // Top wall
+                        if (!topWallLine.empty() && charIdx < topWallLine.length() && topWallLine[charIdx] == '-') {
+                            cell.hasTopWall = true;
+                        }
+                        
+                        // Bottom wall
+                        if (!bottomWallLine.empty() && charIdx < bottomWallLine.length() && bottomWallLine[charIdx] == '-') {
+                            cell.hasBottomWall = true;
+                        }
+                    }
+                    cellCol++;
+                }
+            }
+            cellRow++;
+        }
+        
+        SDL_Log("Parsed maze: %dx%d with %zu cells", rows, cols, cells.size());
+        return cells;
+    }
+
     // Utility method for handling wall collisions
     void handleWallCollision(b2BodyId possibleWallId, b2BodyId possibleBallId) {
         // Check if possibleWallId is actually a wall by looking at userData tag
@@ -1066,6 +1229,9 @@ bool Physics::run() const noexcept {
     // Set a good default value for pixelsPerMeter
     this->m_impl->pixelsPerMeter = 20.0f;
     
+    // Start background maze generation while resources are loading
+    this->m_impl->startBackgroundMazeGeneration();
+    
     // Generate initial level at startup
     int display_w, display_h;
     SDL_GetWindowSize(window, &display_w, &display_h);
@@ -1161,6 +1327,22 @@ bool Physics::run() const noexcept {
         if (gState == State::MAIN_MENU && previousState != State::MAIN_MENU) {
             // Create and display maze with distances when first entering MAIN_MENU
             this->generateMazeWithDistances(ref(persistentMazeStr), display_w, display_h);
+            
+            // Check if background maze generation is complete
+            if (this->m_impl->checkMazeGeneration() && !this->m_impl->generatedMazes.empty()) {
+                // Use the first generated maze
+                int rows, cols;
+                auto mazeCells = this->m_impl->parseMazeString(this->m_impl->generatedMazes[0], rows, cols);
+                
+                if (!mazeCells.empty()) {
+                    // Initialize current maze with parsed data
+                    this->m_impl->currentMaze = std::make_unique<Maze>();
+                    float cellSize = std::min(display_w / (float)cols, display_h / (float)rows) * 0.8f; // 80% of available space
+                    this->m_impl->currentMaze->initialize(renderer, mazeCells, rows, cols, cellSize);
+                    
+                    SDL_Log("Initialized maze rendering with %dx%d maze", rows, cols);
+                }
+            }
         }
         previousState = gState;
         
@@ -1170,8 +1352,19 @@ bool Physics::run() const noexcept {
             this->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
         }
         
-        // Draw the maze using the persistent maze string
-        this->drawMaze(renderer, persistentMazeStr, display_w, display_h);
+        // Draw the current maze if available (in PLAY_SINGLE_MODE or MAIN_MENU)
+        if ((gState == State::PLAY_SINGLE_MODE || gState == State::MAIN_MENU) && this->m_impl->currentMaze) {
+            // Calculate centering offset
+            float offsetX = (display_w - this->m_impl->currentMaze->getCols() * this->m_impl->currentMaze->getCellSize()) / 2.0f;
+            float offsetY = (display_h - this->m_impl->currentMaze->getRows() * this->m_impl->currentMaze->getCellSize()) / 2.0f;
+            
+            this->m_impl->currentMaze->draw(renderer, this->m_impl->camera, 
+                                           this->m_impl->pixelsPerMeter, offsetX, offsetY, 
+                                           this->m_impl->currentMaze->getCellSize(), display_w, display_h);
+        } else {
+            // Fall back to old maze rendering if new system isn't ready
+            this->drawMaze(renderer, persistentMazeStr, display_w, display_h);
+        }
         
         // Draw the physics entities (balls, walls, exit) if we're in a playing state
         if ((gState == State::PLAY_SINGLE_MODE || gState == State::PLAY_MULTI_MODE) && 
@@ -1474,7 +1667,7 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
     SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255); // Light background
     SDL_RenderClear(renderer);
     
-    // Draw maze path cells with different colors for the grid
+    // Draw maze cells - render all characters, not just spaces like the geometry example
     for (size_t i = 0; i < mazeLen; i++) {
         char c = mazeData[i];
         if (c == '\n') {
@@ -1483,68 +1676,53 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
             continue;
         }
         
-        // Calculate base cell position
-        float baseX = offsetX + (currentCol * cellSize);
-        float baseY = offsetY + (currentRow * cellSize);
+        // Calculate position - simplified like geometry example
+        float x = offsetX + (currentCol * cellSize);
+        float y = offsetY + (currentRow * cellSize);
         
-        // Apply camera transformation
-        SDL_FPoint screenPos = camera->worldToScreen(baseX, baseY, display_w, display_h);
-        float x = screenPos.x;
-        float y = screenPos.y;
+        SDL_FRect rect = {x, y, cellSize, cellSize};
         
-        // Scale the cell size according to zoom
-        float scaledCellSize = cellSize * camera->zoom;
-        
-        if (c == ' ') { 
-            // Path cell - light gray
-            if (currentRow % 2 == 1 && currentCol % 2 == 1) {
-                // Make path cells stand out more
-                SDL_SetRenderDrawColor(renderer, 220, 220, 220, 255); // Lighter gray
-                
-                // We need to draw a rotated rectangle when the camera is rotated
-                if (camera->rotation != 0.0f) {
-                    // Calculate the four corners of the rotated rectangle
-                    float halfSize = scaledCellSize * 0.5f;
-                    float cos_r = cosf(camera->rotation);
-                    float sin_r = sinf(camera->rotation);
-                    
-                    SDL_Vertex vertices[6];
-                    // Define the four corner points of the rotated rectangle
-                    SDL_FPoint points[4] = {
-                        {x - halfSize, y - halfSize},  // Top left
-                        {x + halfSize, y - halfSize},  // Top right
-                        {x + halfSize, y + halfSize},  // Bottom right
-                        {x - halfSize, y + halfSize}   // Bottom left
-                    };
-                    
-                    // Create a color for the vertices
-                    SDL_FColor color = {220.0f/255.0f, 220.0f/255.0f, 220.0f/255.0f, 1.0f};
-                    
-                    // Create the vertices for two triangles (forming the rectangle)
-                    for (int i = 0; i < 4; i++) {
-                        vertices[i].position = points[i];
-                        vertices[i].color = color;
-                        vertices[i].tex_coord = {0.0f, 0.0f};  // We're not using textures
+        // Set color and draw based on cell type like the geometry example
+        switch(c) {
+            case ' ': // Open path - light green
+                SDL_SetRenderDrawColor(renderer, 0x90, 0xFF, 0x90, 0xFF);
+                SDL_RenderFillRect(renderer, &rect);
+                break;
+            case '-': // Horizontal wall - red  
+                SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+                SDL_RenderFillRect(renderer, &rect);
+                break;
+            case '|': // Vertical wall - red
+                SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+                SDL_RenderFillRect(renderer, &rect);
+                break;
+            case '+': // Wall junction - dark red
+                SDL_SetRenderDrawColor(renderer, 0x80, 0x00, 0x00, 0xFF);
+                SDL_RenderFillRect(renderer, &rect);
+                break;
+            default:
+                // Check if it's a distance character (0-9, A-Z, a-z)
+                if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+                    // Draw cell based on distance value - use blue tones
+                    int distanceValue = 0;
+                    if (c >= '0' && c <= '9') {
+                        distanceValue = c - '0';
+                    } else if (c >= 'A' && c <= 'Z') {
+                        distanceValue = c - 'A' + 10;
+                    } else if (c >= 'a' && c <= 'z') {
+                        distanceValue = c - 'a' + 10;
                     }
                     
-                    // Create two triangles from the vertices (0,1,3) and (1,2,3)
-                    vertices[4] = vertices[3];  // Duplicate vertex 3
-                    vertices[5] = vertices[1];  // Duplicate vertex 1
-                    
-                    // Render the triangles
-                    SDL_RenderGeometry(renderer, nullptr, vertices, 6, nullptr, 0);
-                }
-                else {
-                    // No rotation, just draw a regular rectangle
-                    SDL_FRect rect = {x - scaledCellSize * 0.5f, y - scaledCellSize * 0.5f, 
-                                    scaledCellSize, scaledCellSize};
+                    // Create varying blue intensity like geometry example
+                    uint8_t intensity = static_cast<uint8_t>(50 + (distanceValue * 8) % 200);
+                    SDL_SetRenderDrawColor(renderer, 0x00, 0x00, intensity, 0xFF);
                     SDL_RenderFillRect(renderer, &rect);
-                    
-                    // Add a subtle grid pattern to help with depth perception
-                    SDL_SetRenderDrawColor(renderer, 210, 210, 210, 255);
-                    SDL_RenderRect(renderer, &rect);
+                } else {
+                    // Unknown character - use yellow like geometry example
+                    SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0x00, 0xFF);
+                    SDL_RenderFillRect(renderer, &rect);
                 }
-            }
+                break;
         }
         
         currentCol++;
@@ -1553,16 +1731,24 @@ void Physics::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, in
 
 // Generate a new level
 void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const {
-    // auto m_ptr = mazes::factory::create_with_rows_columns(INIT_MAZE_ROWS, INIT_MAZE_COLS);
-    // if (!m_ptr.has_value()) {
+    // Generate a simple maze using the MazeBuilder create API
+    mazes::configurator config;
+    config.rows(INIT_MAZE_ROWS)
+          .columns(INIT_MAZE_COLS)
+          .distances(false)  // Don't need distances for physics maze
+          .seed(static_cast<unsigned int>(SDL_GetTicks())); // Use current time as seed
     
-    //     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze\n");
-    //     return;
-    // }
-
-    auto s = "";// mazes::stringz::stringify(cref(m_ptr.value()));
-
-    persistentMazeStr = s;
+    std::string generatedMaze = mazes::create(config);
+    
+    if (generatedMaze.empty()) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze\n");
+        // Create a simple fallback maze
+        persistentMazeStr = "+---+---+\n|   |   |\n+   +   +\n|       |\n+---+---+\n";
+        SDL_Log("Using fallback maze: %s", persistentMazeStr.c_str());
+    } else {
+        persistentMazeStr = generatedMaze;
+        SDL_Log("Generated maze (%zu chars): %s", generatedMaze.length(), generatedMaze.substr(0, 100).c_str());
+    }
     
     // Calculate cell size
     int maxCols = 11; // Hardcoded maze width
