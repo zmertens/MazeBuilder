@@ -6,13 +6,16 @@ set(EXE_NAME "mazebuilderphysics")
 set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AudioHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Ball.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Level.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Maze.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/UdpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Wall.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WorkerConcurrent.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/World.cpp)
@@ -45,7 +48,7 @@ else()
     message(INFO ": Building ${EXE_NAME} for the Desktop!")
 
     add_executable(${EXE_NAME} ${EXE_SOURCES} ${DEAR_IMGUI_SOURCES})
-    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d SFML::Audio)
+    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d SFML::Audio SFML::Network)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
     target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
@@ -63,6 +66,11 @@ else()
 		add_custom_command(
 			TARGET ${EXE_NAME} POST_BUILD
 			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Audio> $<TARGET_FILE_DIR:${EXE_NAME}>
+			VERBATIM
+		)
+        add_custom_command(
+			TARGET ${EXE_NAME} POST_BUILD
+			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Network> $<TARGET_FILE_DIR:${EXE_NAME}>
 			VERBATIM
 		)
 	endif()

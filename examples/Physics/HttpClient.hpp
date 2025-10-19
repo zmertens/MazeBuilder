@@ -1,14 +1,14 @@
-#ifndef HTTP_CLIENT_H
-#define HTTP_CLIENT_H
+#ifndef HTTP_CLIENT_HPP
+#define HTTP_CLIENT_HPP
 
 #include <string>
 
 /// @brief HTTP client for communicating with Corners maze building server
-class http_client {
+class HttpClient {
 public:
     /// @brief Constructor
     /// @param server_url Base URL of the Corners server
-    explicit http_client(const std::string& server_url);
+    explicit HttpClient(const std::string& server_url);
     
     /// @brief Create a new maze via HTTP POST request
     /// @param rows Number of rows
@@ -35,4 +35,4 @@ private:
     unsigned short m_port;
 };
 
-#endif // HTTP_CLIENT_H
+#endif // HTTP_CLIENT_HPP

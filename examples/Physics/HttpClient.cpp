@@ -1,4 +1,4 @@
-#include "http_client.h"
+#include "HttpClient.hpp"
 
 #include <iostream>
 #include <regex>
@@ -7,14 +7,14 @@
 
 #include <SFML/Network.hpp>
 
-http_client::http_client(const std::string& server_url)
+HttpClient::HttpClient(const std::string& server_url)
     : m_server_url(server_url)
     , m_port(80)
 {
     parse_server_url();
 }
 
-void http_client::parse_server_url() {
+void HttpClient::parse_server_url() {
 
     using std::regex;
     using std::smatch;
@@ -89,7 +89,7 @@ void http_client::parse_server_url() {
 #endif
 }
 
-std::string http_client::create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
+std::string HttpClient::create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
 
     auto format_response = [](const sf::Http::Response& response) -> std::string {
 
@@ -160,7 +160,7 @@ std::string http_client::create_maze(int rows, int columns, int seed, const std:
     }
 }
 
-std::string http_client::create_json_payload(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
+std::string HttpClient::create_json_payload(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
     std::ostringstream oss;
     oss << "{"
         << "\"rows\":" << rows << ","

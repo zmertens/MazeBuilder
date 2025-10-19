@@ -14,7 +14,7 @@
 
 #include "Physics.hpp"
 
-#include "cout_thread_safe.hpp"
+#include "CoutThreadSafe.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -55,7 +55,7 @@
 
 static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 static const std::string RESOURCE_PATH_PREFIX = "resources";
-static const std::string PHYSICS_JSON_PATH = RESOURCE_PATH_PREFIX + "/physics.json";
+static const std::string PHYSICS_JSON_PATH = RESOURCE_PATH_PREFIX + "/" + "physics.json";
 
 struct Physics::PhysicsImpl {
     
@@ -972,7 +972,7 @@ bool Physics::run() const noexcept {
     // Load physics.json configuration
     mazes::json_helper jh{};
     if (!jh.load(PHYSICS_JSON_PATH, this->m_impl->resourceMap)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load physics.json from: %s\n", PHYSICS_JSON_PATH);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load physics.json from: %s\n", PHYSICS_JSON_PATH.c_str());
         return false;
     }
     
