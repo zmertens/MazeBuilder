@@ -2,19 +2,18 @@
 #define STATE_HPP
 
 enum class State {
+    ABOUT_MENU,
+    MAIN_MENU,
+    NET_CONNECT,
+    PICK_ALIAS_MENU,
+    PLAY_SINGLE_MODE,
+    PLAY_MULTI_MODE,
+    PLAY_PAUSED,
+    SCORES_MENU,
     // Physics is starting, show welcome screen
     SPLASH,
-    // Main menu / configurations 
-    OPTIONS,
-    // Physics is running
-    PLAY,
-    // Level is generated but Physics is paused/options
-    PAUSE,
-    // Physics is exiting and done
+    // Application is exiting
     DONE,
-    // Useful when knowing when to re-draw in Physics loop
-    // Level is being generated and not yet playable
-    UPLOADING_LEVEL,
 };
 
 #endif // STATE_HPP

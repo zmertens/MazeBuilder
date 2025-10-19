@@ -110,6 +110,11 @@ struct Physics::PhysicsImpl {
     // Splash screen texture
     SDL_Texture* splashTexture = nullptr;
     int splashWidth = 0, splashHeight = 0;
+    
+    // Maze distance data
+    std::unordered_map<int, char> distanceMap; // cell index -> base36 distance character
+    SDL_Texture* mazeDistanceTexture = nullptr;
+    int mazeWidth = 0, mazeHeight = 0;
 
     // Camera for coordinate transformations
     std::unique_ptr<OrthographicCamera> camera;
@@ -126,6 +131,12 @@ struct Physics::PhysicsImpl {
         if (splashTexture) {
             SDL_DestroyTexture(splashTexture);
             splashTexture = nullptr;
+        }
+        
+        // Clean up maze distance texture
+        if (mazeDistanceTexture) {
+            SDL_DestroyTexture(mazeDistanceTexture);
+            mazeDistanceTexture = nullptr;
         }
         
         // Doing this here prevents issues when the app is launched and closed quickly
@@ -479,6 +490,140 @@ struct Physics::PhysicsImpl {
         
         SDL_Log("Maze physics created with %zu walls and %zu balls", walls.size(), balls.size());
         SDL_Log("Exit placed at row %d, col %d", exitRow, exitCol);
+    }
+
+    // Generate a maze with distance calculations using the MazeBuilder create API
+    void generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) {
+        // Create configurator with distance calculation enabled
+        mazes::configurator config;
+        config.rows(INIT_MAZE_ROWS)
+              .columns(INIT_MAZE_COLS)
+              .distances(true)  // Enable distance calculations
+              .distances_start(0)  // Start from the first cell
+              .distances_end(-1)   // Calculate to all cells
+              .seed(static_cast<unsigned int>(SDL_GetTicks())); // Use current time as seed
+        
+        // Generate maze string with distances using the create API
+        std::string mazeStr = mazes::create(config);
+        
+        if (mazeStr.empty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze with distances");
+            return;
+        }
+        
+        // Store the maze string
+        persistentMazeStr = mazeStr;
+        
+        // Parse distance data from the maze string
+        this->parseMazeDistances(mazeStr);
+        
+        // Create texture from distance data
+        this->createDistanceTexture(display_w, display_h);
+        
+        SDL_Log("Generated maze with distances: %zu distance entries", this->distanceMap.size());
+    }
+
+    // Parse the maze string and extract base36 distance values
+    void parseMazeDistances(const std::string& mazeStr) {
+        this->distanceMap.clear();
+        
+        int cellIndex = 0;
+        for (size_t i = 0; i < mazeStr.length(); ++i) {
+            char c = mazeStr[i];
+            
+            // Skip newlines and maze structure characters
+            if (c == '\n' || c == '+' || c == '-' || c == '|' || c == ' ') {
+                continue;
+            }
+            
+            // Check if character is a valid base36 distance value (0-9, A-Z)
+            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
+                this->distanceMap[cellIndex] = c;
+                cellIndex++;
+            }
+        }
+    }
+
+    // Create SDL texture from distance map data
+    void createDistanceTexture(int display_w, int display_h) {
+        if (this->distanceMap.empty()) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "No distance data to create texture from");
+            return;
+        }
+        
+        // Clean up existing texture
+        if (this->mazeDistanceTexture) {
+            SDL_DestroyTexture(this->mazeDistanceTexture);
+            this->mazeDistanceTexture = nullptr;
+        }
+        
+        // Calculate texture dimensions based on maze grid
+        int maxCellIndex = 0;
+        for (const auto& [index, distance] : this->distanceMap) {
+            maxCellIndex = std::max(maxCellIndex, index);
+        }
+        
+        // Assume square maze for now, improve this later
+        int mazeDimension = static_cast<int>(std::sqrt(maxCellIndex + 1));
+        this->mazeWidth = mazeDimension * 50;  // 50 pixels per cell
+        this->mazeHeight = mazeDimension * 50;
+        
+        // Create texture
+        this->mazeDistanceTexture = SDL_CreateTexture(
+            sdlHelper.renderer,
+            SDL_PIXELFORMAT_RGBA8888,
+            SDL_TEXTUREACCESS_TARGET,
+            this->mazeWidth,
+            this->mazeHeight
+        );
+        
+        if (!this->mazeDistanceTexture) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create distance texture: %s", SDL_GetError());
+            return;
+        }
+        
+        // Set texture as render target and draw distance visualization
+        SDL_SetRenderTarget(sdlHelper.renderer, this->mazeDistanceTexture);
+        SDL_SetRenderDrawColor(sdlHelper.renderer, 255, 255, 255, 255); // White background
+        SDL_RenderClear(sdlHelper.renderer);
+        
+        // Draw each cell with color based on distance
+        int cellSize = 50;
+        for (const auto& [index, distanceChar] : this->distanceMap) {
+            int row = index / mazeDimension;
+            int col = index % mazeDimension;
+            
+            // Convert base36 character to numeric value for color blending
+            int distanceValue = 0;
+            if (distanceChar >= '0' && distanceChar <= '9') {
+                distanceValue = distanceChar - '0';
+            } else if (distanceChar >= 'A' && distanceChar <= 'Z') {
+                distanceValue = distanceChar - 'A' + 10;
+            } else if (distanceChar >= 'a' && distanceChar <= 'z') {
+                distanceValue = distanceChar - 'a' + 10;
+            }
+            
+            // Create color based on distance (closer = red, farther = blue)
+            Uint8 red = static_cast<Uint8>(255 - (distanceValue * 7) % 256);
+            Uint8 green = static_cast<Uint8>((distanceValue * 5) % 256);
+            Uint8 blue = static_cast<Uint8>((distanceValue * 9) % 256);
+            
+            SDL_SetRenderDrawColor(sdlHelper.renderer, red, green, blue, 255);
+            
+            SDL_FRect cellRect = {
+                static_cast<float>(col * cellSize),
+                static_cast<float>(row * cellSize),
+                static_cast<float>(cellSize - 1),  // Leave 1 pixel border
+                static_cast<float>(cellSize - 1)
+            };
+            
+            SDL_RenderFillRect(sdlHelper.renderer, &cellRect);
+        }
+        
+        // Reset render target
+        SDL_SetRenderTarget(sdlHelper.renderer, nullptr);
+        
+        SDL_Log("Created distance texture: %dx%d", this->mazeWidth, this->mazeHeight);
     }
 
     // Utility method for handling wall collisions
@@ -915,7 +1060,8 @@ bool Physics::run() const noexcept {
     static std::string persistentMazeStr;
     
     auto&& gState = this->m_impl->state;
-    gState = State::PLAY;
+    // Start with SPLASH state instead of directly going to PLAY
+    gState = State::SPLASH;
     
     // Set a good default value for pixelsPerMeter
     this->m_impl->pixelsPerMeter = 20.0f;
@@ -950,8 +1096,8 @@ bool Physics::run() const noexcept {
             currentTimeStep += FIXED_TIME_STEP;
         }
 
-        // Update physics simulation if we're in PLAY state
-        if (gState == State::PLAY && this->m_impl->physicsWorld) {
+        // Update physics simulation if we're in a playing state
+        if ((gState == State::PLAY_SINGLE_MODE || gState == State::PLAY_MULTI_MODE) && this->m_impl->physicsWorld) {
              
             // Step Box2D world with sub-steps instead of velocity/position iterations
             // Using 4 sub-steps as recommended in the migration guide
@@ -991,19 +1137,44 @@ bool Physics::run() const noexcept {
             // This can be enhanced later with proper text rendering
         }
         
-        // Generate new level if needed
-        if (gState == State::UPLOADING_LEVEL) {
-            audioHelper.playSound("generate");
-            this->m_impl->workerConcurrent.generate("things and stuff");
+        // Render maze distance visualization in MAIN_MENU state
+        if (gState == State::MAIN_MENU && this->m_impl->mazeDistanceTexture) {
+            // Center the maze distance texture on screen
+            int centerX = (display_w - this->m_impl->mazeWidth) / 2;
+            int centerY = (display_h - this->m_impl->mazeHeight) / 2;
+            
+            SDL_FRect mazeRect = {
+                static_cast<float>(centerX),
+                static_cast<float>(centerY),
+                static_cast<float>(this->m_impl->mazeWidth),
+                static_cast<float>(this->m_impl->mazeHeight)
+            };
+            
+            SDL_RenderTexture(renderer, this->m_impl->mazeDistanceTexture, nullptr, &mazeRect);
+            
+            // Add instruction text (could be enhanced with proper text rendering)
+            // For now, we'll just show the distance visualization
+        }
+        
+        // Generate new level in MAIN_MENU state (only once when entering the state)
+        static State previousState = State::SPLASH;
+        if (gState == State::MAIN_MENU && previousState != State::MAIN_MENU) {
+            // Create and display maze with distances when first entering MAIN_MENU
+            this->generateMazeWithDistances(ref(persistentMazeStr), display_w, display_h);
+        }
+        previousState = gState;
+        
+        // Start playing when transitioning from MAIN_MENU to PLAY_SINGLE_MODE
+        if (gState == State::PLAY_SINGLE_MODE && persistentMazeStr.empty()) {
+            // Generate initial level if we don't have one
             this->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
-            gState = State::PLAY;
         }
         
         // Draw the maze using the persistent maze string
         this->drawMaze(renderer, persistentMazeStr, display_w, display_h);
         
-        // Draw the physics entities (balls, walls, exit) if we're in PLAY state
-        if (gState == State::PLAY && 
+        // Draw the physics entities (balls, walls, exit) if we're in a playing state
+        if ((gState == State::PLAY_SINGLE_MODE || gState == State::PLAY_MULTI_MODE) && 
             this->m_impl->physicsWorld) {
             this->drawPhysicsObjects(renderer);
         }
@@ -1404,5 +1575,10 @@ void Physics::generateNewLevel(std::string& persistentMazeStr, int display_w, in
     this->m_impl->createMazePhysics(persistentMazeStr, cellSize);
     
     SDL_Log("New level generated successfully");
+}
+
+// Generate a maze with distance calculations
+void Physics::generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) const {
+    this->m_impl->generateMazeWithDistances(persistentMazeStr, display_w, display_h);
 }
 

@@ -46,9 +46,9 @@ void SDLHelper::poll_events(State& state, std::unique_ptr<OrthographicCamera> co
     
     while (SDL_PollEvent(&e)) {
         if (e.type == SDL_EVENT_KEY_DOWN) {
-            // Handle splash screen transition - any key press transitions from SPLASH to OPTIONS
+            // Handle splash screen transition - any key press transitions from SPLASH to MAIN_MENU
             if (state == State::SPLASH) {
-                state = State::UPLOADING_LEVEL; // Go to level generation then play
+                state = State::MAIN_MENU; // Go to main menu for maze creation
                 break;
             }
             
@@ -56,7 +56,10 @@ void SDLHelper::poll_events(State& state, std::unique_ptr<OrthographicCamera> co
                 state = State::DONE;
                 break;
             } else if (e.key.scancode == SDL_SCANCODE_B) {
-                state = State::UPLOADING_LEVEL;
+                // Generate maze when in MAIN_MENU state
+                if (state == State::MAIN_MENU) {
+                    state = State::PLAY_SINGLE_MODE;
+                }
             } 
             // Arrow key controls for camera movement
             else if (e.key.scancode == SDL_SCANCODE_LEFT) {
