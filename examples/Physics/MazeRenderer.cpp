@@ -11,7 +11,7 @@
 
 #include "Maze.hpp"
 
-class MazeRenderer::MazeRendererImpl {
+struct MazeRenderer::MazeRendererImpl {
 public:
     // Maze distance data
     std::unordered_map<int, char> distanceMap; // cell index -> base36 distance character

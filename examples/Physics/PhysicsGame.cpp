@@ -105,9 +105,6 @@ struct PhysicsGame::PhysicsGameImpl {
     State state;
     WorkerConcurrent workerConcurrent;
     
-    // Configuration loaded from physics.json
-    std::unordered_map<std::string, std::string> resourceMap;
-    
     // Splash screen texture
     SDL_Texture* splashTexture = nullptr;
     int splashWidth = 0, splashHeight = 0;
@@ -1146,27 +1143,10 @@ bool PhysicsGame::run() const noexcept {
     }
 
     // Load audio resources using configuration
-    // Extract the actual filename from JSON string format (remove quotes and array brackets)
-    auto extractValue = [](const std::string& jsonStr) -> std::string {
-        // Handle array format like ["filename"]
-        if (jsonStr.front() == '[' && jsonStr.back() == ']') {
-            // Extract first element from array
-            size_t start = jsonStr.find('"');
-            size_t end = jsonStr.find('"', start + 1);
-            if (start != std::string::npos && end != std::string::npos) {
-                return jsonStr.substr(start + 1, end - start - 1);
-            }
-        }
-        // Handle simple string format with quotes
-        if (jsonStr.size() >= 2 && jsonStr.front() == '"' && jsonStr.back() == '"') {
-            return jsonStr.substr(1, jsonStr.size() - 2);
-        }
-        return jsonStr;
-    };
-    
-    const auto generateOggFile = extractValue(this->m_impl->resourceMap["music_ogg"]);
+    const auto musicOggConfig = this->m_impl->resourceManager->getConfigValue("music_ogg");
+    const auto generateOggFile = this->m_impl->resourceManager->extractJsonValue(musicOggConfig);
     sf::SoundBuffer generateSoundBuffer;
-    const auto generatePath = std::string(RESOURCE_PATH_PREFIX) + "/" + generateOggFile;
+    const auto generatePath = this->m_impl->resourceManager->getResourcePath(generateOggFile);
     if (!generateSoundBuffer.loadFromFile(generatePath)) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generatePath.c_str());
         return false;
@@ -1178,8 +1158,9 @@ bool PhysicsGame::run() const noexcept {
     AudioHelper audioHelper{cref(generateSound)};
 
     // Load and set window icon from configuration
-    const auto iconImageFile = extractValue(this->m_impl->resourceMap["icon_image"]);
-    const auto iconPath = std::string(RESOURCE_PATH_PREFIX) + "/" + iconImageFile;
+    const auto iconImageConfig = this->m_impl->resourceManager->getConfigValue("icon_image");
+    const auto iconImageFile = this->m_impl->resourceManager->extractJsonValue(iconImageConfig);
+    const auto iconPath = this->m_impl->resourceManager->getResourcePath(iconImageFile);
     SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
     if (icon) {
         SDL_SetWindowIcon(sdlHelper.window, icon);
@@ -1190,8 +1171,9 @@ bool PhysicsGame::run() const noexcept {
     }
 
     // Load WAV file from configuration
-    const auto loadingWavFile = extractValue(this->m_impl->resourceMap["music_wav"]);
-    const auto loadingPath = std::string(RESOURCE_PATH_PREFIX) + "/" + loadingWavFile;
+    const auto musicWavConfig = this->m_impl->resourceManager->getConfigValue("music_wav");
+    const auto loadingWavFile = this->m_impl->resourceManager->extractJsonValue(musicWavConfig);
+    const auto loadingPath = this->m_impl->resourceManager->getResourcePath(loadingWavFile);
     if (!sdlHelper.loadWAV(loadingPath.c_str())) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file: %s\n", loadingPath.c_str());
     } else {
@@ -1201,11 +1183,16 @@ bool PhysicsGame::run() const noexcept {
     sdlHelper.playAudioStream();
     
     // Load splash image from configuration
-    const auto splashImageFile = extractValue(this->m_impl->resourceMap["splash_image"]);
-    const auto splashImagePath = std::string(RESOURCE_PATH_PREFIX) + "/" + splashImageFile;
-    this->m_impl->splashTexture = this->m_impl->loadImageTexture(sdlHelper.renderer, splashImagePath, 
-                                                                 this->m_impl->splashWidth, this->m_impl->splashHeight);
+    const auto splashImageConfig = this->m_impl->resourceManager->getConfigValue("splash_image");
+    const auto splashImageFile = this->m_impl->resourceManager->extractJsonValue(splashImageConfig);
+    const auto splashImagePath = this->m_impl->resourceManager->getResourcePath(splashImageFile);
+    this->m_impl->splashTexture = this->m_impl->resourceManager->loadTexture(sdlHelper.renderer, splashImagePath);
     if (this->m_impl->splashTexture) {
+        // Get texture dimensions
+        float width, height;
+        SDL_GetTextureSize(this->m_impl->splashTexture, &width, &height);
+        this->m_impl->splashWidth = static_cast<int>(width);
+        this->m_impl->splashHeight = static_cast<int>(height);
         SDL_Log("Successfully loaded splash image: %s (%dx%d)\n", splashImagePath.c_str(), 
                 this->m_impl->splashWidth, this->m_impl->splashHeight);
     } else {

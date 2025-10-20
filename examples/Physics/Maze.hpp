@@ -8,8 +8,8 @@
 #include <memory>
 #include <SDL3/SDL.h>
 
-class OrthographicCamera;
-class SDL_Renderer;
+struct OrthographicCamera;
+struct SDL_Renderer;
 
 /// @file Maze.hpp
 /// @class Maze  

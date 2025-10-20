@@ -39,11 +39,12 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
 
 int main(int argc, char* argv[]) {
 
-	using std::exception;
-    using std::cout;
     using std::cerr;
-    using std::runtime_error;
     using std::cref;
+    using std::cout;
+    using std::endl;
+    using std::exception;
+    using std::runtime_error;
 
     try {
 
@@ -62,7 +63,7 @@ int main(int argc, char* argv[]) {
 
     } catch (exception ex) {
 
-        cerr << ex.what() << std::endl;
+        cerr << ex.what() << endl;
     }
 
 	return 0;
