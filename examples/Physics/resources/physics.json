@@ -1,10 +1,15 @@
 {
     "title": "maze builder :: physics",
-    "version": "0.1",
-    "description": "A simple maze builder with an in-house physics engine",
+    "version": "0.9.1",
+    "description": "The maze builder game with bouncing balls",
     "author": "zmertens",
     "license": "MIT",
-    "generate": "generate.ogg",
-    "loading_sound_path": "loading.wav",
-    "icon_image_path": "icon.bmp"
+    "resources_dir": "resources",
+    "music_ogg": ["generate.ogg"],
+    "music_wav": ["loading.wav"],
+    "splash_image": "sdl blocks.png",
+    "icon_image": "icon.bmp",
+    "fonts_ttf": "DMSans.ttf",
+    "maze_params": ["-r 100 -c 100 -s 10 -a sidewinder -o stdout -d", "-r 50 -c 50 -s 20 -a dfs -d -o stdout"],
+    "physics_config": "physics.json"
 }

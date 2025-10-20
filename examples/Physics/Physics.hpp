@@ -1,35 +1,50 @@
 #ifndef PHYSICS_HPP
 #define PHYSICS_HPP
 
-#include <string>
 #include <memory>
+#include <string_view>
+#include <string>
 #include <vector>
-#include <unordered_map>
-#include <functional>
-
-#include <MazeBuilder/singleton_base.h>
 
 struct SDL_Renderer;
+class Ball;
+class Wall;
 
-class Physics : public mazes::singleton_base<Physics> {
-    friend class mazes::singleton_base<Physics>;
+class Physics {
 public:
-    Physics(const std::string& title, const std::string& version, int w, int h);
+    Physics();
     ~Physics();
 
-    bool run() const noexcept;
-
-private:
-    // Physics and collision processing
+    // Initialize physics world
+    void initPhysics();
+    
+    // Physics world management
+    void createMazePhysics(const std::string_view& mazeString, float cellSize, int windowWidth, int windowHeight);
+    void clearPhysicsWorld();
+    
+    // Physics simulation
+    void stepPhysics(float timeStep);
     void processPhysicsCollisions() const;
     void updatePhysicsObjects() const;
-       
-    // Rendering methods
-    void drawPhysicsObjects(SDL_Renderer* renderer) const;
-    void drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const;
-    void generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const;
-    void generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) const;
+    
+    // Ball management
+    void createBall(float x, float y);
+    std::vector<Ball> getBalls() const;
+    void updateBallDrag(float mouseX, float mouseY, bool isMouseDown);
+    
+    // Wall management
+    std::vector<Wall> getWalls() const;
+    
+    // Coordinate conversion
+    struct PhysicsPosition { float x; float y; };
+    PhysicsPosition screenToPhysics(float screenX, float screenY, int displayWidth, int displayHeight) const;
+    struct ScreenPosition { float x; float y; };
+    ScreenPosition physicsToScreen(float physX, float physY) const;
+    
+    // Rendering support
+    void drawPhysicsObjects(SDL_Renderer* renderer, float cellSize, float offsetX, float offsetY, int displayWidth, int displayHeight) const;
 
+private:
     struct PhysicsImpl;
     std::unique_ptr<PhysicsImpl> m_impl;
 };

@@ -4,50 +4,65 @@
 #include <exception>
 #include <string>
 
-#include "Physics.hpp"
+#include "PhysicsGame.hpp"
 
 #include <MazeBuilder/maze_builder.h>
+
+static std::string TITLE_STR = "Breaking Walls";
+
+#if defined(MAZE_DEBUG)
+
+TITLE_STR += " - DEBUG";
+#endif
+
+static const std::string VERSION_STR = "v0.1.9";
+
+static constexpr auto WINDOW_W = 1280;
+static constexpr auto WINDOW_H = 720;
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
-// This is necessary due to emscripten's handling of templates
-std::shared_ptr<Physics> get() {
-    std::string title = "physics - gamedev.js jam 2025";
-    std::string version = "0.1.0";
-    return mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
+std::shared_ptr<PhysicsGame> get() {
+
+    return mazes::singleton_base<PhysicsGame>::instance(cref(TITLE_STR), cref(VERSION_STR), WINDOW_W, WINDOW_H);
 }
 
 // bind a getter method from C++ so that it can be accessed in the frontend with JS
 EMSCRIPTEN_BINDINGS(maze_builder_module) {
     emscripten::function("get", &get, emscripten::allow_raw_pointers());
-    emscripten::class_<Physics>("Physics")
-        .smart_ptr<std::shared_ptr<Physics>>("std::shared_ptr<Physics>")
+    emscripten::class_<PhysicsGame>("PhysicsGame")
+        .smart_ptr<std::shared_ptr<PhysicsGame>>("std::shared_ptr<PhysicsGame>")
         .constructor<const std::string&, const std::string&, int, int>();
 }
 #endif
 
 int main(int argc, char* argv[]) {
-	using namespace std;
 
-    static constexpr auto MESSAGE = R"msg(
-        --- WELCOME TO THE MAZE BUILDER - Physics Example  ---
-        |   1. Press 'B' on keyboard to generate a new level |
-        ------------------------------------------------------
-    )msg";
-
-    cout << MESSAGE << endl;
+	using std::exception;
+    using std::cout;
+    using std::cerr;
+    using std::runtime_error;
+    using std::cref;
 
     try {
-        string title = "Breaking Walls";
-        string version = "0.1.0";
-        auto myGameInstance = mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
-        bool res = myGameInstance->run();
-        if (!res) {
-            cerr << "Generator failed to run" << endl;
+
+        using mazes::singleton_base;
+
+        if (auto inst = singleton_base<PhysicsGame>::instance(cref(TITLE_STR), cref(VERSION_STR), WINDOW_W, WINDOW_H); inst->run()) {
+
+#if defined(MAZE_DEBUG)
+
+            cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
+#endif
+        } else {
+
+            throw runtime_error("Error: PhysicsGame encountered an error during execution");
         }
+
     } catch (exception ex) {
-        cerr << ex.what() << endl;
+
+        cerr << ex.what() << std::endl;
     }
 
 	return 0;
