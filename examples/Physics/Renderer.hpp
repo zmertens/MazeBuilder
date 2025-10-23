@@ -1,21 +1,21 @@
-#ifndef MAZE_RENDERER_HPP
-#define MAZE_RENDERER_HPP
+#ifndef RENDERER_HPP
+#define RENDERER_HPP
 
+#include <future>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <vector>
-#include <future>
 #include <unordered_map>
+#include <vector>
 
 struct SDL_Renderer;
 struct SDL_Texture;
 class Maze;
 
-class MazeRenderer {
+class Renderer {
 public:
-    MazeRenderer();
-    ~MazeRenderer();
+    Renderer();
+    ~Renderer();
     
     // Maze generation
     std::string generateNewLevel(int rows, int cols, int displayWidth, int displayHeight);
@@ -39,8 +39,8 @@ public:
     std::vector<Maze> parseMazeForRendering(const std::string& mazeStr, SDL_Renderer* renderer);
     
 private:
-    struct MazeRendererImpl;
-    std::unique_ptr<MazeRendererImpl> m_impl;
+    struct RendererImpl;
+    std::unique_ptr<RendererImpl> m_impl;
 };
 
-#endif // MAZE_RENDERER_HPP
+#endif // RENDERER_HPP

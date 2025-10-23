@@ -2,11 +2,15 @@
 #define MAZE_HPP
 
 #include "Drawable.hpp"
-#include "Wall.hpp"
 #include "Texture.hpp"
-#include <vector>
+#include "Wall.hpp"
+
+#include <cstdint>
+#include <future>
 #include <memory>
-#include <SDL3/SDL.h>
+#include <string>
+#include <vector>
+
 
 struct OrthographicCamera;
 struct SDL_Renderer;
@@ -17,7 +21,7 @@ struct SDL_Renderer;
 class Maze : public Drawable {
 public:
     // Structure to represent a maze cell
-    struct MazeCell {
+    struct Cell {
         char colorValue = '0';  // Base36 color value for rendering
         bool hasTopWall = false;
         bool hasBottomWall = false;
@@ -34,7 +38,7 @@ public:
     ~Maze();
     
     // Initialize maze from parsed data
-    bool initialize(SDL_Renderer* renderer, const std::vector<MazeCell>& cells, int rows, int cols, float cellSize);
+    bool initialize(SDL_Renderer* renderer, const std::vector<Cell>& cells, int rows, int cols, float cellSize);
     
     // Overrides
     void draw(SDL_Renderer* renderer, 
@@ -48,19 +52,27 @@ public:
     const std::vector<Wall>& getWalls() const { return walls; }
     const Texture& getTexture() const { return mazeTexture; }
 
+    std::vector<Cell> parse(const std::string& mazeStr, int& rows, int& cols) const noexcept;
+    void startBackgroundMazeGeneration() noexcept;
+    bool isReady() const noexcept;
+
 private:
     // Maze data
-    std::vector<MazeCell> cells;
+    std::vector<Cell> cells;
     std::vector<Wall> walls;
     Texture mazeTexture;
     int rows = 0;
     int cols = 0;
     float cellSize = 0.0f;
+
+    std::future<std::vector<std::string>> mazeGenerationFuture;
+
+    bool mazeGenerationStarted;
     
     // Helper methods
     void generateWallsFromCells();
     void generateTexture(SDL_Renderer* renderer);
-    Uint8 base36ToColorComponent(char base36Char, int component) const;
+    std::uint8_t base36ToColorComponent(char base36Char, int component) const;
 };
 
 #endif // MAZE_HPP

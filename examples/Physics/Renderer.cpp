@@ -1,4 +1,4 @@
-#include "MazeRenderer.hpp"
+#include "Renderer.hpp"
 
 #include <SDL3/SDL.h>
 #include <cmath>
@@ -11,7 +11,7 @@
 
 #include "Maze.hpp"
 
-struct MazeRenderer::MazeRendererImpl {
+struct Renderer::RendererImpl {
 public:
     // Maze distance data
     std::unordered_map<int, char> distanceMap; // cell index -> base36 distance character
@@ -28,9 +28,9 @@ public:
     float offsetX = 0.0f;
     float offsetY = 0.0f;
     
-    MazeRendererImpl() = default;
+    RendererImpl() = default;
     
-    ~MazeRendererImpl() {
+    ~RendererImpl() {
         if (mazeDistanceTexture) {
             SDL_DestroyTexture(mazeDistanceTexture);
         }
@@ -231,17 +231,17 @@ public:
     }
 };
 
-// MazeRenderer implementation
-MazeRenderer::MazeRenderer() : m_impl(std::make_unique<MazeRendererImpl>()) {
+// Renderer implementation
+Renderer::Renderer() : m_impl(std::make_unique<RendererImpl>()) {
 }
 
-MazeRenderer::~MazeRenderer() = default;
+Renderer::~Renderer() = default;
 
-std::string MazeRenderer::generateNewLevel(int rows, int cols, int displayWidth, int displayHeight) {
+std::string Renderer::generateNewLevel(int rows, int cols, int displayWidth, int displayHeight) {
     return m_impl->generateSimpleMaze(rows, cols);
 }
 
-std::string MazeRenderer::generateMazeWithDistances(int rows, int cols, int displayWidth, int displayHeight) {
+std::string Renderer::generateMazeWithDistances(int rows, int cols, int displayWidth, int displayHeight) {
     std::string mazeStr = m_impl->generateMazeWithDistances(rows, cols);
     
     if (!mazeStr.empty()) {
@@ -252,23 +252,23 @@ std::string MazeRenderer::generateMazeWithDistances(int rows, int cols, int disp
     return mazeStr;
 }
 
-void MazeRenderer::startBackgroundMazeGeneration(int rows, int cols, int numMazes) {
+void Renderer::startBackgroundMazeGeneration(int rows, int cols, int numMazes) {
     m_impl->startBackgroundMazeGeneration(rows, cols, numMazes);
 }
 
-bool MazeRenderer::checkMazeGeneration() {
+bool Renderer::checkMazeGeneration() {
     return m_impl->checkMazeGeneration();
 }
 
-std::vector<std::string> MazeRenderer::getGeneratedMazes() const {
+std::vector<std::string> Renderer::getGeneratedMazes() const {
     return m_impl->generatedMazes;
 }
 
-void MazeRenderer::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int displayWidth, int displayHeight) {
+void Renderer::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int displayWidth, int displayHeight) {
     drawMazeWithCamera(renderer, cells, displayWidth, displayHeight, 0.0f, 0.0f, 1.0f, 0.0f);
 }
 
-void MazeRenderer::drawMazeWithCamera(SDL_Renderer* renderer, const std::string_view& cells, int displayWidth, int displayHeight, 
+void Renderer::drawMazeWithCamera(SDL_Renderer* renderer, const std::string_view& cells, int displayWidth, int displayHeight, 
                                      float cameraX, float cameraY, float zoom, float rotation) {
     if (cells.empty()) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Empty maze data provided for drawing.");
@@ -389,15 +389,15 @@ void MazeRenderer::drawMazeWithCamera(SDL_Renderer* renderer, const std::string_
     }
 }
 
-void MazeRenderer::createDistanceTexture(SDL_Renderer* renderer, int displayWidth, int displayHeight) {
+void Renderer::createDistanceTexture(SDL_Renderer* renderer, int displayWidth, int displayHeight) {
     m_impl->createDistanceTexture(renderer, displayWidth, displayHeight);
 }
 
-SDL_Texture* MazeRenderer::getDistanceTexture() const {
+SDL_Texture* Renderer::getDistanceTexture() const {
     return m_impl->mazeDistanceTexture;
 }
 
-std::vector<Maze> MazeRenderer::parseMazeForRendering(const std::string& mazeStr, SDL_Renderer* renderer) {
+std::vector<Maze> Renderer::parseMazeForRendering(const std::string& mazeStr, SDL_Renderer* renderer) {
     std::vector<Maze> mazes;
     
     // This is where we would integrate with the new Maze class

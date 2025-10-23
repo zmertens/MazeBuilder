@@ -10,12 +10,7 @@
 
 static std::string TITLE_STR = "Breaking Walls";
 
-#if defined(MAZE_DEBUG)
-
-TITLE_STR += " - DEBUG";
-#endif
-
-static const std::string VERSION_STR = "v0.1.9";
+static std::string VERSION_STR = "v0.1.9";
 
 static constexpr auto WINDOW_W = 1280;
 static constexpr auto WINDOW_H = 720;
@@ -40,11 +35,16 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
 int main(int argc, char* argv[]) {
 
     using std::cerr;
-    using std::cref;
     using std::cout;
+    using std::cref;
     using std::endl;
     using std::exception;
     using std::runtime_error;
+
+#if defined(MAZE_DEBUG)
+
+    VERSION_STR += " - DEBUG";
+#endif
 
     try {
 

@@ -36,16 +36,15 @@
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
 
-#include <MazeBuilder/create.h>
-#include <MazeBuilder/create2.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
 #include "Maze.hpp"
-#include "MazeRenderer.hpp"
 #include "OrthographicCamera.hpp"
 #include "Physics.hpp"
+#include "Renderer.hpp"
 #include "ResourceManager.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
@@ -54,7 +53,6 @@
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
-static constexpr auto INIT_MAZE_ROWS = 10, INIT_MAZE_COLS = 10;
 static const std::string RESOURCE_PATH_PREFIX = "resources";
 static const std::string PHYSICS_JSON_PATH = RESOURCE_PATH_PREFIX + "/" + "physics.json";
 
@@ -110,14 +108,13 @@ struct PhysicsGame::PhysicsGameImpl {
     int splashWidth = 0, splashHeight = 0;
     
     // Maze distance data
-    std::unordered_map<int, char> distanceMap; // cell index -> base36 distance character
+    // cell index -> base36 distance character
+    std::unordered_map<int, char> distanceMap;
     SDL_Texture* mazeDistanceTexture = nullptr;
     int mazeWidth = 0, mazeHeight = 0;
     
     // Background maze generation
-    std::vector<std::string> generatedMazes; // Store 10 pre-generated mazes
-    std::future<std::vector<std::string>> mazeGenerationFuture; // Async maze generation
-    bool mazeGenerationStarted = false;
+    std::vector<std::string> generatedMazes;
     
     // Current active maze
     std::unique_ptr<Maze> currentMaze;
@@ -128,7 +125,7 @@ struct PhysicsGame::PhysicsGameImpl {
     // Components using PIMPL idiom
     std::unique_ptr<Physics> physics;
     std::unique_ptr<ResourceManager> resourceManager;
-    std::unique_ptr<MazeRenderer> mazeRenderer;
+    std::unique_ptr<Renderer> mazeRenderer;
 
     PhysicsGameImpl(const std::string& title, const std::string& version, int w, int h)
         : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
@@ -136,7 +133,7 @@ struct PhysicsGame::PhysicsGameImpl {
         , camera{ std::make_unique<OrthographicCamera>() }
         , physics{ std::make_unique<Physics>() }
         , resourceManager{ std::make_unique<ResourceManager>() }
-        , mazeRenderer{ std::make_unique<MazeRenderer>() } {
+        , mazeRenderer{ std::make_unique<Renderer>() } {
 
     }
 
@@ -506,58 +503,6 @@ struct PhysicsGame::PhysicsGameImpl {
         SDL_Log("Exit placed at row %d, col %d", exitRow, exitCol);
     }
 
-    // Generate a maze with distance calculations using the MazeBuilder create API
-    void generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) {
-        // Create configurator with distance calculation enabled
-        mazes::configurator config;
-        config.rows(INIT_MAZE_ROWS)
-              .columns(INIT_MAZE_COLS)
-              .distances(true)  // Enable distance calculations
-              .distances_start(0)  // Start from the first cell
-              .distances_end(-1)   // Calculate to all cells
-              .seed(static_cast<unsigned int>(SDL_GetTicks())); // Use current time as seed
-        
-        // Generate maze string with distances using the create API
-        std::string mazeStr = mazes::create(config);
-        
-        if (mazeStr.empty()) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze with distances");
-            return;
-        }
-        
-        // Store the maze string
-        persistentMazeStr = mazeStr;
-        
-        // Parse distance data from the maze string
-        this->parseMazeDistances(mazeStr);
-        
-        // Create texture from distance data
-        this->createDistanceTexture(display_w, display_h);
-        
-        SDL_Log("Generated maze with distances: %zu distance entries", this->distanceMap.size());
-    }
-
-    // Parse the maze string and extract base36 distance values
-    void parseMazeDistances(const std::string& mazeStr) {
-        this->distanceMap.clear();
-        
-        int cellIndex = 0;
-        for (size_t i = 0; i < mazeStr.length(); ++i) {
-            char c = mazeStr[i];
-            
-            // Skip newlines and maze structure characters
-            if (c == '\n' || c == '+' || c == '-' || c == '|' || c == ' ') {
-                continue;
-            }
-            
-            // Check if character is a valid base36 distance value (0-9, A-Z)
-            if ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) {
-                this->distanceMap[cellIndex] = c;
-                cellIndex++;
-            }
-        }
-    }
-
     // Create SDL texture from distance map data
     void createDistanceTexture(int display_w, int display_h) {
         if (this->distanceMap.empty()) {
@@ -638,159 +583,6 @@ struct PhysicsGame::PhysicsGameImpl {
         SDL_SetRenderTarget(sdlHelper.renderer, nullptr);
         
         SDL_Log("Created distance texture: %dx%d", this->mazeWidth, this->mazeHeight);
-    }
-
-    // Start background maze generation
-    void startBackgroundMazeGeneration() {
-        if (mazeGenerationStarted) {
-            return; // Already started
-        }
-        
-        mazeGenerationStarted = true;
-        
-        // Start async maze generation
-        mazeGenerationFuture = std::async(std::launch::async, [this]() -> std::vector<std::string> {
-            std::vector<mazes::configurator> configs;
-            
-            // Create 10 different maze configurations
-            for (int i = 0; i < 10; i++) {
-                mazes::configurator config;
-                config.rows(INIT_MAZE_ROWS)
-                      .columns(INIT_MAZE_COLS)
-                      .distances(true)  // Enable distance calculations
-                      .distances_start(0)
-                      .distances_end(-1)
-                      .seed(static_cast<unsigned int>(SDL_GetTicks() + i * 1000)); // Different seeds
-                
-                configs.push_back(config);
-            }
-            
-            // Use create2 for concurrent generation
-            return {mazes::create2(configs)};
-        });
-        
-        SDL_Log("Background maze generation started");
-    }
-
-    // Check if maze generation is complete and get results
-    bool checkMazeGeneration() {
-        if (!mazeGenerationStarted || !mazeGenerationFuture.valid()) {
-            return false;
-        }
-        
-        // Check if generation is complete
-        if (mazeGenerationFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            try {
-                auto result = mazeGenerationFuture.get();
-                if (!result.empty()) {
-                    // Split the concatenated string into individual mazes
-                    // For now, just use the entire result as one maze
-                    generatedMazes = {result[0]};
-                    SDL_Log("Background maze generation completed with %zu mazes", generatedMazes.size());
-                    return true;
-                }
-            } catch (const std::exception& e) {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze generation failed: %s", e.what());
-            }
-        }
-        
-        return false; // Still generating
-    }
-
-    // Parse maze string to extract walls and cell colors
-
-    std::vector<Maze::MazeCell> parseMazeString(const std::string& mazeStr, int& rows, int& cols) {
-        std::vector<Maze::MazeCell> cells;
-        
-        if (mazeStr.empty()) {
-            return cells;
-        }
-        
-        // Parse the maze string to find cells and walls
-        std::vector<std::string> lines;
-        std::istringstream iss(mazeStr);
-        std::string line;
-        
-        while (std::getline(iss, line)) {
-            if (!line.empty()) {
-                lines.push_back(line);
-            }
-        }
-        
-        if (lines.empty()) {
-            return cells;
-        }
-        
-        // Calculate dimensions from the maze structure
-        rows = (lines.size() - 1) / 2;  // Every other line is a cell row
-        cols = 0;
-        
-        // Find the first cell line to count columns
-        for (size_t i = 1; i < lines.size(); i += 2) {
-            const std::string& cellLine = lines[i];
-            int colCount = 0;
-            for (size_t j = 1; j < cellLine.length(); j += 2) {
-                if (j < cellLine.length() && cellLine[j] != '|' && cellLine[j] != ' ') {
-                    colCount++;
-                }
-            }
-            cols = std::max(cols, colCount);
-            break;
-        }
-        
-        cells.resize(rows * cols);
-        
-        // Parse cells and their walls
-        int cellRow = 0;
-        for (size_t lineIdx = 1; lineIdx < lines.size() && cellRow < rows; lineIdx += 2) {
-            const std::string& cellLine = lines[lineIdx];
-            const std::string& topWallLine = (lineIdx > 0) ? lines[lineIdx - 1] : "";
-            const std::string& bottomWallLine = (lineIdx + 1 < lines.size()) ? lines[lineIdx + 1] : "";
-            
-            int cellCol = 0;
-            for (size_t charIdx = 1; charIdx < cellLine.length() && cellCol < cols; charIdx += 2) {
-                if (charIdx < cellLine.length()) {
-                    int cellIndex = cellRow * cols + cellCol;
-                    if (cellIndex < cells.size()) {
-                        Maze::MazeCell& cell = cells[cellIndex];
-                        cell.row = cellRow;
-                        cell.col = cellCol;
-                        
-                        // Extract color value
-                        char ch = cellLine[charIdx];
-                        if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
-                            cell.colorValue = ch;
-                        }
-                        
-                        // Check walls
-                        // Left wall
-                        if (charIdx > 0 && cellLine[charIdx - 1] == '|') {
-                            cell.hasLeftWall = true;
-                        }
-                        
-                        // Right wall
-                        if (charIdx + 1 < cellLine.length() && cellLine[charIdx + 1] == '|') {
-                            cell.hasRightWall = true;
-                        }
-                        
-                        // Top wall
-                        if (!topWallLine.empty() && charIdx < topWallLine.length() && topWallLine[charIdx] == '-') {
-                            cell.hasTopWall = true;
-                        }
-                        
-                        // Bottom wall
-                        if (!bottomWallLine.empty() && charIdx < bottomWallLine.length() && bottomWallLine[charIdx] == '-') {
-                            cell.hasBottomWall = true;
-                        }
-                    }
-                    cellCol++;
-                }
-            }
-            cellRow++;
-        }
-        
-        SDL_Log("Parsed maze: %dx%d with %zu cells", rows, cols, cells.size());
-        return cells;
     }
 
     // Utility method for handling wall collisions
@@ -1110,13 +902,15 @@ PhysicsGame::~PhysicsGame() = default;
 bool PhysicsGame::run() const noexcept {
     using namespace std;
 
-    auto&& sdlHelper = this->m_impl->sdlHelper;
-    auto&& workers = this->m_impl->workerConcurrent;
+    auto&& gamePtr = this->m_impl;
+
+    auto&& sdlHelper = gamePtr->sdlHelper;
+    auto&& workers = gamePtr->workerConcurrent;
 
     sdlHelper.init();
-    
-    string_view titleView = this->m_impl->title;
-    sdlHelper.window = SDL_CreateWindow(titleView.data(), this->m_impl->INIT_WINDOW_W, this->m_impl->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
+
+    string_view titleView = gamePtr->title;
+    sdlHelper.window = SDL_CreateWindow(titleView.data(), gamePtr->INIT_WINDOW_W, gamePtr->INIT_WINDOW_H, SDL_WINDOW_RESIZABLE);
     if (!sdlHelper.window) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed: %s\n", SDL_GetError());
         return false;
@@ -1208,16 +1002,13 @@ bool PhysicsGame::run() const noexcept {
     // Create a static persistent string to store the maze data
     static std::string persistentMazeStr;
     
-    auto&& gState = this->m_impl->state;
-    // Start with SPLASH state instead of directly going to PLAY
-    gState = State::SPLASH;
-    
     // Set a good default value for pixelsPerMeter
     this->m_impl->pixelsPerMeter = 20.0f;
     
     // Start background maze generation while resources are loading
-    this->m_impl->startBackgroundMazeGeneration();
-    
+    Maze myMaze{};
+    myMaze.startBackgroundMazeGeneration();
+
     // Generate initial level at startup
     int display_w, display_h;
     SDL_GetWindowSize(window, &display_w, &display_h);
@@ -1235,7 +1026,9 @@ bool PhysicsGame::run() const noexcept {
 
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
-    while (gState != State::DONE) {
+    gamePtr->state = State::SPLASH;
+    while (gamePtr->state != State::DONE) {
+
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = static_cast<double>(SDL_GetTicks()) - previous;
         previous = static_cast<double>(SDL_GetTicks());
@@ -1312,14 +1105,14 @@ bool PhysicsGame::run() const noexcept {
         static State previousState = State::SPLASH;
         if (gState == State::MAIN_MENU && previousState != State::MAIN_MENU) {
             // Create and display maze with distances when first entering MAIN_MENU
-            this->generateMazeWithDistances(ref(persistentMazeStr), display_w, display_h);
+
             
             // Check if background maze generation is complete
-            if (this->m_impl->checkMazeGeneration() && !this->m_impl->generatedMazes.empty()) {
+            if (myMaze.isReady() && !this->m_impl->generatedMazes.empty()) {
                 // Use the first generated maze
                 int rows, cols;
-                auto mazeCells = this->m_impl->parseMazeString(this->m_impl->generatedMazes[0], rows, cols);
-                
+                auto mazeCells = myMaze.parse(this->m_impl->generatedMazes[0], rows, cols);
+
                 if (!mazeCells.empty()) {
                     // Initialize current maze with parsed data
                     this->m_impl->currentMaze = std::make_unique<Maze>();
@@ -1403,13 +1196,13 @@ void PhysicsGame::drawPhysicsObjects(SDL_Renderer* renderer) const {
 
 // Draw the maze background
 void PhysicsGame::drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const {
-    // Delegate to MazeRenderer component
+    // Delegate to Renderer component
     const auto& camera = this->m_impl->camera;
     this->m_impl->mazeRenderer->drawMazeWithCamera(renderer, cells, display_w, display_h, 
                                                    camera->x, camera->y, camera->zoom, camera->rotation);
     
-    // Update physics game state with calculated values from MazeRenderer
-    // The MazeRenderer should calculate and store these values internally
+    // Update physics game state with calculated values from Renderer
+    // The Renderer should calculate and store these values internally
     // For now, we'll keep the essential calculations here
     if (!cells.empty()) {
         // Calculate maze dimensions
@@ -1458,12 +1251,13 @@ void PhysicsGame::drawMaze(SDL_Renderer* renderer, const std::string_view& cells
 
 // Generate a new level
 void PhysicsGame::generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const {
-    // Use MazeRenderer component to generate maze
-    persistentMazeStr = this->m_impl->mazeRenderer->generateNewLevel(INIT_MAZE_ROWS, INIT_MAZE_COLS, display_w, display_h);
+    // Use Renderer component to generate maze
+    persistentMazeStr = this->m_impl->mazeRenderer->generateNewLevel(mazes::configurator::DEFAULT_ROWS, 
+        mazes::configurator::DEFAULT_COLUMNS, display_w, display_h);
     
     // Calculate cell size
-    float cellW = static_cast<float>(display_w) / static_cast<float>(INIT_MAZE_COLS);
-    float cellH = static_cast<float>(display_h) / static_cast<float>(INIT_MAZE_ROWS);
+    float cellW = static_cast<float>(display_w) / static_cast<float>(mazes::configurator::DEFAULT_COLUMNS);
+    float cellH = static_cast<float>(display_h) / static_cast<float>(mazes::configurator::DEFAULT_ROWS);
     float cellSize = std::min(cellW, cellH);
     
     // Use Physics component to create physics objects for the maze
@@ -1471,13 +1265,3 @@ void PhysicsGame::generateNewLevel(std::string& persistentMazeStr, int display_w
     
     SDL_Log("New level generated successfully using components");
 }
-
-// Generate a maze with distance calculations
-void PhysicsGame::generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) const {
-    // Use MazeRenderer component to generate maze with distances
-    persistentMazeStr = this->m_impl->mazeRenderer->generateMazeWithDistances(INIT_MAZE_ROWS, INIT_MAZE_COLS, display_w, display_h);
-    
-    // Create distance texture
-    this->m_impl->mazeRenderer->createDistanceTexture(this->m_impl->sdlHelper.renderer, display_w, display_h);
-}
-

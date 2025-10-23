@@ -1,8 +1,17 @@
 #include "Maze.hpp"
+
 #include "OrthographicCamera.hpp"
+
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/create.h>
+#include <MazeBuilder/create2.h>
+
 #include <SDL3/SDL.h>
-#include <cmath>
+
 #include <algorithm>
+#include <chrono>
+#include <cmath>
+#include <sstream>
 
 // Constructor
 Maze::Maze() {
@@ -13,16 +22,16 @@ Maze::~Maze() {
 }
 
 // Initialize maze from parsed data
-bool Maze::initialize(SDL_Renderer* renderer, const std::vector<MazeCell>& mazeCells, int mazeRows, int mazeCols, float mazeCellSize) {
-    if (mazeCells.empty() || mazeRows <= 0 || mazeCols <= 0 || !renderer) {
+bool Maze::initialize(SDL_Renderer* renderer, const std::vector<Maze::Cell>& cells, int mazeRows, int mazeCols, float cellSize) {
+    if (cells.empty() || mazeRows <= 0 || mazeCols <= 0 || !renderer) {
         return false;
     }
-    
-    cells = mazeCells;
+
+    this->cells = cells;
     rows = mazeRows;
     cols = mazeCols;
-    cellSize = mazeCellSize;
-    
+    cellSize = cellSize;
+
     // Generate wall objects from cell data
     generateWallsFromCells();
     
@@ -124,9 +133,9 @@ void Maze::generateTexture(SDL_Renderer* renderer) {
         };
         
         // Convert base36 color to RGB
-        Uint8 red = base36ToColorComponent(cell.colorValue, 0);
-        Uint8 green = base36ToColorComponent(cell.colorValue, 1);
-        Uint8 blue = base36ToColorComponent(cell.colorValue, 2);
+        std::uint8_t red = base36ToColorComponent(cell.colorValue, 0);
+        std::uint8_t green = base36ToColorComponent(cell.colorValue, 1);
+        std::uint8_t blue = base36ToColorComponent(cell.colorValue, 2);
         
         // Draw cell background
         SDL_SetRenderDrawColor(renderer, red, green, blue, 255);
@@ -165,7 +174,7 @@ void Maze::generateTexture(SDL_Renderer* renderer) {
 }
 
 // Convert base36 character to color component
-Uint8 Maze::base36ToColorComponent(char base36Char, int component) const {
+std::uint8_t Maze::base36ToColorComponent(char base36Char, int component) const {
     int value = 0;
     
     if (base36Char >= '0' && base36Char <= '9') {
@@ -179,12 +188,156 @@ Uint8 Maze::base36ToColorComponent(char base36Char, int component) const {
     // Create different color variations based on component and value
     switch (component) {
         case 0: // Red component
-            return static_cast<Uint8>((value * 7 + 50) % 256);
+            return static_cast<std::uint8_t>((value * 7 + 50) % 256);
         case 1: // Green component  
-            return static_cast<Uint8>((value * 11 + 100) % 256);
+            return static_cast<std::uint8_t>((value * 11 + 100) % 256);
         case 2: // Blue component
-            return static_cast<Uint8>((value * 13 + 150) % 256);
+            return static_cast<std::uint8_t>((value * 13 + 150) % 256);
         default:
-            return static_cast<Uint8>(value * 7 % 256);
+            return static_cast<std::uint8_t>(value * 7 % 256);
     }
+}
+
+// Start background maze generation
+void Maze::startBackgroundMazeGeneration() noexcept{
+
+    if (mazeGenerationStarted) {
+
+        return;
+    }
+    
+    mazeGenerationStarted = true;
+    
+    // Start async maze generation
+    mazeGenerationFuture = std::async(std::launch::async, [this]() -> std::vector<std::string> {
+        std::vector<mazes::configurator> configs;
+        
+        // Create 10 different maze configurations
+        for (int i = 0; i < 10; i++) {
+            mazes::configurator config;
+            config.rows(mazes::configurator::DEFAULT_ROWS)
+                    .columns(mazes::configurator::DEFAULT_COLUMNS)
+                    .distances(true)
+                    .distances_start(0)
+                    .distances_end(-1)
+                    .seed(static_cast<unsigned int>(SDL_GetTicks() + i * 1000));
+            
+            configs.push_back(config);
+        }
+        
+        // Use create2 for concurrent generation
+        return {mazes::create2(configs)};
+    });
+    
+    SDL_Log("Background maze generation started");
+}
+
+// Check if maze generation is complete and get results
+bool Maze::isReady() const noexcept {
+
+    if (!mazeGenerationStarted || !mazeGenerationFuture.valid()) {
+
+        return false;
+    }
+    
+    // Check if generation is complete
+    return mazeGenerationFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
+// Parse maze string to extract walls and cell colors
+
+std::vector<Maze::Cell> Maze::parse(const std::string& mazeStr, int& rows, int& cols) const noexcept {
+    
+    std::vector<Maze::Cell> cells;
+
+    if (mazeStr.empty()) {
+
+        return cells;
+    }
+    
+    // Parse the maze string to find cells and walls
+    std::vector<std::string> lines;
+    std::istringstream iss(mazeStr);
+    std::string line;
+    
+    while (std::getline(iss, line)) {
+        if (!line.empty()) {
+            lines.push_back(line);
+        }
+    }
+    
+    if (lines.empty()) {
+        return cells;
+    }
+    
+    // Calculate dimensions from the maze structure
+    rows = (lines.size() - 1) / 2;  // Every other line is a cell row
+    cols = 0;
+    
+    // Find the first cell line to count columns
+    for (size_t i = 1; i < lines.size(); i += 2) {
+        const std::string& cellLine = lines[i];
+        int colCount = 0;
+        for (size_t j = 1; j < cellLine.length(); j += 2) {
+            if (j < cellLine.length() && cellLine[j] != '|' && cellLine[j] != ' ') {
+                colCount++;
+            }
+        }
+        cols = std::max(cols, colCount);
+        break;
+    }
+    
+    cells.resize(rows * cols);
+    
+    // Parse cells and their walls
+    int cellRow = 0;
+    for (size_t lineIdx = 1; lineIdx < lines.size() && cellRow < rows; lineIdx += 2) {
+        const std::string& cellLine = lines[lineIdx];
+        const std::string& topWallLine = (lineIdx > 0) ? lines[lineIdx - 1] : "";
+        const std::string& bottomWallLine = (lineIdx + 1 < lines.size()) ? lines[lineIdx + 1] : "";
+        
+        int cellCol = 0;
+        for (size_t charIdx = 1; charIdx < cellLine.length() && cellCol < cols; charIdx += 2) {
+            if (charIdx < cellLine.length()) {
+                int cellIndex = cellRow * cols + cellCol;
+                if (cellIndex < cells.size()) {
+                    Cell& cell = cells[cellIndex];
+                    cell.row = cellRow;
+                    cell.col = cellCol;
+                    
+                    // Extract color value
+                    char ch = cellLine[charIdx];
+                    if ((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
+                        cell.colorValue = ch;
+                    }
+                    
+                    // Check walls
+                    // Left wall
+                    if (charIdx > 0 && cellLine[charIdx - 1] == '|') {
+                        cell.hasLeftWall = true;
+                    }
+                    
+                    // Right wall
+                    if (charIdx + 1 < cellLine.length() && cellLine[charIdx + 1] == '|') {
+                        cell.hasRightWall = true;
+                    }
+                    
+                    // Top wall
+                    if (!topWallLine.empty() && charIdx < topWallLine.length() && topWallLine[charIdx] == '-') {
+                        cell.hasTopWall = true;
+                    }
+                    
+                    // Bottom wall
+                    if (!bottomWallLine.empty() && charIdx < bottomWallLine.length() && bottomWallLine[charIdx] == '-') {
+                        cell.hasBottomWall = true;
+                    }
+                }
+                cellCol++;
+            }
+        }
+        cellRow++;
+    }
+    
+    SDL_Log("Parsed maze: %dx%d with %zu cells", rows, cols, cells.size());
+    return cells;
 }

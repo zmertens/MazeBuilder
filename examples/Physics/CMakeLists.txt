@@ -10,11 +10,11 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Level.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Maze.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/MazeRenderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ResourceManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
@@ -53,6 +53,7 @@ else()
     add_executable(${EXE_NAME} ${EXE_SOURCES} ${DEAR_IMGUI_SOURCES})
     target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d SFML::Audio SFML::Network)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
+    target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
     target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
