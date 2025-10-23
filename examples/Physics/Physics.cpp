@@ -155,6 +155,33 @@ Physics::Physics() : m_impl(std::make_unique<PhysicsImpl>()) {
 
 Physics::~Physics() = default;
 
+bool Physics::initializeFromMaze(const std::string_view& mazeString, float cellSize, int windowWidth, int windowHeight) {
+    // Complete physics initialization in one call
+    initPhysics();
+    createMazePhysics(mazeString, cellSize, windowWidth, windowHeight);
+    
+    // Perform initial physics step to ensure bodies are positioned
+    if (m_impl->physicsWorld) {
+        SDL_Log("Performing initial physics step");
+        m_impl->physicsWorld->step(m_impl->timeStep, 4);
+        return true;
+    }
+    return false;
+}
+
+void Physics::updatePhysics(float deltaTime, bool isPlaying) {
+    if (!isPlaying || !m_impl->physicsWorld) {
+        return;
+    }
+    
+    // Step Box2D world with sub-steps as recommended
+    m_impl->physicsWorld->step(deltaTime, 4);
+    
+    // Handle collisions and physics interactions
+    processPhysicsCollisions();
+    updatePhysicsObjects();
+}
+
 void Physics::initPhysics() {
     m_impl->initPhysics();
 }

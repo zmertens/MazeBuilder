@@ -15,14 +15,16 @@ public:
     Physics();
     ~Physics();
 
-    // Initialize physics world
-    void initPhysics();
+    // Complete physics initialization from maze data
+    bool initializeFromMaze(const std::string_view& mazeString, float cellSize, int windowWidth, int windowHeight);
     
     // Physics world management
+    void initPhysics();
     void createMazePhysics(const std::string_view& mazeString, float cellSize, int windowWidth, int windowHeight);
     void clearPhysicsWorld();
     
-    // Physics simulation
+    // Game loop physics operations
+    void updatePhysics(float deltaTime, bool isPlaying);
     void stepPhysics(float timeStep);
     void processPhysicsCollisions() const;
     void updatePhysicsObjects() const;

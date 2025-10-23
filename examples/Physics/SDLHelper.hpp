@@ -8,13 +8,16 @@
 
 #include "State.hpp"
 
+#include <MazeBuilder/singleton_base.h>
+
 struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_AudioStream;
 
 struct OrthographicCamera;
 
-class SDLHelper {
+class SDLHelper : public mazes::singleton_base<SDLHelper> {
+    friend class mazes::singleton_base<SDLHelper>;
 public:
     SDL_Window* window;
 
@@ -27,8 +30,12 @@ private:
     std::uint32_t wavLength;
 
 public:
+
     explicit SDLHelper() noexcept;
+    
     ~SDLHelper();
+
+    void createWindowAndRenderer(std::string_view title, int width, int height) noexcept;
 
     void init() noexcept;
 

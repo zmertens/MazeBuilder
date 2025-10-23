@@ -26,15 +26,42 @@ SDLHelper::~SDLHelper() {
     SDL_Quit();
 }
 
-void SDLHelper::init() noexcept {
-    using namespace std;
-    
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
-        SDL_Log("SDL_Init success\n");
+void SDLHelper::createWindowAndRenderer(std::string_view title, int width, int height) noexcept {
 
-        // Audio initialization moved to a separate method that gets called
-        // only after SDL_Init has succeeded and a WAV file has been loaded
+    this->window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_RESIZABLE);
+
+    if (!this->window) {
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed: %s\n", SDL_GetError());
+
+        return;
+    }
+
+    this->renderer = SDL_CreateRenderer(this->window, nullptr);
+
+    if (!this->renderer) {
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateRenderer failed: %s\n", SDL_GetError());
+        SDL_DestroyWindow(this->window);
+
+        return;
+    }
+
+    if (auto props = SDL_GetRendererProperties(this->renderer); props != 0) {
+
+        SDL_Log("Renderer created: %s\n", SDL_GetStringProperty(props, SDL_PROP_RENDERER_NAME_STRING, "default"));
     } else {
+        
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
+    }
+}
+
+void SDLHelper::init() noexcept {
+    using std::cerr;
+    using std::endl;
+    
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO)) {
+
         cerr << "SDL_Init Error: " << SDL_GetError() << endl;
     }
 }

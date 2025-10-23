@@ -198,6 +198,39 @@ std::uint8_t Maze::base36ToColorComponent(char base36Char, int component) const 
     }
 }
 
+// Complete maze generation and initialization
+bool Maze::generateAndInitializeMaze(SDL_Renderer* renderer, int displayWidth, int displayHeight) {
+    std::string mazeStr = generateNewMazeString(displayWidth, displayHeight);
+    if (mazeStr.empty()) {
+        return false;
+    }
+    
+    int mazeRows, mazeCols;
+    auto mazeCells = parse(mazeStr, mazeRows, mazeCols);
+    if (mazeCells.empty()) {
+        return false;
+    }
+    
+    float cellSize = std::min(displayWidth / (float)mazeCols, displayHeight / (float)mazeRows) * 0.8f;
+    return initialize(renderer, mazeCells, mazeRows, mazeCols, cellSize);
+}
+
+std::string Maze::generateNewMazeString(int displayWidth, int displayHeight) {
+    // Calculate optimal maze size based on display dimensions
+    int optimalCols = std::max(10, displayWidth / 40);  // ~40 pixels per cell
+    int optimalRows = std::max(8, displayHeight / 40);
+    
+    mazes::configurator config;
+    config.rows(optimalRows)
+          .columns(optimalCols)
+          .distances(true)
+          .distances_start(0)
+          .distances_end(-1)
+          .seed(static_cast<unsigned int>(SDL_GetTicks()));
+    
+    return mazes::create(config);
+}
+
 // Start background maze generation
 void Maze::startBackgroundMazeGeneration() noexcept{
 

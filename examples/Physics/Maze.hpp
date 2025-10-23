@@ -52,6 +52,10 @@ public:
     const std::vector<Wall>& getWalls() const { return walls; }
     const Texture& getTexture() const { return mazeTexture; }
 
+    // Complete maze generation and initialization
+    bool generateAndInitializeMaze(SDL_Renderer* renderer, int displayWidth, int displayHeight);
+    std::string generateNewMazeString(int displayWidth, int displayHeight);
+    
     std::vector<Cell> parse(const std::string& mazeStr, int& rows, int& cols) const noexcept;
     void startBackgroundMazeGeneration() noexcept;
     bool isReady() const noexcept;

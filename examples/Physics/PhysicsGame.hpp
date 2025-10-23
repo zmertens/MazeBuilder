@@ -19,15 +19,6 @@ public:
     bool run() const noexcept;
 
 private:
-    // Physics and collision processing
-    void processPhysicsCollisions() const;
-    void updatePhysicsObjects() const;
-       
-    // Rendering methods
-    void drawPhysicsObjects(SDL_Renderer* renderer) const;
-    void drawMaze(SDL_Renderer* renderer, const std::string_view& cells, int display_w, int display_h) const;
-    void generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const;
-    void generateMazeWithDistances(std::string& persistentMazeStr, int display_w, int display_h) const;
 
     struct PhysicsGameImpl;
     std::unique_ptr<PhysicsGameImpl> m_impl;

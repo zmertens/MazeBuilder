@@ -13,6 +13,17 @@ public:
     ResourceManager();
     ~ResourceManager();
     
+    // Complete resource initialization
+    struct GameResources {
+        SDL_Texture* splashTexture = nullptr;
+        int splashWidth = 0;
+        int splashHeight = 0;
+        std::string musicPath;
+        std::string soundPath;
+        bool success = false;
+    };
+    GameResources initializeAllResources(SDL_Renderer* renderer, const std::string& configPath);
+    
     // Configuration management
     bool loadConfiguration(const std::string& configPath);
     std::string getConfigValue(const std::string& key) const;

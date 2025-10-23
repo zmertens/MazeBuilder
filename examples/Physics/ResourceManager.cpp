@@ -102,6 +102,46 @@ ResourceManager::ResourceManager() : m_impl(std::make_unique<ResourceManagerImpl
 
 ResourceManager::~ResourceManager() = default;
 
+ResourceManager::GameResources ResourceManager::initializeAllResources(SDL_Renderer* renderer, const std::string& configPath) {
+    GameResources resources;
+    
+    // Load configuration
+    if (!loadConfiguration(configPath)) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load configuration from: %s", configPath.c_str());
+        return resources;
+    }
+    
+    // Load splash image
+    const auto splashImageConfig = getConfigValue("splash_image");
+    const auto splashImageFile = extractJsonValue(splashImageConfig);
+    const auto splashImagePath = getResourcePath(splashImageFile);
+    resources.splashTexture = loadTexture(renderer, splashImagePath);
+    
+    if (resources.splashTexture) {
+        float width, height;
+        SDL_GetTextureSize(resources.splashTexture, &width, &height);
+        resources.splashWidth = static_cast<int>(width);
+        resources.splashHeight = static_cast<int>(height);
+        SDL_Log("Successfully loaded splash image: %s (%dx%d)", splashImagePath.c_str(), 
+                resources.splashWidth, resources.splashHeight);
+    } else {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash image: %s", splashImagePath.c_str());
+    }
+    
+    // Load audio paths
+    const auto musicOggConfig = getConfigValue("music_ogg");
+    const auto generateOggFile = extractJsonValue(musicOggConfig);
+    resources.soundPath = getResourcePath(generateOggFile);
+    
+    const auto musicWavConfig = getConfigValue("music_wav");
+    const auto loadingWavFile = extractJsonValue(musicWavConfig);
+    resources.musicPath = getResourcePath(loadingWavFile);
+    
+    resources.success = true;
+    SDL_Log("Resource initialization completed successfully");
+    return resources;
+}
+
 bool ResourceManager::loadConfiguration(const std::string& configPath) {
     mazes::json_helper jh{};
     if (!jh.load(configPath, m_impl->resourceMap)) {
