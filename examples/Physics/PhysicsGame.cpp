@@ -175,6 +175,9 @@ PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::
     : m_impl{ std::make_unique<PhysicsGameImpl>(title, version, resourcePath, w, h)} {
 }
 
+PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, int w, int h)
+    : PhysicsGame(std::string_view(title), std::string_view(version), {}, w, h) {}
+
 PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
