@@ -2,17 +2,14 @@
 #define PHYSICS_GAME_HPP
 
 #include <memory>
-#include <string>
 #include <string_view>
 
 #include <MazeBuilder/singleton_base.h>
 
-struct SDL_Renderer;
-
 class PhysicsGame : public mazes::singleton_base<PhysicsGame> {
     friend class mazes::singleton_base<PhysicsGame>;
 public:
-    PhysicsGame(const std::string& title, const std::string& version, int w, int h);
+    PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h);
 
     ~PhysicsGame();
 

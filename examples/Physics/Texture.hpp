@@ -1,6 +1,8 @@
 #ifndef TEXTURE_HPP
 #define TEXTURE_HPP
 
+#include <string_view>
+
 struct SDL_Texture;
 struct SDL_Renderer;
 
@@ -28,7 +30,11 @@ public:
 
     SDL_Texture* get() const noexcept;
 
-    bool loadTarget(SDL_Renderer* renderer, int w, int h);
+    bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
+    
+    bool loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept;
+
+    bool loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept;
 
     void render(SDL_Renderer *renderer, int x, int y) const noexcept;
 }; // Texture class

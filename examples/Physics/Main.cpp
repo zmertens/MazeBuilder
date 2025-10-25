@@ -6,7 +6,7 @@
 
 #include "PhysicsGame.hpp"
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/singleton_base.h>
 
 static std::string TITLE_STR = "Breaking Walls";
 
@@ -41,16 +41,25 @@ int main(int argc, char* argv[]) {
     using std::exception;
     using std::runtime_error;
 
+    using mazes::singleton_base;
+
 #if defined(MAZE_DEBUG)
 
     VERSION_STR += " - DEBUG";
 #endif
 
+    if (argc != 2) {
+        
+        cerr << "Usage: " << argv[0] << " <path_to_config.json>" << endl;
+        
+        return EXIT_FAILURE;
+    }
+
+    std::string_view configPath { argv[1] };
+
     try {
 
-        using mazes::singleton_base;
-
-        if (auto inst = singleton_base<PhysicsGame>::instance(cref(TITLE_STR), cref(VERSION_STR), WINDOW_W, WINDOW_H); inst->run()) {
+        if (auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H); inst->run()) {
 
 #if defined(MAZE_DEBUG)
 

@@ -45,7 +45,7 @@
 #include "OrthographicCamera.hpp"
 #include "Physics.hpp"
 #include "Renderer.hpp"
-#include "ResourceManager.hpp"
+#include "PhysicsResourceManager.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
 #include "Texture.hpp"
@@ -53,8 +53,7 @@
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
-static const std::string RESOURCE_PATH_PREFIX = "resources";
-static const std::string PHYSICS_JSON_PATH = RESOURCE_PATH_PREFIX + "/" + "physics.json";
+using Resources = PhysicsResourceManager::PhysicsResources;
 
 struct PhysicsGame::PhysicsGameImpl {
     
@@ -95,8 +94,9 @@ struct PhysicsGame::PhysicsGameImpl {
     int draggedBallIndex = -1;
     b2Vec2 lastMousePos = {0.0f, 0.0f};
    
-    const std::string& title;
-    const std::string& version;
+    std::string title;
+    std::string version;
+    std::string resourcePath;
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
     State state;
@@ -123,15 +123,13 @@ struct PhysicsGame::PhysicsGameImpl {
 
     // Components using PIMPL idiom
     std::unique_ptr<Physics> physics;
-    std::unique_ptr<ResourceManager> resourceManager;
     std::unique_ptr<Renderer> mazeRenderer;
 
-    PhysicsGameImpl(const std::string& title, const std::string& version, int w, int h)
-        : title{ title }, version{ version }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
+    PhysicsGameImpl(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
+        : title{ title }, version{ version }, resourcePath{ resourcePath }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , state{ State::SPLASH }, workerConcurrent{state}
         , camera{ std::make_unique<OrthographicCamera>() }
         , physics{ std::make_unique<Physics>() }
-        , resourceManager{ std::make_unique<ResourceManager>() }
         , mazeRenderer{ std::make_unique<Renderer>() } {
 
     }
@@ -165,17 +163,30 @@ struct PhysicsGame::PhysicsGameImpl {
         
         SDL_Log("New level generated successfully using components");
     }
+
+    std::optional<Resources> initializeGame() {
+
+        return PhysicsResourceManager::instance()->initializeAllResources(this->resourcePath);
+    }
 }; // impl
 
-PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, int w, int h)
-    : m_impl{ std::make_unique<PhysicsGameImpl>(std::cref(title), std::cref(version), w, h)} {
+PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
+    : m_impl{ std::make_unique<PhysicsGameImpl>(title, version, resourcePath, w, h)} {
 }
 
 PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
 bool PhysicsGame::run() const noexcept {
-    using namespace std;
+    
+    using std::make_unique;
+    using std::move;
+    using std::optional;
+    using std::ref;
+    using std::string;
+    using std::string_view;
+    using std::unique_ptr;
+    using std::vector;
 
     auto&& gamePtr = this->m_impl;
 
@@ -191,21 +202,30 @@ bool PhysicsGame::run() const noexcept {
     workers.initThreads();
     workers.generate("12345");
 
-    // Load physics.json configuration using ResourceManager component
-    if (!this->m_impl->resourceManager->loadConfiguration(PHYSICS_JSON_PATH)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load physics.json from: %s\n", PHYSICS_JSON_PATH.c_str());
+    // Load audio resources using configuration
+    Resources resources;
+    if (auto physicsResources = this->m_impl->initializeGame(); physicsResources.has_value()) {
+
+        resources = move(physicsResources.value());
+        
+        SDL_Log("Game resources initialized successfully");
+
+    } else {
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to initialize game resources\n");
+
         return false;
     }
 
-    // Load audio resources using configuration
-    const auto musicOggConfig = this->m_impl->resourceManager->getConfigValue("music_ogg");
-    const auto generateOggFile = this->m_impl->resourceManager->extractJsonValue(musicOggConfig);
     sf::SoundBuffer generateSoundBuffer;
-    const auto generatePath = this->m_impl->resourceManager->getResourcePath(generateOggFile);
+    const auto generatePath = resources.musicPath;
     if (!generateSoundBuffer.loadFromFile(generatePath)) {
+        
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generatePath.c_str());
+
         return false;
     } else {
+
         SDL_Log("Success loading sound file: %s\n", generatePath.c_str());
     }
 
@@ -213,45 +233,21 @@ bool PhysicsGame::run() const noexcept {
     AudioHelper audioHelper{cref(generateSound)};
 
     // Load and set window icon from configuration
-    const auto iconImageConfig = this->m_impl->resourceManager->getConfigValue("icon_image");
-    const auto iconImageFile = this->m_impl->resourceManager->extractJsonValue(iconImageConfig);
-    const auto iconPath = this->m_impl->resourceManager->getResourcePath(iconImageFile);
-    SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
-    if (icon) {
-        SDL_SetWindowIcon(sdlHelper->window, icon);
-        SDL_DestroySurface(icon);
-        SDL_Log("Successfully loaded icon: %s\n", iconPath.c_str());
-    } else {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s\n", iconPath.c_str(), SDL_GetError());
-    }
+    auto iconPath = resources.windowIconPath;
 
-    // Load WAV file from configuration
-    const auto musicWavConfig = this->m_impl->resourceManager->getConfigValue("music_wav");
-    const auto loadingWavFile = this->m_impl->resourceManager->extractJsonValue(musicWavConfig);
-    const auto loadingPath = this->m_impl->resourceManager->getResourcePath(loadingWavFile);
-    if (!sdlHelper->loadWAV(loadingPath.c_str())) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load WAV file: %s\n", loadingPath.c_str());
-    } else {
-        SDL_Log("Successfully loaded WAV file: %s\n", loadingPath.c_str());
-    }
+    if (iconPath.empty()) {
 
-    sdlHelper->playAudioStream();
-
-    // Load splash image from configuration
-    const auto splashImageConfig = this->m_impl->resourceManager->getConfigValue("splash_image");
-    const auto splashImageFile = this->m_impl->resourceManager->extractJsonValue(splashImageConfig);
-    const auto splashImagePath = this->m_impl->resourceManager->getResourcePath(splashImageFile);
-    this->m_impl->splashTexture = this->m_impl->resourceManager->loadTexture(sdlHelper->renderer, splashImagePath);
-    if (this->m_impl->splashTexture) {
-        // Get texture dimensions
-        float width, height;
-        SDL_GetTextureSize(this->m_impl->splashTexture, &width, &height);
-        this->m_impl->splashWidth = static_cast<int>(width);
-        this->m_impl->splashHeight = static_cast<int>(height);
-        SDL_Log("Successfully loaded splash image: %s (%dx%d)\n", splashImagePath.c_str(), 
-                this->m_impl->splashWidth, this->m_impl->splashHeight);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Window icon path is empty in configuration\n");
     } else {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash image: %s\n", splashImagePath.c_str());
+
+        SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
+        if (icon) {
+            SDL_SetWindowIcon(sdlHelper->window, icon);
+            SDL_DestroySurface(icon);
+            SDL_Log("Successfully loaded icon: %s\n", iconPath.c_str());
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s\n", iconPath.c_str(), SDL_GetError());
+        }
     }
 
     auto&& renderer = sdlHelper->renderer;
