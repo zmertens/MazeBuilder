@@ -33,14 +33,18 @@ public:
             return std::nullopt;
         }
         
-        // Load splash texture
+        // Load splash texture path only (actual texture loading will be done by game)
         std::string splashPath = getConfigValue("splash_image");
+        resources.splashPath = getResourcePath(splashPath);
         
         // Load music and sound paths
-        resources.musicPath = getConfigValue("music_path");
-        resources.soundPath = getConfigValue("sound_path");
+        resources.musicPath = getConfigValue("music_wav");
+        resources.soundPath = getConfigValue("music_ogg");
         
-        resources.success = (resources.splashTexture != nullptr);
+        resources.windowIconPath = getResourcePath(getConfigValue("icon_image"));
+
+        // Success if we have basic paths loaded
+        resources.success = (!resources.windowIconPath.empty() && !resources.splashPath.empty());
 
         return resources;
     }
@@ -61,15 +65,19 @@ private:
     
     // Extract the actual filename from JSON string format (remove quotes and array brackets)
     std::string extractJsonValue(const std::string& jsonStr) const {
+        if (jsonStr.empty()) {
+            return "";
+        }
+        
         std::string result = jsonStr;
         
         // Remove array brackets if present
-        if (result.front() == '[' && result.back() == ']') {
+        if (result.length() >= 2 && result.front() == '[' && result.back() == ']') {
             result = result.substr(1, result.length() - 2);
         }
         
         // Remove quotes if present
-        if (result.front() == '"' && result.back() == '"') {
+        if (result.length() >= 2 && result.front() == '"' && result.back() == '"') {
             result = result.substr(1, result.length() - 2);
         }
         
@@ -78,7 +86,7 @@ private:
         if (commaPos != std::string::npos) {
             result = result.substr(0, commaPos);
             // Remove quotes from the first element
-            if (result.front() == '"' && result.back() == '"') {
+            if (result.length() >= 2 && result.front() == '"' && result.back() == '"') {
                 result = result.substr(1, result.length() - 2);
             }
         }

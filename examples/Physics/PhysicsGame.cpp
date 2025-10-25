@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <deque>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <random>
@@ -164,7 +165,7 @@ struct PhysicsGame::PhysicsGameImpl {
         SDL_Log("New level generated successfully using components");
     }
 
-    std::optional<Resources> initializeGame() {
+    std::optional<Resources> loadResources() {
 
         return PhysicsResourceManager::instance()->initializeAllResources(this->resourcePath);
     }
@@ -179,6 +180,8 @@ PhysicsGame::~PhysicsGame() = default;
 // Main game loop
 bool PhysicsGame::run() const noexcept {
     
+    using std::async;
+    using std::launch;
     using std::make_unique;
     using std::move;
     using std::optional;
@@ -189,65 +192,78 @@ bool PhysicsGame::run() const noexcept {
     using std::vector;
 
     auto&& gamePtr = this->m_impl;
-
     auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
     auto&& workers = gamePtr->workerConcurrent;
 
+    // Initialize SDL first
     sdlHelper->init();
 
     auto windowTitle = gamePtr->title + " - " + gamePtr->version;
     sdlHelper->createWindowAndRenderer(windowTitle, gamePtr->INIT_WINDOW_W, gamePtr->INIT_WINDOW_H);
 
-    // Workers
-    workers.initThreads();
-    workers.generate("12345");
-
-    // Load audio resources using configuration
-    Resources resources;
-    if (auto physicsResources = this->m_impl->initializeGame(); physicsResources.has_value()) {
-
-        resources = move(physicsResources.value());
-        
-        SDL_Log("Game resources initialized successfully");
-
-    } else {
-
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to initialize game resources\n");
-
+    // Check if window and renderer were created successfully
+    if (!sdlHelper->window || !sdlHelper->renderer) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer");
         return false;
+    }
+
+    SDL_Log("Successfully created SDL window and renderer");
+
+    // Now load resources after SDL is initialized
+    auto resources = gamePtr->loadResources();
+    if (!resources.has_value() || !resources.value().success) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load game resources");
+        return false;
+    }
+
+    SDL_Log("Successfully loaded all game resources");
+
+    // Workers (generate only after everything else is set up)
+    workers.initThreads();
+    // Remove the problematic workers.generate("12345") call that's causing vertex errors
+
+    // Load splash texture if we have a path
+    if (!resources.value().splashPath.empty()) {
+        // Load the splash texture using stb_image (similar to ResourceManager approach)
+        int width, height, channels;
+        unsigned char* imageData = stbi_load(resources.value().splashPath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
+        
+        if (imageData) {
+            // Create surface from image data (force RGBA format)
+            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, imageData, width * 4);
+            if (surface) {
+                gamePtr->splashTexture = SDL_CreateTextureFromSurface(sdlHelper->renderer, surface);
+                if (gamePtr->splashTexture) {
+                    gamePtr->splashWidth = width;
+                    gamePtr->splashHeight = height;
+                    SDL_Log("Successfully loaded splash texture: %s (%dx%d)", resources.value().splashPath.c_str(), width, height);
+                } else {
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create splash texture: %s", SDL_GetError());
+                }
+                SDL_DestroySurface(surface);
+            }
+            stbi_image_free(imageData);
+        } else {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash image: %s", resources.value().splashPath.c_str());
+        }
     }
 
     sf::SoundBuffer generateSoundBuffer;
-    const auto generatePath = resources.musicPath;
-    if (!generateSoundBuffer.loadFromFile(generatePath)) {
-        
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load sound file: %s\n", generatePath.c_str());
 
-        return false;
-    } else {
+    // Load and set window icon from resources
+    auto iconPath = resources.value().windowIconPath;
 
-        SDL_Log("Success loading sound file: %s\n", generatePath.c_str());
-    }
-
-    unique_ptr<sf::Sound> generateSound = make_unique<sf::Sound>(generateSoundBuffer);
-    AudioHelper audioHelper{cref(generateSound)};
-
-    // Load and set window icon from configuration
-    auto iconPath = resources.windowIconPath;
-
-    if (iconPath.empty()) {
-
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Window icon path is empty in configuration\n");
-    } else {
-
+    if (!iconPath.empty()) {
         SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
         if (icon) {
             SDL_SetWindowIcon(sdlHelper->window, icon);
             SDL_DestroySurface(icon);
-            SDL_Log("Successfully loaded icon: %s\n", iconPath.c_str());
+            SDL_Log("Successfully loaded window icon: %s", iconPath.c_str());
         } else {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s\n", iconPath.c_str(), SDL_GetError());
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", iconPath.c_str(), SDL_GetError());
         }
+    } else {
+        SDL_Log("No window icon specified in configuration");
     }
 
     auto&& renderer = sdlHelper->renderer;
@@ -284,6 +300,9 @@ bool PhysicsGame::run() const noexcept {
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
     gamePtr->state = State::SPLASH;
+    
+    SDL_Log("Starting main game loop in SPLASH state");
+    
     while (gamePtr->state != State::DONE) {
 
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
@@ -296,6 +315,13 @@ bool PhysicsGame::run() const noexcept {
             sdlHelper->poll_events(ref(gamePtr->state), ref(this->m_impl->camera));
             accumulator -= FIXED_TIME_STEP;
             currentTimeStep += FIXED_TIME_STEP;
+            
+            // Debug: log state changes
+            static State lastState = State::SPLASH;
+            if (gamePtr->state != lastState) {
+                SDL_Log("State changed from %d to %d", static_cast<int>(lastState), static_cast<int>(gamePtr->state));
+                lastState = gamePtr->state;
+            }
         }
 
         // Update physics simulation if we're in a playing state
@@ -303,10 +329,10 @@ bool PhysicsGame::run() const noexcept {
              
             // Step Box2D world with sub-steps instead of velocity/position iterations
             // Using 4 sub-steps as recommended in the migration guide
-            this->m_impl->physicsWorld->step(FIXED_TIME_STEP, 4);
+            // this->m_impl->physicsWorld->step(FIXED_TIME_STEP, 4);
         }
 
-        sdlHelper->updateAudioData();
+        // sdlHelper->updateAudioData();
 
         // Get window dimensions
         SDL_GetWindowSize(window, &display_w, &display_h);

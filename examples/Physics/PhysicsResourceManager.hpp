@@ -20,13 +20,13 @@ public:
     
     // Complete resource initialization
     struct PhysicsResources {
-        std::unique_ptr<Texture> splashTexture = nullptr;
+        std::string splashPath;
         int splashWidth = 0;
         int splashHeight = 0;
         std::string musicPath;
         std::string soundPath;
-        bool success = false;
         std::string windowIconPath;
+        bool success = false;
     };
 
     std::optional<PhysicsResources> initializeAllResources(std::string_view configPath);
