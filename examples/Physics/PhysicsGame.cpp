@@ -222,7 +222,8 @@ bool PhysicsGame::run() const noexcept {
     SDL_Log("Successfully loaded all game resources");
 
     // Workers (generate only after everything else is set up)
-    workers.initThreads();
+    // workers.initThreads();
+    // workers.generate("12345");
     // Remove the problematic workers.generate("12345") call that's causing vertex errors
 
     // Load splash texture if we have a path
@@ -282,17 +283,13 @@ bool PhysicsGame::run() const noexcept {
     this->m_impl->pixelsPerMeter = 20.0f;
     
     // Start background maze generation while resources are loading
-    Maze myMaze{};
-    myMaze.startBackgroundMazeGeneration();
+    // Maze myMaze{};
+    // myMaze.startBackgroundMazeGeneration();
 
     // Generate initial level at startup
     int display_w, display_h;
     SDL_GetWindowSize(window, &display_w, &display_h);
-    this->m_impl->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
-    
-    // Log physics world state after level generation
-    SDL_Log("PhysicsGame world created, num walls: %zu, num balls: %zu", 
-        this->m_impl->walls.size(), this->m_impl->balls.size());
+    // this->m_impl->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
     
     // Initial physics simulation step to ensure bodies are positioned
     if (this->m_impl->physicsWorld) {
@@ -387,41 +384,18 @@ bool PhysicsGame::run() const noexcept {
         static State previousState = State::SPLASH;
         if (gamePtr->state == State::MAIN_MENU && previousState != State::MAIN_MENU) {
             // Create and display maze with distances when first entering MAIN_MENU
-
-            
-            // Check if background maze generation is complete
-            if (myMaze.isReady() && !this->m_impl->generatedMazes.empty()) {
-                // Use the first generated maze
-                int rows, cols;
-                auto mazeCells = myMaze.parse(this->m_impl->generatedMazes[0], rows, cols);
-
-                if (!mazeCells.empty()) {
-                    // Initialize current maze with parsed data
-                    this->m_impl->currentMaze = std::make_unique<Maze>();
-                    float cellSize = std::min(display_w / (float)cols, display_h / (float)rows) * 0.8f; // 80% of available space
-                    this->m_impl->currentMaze->initialize(renderer, mazeCells, rows, cols, cellSize);
-                    
-                    SDL_Log("Initialized maze rendering with %dx%d maze", rows, cols);
-                }
-            }
         }
         previousState = gamePtr->state;
         
         // Start playing when transitioning from MAIN_MENU to PLAY_SINGLE_MODE
         if (gamePtr->state == State::PLAY_SINGLE_MODE && persistentMazeStr.empty()) {
-            // Generate initial level if we don't have one
-            this->m_impl->generateNewLevel(ref(persistentMazeStr), display_w, display_h);
+
         }
         
         // Draw the current maze if available (in PLAY_SINGLE_MODE or MAIN_MENU)
         if ((gamePtr->state == State::PLAY_SINGLE_MODE || gamePtr->state == State::MAIN_MENU) && this->m_impl->currentMaze) {
             // Calculate centering offset
-            float offsetX = (display_w - this->m_impl->currentMaze->getCols() * this->m_impl->currentMaze->getCellSize()) / 2.0f;
-            float offsetY = (display_h - this->m_impl->currentMaze->getRows() * this->m_impl->currentMaze->getCellSize()) / 2.0f;
-            
-            this->m_impl->currentMaze->draw(renderer, this->m_impl->camera, 
-                                           this->m_impl->pixelsPerMeter, offsetX, offsetY, 
-                                           this->m_impl->currentMaze->getCellSize(), display_w, display_h);
+
         }
         
         // Present the rendered frame
