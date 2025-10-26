@@ -1,6 +1,6 @@
 include(BuildInfo)
 
-set(CPP_BASE64_SRCS ${CMAKE_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
+set(CPP_BASE64_SRCS ${PROJECT_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
 
 # Don't include this source file in Visual Studio projects
 set_source_files_properties(${CPP_BASE64_SRCS} PROPERTIES 
@@ -85,7 +85,8 @@ set(FMT_DOC OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(fmt)
 
 # Setup object library
-set(MAZE_BUILDER_LIB_OUT "mazebuildercore")
+set(MAZE_BUILDER_LIB_OUT ${MAZE_BUILDER_CORE_LIB})
+
 add_library(${MAZE_BUILDER_LIB_OUT}_obj OBJECT ${MAZE_BUILDER_CORE_SRCS} ${CPP_BASE64_SRCS})
 # Add compile definition to disable problematic FMT_STRING usage
 target_compile_definitions(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:MAZE_DEBUG>")
@@ -100,6 +101,8 @@ target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
+
+add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_obj)
 
 # Shared build
 if(NOT EMSCRIPTEN)
