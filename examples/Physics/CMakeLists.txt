@@ -9,9 +9,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Level.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Maze.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
-	${CMAKE_CURRENT_SOURCE_DIR}/Physics.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsResourceManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp

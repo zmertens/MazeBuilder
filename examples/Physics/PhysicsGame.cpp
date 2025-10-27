@@ -4,9 +4,6 @@
 //
 // Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
 //
-// Score system: 10 points per wall destroyed
-//              -1 point per friendly ball bounce
-//              100 points per exit bounce
 //
 
 #include "PhysicsGame.hpp"
@@ -16,7 +13,6 @@
 #include <cassert>
 #include <cmath>
 #include <cstdint>
-#include <deque>
 #include <functional>
 #include <future>
 #include <iostream>
@@ -25,6 +21,7 @@
 #include <sstream>
 #include <string_view>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <box2d/box2d.h>
@@ -42,9 +39,9 @@
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
-#include "Maze.hpp"
+#include "Drawable.hpp"
 #include "OrthographicCamera.hpp"
-#include "Physics.hpp"
+#include "Physical.hpp"
 #include "Renderer.hpp"
 #include "PhysicsResourceManager.hpp"
 #include "SDLHelper.hpp"
@@ -115,22 +112,17 @@ struct PhysicsGame::PhysicsGameImpl {
     
     // Background maze generation
     std::vector<std::string> generatedMazes;
-    
-    // Current active maze
-    std::unique_ptr<Maze> currentMaze;
 
     // Camera for coordinate transformations
     std::unique_ptr<OrthographicCamera> camera;
 
     // Components using PIMPL idiom
-    std::unique_ptr<Physics> physics;
     std::unique_ptr<Renderer> mazeRenderer;
 
     PhysicsGameImpl(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
         : title{ title }, version{ version }, resourcePath{ resourcePath }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , state{ State::SPLASH }, workerConcurrent{state}
         , camera{ std::make_unique<OrthographicCamera>() }
-        , physics{ std::make_unique<Physics>() }
         , mazeRenderer{ std::make_unique<Renderer>() } {
 
     }
@@ -147,22 +139,6 @@ struct PhysicsGame::PhysicsGameImpl {
             SDL_DestroyTexture(mazeDistanceTexture);
             mazeDistanceTexture = nullptr;
         }
-    }
-
-    void generateNewLevel(std::string& persistentMazeStr, int display_w, int display_h) const {
-        // Use Renderer component to generate maze
-        persistentMazeStr = this->mazeRenderer->generateNewLevel(mazes::configurator::DEFAULT_ROWS, 
-            mazes::configurator::DEFAULT_COLUMNS, display_w, display_h);
-        
-        // Calculate cell size
-        float cellW = static_cast<float>(display_w) / static_cast<float>(mazes::configurator::DEFAULT_COLUMNS);
-        float cellH = static_cast<float>(display_h) / static_cast<float>(mazes::configurator::DEFAULT_ROWS);
-        float cellSize = std::min(cellW, cellH);
-        
-        // Use Physics component to create physics objects for the maze
-        this->physics->createMazePhysics(persistentMazeStr, cellSize, display_w, display_h);
-        
-        SDL_Log("New level generated successfully using components");
     }
 
     std::optional<Resources> loadResources() {
@@ -222,8 +198,8 @@ bool PhysicsGame::run() const noexcept {
     SDL_Log("Successfully loaded all game resources");
 
     // Workers (generate only after everything else is set up)
-    // workers.initThreads();
-    // workers.generate("12345");
+    workers.initThreads();
+    workers.generate("12345");
     // Remove the problematic workers.generate("12345") call that's causing vertex errors
 
     // Load splash texture if we have a path
@@ -300,7 +276,15 @@ bool PhysicsGame::run() const noexcept {
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
     gamePtr->state = State::SPLASH;
-    
+
+    using GameObjects = std::variant<Ball, Wall>;
+
+    vector<GameObjects> entities;
+    entities.emplace_back(Ball{});
+    entities.emplace_back(Wall{});
+    entities.emplace_back(Wall{});
+
+
     SDL_Log("Starting main game loop in SPLASH state");
     
     while (gamePtr->state != State::DONE) {
@@ -315,13 +299,6 @@ bool PhysicsGame::run() const noexcept {
             sdlHelper->poll_events(ref(gamePtr->state), ref(this->m_impl->camera));
             accumulator -= FIXED_TIME_STEP;
             currentTimeStep += FIXED_TIME_STEP;
-            
-            // Debug: log state changes
-            static State lastState = State::SPLASH;
-            if (gamePtr->state != lastState) {
-                SDL_Log("State changed from %d to %d", static_cast<int>(lastState), static_cast<int>(gamePtr->state));
-                lastState = gamePtr->state;
-            }
         }
 
         // Update physics simulation if we're in a playing state
@@ -393,16 +370,23 @@ bool PhysicsGame::run() const noexcept {
         }
         
         // Draw the current maze if available (in PLAY_SINGLE_MODE or MAIN_MENU)
-        if ((gamePtr->state == State::PLAY_SINGLE_MODE || gamePtr->state == State::MAIN_MENU) && this->m_impl->currentMaze) {
+        if ((gamePtr->state == State::PLAY_SINGLE_MODE || gamePtr->state == State::MAIN_MENU)) {
             // Calculate centering offset
 
         }
+
+        std::for_each(entities.begin(), entities.end(), [&elapsed](GameObjects& entity) {
+            std::visit([&elapsed](auto&& arg) {
+                arg.update(static_cast<float>(elapsed));
+                arg.draw(static_cast<float>(elapsed));
+            }, entity);
+        });
         
         // Present the rendered frame
         SDL_RenderPresent(renderer);
         
         // FPS counter
-        if (currentTimeStep >= 1000.0) {
+        if (currentTimeStep >= 3000.0) {
             // Calculate frames per second
             SDL_Log("FPS: %d\n", static_cast<int>(1.0 / (elapsed / 1000.0)));
             // Calculate milliseconds per frame (correct formula)
