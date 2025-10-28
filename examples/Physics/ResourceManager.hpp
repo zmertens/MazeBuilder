@@ -11,12 +11,14 @@
 
 class Texture;
 
-class PhysicsResourceManager : public mazes::singleton_base<PhysicsResourceManager> {
-    friend class mazes::singleton_base<PhysicsResourceManager>;
+class ResourceManager : public mazes::singleton_base<ResourceManager> {
+    friend class mazes::singleton_base<ResourceManager>;
 public:
 
-    PhysicsResourceManager();
-    ~PhysicsResourceManager();
+    const static std::string_view COMMON_RESOURCE_PATH_PREFIX;
+
+    ResourceManager();
+    ~ResourceManager();
     
     // Complete resource initialization
     struct PhysicsResources {
@@ -32,8 +34,8 @@ public:
     std::optional<PhysicsResources> initializeAllResources(std::string_view configPath);
 
 private:
-    struct PhysicsResourceManagerImpl;
-    std::unique_ptr<PhysicsResourceManagerImpl> m_impl;
+    struct ResourceManagerImpl;
+    std::unique_ptr<ResourceManagerImpl> m_impl;
 };
 
 #endif // PHYSICS_RESOURCE_MANAGER_HPP

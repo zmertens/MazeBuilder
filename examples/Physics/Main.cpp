@@ -40,6 +40,7 @@ int main(int argc, char* argv[]) {
     using std::endl;
     using std::exception;
     using std::runtime_error;
+    using std::string;
 
     using mazes::singleton_base;
 
@@ -48,6 +49,10 @@ int main(int argc, char* argv[]) {
     VERSION_STR += " - DEBUG";
 #endif
 
+    string configPath{};
+
+#if !defined(__EMSCRIPTEN__)
+
     if (argc != 2) {
         
         cerr << "Usage: " << argv[0] << " <path_to_config.json>" << endl;
@@ -55,7 +60,11 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::string_view configPath { argv[1] };
+    configPath = argv[1];
+#else
+
+    configPath = "resources/physics.json";
+#endif
 
     try {
 

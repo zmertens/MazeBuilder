@@ -1,4 +1,4 @@
-#include "PhysicsResourceManager.hpp"
+#include "ResourceManager.hpp"
 
 #include <iostream>
 #include <unordered_map>
@@ -9,13 +9,12 @@
 
 #include "Texture.hpp"
 
-class PhysicsResourceManager::PhysicsResourceManagerImpl {
+const std::string_view ResourceManager::COMMON_RESOURCE_PATH_PREFIX = "resources";
+
+struct ResourceManager::ResourceManagerImpl {
 public:
     // Configuration data loaded
     std::unordered_map<std::string, std::string> resourceMap;
-    
-    // Resource path prefix
-    static const std::string COMMON_RESOURCE_PATH_PREFIX;
 
     std::optional<PhysicsResources> initializeAllResources(std::string_view configPath) {
 
@@ -60,7 +59,7 @@ private:
     }
 
     std::string getResourcePath(const std::string& filename) const {
-        return COMMON_RESOURCE_PATH_PREFIX + "/" + filename;
+        return std::string(COMMON_RESOURCE_PATH_PREFIX) + "/" + filename;
     }
     
     // Extract the actual filename from JSON string format (remove quotes and array brackets)
@@ -126,16 +125,14 @@ private:
     }
 };
 
-const std::string PhysicsResourceManager::PhysicsResourceManagerImpl::COMMON_RESOURCE_PATH_PREFIX = "resources";
-
-// PhysicsResourceManager implementation
-PhysicsResourceManager::PhysicsResourceManager() : m_impl(std::make_unique<PhysicsResourceManagerImpl>()) {
+// ResourceManager implementation
+ResourceManager::ResourceManager() : m_impl(std::make_unique<ResourceManagerImpl>()) {
 
 }
 
-PhysicsResourceManager::~PhysicsResourceManager() = default;
+ResourceManager::~ResourceManager() = default;
 
-std::optional<PhysicsResourceManager::PhysicsResources> PhysicsResourceManager::initializeAllResources(std::string_view configPath) {
+std::optional<ResourceManager::PhysicsResources> ResourceManager::initializeAllResources(std::string_view configPath) {
 
     return this->m_impl->initializeAllResources(configPath);
 }

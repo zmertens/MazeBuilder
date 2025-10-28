@@ -8,8 +8,6 @@
 
 #include "PhysicsGame.hpp"
 
-#include "CoutThreadSafe.hpp"
-
 #include <cassert>
 #include <cmath>
 #include <cstdint>
@@ -28,8 +26,6 @@
 #include <SDL3/SDL.h>
 #include <SFML/Audio.hpp>
 
-#include <stb/stb_image.h>
-
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
@@ -39,11 +35,12 @@
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
+#include "CoutThreadSafe.hpp"
 #include "Drawable.hpp"
 #include "OrthographicCamera.hpp"
 #include "Physical.hpp"
 #include "Renderer.hpp"
-#include "PhysicsResourceManager.hpp"
+#include "ResourceManager.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
 #include "Texture.hpp"
@@ -51,7 +48,7 @@
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
-using Resources = PhysicsResourceManager::PhysicsResources;
+using Resources = ResourceManager::PhysicsResources;
 
 struct PhysicsGame::PhysicsGameImpl {
     
@@ -83,11 +80,9 @@ struct PhysicsGame::PhysicsGameImpl {
     int32_t positionIterations = 2;
     
     // Game-specific variables
-    std::vector<Wall> walls;
-    std::vector<Ball> balls;
-    ExitCell exitCell;
     int score = 0;
-    float pixelsPerMeter = 10.0f; // Scale factor for Box2D (which uses meters)
+    // Scale factor for Box2D (which uses meters)
+    float pixelsPerMeter = 10.0f;
     bool isDragging = false;
     int draggedBallIndex = -1;
     b2Vec2 lastMousePos = {0.0f, 0.0f};
@@ -98,17 +93,9 @@ struct PhysicsGame::PhysicsGameImpl {
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
     State state;
-    WorkerConcurrent workerConcurrent;
     
     // Splash screen texture
-    SDL_Texture* splashTexture = nullptr;
-    int splashWidth = 0, splashHeight = 0;
-    
-    // Maze distance data
-    // cell index -> base36 distance character
-    std::unordered_map<int, char> distanceMap;
-    SDL_Texture* mazeDistanceTexture = nullptr;
-    int mazeWidth = 0, mazeHeight = 0;
+    Texture splashTexture;
     
     // Background maze generation
     std::vector<std::string> generatedMazes;
@@ -120,30 +107,24 @@ struct PhysicsGame::PhysicsGameImpl {
     std::unique_ptr<Renderer> mazeRenderer;
 
     PhysicsGameImpl(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
-        : title{ title }, version{ version }, resourcePath{ resourcePath }, INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , state{ State::SPLASH }, workerConcurrent{state}
+        : title{ title }
+        , version{ version }
+        , resourcePath{ resourcePath }
+        , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
+        , state{ State::SPLASH }
         , camera{ std::make_unique<OrthographicCamera>() }
         , mazeRenderer{ std::make_unique<Renderer>() } {
 
     }
 
     ~PhysicsGameImpl() {
-        // Clean up splash texture
-        if (splashTexture) {
-            SDL_DestroyTexture(splashTexture);
-            splashTexture = nullptr;
-        }
-        
-        // Clean up maze distance texture
-        if (mazeDistanceTexture) {
-            SDL_DestroyTexture(mazeDistanceTexture);
-            mazeDistanceTexture = nullptr;
-        }
+
+
     }
 
     std::optional<Resources> loadResources() {
 
-        return PhysicsResourceManager::instance()->initializeAllResources(this->resourcePath);
+        return ResourceManager::instance()->initializeAllResources(this->resourcePath);
     }
 }; // impl
 
@@ -152,7 +133,7 @@ PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::
 }
 
 PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, int w, int h)
-    : PhysicsGame(std::string_view(title), std::string_view(version), {}, w, h) {}
+    : PhysicsGame(std::string_view(title), std::string_view(version), ResourceManager::COMMON_RESOURCE_PATH_PREFIX, w, h) {}
 
 PhysicsGame::~PhysicsGame() = default;
 
@@ -172,7 +153,6 @@ bool PhysicsGame::run() const noexcept {
 
     auto&& gamePtr = this->m_impl;
     auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
-    auto&& workers = gamePtr->workerConcurrent;
 
     // Initialize SDL first
     sdlHelper->init();
@@ -197,34 +177,15 @@ bool PhysicsGame::run() const noexcept {
 
     SDL_Log("Successfully loaded all game resources");
 
-    // Workers (generate only after everything else is set up)
-    workers.initThreads();
-    workers.generate("12345");
-    // Remove the problematic workers.generate("12345") call that's causing vertex errors
-
     // Load splash texture if we have a path
     if (!resources.value().splashPath.empty()) {
-        // Load the splash texture using stb_image (similar to ResourceManager approach)
-        int width, height, channels;
-        unsigned char* imageData = stbi_load(resources.value().splashPath.c_str(), &width, &height, &channels, STBI_rgb_alpha);
-        
-        if (imageData) {
-            // Create surface from image data (force RGBA format)
-            SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, imageData, width * 4);
-            if (surface) {
-                gamePtr->splashTexture = SDL_CreateTextureFromSurface(sdlHelper->renderer, surface);
-                if (gamePtr->splashTexture) {
-                    gamePtr->splashWidth = width;
-                    gamePtr->splashHeight = height;
-                    SDL_Log("Successfully loaded splash texture: %s (%dx%d)", resources.value().splashPath.c_str(), width, height);
-                } else {
-                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create splash texture: %s", SDL_GetError());
-                }
-                SDL_DestroySurface(surface);
-            }
-            stbi_image_free(imageData);
+        if (gamePtr->splashTexture.loadFromFile(sdlHelper->renderer, resources.value().splashPath)) {
+            SDL_Log("Successfully loaded splash texture: %s (%dx%d)", 
+                resources.value().splashPath.c_str(), 
+                gamePtr->splashTexture.getWidth(), 
+                gamePtr->splashTexture.getHeight());
         } else {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash image: %s", resources.value().splashPath.c_str());
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash texture: %s", resources.value().splashPath.c_str());
         }
     }
 
@@ -319,42 +280,23 @@ bool PhysicsGame::run() const noexcept {
         SDL_RenderClear(renderer);
         
         // Render splash screen if in SPLASH state
-        if (gamePtr->state == State::SPLASH && this->m_impl->splashTexture) {
+        if (gamePtr->state == State::SPLASH && this->m_impl->splashTexture.get()) {
             // Center the splash image on screen
-            int centerX = (display_w - this->m_impl->splashWidth) / 2;
-            int centerY = (display_h - this->m_impl->splashHeight) / 2;
+            int centerX = (display_w - this->m_impl->splashTexture.getWidth()) / 2;
+            int centerY = (display_h - this->m_impl->splashTexture.getHeight()) / 2;
             
             SDL_FRect splashRect = {
                 static_cast<float>(centerX),
                 static_cast<float>(centerY),
-                static_cast<float>(this->m_impl->splashWidth),
-                static_cast<float>(this->m_impl->splashHeight)
+                static_cast<float>(this->m_impl->splashTexture.getWidth()),
+                static_cast<float>(this->m_impl->splashTexture.getHeight())
             };
             
-            SDL_RenderTexture(renderer, this->m_impl->splashTexture, nullptr, &splashRect);
+            SDL_RenderTexture(renderer, this->m_impl->splashTexture.get(), nullptr, &splashRect);
             
             // Add a simple "Press any key to continue" text instruction
             // For now, we'll just continue after a short delay or key press
             // This can be enhanced later with proper text rendering
-        }
-        
-        // Render maze distance visualization in MAIN_MENU state
-        if (gamePtr->state == State::MAIN_MENU && this->m_impl->mazeDistanceTexture) {
-            // Center the maze distance texture on screen
-            int centerX = (display_w - this->m_impl->mazeWidth) / 2;
-            int centerY = (display_h - this->m_impl->mazeHeight) / 2;
-            
-            SDL_FRect mazeRect = {
-                static_cast<float>(centerX),
-                static_cast<float>(centerY),
-                static_cast<float>(this->m_impl->mazeWidth),
-                static_cast<float>(this->m_impl->mazeHeight)
-            };
-            
-            SDL_RenderTexture(renderer, this->m_impl->mazeDistanceTexture, nullptr, &mazeRect);
-            
-            // Add instruction text (could be enhanced with proper text rendering)
-            // For now, we'll just show the distance visualization
         }
         
         // Generate new level in MAIN_MENU state (only once when entering the state)
@@ -391,8 +333,6 @@ bool PhysicsGame::run() const noexcept {
             SDL_Log("FPS: %d\n", static_cast<int>(1.0 / (elapsed / 1000.0)));
             // Calculate milliseconds per frame (correct formula)
             SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
-            // Log physics world status
-            SDL_Log("Walls: %zu, Balls: %zu", this->m_impl->walls.size(), this->m_impl->balls.size());
             currentTimeStep = 0.0;
         }
     }

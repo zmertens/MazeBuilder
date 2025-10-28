@@ -30,6 +30,10 @@ public:
 
     SDL_Texture* get() const noexcept;
 
+    int getWidth() const noexcept { return width; }
+    
+    int getHeight() const noexcept { return height; }
+
     bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
     
     bool loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept;
