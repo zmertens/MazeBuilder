@@ -23,10 +23,10 @@ void Wall::setOrientation(Orientation orientation) { this->orientation = orienta
 
 void Wall::update(float elapsed) noexcept {
     // Update logic here
-    SDL_Log("Wall update() called - implement update logic here");
+    // SDL_Log("Wall update() called - implement update logic here");
 }
 
 void Wall::draw(float elapsed) const noexcept {
     // Drawing code here
-    SDL_Log("Wall draw() called - implement rendering logic here");
+    // SDL_Log("Wall draw() called - implement rendering logic here");
 }

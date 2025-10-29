@@ -41,7 +41,7 @@ if(EMSCRIPTEN)
         "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
-    target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map>")
+    target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map --profile>")
     target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
     set_target_properties(${VOXELS_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
 

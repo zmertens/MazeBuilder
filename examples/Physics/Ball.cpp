@@ -51,7 +51,7 @@
 
 void Ball::update(float elapsed) noexcept {
 
-    SDL_Log("Ball update() called - implement update logic here");
+    // SDL_Log("Ball update() called - implement update logic here");
 
     // if (isExploding) {
     //     explosionTimer += elapsed;
@@ -68,7 +68,7 @@ void Ball::update(float elapsed) noexcept {
 // Draw the ball
 void Ball::draw(float elapsed) const noexcept {
 
-    SDL_Log("Ball draw() called - implement rendering logic here");
+    // SDL_Log("Ball draw() called - implement rendering logic here");
 
     static SDL_Texture* ballTexture = nullptr;
 
