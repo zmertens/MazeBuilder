@@ -1,42 +1,91 @@
-#ifndef PHYSICS_RESOURCE_MANAGER_HPP
-#define PHYSICS_RESOURCE_MANAGER_HPP
+#ifndef RESOURCE_MANAGER_HPP
+#define RESOURCE_MANAGER_HPP
 
+#include <map>
 #include <memory>
-#include <optional>
+#include <stdexcept>
 #include <string>
-#include <string_view>
-#include <unordered_map>
+#include <cassert>
 
-#include <MazeBuilder/singleton_base.h>
-
+struct SDL_Renderer;
 class Texture;
 
-class ResourceManager : public mazes::singleton_base<ResourceManager> {
-    friend class mazes::singleton_base<ResourceManager>;
+template <typename Resource, typename Identifier>
+class ResourceManager
+{
 public:
+    void load(Identifier id, const std::string& filename, SDL_Renderer* renderer);
 
-    const static std::string_view COMMON_RESOURCE_PATH_PREFIX;
+    template <typename Parameter>
+    void load(Identifier id, const std::string& filename, const Parameter& secondParam, SDL_Renderer* renderer);
 
-    ResourceManager();
-    ~ResourceManager();
-    
-    // Complete resource initialization
-    struct PhysicsResources {
-        std::string splashPath;
-        int splashWidth = 0;
-        int splashHeight = 0;
-        std::string musicPath;
-        std::string soundPath;
-        std::string windowIconPath;
-        bool success = false;
-    };
+    Resource& get(Identifier id);
+    const Resource& get(Identifier id) const;
 
-    std::optional<PhysicsResources> initializeAllResources(std::string_view configPath);
 
 private:
-    struct ResourceManagerImpl;
-    std::unique_ptr<ResourceManagerImpl> m_impl;
+    void insertResource(Identifier id, std::unique_ptr<Resource> resource);
+
+
+private:
+    std::map<Identifier, std::unique_ptr<Resource>> mResourceMap;
 };
 
-#endif // PHYSICS_RESOURCE_MANAGER_HPP
+
+template <typename Resource, typename Identifier>
+void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, SDL_Renderer* renderer)
+{
+	// Create and load resource
+	auto resource = std::make_unique<Resource>();
+	if (!resource->loadFromFile(renderer, filename)) {
+
+		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
+	}
+
+	// If loading successful, insert resource to map
+	insertResource(id, std::move(resource));
+}
+
+template <typename Resource, typename Identifier>
+template <typename Parameter>
+void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, const Parameter& secondParam, SDL_Renderer* renderer)
+{
+	// // Create and load resource
+	// auto resource = std::make_unique<Resource>();
+	// if (!resource->loadFromFile(renderer, filename, secondParam)) {
+
+		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
+    // }
+
+	// // If loading successful, insert resource to map
+	// insertResource(id, std::move(resource));
+}
+
+template <typename Resource, typename Identifier>
+Resource& ResourceManager<Resource, Identifier>::get(Identifier id)
+{
+	auto found = mResourceMap.find(id);
+	assert(found != mResourceMap.cend());
+
+	return *found->second;
+}
+
+template <typename Resource, typename Identifier>
+const Resource& ResourceManager<Resource, Identifier>::get(Identifier id) const
+{
+	auto found = mResourceMap.find(id);
+	assert(found != mResourceMap.cend());
+
+	return *found->second;
+}
+
+template <typename Resource, typename Identifier>
+void ResourceManager<Resource, Identifier>::insertResource(Identifier id, std::unique_ptr<Resource> resource) 
+{
+	// Insert and check success
+	auto inserted = mResourceMap.insert(std::make_pair(id, std::move(resource)));
+	assert(inserted.second);
+}
+
+#endif // RESOURCE_MANAGER_HPP
 

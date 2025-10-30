@@ -189,6 +189,7 @@ void SDLHelper::updateAudioData() noexcept {
     }
 }
 
+// Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
 void SDLHelper::playAudioStream() noexcept {
     if (this->audioDeviceId) {
         SDL_BindAudioStream(this->audioDeviceId, this->audioStream);

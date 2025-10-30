@@ -6,6 +6,7 @@
 
 #include "PhysicsGame.hpp"
 
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/singleton_base.h>
 
 static std::string TITLE_STR = "Breaking Walls";
@@ -42,6 +43,7 @@ int main(int argc, char* argv[]) {
     using std::runtime_error;
     using std::string;
 
+    using mazes::randomizer;
     using mazes::singleton_base;
 
 #if defined(MAZE_DEBUG)
@@ -68,7 +70,9 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        if (auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H); inst->run()) {
+        randomizer rng{};
+
+        if (auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H); inst->run(nullptr, rng)) {
 
 #if defined(MAZE_DEBUG)
 

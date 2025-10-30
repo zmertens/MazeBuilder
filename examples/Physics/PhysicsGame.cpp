@@ -2,7 +2,6 @@
 // PhysicsGame class implementation
 // Simple 2D physics simulation with bouncy balls that break walls
 //
-// Audio Handling reference from SDL_AUDIO_STREAM: SDL\test\testaudio.c
 //
 //
 
@@ -30,16 +29,20 @@
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
 
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
+#include <MazeBuilder/randomizer.h>
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
 #include "CoutThreadSafe.hpp"
 #include "Drawable.hpp"
+#include "JsonUtils.hpp"
 #include "OrthographicCamera.hpp"
 #include "Physical.hpp"
 #include "Renderer.hpp"
+#include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "SDLHelper.hpp"
 #include "State.hpp"
@@ -48,9 +51,9 @@
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
-using Resources = ResourceManager::PhysicsResources;
-
 struct PhysicsGame::PhysicsGameImpl {
+
+    static constexpr auto COMMON_RESOURCE_PATH_PREFIX = "resources";
     
     // Game-specific constants
     static constexpr float WALL_HIT_THRESHOLD = 4.0f; // Number of hits before a wall breaks
@@ -121,11 +124,6 @@ struct PhysicsGame::PhysicsGameImpl {
 
 
     }
-
-    std::optional<Resources> loadResources() {
-
-        return ResourceManager::instance()->initializeAllResources(this->resourcePath);
-    }
 }; // impl
 
 PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
@@ -133,12 +131,12 @@ PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::
 }
 
 PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, int w, int h)
-    : PhysicsGame(std::string_view(title), std::string_view(version), ResourceManager::COMMON_RESOURCE_PATH_PREFIX, w, h) {}
+    : PhysicsGame(std::string_view(title), std::string_view(version), PhysicsGameImpl::COMMON_RESOURCE_PATH_PREFIX, w, h) {}
 
 PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
-bool PhysicsGame::run() const noexcept {
+bool PhysicsGame::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept {
     
     using std::async;
     using std::launch;
@@ -149,6 +147,7 @@ bool PhysicsGame::run() const noexcept {
     using std::string;
     using std::string_view;
     using std::unique_ptr;
+    using std::unordered_map;
     using std::vector;
 
     auto&& gamePtr = this->m_impl;
@@ -169,30 +168,26 @@ bool PhysicsGame::run() const noexcept {
     SDL_Log("Successfully created SDL window and renderer");
 
     // Now load resources after SDL is initialized
-    auto resources = gamePtr->loadResources();
-    if (!resources.has_value() || !resources.value().success) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load game resources");
+    JsonUtils jsonUtils{};
+    unordered_map<string, string> resources{};
+    TextureManager splashTextureManager;
+    try {
+        // Load resource configuration
+        jsonUtils.loadConfiguration(gamePtr->resourcePath, ref(resources));
+        SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
+        splashTextureManager.load(Textures::ID::SPLASH_SCREEN, PhysicsGameImpl::COMMON_RESOURCE_PATH_PREFIX + string{"/"} + jsonUtils.getValue("splash_image", resources), sdlHelper->renderer);
+    } catch (const std::exception& e) {
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash screen texture: %s", e.what());
         return false;
     }
-
+    
     SDL_Log("Successfully loaded all game resources");
-
-    // Load splash texture if we have a path
-    if (!resources.value().splashPath.empty()) {
-        if (gamePtr->splashTexture.loadFromFile(sdlHelper->renderer, resources.value().splashPath)) {
-            SDL_Log("Successfully loaded splash texture: %s (%dx%d)", 
-                resources.value().splashPath.c_str(), 
-                gamePtr->splashTexture.getWidth(), 
-                gamePtr->splashTexture.getHeight());
-        } else {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash texture: %s", resources.value().splashPath.c_str());
-        }
-    }
 
     sf::SoundBuffer generateSoundBuffer;
 
     // Load and set window icon from resources
-    auto iconPath = resources.value().windowIconPath;
+    auto iconPath = PhysicsGameImpl::COMMON_RESOURCE_PATH_PREFIX + string{"/"} + jsonUtils.getValue("window_icon_path", resources);
 
     if (!iconPath.empty()) {
         SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());

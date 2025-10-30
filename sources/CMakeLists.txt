@@ -21,7 +21,6 @@ set(MAZE_BUILDER_CORE_SRCS
     distances.cpp
     grid.cpp
     grid_factory.cpp
-    grid_range.cpp
     io_utils.cpp
     json_helper.cpp
     lab.cpp

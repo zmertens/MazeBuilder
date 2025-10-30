@@ -20,7 +20,6 @@
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_factory.h>
-#include <MazeBuilder/grid_range.h>
 #include <MazeBuilder/hash_funcs.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/json_helper.h>

@@ -13,7 +13,6 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Renderer.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ResourceManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp

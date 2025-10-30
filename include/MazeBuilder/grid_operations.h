@@ -43,10 +43,6 @@ namespace mazes
         /// @return
         virtual void set_neighbor(const std::shared_ptr<cell> &c, Direction dir, std::shared_ptr<cell> const &neighbor) noexcept = 0;
 
-        /// @brief Transformation and display cells
-        /// @param cells Vector to fill with cells
-        virtual void sort(std::vector<std::shared_ptr<cell>> &cells) const noexcept = 0;
-
         // Convenience methods for accessing neighbors
         virtual std::shared_ptr<cell> get_north(const std::shared_ptr<cell> &c) const noexcept = 0;
         virtual std::shared_ptr<cell> get_south(const std::shared_ptr<cell> &c) const noexcept = 0;
@@ -58,21 +54,12 @@ namespace mazes
         /// @return
         virtual std::shared_ptr<cell> search(int index) const noexcept = 0;
 
-        /// @brief Retrieves a collection of cell objects.
-        /// @return A vector containing shared pointers to cell objects.
-        virtual std::vector<std::shared_ptr<cell>> get_cells() const noexcept = 0;
-
         /// @brief Get the count of cells in the grid
         /// @return The number of cells in the grid
         virtual int num_cells() const noexcept = 0;
 
         /// @brief Cleanup cells by cleaning up links within cells
         virtual void clear_cells() noexcept = 0;
-
-        /// @brief Set the cells in the grid
-        /// @param cells Vector of cells to set
-        /// @return True if the cells were successfully set, false otherwise
-        virtual bool set_cells(const std::vector<std::shared_ptr<cell>> &cells) noexcept = 0;
 
         virtual void set_str(std::string const &str) noexcept = 0;
 

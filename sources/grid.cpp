@@ -2,7 +2,6 @@
 
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/grid_range.h>
 #include <MazeBuilder/lab.h>
 
 #include <algorithm>
@@ -31,6 +30,15 @@ grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
     : m_dimensions(dimens)
 {
 
+    // For large grids, avoid creating all cells upfront to prevent memory issues
+    // Cells will be created lazily when accessed via search() method
+    auto total_cells = std::get<0>(m_dimensions) * std::get<1>(m_dimensions) * std::get<2>(m_dimensions);
+
+    m_cells.reserve(total_cells);
+
+    for (size_t i{0}; i < total_cells; ++i) {
+        m_cells.emplace(static_cast<int32_t>(i), std::make_shared<cell>(static_cast<int32_t>(i)));
+    }
 }
 
 // Copy constructor
@@ -79,8 +87,6 @@ grid::~grid()
 
     // First clean up cell references
     clear_cells();
-
-    m_dimensions = {configurator::DEFAULT_ROWS, configurator::DEFAULT_COLUMNS, configurator::DEFAULT_LEVELS};
 }
 
 void grid::clear_cells() noexcept
@@ -91,9 +97,6 @@ void grid::clear_cells() noexcept
         std::lock_guard<std::mutex> lock(m_topology_mutex);
         m_topology.clear();
     }
-
-    // Use range to clear all cells
-    cells().clear();
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
@@ -120,22 +123,6 @@ int grid::num_cells() const noexcept
     return static_cast<int>(m_cells.size());
 }
 
-std::vector<std::shared_ptr<cell>> grid::get_cells() const noexcept
-{
-    return cells().to_vector();
-}
-
-void grid::sort([[maybe_unused]] std::vector<std::shared_ptr<cell>> &cells) const noexcept
-{
-    using namespace std;
-
-    // sort(cells.begin(), cells.end(),
-    //      [](const std::shared_ptr<cell>& a, const std::shared_ptr<cell>& b)
-    //      {
-    //          return a->get_index() < b->get_index();
-    //      });
-}
-
 // Get the contents of a cell for this type of grid
 std::string grid::contents_of([[maybe_unused]] std::shared_ptr<cell> const &c) const noexcept
 {
@@ -156,14 +143,6 @@ grid_operations &grid::operations() noexcept
 const grid_operations &grid::operations() const noexcept
 {
     return *this;
-}
-
-bool grid::set_cells(const std::vector<std::shared_ptr<cell>> &cells) noexcept
-{
-    // Use range to set cells and clear existing ones
-    this->cells().set_from_vector(cells);
-
-    return true;
 }
 
 void grid::set_str(std::string const &str) noexcept
@@ -328,41 +307,4 @@ std::vector<std::vector<std::uint32_t>> grid::get_faces() const noexcept
 void grid::set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept
 {
     m_faces = faces;
-}
-
-// Range-based access methods
-grid_range grid::cells()
-{
-    auto create_func = [this](int index) -> std::shared_ptr<cell> {
-        auto new_cell = std::make_shared<cell>(index);
-        m_cells[index] = new_cell;
-        return new_cell;
-    };
-    
-    return grid_range(m_cells, m_dimensions, create_func);
-}
-
-grid_range grid::cells(int start_index, int end_index)
-{
-    auto create_func = [this](int index) -> std::shared_ptr<cell> {
-        auto new_cell = std::make_shared<cell>(index);
-        m_cells[index] = new_cell;
-        return new_cell;
-    };
-    
-    return grid_range(m_cells, m_dimensions, start_index, end_index, create_func);
-}
-
-const grid_range grid::cells() const
-{
-    // For const version, we don't provide a creation function
-    return grid_range(const_cast<std::unordered_map<int, std::shared_ptr<cell>>&>(m_cells), 
-                     m_dimensions, nullptr);
-}
-
-const grid_range grid::cells(int start_index, int end_index) const
-{
-    // For const version, we don't provide a creation function
-    return grid_range(const_cast<std::unordered_map<int, std::shared_ptr<cell>>&>(m_cells), 
-                     m_dimensions, start_index, end_index, nullptr);
 }

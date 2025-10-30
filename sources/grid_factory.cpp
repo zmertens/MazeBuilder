@@ -69,35 +69,17 @@ std::optional<std::unique_ptr<grid_interface>> grid_factory::create(const std::s
 
     if (auto it = m_creators.find(key); it != m_creators.cend())
     {
-
         try
         {
+            auto g = it->second(config);
 
-            auto grid = it->second(config);
-
-            if (!grid)
+            if (!g)
             {
 
                 throw new std::runtime_error(string_utils::format("Creator for key {} returned nullptr", key));
             }
 
-            auto &&ops = grid->operations();
-
-            // For large grids, avoid creating all cells upfront to prevent memory issues
-            // Cells will be created lazily when accessed via search() method
-            size_t total_cells = config.rows() * config.columns() * config.levels();
-
-            std::vector<std::shared_ptr<cell>> cells_linked_with_neighbors;
-            cells_linked_with_neighbors.reserve(total_cells);
-
-            for (size_t i = 0; i < total_cells; ++i)
-            {
-                cells_linked_with_neighbors.emplace_back(std::make_shared<cell>(static_cast<int32_t>(i)));
-            }
-
-            ops.set_cells(std::cref(cells_linked_with_neighbors));
-
-            return grid;
+            return g;
         }
         catch (const std::exception &ex)
         {
