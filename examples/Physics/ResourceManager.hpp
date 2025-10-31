@@ -7,17 +7,16 @@
 #include <string>
 #include <cassert>
 
-struct SDL_Renderer;
 class Texture;
 
 template <typename Resource, typename Identifier>
 class ResourceManager
 {
 public:
-    void load(Identifier id, const std::string& filename, SDL_Renderer* renderer);
+    void load(Identifier id, const std::string& filename);
 
     template <typename Parameter>
-    void load(Identifier id, const std::string& filename, const Parameter& secondParam, SDL_Renderer* renderer);
+    void load(Identifier id, const std::string& filename, const Parameter& secondParam);
 
     Resource& get(Identifier id);
     const Resource& get(Identifier id) const;
@@ -33,11 +32,11 @@ private:
 
 
 template <typename Resource, typename Identifier>
-void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, SDL_Renderer* renderer)
+void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename)
 {
 	// Create and load resource
 	auto resource = std::make_unique<Resource>();
-	if (!resource->loadFromFile(renderer, filename)) {
+	if (!resource->loadFromFile(filename)) {
 
 		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
 	}
@@ -48,7 +47,7 @@ void ResourceManager<Resource, Identifier>::load(Identifier id, const std::strin
 
 template <typename Resource, typename Identifier>
 template <typename Parameter>
-void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, const Parameter& secondParam, SDL_Renderer* renderer)
+void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, const Parameter& secondParam)
 {
 	// // Create and load resource
 	// auto resource = std::make_unique<Resource>();

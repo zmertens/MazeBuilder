@@ -1,5 +1,7 @@
 #include "Texture.hpp"
 
+#include "SDLHelper.hpp"
+
 #include <SDL3/SDL.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -25,8 +27,10 @@ SDL_Texture* Texture::get() const noexcept {
     return this->texture;
 }
 
-bool Texture::loadTarget(SDL_Renderer* renderer, int w, int h) noexcept {
-    
+bool Texture::loadTarget(int w, int h) noexcept {
+
+    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+
     this->free();
 
     this->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
@@ -44,8 +48,10 @@ bool Texture::loadTarget(SDL_Renderer* renderer, int w, int h) noexcept {
 }
 
 // Load an image file using stb_image and create an SDL texture
-bool Texture::loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept {
-    
+bool Texture::loadFromFile(std::string_view path) noexcept {
+
+    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+
     this->free();
 
     int width, height, channels;
@@ -92,7 +98,9 @@ bool Texture::loadFromFile(SDL_Renderer* renderer, std::string_view path) noexce
     return true;
 }
 
-bool Texture::loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept {
+bool Texture::loadImageTexture(std::string_view imagePath) noexcept {
+
+    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
 
     this->free();
 
@@ -125,8 +133,10 @@ bool Texture::loadImageTexture(SDL_Renderer* renderer, std::string_view imagePat
     return true;
 }
 
-void Texture::render(SDL_Renderer *renderer, int x, int y) const noexcept {
-    
+void Texture::render(int x, int y) const noexcept {
+
+    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+
     SDL_FRect destinationRect = { static_cast<float>(x),
         static_cast<float>(y),
         static_cast<float>(width),

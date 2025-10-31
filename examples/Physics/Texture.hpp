@@ -4,7 +4,6 @@
 #include <string_view>
 
 struct SDL_Texture;
-struct SDL_Renderer;
 
 /// @file Texture.hpp
 /// @brief Texture class for SDL3
@@ -34,13 +33,13 @@ public:
     
     int getHeight() const noexcept { return height; }
 
-    bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
+    bool loadTarget(int w, int h) noexcept;
     
-    bool loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept;
+    bool loadFromFile(std::string_view path) noexcept;
 
-    bool loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept;
+    bool loadImageTexture(std::string_view imagePath) noexcept;
 
-    void render(SDL_Renderer *renderer, int x, int y) const noexcept;
+    void render(int x, int y) const noexcept;
 }; // Texture class
 
 #endif // TEXTURE_HPP

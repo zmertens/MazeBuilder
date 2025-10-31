@@ -175,7 +175,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         // Load resource configuration
         jsonUtils.loadConfiguration(gamePtr->resourcePath, ref(resources));
         SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-        splashTextureManager.load(Textures::ID::SPLASH_SCREEN, PhysicsGameImpl::COMMON_RESOURCE_PATH_PREFIX + string{"/"} + jsonUtils.getValue("splash_image", resources), sdlHelper->renderer);
+        splashTextureManager.load(Textures::ID::SPLASH_SCREEN, PhysicsGameImpl::COMMON_RESOURCE_PATH_PREFIX + string{"/"} + jsonUtils.getValue("splash_image", resources));
     } catch (const std::exception& e) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash screen texture: %s", e.what());
