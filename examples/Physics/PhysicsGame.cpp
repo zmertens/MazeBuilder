@@ -136,7 +136,7 @@ PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, i
 PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
-bool PhysicsGame::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept {
+bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept {
     
     using std::async;
     using std::launch;
