@@ -10,7 +10,7 @@
 class Texture;
 
 /// @brief 
-class Sprite : public Drawable, Transformable {
+class Sprite : public Transformable {
 public:
     explicit Sprite(const Texture& texture);
     Sprite(const Texture& texture, const SDL_Rect& rect);

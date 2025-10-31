@@ -9,7 +9,7 @@
 #include <vector>
 #include <box2d/math_functions.h>
 
-class SceneNode : public Drawable, public Transformable {
+class SceneNode : public Transformable {
 public:
     using Ptr = std::unique_ptr<SceneNode>;
 
