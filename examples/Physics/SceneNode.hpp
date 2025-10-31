@@ -14,7 +14,6 @@ public:
     using Ptr = std::unique_ptr<SceneNode>;
 
 public:
-    explicit SceneNode();
 
     void attachChild(Ptr child);
     Ptr detachChild(const SceneNode& node);

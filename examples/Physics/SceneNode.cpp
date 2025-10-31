@@ -9,13 +9,6 @@
 #include <algorithm>
 #include <cassert>
 
-
-SceneNode::SceneNode()
-    : mChildren()
-    , mParent(nullptr)
-{
-}
-
 void SceneNode::attachChild(Ptr child)
 {
     child->mParent = this;

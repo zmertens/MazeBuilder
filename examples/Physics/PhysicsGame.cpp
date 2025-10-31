@@ -142,7 +142,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     SDL_SetRenderVSync(renderer, true);
     auto&& window = sdlHelper->window;
 
-    vector<SDL_Vertex> level;
+    gameWorld.init();
     
     // Start background maze generation while resources are loading
     // Maze myMaze{};

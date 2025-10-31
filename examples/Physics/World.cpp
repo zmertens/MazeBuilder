@@ -2,6 +2,7 @@
 
 #include "RenderStates.hpp"
 #include "SDLHelper.hpp"
+#include "SpriteNode.hpp"
 #include "Texture.hpp"
 
 #include "JsonUtils.hpp"
@@ -12,25 +13,22 @@
 
 #include <string>
 
-World::World()
-    : m_worldView()
-    , m_textures()
-    , m_sceneGraph()
-    , m_sceneLayers()
-    , m_forceDueToGravity{ -9.8f }
-{
+void World::destroy() noexcept {
+    
+    if (isValid()) {
+
+        destroyWorld();
+    }
+}
+
+void World::init() noexcept {
+
     b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = { 0.0f, m_forceDueToGravity };
+    worldDef.gravity = { 0.0f, FORCE_DUE_TO_GRAVITY };
     m_worldId = b2CreateWorld(&worldDef);
 
     loadTextures();
     buildScene();
-}
-
-World::~World() {
-    if (isValid()) {
-        destroyWorld();
-    }
 }
 
 void World::update(float dt) {
@@ -99,12 +97,11 @@ void World::loadTextures() {
     // Now load resources after SDL is initialized
     JsonUtils jsonUtils{};
     unordered_map<string, string> resources{};
-    TextureManager splashTextureManager;
     try {
         // Load resource configuration
         jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
         SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-        splashTextureManager.load(Textures::ID::SPLASH_SCREEN, "resources/" + jsonUtils.getValue("splash_image", resources));
+        m_textures.load(Textures::ID::SPLASH_SCREEN, "resources/" + jsonUtils.getValue("splash_image", resources));
     } catch (const std::exception& e) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash screen texture: %s", e.what());
@@ -135,8 +132,16 @@ void World::loadTextures() {
 
 void World::buildScene() {
     for (std::size_t i = 0; i < static_cast<std::size_t>(Layer::LAYER_COUNT); ++i) {
-        SceneNode::Ptr layer(new SceneNode());
+        SceneNode::Ptr layer = std::make_unique<SceneNode>();
         m_sceneLayers[i] = layer.get();
         m_sceneGraph.attachChild(std::move(layer));
     }
+
+    auto& texture1 = m_textures.get(Textures::ID::SPLASH_SCREEN);
+    SDL_Rect fullScreenRect = { 0, 0, texture1.getWidth(), texture1.getHeight() };
+    auto backgroundSprite = std::make_unique<SpriteNode>(texture1, fullScreenRect);
+    backgroundSprite->setPosition(0.0f, 0.0f);
+    SceneNode::Ptr spriteNode = std::move(backgroundSprite);
+    SDL_Log("World::buildScene - Adding background sprite to scene");
+    m_sceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(std::move(spriteNode));
 }

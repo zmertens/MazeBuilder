@@ -14,13 +14,12 @@
 
 struct SDL_Renderer;
 
-class World {
+class World final {
 public:
 
-    explicit World();
-    
-    // Destructor
-    ~World();
+    void init() noexcept;
+
+    void destroy() noexcept;
     
     // Update the world (update physics and entities)
     void update(float dt);
@@ -74,6 +73,8 @@ private:
 
 private:
 
+    static constexpr auto FORCE_DUE_TO_GRAVITY = 9.8f;
+
     View m_worldView;
     TextureManager m_textures;
 
@@ -81,7 +82,6 @@ private:
     std::array<SceneNode*, static_cast<std::size_t>(Layer::LAYER_COUNT)> m_sceneLayers;
 
     b2WorldId m_worldId;
-    float m_forceDueToGravity;
 };
 
 #endif // WORLD_HPP
