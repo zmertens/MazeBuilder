@@ -1,6 +1,8 @@
 #ifndef DRAWABLE_HPP
 #define DRAWABLE_HPP
 
+#include "RenderStates.hpp"
+
 #include <memory>
 
 /// @brief Abstract base class for drawable objects
@@ -8,7 +10,7 @@ class Drawable {
 private:
     struct DrawableConcept {
         virtual ~DrawableConcept() = default;
-        virtual void draw(float elapsed) const noexcept = 0;
+        virtual void draw(RenderStates states) const noexcept = 0;
         virtual std::unique_ptr<DrawableConcept> clone() const = 0;
     };
     
@@ -18,8 +20,8 @@ private:
         
         DrawableModel(T t) : obj(std::move(t)) {}
 
-        void draw(float elapsed) const noexcept override {
-            obj.draw(elapsed);
+        void draw(RenderStates states) const noexcept override {
+            obj.draw(states);
         }
         
         std::unique_ptr<DrawableConcept> clone() const override {
@@ -30,6 +32,8 @@ private:
     std::unique_ptr<DrawableConcept> impl;
 
 public:
+    explicit Drawable() = default;
+
     template<typename T>
     Drawable(T obj) : impl(std::make_unique<DrawableModel<T>>(std::move(obj))) {}
     
@@ -45,8 +49,8 @@ public:
     Drawable(Drawable&&) = default;
     Drawable& operator=(Drawable&&) = default;
     
-    void draw(float elapsed) const noexcept {
-        impl->draw(elapsed);
+    void draw(RenderStates states) const noexcept {
+        impl->draw(states);
     }
 };
 #endif // DRAWABLE_HPP

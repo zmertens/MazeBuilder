@@ -6,21 +6,26 @@ set(EXE_NAME "mazebuilderphysics")
 set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/AudioHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Ball.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Entity.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Level.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/OrthographicCamera.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Pathfinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Sprite.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SpriteNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Transformable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UdpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Wall.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/WorkerConcurrent.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/World.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/World.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/View.cpp)
 
 if(EMSCRIPTEN)
     message(INFO ": Building ${EXE_NAME} examples for the Web!")

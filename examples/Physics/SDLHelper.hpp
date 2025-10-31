@@ -14,8 +14,6 @@ struct SDL_Window;
 struct SDL_Renderer;
 struct SDL_AudioStream;
 
-struct OrthographicCamera;
-
 class SDLHelper : public mazes::singleton_base<SDLHelper> {
     friend class mazes::singleton_base<SDLHelper>;
 public:
@@ -41,7 +39,7 @@ public:
 
     bool loadFont(const std::string& f, unsigned int fSize) noexcept;
 
-    void poll_events(State& state, std::unique_ptr<OrthographicCamera> const& camera) noexcept;
+    void poll_events(State& state) noexcept;
 
     void updateAudioData() noexcept;
 

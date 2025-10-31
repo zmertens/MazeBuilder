@@ -1,12 +1,16 @@
 #ifndef WALL_HPP
 #define WALL_HPP
 
-class Wall {
+#include "Entity.hpp"
+#include "ResourceIdentifiers.hpp"
+
+class Wall : public Entity {
 public:
     enum class Orientation {
         HORIZONTAL, VERTICAL, CORNER
     };
 
+    explicit Wall(Orientation orientation, const TextureManager& textureManager);
 
     // Getters
     int getHitCount() const;
@@ -22,13 +26,11 @@ public:
     void setCol(int col);
     void setOrientation(Orientation orientation);
 
-    // Physical override
-    void update(float elapsed) noexcept;
-
-    // Drawable override
-    void draw(float elapsed) const noexcept;
+    void draw(RenderStates states) const noexcept;
 
 private:
+
+    virtual void updateCurrent(float dt) override;
 
     int hitCount;
     bool isDestroyed;

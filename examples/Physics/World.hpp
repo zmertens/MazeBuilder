@@ -2,21 +2,37 @@
 #define WORLD_HPP
 
 #include <box2d/box2d.h>
+
 #include <cstdint>
+
+#include "SceneNode.hpp"
+#include "View.hpp"
+#include "ResourceManager.hpp"
+#include "ResourceIdentifiers.hpp"
+
+#include <array>
+
+struct SDL_Renderer;
 
 class World {
 public:
-    // Constructor that accepts gravity force
-    explicit World(float forceDueToGravity);
+
+    explicit World();
     
     // Destructor
     ~World();
+    
+    // Update the world (update physics and entities)
+    void update(float dt);
+    
+    // Draw the world (render entities)
+    void draw() const noexcept;
     
     // Get the Box2D world ID
     b2WorldId getWorldId() const;
     
     // Step the physics simulation forward
-    void step(float timeStep, int32_t velocityIterations = 6, int32_t positionIterations = 2);
+    void step(float timeStep, std::int32_t subSteps = 6);
     
     // Create a body in the world
     b2BodyId createBody(const b2BodyDef* bodyDef);
@@ -41,9 +57,31 @@ public:
     
     // Destroy the world
     void destroyWorld();
-    
+
 private:
-    b2WorldId m_worldId = b2_nullWorldId;
+    // Load textures for the world
+    void loadTextures();
+    
+    // Build the scene (initialize scene graph and layers)
+    void buildScene();
+
+private:
+    enum class Layer {
+        BACKGROUND = 0,
+        FOREGROUND = 1,
+        LAYER_COUNT = 2
+    };
+
+private:
+
+    View m_worldView;
+    TextureManager m_textures;
+
+    SceneNode m_sceneGraph;
+    std::array<SceneNode*, static_cast<std::size_t>(Layer::LAYER_COUNT)> m_sceneLayers;
+
+    b2WorldId m_worldId;
+    float m_forceDueToGravity;
 };
 
 #endif // WORLD_HPP
