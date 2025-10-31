@@ -50,6 +50,10 @@
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
+#if defined(__EMSCRIPTEN__)
+#include <emscripten_local/emscripten_mainloop_stub.h>
+#endif
+
 struct PhysicsGame::PhysicsGameImpl {
 
     static constexpr auto COMMON_RESOURCE_PATH_PREFIX = "resources";
@@ -159,9 +163,13 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     gameState = State::SPLASH;
 
     SDL_Log("Starting main game loop in SPLASH state");
-    
-    while (gameState != State::DONE) {
 
+#if defined(__EMSCRIPTEN__)
+    EMSCRIPTEN_MAINLOOP_BEGIN
+#else
+    while (gameState != State::DONE)
+#endif
+    {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
         auto elapsed = static_cast<double>(SDL_GetTicks()) - previous;
         previous = static_cast<double>(SDL_GetTicks());
@@ -206,6 +214,11 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
             currentTimeStep = 0.0;
         }
     }
+
+#if defined(__EMSCRIPTEN__)
+    EMSCRIPTEN_MAINLOOP_END;
+    emscripten_cancel_main_loop();
+#endif
     
     return true;
 }
