@@ -89,12 +89,13 @@ void World::loadTextures() {
 
     if (!iconPath.empty()) {
         SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
-        if (icon) {
-            auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get();
+        if (auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get(); sdlHelper != nullptr && icon) {
+
             SDL_SetWindowIcon(sdlHelper->window, icon);
             SDL_DestroySurface(icon);
             SDL_Log("Successfully loaded window icon: %s", iconPath.c_str());
         } else {
+
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", iconPath.c_str(), SDL_GetError());
         }
     } else {
@@ -128,42 +129,36 @@ void World::buildScene() {
     mPlayerPathfinder->setPosition(0.f, 0.f);
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(leader));
 
-    // Create and add entities directly to scene graph
+    // Create and add entities directly to scene graph - positioned to be visible
     auto ballNormal = make_unique<Ball>(Ball::Type::NORMAL, mTextures);
     auto* ballNormalPtr = ballNormal.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballNormal));
-    ballNormalPtr->setPosition(100.0f, 100.0f);
-    SDL_Log("Set ball normal position to (100, 100) after attaching");
+    ballNormalPtr->setPosition(100.0f, 550.0f);  // Below splash screen
     
     auto ballHeavy = make_unique<Ball>(Ball::Type::HEAVY, mTextures);
     auto* ballHeavyPtr = ballHeavy.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballHeavy));
-    ballHeavyPtr->setPosition(150.0f, 100.0f);
-    SDL_Log("Set ball heavy position to (150, 100) after attaching");
+    ballHeavyPtr->setPosition(250.0f, 550.0f);  // Below splash screen
     
     auto ballLight = make_unique<Ball>(Ball::Type::LIGHT, mTextures);
     auto* ballLightPtr = ballLight.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballLight));
-    ballLightPtr->setPosition(200.0f, 100.0f);
-    SDL_Log("Set ball light position to (200, 100) after attaching");
+    ballLightPtr->setPosition(400.0f, 550.0f);  // Below splash screen
     
     auto ballExplosive = make_unique<Ball>(Ball::Type::EXPLOSIVE, mTextures);
     auto* ballExplosivePtr = ballExplosive.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballExplosive));
-    ballExplosivePtr->setPosition(250.0f, 100.0f);
-    SDL_Log("Set ball explosive position to (250, 100) after attaching");
+    ballExplosivePtr->setPosition(550.0f, 550.0f);  // Below splash screen
     
     auto wallHorizontal = make_unique<Wall>(Wall::Orientation::HORIZONTAL, mTextures);
     auto* wallHorizontalPtr = wallHorizontal.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallHorizontal));
-    wallHorizontalPtr->setPosition(100.0f, 200.0f);
-    SDL_Log("Set wall horizontal position to (100, 200) after attaching");
+    wallHorizontalPtr->setPosition(100.0f, 700.0f);  // Below balls
     
     auto wallVertical = make_unique<Wall>(Wall::Orientation::VERTICAL, mTextures);
     auto* wallVerticalPtr = wallVertical.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallVertical));
-    wallVerticalPtr->setPosition(200.0f, 200.0f);
-    SDL_Log("Set wall vertical position to (200, 200) after attaching");
+    wallVerticalPtr->setPosition(250.0f, 700.0f);  // Below balls
 
     SDL_Log("World::buildScene - Scene built successfully");
 }
