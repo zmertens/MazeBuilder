@@ -16,7 +16,7 @@ b2Vec2 Entity::getVelocity() const
     return mVelocity;
 }
 
-void Entity::updateCurrent(float dt)
+void Entity::updateCurrent(float dt) noexcept
 {
     move(mVelocity * dt);
 }

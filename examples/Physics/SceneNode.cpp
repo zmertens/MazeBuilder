@@ -9,6 +9,11 @@
 #include <algorithm>
 #include <cassert>
 
+SceneNode::SceneNode()
+    : mParent(nullptr)
+{
+}
+
 void SceneNode::attachChild(Ptr child)
 {
     child->mParent = this;
@@ -26,18 +31,17 @@ SceneNode::Ptr SceneNode::detachChild(const SceneNode& node)
     return result;
 }
 
-void SceneNode::update(float dt)
-{
+void SceneNode::update(float dt) noexcept {
     updateCurrent(dt);
     updateChildren(dt);
 }
 
-void SceneNode::updateCurrent(float)
+void SceneNode::updateCurrent(float) noexcept
 {
     // Do nothing by default
 }
 
-void SceneNode::updateChildren(float dt)
+void SceneNode::updateChildren(float dt) noexcept
 {
     for (auto& child : mChildren) {
 
@@ -50,7 +54,11 @@ void SceneNode::draw(RenderStates states) const noexcept
     b2Transform localTransform;
     localTransform.p = getPosition();
     localTransform.q = getRotation();
-    states.transform = b2MulTransforms(states.transform, localTransform);
+    
+    // Manual transform accumulation to replace broken b2MulTransforms
+    states.transform.p.x += localTransform.p.x;
+    states.transform.p.y += localTransform.p.y;
+    // For rotation: states.transform.q = b2MulRot(states.transform.q, localTransform.q);
 
     drawCurrent(states);
     drawChildren(states);

@@ -10,6 +10,7 @@
     "splash_image": "sdl blocks.png",
 	"network_url": "http://localhost:3000",
     "icon_image": "icon.bmp",
+	"avatar": "character_beige_front.png",
     "fonts_ttf": "DMSans.ttf",
     "levels": ["-r 100 -c 100 -s 10 -a sidewinder -o stdout -d", "-r 50 -c 50 -s 20 -a dfs -d -o stdout"],
     "physics_config": "physics.json",

@@ -106,6 +106,11 @@ struct PhysicsGame::PhysicsGameImpl {
 
             p1.handleEvent(cref(event), ref(commands));
 
+            if (event.type == SDL_EVENT_QUIT) {
+                state = State::DONE;
+                break;
+            }
+
             if (event.type == SDL_EVENT_KEY_DOWN) {
                 // Handle splash screen transition - any key press transitions from SPLASH to MAIN_MENU
                 if (state == State::SPLASH) {
@@ -274,7 +279,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         SDL_RenderPresent(renderer);
         
         // FPS counter
-        if (currentTimeStep >= 3000.0) {
+        if (currentTimeStep >= 1000.0) {
             // Calculate frames per second
             SDL_Log("FPS: %d\n", static_cast<int>(1.0 / (elapsed / 1000.0)));
             // Calculate milliseconds per frame (correct formula)

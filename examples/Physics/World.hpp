@@ -5,11 +5,12 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 #include "Command.hpp"
 #include "CommandQueue.hpp"
-#include "ResourceManager.hpp"
 #include "ResourceIdentifiers.hpp"
+#include "ResourceManager.hpp"
 #include "SceneNode.hpp"
 #include "View.hpp"
 

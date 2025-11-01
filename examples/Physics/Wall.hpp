@@ -3,6 +3,7 @@
 
 #include "Entity.hpp"
 #include "ResourceIdentifiers.hpp"
+#include "Sprite.hpp"
 
 class Wall : public Entity {
 public:
@@ -26,17 +27,21 @@ public:
     void setCol(int col);
     void setOrientation(Orientation orientation);
 
-    void draw(RenderStates states) const noexcept;
+private:
+    virtual void drawCurrent(RenderStates states) const noexcept override;
 
 private:
 
-    virtual void updateCurrent(float dt) override;
+    Textures::ID toTextureID() const noexcept;
+
+    virtual void updateCurrent(float dt) noexcept override;
 
     int hitCount;
     bool isDestroyed;
     int row;
     int col;
     Orientation orientation;
+    Sprite mSprite;
 
 };
 

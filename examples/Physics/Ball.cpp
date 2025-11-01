@@ -6,6 +6,13 @@
 
 #include <box2d/box2d.h>
 
+#include "ResourceIdentifiers.hpp"
+#include "ResourceManager.hpp"
+
+Ball::Ball(Type type, const TextureManager& textureManager)
+    : mType{type}, mSprite{textureManager.get(toTextureID(type))} {
+}
+
 // // Create a dynamic body for the ball
 // b2BodyDef bodyDef = b2DefaultBodyDef();
 // bodyDef.type = b2_dynamicBody;
@@ -47,109 +54,33 @@
 // shapeId = ballShapeId;
 // isActive = true;
 
-void Ball::update(float elapsed) noexcept {
+void Ball::updateCurrent(float dt) noexcept {
 
-    // SDL_Log("Ball update() called - implement update logic here");
-
-    // if (isExploding) {
-    //     explosionTimer += elapsed;
-    //     if (explosionTimer >= 0.5f) {
-    //         // Reset ball after explosion
-    //         isExploding = false;
-    //         explosionTimer = 0.0f;
-    //         isActive = false;
-    //         // Optionally reset position or other properties here
-    //     }
-    // }
 }
 
+
 // Draw the ball
-void Ball::draw(float elapsed) const noexcept {
+void Ball::drawCurrent(RenderStates states) const noexcept {
+    mSprite.draw(states);
+}
 
-    // SDL_Log("Ball draw() called - implement rendering logic here");
-
-    // // Get ball position from Box2D
-    // b2Vec2 pos = b2Body_GetPosition(bodyId);
+Textures::ID Ball::toTextureID(Type type) const noexcept {
     
-    // // Convert physics coordinates to world coordinates
-    // float worldX = offsetX + (pos.x * pixelsPerMeter);
-    // float worldY = offsetY + (pos.y * pixelsPerMeter);
-    
-    // // Apply camera transform
-    // SDL_FPoint screenPos = camera->worldToScreen(worldX, worldY, display_w, display_h);
-    // float screenX = screenPos.x;
-    // float screenY = screenPos.y;
-    
-    // // Scale radius based on zoom
-    // float radius = getRadius() * pixelsPerMeter * camera->zoom;
-    
-    // // Debug log to verify ball positions
-
-    // // SDL_Log("Ball: physics(%.2f,%.2f) world(%.2f,%.2f) screen(%.2f,%.2f) r=%.2f active=%d", 
-    //     // pos.x, pos.y, worldX, worldY, screenX, screenY, radius, ball.isActive ? 1 : 0);
-    
-    // if (getIsExploding()) {
-    //     // Render explosion animation
-    //     float explosionProgress = getExplosionTimer() / 0.5f;
-    //     float expandedRadius = radius * (1.0f + explosionProgress * 2.0f);
-        
-    //     // Fade out as explosion progresses
-    //     int alpha = static_cast<int>(255 * (1.0f - explosionProgress));
-        
-    //     SDL_SetRenderDrawColor(renderer, 255, 165, 0, alpha); // Orange
-        
-    //     // Draw explosion as a circle with rays
-    //     for (int w = 0; w < 16; w++) {
-    //         float angle = static_cast<float>(w) * SDL_PI_F / 8.0f;
-    //         SDL_RenderLine(
-    //             renderer,
-    //             screenX,
-    //             screenY,
-    //             screenX + SDL_cosf(angle) * expandedRadius,
-    //             screenY + SDL_sinf(angle) * expandedRadius
-    //         );
-    //     }
-    // } else {
-    //     // Normal ball rendering - make it more visible with solid red circle
-    //     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Bright red
-        
-    //     // Use efficient circle rendering for large radius
-    //     // Number of line segments to approximate the circle
-    //     const int segments = 32;
-    //     float previousX = screenX + radius;
-    //     float previousY = screenY;
-        
-    //     for (int i = 1; i <= segments; i++) {
-    //         float angle = (2.0f * SDL_PI_F * static_cast<float>(i)) / static_cast<float>(segments);
-    //         float x = screenX + radius * SDL_cosf(angle);
-    //         float y = screenY + radius * SDL_sinf(angle);
-            
-    //         SDL_RenderLine(renderer, previousX, previousY, x, y);
-    //         previousX = x;
-    //         previousY = y;
-    //     }
-        
-    //     // Fill the circle efficiently
-    //     for (int y = -radius; y <= radius; y += 1) {
-    //         float width = SDL_sqrtf(radius * radius - static_cast<float>(y * y));
-    //         SDL_RenderLine(renderer, screenX - width, screenY + y, screenX + width, screenY + y);
-    //     }
-        
-    //     // Add highlight effect for better visualization
-    //      // Light red highlight
-    //     SDL_SetRenderDrawColor(renderer, 255, 200, 200, 255);
-    //     float highlight_radius = radius * 0.5f;
-    //     // Offset to upper left for light effect
-    //     float highlightOffsetX = -radius * 0.2f;
-    //     float highlightOffsetY = -radius * 0.2f;
-    //     // Draw the highlight effect
-    //     for (int y = -highlight_radius; y <= 0; y += 1) {
-    //         float width = SDL_sqrtf(highlight_radius * highlight_radius - static_cast<float>(y * y));
-    //         SDL_RenderLine(renderer, 
-    //             screenX + highlightOffsetX - width / 2.f, 
-    //             screenY + highlightOffsetY + y, 
-    //             screenX + highlightOffsetX + width / 2.f, 
-    //             screenY + highlightOffsetY + y);
-    //     }
-    // }
+    switch (type) {
+        case Type::NORMAL: {
+            return Textures::ID::AVATAR;
+        }
+        case Type::HEAVY: {
+            return Textures::ID::AVATAR;
+        }
+        case Type::LIGHT: {
+            return Textures::ID::AVATAR;
+        }
+        case Type::EXPLOSIVE: {
+            return Textures::ID::AVATAR;
+        }
+        default: {
+            return Textures::ID::AVATAR;
+        }
+    }
 }

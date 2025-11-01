@@ -16,11 +16,14 @@ public:
 
     explicit Pathfinder(Type type, const TextureManager& textures);
 
+    virtual ~Pathfinder() = default;
+
     virtual Type getCategory() const noexcept;
 
+    void draw(RenderStates states) const noexcept;
 
 private:
-    virtual void drawCurrent(RenderStates states) const noexcept override;
+    virtual void updateCurrent(float dt) noexcept override;
 
     Textures::ID toTextureID(Type type) const noexcept;
 

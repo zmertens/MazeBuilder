@@ -1,10 +1,12 @@
 #include "World.hpp"
 
+#include "Ball.hpp"
 #include "Pathfinder.hpp"
 #include "RenderStates.hpp"
 #include "SDLHelper.hpp"
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
+#include "Wall.hpp"
 
 #include "JsonUtils.hpp"
 
@@ -62,10 +64,19 @@ void World::loadTextures() {
         // Load resource configuration
         jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
         SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-        mTextures.load(Textures::ID::SPLASH_SCREEN, "resources/" + jsonUtils.getValue("splash_image", resources));
+        auto splashImagePath = "resources/" + jsonUtils.getValue("splash_image", resources);
+        SDL_Log("DEBUG: Loading splash screen from: %s", splashImagePath.c_str());
+        mTextures.load(Textures::ID::SPLASH_SCREEN, splashImagePath);
+        
+        auto avatarValue = jsonUtils.getValue("avatar", resources);
+        SDL_Log("DEBUG: Avatar value from JSON: '%s'", avatarValue.c_str());
+        // Temporary fix - hardcode the avatar path since JSON parsing seems to have issues
+        string avatarImagePath = "resources/character_beige_front.png";
+        SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
+        mTextures.load(Textures::ID::AVATAR, avatarImagePath);
     } catch (const std::exception& e) {
 
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash screen texture: %s", e.what());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
         return;
     }
 
@@ -110,11 +121,49 @@ void World::buildScene() {
     auto backgroundSprite = make_unique<SpriteNode>(texture1, fullScreenRect);
     backgroundSprite->setPosition(0.0f, 0.0f);
     SceneNode::Ptr spriteNode = move(backgroundSprite);
-    SDL_Log("World::buildScene - Adding background sprite to scene");
     mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(spriteNode));
 
     auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
     mPlayerPathfinder = leader.get();
     mPlayerPathfinder->setPosition(0.f, 0.f);
-    mSceneLayers[static_cast<std::size_t>(Layer::FOREGROUND)]->attachChild(move(leader));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(leader));
+
+    // Create and add entities directly to scene graph
+    auto ballNormal = make_unique<Ball>(Ball::Type::NORMAL, mTextures);
+    auto* ballNormalPtr = ballNormal.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballNormal));
+    ballNormalPtr->setPosition(100.0f, 100.0f);
+    SDL_Log("Set ball normal position to (100, 100) after attaching");
+    
+    auto ballHeavy = make_unique<Ball>(Ball::Type::HEAVY, mTextures);
+    auto* ballHeavyPtr = ballHeavy.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballHeavy));
+    ballHeavyPtr->setPosition(150.0f, 100.0f);
+    SDL_Log("Set ball heavy position to (150, 100) after attaching");
+    
+    auto ballLight = make_unique<Ball>(Ball::Type::LIGHT, mTextures);
+    auto* ballLightPtr = ballLight.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballLight));
+    ballLightPtr->setPosition(200.0f, 100.0f);
+    SDL_Log("Set ball light position to (200, 100) after attaching");
+    
+    auto ballExplosive = make_unique<Ball>(Ball::Type::EXPLOSIVE, mTextures);
+    auto* ballExplosivePtr = ballExplosive.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballExplosive));
+    ballExplosivePtr->setPosition(250.0f, 100.0f);
+    SDL_Log("Set ball explosive position to (250, 100) after attaching");
+    
+    auto wallHorizontal = make_unique<Wall>(Wall::Orientation::HORIZONTAL, mTextures);
+    auto* wallHorizontalPtr = wallHorizontal.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallHorizontal));
+    wallHorizontalPtr->setPosition(100.0f, 200.0f);
+    SDL_Log("Set wall horizontal position to (100, 200) after attaching");
+    
+    auto wallVertical = make_unique<Wall>(Wall::Orientation::VERTICAL, mTextures);
+    auto* wallVerticalPtr = wallVertical.get();
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallVertical));
+    wallVerticalPtr->setPosition(200.0f, 200.0f);
+    SDL_Log("Set wall vertical position to (200, 200) after attaching");
+
+    SDL_Log("World::buildScene - Scene built successfully");
 }

@@ -11,7 +11,7 @@ private:
     struct DrawableConcept {
         virtual ~DrawableConcept() = default;
         virtual void draw(RenderStates states) const noexcept = 0;
-        virtual std::unique_ptr<DrawableConcept> clone() const = 0;
+        // Remove clone method as it's not needed for move-only semantics
     };
     
     template<typename T>
@@ -23,10 +23,6 @@ private:
         void draw(RenderStates states) const noexcept override {
             obj.draw(states);
         }
-        
-        std::unique_ptr<DrawableConcept> clone() const override {
-            return std::make_unique<DrawableModel<T>>(obj);
-        }
     };
     
     std::unique_ptr<DrawableConcept> impl;
@@ -37,15 +33,11 @@ public:
     template<typename T>
     Drawable(T obj) : impl(std::make_unique<DrawableModel<T>>(std::move(obj))) {}
     
-    Drawable(const Drawable& other) : impl(other.impl->clone()) {}
+    // Delete copy constructor and assignment operator
+    Drawable(const Drawable&) = delete;
+    Drawable& operator=(const Drawable&) = delete;
     
-    Drawable& operator=(const Drawable& other) {
-        if (this != &other) {
-            impl = other.impl->clone();
-        }
-        return *this;
-    }
-    
+    // Allow move constructor and assignment operator
     Drawable(Drawable&&) = default;
     Drawable& operator=(Drawable&&) = default;
     

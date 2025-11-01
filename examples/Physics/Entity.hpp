@@ -1,6 +1,7 @@
 #ifndef ENTITY_HPP
 #define ENTITY_HPP
 
+#include "ResourceIdentifiers.hpp"
 #include "SceneNode.hpp"
 
 #include <box2d/math_functions.h>
@@ -13,8 +14,7 @@ public:
 
 
 private:
-    virtual void updateCurrent(float dt) override;
-
+    virtual void updateCurrent(float dt) noexcept override;
 
 private:
     b2Vec2 mVelocity;

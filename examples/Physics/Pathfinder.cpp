@@ -14,7 +14,12 @@ Pathfinder::Type Pathfinder::getCategory() const noexcept
     return mType;
 }
 
-void Pathfinder::drawCurrent(RenderStates states) const noexcept
+void Pathfinder::updateCurrent(float dt) noexcept
+{
+    // Update logic for Pathfinder can be implemented here
+}
+
+void Pathfinder::draw(RenderStates states) const noexcept
 {
     mSprite.draw(states);
 }
