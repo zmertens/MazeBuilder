@@ -51,7 +51,11 @@ void SDLHelper::createWindowAndRenderer(std::string_view title, int width, int h
     } else {
         
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to get renderer info: %s\n", SDL_GetError());
+
+        return;
     }
+
+    SDL_SetRenderVSync(this->renderer, true);
 }
 
 void SDLHelper::init() noexcept {
@@ -64,15 +68,6 @@ void SDLHelper::init() noexcept {
     }
 }
 
-void SDLHelper::poll_events(State& state) noexcept {
-    using namespace std;
-
-    SDL_Event e;
-    
-  
-    
-}
-
 void SDLHelper::updateAudioData() noexcept {
     // Only attempt audio operations if we have valid audio data
     if (!this->wavBuffer || !this->wavLength || !this->audioStream) {
@@ -80,11 +75,11 @@ void SDLHelper::updateAudioData() noexcept {
     }
 
     // Check if we need to add more data to the stream
-    if (SDL_GetAudioStreamAvailable(this->audioStream) < this->wavLength) {
+    if (SDL_GetAudioStreamAvailable(this->audioStream) < static_cast<int>(this->wavLength)) {
         SDL_PutAudioStreamData(this->audioStream, this->wavBuffer, this->wavLength);
         auto streamingBytesAvailable = SDL_GetAudioStreamAvailable(this->audioStream);
-        
-        if (streamingBytesAvailable < this->wavLength) {
+
+        if (streamingBytesAvailable < static_cast<int>(this->wavLength)) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Audio stream buffer is not full: %s\n", SDL_GetError());
         } else {
             SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "Audio stream buffer is full: %u bytes available", streamingBytesAvailable);

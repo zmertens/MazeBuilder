@@ -39,8 +39,6 @@ public:
 
     bool loadFont(const std::string& f, unsigned int fSize) noexcept;
 
-    void poll_events(State& state) noexcept;
-
     void updateAudioData() noexcept;
 
     void playAudioStream() noexcept;

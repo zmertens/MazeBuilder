@@ -5,25 +5,39 @@
 #include "View.hpp"
 
 struct SDL_Renderer;
+class View;
 
 /// @brief SDL-based RenderWindow that mimics SFML's sf::RenderWindow interface
 class RenderWindow {
 public:
     explicit RenderWindow(SDL_Renderer* renderer);
 
+    virtual ~RenderWindow() = default;
+
+    // Delete copy constructor and copy assignment operator
+    // because RenderWindow contains std::unique_ptr which is not copyable
+    RenderWindow(const RenderWindow&) = delete;
+    RenderWindow& operator=(const RenderWindow&) = delete;
+
+    // Allow move constructor and move assignment operator
+    RenderWindow(RenderWindow&&) = default;
+    RenderWindow& operator=(RenderWindow&&) = default;
+
     /// @brief Set the current view (camera) for rendering
     void setView(const View& view);
 
-    /// @brief Draw a drawable object (like SceneNode)
+    /// @brief Draw a drawable object (like RenderWindow)
     /// @tparam T Any type with a draw(RenderStates) method
     template<typename T>
-    void draw(const T& drawable);
+    void draw(const T& drawable) const noexcept;
 
     /// @brief Clear the render target
-    void clear();
+    void clear() const noexcept;
 
     /// @brief Present the rendered frame
-    void display();
+    void display() const noexcept;
+
+    bool isOpen() const noexcept;
 
 private:
     SDL_Renderer* mRenderer;
@@ -32,7 +46,7 @@ private:
 
 // Template implementation
 template<typename T>
-void RenderWindow::draw(const T& drawable) {
+void RenderWindow::draw(const T& drawable) const noexcept {
     RenderStates states;
     // Apply view transform if needed (for camera/scrolling)
     // states.transform could be modified based on mCurrentView here

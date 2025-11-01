@@ -1,7 +1,7 @@
 #ifndef WORLD_HPP
 #define WORLD_HPP
 
-#include <box2d/box2d.h>
+#include <box2d/id.h>
 
 #include <array>
 #include <cstdint>
@@ -9,16 +9,19 @@
 
 #include "Command.hpp"
 #include "CommandQueue.hpp"
+#include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
-#include "RenderWindow.hpp"
 #include "SceneNode.hpp"
 #include "View.hpp"
 
 class Pathfinder;
+class RenderWindow;
 
 class World final {
 public:
+
+    explicit World(RenderWindow& window);
 
     void init() noexcept;
 
@@ -28,7 +31,7 @@ public:
     void update(float dt);
     
     // Draw the world (render entities) - pass renderer for drawing
-    void draw(RenderWindow& window) const noexcept;
+    void draw() const noexcept;
     
     CommandQueue& getCommandQueue() noexcept;
 
@@ -53,6 +56,7 @@ private:
 
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
+    RenderWindow& mWindow;
     View mWorldView;
     TextureManager mTextures;
 

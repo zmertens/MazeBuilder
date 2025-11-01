@@ -36,21 +36,24 @@
 
 #include "AudioHelper.hpp"
 #include "Ball.hpp"
-#include "CoutThreadSafe.hpp"
-#include "Drawable.hpp"
+#include "GameState.hpp"
 #include "JsonUtils.hpp"
 #include "Physical.hpp"
 #include "Player.hpp"
+#include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "SDLHelper.hpp"
+#include "SplashState.hpp"
 #include "State.hpp"
+#include "StateStack.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
 #include "WorkerConcurrent.hpp"
 #include "World.hpp"
 
 #if defined(__EMSCRIPTEN__)
+
 #include <emscripten_local/emscripten_mainloop_stub.h>
 #endif
 
@@ -66,7 +69,11 @@ struct PhysicsGame::PhysicsGameImpl {
         
     Player p1;
 
-    World world;
+    RenderWindow window;
+
+    TextureManager textures;
+
+    StateStack stateStack;
     
     // Game-specific variables
     int score = 0;
@@ -81,8 +88,77 @@ struct PhysicsGame::PhysicsGameImpl {
         , version{ version }
         , resourcePath{ resourcePath }
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , world{}, p1{} {
+        , p1{}, window{mazes::singleton_base<SDLHelper>::instance()->renderer}
+        , textures{}
+        , stateStack{State::Context{window, textures, p1}} {
 
+        initSDL();
+        loadTextures();
+        registerStates();
+        stateStack.pushState(States::ID::SPLASH);
+    }
+
+    void initSDL() noexcept {
+        auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
+
+        sdlHelper->init();
+
+        auto windowTitle = title + " - " + version;
+        sdlHelper->createWindowAndRenderer(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
+
+        // Check if window and renderer were created successfully
+        if (!sdlHelper->window || !sdlHelper->renderer) {
+
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer");
+
+            return;
+        }
+
+        SDL_Log("Successfully created SDL window and renderer");
+    }
+
+    void loadTextures() {
+        using std::string;
+        using std::unordered_map;
+        using std::ref;
+
+        JsonUtils jsonUtils{};
+        unordered_map<string, string> resources{};
+        try {
+            // Load resource configuration
+            jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
+            SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
+            auto splashImagePath = "resources/" + jsonUtils.getValue("splash_image", resources);
+            SDL_Log("DEBUG: Loading splash screen from: %s", splashImagePath.c_str());
+            textures.load(Textures::ID::SPLASH_SCREEN, splashImagePath);
+            
+            auto avatarValue = jsonUtils.getValue("avatar", resources);
+            SDL_Log("DEBUG: Avatar value from JSON: '%s'", avatarValue.c_str());
+            string avatarImagePath = "resources/character_beige_front.png";
+            SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
+            textures.load(Textures::ID::AVATAR, avatarImagePath);
+        } catch (const std::exception& e) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
+            throw;
+        }
+
+        SDL_Log("Successfully loaded all game resources");
+
+        // Load and set window icon from resources
+        auto iconPath = "resources/" + jsonUtils.getValue("window_icon_path", resources);
+
+        if (!iconPath.empty()) {
+            SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
+            if (auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get(); sdlHelper != nullptr && icon) {
+                SDL_SetWindowIcon(sdlHelper->window, icon);
+                SDL_DestroySurface(icon);
+                SDL_Log("Successfully loaded window icon: %s", iconPath.c_str());
+            } else {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", iconPath.c_str(), SDL_GetError());
+            }
+        } else {
+            SDL_Log("No window icon specified in configuration");
+        }
     }
 
     ~PhysicsGameImpl() {
@@ -92,51 +168,37 @@ struct PhysicsGame::PhysicsGameImpl {
 
     void processInput() {
 
-        using std::cref;
-        using std::ref;
-
-        CommandQueue& commands = world.getCommandQueue();
-
         SDL_Event event;
 
         while (SDL_PollEvent(&event)) {
 
-            p1.handleEvent(cref(event), ref(commands));
+            // Let the state stack handle events
+            stateStack.handleEvent(event);
 
             if (event.type == SDL_EVENT_QUIT) {
-                
+                stateStack.clearStates();
                 break;
             }
-
-            if (event.type == SDL_EVENT_KEY_DOWN) {
-                
-
-                if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-                 
-                    break;
-                }
-            } 
         }
-
-        p1.handleRealtimeInput(ref(commands));
     }
 
     void update(float dt, int subSteps = 4) {
 
-        world.update(dt);
+        stateStack.update(dt);
     }
 
-    void render() const {
+    void render() const noexcept {
 
-        auto* renderer = mazes::singleton_base<SDLHelper>::instance()->renderer;
-
-        // Create RenderWindow wrapper for SFML-like interface
-        RenderWindow window(renderer);
-        
         // Clear, draw, and present (like SFML)
         window.clear();
-        world.draw(window);
+        stateStack.draw();
         window.display();
+    }
+
+    void registerStates() noexcept {
+
+        stateStack.registerState<SplashState>(States::ID::SPLASH);
+        stateStack.registerState<GameState>(States::ID::GAME);
     }
 }; // impl
 
@@ -165,45 +227,23 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     using std::vector;
 
     auto&& gamePtr = this->m_impl;
-    auto&& gameWorld = this->m_impl->world;
-    auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
-
-    // Initialize SDL first
-    sdlHelper->init();
-
-    auto windowTitle = gamePtr->title + " - " + gamePtr->version;
-    sdlHelper->createWindowAndRenderer(windowTitle, gamePtr->INIT_WINDOW_W, gamePtr->INIT_WINDOW_H);
-
-    // Check if window and renderer were created successfully
-    if (!sdlHelper->window || !sdlHelper->renderer) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer");
-        return false;
-    }
-
-    SDL_Log("Successfully created SDL window and renderer");
-
-    auto&& renderer = sdlHelper->renderer;
-    SDL_SetRenderVSync(renderer, true);
-    auto&& window = sdlHelper->window;
-
-    gameWorld.init();
     
     // Start background maze generation while resources are loading
     // Maze myMaze{};
     // myMaze.startBackgroundMazeGeneration();
-
-    int display_w, display_h;
-    SDL_GetWindowSize(window, &display_w, &display_h);
 
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
 
     SDL_Log("Starting main game loop in SPLASH state");
 
+    // Apply pending state changes (push SPLASH state onto stack)
+    gamePtr->stateStack.update(0.0f);
+
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (1)
+    while (!gamePtr->stateStack.isEmpty())
 #endif
     {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
@@ -220,11 +260,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
             currentTimeStep += FIXED_TIME_STEP;
         }
-
-        // sdlHelper->updateAudioData();
-
-        // Get window dimensions
-        SDL_GetWindowSize(window, &display_w, &display_h);
 
         gamePtr->update(static_cast<float>(elapsed) / 1000.f);
 

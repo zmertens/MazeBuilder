@@ -1,20 +1,34 @@
 #include "World.hpp"
 
 #include "Ball.hpp"
+#include "JsonUtils.hpp"
 #include "Pathfinder.hpp"
 #include "RenderStates.hpp"
+#include "RenderWindow.hpp"
 #include "SDLHelper.hpp"
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
 
-#include "JsonUtils.hpp"
+#include <box2d/box2d.h>
 
 #include <SDL3/SDL.h>
 
 #include <MazeBuilder/singleton_base.h>
 
 #include <string>
+
+World::World(RenderWindow& window)
+    : mWindow{ window }
+    , mWorldView{ /* window.getView() */ }
+    , mTextures{}
+    , mSceneGraph{}
+    , mSceneLayers{}
+    , mWorldId{ b2_nullWorldId }
+    , mCommandQueue{}
+    , mPlayerPathfinder{ nullptr }
+{
+}
 
 void World::init() noexcept {
 
@@ -29,15 +43,15 @@ void World::init() noexcept {
 }
 
 void World::update(float dt) {
+
+    mWindow.setView(mWorldView);
+
     mSceneGraph.update(dt);
 }
 
-void World::draw(RenderWindow& window) const noexcept {
-    // Set the view/camera (like SFML's mWindow.setView(mWorldView))
-    window.setView(mWorldView);
+void World::draw() const noexcept {
     
-    // Draw the scene graph (like SFML's mWindow.draw(mSceneGraph))
-    window.draw(mSceneGraph);
+    mWindow.draw(mSceneGraph);
 }
 
 CommandQueue& World::getCommandQueue() noexcept {

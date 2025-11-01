@@ -66,4 +66,13 @@ private:
     std::map<States::ID, std::function<State::Ptr()>> mFactories;
 };
 
+template <typename T>
+void StateStack::registerState(States::ID stateID)
+{
+	mFactories.insert_or_assign(stateID, [this] ()
+	{
+		return State::Ptr(std::make_unique<T>(*this, mContext));
+	});
+}
+
 #endif // STATE_STACK_HPP

@@ -3,39 +3,50 @@
 #include "SDLHelper.hpp"
 #include "Texture.hpp"
 
-#include <SDL3/SDL.h>
-
 #include <MazeBuilder/singleton_base.h>
 
 Sprite::Sprite(const Texture& texture)
-    : m_texture(&texture), m_textureRect()
-{
-    m_textureRect = { 0, 0, texture.getWidth(), texture.getHeight() };
+    : mTexture(&texture), mTextureRect{ SDL_Rect{ 0, 0, texture.getWidth(), texture.getHeight() } }{
+
+
 }
 
 Sprite::Sprite(const Texture& texture, const SDL_Rect& rect)
-    : m_texture(&texture), m_textureRect(rect)
-{
+    : mTexture(&texture), mTextureRect{ rect }{
+
 }
 
 void Sprite::draw(RenderStates states) const noexcept {
-    if (m_texture) {
+    if (mTexture) {
 
-        auto* renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+        auto rectangleBounds = SDL_Rect{ 0, 0, mTexture->getWidth(), mTexture->getHeight() };
 
         // Convert source rect from SDL_Rect to SDL_FRect
         SDL_FRect srcRect;
-        srcRect.x = static_cast<float>(m_textureRect.x);
-        srcRect.y = static_cast<float>(m_textureRect.y);
-        srcRect.w = static_cast<float>(m_textureRect.w);
-        srcRect.h = static_cast<float>(m_textureRect.h);
+        srcRect.x = static_cast<float>(rectangleBounds.x);
+        srcRect.y = static_cast<float>(rectangleBounds.y);
+        srcRect.w = static_cast<float>(rectangleBounds.w);
+        srcRect.h = static_cast<float>(rectangleBounds.h);
 
         SDL_FRect dstRect;
         dstRect.x = states.transform.p.x;
         dstRect.y = states.transform.p.y;
-        dstRect.w = static_cast<float>(m_textureRect.w);
-        dstRect.h = static_cast<float>(m_textureRect.h);
+        dstRect.w = static_cast<float>(rectangleBounds.w);
+        dstRect.h = static_cast<float>(rectangleBounds.h);
 
-        SDL_RenderTexture(renderer, m_texture->get(), &srcRect, &dstRect);
+        SDL_RenderTexture(mazes::singleton_base<SDLHelper>::instance().get()->renderer, mTexture->get(), &srcRect, &dstRect);
+    }
+}
+
+/// @brief 
+/// @param texture 
+/// @param resetRect false
+void Sprite::setTexture(const Texture& texture, bool resetRect) {
+    
+    mTexture = &texture;
+
+    if (resetRect) {
+
+        mTextureRect = SDL_Rect{ 0, 0, texture.getWidth(), texture.getHeight() };
     }
 }

@@ -37,9 +37,9 @@ public:
     State(State&&) = default;
     State& operator=(State&&) = default;
 
-    virtual void draw() = 0;
-    virtual bool update(float dt) = 0;
-    virtual bool handleEvent(const SDL_Event& event) = 0;
+    virtual void draw() const noexcept = 0;
+    virtual bool update(float dt) noexcept = 0;
+    virtual bool handleEvent(const SDL_Event& event) noexcept = 0;
 protected:
     void requestStackPush(States::ID stateID);
     void requestStackPop();

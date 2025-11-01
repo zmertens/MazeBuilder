@@ -8,6 +8,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Ball.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandQueue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Entity.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/GameState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Level.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
@@ -18,6 +19,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SplashState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Sprite.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SpriteNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/State.cpp
