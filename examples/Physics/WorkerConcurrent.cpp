@@ -7,9 +7,8 @@
 #include <SDL3/SDL.h>
 
 // Constructor
-WorkerConcurrent::WorkerConcurrent(State& state)
-    : state(state)
-    , gameMtx(SDL_CreateMutex()), gameCond(SDL_CreateCondition()), pendingWorkCount(0) {
+WorkerConcurrent::WorkerConcurrent()
+    : gameMtx(SDL_CreateMutex()), gameCond(SDL_CreateCondition()), pendingWorkCount(0) {
 
     if (!gameCond) {
 
@@ -25,7 +24,7 @@ WorkerConcurrent::WorkerConcurrent(State& state)
 // Destructor
 WorkerConcurrent::~WorkerConcurrent() {
 
-    state = State::DONE;
+    // state = State::DONE;
 
     pendingWorkCount = 0;
 
@@ -49,7 +48,7 @@ WorkerConcurrent::~WorkerConcurrent() {
 
 // Copy Constructor
 WorkerConcurrent::WorkerConcurrent(const WorkerConcurrent& other)
-    : state(other.state), workQueue(other.workQueue), pendingWorkCount(other.pendingWorkCount) {
+    : workQueue(other.workQueue), pendingWorkCount(other.pendingWorkCount) {
 
     gameMtx = SDL_CreateMutex();
     gameCond = SDL_CreateCondition();
@@ -77,7 +76,6 @@ WorkerConcurrent& WorkerConcurrent::operator=(const WorkerConcurrent& other) {
     SDL_DestroyCondition(gameCond);
 
     // Copy data
-    state = other.state;
     for (auto&& item : other.workQueue) {
         workQueue.push_back(item);
     }
@@ -96,8 +94,7 @@ WorkerConcurrent& WorkerConcurrent::operator=(const WorkerConcurrent& other) {
 
 // Move Constructor
 WorkerConcurrent::WorkerConcurrent(WorkerConcurrent&& other) noexcept
-    : state(other.state)
-    , workQueue(std::move(other.workQueue))
+    : workQueue(std::move(other.workQueue))
     , threads(std::move(other.threads))
     , gameMtx(other.gameMtx)
     , gameCond(other.gameCond)
@@ -126,7 +123,6 @@ WorkerConcurrent& WorkerConcurrent::operator=(WorkerConcurrent&& other) noexcept
     SDL_DestroyCondition(gameCond);
 
     // Move data
-    state = other.state;
     workQueue = std::move(other.workQueue);
     threads = std::move(other.threads);
     gameMtx = other.gameMtx;
@@ -157,10 +153,10 @@ void WorkerConcurrent::initThreads() noexcept {
                     SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
                 }
 
-                if (workerPtr->state == State::DONE) {
-                    SDL_UnlockMutex(workerPtr->gameMtx);
-                    break;
-                }
+                // if (workerPtr->state == State::DONE) {
+                //     SDL_UnlockMutex(workerPtr->gameMtx);
+                //     break;
+                // }
 
                 if (!workerPtr->workQueue.empty()) {
 

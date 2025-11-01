@@ -20,6 +20,8 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Sprite.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SpriteNode.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/State.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/StateStack.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Transformable.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/UdpClient.cpp

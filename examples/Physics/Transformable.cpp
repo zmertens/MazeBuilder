@@ -1,9 +1,9 @@
 #include "Transformable.hpp"
 
 Transformable::Transformable()
-    : mPosition(0.f, 0.f)
-    , mRotation(0.f)
-    , mScale(1.f, 1.f)
+    : mPosition{0.f, 0.f}
+    , mRotation{0.f}
+    , mScale{1.f, 1.f}
 {
 }
 

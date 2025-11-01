@@ -76,14 +76,11 @@ struct PhysicsGame::PhysicsGameImpl {
     std::string resourcePath;
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
-    State state;
-
     PhysicsGameImpl(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
         : title{ title}
         , version{ version }
         , resourcePath{ resourcePath }
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , state{ State::SPLASH }
         , world{}, p1{} {
 
     }
@@ -107,25 +104,16 @@ struct PhysicsGame::PhysicsGameImpl {
             p1.handleEvent(cref(event), ref(commands));
 
             if (event.type == SDL_EVENT_QUIT) {
-                state = State::DONE;
+                
                 break;
             }
 
             if (event.type == SDL_EVENT_KEY_DOWN) {
-                // Handle splash screen transition - any key press transitions from SPLASH to MAIN_MENU
-                if (state == State::SPLASH) {
-                    state = State::MAIN_MENU; // Go to main menu for maze creation
-                    break;
-                }
+                
 
                 if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-                    state = State::DONE;
+                 
                     break;
-                } else if (event.key.scancode == SDL_SCANCODE_B) {
-                    // Generate maze when in MAIN_MENU state
-                    if (state == State::MAIN_MENU) {
-                        state = State::PLAY_SINGLE_MODE;
-                    }
                 }
             } 
         }
@@ -178,7 +166,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
     auto&& gamePtr = this->m_impl;
     auto&& gameWorld = this->m_impl->world;
-    auto&& gameState = this->m_impl->state;
     auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
 
     // Initialize SDL first
@@ -210,14 +197,13 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
-    gameState = State::SPLASH;
 
     SDL_Log("Starting main game loop in SPLASH state");
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (gameState != State::DONE)
+    while (1)
 #endif
     {
         static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
@@ -239,12 +225,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
         // Get window dimensions
         SDL_GetWindowSize(window, &display_w, &display_h);
-                
-        // Draw the current maze if available (in PLAY_SINGLE_MODE or MAIN_MENU)
-        if ((gameState == State::PLAY_SINGLE_MODE || gameState == State::MAIN_MENU)) {
-            // Calculate centering offset
-
-        }
 
         gamePtr->update(static_cast<float>(elapsed) / 1000.f);
 

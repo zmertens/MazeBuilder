@@ -1,36 +1,52 @@
 #ifndef STATE_HPP
 #define STATE_HPP
 
-enum class State {
-    // Shows info about the game
-    ABOUT_MENU,
+#include <memory>
 
-    // Main navigation menu
-    MAIN_MENU,
+#include "RenderWindow.hpp"
+#include "ResourceIdentifiers.hpp"
+#include "StateIdentifiers.hpp"
 
-    // Connect to multiplayer server
-    NET_CONNECT,
+class Player;
+class StateStack;
+union SDL_Event;
 
-    // Select an alias
-    PICK_ALIAS_MENU,
+class State {
+public:
+    typedef std::unique_ptr<State> Ptr;
+    
+    struct Context { 
 
-    // Single player mode
-    PLAY_SINGLE_MODE,
+        explicit Context(RenderWindow& window, TextureManager& textures, Player& player);
 
-    // Multiplayer mode
-    PLAY_MULTI_MODE,
+        RenderWindow* window;
+        TextureManager* textures;  
+        Player* player;
+    };
+public:
+    explicit State(StateStack& stack, Context context);
 
-    // Game is paused
-    PLAY_PAUSED,
+    virtual ~State() = default;
 
-    // Show high scores
-    SCORES_MENU,
+    // Delete copy constructor and copy assignment operator
+    // because State contains std::unique_ptr which is not copyable
+    State(const State&) = delete;
+    State& operator=(const State&) = delete;
 
-    // Game is starting, show welcome screen
-    SPLASH,
+    // Allow move constructor and move assignment operator
+    State(State&&) = default;
+    State& operator=(State&&) = default;
 
-    // Application is done and exiting
-    DONE,
+    virtual void draw() = 0;
+    virtual bool update(float dt) = 0;
+    virtual bool handleEvent(const SDL_Event& event) = 0;
+protected:
+    void requestStackPush(States::ID stateID);
+    void requestStackPop();
+    void requestStateClear();
+    Context getContext() const noexcept;
+private:
+    StateStack* mStack;
+    Context mContext;
 };
-
 #endif // STATE_HPP

@@ -5,8 +5,6 @@
 #include <vector>
 #include <string_view>
 
-#include "State.hpp"
-
 struct SDL_Thread;
 struct SDL_Mutex;
 struct SDL_Condition;
@@ -17,7 +15,7 @@ struct SDL_Vertex;
 /// @details Each thread processes a segment of a string, setting vertices for rendering.
 class WorkerConcurrent {
 public:
-    explicit WorkerConcurrent(State& state);
+    explicit WorkerConcurrent();
     ~WorkerConcurrent();
     WorkerConcurrent(const WorkerConcurrent& other);
     WorkerConcurrent& operator=(const WorkerConcurrent& other);
@@ -43,8 +41,6 @@ private:
     };
 
     void doWork(std::vector<SDL_Vertex>& vertices, WorkItem const& workItem) const noexcept;
-
-    State& state;
 
     std::deque<WorkItem> workQueue;
     std::vector<SDL_Thread*> threads;
