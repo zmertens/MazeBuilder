@@ -32,11 +32,12 @@ void World::update(float dt) {
     mSceneGraph.update(dt);
 }
 
-void World::draw() const noexcept {
-    RenderStates states;
-    // In a real application, you would get the view from your camera
-    // For now, we'll use a default RenderStates
-    mSceneGraph.draw(states);
+void World::draw(RenderWindow& window) const noexcept {
+    // Set the view/camera (like SFML's mWindow.setView(mWorldView))
+    window.setView(mWorldView);
+    
+    // Draw the scene graph (like SFML's mWindow.draw(mSceneGraph))
+    window.draw(mSceneGraph);
 }
 
 CommandQueue& World::getCommandQueue() noexcept {

@@ -9,9 +9,19 @@ Pathfinder::Pathfinder(Type type, const TextureManager& textures)
 {
 }
 
-Pathfinder::Type Pathfinder::getCategory() const noexcept
+Category::Type Pathfinder::getCategory() const noexcept
 {
-    return mType;
+    switch (mType) {
+        case Type::ALLY: {
+            return Category::Type::PLAYER;
+        }
+        case Type::ENEMY: {
+            return Category::Type::ENEMY;
+        }
+        default: {
+            return Category::Type::NONE;
+        }
+    }
 }
 
 void Pathfinder::updateCurrent(float dt) noexcept

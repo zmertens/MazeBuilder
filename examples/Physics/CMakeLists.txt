@@ -14,6 +14,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Pathfinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RenderWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
@@ -38,7 +39,7 @@ if(EMSCRIPTEN)
     target_compile_options(${EXE_NAME} PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
     target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/glad/include>)
-    target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
+    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
     target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 

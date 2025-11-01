@@ -1,6 +1,7 @@
 #include "Player.hpp"
 
 #include "CommandQueue.hpp"
+#include "Pathfinder.hpp"
 
 #include <SDL3/SDL.h>
 
@@ -32,32 +33,17 @@ void Player::handleEvent(const SDL_Event& event, CommandQueue& commands) {
 // Handle continuous input for realtime actions
 void Player::handleRealtimeInput(CommandQueue& commands) {
     
-    const auto* keyState = SDL_GetKeyboardState(NULL);
+    for (auto& pair : mKeyBinding) {
+        
+        if (isRealtimeAction(pair.second)) {
 
-    if (keyState[SDL_SCANCODE_LEFT]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_RIGHT]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_UP]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_DOWN]) {
-        
-    }
-    
-    if (keyState[SDL_SCANCODE_Q]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_E]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_EQUALS]) {
-        
-    }
-    if (keyState[SDL_SCANCODE_MINUS]) {
-        
+            const auto* keyState = SDL_GetKeyboardState(nullptr);
+
+            if (pair.first < SDL_arraysize(keyState) && keyState[pair.first]) {
+
+                commands.push(mActionBinding[pair.second]);
+            }
+        }
     }
 }
 
@@ -76,12 +62,33 @@ bool Player::isRealtimeAction(Action action)
 
 void Player::initializeActions()
 {
-	static constexpr auto playerSpeed = 200.f;
+    static constexpr auto playerSpeed = 200.f;
 
-	// mActionBinding[Action::MOVE_LEFT].action = derivedAction<Aircraft>(AircraftMover(-playerSpeed, 0.f));
-	// mActionBinding[Action::MOVE_RIGHT].action = derivedAction<Aircraft>(AircraftMover(+playerSpeed, 0.f));
-	// mActionBinding[Action::MOVE_UP].action = derivedAction<Aircraft>(AircraftMover(0.f, -playerSpeed));
-	// mActionBinding[Action::MOVE_DOWN].action = derivedAction<Aircraft>(AircraftMover(0.f, +playerSpeed));
+    // Define movement functor similar to SFML's AircraftMover
+    // Lambda captures velocity and applies it to Pathfinder
+    mActionBinding[Action::MOVE_LEFT].action = derivedAction<Pathfinder>(
+        [](Pathfinder& pathfinder, float dt) {
+            pathfinder.accelerate(-playerSpeed * dt, 0.f);
+        }
+    );
+    
+    mActionBinding[Action::MOVE_RIGHT].action = derivedAction<Pathfinder>(
+        [](Pathfinder& pathfinder, float dt) {
+            pathfinder.accelerate(+playerSpeed * dt, 0.f);
+        }
+    );
+    
+    mActionBinding[Action::MOVE_UP].action = derivedAction<Pathfinder>(
+        [](Pathfinder& pathfinder, float dt) {
+            pathfinder.accelerate(0.f, -playerSpeed * dt);
+        }
+    );
+    
+    mActionBinding[Action::MOVE_DOWN].action = derivedAction<Pathfinder>(
+        [](Pathfinder& pathfinder, float dt) {
+            pathfinder.accelerate(0.f, +playerSpeed * dt);
+        }
+    );
 }
 
 void Player::assignKey(Action action, std::uint32_t key) {
@@ -106,6 +113,6 @@ std::uint32_t Player::getAssignedKey(Action action) const {
             return pair.first;
         }
     }
-    
+
     return SDL_SCANCODE_UNKNOWN;
 }

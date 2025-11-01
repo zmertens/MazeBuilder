@@ -11,6 +11,7 @@
 #include "CommandQueue.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
+#include "RenderWindow.hpp"
 #include "SceneNode.hpp"
 #include "View.hpp"
 
@@ -26,8 +27,8 @@ public:
     // Update the world (update physics and entities)
     void update(float dt);
     
-    // Draw the world (render entities)
-    void draw() const noexcept;
+    // Draw the world (render entities) - pass renderer for drawing
+    void draw(RenderWindow& window) const noexcept;
     
     CommandQueue& getCommandQueue() noexcept;
 

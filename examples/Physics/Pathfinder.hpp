@@ -1,6 +1,7 @@
 #ifndef PATHFINDER_HPP
 #define PATHFINDER_HPP
 
+#include "Category.hpp"
 #include "Entity.hpp"
 #include "RenderStates.hpp"
 #include "ResourceIdentifiers.hpp"
@@ -18,7 +19,7 @@ public:
 
     virtual ~Pathfinder() = default;
 
-    virtual Type getCategory() const noexcept;
+    virtual Category::Type getCategory() const noexcept override;
 
     void draw(RenderStates states) const noexcept;
 

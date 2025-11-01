@@ -1,4 +1,6 @@
 #include "SceneNode.hpp"
+
+#include "Command.hpp"
 #include "RenderStates.hpp"
 
 #include <box2d/math_functions.h>
@@ -10,7 +12,7 @@
 #include <cassert>
 
 SceneNode::SceneNode()
-    : mParent(nullptr)
+    : mChildren{}, mParent(nullptr)
 {
 }
 
@@ -51,14 +53,10 @@ void SceneNode::updateChildren(float dt) noexcept
 
 void SceneNode::draw(RenderStates states) const noexcept
 {
-    b2Transform localTransform;
-    localTransform.p = getPosition();
-    localTransform.q = getRotation();
-    
-    // Manual transform accumulation to replace broken b2MulTransforms
-    states.transform.p.x += localTransform.p.x;
-    states.transform.p.y += localTransform.p.y;
-    // For rotation: states.transform.q = b2MulRot(states.transform.q, localTransform.q);
+    states.transform.p.x += getPosition().x;
+    states.transform.p.y += getPosition().y;
+
+    states.transform.q = getRotation();
 
     drawCurrent(states);
     drawChildren(states);
@@ -78,10 +76,10 @@ void SceneNode::drawChildren(RenderStates states) const noexcept
 
 b2Vec2 SceneNode::getWorldPosition() const
 {
-    return getWorldTransform().p;
+    return { getWorldTransform().getPosition().x, getWorldTransform().getPosition().y };
 }
 
-b2Transform SceneNode::getWorldTransform() const
+Transformable SceneNode::getWorldTransform() const
 {
     b2Transform transform = b2Transform_identity;
 
@@ -92,6 +90,30 @@ b2Transform SceneNode::getWorldTransform() const
         localTransform.q = node->getRotation();
         transform = b2MulTransforms(localTransform, transform);
     }
+    
+    Transformable worldTransform;
+    worldTransform.setPosition(transform.p);
+    worldTransform.setRotation(transform.q);
 
-    return transform;
+    return worldTransform;
+}
+
+void SceneNode::onCommand(const Command& command, float dt) noexcept
+{
+    // Check if the command applies to this node
+    if (command.category == getCategory()) {
+
+        command.action(*this, dt);
+    }
+
+    // Pass the command to the children
+    for (const auto& child : mChildren) {
+
+        child->onCommand(command, dt);
+    }
+}
+
+Category::Type SceneNode::getCategory() const noexcept {
+
+    return Category::Type::SCENE;
 }

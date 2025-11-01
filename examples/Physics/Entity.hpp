@@ -8,6 +8,9 @@
 
 class Entity : public SceneNode {
 public:
+    void accelerate(b2Vec2 velocityChange) noexcept;
+    void accelerate(float vx, float vy) noexcept;
+
     void setVelocity(b2Vec2 velocity);
     void setVelocity(float vx, float vy);
     b2Vec2 getVelocity() const;

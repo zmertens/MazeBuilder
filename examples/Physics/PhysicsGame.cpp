@@ -128,37 +128,6 @@ struct PhysicsGame::PhysicsGameImpl {
                     }
                 }
             } 
-            // Arrow key controls for camera movement
-            else if (event.key.scancode == SDL_SCANCODE_LEFT) {
-
-            }
-            else if (event.key.scancode == SDL_SCANCODE_RIGHT) {
-
-            }
-            else if (event.key.scancode == SDL_SCANCODE_UP) {
-
-            }
-            else if (event.key.scancode == SDL_SCANCODE_DOWN) {
-
-            }
-            // Rotation controls with Q/E keys
-            else if (event.key.scancode == SDL_SCANCODE_Q) {
-
-            }
-            else if (event.key.scancode == SDL_SCANCODE_E) {
-
-            }
-            // Zoom controls with +/- (equals/minus) keys
-            else if (event.key.scancode == SDL_SCANCODE_EQUALS) {
-
-            }
-            else if (event.key.scancode == SDL_SCANCODE_MINUS) {
-
-            }
-            // Reset camera with R key
-            else if (event.key.scancode == SDL_SCANCODE_R) {
-
-            }
         }
 
         p1.handleRealtimeInput(ref(commands));
@@ -171,7 +140,15 @@ struct PhysicsGame::PhysicsGameImpl {
 
     void render() const {
 
-        world.draw();
+        auto* renderer = mazes::singleton_base<SDLHelper>::instance()->renderer;
+
+        // Create RenderWindow wrapper for SFML-like interface
+        RenderWindow window(renderer);
+        
+        // Clear, draw, and present (like SFML)
+        window.clear();
+        world.draw(window);
+        window.display();
     }
 }; // impl
 
@@ -262,21 +239,16 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
         // Get window dimensions
         SDL_GetWindowSize(window, &display_w, &display_h);
-        
-        // Clear the screen
-        SDL_SetRenderDrawColor(renderer, 240, 240, 240, 255); // Light gray background
-        SDL_RenderClear(renderer);
-        
+                
         // Draw the current maze if available (in PLAY_SINGLE_MODE or MAIN_MENU)
         if ((gameState == State::PLAY_SINGLE_MODE || gameState == State::MAIN_MENU)) {
             // Calculate centering offset
 
         }
 
+        gamePtr->update(static_cast<float>(elapsed) / 1000.f);
+
         gamePtr->render();
-        
-        // Present the rendered frame
-        SDL_RenderPresent(renderer);
         
         // FPS counter
         if (currentTimeStep >= 1000.0) {
