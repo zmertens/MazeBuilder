@@ -236,7 +236,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     double accumulator = 0.0, currentTimeStep = 0.0;
 
     SDL_Log("Starting main game loop in SPLASH state");
-
+    
     // Apply pending state changes (push SPLASH state onto stack)
     gamePtr->stateStack.update(0.0f);
 
@@ -246,9 +246,11 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     while (!gamePtr->stateStack.isEmpty())
 #endif
     {
-        static constexpr auto FIXED_TIME_STEP = 1.0 / 60.0;
-        auto elapsed = static_cast<double>(SDL_GetTicks()) - previous;
-        previous = static_cast<double>(SDL_GetTicks());
+         // Expected milliseconds per frame (16.67ms)
+        static constexpr auto FIXED_TIME_STEP = 1000.0 / 60.0;
+        auto current = static_cast<double>(SDL_GetTicks());
+        auto elapsed = current - previous;
+        previous = current;
         accumulator += elapsed;
         
         // Handle events and update physics at a fixed time step
@@ -259,17 +261,24 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
             accumulator -= FIXED_TIME_STEP;
 
             currentTimeStep += FIXED_TIME_STEP;
-        }
 
-        gamePtr->update(static_cast<float>(elapsed) / 1000.f);
+            gamePtr->update(static_cast<float>(FIXED_TIME_STEP) / 1000.f);
+        }
 
         gamePtr->render();
         
+        // Cap frame rate at 60 FPS if VSync doesn't work
+        if (auto frameTime = static_cast<double>(SDL_GetTicks()) - current; frameTime < FIXED_TIME_STEP) {
+
+            SDL_Delay(static_cast<std::uint32_t>(FIXED_TIME_STEP - frameTime));
+        }
+        
         // FPS counter
         if (currentTimeStep >= 1000.0) {
-            // Calculate frames per second
-            SDL_Log("FPS: %d\n", static_cast<int>(1.0 / (elapsed / 1000.0)));
-            // Calculate milliseconds per frame (correct formula)
+
+            // Calculate frames per second (elapsed is in milliseconds)
+            SDL_Log("FPS: %d\n", static_cast<int>(1000.0 / elapsed));
+            // Calculate milliseconds per frame
             SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
             currentTimeStep = 0.0;
         }

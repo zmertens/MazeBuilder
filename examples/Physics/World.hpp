@@ -21,7 +21,7 @@ class RenderWindow;
 class World final {
 public:
 
-    explicit World(RenderWindow& window);
+    explicit World(RenderWindow& window, TextureManager& textures);
 
     void init() noexcept;
 
@@ -58,7 +58,7 @@ private:
 
     RenderWindow& mWindow;
     View mWorldView;
-    TextureManager mTextures;
+    TextureManager& mTextures;
 
     SceneNode mSceneGraph;
     std::array<SceneNode*, static_cast<std::size_t>(Layer::LAYER_COUNT)> mSceneLayers;

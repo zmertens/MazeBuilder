@@ -9,7 +9,7 @@
 
 GameState::GameState(StateStack& stack, State::Context context)
     : State{stack, context}
-    , mWorld{*context.window}
+    , mWorld{*context.window, *context.textures}
     , mPlayer{*context.player}
 {
     mWorld.init();
@@ -41,7 +41,7 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
         if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
 
             // requestStackPush(States::ID::PAUSE);
-            requestStackPop();
+            requestStateClear(); // Clear all states to exit the game
         }
     }
 

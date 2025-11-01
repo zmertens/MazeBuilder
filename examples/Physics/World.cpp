@@ -18,10 +18,10 @@
 
 #include <string>
 
-World::World(RenderWindow& window)
+World::World(RenderWindow& window, TextureManager& textures)
     : mWindow{ window }
     , mWorldView{ /* window.getView() */ }
-    , mTextures{}
+    , mTextures{ textures }
     , mSceneGraph{}
     , mSceneLayers{}
     , mWorldId{ b2_nullWorldId }
@@ -38,7 +38,8 @@ void World::init() noexcept {
 
     mPlayerPathfinder = nullptr;
 
-    loadTextures();
+    // Note: Textures are already loaded in PhysicsGameImpl constructor
+    // loadTextures(); // Removed to avoid duplicate loading
     buildScene();
 }
 

@@ -55,7 +55,7 @@ void SDLHelper::createWindowAndRenderer(std::string_view title, int width, int h
         return;
     }
 
-    SDL_SetRenderVSync(this->renderer, true);
+    SDL_SetRenderVSync(renderer, 1);
 }
 
 void SDLHelper::init() noexcept {
