@@ -39,8 +39,8 @@
 #include "CoutThreadSafe.hpp"
 #include "Drawable.hpp"
 #include "JsonUtils.hpp"
-#include "OrthographicCamera.hpp"
 #include "Physical.hpp"
+#include "Player.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "SDLHelper.hpp"
@@ -64,9 +64,9 @@ struct PhysicsGame::PhysicsGameImpl {
 
     static constexpr int MAX_BALLS = 10;
         
-    World world;
+    Player p1;
 
-    float timeStep;
+    World world;
     
     // Game-specific variables
     int score = 0;
@@ -79,18 +79,89 @@ struct PhysicsGame::PhysicsGameImpl {
     State state;
 
     PhysicsGameImpl(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
-        : timeStep{ 1.f }
-        , title{ title}
+        : title{ title}
         , version{ version }
         , resourcePath{ resourcePath }
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , state{ State::SPLASH } {
+        , state{ State::SPLASH }
+        , world{}, p1{} {
 
     }
 
     ~PhysicsGameImpl() {
 
 
+    }
+
+    void processInput() {
+
+        using std::cref;
+        using std::ref;
+
+        CommandQueue& commands = world.getCommandQueue();
+
+        SDL_Event event;
+
+        while (SDL_PollEvent(&event)) {
+
+            p1.handleEvent(cref(event), ref(commands));
+
+            if (event.type == SDL_EVENT_KEY_DOWN) {
+                // Handle splash screen transition - any key press transitions from SPLASH to MAIN_MENU
+                if (state == State::SPLASH) {
+                    state = State::MAIN_MENU; // Go to main menu for maze creation
+                    break;
+                }
+
+                if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
+                    state = State::DONE;
+                    break;
+                } else if (event.key.scancode == SDL_SCANCODE_B) {
+                    // Generate maze when in MAIN_MENU state
+                    if (state == State::MAIN_MENU) {
+                        state = State::PLAY_SINGLE_MODE;
+                    }
+                }
+            } 
+            // Arrow key controls for camera movement
+            else if (event.key.scancode == SDL_SCANCODE_LEFT) {
+
+            }
+            else if (event.key.scancode == SDL_SCANCODE_RIGHT) {
+
+            }
+            else if (event.key.scancode == SDL_SCANCODE_UP) {
+
+            }
+            else if (event.key.scancode == SDL_SCANCODE_DOWN) {
+
+            }
+            // Rotation controls with Q/E keys
+            else if (event.key.scancode == SDL_SCANCODE_Q) {
+
+            }
+            else if (event.key.scancode == SDL_SCANCODE_E) {
+
+            }
+            // Zoom controls with +/- (equals/minus) keys
+            else if (event.key.scancode == SDL_SCANCODE_EQUALS) {
+
+            }
+            else if (event.key.scancode == SDL_SCANCODE_MINUS) {
+
+            }
+            // Reset camera with R key
+            else if (event.key.scancode == SDL_SCANCODE_R) {
+
+            }
+        }
+
+        p1.handleRealtimeInput(ref(commands));
+    }
+
+    void update(float dt, int subSteps = 4) {
+
+        world.update(dt);
     }
 
     void render() const {
@@ -154,9 +225,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
     int display_w, display_h;
     SDL_GetWindowSize(window, &display_w, &display_h);
-    
-    // Initial physics simulation step to ensure bodies are positioned
-    gameWorld.step(this->m_impl->timeStep, 4);
 
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
@@ -178,7 +246,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         // Handle events and update physics at a fixed time step
         while (accumulator >= FIXED_TIME_STEP) {
 
-            sdlHelper->poll_events(ref(gameState));
+            gamePtr->processInput();
 
             accumulator -= FIXED_TIME_STEP;
 

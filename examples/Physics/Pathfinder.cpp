@@ -1,22 +1,34 @@
 #include "Pathfinder.hpp"
 
-void Pathfinder::setVelocity(b2Vec2 velocity)
+#include "ResourceManager.hpp"
+#include "Texture.hpp"
+
+Pathfinder::Pathfinder(Type type, const TextureManager& textures)
+    : mType(type)
+    , mSprite(textures.get(toTextureID(type)))
 {
-    mVelocity = velocity;
 }
 
-void Pathfinder::setVelocity(float vx, float vy)
+Pathfinder::Type Pathfinder::getCategory() const noexcept
 {
-    mVelocity.x = vx;
-    mVelocity.y = vy;
+    return mType;
 }
 
-b2Vec2 Pathfinder::getVelocity() const
+void Pathfinder::drawCurrent(RenderStates states) const noexcept
 {
-    return mVelocity;
+    mSprite.draw(states);
 }
 
-void Pathfinder::updateCurrent(float dt)
-{
-    move(mVelocity * dt);
+Textures::ID Pathfinder::toTextureID(Type type) const noexcept {
+    switch (type) {
+        case Type::ALLY: {
+            return Textures::ID::AVATAR;
+        }
+        case Type::ENEMY: {
+            return Textures::ID::AVATAR;
+        }
+        default: {
+            return Textures::ID::AVATAR;
+        }
+    }
 }

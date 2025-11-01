@@ -6,8 +6,6 @@
 
 #include <box2d/box2d.h>
 
-#include "OrthographicCamera.hpp"
-
 // // Create a dynamic body for the ball
 // b2BodyDef bodyDef = b2DefaultBodyDef();
 // bodyDef.type = b2_dynamicBody;
@@ -69,8 +67,6 @@ void Ball::update(float elapsed) noexcept {
 void Ball::draw(float elapsed) const noexcept {
 
     // SDL_Log("Ball draw() called - implement rendering logic here");
-
-    static SDL_Texture* ballTexture = nullptr;
 
     // // Get ball position from Box2D
     // b2Vec2 pos = b2Body_GetPosition(bodyId);

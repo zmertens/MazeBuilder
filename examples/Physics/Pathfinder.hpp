@@ -1,23 +1,33 @@
 #ifndef PATHFINDER_HPP
 #define PATHFINDER_HPP
 
-#include "SceneNode.hpp"
+#include "Entity.hpp"
+#include "RenderStates.hpp"
+#include "ResourceIdentifiers.hpp"
+#include "Sprite.hpp"
 
-#include <box2d/math_functions.h>
-
-class Pathfinder : public SceneNode {
+class Pathfinder : public Entity {
 public:
-    void setVelocity(b2Vec2 velocity);
-    void setVelocity(float vx, float vy);
-    b2Vec2 getVelocity() const;
+
+    enum class Type {
+        ALLY,
+        ENEMY
+    };
+
+    explicit Pathfinder(Type type, const TextureManager& textures);
+
+    virtual Type getCategory() const noexcept;
 
 
 private:
-    virtual void updateCurrent(float dt) override;
+    virtual void drawCurrent(RenderStates states) const noexcept override;
+
+    Textures::ID toTextureID(Type type) const noexcept;
 
 
 private:
-    b2Vec2 mVelocity;
+    Type mType;
+    Sprite mSprite;
 };
 
 #endif // PATHFINDER_HPP

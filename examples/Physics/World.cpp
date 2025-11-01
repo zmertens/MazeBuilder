@@ -1,5 +1,6 @@
 #include "World.hpp"
 
+#include "Pathfinder.hpp"
 #include "RenderStates.hpp"
 #include "SDLHelper.hpp"
 #include "SpriteNode.hpp"
@@ -13,79 +14,39 @@
 
 #include <string>
 
-void World::destroy() noexcept {
-    
-    if (isValid()) {
-
-        destroyWorld();
-    }
-}
-
 void World::init() noexcept {
 
     b2WorldDef worldDef = b2DefaultWorldDef();
     worldDef.gravity = { 0.0f, FORCE_DUE_TO_GRAVITY };
-    m_worldId = b2CreateWorld(&worldDef);
+    mWorldId = b2CreateWorld(&worldDef);
+
+    mPlayerPathfinder = nullptr;
 
     loadTextures();
     buildScene();
 }
 
 void World::update(float dt) {
-    m_sceneGraph.update(dt);
+    mSceneGraph.update(dt);
 }
 
 void World::draw() const noexcept {
     RenderStates states;
     // In a real application, you would get the view from your camera
     // For now, we'll use a default RenderStates
-    m_sceneGraph.draw(states);
+    mSceneGraph.draw(states);
 }
 
-b2WorldId World::getWorldId() const {
-    return m_worldId;
-}
+CommandQueue& World::getCommandQueue() noexcept {
 
-/// @brief 
-/// @param timeStep 
-/// @param subSteps 6
-void World::step(float timeStep, std::int32_t subSteps) {
-    b2World_Step(m_worldId, timeStep, subSteps);
-}
-
-b2BodyId World::createBody(const b2BodyDef* bodyDef) {
-    return b2CreateBody(m_worldId, bodyDef);
-}
-
-void World::destroyBody(b2BodyId bodyId) {
-    b2DestroyBody(bodyId);
-}
-
-b2ShapeId World::createPolygonShape(b2BodyId bodyId, const b2ShapeDef* shapeDef, const b2Polygon* polygon) {
-    return b2CreatePolygonShape(bodyId, shapeDef, polygon);
-}
-
-b2ShapeId World::createCircleShape(b2BodyId bodyId, const b2ShapeDef* shapeDef, const b2Circle* circle) {
-    return b2CreateCircleShape(bodyId, shapeDef, circle);
-}
-
-b2ShapeId World::createSegmentShape(b2BodyId bodyId, const b2ShapeDef* shapeDef, const b2Segment* segment) {
-    return b2CreateSegmentShape(bodyId, shapeDef, segment);
-}
-
-bool World::isValid() const {
-    return b2World_IsValid(m_worldId);
-}
-
-b2ContactEvents World::getContactEvents() const {
-    return b2World_GetContactEvents(m_worldId);
+    return mCommandQueue;
 }
 
 void World::destroyWorld() {
-    if (b2World_IsValid(m_worldId))
+    if (b2World_IsValid(mWorldId))
     {
-        b2DestroyWorld(m_worldId);
-        m_worldId = b2_nullWorldId;
+        b2DestroyWorld(mWorldId);
+        mWorldId = b2_nullWorldId;
     }
 }
 
@@ -101,7 +62,7 @@ void World::loadTextures() {
         // Load resource configuration
         jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
         SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-        m_textures.load(Textures::ID::SPLASH_SCREEN, "resources/" + jsonUtils.getValue("splash_image", resources));
+        mTextures.load(Textures::ID::SPLASH_SCREEN, "resources/" + jsonUtils.getValue("splash_image", resources));
     } catch (const std::exception& e) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load splash screen texture: %s", e.what());
@@ -131,17 +92,29 @@ void World::loadTextures() {
 }
 
 void World::buildScene() {
-    for (std::size_t i = 0; i < static_cast<std::size_t>(Layer::LAYER_COUNT); ++i) {
-        SceneNode::Ptr layer = std::make_unique<SceneNode>();
-        m_sceneLayers[i] = layer.get();
-        m_sceneGraph.attachChild(std::move(layer));
+
+    using std::cref;
+    using std::make_unique;
+    using std::move;
+    using std::size_t;
+    using std::unique_ptr;
+
+    for (size_t i = 0; i < static_cast<size_t>(Layer::LAYER_COUNT); ++i) {
+        SceneNode::Ptr layer = make_unique<SceneNode>();
+        mSceneLayers[i] = layer.get();
+        mSceneGraph.attachChild(move(layer));
     }
 
-    auto& texture1 = m_textures.get(Textures::ID::SPLASH_SCREEN);
+    auto& texture1 = mTextures.get(Textures::ID::SPLASH_SCREEN);
     SDL_Rect fullScreenRect = { 0, 0, texture1.getWidth(), texture1.getHeight() };
-    auto backgroundSprite = std::make_unique<SpriteNode>(texture1, fullScreenRect);
+    auto backgroundSprite = make_unique<SpriteNode>(texture1, fullScreenRect);
     backgroundSprite->setPosition(0.0f, 0.0f);
-    SceneNode::Ptr spriteNode = std::move(backgroundSprite);
+    SceneNode::Ptr spriteNode = move(backgroundSprite);
     SDL_Log("World::buildScene - Adding background sprite to scene");
-    m_sceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(std::move(spriteNode));
+    mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(spriteNode));
+
+    auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
+    mPlayerPathfinder = leader.get();
+    mPlayerPathfinder->setPosition(0.f, 0.f);
+    mSceneLayers[static_cast<std::size_t>(Layer::FOREGROUND)]->attachChild(move(leader));
 }
