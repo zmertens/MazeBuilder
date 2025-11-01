@@ -5,7 +5,7 @@
 
 Pathfinder::Pathfinder(Type type, const TextureManager& textures)
     : mType(type)
-    , mSprite(textures.get(toTextureID(type)))
+    , mSprite(textures.get(getTextureID()))
 {
 }
 
@@ -24,8 +24,8 @@ void Pathfinder::draw(RenderStates states) const noexcept
     mSprite.draw(states);
 }
 
-Textures::ID Pathfinder::toTextureID(Type type) const noexcept {
-    switch (type) {
+Textures::ID Pathfinder::getTextureID() const noexcept {
+    switch (mType) {
         case Type::ALLY: {
             return Textures::ID::AVATAR;
         }

@@ -14,6 +14,9 @@ public:
 
 
 private:
+
+    virtual Textures::ID getTextureID() const noexcept = 0;
+
     virtual void updateCurrent(float dt) noexcept override;
 
 private:

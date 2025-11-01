@@ -10,7 +10,7 @@
 #include "ResourceManager.hpp"
 
 Ball::Ball(Type type, const TextureManager& textureManager)
-    : mType{type}, mSprite{textureManager.get(toTextureID(type))} {
+    : mType{type}, mSprite{textureManager.get(getTextureID())} {
 }
 
 // // Create a dynamic body for the ball
@@ -70,9 +70,9 @@ void Ball::drawCurrent(RenderStates states) const noexcept {
     mSprite.draw(states);
 }
 
-Textures::ID Ball::toTextureID(Type type) const noexcept {
-    
-    switch (type) {
+Textures::ID Ball::getTextureID() const noexcept {
+
+    switch (mType) {
         case Type::NORMAL: {
             return Textures::ID::AVATAR;
         }

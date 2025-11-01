@@ -23,12 +23,11 @@ public:
     void draw(RenderStates states) const noexcept;
 
 private:
+
+    Textures::ID getTextureID() const noexcept override;
+
     virtual void updateCurrent(float dt) noexcept override;
 
-    Textures::ID toTextureID(Type type) const noexcept;
-
-
-private:
     Type mType;
     Sprite mSprite;
 };

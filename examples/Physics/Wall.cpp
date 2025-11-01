@@ -13,7 +13,7 @@ Wall::Wall(Orientation orientation, const TextureManager& textureManager)
     , row{ 0 }
     , col{ 0 }
     , orientation{ orientation }
-    , mSprite{ textureManager.get(toTextureID()) } {
+    , mSprite{ textureManager.get(getTextureID()) } {
 }
 
 int Wall::getHitCount() const { return hitCount; }
@@ -39,7 +39,7 @@ void Wall::drawCurrent(RenderStates states) const noexcept {
     }
 }
 
-Textures::ID Wall::toTextureID() const noexcept {
+Textures::ID Wall::getTextureID() const noexcept {
     
     switch (orientation) {
     case Orientation::HORIZONTAL:

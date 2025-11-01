@@ -24,7 +24,7 @@ private:
 
 private:
 
-    Textures::ID toTextureID(Type type) const noexcept;
+    virtual Textures::ID getTextureID() const noexcept override;
 
     virtual void updateCurrent(float dt) noexcept override;
 
