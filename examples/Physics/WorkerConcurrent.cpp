@@ -1,14 +1,20 @@
 #include "WorkerConcurrent.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <string>
 
 #include <SDL3/SDL.h>
 
+WorkerConcurrent::WorkItem::WorkItem(const float maxTime, float elapsedTime, int start, int count)
+    : maxTime(maxTime), elapsedTime(elapsedTime), start{ start }, count{ count } {
+
+}
+
 // Constructor
 WorkerConcurrent::WorkerConcurrent()
-    : gameMtx(SDL_CreateMutex()), gameCond(SDL_CreateCondition()), pendingWorkCount(0) {
+    : gameMtx(SDL_CreateMutex()), gameCond(SDL_CreateCondition()), pendingWorkCount(0), shouldExit(false) {
 
     if (!gameCond) {
 
@@ -24,21 +30,23 @@ WorkerConcurrent::WorkerConcurrent()
 // Destructor
 WorkerConcurrent::~WorkerConcurrent() {
 
-    // state = State::DONE;
-
-    pendingWorkCount = 0;
-
+    // Signal threads to exit
     SDL_LockMutex(gameMtx);
+    shouldExit = true;
     SDL_BroadcastCondition(gameCond);
     SDL_UnlockMutex(gameMtx);
 
+    // Wait for all threads to finish
     for (auto t : threads) {
         if (t) {
 
             auto name = SDL_GetThreadName(t);
             int status = 0;
             SDL_WaitThread(t, &status);
-            SDL_Log("Worker thread with status [ %s | %d ] to finish\n", name, status);
+#if defined(MAZE_DEBUG)
+
+            SDL_Log("Worker thread with status [ %s | %d ] finished\n", name, status);
+#endif
         }
     }
 
@@ -86,6 +94,7 @@ WorkerConcurrent& WorkerConcurrent::operator=(const WorkerConcurrent& other) {
     gameCond = SDL_CreateCondition();
 
     if (!gameMtx || !gameCond) {
+
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating SDL concurrency objects: %s\n", SDL_GetError());
     }
 
@@ -138,64 +147,79 @@ WorkerConcurrent& WorkerConcurrent::operator=(WorkerConcurrent&& other) noexcept
 
 // Initialize worker threads
 void WorkerConcurrent::initThreads() noexcept {
-    using namespace std;
+
+    using std::back_inserter;
+    using std::copy;
+    using std::cref;
+    using std::ref;
+    using std::string;
+    using std::to_string;
+    using std::vector;
 
     auto threadFunc = [](void* data) -> int {
 
-        auto* workerPtr = reinterpret_cast<WorkerConcurrent*>(data);
+        if (auto workerPtr = reinterpret_cast<WorkerConcurrent*>(data)) {
 
-        vector<SDL_Vertex> vertices;
+            float elapsedTime = 0.0f;
 
-        while (1) {
-            {
-                SDL_LockMutex(workerPtr->gameMtx);
-                while (workerPtr->workQueue.empty()) {
-                    SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
-                }
+            while (!workerPtr->shouldExit) {
+                {
+                    SDL_LockMutex(workerPtr->gameMtx);
+                    while (workerPtr->workQueue.empty() && !workerPtr->shouldExit) {
+                        SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
+                    }
 
-                // if (workerPtr->state == State::DONE) {
-                //     SDL_UnlockMutex(workerPtr->gameMtx);
-                //     break;
-                // }
+                    // Check if we should exit before processing
+                    if (workerPtr->shouldExit) {
+                        SDL_UnlockMutex(workerPtr->gameMtx);
+                        break;
+                    }
 
-                if (!workerPtr->workQueue.empty()) {
+                    if (!workerPtr->workQueue.empty()) {
 
-                    auto&& tempWorker = workerPtr->workQueue.front();
-                    workerPtr->workQueue.pop_front();
+                        auto&& tempWorker = workerPtr->workQueue.front();
+                        workerPtr->workQueue.pop_front();
 
-                    SDL_Log("Processing work item [ start: %d | count: %d | rows: %d | columns: %d]\n",
-                        tempWorker.start, tempWorker.count, tempWorker.rows, tempWorker.columns);
+#if defined(MAZE_DEBUG)
 
-                    vertices.clear();
+                        SDL_Log("Processing work item [ start: %d | count: %d]\n", tempWorker.start, tempWorker.count);
+#endif
 
-                    workerPtr->doWork(ref(vertices), cref(tempWorker));
+                        SDL_UnlockMutex(workerPtr->gameMtx);
 
-                    SDL_Log("Generated %zu vertices for this work item\n", vertices.size());
+                        workerPtr->doWork(ref(elapsedTime), cref(tempWorker));
 
-                    if (!vertices.empty()) {
-                        copy(vertices.begin(), vertices.end(), back_inserter(tempWorker.vertices));
-                        SDL_Log("Total vertices after copy: %zu\n", tempWorker.vertices.size());
+                        if (elapsedTime >= tempWorker.maxTime) {
+                            
+                            SDL_Log("Max time reached for this work item: %.2f >= %.2f\n", elapsedTime, tempWorker.maxTime);
+                            elapsedTime = 0.0f;
+                        }
                     } else {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "No vertices generated for this work item\n");
+                        SDL_UnlockMutex(workerPtr->gameMtx);
                     }
                 }
-                SDL_UnlockMutex(workerPtr->gameMtx);
-            }
 
-            {
-                SDL_LockMutex(workerPtr->gameMtx);
-                workerPtr->pendingWorkCount -= 1;
-                SDL_Log("Pending work count: %d\n", workerPtr->pendingWorkCount);
+                {
+                    SDL_LockMutex(workerPtr->gameMtx);
+                    workerPtr->pendingWorkCount -= 1;
 
-                if (workerPtr->pendingWorkCount <= 0) {
-                    SDL_SignalCondition(workerPtr->gameCond);
+                    if (workerPtr->pendingWorkCount <= 0) {
+
+                        SDL_SignalCondition(workerPtr->gameCond);
+                    }
+#if defined(MAZE_DEBUG)
+
+                    SDL_Log("Pending work count: %d\n", workerPtr->pendingWorkCount);
+#endif
+
+                    SDL_UnlockMutex(workerPtr->gameMtx);
                 }
-
-                SDL_UnlockMutex(workerPtr->gameMtx);
             }
+    
+            return 0;
         }
 
-        return 0;
+        return -1;
         }; // lambda
 
 
@@ -216,17 +240,17 @@ void WorkerConcurrent::initThreads() noexcept {
     }
 }
 
-void WorkerConcurrent::generate(std::string_view tab) noexcept {
-    using namespace std;
+void WorkerConcurrent::generate(const float maxTime) noexcept {
+    using std::size_t;
 
     if (this->pendingWorkCount == 0) {
 
         SDL_WaitCondition(gameCond, gameMtx);
     }
 
-    if (tab.empty()) {
+    if (maxTime <= 0.f) {
 
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze string is empty, cannot generate level\n");
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Max time is non-positive, cannot track\n");
 
         return;
     }
@@ -235,38 +259,24 @@ void WorkerConcurrent::generate(std::string_view tab) noexcept {
 
     static constexpr auto BLOCK_COUNT = 4;
 
-    size_t charsPerWorker = tab.size() / BLOCK_COUNT;
-
-    vector<SDL_Vertex> vertices;
+    size_t charsPerWorker = static_cast<size_t>(maxTime / static_cast<float>(BLOCK_COUNT));
 
     for (auto w = 0; w < BLOCK_COUNT; w++) {
 
-        size_t startIdx = w * charsPerWorker;
-        size_t endIdx = (w == BLOCK_COUNT - 1) ? tab.size() : (w + 1) * charsPerWorker;
-        if (w > 0) {
-            while (startIdx > 0 && tab[startIdx] != '\n') {
-                startIdx--;
-            }
-            if (startIdx > 0) startIdx++;
-        }
-        if (w < BLOCK_COUNT - 1) {
-            while (endIdx < tab.size() && tab[endIdx] != '\n') {
-                endIdx++;
-            }
-            if (endIdx < tab.size()) endIdx++;
-        }
+        float startTime = w * charsPerWorker;
+        float endTime = (w == BLOCK_COUNT - 1) ? maxTime : (w + 1) * charsPerWorker;
 
+        size_t startIdx = static_cast<size_t>(startTime);
+        size_t endIdx = static_cast<size_t>(endTime);
         size_t count = endIdx - startIdx;
 
         SDL_Log("Worker %d: Processing from %zu to %zu (count: %zu)\n", w, startIdx, endIdx, count);
 
         workQueue.push_back({
-            cref(tab),
-            ref(vertices),
+            maxTime,
+            0.0f,
             static_cast<int>(startIdx),
-            static_cast<int>(count),
-            1,
-            1
+            static_cast<int>(count)
             });
     }
 
@@ -277,21 +287,28 @@ void WorkerConcurrent::generate(std::string_view tab) noexcept {
     SDL_UnlockMutex(this->gameMtx);
 } // generate
 
-void WorkerConcurrent::doWork(std::vector<SDL_Vertex>& vertices, WorkItem const& item) const noexcept {
-    using namespace std;
+void WorkerConcurrent::doWork(const float& elapsedTime, WorkItem const& item) const noexcept {
 
-    SDL_FColor wallColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // Black
-    auto pushV = [&vertices](auto v1, auto v2, auto v3, auto v4)->void {
-        vertices.push_back(v1);
-        vertices.push_back(v2);
-        vertices.push_back(v4);
-        vertices.push_back(v2);
-        vertices.push_back(v3);
-        vertices.push_back(v4);
-        };
+    // Simulate work being done
+    SDL_Delay(static_cast<std::uint32_t>(elapsedTime * 1000));
 
-    SDL_FColor cellColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-    const auto& mazeString = item.sv;
+    SDL_Log("Processing work item from %d to %d\n", item.start, item.start + item.count);
+}
 
-    SDL_Log("Processing maze string segment from %d to %d\n", item.start, item.start + item.count);
+bool WorkerConcurrent::isDone() const noexcept {
+
+    SDL_LockMutex(this->gameMtx);
+    bool done = (this->pendingWorkCount <= 0);
+    SDL_UnlockMutex(this->gameMtx);
+
+    return done;
+}
+
+float WorkerConcurrent::getCompletion() const noexcept {
+
+    SDL_LockMutex(this->gameMtx);
+    float completion = 1.0f - (static_cast<float>(this->pendingWorkCount) / static_cast<float>(this->workQueue.size() + this->pendingWorkCount));
+    SDL_UnlockMutex(this->gameMtx);
+
+    return completion;
 }

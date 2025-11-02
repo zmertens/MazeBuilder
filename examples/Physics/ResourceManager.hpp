@@ -116,4 +116,3 @@ void ResourceManager<Resource, Identifier>::insertResource(Identifier id, std::u
 }
 
 #endif // RESOURCE_MANAGER_HPP
-

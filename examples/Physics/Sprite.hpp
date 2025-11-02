@@ -1,7 +1,6 @@
 #ifndef SPRITE_HPP
 #define SPRITE_HPP
 
-#include "Drawable.hpp"
 #include "RenderStates.hpp"
 #include "Transformable.hpp"
 

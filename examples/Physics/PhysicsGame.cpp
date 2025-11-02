@@ -39,7 +39,7 @@
 #include "Ball.hpp"
 #include "GameState.hpp"
 #include "JsonUtils.hpp"
-#include "Physical.hpp"
+#include "LoadingState.hpp"
 #include "Player.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
@@ -105,6 +105,7 @@ struct PhysicsGame::PhysicsGameImpl {
         loadTextures();
         registerStates();
         
+        stateStack->pushState(States::ID::LOADING);
         stateStack->pushState(States::ID::SPLASH);
     }
 
@@ -231,8 +232,9 @@ struct PhysicsGame::PhysicsGameImpl {
 
     void registerStates() noexcept {
 
-        stateStack->registerState<SplashState>(States::ID::SPLASH);
         stateStack->registerState<GameState>(States::ID::GAME);
+        stateStack->registerState<LoadingState>(States::ID::LOADING);
+        stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
 }; // impl
 

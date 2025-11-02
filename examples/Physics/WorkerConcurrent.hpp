@@ -23,30 +23,27 @@ public:
     WorkerConcurrent& operator=(WorkerConcurrent&& other) noexcept;
 
     void initThreads() noexcept;
-    void generate(std::string_view tab) noexcept;
+    void generate(const float maxTime) noexcept;
+    bool isDone() const noexcept;
+    float getCompletion() const noexcept;
 
 private:
     struct WorkItem {
-        const std::string_view& sv;
-        std::vector<SDL_Vertex>& vertices;
+        const float maxTime;
+        float elapsedTime;
         int start, count;
-        int rows, columns;
-        WorkItem(const std::string_view& sv,
-            std::vector<SDL_Vertex>& vertices,
-            int start, int count, int rows, int columns)
-            : sv(sv)
-            , vertices(vertices), start{ start }, count{ count }, rows{ rows }, columns{ columns } {
 
-        }
+        WorkItem(const float maxTime, float elapsedTime, int start, int count);
     };
 
-    void doWork(std::vector<SDL_Vertex>& vertices, WorkItem const& workItem) const noexcept;
+    void doWork(const float& elapsedTime, WorkItem const& workItem) const noexcept;
 
     std::deque<WorkItem> workQueue;
     std::vector<SDL_Thread*> threads;
     SDL_Mutex* gameMtx;
     SDL_Condition* gameCond;
     int pendingWorkCount;
+    bool shouldExit; // Flag to signal threads to exit
 };
 
 #endif // WORKER_CONCURRENT
