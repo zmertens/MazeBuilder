@@ -140,13 +140,14 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
 
             string windowIconPath = resourcePathPrefix + jsonUtils.extractJsonValue(windowIconKey->second);
 
-            if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon) {
+            if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon != nullptr) {
 
-                auto* window = mazes::singleton_base<SDLHelper>::instance()->window;
+                if (auto* window = mazes::singleton_base<SDLHelper>::instance()->window; window != nullptr) {
 
-                SDL_SetWindowIcon(window, icon);
-                SDL_DestroySurface(icon);
-                SDL_Log("DEBUG: Loading window icon from: %s", windowIconPath.c_str());
+                    SDL_SetWindowIcon(window, icon);
+                    SDL_DestroySurface(icon);
+                    SDL_Log("DEBUG: Loading window icon from: %s", windowIconPath.c_str());
+                }
             } else {
 
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", windowIconPath.c_str(), SDL_GetError());

@@ -26,7 +26,7 @@ SDLHelper::~SDLHelper() {
 
 void SDLHelper::createWindowAndRenderer(std::string_view title, int width, int height) noexcept {
 
-    this->window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_RESIZABLE);
+    this->window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
 
     if (!this->window) {
 

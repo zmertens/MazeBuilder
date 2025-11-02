@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdint>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -26,46 +27,63 @@ WorkerConcurrent::WorkerConcurrent()
     : gameMtx(SDL_CreateMutex())
     , gameCond(SDL_CreateCondition())
     , pendingWorkCount(0)
-    , shouldExit(false)
+    , shouldExit{ }
     , mResources{}
-    , mTotalWorkItems(0) {
+ , mTotalWorkItems(0) {
+
+    // Initialize atomic int to 0 (false)
+  SDL_SetAtomicInt(&shouldExit, 0);
 
     if (!gameCond) {
 
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating condition variable: %s\n", SDL_GetError());
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating condition variable: %s\n", SDL_GetError());
     }
 
     if (!gameMtx) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating mutex: %s\n", SDL_GetError());
-    }
+  }
 }
 
 // Destructor
 WorkerConcurrent::~WorkerConcurrent() {
 
-    // Signal threads to exit
+    // Signal threads to exit using atomic operation
+    SDL_SetAtomicInt(&shouldExit, 1);
+    
     SDL_LockMutex(gameMtx);
-    shouldExit = true;
-    SDL_BroadcastCondition(gameCond);
+    // Clear work queue to prevent any new work from being picked up
+    workQueue.clear();
+  pendingWorkCount = 0;
+ SDL_BroadcastCondition(gameCond);
     SDL_UnlockMutex(gameMtx);
+
+    // Give threads a moment to see the exit signal
+    SDL_Delay(50);
 
     // Wait for all threads to finish
     for (auto t : threads) {
-        if (t) {
-
-            auto name = SDL_GetThreadName(t);
-            int status = 0;
-            SDL_WaitThread(t, &status);
-#if defined(MAZE_DEBUG)
-
-            SDL_Log("Worker thread with status [ %s | %d ] finished\n", name, status);
-#endif
-        }
+     if (t) {
+          auto name = SDL_GetThreadName(t);
+        int status = 0;
+        SDL_WaitThread(t, &status);
+          SDL_Log("Worker thread with status [ %s | %d ] finished\n", name, status);
+   }
     }
 
-    SDL_DestroyMutex(gameMtx);
-    SDL_DestroyCondition(gameCond);
+ // Clear threads vector
+    threads.clear();
+
+    // Now it's safe to destroy synchronization primitives
+    if (gameMtx) {
+   SDL_DestroyMutex(gameMtx);
+    gameMtx = nullptr;
+    }
+
+    if (gameCond) {
+      SDL_DestroyCondition(gameCond);
+   gameCond = nullptr;
+    }
 }
 
 // Copy Constructor
@@ -172,54 +190,54 @@ void WorkerConcurrent::initThreads() noexcept {
 
     auto threadFunc = [](void* data) -> int {
 
-        if (auto workerPtr = reinterpret_cast<WorkerConcurrent*>(data)) {
+      if (auto workerPtr = reinterpret_cast<WorkerConcurrent*>(data)) {
 
-            while (!workerPtr->shouldExit) {
-                {
-                    SDL_LockMutex(workerPtr->gameMtx);
-                    while (workerPtr->workQueue.empty() && !workerPtr->shouldExit) {
-                        SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
-                    }
+    while (SDL_GetAtomicInt(&workerPtr->shouldExit) == 0) {
+      SDL_LockMutex(workerPtr->gameMtx);
 
-                    // Check if we should exit before processing
-                    if (workerPtr->shouldExit) {
-                        SDL_UnlockMutex(workerPtr->gameMtx);
-                        break;
-                    }
+       while (workerPtr->workQueue.empty() && SDL_GetAtomicInt(&workerPtr->shouldExit) == 0) {
+ SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
+       }
 
-                    if (!workerPtr->workQueue.empty()) {
+  // Check if we should exit before processing
+    if (SDL_GetAtomicInt(&workerPtr->shouldExit) != 0) {
+  SDL_UnlockMutex(workerPtr->gameMtx);
+    break;
+  }
 
-                        auto tempWorker = workerPtr->workQueue.front();
-                        workerPtr->workQueue.pop_front();
+    std::optional<WorkItem> tempWorker;
+bool hasWork = false;
 
-                        SDL_UnlockMutex(workerPtr->gameMtx);
+ if (!workerPtr->workQueue.empty()) {
+     tempWorker = workerPtr->workQueue.front();
+ workerPtr->workQueue.pop_front();
+   hasWork = true;
+     }
 
-                        // Process the work item
-                        workerPtr->doWork(tempWorker);
+   SDL_UnlockMutex(workerPtr->gameMtx);
 
-                    } else {
-                        SDL_UnlockMutex(workerPtr->gameMtx);
-                    }
-                }
-
-                {
-                    SDL_LockMutex(workerPtr->gameMtx);
-                    workerPtr->pendingWorkCount -= 1;
-
-                    if (workerPtr->pendingWorkCount <= 0) {
-
-                        SDL_SignalCondition(workerPtr->gameCond);
-                    }
-
-                    SDL_UnlockMutex(workerPtr->gameMtx);
-                }
-            }
-    
-            return 0;
+     // Process work outside the lock
+       if (hasWork && SDL_GetAtomicInt(&workerPtr->shouldExit) == 0 && tempWorker.has_value()) {
+    workerPtr->doWork(tempWorker.value());
         }
 
-        return -1;
-        }; // lambda
+  // Update pending work count
+   SDL_LockMutex(workerPtr->gameMtx);
+    if (hasWork) {
+  workerPtr->pendingWorkCount -= 1;
+
+ if (workerPtr->pendingWorkCount <= 0) {
+    SDL_SignalCondition(workerPtr->gameCond);
+  }
+  }
+       SDL_UnlockMutex(workerPtr->gameMtx);
+    }
+
+   return 0;
+        }
+
+  return -1;
+  }; // lambda
 
 
     static constexpr auto NUM_WORKERS = 4;
@@ -257,7 +275,7 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept {
     // Load JSON configuration
     JsonUtils jsonUtils{};
     unordered_map<string, string> resources{};
-    
+
     try {
         jsonUtils.loadConfiguration(string(resourcePath), resources);
         SDL_Log("Loaded %zu resources from %s\n", resources.size(), resourcePath.data());
@@ -273,145 +291,164 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept {
 
     // Create work items - distribute resources among workers
     SDL_LockMutex(gameMtx);
-    
+
     int index = 0;
     for (const auto& [key, value] : resources) {
-        workQueue.push_back(WorkItem{key, value, index++});
+        workQueue.push_back(WorkItem{ key, value, index++ });
     }
-    
+
     mTotalWorkItems = static_cast<int>(workQueue.size());
     pendingWorkCount = mTotalWorkItems;
-    
+
     SDL_Log("Created %d work items for resource loading\n", mTotalWorkItems);
-    
+
     SDL_BroadcastCondition(gameCond);
     SDL_UnlockMutex(gameMtx);
 }
 
 void WorkerConcurrent::doWork(WorkItem const& item) noexcept {
 
+    // Early exit check before any work
+ if (SDL_GetAtomicInt(&shouldExit) != 0) {
+   return;
+ }
+
     // Simulate resource loading work (checking, validating, etc.)
-    SDL_Delay(100); // Small delay to simulate I/O
+  SDL_Delay(100); // Small delay to simulate I/O
 
     SDL_Log("Processing resource [%d]: %s = %s\n", item.index, item.key.c_str(), item.value.c_str());
-    
-    // Store the processed resource in a thread-safe manner
-    SDL_LockMutex(gameMtx);
-    mResources[item.key] = item.value;
-    
-    // Check if this is a config* key (config1, config2, etc.) and hasn't been processed yet
-    // Must start with "config" and be followed by a digit
-    bool isConfigKey = false;
+
+    // Check if this is a config* key before acquiring expensive locks
+  bool isConfigKey = false;
     if (item.key.size() >= 7 && item.key.substr(0, 6) == "config") {
-        // Check if character after "config" is a digit
-        char nextChar = item.key[6];
-        isConfigKey = (nextChar >= '0' && nextChar <= '9');
+ char nextChar = item.key[6];
+  isConfigKey = (nextChar >= '0' && nextChar <= '9');
     }
-    bool alreadyProcessed = mProcessedConfigs.find(item.key) != mProcessedConfigs.end();
-    
+
+  // Store the processed resource in a thread-safe manner
+    SDL_LockMutex(gameMtx);
+
+    // Double-check if we're shutting down
+ if (SDL_GetAtomicInt(&shouldExit) != 0) {
+      SDL_UnlockMutex(gameMtx);
+  return;
+    }
+
+    mResources[item.key] = item.value;
+
+  bool alreadyProcessed = mProcessedConfigs.find(item.key) != mProcessedConfigs.end();
+
     if (isConfigKey && !alreadyProcessed) {
-        // Mark as processed immediately to prevent duplicate processing
-        mProcessedConfigs[item.key] = true;
-        
+   // Mark as processed immediately to prevent duplicate processing
+   mProcessedConfigs[item.key] = true;
+
+// Get the JSON value while we still hold the lock
+ std::string jsonValue = item.value;
+
         // Release mutex before doing expensive work
-        SDL_UnlockMutex(gameMtx);
-        
-        // Helper lambda to convert JSON object string to configurator
+ SDL_UnlockMutex(gameMtx);
+
+   // Check again if we're shutting down before expensive operation
+      if (SDL_GetAtomicInt(&shouldExit) != 0) {
+   return;
+   }
+
+    // Helper lambda to convert JSON object string to configurator
         auto jsonToConfigurator = [](const std::string& jsonValue) -> mazes::configurator {
-            mazes::configurator config;
-            
-            // Parse the JSON object string to extract configuration values
-            // Expected format: {"rows": 100, "columns": 99, "seed": 50, "algo": "dfs"}
-            
+     mazes::configurator config;
+
+// Parse the JSON object string to extract configuration values
+    // Expected format: {"rows": 100, "columns": 99, "seed": 50, "algo": "dfs"}
+
             // Extract rows
-            if (auto rowsPos = jsonValue.find("\"rows\""); rowsPos != std::string::npos) {
-                auto colonPos = jsonValue.find(':', rowsPos);
-                if (colonPos != std::string::npos) {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    // Remove whitespace
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try {
-                        config.rows(static_cast<unsigned int>(std::stoi(value)));
-                    } catch (...) {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse rows from: %s\n", value.c_str());
-                    }
-                }
-            }
-            
-            // Extract columns
+  if (auto rowsPos = jsonValue.find("\"rows\""); rowsPos != std::string::npos) {
+    auto colonPos = jsonValue.find(':', rowsPos);
+    if (colonPos != std::string::npos) {
+     auto commaPos = jsonValue.find(',', colonPos);
+    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
+         // Remove whitespace
+ value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
+   try {
+   config.rows(static_cast<unsigned int>(std::stoi(value)));
+} catch (...) {
+          SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse rows from: %s\n", value.c_str());
+    }
+  }
+  }
+
+        // Extract columns
             if (auto colsPos = jsonValue.find("\"columns\""); colsPos != std::string::npos) {
-                auto colonPos = jsonValue.find(':', colsPos);
-                if (colonPos != std::string::npos) {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try {
-                        config.columns(static_cast<unsigned int>(std::stoi(value)));
-                    } catch (...) {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse columns from: %s\n", value.c_str());
-                    }
-                }
-            }
-            
-            // Extract seed
-            if (auto seedPos = jsonValue.find("\"seed\""); seedPos != std::string::npos) {
-                auto colonPos = jsonValue.find(':', seedPos);
-                if (colonPos != std::string::npos) {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    if (commaPos == std::string::npos) {
-                        commaPos = jsonValue.find('}', colonPos);
-                    }
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try {
-                        config.seed(static_cast<unsigned int>(std::stoi(value)));
-                    } catch (...) {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse seed from: %s\n", value.c_str());
-                    }
-                }
-            }
-            
-            // Extract algo
-            if (auto algoPos = jsonValue.find("\"algo\""); algoPos != std::string::npos) {
-                auto colonPos = jsonValue.find(':', algoPos);
-                if (colonPos != std::string::npos) {
-                    auto quoteStart = jsonValue.find('"', colonPos);
-                    if (quoteStart != std::string::npos) {
-                        auto quoteEnd = jsonValue.find('"', quoteStart + 1);
-                        if (quoteEnd != std::string::npos) {
-                            auto algoStr = jsonValue.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-                            
-                            // Map string to algo enum
-                            if (algoStr == "dfs") {
-                                config.algo_id(mazes::algo::DFS);
-                            } else if (algoStr == "binary_tree") {
-                                config.algo_id(mazes::algo::BINARY_TREE);
-                            } else if (algoStr == "sidewinder") {
-                                config.algo_id(mazes::algo::SIDEWINDER);
-                            } else {
-                                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unknown algorithm: %s, using default\n", algoStr.c_str());
-                            }
-                        }
-                    }
-                }
-            }
-            
-            return config;
-        };
-        
-        // Convert the JSON value to a configurator
-        mazes::configurator config = jsonToConfigurator(item.value);
-        
-        // Call create() and log the result
-        try {
-            std::string mazeStr = mazes::create(config);
-            SDL_Log("Generated maze for %s:\n%s\n", item.key.c_str(), mazeStr.c_str());
-        } catch (const std::exception& e) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze for %s: %s\n", item.key.c_str(), e.what());
+ auto colonPos = jsonValue.find(':', colsPos);
+      if (colonPos != std::string::npos) {
+ auto commaPos = jsonValue.find(',', colonPos);
+          auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
+   value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
+     try {
+    config.columns(static_cast<unsigned int>(std::stoi(value)));
+  } catch (...) {
+      SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse columns from: %s\n", value.c_str());
+             }
+    }
+   }
+
+         // Extract seed
+         if (auto seedPos = jsonValue.find("\"seed\""); seedPos != std::string::npos) {
+      auto colonPos = jsonValue.find(':', seedPos);
+        if (colonPos != std::string::npos) {
+    auto commaPos = jsonValue.find(',', colonPos);
+      if (commaPos == std::string::npos) {
+    commaPos = jsonValue.find('}', colonPos);
+          }
+ auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
+ value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
+      try {
+     config.seed(static_cast<unsigned int>(std::stoi(value)));
+    } catch (...) {
+  SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse seed from: %s\n", value.c_str());
         }
-    } else {
-        SDL_UnlockMutex(gameMtx);
+  }
+   }
+
+          // Extract algo
+  if (auto algoPos = jsonValue.find("\"algo\""); algoPos != std::string::npos) {
+     auto colonPos = jsonValue.find(':', algoPos);
+           if (colonPos != std::string::npos) {
+      auto quoteStart = jsonValue.find('"', colonPos);
+   if (quoteStart != std::string::npos) {
+   auto quoteEnd = jsonValue.find('"', quoteStart + 1);
+   if (quoteEnd != std::string::npos) {
+   auto algoStr = jsonValue.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
+
+        // Map string to algo enum
+    if (algoStr == "dfs") {
+  config.algo_id(mazes::algo::DFS);
+  } else if (algoStr == "binary_tree") {
+      config.algo_id(mazes::algo::BINARY_TREE);
+ } else if (algoStr == "sidewinder") {
+       config.algo_id(mazes::algo::SIDEWINDER);
+     } else {
+     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unknown algorithm: %s, using default\n", algoStr.c_str());
+    }
+    }
+}
+            }
+ }
+
+    return config;
+   };
+
+   // Convert the JSON value to a configurator
+   mazes::configurator config = jsonToConfigurator(jsonValue);
+
+  // Call create() and log the result
+ try {
+  std::string mazeStr = mazes::create(config);
+   SDL_Log("Generated maze for %s:\n%s\n", item.key.c_str(), mazeStr.c_str());
+     } catch (const std::exception& e) {
+   SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze for %s: %s\n", item.key.c_str(), e.what());
+  }
+  } else {
+     SDL_UnlockMutex(gameMtx);
     }
 }
 
@@ -438,10 +475,10 @@ float WorkerConcurrent::getCompletion() const noexcept {
 }
 
 std::unordered_map<std::string, std::string> WorkerConcurrent::getResources() const noexcept {
-    
+
     SDL_LockMutex(gameMtx);
     auto resourcesCopy = mResources;
     SDL_UnlockMutex(gameMtx);
-    
+
     return resourcesCopy;
 }

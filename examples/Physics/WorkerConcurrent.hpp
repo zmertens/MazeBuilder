@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <SDL3/SDL_atomic.h>
+
 struct SDL_Thread;
 struct SDL_Mutex;
 struct SDL_Condition;
@@ -48,7 +50,7 @@ private:
     SDL_Mutex* gameMtx;
     SDL_Condition* gameCond;
     int pendingWorkCount;
-    bool shouldExit;
+    SDL_AtomicInt shouldExit;
     
     // Store loaded resources
     std::unordered_map<std::string, std::string> mResources;
