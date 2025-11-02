@@ -2,8 +2,10 @@
 #define WORKER_CONCURRENT
 
 #include <deque>
-#include <vector>
+#include <string>
 #include <string_view>
+#include <unordered_map>
+#include <vector>
 
 struct SDL_Thread;
 struct SDL_Mutex;
@@ -23,27 +25,34 @@ public:
     WorkerConcurrent& operator=(WorkerConcurrent&& other) noexcept;
 
     void initThreads() noexcept;
-    void generate(const float maxTime) noexcept;
+    void generate(std::string_view resourcePath) noexcept;
     bool isDone() const noexcept;
     float getCompletion() const noexcept;
+    
+    // Get the loaded resources (thread-safe)
+    std::unordered_map<std::string, std::string> getResources() const noexcept;
 
 private:
     struct WorkItem {
-        const float maxTime;
-        float elapsedTime;
-        int start, count;
+        std::string key;
+        std::string value;
+        int index;
 
-        WorkItem(const float maxTime, float elapsedTime, int start, int count);
+        WorkItem(std::string key, std::string value, int index);
     };
 
-    void doWork(const float& elapsedTime, WorkItem const& workItem) const noexcept;
+    void doWork(WorkItem const& workItem) noexcept;
 
     std::deque<WorkItem> workQueue;
     std::vector<SDL_Thread*> threads;
     SDL_Mutex* gameMtx;
     SDL_Condition* gameCond;
     int pendingWorkCount;
-    bool shouldExit; // Flag to signal threads to exit
+    bool shouldExit;
+    
+    // Store loaded resources
+    std::unordered_map<std::string, std::string> mResources;
+    int mTotalWorkItems;
 };
 
 #endif // WORKER_CONCURRENT

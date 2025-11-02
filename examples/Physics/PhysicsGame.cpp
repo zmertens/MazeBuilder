@@ -102,9 +102,12 @@ struct PhysicsGame::PhysicsGameImpl {
         // Initialize StateStack AFTER RenderWindow is created
         stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
         
-        loadTextures();
+        // Load initial textures needed for loading/splash screens
+        loadInitialTextures();
+        
         registerStates();
         
+        // Push loading state with resource path, then splash state on top
         stateStack->pushState(States::ID::LOADING);
         stateStack->pushState(States::ID::SPLASH);
     }
@@ -128,34 +131,16 @@ struct PhysicsGame::PhysicsGameImpl {
         SDL_Log("Successfully created SDL window and renderer");
     }
 
-    void loadTextures() noexcept {
+    void loadInitialTextures() noexcept {
         using std::string;
-        using std::unordered_map;
-        using std::ref;
 
-        JsonUtils jsonUtils{};
-        unordered_map<string, string> resources{};
-
-        // Configure maze generation
+        // Configure and generate maze for loading/splash screens
         mazes::configurator config{};
         config.rows(20).columns(20).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
 
         try {
-            // Load resource configuration
-            jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
-            SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-            auto splashImagePath = "resources/" + jsonUtils.getValue("splash_image", resources);
-            SDL_Log("DEBUG: Loading splash screen from: %s", splashImagePath.c_str());
-            textures.load(Textures::ID::SPLASH_SCREEN, splashImagePath);
-            
-            auto avatarValue = jsonUtils.getValue("avatar", resources);
-            SDL_Log("DEBUG: Avatar value from JSON: '%s'", avatarValue.c_str());
-            string avatarImagePath = "resources/character_beige_front.png";
-            SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
-            textures.load(Textures::ID::AVATAR, avatarImagePath);
-
             // Generate maze and create texture from it
-            SDL_Log("DEBUG: Generating maze with dimensions %dx%d", config.rows(), config.columns());
+            SDL_Log("DEBUG: Generating initial maze with dimensions %dx%d", config.rows(), config.columns());
             string mazeString = mazes::create(config);
             
             if (!mazeString.empty()) {
@@ -171,28 +156,8 @@ struct PhysicsGame::PhysicsGameImpl {
             } else {
                 SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze string");
             }
-
         } catch (const std::exception& e) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
-            return;
-        }
-
-        SDL_Log("Successfully loaded all game resources");
-
-        // Load and set window icon from resources
-        auto iconPath = "resources/" + jsonUtils.getValue("window_icon_path", resources);
-
-        if (!iconPath.empty()) {
-            SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
-            if (auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get(); sdlHelper != nullptr && icon) {
-                SDL_SetWindowIcon(sdlHelper->window, icon);
-                SDL_DestroySurface(icon);
-                SDL_Log("Successfully loaded window icon: %s", iconPath.c_str());
-            } else {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", iconPath.c_str(), SDL_GetError());
-            }
-        } else {
-            SDL_Log("No window icon specified in configuration");
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load initial textures: %s", e.what());
         }
     }
 
@@ -233,7 +198,7 @@ struct PhysicsGame::PhysicsGameImpl {
     void registerStates() noexcept {
 
         stateStack->registerState<GameState>(States::ID::GAME);
-        stateStack->registerState<LoadingState>(States::ID::LOADING);
+        stateStack->registerState<LoadingState>(States::ID::LOADING, resourcePath);
         stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
 }; // impl
@@ -271,7 +236,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
 
-    SDL_Log("Starting main game loop in SPLASH state");
+    SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
     gamePtr->stateStack->update(0.0f);

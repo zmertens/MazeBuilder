@@ -35,6 +35,9 @@ public:
     template <typename T>
     void registerState(States::ID stateID);
 
+    template <typename T, typename ResourcePath>
+    void registerState(States::ID stateID, ResourcePath&& resourcePath);
+
     void update(float dt) noexcept;
 
     void draw() const noexcept;
@@ -46,6 +49,9 @@ public:
     void popState();
 
     void clearStates();
+
+    template <typename Pointer>
+    Pointer peekState() const noexcept;
 
     bool isEmpty() const noexcept;
 private:
@@ -73,6 +79,29 @@ void StateStack::registerState(States::ID stateID)
 	{
 		return State::Ptr(std::make_unique<T>(*this, mContext));
 	});
+}
+
+template <typename T, typename ResourcePath>
+void StateStack::registerState(States::ID stateID, ResourcePath&& resourcePath)
+{
+    mFactories.insert_or_assign(stateID, [this, resourcePath = std::forward<ResourcePath>(resourcePath)] ()
+    {
+        return State::Ptr(std::make_unique<T>(*this, mContext, resourcePath));
+    });
+}
+
+template <typename Pointer>
+Pointer StateStack::peekState() const noexcept
+{
+    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it) {
+
+        if (auto statePtr = dynamic_cast<Pointer>((*it).get())) {
+
+            return statePtr;
+        }
+    }
+
+    return nullptr;
 }
 
 #endif // STATE_STACK_HPP

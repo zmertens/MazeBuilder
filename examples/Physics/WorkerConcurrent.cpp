@@ -4,17 +4,25 @@
 #include <cstdint>
 #include <iterator>
 #include <string>
+#include <unordered_map>
 
 #include <SDL3/SDL.h>
 
-WorkerConcurrent::WorkItem::WorkItem(const float maxTime, float elapsedTime, int start, int count)
-    : maxTime(maxTime), elapsedTime(elapsedTime), start{ start }, count{ count } {
+#include "JsonUtils.hpp"
+
+WorkerConcurrent::WorkItem::WorkItem(std::string key, std::string value, int index)
+    : key(std::move(key)), value(std::move(value)), index(index) {
 
 }
 
 // Constructor
 WorkerConcurrent::WorkerConcurrent()
-    : gameMtx(SDL_CreateMutex()), gameCond(SDL_CreateCondition()), pendingWorkCount(0), shouldExit(false) {
+    : gameMtx(SDL_CreateMutex())
+    , gameCond(SDL_CreateCondition())
+    , pendingWorkCount(0)
+    , shouldExit(false)
+    , mResources{}
+    , mTotalWorkItems(0) {
 
     if (!gameCond) {
 
@@ -160,8 +168,6 @@ void WorkerConcurrent::initThreads() noexcept {
 
         if (auto workerPtr = reinterpret_cast<WorkerConcurrent*>(data)) {
 
-            float elapsedTime = 0.0f;
-
             while (!workerPtr->shouldExit) {
                 {
                     SDL_LockMutex(workerPtr->gameMtx);
@@ -177,23 +183,14 @@ void WorkerConcurrent::initThreads() noexcept {
 
                     if (!workerPtr->workQueue.empty()) {
 
-                        auto&& tempWorker = workerPtr->workQueue.front();
+                        auto tempWorker = workerPtr->workQueue.front();
                         workerPtr->workQueue.pop_front();
-
-#if defined(MAZE_DEBUG)
-
-                        SDL_Log("Processing work item [ start: %d | count: %d]\n", tempWorker.start, tempWorker.count);
-#endif
 
                         SDL_UnlockMutex(workerPtr->gameMtx);
 
-                        workerPtr->doWork(ref(elapsedTime), cref(tempWorker));
+                        // Process the work item
+                        workerPtr->doWork(tempWorker);
 
-                        if (elapsedTime >= tempWorker.maxTime) {
-                            
-                            SDL_Log("Max time reached for this work item: %.2f >= %.2f\n", elapsedTime, tempWorker.maxTime);
-                            elapsedTime = 0.0f;
-                        }
                     } else {
                         SDL_UnlockMutex(workerPtr->gameMtx);
                     }
@@ -207,10 +204,6 @@ void WorkerConcurrent::initThreads() noexcept {
 
                         SDL_SignalCondition(workerPtr->gameCond);
                     }
-#if defined(MAZE_DEBUG)
-
-                    SDL_Log("Pending work count: %d\n", workerPtr->pendingWorkCount);
-#endif
 
                     SDL_UnlockMutex(workerPtr->gameMtx);
                 }
@@ -240,59 +233,65 @@ void WorkerConcurrent::initThreads() noexcept {
     }
 }
 
-void WorkerConcurrent::generate(const float maxTime) noexcept {
-    using std::size_t;
+void WorkerConcurrent::generate(std::string_view resourcePath) noexcept {
+    using std::string;
+    using std::unordered_map;
 
-    if (this->pendingWorkCount == 0) {
-
-        SDL_WaitCondition(gameCond, gameMtx);
-    }
-
-    if (maxTime <= 0.f) {
-
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Max time is non-positive, cannot track\n");
-
+    if (resourcePath.empty()) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Resource path is empty\n");
         return;
     }
 
+    SDL_LockMutex(gameMtx);
     workQueue.clear();
+    mResources.clear();
+    SDL_UnlockMutex(gameMtx);
 
-    static constexpr auto BLOCK_COUNT = 4;
-
-    size_t charsPerWorker = static_cast<size_t>(maxTime / static_cast<float>(BLOCK_COUNT));
-
-    for (auto w = 0; w < BLOCK_COUNT; w++) {
-
-        float startTime = w * charsPerWorker;
-        float endTime = (w == BLOCK_COUNT - 1) ? maxTime : (w + 1) * charsPerWorker;
-
-        size_t startIdx = static_cast<size_t>(startTime);
-        size_t endIdx = static_cast<size_t>(endTime);
-        size_t count = endIdx - startIdx;
-
-        SDL_Log("Worker %d: Processing from %zu to %zu (count: %zu)\n", w, startIdx, endIdx, count);
-
-        workQueue.push_back({
-            maxTime,
-            0.0f,
-            static_cast<int>(startIdx),
-            static_cast<int>(count)
-            });
+    // Load JSON configuration
+    JsonUtils jsonUtils{};
+    unordered_map<string, string> resources{};
+    
+    try {
+        jsonUtils.loadConfiguration(string(resourcePath), resources);
+        SDL_Log("Loaded %zu resources from %s\n", resources.size(), resourcePath.data());
+    } catch (const std::exception& e) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load resources: %s\n", e.what());
+        return;
     }
 
-    this->pendingWorkCount = BLOCK_COUNT;
+    if (resources.empty()) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "No resources found in %s\n", resourcePath.data());
+        return;
+    }
 
-    SDL_LockMutex(this->gameMtx);
-    SDL_SignalCondition(gameCond);
-    SDL_UnlockMutex(this->gameMtx);
-} // generate
+    // Create work items - distribute resources among workers
+    SDL_LockMutex(gameMtx);
+    
+    int index = 0;
+    for (const auto& [key, value] : resources) {
+        workQueue.push_back(WorkItem{key, value, index++});
+    }
+    
+    mTotalWorkItems = static_cast<int>(workQueue.size());
+    pendingWorkCount = mTotalWorkItems;
+    
+    SDL_Log("Created %d work items for resource loading\n", mTotalWorkItems);
+    
+    SDL_BroadcastCondition(gameCond);
+    SDL_UnlockMutex(gameMtx);
+}
 
-void WorkerConcurrent::doWork(const float& elapsedTime, WorkItem const& item) const noexcept {
+void WorkerConcurrent::doWork(WorkItem const& item) noexcept {
 
-    // Simulate work being done
-    SDL_Delay(static_cast<std::uint32_t>(elapsedTime * 1000));
+    // Simulate resource loading work (checking, validating, etc.)
+    SDL_Delay(100); // Small delay to simulate I/O
 
-    SDL_Log("Processing work item from %d to %d\n", item.start, item.start + item.count);
+    SDL_Log("Processing resource [%d]: %s = %s\n", item.index, item.key.c_str(), item.value.c_str());
+    
+    // Store the processed resource in a thread-safe manner
+    SDL_LockMutex(gameMtx);
+    mResources[item.key] = item.value;
+    SDL_UnlockMutex(gameMtx);
 }
 
 bool WorkerConcurrent::isDone() const noexcept {
@@ -307,8 +306,21 @@ bool WorkerConcurrent::isDone() const noexcept {
 float WorkerConcurrent::getCompletion() const noexcept {
 
     SDL_LockMutex(this->gameMtx);
-    float completion = 1.0f - (static_cast<float>(this->pendingWorkCount) / static_cast<float>(this->workQueue.size() + this->pendingWorkCount));
+    float completion = 0.0f;
+    if (mTotalWorkItems > 0) {
+        int completed = mTotalWorkItems - pendingWorkCount;
+        completion = static_cast<float>(completed) / static_cast<float>(mTotalWorkItems);
+    }
     SDL_UnlockMutex(this->gameMtx);
 
     return completion;
+}
+
+std::unordered_map<std::string, std::string> WorkerConcurrent::getResources() const noexcept {
+    
+    SDL_LockMutex(gameMtx);
+    auto resourcesCopy = mResources;
+    SDL_UnlockMutex(gameMtx);
+    
+    return resourcesCopy;
 }
