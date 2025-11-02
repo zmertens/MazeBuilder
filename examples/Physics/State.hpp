@@ -45,6 +45,7 @@ protected:
     void requestStackPop();
     void requestStateClear();
     Context getContext() const noexcept;
+    StateStack& getStack() const noexcept;
 private:
     StateStack* mStack;
     Context mContext;

@@ -4,6 +4,8 @@
 #include "Sprite.hpp"
 #include "State.hpp"
 
+class LoadingState;
+
 class SplashState : public State {
 public:
 
@@ -14,6 +16,8 @@ public:
     virtual bool handleEvent(const SDL_Event& event) noexcept override;
 
 private:
+    bool isLoadingComplete() const noexcept;
+
     Sprite mSplashSprite;
 
     bool mShowText;

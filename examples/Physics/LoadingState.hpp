@@ -2,6 +2,8 @@
 #define LOADING_STATE_HPP
 
 #include <string_view>
+#include <unordered_map>
+#include <string>
 
 #include "Sprite.hpp"
 #include "State.hpp"
@@ -19,8 +21,13 @@ public:
     virtual bool update(float dt) noexcept override;
     virtual bool handleEvent(const SDL_Event& event) noexcept override;
 
+    // Check if loading has completed
+    bool isFinished() const noexcept;
+
 private:
     void loadResources(std::string_view resourcePath) noexcept;
+
+    void loadTexturesFromResources(const std::unordered_map<std::string, std::string>& resources) noexcept;
 
     void setCompletion(float percent) noexcept;
 

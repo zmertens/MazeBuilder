@@ -33,3 +33,7 @@ State::Context State::getContext() const noexcept {
  
     return mContext;
 }
+
+StateStack& State::getStack() const noexcept {
+    return *mStack;
+}
