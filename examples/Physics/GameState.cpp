@@ -2,6 +2,8 @@
 
 #include <functional>
 
+#include <MazeBuilder/create.h>
+
 #include "CommandQueue.hpp"
 #include "Player.hpp"
 #include "StateStack.hpp"

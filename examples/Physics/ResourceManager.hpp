@@ -1,13 +1,31 @@
 #ifndef RESOURCE_MANAGER_HPP
 #define RESOURCE_MANAGER_HPP
 
+#include <cassert>
 #include <map>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <cassert>
+#include <type_traits>
+#include <utility>
 
 class Texture;
+
+template <typename T>
+class HasLoadFromFile {
+public:
+	static constexpr bool value = requires(T t, std::string_view path) {
+		{ t.loadFromFile(path) } -> std::convertible_to<bool>;
+	};
+};
+
+template <typename T>
+class HasLoadFromStr {
+public:
+	static constexpr bool value = requires(T t, std::string_view str, int param2) {
+		{ t.loadFromStr(str, param2) } -> std::convertible_to<bool>;
+	};
+};
 
 template <typename Resource, typename Identifier>
 class ResourceManager
@@ -34,8 +52,14 @@ private:
 template <typename Resource, typename Identifier>
 void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename)
 {
+	if constexpr (!HasLoadFromFile<Resource>::value) {
+
+		static_assert(HasLoadFromFile<Resource>::value, "Resource type does not support loadFromFile method.");
+	}
+
 	// Create and load resource
 	auto resource = std::make_unique<Resource>();
+
 	if (!resource->loadFromFile(filename)) {
 
 		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
@@ -47,17 +71,22 @@ void ResourceManager<Resource, Identifier>::load(Identifier id, const std::strin
 
 template <typename Resource, typename Identifier>
 template <typename Parameter>
-void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& filename, const Parameter& secondParam)
+void ResourceManager<Resource, Identifier>::load(Identifier id, const std::string& str, const Parameter& secondParam)
 {
-	// // Create and load resource
-	// auto resource = std::make_unique<Resource>();
-	// if (!resource->loadFromFile(renderer, filename, secondParam)) {
+	if constexpr (!HasLoadFromStr<Resource>::value) {
 
-		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
-    // }
+		static_assert(HasLoadFromStr<Resource>::value, "Resource type does not support loadFromStr method.");
+	}
 
-	// // If loading successful, insert resource to map
-	// insertResource(id, std::move(resource));
+	// Create and load resource
+	auto resource = std::make_unique<Resource>();
+	if (!resource->loadFromStr(str, secondParam)) {
+
+		throw std::runtime_error("ResourceManager::load - Failed to load " + str);
+	}
+
+	// If loading successful, insert resource to map
+	insertResource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>

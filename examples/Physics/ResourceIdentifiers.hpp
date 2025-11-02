@@ -6,7 +6,8 @@ namespace Textures {
 	enum class ID {
 
 		AVATAR = 0,
-		SPLASH_SCREEN = 1
+		MAZE = 1,
+		SPLASH_SCREEN = 2
 	};
 }
 

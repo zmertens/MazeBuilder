@@ -31,6 +31,7 @@
 
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/create.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/randomizer.h>
 
@@ -133,6 +134,11 @@ struct PhysicsGame::PhysicsGameImpl {
 
         JsonUtils jsonUtils{};
         unordered_map<string, string> resources{};
+
+        // Configure maze generation
+        mazes::configurator config{};
+        config.rows(20).columns(20).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
+
         try {
             // Load resource configuration
             jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
@@ -146,6 +152,25 @@ struct PhysicsGame::PhysicsGameImpl {
             string avatarImagePath = "resources/character_beige_front.png";
             SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
             textures.load(Textures::ID::AVATAR, avatarImagePath);
+
+            // Generate maze and create texture from it
+            SDL_Log("DEBUG: Generating maze with dimensions %dx%d", config.rows(), config.columns());
+            string mazeString = mazes::create(config);
+            
+            if (!mazeString.empty()) {
+                SDL_Log("DEBUG: Maze generated successfully, length: %zu characters", mazeString.size());
+                
+                // Load the maze texture from the generated string
+                constexpr int cellSize = 4; // Pixels per character in the maze
+                textures.load(Textures::ID::MAZE, mazeString, cellSize);
+                
+                auto& mazeTexture = textures.get(Textures::ID::MAZE);
+                SDL_Log("DEBUG: Maze texture created successfully: %dx%d", 
+                        mazeTexture.getWidth(), mazeTexture.getHeight());
+            } else {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze string");
+            }
+
         } catch (const std::exception& e) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
             return;

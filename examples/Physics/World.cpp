@@ -80,13 +80,6 @@ void World::buildScene() {
         mSceneGraph.attachChild(move(layer));
     }
 
-    auto& texture1 = mTextures.get(Textures::ID::SPLASH_SCREEN);
-    SDL_Rect fullScreenRect = { 0, 0, texture1.getWidth(), texture1.getHeight() };
-    auto backgroundSprite = make_unique<SpriteNode>(texture1, fullScreenRect);
-    backgroundSprite->setPosition(0.0f, 0.0f);
-    SceneNode::Ptr spriteNode = move(backgroundSprite);
-    mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(spriteNode));
-
     auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
     mPlayerPathfinder = leader.get();
     mPlayerPathfinder->setPosition(0.f, 0.f);
@@ -122,6 +115,15 @@ void World::buildScene() {
     auto* wallVerticalPtr = wallVertical.get();
     mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallVertical));
     wallVerticalPtr->setPosition(250.0f, 700.0f);  // Below balls
+
+    // maze
+    // set the texture that was procedurally generated from MazeBuilder in PhysicsGame
+    auto& mazeTexture = mTextures.get(Textures::ID::MAZE);
+    SDL_Rect mazeRect = { 0, 0, mazeTexture.getWidth(), mazeTexture.getHeight() };
+    auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
+    mazeSprite->setPosition(0.0f, 0.0f);
+    SceneNode::Ptr mazeNode = move(mazeSprite);
+    mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(mazeNode));
 
     SDL_Log("World::buildScene - Scene built successfully");
 }

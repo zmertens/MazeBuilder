@@ -49,10 +49,8 @@ void Sprite::draw(RenderStates states) const noexcept {
     dstRect.w = static_cast<float>(rectangleBounds.w);
     dstRect.h = static_cast<float>(rectangleBounds.h);
 
-    SDL_Log("Sprite::draw - Rendering %dx%d texture at (%.1f, %.1f)", 
-            rectangleBounds.w, rectangleBounds.h, dstRect.x, dstRect.y);
-
     if (!SDL_RenderTexture(sdlHelper->renderer, mTexture->get(), &srcRect, &dstRect)) {
+
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RenderTexture failed: %s", SDL_GetError());
     }
 }

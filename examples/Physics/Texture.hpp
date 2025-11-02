@@ -39,6 +39,8 @@ public:
 
     bool loadImageTexture(std::string_view imagePath) noexcept;
 
+    bool loadFromStr(std::string_view str, int cellSize = 10) noexcept;
+
     void render(int x, int y) const noexcept;
 }; // Texture class
 
