@@ -53,6 +53,9 @@ private:
     // Store loaded resources
     std::unordered_map<std::string, std::string> mResources;
     int mTotalWorkItems;
+    
+    // Track which config* keys have been processed to ensure one-time execution
+    std::unordered_map<std::string, bool> mProcessedConfigs;
 };
 
 #endif // WORKER_CONCURRENT

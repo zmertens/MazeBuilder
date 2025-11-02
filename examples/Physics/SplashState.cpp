@@ -10,7 +10,7 @@
 SplashState::SplashState(StateStack& stack, Context context)
     : State(stack, context)
     , mShowText{ true }
-    , mSplashSprite{context.textures->get(Textures::ID::MAZE)} {
+    , mSplashSprite{context.textures->get(Textures::ID::SPLASH_SCREEN)} {
 
 }
 

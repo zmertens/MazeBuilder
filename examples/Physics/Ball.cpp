@@ -74,19 +74,19 @@ Textures::ID Ball::getTextureID() const noexcept {
 
     switch (mType) {
         case Type::NORMAL: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::BALL_NORMAL;
         }
         case Type::HEAVY: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::BALL_NORMAL;
         }
         case Type::LIGHT: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::BALL_NORMAL;
         }
         case Type::EXPLOSIVE: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::BALL_NORMAL;
         }
         default: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::BALL_NORMAL;
         }
     }
 }

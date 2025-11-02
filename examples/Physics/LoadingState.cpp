@@ -2,8 +2,7 @@
 
 #include <SDL3/SDL.h>
 
-#include <MazeBuilder/configurator.h>
-#include <MazeBuilder/create.h>
+#include <MazeBuilder/io_utils.h>
 
 #include "JsonUtils.hpp"
 #include "ResourceIdentifiers.hpp"
@@ -17,19 +16,20 @@
 /// @param resourcePath ""
 LoadingState::LoadingState(StateStack& stack, State::Context context, std::string_view resourcePath)
     : State(stack, context)
-    , mLoadingSprite{context.textures->get(Textures::ID::MAZE)}
+    , mLoadingSprite{context.textures->get(Textures::ID::SPLASH_SCREEN)}
     , mForeman{}
-    , mHasFinished{false} {
+    , mHasFinished{false}
+    , mResourcePath{resourcePath} {
 
     mForeman.initThreads();
     
     // Start loading resources in background if path is provided
-    if (!resourcePath.empty()) {
+    if (!mResourcePath.empty()) {
 
-        loadResources(resourcePath);
+        loadResources();
     } else {
 
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "LoadingState: No resource path provided: %s\n", resourcePath.data());
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "LoadingState: No resource path provided: %s\n", mResourcePath.data());
         mHasFinished = true;
     }
 }
@@ -50,7 +50,7 @@ bool LoadingState::update(float dt) noexcept {
         SDL_Log("Loading complete! Loaded %zu resources. Loading textures...\n", resources.size());
         
         // Now actually load the textures from the resource metadata
-        loadTexturesFromResources(resources);
+        loadTexturesFromResources(std::cref(resources));
         
         mHasFinished = true;
         SDL_Log("All textures loaded! Press any key to continue...\n");
@@ -83,13 +83,13 @@ bool LoadingState::isFinished() const noexcept { return mHasFinished; }
 
 /// @brief Load resources from the specified path
 /// @param resourcePath Path to the JSON resource configuration
-void LoadingState::loadResources(std::string_view resourcePath) noexcept {
+void LoadingState::loadResources() noexcept {
 
-    SDL_Log("LoadingState::loadResources - Loading from: %s\n", resourcePath.data());
-    
+    SDL_Log("LoadingState::loadResources - Loading from: %s\n", mResourcePath.data());
+
     // This would be called by the application to trigger resource loading
     // The resources would be loaded by the worker threads and stored
-    mForeman.generate(resourcePath);
+    mForeman.generate(mResourcePath);
 }
 
 void LoadingState::loadTexturesFromResources(const std::unordered_map<std::string, std::string>& resources) noexcept {
@@ -99,23 +99,24 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
     JsonUtils jsonUtils{};
     
     try {
+
+        // Construct a string from the resource path
+        auto resourcePathPrefix = mazes::io_utils::getDirectoryPath(mResourcePath) + "/";
+
         // Load splash screen texture
-        auto splashImageKey = resources.find("splash_image");
-        if (splashImageKey != resources.end()) {
-            string splashImagePath = "resources/" + jsonUtils.extractJsonValue(splashImageKey->second);
-            SDL_Log("DEBUG: Loading splash screen from: %s", splashImagePath.c_str());
-            textures.load(Textures::ID::SPLASH_SCREEN, splashImagePath);
+        if (auto sdlBlocksKey = resources.find("sdl_blocks"); sdlBlocksKey != resources.cend()) {
+
+            string sdlBlocksPath = resourcePathPrefix + jsonUtils.extractJsonValue(sdlBlocksKey->second);
+            textures.load(Textures::ID::SDL_BLOCKS, sdlBlocksPath);
+            SDL_Log("DEBUG: Loading SDL blocks from: %s", sdlBlocksPath.c_str());
         }
         
         // Load avatar texture
-        auto avatarKey = resources.find("avatar");
-        if (avatarKey != resources.end()) {
-            string avatarImagePath = "resources/" + jsonUtils.extractJsonValue(avatarKey->second);
-            SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
-            textures.load(Textures::ID::AVATAR, avatarImagePath);
-        } else {
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Avatar resource not found, using default\n");
-            textures.load(Textures::ID::AVATAR, "resources/character_beige_front.png");
+        if (auto avatarKey = resources.find("astronaut"); avatarKey != resources.cend()) {
+
+            string avatarImagePath = resourcePathPrefix + jsonUtils.extractJsonValue(avatarKey->second);
+            textures.load(Textures::ID::ASTRONAUT, avatarImagePath);
+            SDL_Log("DEBUG: Loading astronaut from: %s", avatarImagePath.c_str());
         }
         
     } catch (const std::exception& e) {

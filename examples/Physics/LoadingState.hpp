@@ -1,9 +1,9 @@
 #ifndef LOADING_STATE_HPP
 #define LOADING_STATE_HPP
 
+#include <string>
 #include <string_view>
 #include <unordered_map>
-#include <string>
 
 #include "Sprite.hpp"
 #include "State.hpp"
@@ -25,7 +25,7 @@ public:
     bool isFinished() const noexcept;
 
 private:
-    void loadResources(std::string_view resourcePath) noexcept;
+    void loadResources() noexcept;
 
     void loadTexturesFromResources(const std::unordered_map<std::string, std::string>& resources) noexcept;
 
@@ -36,6 +36,8 @@ private:
     WorkerConcurrent mForeman;
     
     bool mHasFinished;
+
+    std::string mResourcePath;
 };
 
 #endif // LOADING_STATE_HPP

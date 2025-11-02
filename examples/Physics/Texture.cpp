@@ -243,15 +243,3 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
 
     return true;
 }
-
-void Texture::render(int x, int y) const noexcept {
-
-    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
-
-    SDL_FRect destinationRect = { static_cast<float>(x),
-        static_cast<float>(y),
-        static_cast<float>(width),
-        static_cast<float>(height) };
-
-    SDL_RenderTexture(renderer, this->texture, nullptr, &destinationRect);
-}

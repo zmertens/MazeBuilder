@@ -9,9 +9,6 @@ struct SDL_Texture;
 /// @brief Texture class for SDL3
 /// @details This class wraps SDL_Texture and provides methods for loading, rendering, and freeing textures.
 class Texture {
-private:
-    SDL_Texture* texture;
-    int width, height;
 public:
     explicit Texture() noexcept;
 
@@ -40,8 +37,9 @@ public:
     bool loadImageTexture(std::string_view imagePath) noexcept;
 
     bool loadFromStr(std::string_view str, int cellSize = 10) noexcept;
-
-    void render(int x, int y) const noexcept;
+private:
+    SDL_Texture* texture;
+    int width, height;
 }; // Texture class
 
 #endif // TEXTURE_HPP

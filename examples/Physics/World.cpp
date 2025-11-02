@@ -118,7 +118,7 @@ void World::buildScene() {
 
     // maze
     // set the texture that was procedurally generated from MazeBuilder in PhysicsGame
-    auto& mazeTexture = mTextures.get(Textures::ID::MAZE);
+    auto& mazeTexture = mTextures.get(Textures::ID::SPLASH_SCREEN);
     SDL_Rect mazeRect = { 0, 0, mazeTexture.getWidth(), mazeTexture.getHeight() };
     auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
     mazeSprite->setPosition(0.0f, 0.0f);

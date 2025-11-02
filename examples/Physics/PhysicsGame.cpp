@@ -136,7 +136,7 @@ struct PhysicsGame::PhysicsGameImpl {
 
         // Configure and generate maze for loading/splash screens
         mazes::configurator config{};
-        config.rows(20).columns(20).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
+        config.rows(INIT_WINDOW_H).columns(INIT_WINDOW_W).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
 
         try {
             // Generate maze and create texture from it
@@ -148,9 +148,9 @@ struct PhysicsGame::PhysicsGameImpl {
                 
                 // Load the maze texture from the generated string
                 constexpr int cellSize = 4; // Pixels per character in the maze
-                textures.load(Textures::ID::MAZE, mazeString, cellSize);
+                textures.load(Textures::ID::SPLASH_SCREEN, mazeString, cellSize);
                 
-                auto& mazeTexture = textures.get(Textures::ID::MAZE);
+                auto& mazeTexture = textures.get(Textures::ID::SPLASH_SCREEN);
                 SDL_Log("DEBUG: Maze texture created successfully: %dx%d", 
                         mazeTexture.getWidth(), mazeTexture.getHeight());
             } else {

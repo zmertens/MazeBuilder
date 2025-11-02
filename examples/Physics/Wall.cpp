@@ -43,12 +43,12 @@ Textures::ID Wall::getTextureID() const noexcept {
     
     switch (orientation) {
     case Orientation::HORIZONTAL:
-        return Textures::ID::AVATAR;
+        return Textures::ID::WALL_HORIZONTAL;
     case Orientation::VERTICAL:
-        return Textures::ID::AVATAR;
+        return Textures::ID::WALL_VERTICAL;
     case Orientation::CORNER:
-        return Textures::ID::AVATAR;
+        return Textures::ID::WALL_CORNER;
     default:
-        return Textures::ID::AVATAR;
+        return Textures::ID::ASTRONAUT;
     }
 }

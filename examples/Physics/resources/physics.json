@@ -7,12 +7,30 @@
     "resources_dir": "resources",
     "music_ogg": ["generate.ogg"],
     "music_wav": ["loading.wav"],
-    "splash_image": "sdl blocks.png",
+    "sdl_blocks": "sdl blocks.png",
 	"network_url": "http://localhost:3000",
     "icon_image": "icon.bmp",
-	"avatar": "character_beige_front.png",
+	"astronaut": "character_beige_front.png",
     "fonts_ttf": "DMSans.ttf",
     "levels": ["-r 100 -c 100 -s 10 -a sidewinder -o stdout -d", "-r 50 -c 50 -s 20 -a dfs -d -o stdout"],
     "physics_config": "physics.json",
-    "window_icon_path": "icon.bmp"
+    "window_icon_path": "icon.bmp",
+	"config1": {
+		"rows": 9,
+		"columns": 19,
+		"seed": 50,
+		"algo": "dfs"
+	},
+	"config2": {
+		"rows": 5,
+		"columns": 6,
+		"seed": 23,
+		"algo": "binary_tree"
+	},
+	"config3": {
+		"rows": 15,
+		"columns": 10,
+		"seed": 50,
+		"algo": "sidewinder"
+	}
 }

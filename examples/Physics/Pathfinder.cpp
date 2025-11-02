@@ -37,13 +37,13 @@ void Pathfinder::draw(RenderStates states) const noexcept
 Textures::ID Pathfinder::getTextureID() const noexcept {
     switch (mType) {
         case Type::ALLY: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::ASTRONAUT;
         }
         case Type::ENEMY: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::ASTRONAUT;
         }
         default: {
-            return Textures::ID::AVATAR;
+            return Textures::ID::ASTRONAUT;
         }
     }
 }
