@@ -265,7 +265,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         if (gamePtr->stateStack->isEmpty()) {
 
             gamePtr->window->close();
-            break;
         }
 
         gamePtr->render();
