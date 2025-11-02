@@ -21,9 +21,8 @@ public:
 
     virtual Category::Type getCategory() const noexcept override;
 
-    void draw(RenderStates states) const noexcept;
-
 private:
+    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
     Textures::ID getTextureID() const noexcept override;
 

@@ -72,6 +72,8 @@ struct PhysicsGame::PhysicsGameImpl {
 
     std::unique_ptr<RenderWindow> window;
 
+    SDLHelper sdlHelper;
+
     TextureManager textures;
 
     std::unique_ptr<StateStack> stateStack;
@@ -91,13 +93,14 @@ struct PhysicsGame::PhysicsGameImpl {
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
         , p1{}
         , window{nullptr}
+        , sdlHelper{}
         , textures{}
         , stateStack{nullptr} {
 
         initSDL();
         
         // Initialize RenderWindow AFTER SDL renderer is created
-        window = std::make_unique<RenderWindow>(mazes::singleton_base<SDLHelper>::instance()->renderer);
+        window = std::make_unique<RenderWindow>(sdlHelper.renderer, sdlHelper.window);
         
         // Initialize StateStack AFTER RenderWindow is created
         stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
@@ -113,22 +116,20 @@ struct PhysicsGame::PhysicsGameImpl {
     }
 
     void initSDL() noexcept {
-        auto&& sdlHelper = mazes::singleton_base<SDLHelper>::instance();
-
-        sdlHelper->init();
 
         auto windowTitle = title + " - " + version;
-        sdlHelper->createWindowAndRenderer(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
+        sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
 
         // Check if window and renderer were created successfully
-        if (!sdlHelper->window || !sdlHelper->renderer) {
+        if (!sdlHelper.window || !sdlHelper.renderer) {
 
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer");
 
             return;
         }
 
-        SDL_Log("Successfully created SDL window and renderer");
+        SDL_Log("Successfully created SDL window and renderer: %s (%dx%d)\n", 
+                windowTitle.c_str(), INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
     void loadInitialTextures() noexcept {
@@ -148,7 +149,7 @@ struct PhysicsGame::PhysicsGameImpl {
                 
                 // Load the maze texture from the generated string
                 constexpr int cellSize = 4; // Pixels per character in the maze
-                textures.load(Textures::ID::SPLASH_SCREEN, mazeString, cellSize);
+                textures.load(sdlHelper.renderer, Textures::ID::SPLASH_SCREEN, mazeString, cellSize);
                 
                 auto& mazeTexture = textures.get(Textures::ID::SPLASH_SCREEN);
                 SDL_Log("DEBUG: Maze texture created successfully: %dx%d", 
@@ -159,11 +160,6 @@ struct PhysicsGame::PhysicsGameImpl {
         } catch (const std::exception& e) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load initial textures: %s", e.what());
         }
-    }
-
-    ~PhysicsGameImpl() {
-
-
     }
 
     void processInput() {
@@ -244,7 +240,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (!gamePtr->stateStack->isEmpty())
+    while (gamePtr->window->isOpen())
 #endif
     {
          // Expected milliseconds per frame (16.67ms)
@@ -264,6 +260,12 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
             currentTimeStep += FIXED_TIME_STEP;
 
             gamePtr->update(static_cast<float>(FIXED_TIME_STEP) / 1000.f);
+        }
+
+        if (gamePtr->stateStack->isEmpty()) {
+
+            gamePtr->window->close();
+            break;
         }
 
         gamePtr->render();
@@ -291,4 +293,17 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 #endif
     
     return true;
+}
+
+void PhysicsGame::cleanup() noexcept {
+
+    if (auto& textures = this->m_impl->textures; !textures.isEmpty()) {
+        textures.clear();
+        SDL_Log("PhysicsGame::cleanup() - Cleared texture manager\n");
+    }
+
+    if (auto& sdl = this->m_impl->sdlHelper; sdl.window || sdl.renderer) {
+        sdl.destroy();
+        SDL_Log("PhysicsGame::cleanup() - Cleaning up SDL resources\n");
+    }
 }

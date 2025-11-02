@@ -6,6 +6,7 @@
 
 #include <SDL3/SDL_rect.h>
 
+struct SDL_Renderer;
 class Texture;
 
 /// @brief 
@@ -17,7 +18,7 @@ public:
     
     explicit Sprite(const Texture& texture, const SDL_Rect& rect);
 
-    void draw(RenderStates states) const noexcept;
+    void draw(SDL_Renderer* renderer, RenderStates states) const noexcept;
 
     /// @brief Change the source texture of the sprite
     /// @param texture New texture (must exist as long as sprite uses it)

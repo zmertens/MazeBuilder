@@ -60,14 +60,14 @@ void Ball::updateCurrent(float dt) noexcept {
 
 
 // Draw the ball
-void Ball::drawCurrent(RenderStates states) const noexcept {
+void Ball::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept {
     static int drawCount = 0;
     if (drawCount < 5) {
         SDL_Log("Ball::drawCurrent - Drawing ball at pos(%.1f,%.1f)", 
                 states.transform.p.x, states.transform.p.y);
         drawCount++;
     }
-    mSprite.draw(states);
+    mSprite.draw(renderer, states);
 }
 
 Textures::ID Ball::getTextureID() const noexcept {

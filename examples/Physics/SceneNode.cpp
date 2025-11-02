@@ -51,26 +51,26 @@ void SceneNode::updateChildren(float dt) noexcept
     }
 }
 
-void SceneNode::draw(RenderStates states) const noexcept
+void SceneNode::draw(SDL_Renderer* renderer, RenderStates states) const noexcept
 {
     states.transform.p.x += getPosition().x;
     states.transform.p.y += getPosition().y;
 
     states.transform.q = getRotation();
 
-    drawCurrent(states);
-    drawChildren(states);
+    drawCurrent(renderer, states);
+    drawChildren(renderer, states);
 }
 
-void SceneNode::drawCurrent(RenderStates) const noexcept
+void SceneNode::drawCurrent(SDL_Renderer*, RenderStates) const noexcept
 {
     // Do nothing by default
 }
 
-void SceneNode::drawChildren(RenderStates states) const noexcept
+void SceneNode::drawChildren(SDL_Renderer* renderer, RenderStates states) const noexcept
 {
     for (auto& child : mChildren) {
-        child->draw(states);
+        child->draw(renderer, states);
     }
 }
 

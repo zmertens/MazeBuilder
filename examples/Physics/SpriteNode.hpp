@@ -12,10 +12,8 @@ public:
     explicit SpriteNode(const Texture& texture);
     explicit SpriteNode(const Texture& texture, const SDL_Rect& textureRect);
 
-    void draw(RenderStates states) const noexcept;
-
 private:
-    virtual void drawCurrent(RenderStates states) const noexcept override;
+    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 
 private:

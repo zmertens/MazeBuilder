@@ -1,7 +1,5 @@
 #include "Texture.hpp"
 
-#include "SDLHelper.hpp"
-
 #include <SDL3/SDL.h>
 
 #include <MazeBuilder/enums.h>
@@ -9,18 +7,17 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
-Texture::Texture() noexcept : texture{ nullptr }, width(0), height(0) {
-}
-
-Texture::~Texture() {
-
-    this->free();
-}
-
 void Texture::free() noexcept {
     if (this->texture) {
-
-        SDL_DestroyTexture(texture);
+        // Check if SDL is still initialized before destroying texture
+        if (SDL_WasInit(SDL_INIT_VIDEO)) {
+            SDL_DestroyTexture(texture);
+        } else {
+            SDL_Log("Texture::free() - SDL already quit, skipping texture destruction\n");
+        }
+        texture = nullptr;  // Set to null after destroying
+        width = 0;
+        height = 0;
     }
 }
 
@@ -29,19 +26,17 @@ SDL_Texture* Texture::get() const noexcept {
     return this->texture;
 }
 
-bool Texture::loadTarget(int w, int h) noexcept {
-
-    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+bool Texture::loadTarget(SDL_Renderer* renderer, int w, int h) noexcept {
 
     this->free();
 
     this->texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, w, h);
-    
+
     if (!this->texture) {
-    
+
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture: %s\n", SDL_GetError());
     } else {
-    
+
         this->width = w;
         this->height = h;
     }
@@ -50,22 +45,20 @@ bool Texture::loadTarget(int w, int h) noexcept {
 }
 
 // Load an image file using stb_image and create an SDL texture
-bool Texture::loadFromFile(std::string_view path) noexcept {
-
-    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+bool Texture::loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept {
 
     this->free();
 
     int width, height, channels;
     unsigned char* imageData = stbi_load(path.data(), &width, &height, &channels, STBI_rgb_alpha);
-    
+
     if (!imageData) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load image: %s - %s\n", path.data(), stbi_failure_reason());
 
         return false;
     }
-    
+
     // Create surface from image data (force RGBA format)
     SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, imageData, width * 4);
 
@@ -74,12 +67,12 @@ bool Texture::loadFromFile(std::string_view path) noexcept {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create surface: %s\n", SDL_GetError());
 
         stbi_image_free(imageData);
-        
+
         SDL_DestroySurface(surface);
 
         return false;
     }
-    
+
     // Create texture from surface
     this->texture = SDL_CreateTextureFromSurface(renderer, surface);
 
@@ -89,10 +82,10 @@ bool Texture::loadFromFile(std::string_view path) noexcept {
 
         return false;
     }
-    
+
     // Set blend mode for transparency
     SDL_SetTextureBlendMode(this->texture, SDL_BLENDMODE_BLEND);
-    
+
     // Clean up
     SDL_DestroySurface(surface);
     stbi_image_free(imageData);
@@ -105,15 +98,13 @@ bool Texture::loadFromFile(std::string_view path) noexcept {
     return true;
 }
 
-bool Texture::loadImageTexture(std::string_view imagePath) noexcept {
-
-    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+bool Texture::loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept {
 
     this->free();
 
     SDL_Surface* loadedSurface = SDL_LoadBMP(imagePath.data());
     if (!loadedSurface) {
-    
+
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to load image %s! SDL Error: %s\n", imagePath.data(), SDL_GetError());
         return false;
     }
@@ -124,7 +115,7 @@ bool Texture::loadImageTexture(std::string_view imagePath) noexcept {
     }
 
     this->texture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
-    
+
     if (!this->texture) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture from %s! SDL Error: %s\n", imagePath.data(), SDL_GetError());
@@ -136,13 +127,11 @@ bool Texture::loadImageTexture(std::string_view imagePath) noexcept {
     this->height = loadedSurface->h;
 
     SDL_DestroySurface(loadedSurface);
-    
+
     return true;
 }
 
-bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
-    
-    auto renderer = mazes::singleton_base<SDLHelper>::instance().get()->renderer;
+bool Texture::loadFromStr(SDL_Renderer* renderer, std::string_view str, int cellSize) noexcept {
 
     this->free();
 
@@ -167,7 +156,7 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
             currentLineWidth++;
         }
     }
-    
+
     // Handle last line if it doesn't end with newline
     if (currentLineWidth > 0) {
         mazeHeight++;
@@ -186,7 +175,7 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
     this->height = mazeHeight * cellSize;
 
     SDL_Surface* surface = SDL_CreateSurface(this->width, this->height, SDL_PIXELFORMAT_RGBA8888);
-    
+
     if (!surface) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create surface for maze: %s", SDL_GetError());
         return false;
@@ -207,12 +196,12 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
         }
 
         // Determine color based on character
-        SDL_Rect charRect = {col * cellSize, row * cellSize, cellSize, cellSize};
-        
+        SDL_Rect charRect = { col * cellSize, row * cellSize, cellSize, cellSize };
+
         std::uint8_t r = 255, g = 255, b = 255, a = 255;
 
-        if (c == static_cast<char>(mazes::barriers::CORNER) 
-            || c == static_cast<char>(mazes::barriers::HORIZONTAL) 
+        if (c == static_cast<char>(mazes::barriers::CORNER)
+            || c == static_cast<char>(mazes::barriers::HORIZONTAL)
             || c == static_cast<char>(mazes::barriers::VERTICAL)) {
 
             // Walls are black
@@ -224,13 +213,13 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
         }
 
         SDL_FillSurfaceRect(surface, &charRect, SDL_MapSurfaceRGBA(surface, r, g, b, a));
-        
+
         col++;
     }
 
     // Create texture from surface
     this->texture = SDL_CreateTextureFromSurface(renderer, surface);
-    
+
     if (!this->texture) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create texture from maze surface: %s", SDL_GetError());
         SDL_DestroySurface(surface);
@@ -238,7 +227,7 @@ bool Texture::loadFromStr(std::string_view str, int cellSize) noexcept {
     }
 
     SDL_SetTextureBlendMode(this->texture, SDL_BLENDMODE_BLEND);
-    
+
     SDL_DestroySurface(surface);
 
     return true;

@@ -33,9 +33,9 @@ void Wall::updateCurrent(float dt) noexcept {
     // Walls do not have children to update
 }
 
-void Wall::drawCurrent(RenderStates states) const noexcept {
+void Wall::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept {
     if (!isDestroyed) {
-        mSprite.draw(states);
+        mSprite.draw(renderer, states);
     }
 }
 

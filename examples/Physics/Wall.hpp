@@ -28,7 +28,7 @@ public:
     void setOrientation(Orientation orientation);
 
 private:
-    virtual void drawCurrent(RenderStates states) const noexcept override;
+    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 private:
 

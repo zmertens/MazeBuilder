@@ -20,7 +20,7 @@ public:
     explicit Ball(Type type, const TextureManager& textureManager);
 
 private:
-    virtual void drawCurrent(RenderStates states) const noexcept override;
+    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 private:
 

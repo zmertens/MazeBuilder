@@ -56,9 +56,9 @@ int main(int argc, char* argv[]) {
 #if !defined(__EMSCRIPTEN__)
 
     if (argc != 2) {
-        
+
         cerr << "Usage: " << argv[0] << " <path_to_config.json>" << endl;
-        
+
         return EXIT_FAILURE;
     }
 
@@ -70,23 +70,29 @@ int main(int argc, char* argv[]) {
 
     try {
 
-        randomizer rng{};
+        randomizer rng;
 
-        if (auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H); inst->run(nullptr, rng)) {
+        // Get singleton and run the game
+        ;
+
+        if (auto& gameInstance = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H)
+            ; !gameInstance->run(nullptr, rng)) {
+
+            throw runtime_error("Error: PhysicsGame encountered an error during execution");
+        } else {
+
+            gameInstance->cleanup();
+        }
 
 #if defined(MAZE_DEBUG)
 
-            cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
+        cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
 #endif
-        } else {
-
-            throw runtime_error("Error: PhysicsGame encountered an error during execution");
-        }
 
     } catch (exception ex) {
 
         cerr << ex.what() << endl;
     }
 
-	return 0;
+    return 0;
 }

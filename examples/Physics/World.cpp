@@ -3,7 +3,6 @@
 #include "Ball.hpp"
 #include "JsonUtils.hpp"
 #include "Pathfinder.hpp"
-#include "RenderStates.hpp"
 #include "RenderWindow.hpp"
 #include "SDLHelper.hpp"
 #include "SpriteNode.hpp"

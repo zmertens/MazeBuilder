@@ -1,9 +1,8 @@
 #include "Sprite.hpp"
 
-#include "SDLHelper.hpp"
 #include "Texture.hpp"
 
-#include <MazeBuilder/singleton_base.h>
+#include <SDL3/SDL.h>
 
 Sprite::Sprite(const Texture& texture)
     : mTexture(&texture), mTextureRect{ SDL_Rect{ 0, 0, texture.getWidth(), texture.getHeight() } }{
@@ -16,22 +15,24 @@ Sprite::Sprite(const Texture& texture, const SDL_Rect& rect)
 
 }
 
-void Sprite::draw(RenderStates states) const noexcept {
+void Sprite::draw(SDL_Renderer* renderer, RenderStates states) const noexcept {
     if (!mTexture) {
         return;
     }
 
-    auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get();
-    if (!sdlHelper || !sdlHelper->renderer) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Sprite::draw - SDLHelper or renderer is null");
-        return;
+    // Check if SDL is still initialized before accessing renderer
+    if (!SDL_WasInit(SDL_INIT_VIDEO)) {
+        return; // SDL already quit, skip drawing
+    }
+
+    if (!renderer) {
+        return; // Renderer not available
     }
 
     auto* sdlTexture = mTexture->get();
     if (!sdlTexture) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Sprite::draw - SDL_Texture is null!");
-        return;
-    }
+        return; // Texture not available
+ }
 
     auto rectangleBounds = SDL_Rect{ 0, 0, mTexture->getWidth(), mTexture->getHeight() };
 
@@ -49,7 +50,7 @@ void Sprite::draw(RenderStates states) const noexcept {
     dstRect.w = static_cast<float>(rectangleBounds.w);
     dstRect.h = static_cast<float>(rectangleBounds.h);
 
-    if (!SDL_RenderTexture(sdlHelper->renderer, mTexture->get(), &srcRect, &dstRect)) {
+    if (!SDL_RenderTexture(renderer, mTexture->get(), &srcRect, &dstRect)) {
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RenderTexture failed: %s", SDL_GetError());
     }

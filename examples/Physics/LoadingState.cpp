@@ -3,12 +3,10 @@
 #include <SDL3/SDL.h>
 
 #include <MazeBuilder/io_utils.h>
-#include <MazeBuilder/singleton_base.h>
 
 #include "JsonUtils.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
-#include "SDLHelper.hpp"
 #include "StateStack.hpp"
 #include "Texture.hpp"
 
@@ -98,6 +96,7 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
     using std::string;
     
     auto& textures = *getContext().textures;
+    auto* renderer = getContext().window->getRenderer();
     JsonUtils jsonUtils{};
     
     try {
@@ -109,7 +108,7 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
         if (auto sdlBlocksKey = resources.find("sdl_blocks"); sdlBlocksKey != resources.cend()) {
 
             string sdlBlocksPath = resourcePathPrefix + jsonUtils.extractJsonValue(sdlBlocksKey->second);
-            textures.load(Textures::ID::SDL_BLOCKS, sdlBlocksPath);
+            textures.load(renderer, Textures::ID::SDL_BLOCKS, sdlBlocksPath);
             SDL_Log("DEBUG: Loading SDL blocks from: %s", sdlBlocksPath.c_str());
         }
         
@@ -117,21 +116,21 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
         if (auto avatarKey = resources.find("astronaut"); avatarKey != resources.cend()) {
 
             string avatarImagePath = resourcePathPrefix + jsonUtils.extractJsonValue(avatarKey->second);
-            textures.load(Textures::ID::ASTRONAUT, avatarImagePath);
+            textures.load(renderer, Textures::ID::ASTRONAUT, avatarImagePath);
             SDL_Log("DEBUG: Loading astronaut from: %s", avatarImagePath.c_str());
         }
 
         if (auto ballNormalKey = resources.find("ball_normal"); ballNormalKey != resources.cend()) {
 
             string ballNormalPath = resourcePathPrefix + jsonUtils.extractJsonValue(ballNormalKey->second);
-            textures.load(Textures::ID::BALL_NORMAL, ballNormalPath);
+            textures.load(renderer, Textures::ID::BALL_NORMAL, ballNormalPath);
             SDL_Log("DEBUG: Loading ball normal from: %s", ballNormalPath.c_str());
         }
 
         if (auto wallHorizontalKey = resources.find("wall_horizontal"); wallHorizontalKey != resources.cend()) {
 
             string wallHorizontalPath = resourcePathPrefix + jsonUtils.extractJsonValue(wallHorizontalKey->second);
-            textures.load(Textures::ID::WALL_HORIZONTAL, wallHorizontalPath);
+            textures.load(renderer, Textures::ID::WALL_HORIZONTAL, wallHorizontalPath);
             SDL_Log("DEBUG: Loading wall horizontal from: %s", wallHorizontalPath.c_str());
         }
 
@@ -142,9 +141,9 @@ void LoadingState::loadTexturesFromResources(const std::unordered_map<std::strin
 
             if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon != nullptr) {
 
-                if (auto* window = mazes::singleton_base<SDLHelper>::instance()->window; window != nullptr) {
+                if (auto* renderWindow = getContext().window; renderWindow != nullptr) {
 
-                    SDL_SetWindowIcon(window, icon);
+                    SDL_SetWindowIcon(renderWindow->getSDLWindow(), icon);
                     SDL_DestroySurface(icon);
                     SDL_Log("DEBUG: Loading window icon from: %s", windowIconPath.c_str());
                 }
