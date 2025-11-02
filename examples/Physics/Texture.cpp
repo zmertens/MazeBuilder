@@ -88,12 +88,17 @@ bool Texture::loadFromFile(std::string_view path) noexcept {
         return false;
     }
     
+    // Set blend mode for transparency
+    SDL_SetTextureBlendMode(this->texture, SDL_BLENDMODE_BLEND);
+    
     // Clean up
     SDL_DestroySurface(surface);
     stbi_image_free(imageData);
 
     this->width = width;
     this->height = height;
+
+    SDL_Log("Texture loaded successfully: %dx%d from %s", width, height, path.data());
 
     return true;
 }

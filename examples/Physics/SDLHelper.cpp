@@ -56,6 +56,12 @@ void SDLHelper::createWindowAndRenderer(std::string_view title, int width, int h
     }
 
     SDL_SetRenderVSync(renderer, 1);
+    
+    // Verify renderer is ready
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    SDL_RenderClear(renderer);
+    SDL_RenderPresent(renderer);
+    SDL_Log("SDLHelper::createWindowAndRenderer - Test render complete");
 }
 
 void SDLHelper::init() noexcept {

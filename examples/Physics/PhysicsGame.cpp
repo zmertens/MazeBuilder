@@ -69,11 +69,11 @@ struct PhysicsGame::PhysicsGameImpl {
         
     Player p1;
 
-    RenderWindow window;
+    std::unique_ptr<RenderWindow> window;
 
     TextureManager textures;
 
-    StateStack stateStack;
+    std::unique_ptr<StateStack> stateStack;
     
     // Game-specific variables
     int score = 0;
@@ -88,14 +88,23 @@ struct PhysicsGame::PhysicsGameImpl {
         , version{ version }
         , resourcePath{ resourcePath }
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , p1{}, window{mazes::singleton_base<SDLHelper>::instance()->renderer}
+        , p1{}
+        , window{nullptr}
         , textures{}
-        , stateStack{State::Context{window, textures, p1}} {
+        , stateStack{nullptr} {
 
         initSDL();
+        
+        // Initialize RenderWindow AFTER SDL renderer is created
+        window = std::make_unique<RenderWindow>(mazes::singleton_base<SDLHelper>::instance()->renderer);
+        
+        // Initialize StateStack AFTER RenderWindow is created
+        stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
+        
         loadTextures();
         registerStates();
-        stateStack.pushState(States::ID::SPLASH);
+        
+        stateStack->pushState(States::ID::SPLASH);
     }
 
     void initSDL() noexcept {
@@ -117,7 +126,7 @@ struct PhysicsGame::PhysicsGameImpl {
         SDL_Log("Successfully created SDL window and renderer");
     }
 
-    void loadTextures() {
+    void loadTextures() noexcept {
         using std::string;
         using std::unordered_map;
         using std::ref;
@@ -139,7 +148,7 @@ struct PhysicsGame::PhysicsGameImpl {
             textures.load(Textures::ID::AVATAR, avatarImagePath);
         } catch (const std::exception& e) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
-            throw;
+            return;
         }
 
         SDL_Log("Successfully loaded all game resources");
@@ -173,10 +182,10 @@ struct PhysicsGame::PhysicsGameImpl {
         while (SDL_PollEvent(&event)) {
 
             // Let the state stack handle events
-            stateStack.handleEvent(event);
+            stateStack->handleEvent(event);
 
             if (event.type == SDL_EVENT_QUIT) {
-                stateStack.clearStates();
+                stateStack->clearStates();
                 break;
             }
         }
@@ -184,21 +193,21 @@ struct PhysicsGame::PhysicsGameImpl {
 
     void update(float dt, int subSteps = 4) {
 
-        stateStack.update(dt);
+        stateStack->update(dt);
     }
 
     void render() const noexcept {
 
         // Clear, draw, and present (like SFML)
-        window.clear();
-        stateStack.draw();
-        window.display();
+        window->clear();
+        stateStack->draw();
+        window->display();
     }
 
     void registerStates() noexcept {
 
-        stateStack.registerState<SplashState>(States::ID::SPLASH);
-        stateStack.registerState<GameState>(States::ID::GAME);
+        stateStack->registerState<SplashState>(States::ID::SPLASH);
+        stateStack->registerState<GameState>(States::ID::GAME);
     }
 }; // impl
 
@@ -236,14 +245,14 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     double accumulator = 0.0, currentTimeStep = 0.0;
 
     SDL_Log("Starting main game loop in SPLASH state");
-    
+
     // Apply pending state changes (push SPLASH state onto stack)
-    gamePtr->stateStack.update(0.0f);
+    gamePtr->stateStack->update(0.0f);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (!gamePtr->stateStack.isEmpty())
+    while (!gamePtr->stateStack->isEmpty())
 #endif
     {
          // Expected milliseconds per frame (16.67ms)

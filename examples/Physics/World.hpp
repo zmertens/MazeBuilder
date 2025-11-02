@@ -39,9 +39,6 @@ public:
     void destroyWorld();
 
 private:
-    // Load textures for the world
-    void loadTextures();
-    
     // Build the scene (initialize scene graph and layers)
     void buildScene();
 

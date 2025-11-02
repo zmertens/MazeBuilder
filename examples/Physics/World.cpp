@@ -38,8 +38,6 @@ void World::init() noexcept {
 
     mPlayerPathfinder = nullptr;
 
-    // Note: Textures are already loaded in PhysicsGameImpl constructor
-    // loadTextures(); // Removed to avoid duplicate loading
     buildScene();
 }
 
@@ -65,57 +63,6 @@ void World::destroyWorld() {
     {
         b2DestroyWorld(mWorldId);
         mWorldId = b2_nullWorldId;
-    }
-}
-
-void World::loadTextures() {
-
-    using std::string;
-    using std::unordered_map;
-
-    // Now load resources after SDL is initialized
-    JsonUtils jsonUtils{};
-    unordered_map<string, string> resources{};
-    try {
-        // Load resource configuration
-        jsonUtils.loadConfiguration("resources/physics.json", ref(resources));
-        SDL_Log(jsonUtils.getValue("splash_image", resources).c_str());
-        auto splashImagePath = "resources/" + jsonUtils.getValue("splash_image", resources);
-        SDL_Log("DEBUG: Loading splash screen from: %s", splashImagePath.c_str());
-        mTextures.load(Textures::ID::SPLASH_SCREEN, splashImagePath);
-        
-        auto avatarValue = jsonUtils.getValue("avatar", resources);
-        SDL_Log("DEBUG: Avatar value from JSON: '%s'", avatarValue.c_str());
-        // Temporary fix - hardcode the avatar path since JSON parsing seems to have issues
-        string avatarImagePath = "resources/character_beige_front.png";
-        SDL_Log("DEBUG: Loading avatar from: %s", avatarImagePath.c_str());
-        mTextures.load(Textures::ID::AVATAR, avatarImagePath);
-    } catch (const std::exception& e) {
-
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s", e.what());
-        return;
-    }
-
-    SDL_Log("Successfully loaded all game resources");
-
-    //sf::SoundBuffer generateSoundBuffer;
-
-    // Load and set window icon from resources
-    auto iconPath = "resources/" + jsonUtils.getValue("window_icon_path", resources);
-
-    if (!iconPath.empty()) {
-        SDL_Surface* icon = SDL_LoadBMP(iconPath.c_str());
-        if (auto* sdlHelper = mazes::singleton_base<SDLHelper>::instance().get(); sdlHelper != nullptr && icon) {
-
-            SDL_SetWindowIcon(sdlHelper->window, icon);
-            SDL_DestroySurface(icon);
-            SDL_Log("Successfully loaded window icon: %s", iconPath.c_str());
-        } else {
-
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", iconPath.c_str(), SDL_GetError());
-        }
-    } else {
-        SDL_Log("No window icon specified in configuration");
     }
 }
 
