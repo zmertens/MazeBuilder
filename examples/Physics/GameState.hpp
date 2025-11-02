@@ -6,6 +6,7 @@
 
 class Player;
 class StateStack;
+union SDL_Event;
 
 class GameState : public State {
 public:

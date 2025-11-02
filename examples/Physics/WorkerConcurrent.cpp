@@ -299,8 +299,14 @@ void WorkerConcurrent::doWork(WorkItem const& item) noexcept {
     SDL_LockMutex(gameMtx);
     mResources[item.key] = item.value;
     
-    // Check if this is a config* key and hasn't been processed yet
-    bool isConfigKey = mazes::string_utils::contains(item.key, "config");
+    // Check if this is a config* key (config1, config2, etc.) and hasn't been processed yet
+    // Must start with "config" and be followed by a digit
+    bool isConfigKey = false;
+    if (item.key.size() >= 7 && item.key.substr(0, 6) == "config") {
+        // Check if character after "config" is a digit
+        char nextChar = item.key[6];
+        isConfigKey = (nextChar >= '0' && nextChar <= '9');
+    }
     bool alreadyProcessed = mProcessedConfigs.find(item.key) != mProcessedConfigs.end();
     
     if (isConfigKey && !alreadyProcessed) {

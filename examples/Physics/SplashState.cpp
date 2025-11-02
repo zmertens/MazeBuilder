@@ -29,6 +29,8 @@ bool SplashState::update(float dt) noexcept {
 bool SplashState::handleEvent(const SDL_Event& event) noexcept {
 
     if (event.type == SDL_EVENT_KEY_DOWN) {
+        
+        SDL_Log("SplashState: Key pressed, checking if loading is complete...");
 
         // Only allow transition if loading is complete
         if (!isLoadingComplete()) {
@@ -36,6 +38,7 @@ bool SplashState::handleEvent(const SDL_Event& event) noexcept {
             return true;
         }
 
+        SDL_Log("SplashState: Loading complete! Transitioning to game state...");
         // Pop the splash state
         requestStackPop();
         // Pop the loading state underneath

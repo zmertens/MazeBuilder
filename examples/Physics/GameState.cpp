@@ -1,5 +1,7 @@
 #include "GameState.hpp"
 
+#include <SDL3/SDL.h>
+
 #include <functional>
 
 #include <MazeBuilder/create.h>
