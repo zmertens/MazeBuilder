@@ -19,7 +19,7 @@ public:
         std::lock_guard<std::mutex> lock{cout_mutex};
 
         std::cout << rdbuf();
-        
+
         std::cout.flush();
     }
 };

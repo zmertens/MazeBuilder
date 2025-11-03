@@ -3,10 +3,9 @@
 
 #include <string>
 
-class SessionHelper {
-
-    public:
-
+class SessionHelper
+{
+public:
 };
 
 #endif // SESSION_HELPER_HPP

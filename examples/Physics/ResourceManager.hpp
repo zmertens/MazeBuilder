@@ -24,14 +24,15 @@ public:
     Resource& get(Identifier id);
     const Resource& get(Identifier id) const;
 
-    void clear() noexcept {
-
-        std::for_each(mResourceMap.cbegin(), mResourceMap.cend(), [](const auto& pair) {
-            if (pair.second) {
-                
+    void clear() noexcept
+    {
+        std::for_each(mResourceMap.cbegin(), mResourceMap.cend(), [](const auto& pair)
+        {
+            if (pair.second)
+            {
                 pair.second->free();
             }
-            });
+        });
         mResourceMap.clear();
     }
 
@@ -48,55 +49,58 @@ private:
 template <typename Resource, typename Identifier>
 void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const std::string& filename)
 {
-	// Create and load resource
-	auto resource = std::make_unique<Resource>();
+    // Create and load resource
+    auto resource = std::make_unique<Resource>();
 
-	if (!resource->loadFromFile(renderer, filename)) {
-		throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
-	}
+    if (!resource->loadFromFile(renderer, filename))
+    {
+        throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
+    }
 
-	// If loading successful, insert resource to map
-	insertResource(id, std::move(resource));
+    // If loading successful, insert resource to map
+    insertResource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>
 template <typename Parameter>
-void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const std::string& str, const Parameter& secondParam)
+void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const std::string& str,
+                                                 const Parameter& secondParam)
 {
-	// Create and load resource
-	auto resource = std::make_unique<Resource>();
-	if (!resource->loadFromStr(renderer, str, secondParam)) {
-		throw std::runtime_error("ResourceManager::load - Failed to load " + str);
-	}
+    // Create and load resource
+    auto resource = std::make_unique<Resource>();
+    if (!resource->loadFromStr(renderer, str, secondParam))
+    {
+        throw std::runtime_error("ResourceManager::load - Failed to load " + str);
+    }
 
-	// If loading successful, insert resource to map
-	insertResource(id, std::move(resource));
+    // If loading successful, insert resource to map
+    insertResource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>
 Resource& ResourceManager<Resource, Identifier>::get(Identifier id)
 {
-	auto found = mResourceMap.find(id);
-	assert(found != mResourceMap.cend());
+    auto found = mResourceMap.find(id);
+    assert(found != mResourceMap.cend());
 
-	return *found->second;
+    return *found->second;
 }
 
 template <typename Resource, typename Identifier>
 const Resource& ResourceManager<Resource, Identifier>::get(Identifier id) const
 {
-	auto found = mResourceMap.find(id);
-	assert(found != mResourceMap.cend());
+    auto found = mResourceMap.find(id);
+    assert(found != mResourceMap.cend());
 
-	return *found->second;
+    return *found->second;
 }
 
 template <typename Resource, typename Identifier>
-void ResourceManager<Resource, Identifier>::insertResource(Identifier id, std::unique_ptr<Resource> resource) 
+void ResourceManager<Resource, Identifier>::insertResource(Identifier id, std::unique_ptr<Resource> resource)
 {
-	// Insert and check success
-	auto inserted = mResourceMap.insert(std::make_pair(id, std::move(resource)));
-	assert(inserted.second);
+    // Insert and check success
+    auto inserted = mResourceMap.insert(std::make_pair(id, std::move(resource)));
+    assert(inserted.second);
 }
 
 #endif // RESOURCE_MANAGER_HPP

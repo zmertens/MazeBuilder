@@ -7,12 +7,13 @@
 
 #include <SFML/Audio.hpp>
 
-class AudioHelper {
+class AudioHelper
+{
 public:
     /// @brief 
     /// @param audioConfig 
     explicit AudioHelper(const std::unique_ptr<sf::Sound>& generateSound) noexcept;
-    
+
     /// @brief 
     ~AudioHelper();
 

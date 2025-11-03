@@ -10,12 +10,13 @@ struct SDL_Renderer;
 class Texture;
 
 /// @brief 
-class Sprite : public Transformable {
+class Sprite : public Transformable
+{
 public:
     explicit Sprite(const Texture& texture);
-    
+
     explicit Sprite(const Texture&& texture) = delete;
-    
+
     explicit Sprite(const Texture& texture, const SDL_Rect& rect);
 
     void draw(SDL_Renderer* renderer, RenderStates states) const noexcept;

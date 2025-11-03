@@ -3,7 +3,8 @@
 
 #include <box2d/math_functions.h>
 
-class Transformable {
+class Transformable
+{
 public:
     Transformable();
 

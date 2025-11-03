@@ -6,7 +6,8 @@
 
 #include <box2d/math_functions.h>
 
-class Entity : public SceneNode {
+class Entity : public SceneNode
+{
 public:
     void accelerate(b2Vec2 velocityChange) noexcept;
     void accelerate(float vx, float vy) noexcept;
@@ -15,9 +16,7 @@ public:
     void setVelocity(float vx, float vy);
     b2Vec2 getVelocity() const;
 
-
 private:
-
     virtual Textures::ID getTextureID() const noexcept = 0;
 
     virtual void updateCurrent(float dt) noexcept override;

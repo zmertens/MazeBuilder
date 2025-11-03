@@ -5,7 +5,8 @@
 
 #include <queue>
 
-class CommandQueue {
+class CommandQueue
+{
 public:
     void push(const Command& command);
 

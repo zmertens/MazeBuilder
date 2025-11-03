@@ -2,8 +2,10 @@
 #define STATE_IDENTIFIERS_HPP
 
 
-namespace States {
-    enum class ID {
+namespace States
+{
+    enum class ID
+    {
         NONE,
         SPLASH,
         LOADING,

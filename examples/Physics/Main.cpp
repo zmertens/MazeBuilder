@@ -22,13 +22,14 @@ static constexpr auto WINDOW_H = 720;
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
-std::shared_ptr<PhysicsGame> get() {
-
+std::shared_ptr<PhysicsGame> get()
+{
     return mazes::singleton_base<PhysicsGame>::instance(cref(TITLE_STR), cref(VERSION_STR), WINDOW_W, WINDOW_H);
 }
 
 // bind a getter method from C++ so that it can be accessed in the frontend with JS
-EMSCRIPTEN_BINDINGS(maze_builder_module) {
+EMSCRIPTEN_BINDINGS (maze_builder_module)
+{
     emscripten::function("get", &get, emscripten::allow_raw_pointers());
     emscripten::class_<PhysicsGame>("PhysicsGame")
         .smart_ptr<std::shared_ptr<PhysicsGame>>("std::shared_ptr<PhysicsGame>")
@@ -36,8 +37,8 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
 }
 #endif
 
-int main(int argc, char* argv[]) {
-
+int main(int argc, char* argv[])
+{
     using std::cerr;
     using std::cout;
     using std::cref;
@@ -59,8 +60,8 @@ int main(int argc, char* argv[]) {
 
 #if !defined(__EMSCRIPTEN__)
 
-    if (argc != 2) {
-
+    if (argc != 2)
+    {
         cerr << "Usage: " << argv[0] << " <path_to_config.json>" << endl;
 
         return EXIT_FAILURE;
@@ -72,16 +73,18 @@ int main(int argc, char* argv[]) {
     configPath = "resources/physics.json";
 #endif
 
-    try {
-
+    try
+    {
         randomizer rng;
 
-        if (auto& gameInstance = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H)
-            ; !gameInstance->run(nullptr, ref(rng))) {
-
+        if (auto& gameInstance = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W,
+                                                                       WINDOW_H)
+            ; !gameInstance->run(nullptr, ref(rng)))
+        {
             throw runtime_error("Error: PhysicsGame encountered an error during execution");
-        } else {
-
+        }
+        else
+        {
             gameInstance->cleanup();
         }
 
@@ -89,9 +92,9 @@ int main(int argc, char* argv[]) {
 
         cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
 #endif
-
-    } catch (exception& ex) {
-
+    }
+    catch (exception& ex)
+    {
         cerr << ex.what() << endl;
     }
 

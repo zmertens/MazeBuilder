@@ -9,8 +9,8 @@
 struct SDL_Window;
 struct SDL_Renderer;
 
-class SDLHelper {
-    
+class SDLHelper
+{
 public:
     SDL_Window* window;
 
@@ -20,7 +20,6 @@ private:
     std::once_flag sdlInitializedFlag;
 
 public:
-
     void init(std::string_view title, int width, int height) noexcept;
 
     void destroyAndQuit() noexcept;

@@ -33,7 +33,8 @@ SceneNode::Ptr SceneNode::detachChild(const SceneNode& node)
     return result;
 }
 
-void SceneNode::update(float dt) noexcept {
+void SceneNode::update(float dt) noexcept
+{
     updateCurrent(dt);
     updateChildren(dt);
 }
@@ -45,8 +46,8 @@ void SceneNode::updateCurrent(float) noexcept
 
 void SceneNode::updateChildren(float dt) noexcept
 {
-    for (auto& child : mChildren) {
-
+    for (auto& child : mChildren)
+    {
         child->update(dt);
     }
 }
@@ -69,14 +70,15 @@ void SceneNode::drawCurrent(SDL_Renderer*, RenderStates) const noexcept
 
 void SceneNode::drawChildren(SDL_Renderer* renderer, RenderStates states) const noexcept
 {
-    for (auto& child : mChildren) {
+    for (auto& child : mChildren)
+    {
         child->draw(renderer, states);
     }
 }
 
 b2Vec2 SceneNode::getWorldPosition() const
 {
-    return { getWorldTransform().getPosition().x, getWorldTransform().getPosition().y };
+    return {getWorldTransform().getPosition().x, getWorldTransform().getPosition().y};
 }
 
 Transformable SceneNode::getWorldTransform() const
@@ -90,7 +92,7 @@ Transformable SceneNode::getWorldTransform() const
         localTransform.q = node->getRotation();
         transform = b2MulTransforms(localTransform, transform);
     }
-    
+
     Transformable worldTransform;
     worldTransform.setPosition(transform.p);
     worldTransform.setRotation(transform.q);
@@ -101,19 +103,19 @@ Transformable SceneNode::getWorldTransform() const
 void SceneNode::onCommand(const Command& command, float dt) noexcept
 {
     // Check if the command applies to this node
-    if (command.category == getCategory()) {
-
+    if (command.category == getCategory())
+    {
         command.action(*this, dt);
     }
 
     // Pass the command to the children
-    for (const auto& child : mChildren) {
-
+    for (const auto& child : mChildren)
+    {
         child->onCommand(command, dt);
     }
 }
 
-Category::Type SceneNode::getCategory() const noexcept {
-
+Category::Type SceneNode::getCategory() const noexcept
+{
     return Category::Type::SCENE;
 }

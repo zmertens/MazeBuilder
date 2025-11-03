@@ -3,9 +3,15 @@
 
 #include <box2d/math_functions.h>
 
-struct RenderStates {
-    RenderStates() : transform(b2Transform_identity) {}
-    explicit RenderStates(const b2Transform& theTransform) : transform(theTransform) {}
+struct RenderStates
+{
+    RenderStates() : transform(b2Transform_identity)
+    {
+    }
+
+    explicit RenderStates(const b2Transform& theTransform) : transform(theTransform)
+    {
+    }
 
     b2Transform transform;
 };

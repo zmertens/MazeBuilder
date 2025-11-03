@@ -4,9 +4,9 @@
 #include "Sprite.hpp"
 #include "State.hpp"
 
-class SplashState : public State {
+class SplashState : public State
+{
 public:
-
     explicit SplashState(StateStack& stack, Context context);
 
     void draw() const noexcept override;

@@ -8,9 +8,9 @@ class Player;
 class StateStack;
 union SDL_Event;
 
-class GameState : public State {
+class GameState : public State
+{
 public:
-
     explicit GameState(StateStack& stack, State::Context context);
 
     virtual void draw() const noexcept override;

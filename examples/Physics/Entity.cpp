@@ -1,10 +1,12 @@
 #include "Entity.hpp"
 
-void Entity::accelerate(b2Vec2 velocityChange) noexcept {
+void Entity::accelerate(b2Vec2 velocityChange) noexcept
+{
     mVelocity += velocityChange;
 }
 
-void Entity::accelerate(float vx, float vy) noexcept {
+void Entity::accelerate(float vx, float vy) noexcept
+{
     mVelocity.x += vx;
     mVelocity.y += vy;
 }

@@ -5,18 +5,19 @@
 #include <SDL3/SDL_events.h>
 
 StateStack::StateStack(State::Context context)
-: mStack()
-, mPendingList()
-, mContext(context)
-, mFactories()
+    : mStack()
+      , mPendingList()
+      , mContext(context)
+      , mFactories()
 {
 }
 
-void StateStack::update(float dt) noexcept {
-    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it) {
- 
-        if (!(*it)->update(dt)) {
-
+void StateStack::update(float dt) noexcept
+{
+    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
+    {
+        if (!(*it)->update(dt))
+        {
             break;
         }
     }
@@ -24,19 +25,20 @@ void StateStack::update(float dt) noexcept {
     applyPendingChanges();
 }
 
-void StateStack::draw() const noexcept {
- 
-    for (const auto& state : mStack) {
-
+void StateStack::draw() const noexcept
+{
+    for (const auto& state : mStack)
+    {
         state->draw();
     }
 }
 
-void StateStack::handleEvent(const SDL_Event& event) noexcept {
-    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it) {
- 
-        if (!(*it)->handleEvent(event)) {
-
+void StateStack::handleEvent(const SDL_Event& event) noexcept
+{
+    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
+    {
+        if (!(*it)->handleEvent(event))
+        {
             break;
         }
     }
@@ -46,28 +48,28 @@ void StateStack::handleEvent(const SDL_Event& event) noexcept {
 
 void StateStack::pushState(States::ID stateID)
 {
-	mPendingList.push_back(PendingChange(Action::PUSH, stateID));
+    mPendingList.push_back(PendingChange(Action::PUSH, stateID));
 }
 
 void StateStack::popState()
 {
-	mPendingList.push_back(PendingChange(Action::POP));
+    mPendingList.push_back(PendingChange(Action::POP));
 }
 
 void StateStack::clearStates()
 {
-	mPendingList.push_back(PendingChange(Action::CLEAR));
+    mPendingList.push_back(PendingChange(Action::CLEAR));
 }
 
 bool StateStack::isEmpty() const noexcept
 {
-	return mStack.empty();
+    return mStack.empty();
 }
 
 State::Ptr StateStack::createState(States::ID stateID)
 {
-    if (auto found = mFactories.find(stateID); found != mFactories.cend()) {
-        
+    if (auto found = mFactories.find(stateID); found != mFactories.cend())
+    {
         return found->second();
     }
 
@@ -76,17 +78,19 @@ State::Ptr StateStack::createState(States::ID stateID)
 
 void StateStack::applyPendingChanges()
 {
-    for (const PendingChange& change : mPendingList) {
-        switch (change.action) {
-            case Action::PUSH:
-                mStack.push_back(createState(change.stateID));
-                break;
-            case Action::POP:
-                mStack.pop_back();
-                break;
-            case Action::CLEAR:
-                mStack.clear();
-                break;
+    for (const PendingChange& change : mPendingList)
+    {
+        switch (change.action)
+        {
+        case Action::PUSH:
+            mStack.push_back(createState(change.stateID));
+            break;
+        case Action::POP:
+            mStack.pop_back();
+            break;
+        case Action::CLEAR:
+            mStack.clear();
+            break;
         }
     }
 
@@ -94,7 +98,7 @@ void StateStack::applyPendingChanges()
 }
 
 StateStack::PendingChange::PendingChange(Action action, States::ID stateID)
-: action(action)
-, stateID(stateID)
+    : action(action)
+      , stateID(stateID)
 {
 }

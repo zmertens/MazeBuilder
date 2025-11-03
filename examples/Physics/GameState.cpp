@@ -13,8 +13,8 @@
 
 GameState::GameState(StateStack& stack, State::Context context)
     : State{stack, context}
-    , mWorld{*context.window, *context.textures}
-    , mPlayer{*context.player}
+      , mWorld{*context.window, *context.textures}
+      , mPlayer{*context.player}
 {
     mWorld.init();
 }
@@ -27,7 +27,7 @@ void GameState::draw() const noexcept
 bool GameState::update(float dt) noexcept
 {
     mWorld.update(dt);
-    
+
     auto& commands = mWorld.getCommandQueue();
     mPlayer.handleRealtimeInput(std::ref(commands));
 
@@ -40,10 +40,10 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
 
     mPlayer.handleEvent(event, std::ref(commands));
 
-    if (event.type == SDL_EVENT_KEY_DOWN) {
-
-        if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
-
+    if (event.type == SDL_EVENT_KEY_DOWN)
+    {
+        if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+        {
             requestStackPush(States::ID::PAUSE);
             requestStackPush(States::ID::MENU);
         }

@@ -11,18 +11,20 @@ class Player;
 class StateStack;
 union SDL_Event;
 
-class State {
+class State
+{
 public:
     typedef std::unique_ptr<State> Ptr;
-    
-    struct Context { 
 
+    struct Context
+    {
         explicit Context(RenderWindow& window, TextureManager& textures, Player& player);
 
         RenderWindow* window;
-        TextureManager* textures;  
+        TextureManager* textures;
         Player* player;
     };
+
 public:
     explicit State(StateStack& stack, Context context);
 
@@ -40,12 +42,14 @@ public:
     virtual void draw() const noexcept = 0;
     virtual bool update(float dt) noexcept = 0;
     virtual bool handleEvent(const SDL_Event& event) noexcept = 0;
+
 protected:
     void requestStackPush(States::ID stateID);
     void requestStackPop();
     void requestStateClear();
     Context getContext() const noexcept;
     StateStack& getStack() const noexcept;
+
 private:
     StateStack* mStack;
     Context mContext;

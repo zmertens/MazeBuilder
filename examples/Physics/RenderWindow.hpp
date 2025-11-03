@@ -9,7 +9,8 @@ struct SDL_Window;
 class View;
 
 /// @brief SDL-based RenderWindow that mimics SFML's sf::RenderWindow interface
-class RenderWindow {
+class RenderWindow
+{
 public:
     explicit RenderWindow(SDL_Renderer* renderer, SDL_Window* window);
 
@@ -31,7 +32,7 @@ public:
 
     /// @brief Draw a drawable object (like RenderWindow)
     /// @tparam T Any type with a draw(RenderStates) method
-    template<typename T>
+    template <typename T>
     void draw(const T& drawable) const noexcept;
 
     /// @brief Clear the render target
@@ -43,10 +44,10 @@ public:
     bool isOpen() const noexcept;
 
     void close() noexcept;
-    
+
     /// @brief Get the SDL renderer for direct access
     SDL_Renderer* getRenderer() const noexcept { return mRenderer; }
-    
+
     /// @brief Get the SDL window for direct access
     SDL_Window* getSDLWindow() const noexcept { return mWindow; }
 
@@ -57,8 +58,9 @@ private:
 };
 
 // Template implementation
-template<typename T>
-void RenderWindow::draw(const T& drawable) const noexcept {
+template <typename T>
+void RenderWindow::draw(const T& drawable) const noexcept
+{
     RenderStates states;
     // Apply view transform if needed (for camera/scrolling)
     // states.transform could be modified based on mCurrentView here

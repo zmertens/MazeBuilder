@@ -12,7 +12,7 @@
 
 PauseState::PauseState(StateStack& stack, Context context)
     : State(stack, context)
-    , mBackgroundShape{}
+      , mBackgroundShape{}
 {
 }
 

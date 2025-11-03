@@ -12,9 +12,9 @@
 class StateStack;
 union SDL_Event;
 
-class LoadingState : public State {
+class LoadingState : public State
+{
 public:
-
     explicit LoadingState(StateStack& stack, State::Context context, std::string_view resourcePath = "");
 
     virtual void draw() const noexcept override;
@@ -34,7 +34,7 @@ private:
     Sprite mLoadingSprite;
 
     WorkerConcurrent mForeman;
-    
+
     bool mHasFinished;
 
     std::string mResourcePath;

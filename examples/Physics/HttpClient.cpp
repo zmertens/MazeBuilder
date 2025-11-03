@@ -9,13 +9,13 @@
 
 HttpClient::HttpClient(const std::string& server_url)
     : m_server_url(server_url)
-    , m_port(80)
+      , m_port(80)
 {
     parse_server_url();
 }
 
-void HttpClient::parse_server_url() {
-
+void HttpClient::parse_server_url()
+{
     using std::regex;
     using std::smatch;
     using std::string;
@@ -33,7 +33,8 @@ void HttpClient::parse_server_url() {
     cout << "DEBUG: Parsing URL: " << m_server_url << endl;
 #endif
 
-    if (regex_match(m_server_url, matches, url_regex)) {
+    if (regex_match(m_server_url, matches, url_regex))
+    {
         m_host = matches[1].str();
 
 #if defined(MAZE_DEBUG)
@@ -41,19 +42,24 @@ void HttpClient::parse_server_url() {
         cout << "DEBUG: Regex matched. Host: " << m_host << endl;
 #endif
 
-        if (matches[2].matched) {
+        if (matches[2].matched)
+        {
             m_port = static_cast<unsigned short>(stoi(matches[2].str()));
 
 #if defined(MAZE_DEBUG)
 
             cout << "DEBUG: Port from URL: " << m_port << endl;
 #endif
-
-        } else {
+        }
+        else
+        {
             // Default ports
-            if (m_server_url.find("https://") == 0) {
+            if (m_server_url.find("https://") == 0)
+            {
                 m_port = 443;
-            } else {
+            }
+            else
+            {
                 m_port = 80;
             }
 
@@ -61,10 +67,10 @@ void HttpClient::parse_server_url() {
 
             cout << "DEBUG: Using default port: " << m_port << endl;
 #endif
-
         }
-    } else {
-
+    }
+    else
+    {
 #if defined(MAZE_DEBUG)
 
         cout << "DEBUG: Regex failed to match URL" << endl;
@@ -73,7 +79,8 @@ void HttpClient::parse_server_url() {
         // Fallback: treat the entire URL as host
         m_host = m_server_url;
         if (m_server_url.find("localhost") != string::npos ||
-            m_server_url.find("127.0.0.1") != string::npos) {
+            m_server_url.find("127.0.0.1") != string::npos)
+        {
             // Default for local development
             m_port = 3000;
         }
@@ -89,17 +96,19 @@ void HttpClient::parse_server_url() {
 #endif
 }
 
-std::string HttpClient::create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
-
-    auto format_response = [](const sf::Http::Response& response) -> std::string {
-
+std::string HttpClient::create_maze(int rows, int columns, int seed, const std::string& algorithm,
+                                    const std::string& distances)
+{
+    auto format_response = [](const sf::Http::Response& response) -> std::string
+    {
         std::ostringstream oss;
 
         // Status line
         oss << "HTTP Response Status: " << static_cast<int>(response.getStatus());
 
         // Status name
-        switch (response.getStatus()) {
+        switch (response.getStatus())
+        {
         case sf::Http::Response::Status::Ok:
             oss << " (OK)";
             break;
@@ -122,17 +131,18 @@ std::string HttpClient::create_maze(int rows, int columns, int seed, const std::
         oss << std::endl;
 
         // Response body
-        if (auto body{response.getBody()}; !body.empty()) {
-
+        if (auto body{response.getBody()}; !body.empty())
+        {
             oss << "Response Body:" << std::endl;
 
             oss << body;
         }
 
         return oss.str();
-        };
+    };
 
-    try {
+    try
+    {
 #if defined(MAZE_DEBUG)
 
         std::cout << "DEBUG: Connecting to " << m_host << ":" << m_port << std::endl;
@@ -154,18 +164,21 @@ std::string HttpClient::create_maze(int rows, int columns, int seed, const std::
 
         sf::Http::Response response = http.sendRequest(request);
         return format_response(response);
-
-    } catch (const std::exception& e) {
+    }
+    catch (const std::exception& e)
+    {
         return "Error creating maze: " + std::string(e.what());
     }
 }
 
-std::string HttpClient::create_json_payload(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
+std::string HttpClient::create_json_payload(int rows, int columns, int seed, const std::string& algorithm,
+                                            const std::string& distances)
+{
     std::ostringstream oss;
     oss << "{"
         << "\"rows\":" << rows << ","
         << "\"columns\":" << columns << ","
-        << "\"levels\":1,"  // Default to 1 level for 2D mazes
+        << "\"levels\":1," // Default to 1 level for 2D mazes
         << "\"seed\":" << seed << ","
         << "\"algo\":\"" << algorithm << "\","
         << "\"distances\":\"" << distances << "\""

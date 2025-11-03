@@ -8,13 +8,16 @@
 #include <MazeBuilder/algo_interface.h>
 #include <MazeBuilder/singleton_base.h>
 
-namespace mazes {
+namespace mazes
+{
     class grid_interface;
     class randomizer;
 }
 
-class PhysicsGame : public mazes::algo_interface, public mazes::singleton_base<PhysicsGame> {
+class PhysicsGame : public mazes::algo_interface, public mazes::singleton_base<PhysicsGame>
+{
     friend class mazes::singleton_base<PhysicsGame>;
+
 public:
     PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h);
 
@@ -27,7 +30,6 @@ public:
     void cleanup() noexcept;
 
 private:
-
     struct PhysicsGameImpl;
     std::unique_ptr<PhysicsGameImpl> m_impl;
 };

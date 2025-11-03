@@ -5,9 +5,11 @@
 #include "ResourceIdentifiers.hpp"
 #include "Sprite.hpp"
 
-class Wall : public Entity {
+class Wall : public Entity
+{
 public:
-    enum class Orientation {
+    enum class Orientation
+    {
         HORIZONTAL, VERTICAL, CORNER
     };
 
@@ -31,7 +33,6 @@ private:
     virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 private:
-
     Textures::ID getTextureID() const noexcept override;
 
     virtual void updateCurrent(float dt) noexcept override;
@@ -42,7 +43,6 @@ private:
     int col;
     Orientation orientation;
     Sprite mSprite;
-
 };
 
 #endif // WALL_HPP

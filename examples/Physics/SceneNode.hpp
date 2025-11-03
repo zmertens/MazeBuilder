@@ -12,7 +12,8 @@
 struct Command;
 struct SDL_Renderer;
 
-class SceneNode : public Transformable {
+class SceneNode : public Transformable
+{
 public:
     using Ptr = std::unique_ptr<SceneNode>;
 

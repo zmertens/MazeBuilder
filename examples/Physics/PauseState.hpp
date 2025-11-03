@@ -5,9 +5,9 @@
 
 #include "State.hpp"
 
-class PauseState : public State {
+class PauseState : public State
+{
 public:
-
     explicit PauseState(StateStack& stack, Context context);
 
     void draw() const noexcept override;

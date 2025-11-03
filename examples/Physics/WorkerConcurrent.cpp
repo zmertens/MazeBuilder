@@ -504,7 +504,7 @@ void WorkerConcurrent::doWork(WorkItem const& item) noexcept
         try
         {
             [[maybe_unused]]
-            std::string mazeStr = mazes::create(config);
+                std::string mazeStr = mazes::create(config);
         }
         catch (const std::exception& e)
         {

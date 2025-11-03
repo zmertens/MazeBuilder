@@ -12,40 +12,46 @@ RenderWindow::RenderWindow(SDL_Renderer* renderer, SDL_Window* window)
 {
 }
 
-void RenderWindow::setView(const View& view) {
+void RenderWindow::setView(const View& view)
+{
     mCurrentView = view;
 }
 
-View RenderWindow::getView() const noexcept {
-
+View RenderWindow::getView() const noexcept
+{
     return mCurrentView;
 }
 
-void RenderWindow::clear() const noexcept {
-    if (!mRenderer) {
+void RenderWindow::clear() const noexcept
+{
+    if (!mRenderer)
+    {
         return; // Window is closed, skip
     }
     SDL_RenderClear(mRenderer);
 }
 
-void RenderWindow::display() const noexcept {
-    if (!mRenderer) {
+void RenderWindow::display() const noexcept
+{
+    if (!mRenderer)
+    {
         return; // Window is closed, skip
     }
     SDL_RenderPresent(mRenderer);
 }
 
-bool RenderWindow::isOpen() const noexcept {
-
+bool RenderWindow::isOpen() const noexcept
+{
     return mRenderer != nullptr;
 }
 
-void RenderWindow::close() noexcept {
+void RenderWindow::close() noexcept
+{
     // Just null out the pointers to signal the window is closed
     // Don't destroy the actual SDL resources - that's SDLHelper's job
     // during proper cleanup in its destructor
     SDL_Log("RenderWindow::close() - Marking window as closed\n");
-    
+
     mRenderer = nullptr;
     mWindow = nullptr;
 }

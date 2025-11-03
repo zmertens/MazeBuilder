@@ -4,9 +4,9 @@
 #include "Sprite.hpp"
 #include "State.hpp"
 
-class MenuState : public State {
+class MenuState : public State
+{
 public:
-
     explicit MenuState(StateStack& stack, Context context);
 
     void draw() const noexcept override;

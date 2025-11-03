@@ -7,10 +7,11 @@
 #include "ResourceIdentifiers.hpp"
 #include "Sprite.hpp"
 
-class Pathfinder : public Entity {
+class Pathfinder : public Entity
+{
 public:
-
-    enum class Type {
+    enum class Type
+    {
         ALLY,
         ENEMY
     };

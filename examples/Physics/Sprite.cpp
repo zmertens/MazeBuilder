@@ -5,36 +5,40 @@
 #include <SDL3/SDL.h>
 
 Sprite::Sprite(const Texture& texture)
-    : mTexture(&texture), mTextureRect{ SDL_Rect{ 0, 0, texture.getWidth(), texture.getHeight() } }{
-
-
+    : mTexture(&texture), mTextureRect{SDL_Rect{0, 0, texture.getWidth(), texture.getHeight()}}
+{
 }
 
 Sprite::Sprite(const Texture& texture, const SDL_Rect& rect)
-    : mTexture(&texture), mTextureRect{ rect }{
-
+    : mTexture(&texture), mTextureRect{rect}
+{
 }
 
-void Sprite::draw(SDL_Renderer* renderer, RenderStates states) const noexcept {
-    if (!mTexture) {
+void Sprite::draw(SDL_Renderer* renderer, RenderStates states) const noexcept
+{
+    if (!mTexture)
+    {
         return;
     }
 
     // Check if SDL is still initialized before accessing renderer
-    if (!SDL_WasInit(SDL_INIT_VIDEO)) {
+    if (!SDL_WasInit(SDL_INIT_VIDEO))
+    {
         return; // SDL already quit, skip drawing
     }
 
-    if (!renderer) {
+    if (!renderer)
+    {
         return; // Renderer not available
     }
 
     auto* sdlTexture = mTexture->get();
-    if (!sdlTexture) {
+    if (!sdlTexture)
+    {
         return; // Texture not available
- }
+    }
 
-    auto rectangleBounds = SDL_Rect{ 0, 0, mTexture->getWidth(), mTexture->getHeight() };
+    auto rectangleBounds = SDL_Rect{0, 0, mTexture->getWidth(), mTexture->getHeight()};
 
     // Convert source rect from SDL_Rect to SDL_FRect
     SDL_FRect srcRect;
@@ -50,8 +54,8 @@ void Sprite::draw(SDL_Renderer* renderer, RenderStates states) const noexcept {
     dstRect.w = static_cast<float>(rectangleBounds.w);
     dstRect.h = static_cast<float>(rectangleBounds.h);
 
-    if (!SDL_RenderTexture(renderer, mTexture->get(), &srcRect, &dstRect)) {
-
+    if (!SDL_RenderTexture(renderer, mTexture->get(), &srcRect, &dstRect))
+    {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_RenderTexture failed: %s", SDL_GetError());
     }
 }
@@ -59,12 +63,12 @@ void Sprite::draw(SDL_Renderer* renderer, RenderStates states) const noexcept {
 /// @brief 
 /// @param texture 
 /// @param resetRect false
-void Sprite::setTexture(const Texture& texture, bool resetRect) {
-    
+void Sprite::setTexture(const Texture& texture, bool resetRect)
+{
     mTexture = &texture;
 
-    if (resetRect) {
-
-        mTextureRect = SDL_Rect{ 0, 0, texture.getWidth(), texture.getHeight() };
+    if (resetRect)
+    {
+        mTextureRect = SDL_Rect{0, 0, texture.getWidth(), texture.getHeight()};
     }
 }

@@ -6,7 +6,6 @@
 #include <SDL3/SDL.h>
 
 
-
 SpriteNode::SpriteNode(const Texture& texture)
     : mSprite(texture)
 {

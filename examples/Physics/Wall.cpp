@@ -8,12 +8,13 @@
 #include "ResourceManager.hpp"
 
 Wall::Wall(Orientation orientation, const TextureManager& textureManager)
-    : hitCount{ 0 }
-    , isDestroyed{ false }
-    , row{ 0 }
-    , col{ 0 }
-    , orientation{ orientation }
-    , mSprite{ textureManager.get(getTextureID()) } {
+    : hitCount{0}
+      , isDestroyed{false}
+      , row{0}
+      , col{0}
+      , orientation{orientation}
+      , mSprite{textureManager.get(getTextureID())}
+{
 }
 
 int Wall::getHitCount() const { return hitCount; }
@@ -29,19 +30,23 @@ void Wall::setRow(int row) { this->row = row; }
 void Wall::setCol(int col) { this->col = col; }
 void Wall::setOrientation(Orientation orientation) { this->orientation = orientation; }
 
-void Wall::updateCurrent(float dt) noexcept {
+void Wall::updateCurrent(float dt) noexcept
+{
     // Walls do not have children to update
 }
 
-void Wall::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept {
-    if (!isDestroyed) {
+void Wall::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept
+{
+    if (!isDestroyed)
+    {
         mSprite.draw(renderer, states);
     }
 }
 
-Textures::ID Wall::getTextureID() const noexcept {
-    
-    switch (orientation) {
+Textures::ID Wall::getTextureID() const noexcept
+{
+    switch (orientation)
+    {
     case Orientation::HORIZONTAL:
         return Textures::ID::WALL_HORIZONTAL;
     case Orientation::VERTICAL:

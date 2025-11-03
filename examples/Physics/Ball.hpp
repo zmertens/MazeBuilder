@@ -8,9 +8,11 @@
 /// @file Ball.hpp
 /// @class Ball
 /// @brief Data class for a ball with physics properties
-class Ball : public Entity {
+class Ball : public Entity
+{
 public:
-    enum class Type {
+    enum class Type
+    {
         NORMAL,
         HEAVY,
         LIGHT,
@@ -23,11 +25,9 @@ private:
     virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 private:
-
     virtual Textures::ID getTextureID() const noexcept override;
 
     virtual void updateCurrent(float dt) noexcept override;
-
 
 private:
     Type mType;

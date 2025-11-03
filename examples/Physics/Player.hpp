@@ -10,10 +10,11 @@ union SDL_Event;
 
 class CommandQueue;
 
-class Player {
+class Player
+{
 public:
-
-    enum class Action {
+    enum class Action
+    {
         MOVE_LEFT,
         MOVE_RIGHT,
         MOVE_UP,
@@ -30,11 +31,9 @@ public:
     void assignKey(Action action, std::uint32_t key);
     std::uint32_t getAssignedKey(Action action) const;
 
-
 private:
     void initializeActions();
     static bool isRealtimeAction(Action action);
-
 
 private:
     std::map<std::uint32_t, Action> mKeyBinding;

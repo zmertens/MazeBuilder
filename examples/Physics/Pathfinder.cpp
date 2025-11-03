@@ -5,20 +5,24 @@
 
 Pathfinder::Pathfinder(Type type, const TextureManager& textures)
     : mType(type)
-    , mSprite(textures.get(getTextureID()))
+      , mSprite(textures.get(getTextureID()))
 {
 }
 
 Category::Type Pathfinder::getCategory() const noexcept
 {
-    switch (mType) {
-        case Type::ALLY: {
+    switch (mType)
+    {
+    case Type::ALLY:
+        {
             return Category::Type::PLAYER;
         }
-        case Type::ENEMY: {
+    case Type::ENEMY:
+        {
             return Category::Type::ENEMY;
         }
-        default: {
+    default:
+        {
             return Category::Type::NONE;
         }
     }
@@ -34,15 +38,20 @@ void Pathfinder::drawCurrent(SDL_Renderer* renderer, RenderStates states) const 
     mSprite.draw(renderer, states);
 }
 
-Textures::ID Pathfinder::getTextureID() const noexcept {
-    switch (mType) {
-        case Type::ALLY: {
+Textures::ID Pathfinder::getTextureID() const noexcept
+{
+    switch (mType)
+    {
+    case Type::ALLY:
+        {
             return Textures::ID::ASTRONAUT;
         }
-        case Type::ENEMY: {
+    case Type::ENEMY:
+        {
             return Textures::ID::ASTRONAUT;
         }
-        default: {
+    default:
+        {
             return Textures::ID::ASTRONAUT;
         }
     }

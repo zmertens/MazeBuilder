@@ -17,7 +17,8 @@ struct SDL_Vertex;
 /// @brief Provides concurrent worker threads for string processing
 /// @details This class manages a queue of work items and spawns multiple threads to process them concurrently.
 /// @details Each thread processes a segment of a string, setting vertices for rendering.
-class WorkerConcurrent {
+class WorkerConcurrent
+{
 public:
     explicit WorkerConcurrent();
     ~WorkerConcurrent();
@@ -30,12 +31,13 @@ public:
     void generate(std::string_view resourcePath) noexcept;
     bool isDone() const noexcept;
     float getCompletion() const noexcept;
-    
+
     // Get the loaded resources (thread-safe)
     std::unordered_map<std::string, std::string> getResources() const noexcept;
 
 private:
-    struct WorkItem {
+    struct WorkItem
+    {
         std::string key;
         std::string value;
         int index;
@@ -51,11 +53,11 @@ private:
     SDL_Condition* gameCond;
     int pendingWorkCount;
     SDL_AtomicInt shouldExit;
-    
+
     // Store loaded resources
     std::unordered_map<std::string, std::string> mResources;
     int mTotalWorkItems;
-    
+
     // Track which config* keys have been processed to ensure one-time execution
     std::unordered_map<std::string, bool> mProcessedConfigs;
 };
