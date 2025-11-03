@@ -1,4 +1,7 @@
-// Basic application of Maze Builder as a level generator (with bouncing balls!)
+// Basic application of Maze Builder as a level generator in a game setting
+// Includes most game engine features like graphics and window management,
+// input handling, state management, and resource loading, audio, and network
+// Player verses computer AI gameplay with physics simulation
 
 #include <iostream>
 #include <exception>
@@ -11,7 +14,7 @@
 
 static std::string TITLE_STR = "Breaking Walls";
 
-static std::string VERSION_STR = "v0.1.9";
+static std::string VERSION_STR = "v0.2.0";
 
 static constexpr auto WINDOW_W = 1280;
 static constexpr auto WINDOW_H = 720;
@@ -40,6 +43,7 @@ int main(int argc, char* argv[]) {
     using std::cref;
     using std::endl;
     using std::exception;
+    using std::ref;
     using std::runtime_error;
     using std::string;
 
@@ -72,11 +76,8 @@ int main(int argc, char* argv[]) {
 
         randomizer rng;
 
-        // Get singleton and run the game
-        ;
-
         if (auto& gameInstance = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H)
-            ; !gameInstance->run(nullptr, rng)) {
+            ; !gameInstance->run(nullptr, ref(rng))) {
 
             throw runtime_error("Error: PhysicsGame encountered an error during execution");
         } else {
@@ -89,7 +90,7 @@ int main(int argc, char* argv[]) {
         cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
 #endif
 
-    } catch (exception ex) {
+    } catch (exception& ex) {
 
         cerr << ex.what() << endl;
     }

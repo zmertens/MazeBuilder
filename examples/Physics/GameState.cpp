@@ -44,8 +44,8 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
 
         if (event.key.scancode == SDL_SCANCODE_ESCAPE) {
 
-            // requestStackPush(States::ID::PAUSE);
-            requestStateClear(); // Clear all states to exit the game
+            requestStackPush(States::ID::PAUSE);
+            requestStackPush(States::ID::MENU);
         }
     }
 

@@ -54,7 +54,7 @@ void SDLHelper::init(std::string_view title, int width, int height) noexcept {
     }
 }
 
-void SDLHelper::destroy() noexcept {
+void SDLHelper::destroyAndQuit() noexcept {
     
     // Prevent double-destruction
     if (!this->window && !this->renderer) {
@@ -63,21 +63,24 @@ void SDLHelper::destroy() noexcept {
     }
         
     if (renderer) {
+
         SDL_DestroyRenderer(renderer);
+#if defined(MAZE_DEBUG)
+
+        SDL_Log("SDLHelper::destroy() - Destroying renderer %p\n", static_cast<void*>(renderer));
+#endif // MAZE_DEBUG
         renderer = nullptr;
     }
     
     if (window) {
+
         SDL_DestroyWindow(window);
-        window = nullptr;
-    }
-
-
 #if defined(MAZE_DEBUG)
 
-    SDL_Log("SDLHelper::destroy() - Destroying renderer %p\n", static_cast<void*>(renderer));
-    SDL_Log("SDLHelper::destroy() - Destroying window %p\n", static_cast<void*>(window));
+        SDL_Log("SDLHelper::destroy() - Destroying window %p\n", static_cast<void*>(window));
 #endif // MAZE_DEBUG
+        window = nullptr;
+    }
 
     SDL_Quit();
 }

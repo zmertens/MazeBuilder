@@ -10,7 +10,8 @@
 #include "ResourceManager.hpp"
 
 Ball::Ball(Type type, const TextureManager& textureManager)
-    : mType{type}, mSprite{textureManager.get(getTextureID())} {
+    : mType{type}, mSprite{textureManager.get(getTextureID())}
+{
 }
 
 // // Create a dynamic body for the ball
@@ -54,38 +55,44 @@ Ball::Ball(Type type, const TextureManager& textureManager)
 // shapeId = ballShapeId;
 // isActive = true;
 
-void Ball::updateCurrent(float dt) noexcept {
-
+void Ball::updateCurrent(float dt) noexcept
+{
 }
 
 
 // Draw the ball
-void Ball::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept {
+void Ball::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept
+{
     static int drawCount = 0;
-    if (drawCount < 5) {
-        SDL_Log("Ball::drawCurrent - Drawing ball at pos(%.1f,%.1f)", 
-                states.transform.p.x, states.transform.p.y);
+    if (drawCount < 5)
+    {
         drawCount++;
     }
     mSprite.draw(renderer, states);
 }
 
-Textures::ID Ball::getTextureID() const noexcept {
-
-    switch (mType) {
-        case Type::NORMAL: {
+Textures::ID Ball::getTextureID() const noexcept
+{
+    switch (mType)
+    {
+    case Type::NORMAL:
+        {
             return Textures::ID::BALL_NORMAL;
         }
-        case Type::HEAVY: {
+    case Type::HEAVY:
+        {
             return Textures::ID::BALL_NORMAL;
         }
-        case Type::LIGHT: {
+    case Type::LIGHT:
+        {
             return Textures::ID::BALL_NORMAL;
         }
-        case Type::EXPLOSIVE: {
+    case Type::EXPLOSIVE:
+        {
             return Textures::ID::BALL_NORMAL;
         }
-        default: {
+    default:
+        {
             return Textures::ID::BALL_NORMAL;
         }
     }

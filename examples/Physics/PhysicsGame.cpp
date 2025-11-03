@@ -1,46 +1,34 @@
 //
 // PhysicsGame class implementation
 // Simple 2D physics simulation with bouncy balls that break walls
-//
-//
+// Navigate from start to finish in a time-sensitive race
 //
 
 #include "PhysicsGame.hpp"
 
-#include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <functional>
 #include <future>
-#include <iostream>
 #include <memory>
-#include <random>
-#include <sstream>
 #include <string_view>
 #include <string>
-#include <variant>
 #include <vector>
 
-#include <box2d/box2d.h>
 #include <SDL3/SDL.h>
 #include <SFML/Audio.hpp>
 
-#include <dearimgui/imgui.h>
-#include <dearimgui/backends/imgui_impl_sdl3.h>
-#include <dearimgui/backends/imgui_impl_opengl3.h>
 
-#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/randomizer.h>
 
-#include "AudioHelper.hpp"
-#include "Ball.hpp"
 #include "GameState.hpp"
-#include "JsonUtils.hpp"
 #include "LoadingState.hpp"
+#include "MenuState.hpp"
 #include "Player.hpp"
+#include "PauseState.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
@@ -49,9 +37,6 @@
 #include "State.hpp"
 #include "StateStack.hpp"
 #include "Texture.hpp"
-#include "Wall.hpp"
-#include "WorkerConcurrent.hpp"
-#include "World.hpp"
 
 #if defined(__EMSCRIPTEN__)
 
@@ -91,10 +76,8 @@ struct PhysicsGame::PhysicsGameImpl {
         , version{ version }
         , resourcePath{ resourcePath }
         , INIT_WINDOW_W{ w }, INIT_WINDOW_H{ h }
-        , p1{}
         , window{nullptr}
         , sdlHelper{}
-        , textures{}
         , stateStack{nullptr} {
 
         initSDL();
@@ -106,7 +89,7 @@ struct PhysicsGame::PhysicsGameImpl {
         stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
         
         // Load initial textures needed for loading/splash screens
-        loadInitialTextures();
+        loadSplashTextures();
         
         registerStates();
         
@@ -132,7 +115,7 @@ struct PhysicsGame::PhysicsGameImpl {
                 windowTitle.c_str(), INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
-    void loadInitialTextures() noexcept {
+    void loadSplashTextures() noexcept {
         using std::string;
 
         // Configure and generate maze for loading/splash screens
@@ -195,6 +178,8 @@ struct PhysicsGame::PhysicsGameImpl {
 
         stateStack->registerState<GameState>(States::ID::GAME);
         stateStack->registerState<LoadingState>(States::ID::LOADING, resourcePath);
+        stateStack->registerState<MenuState>(States::ID::MENU);
+        stateStack->registerState<PauseState>(States::ID::PAUSE);
         stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
 }; // impl
@@ -302,7 +287,7 @@ void PhysicsGame::cleanup() noexcept {
     }
 
     if (auto& sdl = this->m_impl->sdlHelper; sdl.window || sdl.renderer) {
-        sdl.destroy();
+        sdl.destroyAndQuit();
         SDL_Log("PhysicsGame::cleanup() - Cleaning up SDL resources\n");
     }
 }

@@ -17,7 +17,7 @@ SplashState::SplashState(StateStack& stack, Context context)
 void SplashState::draw() const noexcept {
 
     auto& window = *getContext().window;
-    
+
     window.draw(mSplashSprite);
 }
 
@@ -29,7 +29,7 @@ bool SplashState::update(float dt) noexcept {
 bool SplashState::handleEvent(const SDL_Event& event) noexcept {
 
     if (event.type == SDL_EVENT_KEY_DOWN) {
-        
+
         SDL_Log("SplashState: Key pressed, checking if loading is complete...");
 
         // Only allow transition if loading is complete
@@ -38,13 +38,13 @@ bool SplashState::handleEvent(const SDL_Event& event) noexcept {
             return true;
         }
 
-        SDL_Log("SplashState: Loading complete! Transitioning to game state...");
+        SDL_Log("SplashState: Loading complete! Transitioning to menu state...");
         // Pop the splash state
         requestStackPop();
         // Pop the loading state underneath
         requestStackPop();
         // Push the game state
-        requestStackPush(States::ID::GAME);
+        requestStackPush(States::ID::MENU);
         mShowText = !mShowText;
     }
 
@@ -54,9 +54,8 @@ bool SplashState::handleEvent(const SDL_Event& event) noexcept {
 bool SplashState::isLoadingComplete() const noexcept {
     
     // Check if the state below us (LoadingState) is finished
-    LoadingState* loadingState = getStack().peekState<LoadingState*>();
-    
-    if (loadingState) {
+    if (const auto* loadingState = getStack().peekState<LoadingState*>()) {
+
         return loadingState->isFinished();
     }
     

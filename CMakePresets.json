@@ -5,7 +5,7 @@
       "name": "examples",
       "displayName": "Build with examples",
       "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build/",
-      "generator": "Ninja",
+      "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "MAZE_BUILDER_EXAMPLES": "1"

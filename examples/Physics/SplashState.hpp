@@ -4,16 +4,14 @@
 #include "Sprite.hpp"
 #include "State.hpp"
 
-class LoadingState;
-
 class SplashState : public State {
 public:
 
     explicit SplashState(StateStack& stack, Context context);
 
-    virtual void draw() const noexcept override;
-    virtual bool update(float dt) noexcept override;
-    virtual bool handleEvent(const SDL_Event& event) noexcept override;
+    void draw() const noexcept override;
+    bool update(float dt) noexcept override;
+    bool handleEvent(const SDL_Event& event) noexcept override;
 
 private:
     bool isLoadingComplete() const noexcept;

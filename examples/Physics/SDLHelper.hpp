@@ -23,7 +23,7 @@ public:
 
     void init(std::string_view title, int width, int height) noexcept;
 
-    void destroy() noexcept;
+    void destroyAndQuit() noexcept;
 }; // SDLHelper class
 
 #endif // SDLHELPER_HPP
