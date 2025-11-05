@@ -11,16 +11,13 @@ void Texture::free() noexcept
 {
     if (this->texture)
     {
-        // Check if SDL is still initialized before destroying texture
-        if (SDL_WasInit(SDL_INIT_VIDEO))
-        {
-            SDL_DestroyTexture(texture);
-        }
-        else
-        {
-            SDL_Log("Texture::free() - SDL already quit, skipping texture destruction\n");
-        }
-        texture = nullptr; // Set to null after destroying
+#if defined(MAZE_DEBUG)
+
+        SDL_Log("Texture::free - Freeing texture resource\n");
+#endif
+
+        SDL_DestroyTexture(texture);
+        texture = nullptr;
         width = 0;
         height = 0;
     }

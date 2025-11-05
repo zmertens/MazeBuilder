@@ -11,6 +11,7 @@
 
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/singleton_base.h>
+#include <MazeBuilder/string_utils.h>
 
 static std::string TITLE_STR = "Breaking Walls";
 
@@ -50,6 +51,7 @@ int main(int argc, char* argv[])
 
     using mazes::randomizer;
     using mazes::singleton_base;
+    using mazes::string_utils;
 
 #if defined(MAZE_DEBUG)
 
@@ -67,6 +69,13 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
+    if (!string_utils::contains(argv[1], ".json"))
+    {
+        cerr << "Error: Configuration file must be a .json file" << endl;
+
+        return EXIT_FAILURE;
+    }
+
     configPath = argv[1];
 #else
 
@@ -77,15 +86,11 @@ int main(int argc, char* argv[])
     {
         randomizer rng;
 
-        if (auto& gameInstance = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W,
-                                                                       WINDOW_H)
-            ; !gameInstance->run(nullptr, ref(rng)))
+        auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H);
+
+        if (!inst->run(nullptr, ref(rng)))
         {
             throw runtime_error("Error: PhysicsGame encountered an error during execution");
-        }
-        else
-        {
-            gameInstance->cleanup();
         }
 
 #if defined(MAZE_DEBUG)
@@ -96,7 +101,9 @@ int main(int argc, char* argv[])
     catch (exception& ex)
     {
         cerr << ex.what() << endl;
+
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }

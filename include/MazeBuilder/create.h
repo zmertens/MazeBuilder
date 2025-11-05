@@ -51,19 +51,18 @@ namespace mazes
                 }
 
                 if (auto igrid = gf.create(GRID_CREATION_ID, std::cref(config)); igrid.has_value())
-                {
-                    static randomizer rng{};
+   {
+                    thread_local randomizer rng{};
 
                     rng.seed(config.seed());
 
                     if (auto algo_runner = configurator::make_algo_from_config(std::cref(config)); algo_runner.has_value())
                     {
-
                         auto &&igridimpl = igrid.value();
 
                         if (auto success = algo_runner.value()->run(igridimpl.get(), std::ref(rng)))
                         {
-                            static stringify _stringifier;
+                            thread_local stringify _stringifier;
 
                             _stringifier.run(igridimpl.get(), std::ref(rng));
 

@@ -82,10 +82,16 @@ struct PhysicsGame::PhysicsGameImpl
     {
         initSDL();
 
-        // Initialize RenderWindow AFTER SDL renderer is created
+        // Check if SDL initialization succeeded
+        if (!sdlHelper.window || !sdlHelper.renderer)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer - cannot continue");
+            // Don't initialize further objects if SDL failed
+            return;
+        }
+
         window = std::make_unique<RenderWindow>(sdlHelper.renderer, sdlHelper.window);
 
-        // Initialize StateStack AFTER RenderWindow is created
         stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
 
         // Load initial textures needed for loading/splash screens
@@ -98,21 +104,20 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->pushState(States::ID::SPLASH);
     }
 
+    ~PhysicsGameImpl() {
+
+        if (auto& sdl = this->sdlHelper; sdl.window || sdl.renderer)
+        {
+            this->stateStack->clearStates();
+            this->textures.clear();
+            sdl.destroyAndQuit();
+        }
+    }
+
     void initSDL() noexcept
     {
         auto windowTitle = title + " - " + version;
         sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
-
-        // Check if window and renderer were created successfully
-        if (!sdlHelper.window || !sdlHelper.renderer)
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer");
-
-            return;
-        }
-
-        SDL_Log("Successfully created SDL window and renderer: %s (%dx%d)\n",
-                windowTitle.c_str(), INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
     void loadSplashTextures() noexcept
@@ -203,7 +208,10 @@ PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, i
 {
 }
 
-PhysicsGame::~PhysicsGame() = default;
+PhysicsGame::~PhysicsGame()
+{
+    // Unique pointer will automatically clean up
+}
 
 // Main game loop
 bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
@@ -222,9 +230,12 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
 
     auto&& gamePtr = this->m_impl;
 
-    // Start background maze generation while resources are loading
-    // Maze myMaze{};
-    // myMaze.startBackgroundMazeGeneration();
+    // Check if initialization succeeded before entering game loop
+    if (!gamePtr->window || !gamePtr->stateStack)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Game initialization failed - cannot run");
+        return false;
+    }
 
     double previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
@@ -232,12 +243,12 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
-    gamePtr->stateStack->update(0.0f);
+  gamePtr->stateStack->update(0.0f);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (gamePtr->window->isOpen())
+    while (gamePtr->window && gamePtr->window->isOpen())
 #endif
     {
         // Expected milliseconds per frame (16.67ms)
@@ -291,17 +302,3 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     return true;
 }
 
-void PhysicsGame::cleanup() noexcept
-{
-    if (auto& textures = this->m_impl->textures; !textures.isEmpty())
-    {
-        textures.clear();
-        SDL_Log("PhysicsGame::cleanup() - Cleared texture manager\n");
-    }
-
-    if (auto& sdl = this->m_impl->sdlHelper; sdl.window || sdl.renderer)
-    {
-        sdl.destroyAndQuit();
-        SDL_Log("PhysicsGame::cleanup() - Cleaning up SDL resources\n");
-    }
-}

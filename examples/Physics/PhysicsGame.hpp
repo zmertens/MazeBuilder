@@ -23,11 +23,9 @@ public:
 
     PhysicsGame(const std::string& title, const std::string& version, int w, int h);
 
-    ~PhysicsGame();
+    ~PhysicsGame() override;
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept;
-
-    void cleanup() noexcept;
 
 private:
     struct PhysicsGameImpl;

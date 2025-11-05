@@ -254,6 +254,7 @@ void WorkerConcurrent::initThreads() noexcept
             return 0;
         }
 
+        // Cast failed
         return -1;
     }; // lambda
 

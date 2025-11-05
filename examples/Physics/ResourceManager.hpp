@@ -1,7 +1,6 @@
 #ifndef RESOURCE_MANAGER_HPP
 #define RESOURCE_MANAGER_HPP
 
-#include <algorithm>
 #include <cassert>
 #include <map>
 #include <memory>
@@ -26,13 +25,6 @@ public:
 
     void clear() noexcept
     {
-        std::for_each(mResourceMap.cbegin(), mResourceMap.cend(), [](const auto& pair)
-        {
-            if (pair.second)
-            {
-                pair.second->free();
-            }
-        });
         mResourceMap.clear();
     }
 

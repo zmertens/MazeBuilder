@@ -24,25 +24,25 @@ View RenderWindow::getView() const noexcept
 
 void RenderWindow::clear() const noexcept
 {
-    if (!mRenderer)
+    if (!mRenderer || !mWindow)
     {
-        return; // Window is closed, skip
+        return;
     }
     SDL_RenderClear(mRenderer);
 }
 
 void RenderWindow::display() const noexcept
 {
-    if (!mRenderer)
+    if (!mRenderer || !mWindow)
     {
-        return; // Window is closed, skip
+        return;
     }
     SDL_RenderPresent(mRenderer);
 }
 
 bool RenderWindow::isOpen() const noexcept
 {
-    return mRenderer != nullptr;
+    return mRenderer != nullptr && mWindow != nullptr;
 }
 
 void RenderWindow::close() noexcept

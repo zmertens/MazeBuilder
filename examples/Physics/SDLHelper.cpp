@@ -6,6 +6,17 @@ void SDLHelper::init(std::string_view title, int width, int height) noexcept
 {
     auto initFunc = [this, title, width, height]()
     {
+        if (!SDL_SetAppMetadata("Maze builder with physics", title.data(), "physics;maze;c++;sdl")) {
+
+            return;
+        }
+
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, title.data());
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Flips An dAle");
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "MIT License");
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "simulation;game;voxel");
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, title.data());
+
         this->window = SDL_CreateWindow(title.data(), width, height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS);
 
         if (!this->window)
@@ -61,28 +72,32 @@ void SDLHelper::destroyAndQuit() noexcept
     // Prevent double-destruction
     if (!this->window && !this->renderer)
     {
+        SDL_Log("SDLHelper::destroyAndQuit() - Already destroyed, skipping\n");
         return;
     }
 
     if (renderer)
     {
-        SDL_DestroyRenderer(renderer);
 #if defined(MAZE_DEBUG)
-
-        SDL_Log("SDLHelper::destroy() - Destroying renderer %p\n", static_cast<void*>(renderer));
-#endif // MAZE_DEBUG
+        SDL_Log("SDLHelper::destroyAndQuit() - Destroying renderer %p\n", static_cast<void*>(renderer));
+#endif
+        SDL_DestroyRenderer(renderer);
         renderer = nullptr;
     }
 
     if (window)
     {
-        SDL_DestroyWindow(window);
 #if defined(MAZE_DEBUG)
-
-        SDL_Log("SDLHelper::destroy() - Destroying window %p\n", static_cast<void*>(window));
-#endif // MAZE_DEBUG
+        SDL_Log("SDLHelper::destroyAndQuit() - Destroying window %p\n", static_cast<void*>(window));
+#endif
+        SDL_DestroyWindow(window);
         window = nullptr;
     }
 
-    SDL_Quit();
+    // Only call SDL_Quit() if we actually destroyed something
+    if (SDL_WasInit(0) != 0)
+    {
+        SDL_Log("SDLHelper::destroyAndQuit() - Calling SDL_Quit()\n");
+        SDL_Quit();
+    }
 }
