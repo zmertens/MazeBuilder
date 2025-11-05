@@ -7,19 +7,65 @@
 #include <iostream>
 #include <sstream>
 
+// Pimpl implementation to hide udp_client dependency
+struct terminal_gui::terminal_gui_impl {
+
+    
+    terminal_gui_impl() = default;
+
+    ~terminal_gui_impl() {
+        
+    }
+};
+
+// Constructor implementation
+terminal_gui::terminal_gui() = default;
+
+// Destructor implementation
+terminal_gui::~terminal_gui() = default;
+
+// Move constructor
+terminal_gui::terminal_gui(terminal_gui&& other) noexcept
+    : m_server_url(std::move(other.m_server_url))
+    , m_current_directory(std::move(other.m_current_directory))
+    , m_running(other.m_running)
+    , m_commands(std::move(other.m_commands))
+    , m_available_programs(std::move(other.m_available_programs))
+{
+    // Reset the moved-from object
+    other.m_running = false;
+}
+
+// Move assignment operator
+terminal_gui& terminal_gui::operator=(terminal_gui&& other) noexcept {
+    if (this != &other) {
+        
+        // Move all members
+        m_server_url = std::move(other.m_server_url);
+        m_current_directory = std::move(other.m_current_directory);
+        m_running = other.m_running;
+        m_commands = std::move(other.m_commands);
+        m_available_programs = std::move(other.m_available_programs);
+        
+        // Reset the moved-from object
+        other.m_running = false;
+    }
+    return *this;
+}
+
 void terminal_gui::initialize(const std::string& server_url) {
 
     m_server_url = server_url;
 
     m_current_directory = "http";
 
-    m_available_programs = { "find", "mazebuilderhttp", "ls", "help", "exit" };
+    m_available_programs = { "find", "maze_client", "ls", "help", "exit" };
 
     m_running = true;
 
     std::cout << "Terminal initialized with Corners server: " << m_server_url << std::endl;
 
-    std::cout << "Type 'help' for available commands or 'mazebuilderhttp --help' for maze builder options." << std::endl;
+    std::cout << "Type 'help' for available commands or 'maze_client --help' for maze builder options." << std::endl;
 
     std::cout << std::endl;
 
@@ -95,9 +141,9 @@ void terminal_gui::display_prompt() const {
 
 void terminal_gui::register_commands() {
 
-    m_commands["mazebuilderhttp"] = [this](const std::vector<std::string>& args) {
+    m_commands["maze_client"] = [this](const std::vector<std::string>& args) {
 
-        return handle_mazebuilderhttp(args);
+        return handle_maze_client(args);
         };
 
     m_commands["ls"] = [this](const std::vector<std::string>& args) {
@@ -137,24 +183,26 @@ std::vector<std::string> terminal_gui::parse_arguments(const std::string& comman
     return args;
 }
 
-std::string terminal_gui::handle_mazebuilderhttp(const std::vector<std::string>& args) {
+std::string terminal_gui::handle_maze_client(const std::vector<std::string>& args) {
 
     if (args.size() < 2) {
 
-        return show_mazebuilder_help();
+        return show_help();
     }
 
     std::string subcommand = args[1];
 
     if (subcommand == "--help" || subcommand == "-h") {
 
-        return show_mazebuilder_help();
+        return show_help();
     } else if (subcommand == "--create") {
 
         // Parse create command arguments
         auto rows{ 10 }, columns{ 10 }, seed{ 42 };
 
         std::string algorithm{ "dfs" };
+
+        std::string distances{"[0:-1]"};
 
         for (size_t i = 2; i < args.size(); i++) {
 
@@ -170,13 +218,16 @@ std::string terminal_gui::handle_mazebuilderhttp(const std::vector<std::string>&
             } else if (args[i] == "-a" && i + 1 < args.size()) {
 
                 algorithm = args[++i];
+            } else if (args[i] == "-d" && i + 1 < args.size()) {
+
+                distances = args[++i];
             }
         }
 
-        return create_maze(rows, columns, seed, algorithm);
+        return create_maze(rows, columns, seed, algorithm, distances);
     } else {
 
-        return "Unknown mazebuilderhttp command: " + subcommand + "\nUse 'mazebuilderhttp --help' for usage information.";
+        return "Unknown maze_client command: " + subcommand + "\nUse 'maze_client --help' for usage information.";
     }
 }
 
@@ -216,13 +267,14 @@ std::string terminal_gui::handle_find(const std::vector<std::string>& args) {
 
 std::string terminal_gui::handle_help(const std::vector<std::string>& args) {
     return R"(Available commands:
-  mazebuilderhttp  - HTTP client for Corners maze building server
+  maze_client     - HTTP client for Corners maze building server
+
   ls              - List available programs
   find <pattern>  - Find programs matching pattern
   help            - Show this help message
   exit            - Exit the terminal
 
-Use 'mazebuilderhttp --help' for detailed maze builder options.)";
+Use 'maze_client --help' for detailed maze builder options.)";
 }
 
 std::string terminal_gui::handle_exit(const std::vector<std::string>& args) {
@@ -230,20 +282,18 @@ std::string terminal_gui::handle_exit(const std::vector<std::string>& args) {
     return "Goodbye!";
 }
 
-std::string terminal_gui::create_maze(int rows, int columns, int seed, const std::string& algorithm) {
+std::string terminal_gui::create_maze(int rows, int columns, int seed, const std::string& algorithm, const std::string& distances) {
     http_client client(m_server_url);
-    return client.create_maze(rows, columns, seed, algorithm);
+    return client.create_maze(rows, columns, seed, algorithm, distances);
 }
 
-std::string terminal_gui::show_mazebuilder_help() const {
+std::string terminal_gui::show_help() const {
     return R"(mazebuilderhttp - HTTP client for Corners maze building server
 
 Usage:
-  mazebuilderhttp --help                     Show this help message
-  mazebuilderhttp --create -r <rows> -c <columns> -s <seed> -a <algorithm>
+  maze_client --help                     Show this help message
+  maze_client --create -r <rows> -c <columns> -s <seed> -a <algorithm>
                                             Create a new maze
-  mazebuilderhttp --list                    Get all mazes from server
-  mazebuilderhttp --delete <id>             Delete maze by ID
 
 Options:
   -r, --rows <number>      Number of rows (default: 10)
@@ -253,5 +303,5 @@ Options:
                           Available: dfs, binary_tree, sidewinder
 
 Examples:
-  mazebuilderhttp --create -r 10 -c 10 -s 42 -a dfs)";
+  maze_client --create -r 10 -c 10 -s 42 -a dfs -d [0:-1])";
 }

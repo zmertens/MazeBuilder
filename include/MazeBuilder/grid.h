@@ -4,7 +4,6 @@
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/grid_range.h>
 
 #include <atomic>
 #include <cstdint>
@@ -60,6 +59,18 @@ namespace mazes
         /// @brief Destructor
         ~grid() override;
 
+        /// @brief
+        /// @return
+        grid_operations &operations() noexcept override;
+
+        /// @brief
+        /// @return
+        const grid_operations &operations() const noexcept override;
+
+        /// @brief Get the dimensions of the grid
+        /// @return A tuple containing the number of rows, columns, and levels
+        std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept override;
+
         /// @brief Get detailed information of a cell in the grid
         /// @param c
         /// @return
@@ -69,16 +80,6 @@ namespace mazes
         /// @param c
         /// @return
         virtual std::uint32_t background_color_for(std::shared_ptr<cell> const &c) const noexcept override;
-
-        /// @brief
-        /// @return
-        grid_operations &operations() noexcept override;
-
-        /// @brief
-        /// @return
-        const grid_operations &operations() const noexcept override;
-
-        std::tuple<unsigned int, unsigned int, unsigned int> get_dimensions() const noexcept override;
 
         /// @brief Get neighbor by the cell's respective location
         /// @param c
@@ -98,10 +99,6 @@ namespace mazes
         /// @return
         virtual void set_neighbor(const std::shared_ptr<cell> &c, Direction dir, std::shared_ptr<cell> const &neighbor) noexcept override;
 
-        /// @brief Transformation and display cells
-        /// @param cells Vector to fill with cells
-        void sort(std::vector<std::shared_ptr<cell>> &cells) const noexcept override;
-
         // Convenience methods for accessing neighbors
         virtual std::shared_ptr<cell> get_north(const std::shared_ptr<cell> &c) const noexcept override;
         virtual std::shared_ptr<cell> get_south(const std::shared_ptr<cell> &c) const noexcept override;
@@ -113,19 +110,12 @@ namespace mazes
         /// @return
         virtual std::shared_ptr<cell> search(int index) const noexcept override;
 
-        virtual std::vector<std::shared_ptr<cell>> get_cells() const noexcept override;
-
         /// @brief Get the count of cells in the grid
         /// @return The number of cells in the grid
         virtual int num_cells() const noexcept override;
 
         /// @brief Cleanup cells by cleaning up links within cells
         virtual void clear_cells() noexcept override;
-
-        /// @brief Set cells and build topology from them
-        /// @param cells Vector of pre-configured cells
-        /// @return true if successful, false otherwise
-        virtual bool set_cells(const std::vector<std::shared_ptr<cell>> &cells) noexcept override;
 
         virtual void set_str(std::string const &str) noexcept override;
 
@@ -146,27 +136,6 @@ namespace mazes
         /// @brief Set the faces for wavefront object file generation
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept override;
-
-        // Range-based access methods
-        /// @brief Get a range for all cells in the grid
-        /// @return grid_range object for iterating over all cells
-        grid_range cells();
-
-        /// @brief Get a range for a subset of cells
-        /// @param start_index Starting index (inclusive)
-        /// @param end_index Ending index (exclusive)
-        /// @return grid_range object for iterating over specified range
-        grid_range cells(int start_index, int end_index);
-
-        /// @brief Get a const range for all cells in the grid
-        /// @return const grid_range object for iterating over all cells
-        const grid_range cells() const;
-
-        /// @brief Get a const range for a subset of cells
-        /// @param start_index Starting index (inclusive)
-        /// @param end_index Ending index (exclusive)
-        /// @return const grid_range object for iterating over specified range
-        const grid_range cells(int start_index, int end_index) const;
 
     private:
         std::unordered_map<int, std::shared_ptr<cell>> m_cells;

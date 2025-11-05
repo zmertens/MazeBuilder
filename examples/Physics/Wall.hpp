@@ -1,21 +1,21 @@
 #ifndef WALL_HPP
 #define WALL_HPP
 
-#include <box2d/box2d.h>
-#include "Drawable.hpp"
+#include "Entity.hpp"
+#include "ResourceIdentifiers.hpp"
+#include "Sprite.hpp"
 
-class Wall : public Drawable {
+class Wall : public Entity
+{
 public:
-    enum class Orientation {
+    enum class Orientation
+    {
         HORIZONTAL, VERTICAL, CORNER
     };
 
-    // Constructor
-    explicit Wall(b2BodyId bodyId, b2ShapeId shapeId, int hitCount, bool isDestroyed, int row, int col, Orientation orientation);
+    explicit Wall(Orientation orientation, const TextureManager& textureManager);
 
     // Getters
-    b2BodyId getBodyId() const;
-    b2ShapeId getShapeId() const;
     int getHitCount() const;
     bool getIsDestroyed() const;
     int getRow() const;
@@ -23,28 +23,26 @@ public:
     Orientation getOrientation() const;
 
     // Setters
-    void setBodyId(const b2BodyId& id);
-    void setShapeId(const b2ShapeId& id);
     void setHitCount(int hitCount);
     void setIsDestroyed(bool isDestroyed);
     void setRow(int row);
     void setCol(int col);
     void setOrientation(Orientation orientation);
 
-    // Drawable override
-    void draw(SDL_Renderer* renderer,
-        std::unique_ptr<OrthographicCamera> const& camera,
-        float pixelsPerMeter, float offsetX, float offsetY, float cellSize, int display_w, int display_h) const override;
+private:
+    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
 private:
-    b2BodyId bodyId;
-    b2ShapeId shapeId;
+    Textures::ID getTextureID() const noexcept override;
+
+    virtual void updateCurrent(float dt) noexcept override;
+
     int hitCount;
     bool isDestroyed;
     int row;
     int col;
     Orientation orientation;
-
+    Sprite mSprite;
 };
 
 #endif // WALL_HPP

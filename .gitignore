@@ -16,6 +16,8 @@ build-*/
 .vscode
 .vs
 
+.idea/
+
 # Script output files
 scripts/*.txt
 scripts/*.png

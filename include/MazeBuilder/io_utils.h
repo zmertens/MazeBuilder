@@ -1,6 +1,7 @@
 #ifndef IO_UTILS_H
 #define IO_UTILS_H
 
+#include <filesystem>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -45,6 +46,14 @@ namespace mazes
         /// @param data
         /// @return
         bool write_file(const std::string &filename, const std::string &data) const noexcept;
+
+        /// @brief Get the directory path from a full file path
+        /// @param filepath Full file path
+        /// @return Directory path
+        static std::string getDirectoryPath(const std::string& filepath) noexcept {
+            std::filesystem::path p(filepath);
+            return p.parent_path().string();
+        }
     }; // io_utils
 
 }

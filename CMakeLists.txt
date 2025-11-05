@@ -5,7 +5,7 @@ cmake_policy(SET CMP0058 NEW)
 # Prefers to use GLVND (OpenGL Vendor Neutral Dispatch) libraries for OpenGL.
 cmake_policy(SET CMP0072 NEW)
 
-set(MAZE_BUILDER_VERSION 7.5.6)
+set(MAZE_BUILDER_VERSION 7.6.6)
 
 project(MazeBuilder VERSION ${MAZE_BUILDER_VERSION} LANGUAGES C CXX)
 
@@ -16,6 +16,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(MAZE_BUILDER_CORE_LIB "mazebuildercore")
+set(MAZE_DEBUG_DEF "MAZE_DEBUG")
 
 option(MAZE_BUILDER_DOCS "Build ${PROJECT_NAME} documentation" OFF)
 option(MAZE_BUILDER_TESTS "Build ${PROJECT_NAME} with tests" OFF)

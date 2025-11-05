@@ -1,36 +1,69 @@
 #ifndef TEXTURE_HPP
 #define TEXTURE_HPP
 
+#include <string_view>
+
 struct SDL_Texture;
 struct SDL_Renderer;
 
 /// @file Texture.hpp
 /// @brief Texture class for SDL3
 /// @details This class wraps SDL_Texture and provides methods for loading, rendering, and freeing textures.
-class Texture {
-private:
-    SDL_Texture* texture;
-    int width, height;
+class Texture
+{
 public:
-    explicit Texture() noexcept;
+    Texture() = default;
 
-    ~Texture();
+    // Destructor to ensure SDL texture is properly freed
+    ~Texture() noexcept { free(); }
 
-    Texture(const Texture& other) = delete;
+    // Delete copy constructor and copy assignment (textures shouldn't be copied)
+    Texture(const Texture&) = delete;
+    Texture& operator=(const Texture&) = delete;
 
-    Texture& operator=(const Texture& other) = delete;
+    // Allow move semantics if needed in the future
+    Texture(Texture&& other) noexcept : texture(other.texture), width(other.width), height(other.height)
+    {
+        other.texture = nullptr;
+        other.width = 0;
+        other.height = 0;
+    }
 
-    Texture(Texture&& other) noexcept = delete;
-
-    Texture& operator=(Texture&& other) noexcept = delete;
+    Texture& operator=(Texture&& other) noexcept
+    {
+        if (this != &other)
+        {
+            free(); // Clean up existing texture
+            texture = other.texture;
+            width = other.width;
+            height = other.height;
+            other.texture = nullptr;
+            other.width = 0;
+            other.height = 0;
+        }
+        return *this;
+    }
 
     void free() noexcept;
 
     SDL_Texture* get() const noexcept;
 
-    bool loadTarget(SDL_Renderer* renderer, int w, int h);
+    int getWidth() const noexcept { return width; }
 
-    void render(SDL_Renderer *renderer, int x, int y) const noexcept;
+    int getHeight() const noexcept { return height; }
+
+    bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
+
+    bool loadFromFile(SDL_Renderer* renderer, std::string_view path) noexcept;
+
+    bool loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept;
+
+    bool loadFromStr(SDL_Renderer* renderer, std::string_view str, int cellSize = 10) noexcept;
+
+private:
+    SDL_Texture* texture = nullptr;
+    int width = 0;
+    int height = 0;
 }; // Texture class
 
 #endif // TEXTURE_HPP

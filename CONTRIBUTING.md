@@ -2,9 +2,9 @@
 
 Maze Builder is open source under the MIT License.
 
-Please make a pull request (PR) summarizing the changes and improvements (Issues are disabled).
+Please make an issue or pull request (PR) summarizing the changes and improvements.
 
-For example, visit the the [GitHUb PRs page](https://github.com/zmertens/MazeBuilder/pulls).
+For examples, visit the the [GitHUb PRs page](https://github.com/zmertens/MazeBuilder/pulls).
 
 In the PR summary, provide some example code showing how the mazes are being used and displayed.
 

@@ -1,54 +1,109 @@
-// Basic application of Maze Builder as a level generator (with bouncing balls!)
+// Basic application of Maze Builder as a level generator in a game setting
+// Includes most game engine features like graphics and window management,
+// input handling, state management, and resource loading, audio, and network
+// Player verses computer AI gameplay with physics simulation
 
 #include <iostream>
 #include <exception>
 #include <string>
 
-#include "Physics.hpp"
+#include "PhysicsGame.hpp"
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/singleton_base.h>
+#include <MazeBuilder/string_utils.h>
+
+static std::string TITLE_STR = "Breaking Walls";
+
+static std::string VERSION_STR = "v0.2.0";
+
+static constexpr auto WINDOW_W = 1280;
+static constexpr auto WINDOW_H = 720;
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
-// This is necessary due to emscripten's handling of templates
-std::shared_ptr<Physics> get() {
-    std::string title = "physics - gamedev.js jam 2025";
-    std::string version = "0.1.0";
-    return mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
+std::shared_ptr<PhysicsGame> get()
+{
+    return mazes::singleton_base<PhysicsGame>::instance(cref(TITLE_STR), cref(VERSION_STR), WINDOW_W, WINDOW_H);
 }
 
 // bind a getter method from C++ so that it can be accessed in the frontend with JS
-EMSCRIPTEN_BINDINGS(maze_builder_module) {
+EMSCRIPTEN_BINDINGS (maze_builder_module)
+{
     emscripten::function("get", &get, emscripten::allow_raw_pointers());
-    emscripten::class_<Physics>("Physics")
-        .smart_ptr<std::shared_ptr<Physics>>("std::shared_ptr<Physics>")
+    emscripten::class_<PhysicsGame>("PhysicsGame")
+        .smart_ptr<std::shared_ptr<PhysicsGame>>("std::shared_ptr<PhysicsGame>")
         .constructor<const std::string&, const std::string&, int, int>();
 }
 #endif
 
-int main(int argc, char* argv[]) {
-	using namespace std;
+int main(int argc, char* argv[])
+{
+    using std::cerr;
+    using std::cout;
+    using std::cref;
+    using std::endl;
+    using std::exception;
+    using std::ref;
+    using std::runtime_error;
+    using std::string;
 
-    static constexpr auto MESSAGE = R"msg(
-        --- WELCOME TO THE MAZE BUILDER - Physics Example  ---
-        |   1. Press 'B' on keyboard to generate a new level |
-        ------------------------------------------------------
-    )msg";
+    using mazes::randomizer;
+    using mazes::singleton_base;
+    using mazes::string_utils;
 
-    cout << MESSAGE << endl;
+#if defined(MAZE_DEBUG)
 
-    try {
-        string title = "Breaking Walls";
-        string version = "0.1.0";
-        auto myGameInstance = mazes::singleton_base<Physics>::instance(cref(title), cref(version), 1280, 720);
-        bool res = myGameInstance->run();
-        if (!res) {
-            cerr << "Generator failed to run" << endl;
-        }
-    } catch (exception ex) {
-        cerr << ex.what() << endl;
+    VERSION_STR += " - DEBUG";
+#endif
+
+    string configPath{};
+
+#if !defined(__EMSCRIPTEN__)
+
+    if (argc != 2)
+    {
+        cerr << "Usage: " << argv[0] << " <path_to_config.json>" << endl;
+
+        return EXIT_FAILURE;
     }
 
-	return 0;
+    if (!string_utils::contains(argv[1], ".json"))
+    {
+        cerr << "Error: Configuration file must be a .json file" << endl;
+
+        return EXIT_FAILURE;
+    }
+
+    configPath = argv[1];
+#else
+
+    configPath = "resources/physics.json";
+#endif
+
+    try
+    {
+        randomizer rng;
+
+        auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H);
+
+        if (!inst->run(nullptr, ref(rng)))
+        {
+            throw runtime_error("Error: PhysicsGame encountered an error during execution");
+        }
+
+#if defined(MAZE_DEBUG)
+
+        cout << "PhysicsGame ran successfully (DEBUG MODE)" << endl;
+#endif
+    }
+    catch (exception& ex)
+    {
+        cerr << ex.what() << endl;
+
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
 }
