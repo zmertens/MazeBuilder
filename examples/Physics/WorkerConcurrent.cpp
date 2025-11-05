@@ -1,8 +1,9 @@
+// Provides thread-based concurrency for managing resource loading and configuration.
+
 #include "WorkerConcurrent.hpp"
 
 #include <algorithm>
 #include <cctype>
-#include <cstdint>
 #include <iterator>
 #include <optional>
 #include <string>
@@ -13,7 +14,6 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/create2.h>
-#include <MazeBuilder/string_utils.h>
 
 #include "JsonUtils.hpp"
 
@@ -321,7 +321,7 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
     int index = 0;
     for (const auto& [key, value] : resources)
     {
-        workQueue.push_back(WorkItem{key, value, index++});
+        workQueue.emplace_back(key, value, index++);
     }
 
     mTotalWorkItems = static_cast<int>(workQueue.size());
@@ -385,127 +385,11 @@ void WorkerConcurrent::doWork(WorkItem const& item) noexcept
             return;
         }
 
-        // Helper lambda to convert JSON object string to configurator
-        auto jsonToConfigurator = [](const std::string& jsonValue) -> mazes::configurator
-        {
-            mazes::configurator config;
-
-            // Parse the JSON object string to extract configuration values
-            // Expected format: {"rows": 100, "columns": 99, "seed": 50, "algo": "dfs"}
-
-            // Extract rows
-            if (auto rowsPos = jsonValue.find("\"rows\""); rowsPos != std::string::npos)
-            {
-                auto colonPos = jsonValue.find(':', rowsPos);
-                if (colonPos != std::string::npos)
-                {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    // Remove whitespace
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try
-                    {
-                        config.rows(static_cast<unsigned int>(std::stoi(value)));
-                    }
-                    catch (...)
-                    {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse rows from: %s\n", value.c_str());
-                    }
-                }
-            }
-
-            // Extract columns
-            if (auto colsPos = jsonValue.find("\"columns\""); colsPos != std::string::npos)
-            {
-                auto colonPos = jsonValue.find(':', colsPos);
-                if (colonPos != std::string::npos)
-                {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try
-                    {
-                        config.columns(static_cast<unsigned int>(std::stoi(value)));
-                    }
-                    catch (...)
-                    {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse columns from: %s\n", value.c_str());
-                    }
-                }
-            }
-
-            // Extract seed
-            if (auto seedPos = jsonValue.find("\"seed\""); seedPos != std::string::npos)
-            {
-                auto colonPos = jsonValue.find(':', seedPos);
-                if (colonPos != std::string::npos)
-                {
-                    auto commaPos = jsonValue.find(',', colonPos);
-                    if (commaPos == std::string::npos)
-                    {
-                        commaPos = jsonValue.find('}', colonPos);
-                    }
-                    auto value = jsonValue.substr(colonPos + 1, commaPos - colonPos - 1);
-                    value.erase(std::remove_if(value.begin(), value.end(), ::isspace), value.end());
-                    try
-                    {
-                        config.seed(static_cast<unsigned int>(std::stoi(value)));
-                    }
-                    catch (...)
-                    {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse seed from: %s\n", value.c_str());
-                    }
-                }
-            }
-
-            // Extract algo
-            if (auto algoPos = jsonValue.find("\"algo\""); algoPos != std::string::npos)
-            {
-                auto colonPos = jsonValue.find(':', algoPos);
-                if (colonPos != std::string::npos)
-                {
-                    auto quoteStart = jsonValue.find('"', colonPos);
-                    if (quoteStart != std::string::npos)
-                    {
-                        auto quoteEnd = jsonValue.find('"', quoteStart + 1);
-                        if (quoteEnd != std::string::npos)
-                        {
-                            auto algoStr = jsonValue.substr(quoteStart + 1, quoteEnd - quoteStart - 1);
-
-                            // Map string to algo enum
-                            if (algoStr == "dfs")
-                            {
-                                config.algo_id(mazes::algo::DFS);
-                            }
-                            else if (algoStr == "binary_tree")
-                            {
-                                config.algo_id(mazes::algo::BINARY_TREE);
-                            }
-                            else if (algoStr == "sidewinder")
-                            {
-                                config.algo_id(mazes::algo::SIDEWINDER);
-                            }
-                            else
-                            {
-                                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Unknown algorithm: %s, using default\n",
-                                            algoStr.c_str());
-                            }
-                        }
-                    }
-                }
-            }
-
-            return config;
-        };
-
-        // Convert the JSON value to a configurator
-        mazes::configurator config = jsonToConfigurator(jsonValue);
-
         // Call create() and log the result
         try
         {
             [[maybe_unused]]
-                std::string mazeStr = mazes::create(config);
+                std::string mazeStr = mazes::create(JsonUtils::jsonToConfigurator(jsonValue));
         }
         catch (const std::exception& e)
         {
