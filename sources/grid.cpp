@@ -29,9 +29,6 @@ grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
 grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
     : m_dimensions(dimens)
 {
-
-    // For large grids, avoid creating all cells upfront to prevent memory issues
-    // Cells will be created lazily when accessed via search() method
     auto total_cells = std::get<0>(m_dimensions) * std::get<1>(m_dimensions) * std::get<2>(m_dimensions);
 
     m_cells.reserve(total_cells);

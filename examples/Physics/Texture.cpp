@@ -105,34 +105,29 @@ bool Texture::loadImageTexture(SDL_Renderer* renderer, std::string_view imagePat
 {
     this->free();
 
-    SDL_Surface* loadedSurface = SDL_LoadBMP(imagePath.data());
-    if (!loadedSurface)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to load image %s! SDL Error: %s\n", imagePath.data(),
-                     SDL_GetError());
-        return false;
-    }
-    if (!loadedSurface)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to load image %s! SDL Error: %s\n", imagePath.data(),
-                     SDL_GetError());
-        return false;
-    }
+    if (SDL_Surface* loadedSurface = SDL_LoadBMP(imagePath.data())) {
 
-    this->texture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
+        this->texture = SDL_CreateTextureFromSurface(renderer, loadedSurface);
 
-    if (!this->texture)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture from %s! SDL Error: %s\n", imagePath.data(),
-                     SDL_GetError());
+        if (!this->texture)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to create texture from %s! SDL Error: %s\n", imagePath.data(),
+                SDL_GetError());
+            SDL_DestroySurface(loadedSurface);
+            return false;
+        }
+
+        this->width = loadedSurface->w;
+        this->height = loadedSurface->h;
+
         SDL_DestroySurface(loadedSurface);
+    } else {
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Unable to load image %s! SDL Error: %s\n", imagePath.data(),
+            SDL_GetError());
+
         return false;
     }
-
-    this->width = loadedSurface->w;
-    this->height = loadedSurface->h;
-
-    SDL_DestroySurface(loadedSurface);
 
     return true;
 }
