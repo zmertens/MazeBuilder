@@ -4,7 +4,6 @@
 #include "JsonUtils.hpp"
 #include "Pathfinder.hpp"
 #include "RenderWindow.hpp"
-#include "SDLHelper.hpp"
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
@@ -13,15 +12,9 @@
 
 #include <SDL3/SDL.h>
 
-#include <MazeBuilder/singleton_base.h>
-
-#include <string>
-
 World::World(RenderWindow& window, TextureManager& textures)
     : mWindow{window}
-      , mWorldView{
-          /* window.getView() */
-      }
+      , mWorldView{window.getView()}
       , mTextures{textures}
       , mSceneGraph{}
       , mSceneLayers{}
@@ -34,7 +27,7 @@ World::World(RenderWindow& window, TextureManager& textures)
 void World::init() noexcept
 {
     b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = {0.0f, FORCE_DUE_TO_GRAVITY};
+    worldDef.gravity = {.x = 0.0f, .y = FORCE_DUE_TO_GRAVITY};
     mWorldId = b2CreateWorld(&worldDef);
 
     mPlayerPathfinder = nullptr;
@@ -125,8 +118,11 @@ void World::buildScene()
     SDL_Rect mazeRect = {0, 0, mazeTexture.getWidth(), mazeTexture.getHeight()};
     auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
     mazeSprite->setPosition(0.0f, 0.0f);
-    SceneNode::Ptr mazeNode = move(mazeSprite);
+    SceneNode::Ptr mazeNode = std::move(mazeSprite);
     mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(mazeNode));
 
+#if defined(MAZE_DEBUG)
+
     SDL_Log("World::buildScene - Scene built successfully");
+#endif
 }

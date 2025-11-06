@@ -38,7 +38,7 @@ LoadingState::LoadingState(StateStack& stack, State::Context context, std::strin
 
 void LoadingState::draw() const noexcept
 {
-    auto& window = *getContext().window;
+    const auto& window = *getContext().window;
 
     window.draw(mLoadingSprite);
 }
@@ -48,11 +48,14 @@ bool LoadingState::update(float dt) noexcept
     if (!mHasFinished && mForeman.isDone())
     {
         // Loading is complete - get the loaded resources
-        auto resources = mForeman.getResources();
+        const auto resources = mForeman.getResources();
         SDL_Log("Loading complete! Loaded %zu resources. Loading textures...\n", resources.size());
 
-        // Now actually load the textures from the resource metadata
-        loadTexturesFromResources(std::cref(resources));
+        // Now actually load the textures from the worker-collected texture requests
+        loadTexturesFromWorkerRequests();
+
+        // Handle window icon separately (special case, not managed by TextureManager)
+        loadWindowIcon(resources);
 
         mHasFinished = true;
         SDL_Log("All textures loaded! Press any key to continue...\n");
@@ -95,72 +98,55 @@ void LoadingState::loadResources() noexcept
     mForeman.generate(mResourcePath);
 }
 
-void LoadingState::loadTexturesFromResources(const std::unordered_map<std::string, std::string>& resources) noexcept
+void LoadingState::loadTexturesFromWorkerRequests() const noexcept
 {
-    using std::string;
-
     auto& textures = *getContext().textures;
     auto* renderer = getContext().window->getRenderer();
-    JsonUtils jsonUtils{};
+
+    // Get the texture load requests that were collected by worker threads
+    auto textureRequests = mForeman.getTextureLoadRequests();
+
+    SDL_Log("Loading %zu textures on main thread...\n", textureRequests.size());
 
     try
     {
-        // Construct a string from the resource path
-        auto resourcePathPrefix = mazes::io_utils::getDirectoryPath(mResourcePath) + "/";
-
-        // Load splash screen texture
-        if (auto sdlBlocksKey = resources.find("sdl_blocks"); sdlBlocksKey != resources.cend())
+        for (const auto& request : textureRequests)
         {
-            string sdlBlocksPath = resourcePathPrefix + jsonUtils.extractJsonValue(sdlBlocksKey->second);
-            textures.load(renderer, Textures::ID::SDL_BLOCKS, sdlBlocksPath);
-            SDL_Log("DEBUG: Loading SDL blocks from: %s", sdlBlocksPath.c_str());
-        }
-
-        // Load avatar texture
-        if (auto avatarKey = resources.find("astronaut"); avatarKey != resources.cend())
-        {
-            string avatarImagePath = resourcePathPrefix + jsonUtils.extractJsonValue(avatarKey->second);
-            textures.load(renderer, Textures::ID::ASTRONAUT, avatarImagePath);
-            SDL_Log("DEBUG: Loading astronaut from: %s", avatarImagePath.c_str());
-        }
-
-        if (auto ballNormalKey = resources.find("ball_normal"); ballNormalKey != resources.cend())
-        {
-            string ballNormalPath = resourcePathPrefix + jsonUtils.extractJsonValue(ballNormalKey->second);
-            textures.load(renderer, Textures::ID::BALL_NORMAL, ballNormalPath);
-            SDL_Log("DEBUG: Loading ball normal from: %s", ballNormalPath.c_str());
-        }
-
-        if (auto wallHorizontalKey = resources.find("wall_horizontal"); wallHorizontalKey != resources.cend())
-        {
-            string wallHorizontalPath = resourcePathPrefix + jsonUtils.extractJsonValue(wallHorizontalKey->second);
-            textures.load(renderer, Textures::ID::WALL_HORIZONTAL, wallHorizontalPath);
-            SDL_Log("DEBUG: Loading wall horizontal from: %s", wallHorizontalPath.c_str());
-        }
-
-        // Window icon is special case, no need to save the texture in the manager
-        if (auto windowIconKey = resources.find("window_icon"); windowIconKey != resources.cend())
-        {
-            string windowIconPath = resourcePathPrefix + jsonUtils.extractJsonValue(windowIconKey->second);
-
-            if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon != nullptr)
-            {
-                if (auto* renderWindow = getContext().window; renderWindow != nullptr)
-                {
-                    SDL_SetWindowIcon(renderWindow->getSDLWindow(), icon);
-                    SDL_DestroySurface(icon);
-                    SDL_Log("DEBUG: Loading window icon from: %s", windowIconPath.c_str());
-                }
-            }
-            else
-            {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s", windowIconPath.c_str(),
-                             SDL_GetError());
-            }
+            textures.load(renderer, request.id, request.path);
+            SDL_Log("DEBUG: Loaded texture ID %d from: %s\n", static_cast<int>(request.id), request.path.c_str());
         }
     }
     catch (const std::exception& e)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures from resources: %s", e.what());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load textures: %s\n", e.what());
+    }
+}
+
+void LoadingState::loadWindowIcon(const std::unordered_map<std::string, std::string>& resources) noexcept
+{
+    using std::string;
+
+    JsonUtils jsonUtils{};
+    auto resourcePathPrefix = mazes::io_utils::getDirectoryPath(mResourcePath) + "/";
+
+    // Window icon is special case, no need to save the texture in the manager
+    if (auto windowIconKey = resources.find("window_icon"); windowIconKey != resources.cend())
+    {
+        string windowIconPath = resourcePathPrefix + jsonUtils.extractJsonValue(windowIconKey->second);
+
+        if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon != nullptr)
+        {
+            if (auto* renderWindow = getContext().window; renderWindow != nullptr)
+            {
+                SDL_SetWindowIcon(renderWindow->getSDLWindow(), icon);
+                SDL_DestroySurface(icon);
+                SDL_Log("DEBUG: Loading window icon from: %s\n", windowIconPath.c_str());
+            }
+        }
+        else
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load icon: %s - %s\n", windowIconPath.c_str(),
+                         SDL_GetError());
+        }
     }
 }

@@ -14,11 +14,18 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/create2.h>
+#include <MazeBuilder/io_utils.h>
 
 #include "JsonUtils.hpp"
+#include "ResourceIdentifiers.hpp"
 
 WorkerConcurrent::WorkItem::WorkItem(std::string key, std::string value, int index)
     : key(std::move(key)), value(std::move(value)), index(index)
+{
+}
+
+WorkerConcurrent::TextureLoadRequest::TextureLoadRequest(Textures::ID id, std::string path)
+    : id(id), path(std::move(path))
 {
 }
 
@@ -292,15 +299,18 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
     workQueue.clear();
     mResources.clear();
     mProcessedConfigs.clear(); // Clear processed configs tracking
+    mTextureLoadRequests.clear(); // Clear texture load requests
     SDL_UnlockMutex(gameMtx);
 
+    // Store the resource path prefix for use in worker threads
+    mResourcePathPrefix = mazes::io_utils::getDirectoryPath(std::string(resourcePath)) + "/";
+
     // Load JSON configuration
-    JsonUtils jsonUtils{};
     unordered_map<string, string> resources{};
 
     try
     {
-        jsonUtils.loadConfiguration(string(resourcePath), resources);
+        JsonUtils::loadConfiguration(string(resourcePath), resources);
         SDL_Log("Loaded %zu resources from %s\n", resources.size(), resourcePath.data());
     }
     catch (const std::exception& e)
@@ -365,6 +375,27 @@ void WorkerConcurrent::doWork(WorkItem const& item) noexcept
     }
 
     mResources[item.key] = item.value;
+
+    // Check if this is a texture resource and collect the load request
+    std::string extractedValue = JsonUtils::extractJsonValue(item.value);
+    std::string fullPath = mResourcePathPrefix + extractedValue;
+
+    if (item.key == "sdl_blocks")
+    {
+        mTextureLoadRequests.emplace_back(Textures::ID::SDL_BLOCKS, fullPath);
+    }
+    else if (item.key == "astronaut")
+    {
+        mTextureLoadRequests.emplace_back(Textures::ID::ASTRONAUT, fullPath);
+    }
+    else if (item.key == "ball_normal")
+    {
+        mTextureLoadRequests.emplace_back(Textures::ID::BALL_NORMAL, fullPath);
+    }
+    else if (item.key == "wall_horizontal")
+    {
+        mTextureLoadRequests.emplace_back(Textures::ID::WALL_HORIZONTAL, fullPath);
+    }
 
     bool alreadyProcessed = mProcessedConfigs.find(item.key) != mProcessedConfigs.end();
 
@@ -433,3 +464,20 @@ std::unordered_map<std::string, std::string> WorkerConcurrent::getResources() co
 
     return resourcesCopy;
 }
+
+std::vector<WorkerConcurrent::TextureLoadRequest> WorkerConcurrent::getTextureLoadRequests() const noexcept
+{
+    SDL_LockMutex(gameMtx);
+    auto requestsCopy = mTextureLoadRequests;
+    SDL_UnlockMutex(gameMtx);
+
+    return requestsCopy;
+}
+
+void WorkerConcurrent::setResourcePathPrefix(std::string_view prefix) noexcept
+{
+    SDL_LockMutex(gameMtx);
+    mResourcePathPrefix = prefix;
+    SDL_UnlockMutex(gameMtx);
+}
+

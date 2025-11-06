@@ -25,8 +25,6 @@ public:
 
     void init() noexcept;
 
-    void destroy() noexcept;
-
     // Update the world (update physics and entities)
     void update(float dt);
 
@@ -42,7 +40,6 @@ private:
     // Build the scene (initialize scene graph and layers)
     void buildScene();
 
-private:
     enum class Layer
     {
         BACKGROUND = 0,
@@ -50,7 +47,6 @@ private:
         LAYER_COUNT = 2
     };
 
-private:
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
     RenderWindow& mWindow;
