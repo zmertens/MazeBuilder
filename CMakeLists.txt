@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1...3.5)
+cmake_minimum_required(VERSION 3.11...4.1)
 
 # Generators using Ninja can tell if the build files are generated as a side effect of running the command, which can help avoid unnecessary rebuilds.
 cmake_policy(SET CMP0058 NEW)

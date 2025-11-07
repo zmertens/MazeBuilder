@@ -16,8 +16,10 @@
 #include <vector>
 
 #include <SDL3/SDL.h>
-#include <SFML/Audio.hpp>
 
+#include <dearimgui/imgui.h>
+#include <dearimgui/backends/imgui_impl_sdl3.h>
+#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
@@ -92,6 +94,8 @@ struct PhysicsGame::PhysicsGameImpl
 
         window = std::make_unique<RenderWindow>(sdlHelper.renderer, sdlHelper.window);
 
+        initDearImGui();
+
         stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
 
         // Load initial textures needed for loading/splash screens
@@ -118,6 +122,20 @@ struct PhysicsGame::PhysicsGameImpl
     {
         auto windowTitle = title + " - " + version;
         sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
+    }
+
+    void initDearImGui() noexcept
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
+        ImGui::GetIO().IniFilename = nullptr;
+
+        // Setup ImGui Platform/Renderer backends
+        ImGui_ImplSDL3_InitForSDLRenderer(this->sdlHelper.window, this->sdlHelper.renderer);
+        ImGui_ImplSDLRenderer3_Init(this->sdlHelper.renderer);
     }
 
     void loadSplashTextures() noexcept
