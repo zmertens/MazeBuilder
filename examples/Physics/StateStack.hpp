@@ -64,7 +64,7 @@ private:
 private:
     struct PendingChange
     {
-        explicit PendingChange(Action action, States::ID stateID = States::ID::NONE);
+        explicit PendingChange(Action action, States::ID stateID = States::ID::DONE);
 
         Action action;
         States::ID stateID;

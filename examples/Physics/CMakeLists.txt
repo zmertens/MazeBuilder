@@ -22,6 +22,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SettingsState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SplashState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Sprite.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SpriteNode.cpp

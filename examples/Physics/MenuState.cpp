@@ -4,12 +4,13 @@
 
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
+#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include "Font.hpp"
+#include "PauseState.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "StateStack.hpp"
-#include "backends/imgui_impl_sdlrenderer3.h"
 
 MenuState::MenuState(StateStack& stack, Context context)
     : State(stack, context)
@@ -56,26 +57,20 @@ void MenuState::draw() const noexcept
             ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
             ImGui::Spacing();
 
-            if (ImGui::Selectable("Start Game", mSelectedMenuItem == 0)) {
-                mSelectedMenuItem = 0;
+            if (ImGui::Selectable("Start Game", mSelectedMenuItem == static_cast<unsigned int>(States::ID::GAME))) {
+                mSelectedMenuItem = static_cast<unsigned int>(States::ID::GAME);
                 SDL_Log("Navigation: Start Game selected");
             }
             ImGui::Spacing();
 
-            if (ImGui::Selectable("Settings", mSelectedMenuItem == 1)) {
-                mSelectedMenuItem = 1;
+            if (ImGui::Selectable("Settings", mSelectedMenuItem == static_cast<unsigned int>(States::ID::SETTINGS))) {
+                mSelectedMenuItem = static_cast<unsigned int>(States::ID::SETTINGS);
                 SDL_Log("Navigation: Settings selected");
             }
             ImGui::Spacing();
 
-            if (ImGui::Selectable("Controls", mSelectedMenuItem == 2)) {
-                mSelectedMenuItem = 2;
-                SDL_Log("Navigation: Controls selected");
-            }
-            ImGui::Spacing();
-
-            if (ImGui::Selectable("About", mSelectedMenuItem == 3)) {
-                mSelectedMenuItem = 3;
+            if (ImGui::Selectable("Splash screen (about)", mSelectedMenuItem == static_cast<unsigned int>(States::ID::SPLASH))) {
+                mSelectedMenuItem = static_cast<unsigned int>(States::ID::SPLASH);
                 SDL_Log("Navigation: About selected");
             }
             ImGui::Spacing();
@@ -92,8 +87,8 @@ void MenuState::draw() const noexcept
             // Display selected menu info
             ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
             ImGui::SameLine();
-            const char* menuItems[] = {"Start Game", "Settings", "Controls", "About", "Exit"};
-            if (mSelectedMenuItem >= 0 && mSelectedMenuItem < 5) {
+            const char* menuItems[] = {"Start Game", "Settings", "Splash screen", "Exit"};
+            if (mSelectedMenuItem >= 0 && mSelectedMenuItem < 4) {
                 ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "%s", menuItems[mSelectedMenuItem]);
             }
 
@@ -104,7 +99,8 @@ void MenuState::draw() const noexcept
             // Action buttons
             if (ImGui::Button("Confirm Selection", ImVec2(180, 40))) {
                 SDL_Log("Confirmed selection: %d", mSelectedMenuItem);
-                // Add logic to handle menu selection
+                // Close menu window to trigger state transition in update()
+                mShowMenuWindow = false;
             }
 
             ImGui::SameLine();
@@ -114,10 +110,11 @@ void MenuState::draw() const noexcept
             }
         }
         ImGui::End();
-        ImGui::PopFont();
 
         ImGui::PopStyleColor(10);
     }
+
+    ImGui::PopFont();
 
     ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
@@ -129,10 +126,42 @@ void MenuState::draw() const noexcept
 
 bool MenuState::update(float dt) noexcept
 {
+    // Only transition when menu is closed (confirmed or cancelled)
     if (!mShowMenuWindow)
     {
-        requestStackPop();
-        requestStackPush(States::ID::GAME);
+        // Handle state transition based on selected menu item
+        switch (static_cast<States::ID>(mSelectedMenuItem)) {
+            case States::ID::GAME:
+                // Check if Pause state is underneath
+                if (auto isPauseState = getStack().peekState<PauseState*>(); isPauseState)
+                {
+                    requestStackPop(); // Pop MenuState
+                    // Resume the game by popping PauseState
+                }
+                else
+                {
+                    requestStackPop(); // Pop MenuState
+                    requestStackPush(States::ID::GAME);
+                }
+                break;
+
+            case States::ID::SETTINGS:
+                requestStackPush(States::ID::SETTINGS);
+                // Reset menu window to show when we return
+                mShowMenuWindow = true;
+                break;
+
+            case States::ID::SPLASH:
+                requestStackPush(States::ID::SPLASH);
+                // Reset menu window to show when we return
+                mShowMenuWindow = true;
+                break;
+
+            default:
+                // Exit or unknown selection
+                requestStackPop();
+                break;
+        }
     }
 
     return true;
@@ -147,7 +176,7 @@ bool MenuState::handleEvent(const SDL_Event& event) noexcept
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
 
-            mShowText = !mShowText;
+            mShowMenuWindow = !mShowMenuWindow;
         }
     }
 

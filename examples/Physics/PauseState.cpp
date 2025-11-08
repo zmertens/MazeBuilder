@@ -7,12 +7,12 @@
 #include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include "Font.hpp"
+#include "MenuState.hpp"
 #include "ResourceManager.hpp"
-#include "StateStack.hpp"
 
 PauseState::PauseState(StateStack& stack, Context context)
     : State(stack, context)
-      , mBackgroundShape{}, mExitSelected(false), mResumeSelected(false)
+      , mBackgroundShape{}, mSelectedMenuItem(static_cast<unsigned int>(States::ID::PAUSE))
 {
 }
 
@@ -47,14 +47,23 @@ void PauseState::draw() const noexcept
         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
         ImGui::Spacing();
 
-        if (ImGui::Button("Resume Game", ImVec2(200, 40))) {
-            mResumeSelected = true;
+        if (ImGui::Button("Resume Game", ImVec2(200, 40)))
+        {
+            mSelectedMenuItem = static_cast<unsigned int>(States::ID::GAME);
             SDL_Log("Navigation: Resume Game selected");
         }
         ImGui::Spacing();
 
-        if (ImGui::Button("Exit Game", ImVec2(200, 40))) {
-            mExitSelected = true;
+        if (ImGui::Button("Main Menu", ImVec2(200, 40)))
+        {
+            mSelectedMenuItem = static_cast<unsigned int>(States::ID::MENU);
+            SDL_Log("Navigation: Main Menu selected");
+        }
+        ImGui::Spacing();
+
+        if (ImGui::Button("Exit Game", ImVec2(200, 40)))
+        {
+            mSelectedMenuItem = static_cast<unsigned int>(States::ID::DONE);
             SDL_Log("Navigation: Exit Game selected");
         }
         ImGui::Spacing();
@@ -71,14 +80,25 @@ void PauseState::draw() const noexcept
 
 bool PauseState::update(float dt) noexcept
 {
-    if (mExitSelected)
+    switch (mSelectedMenuItem)
     {
+    case static_cast<unsigned int>(States::ID::DONE):
         requestStateClear();
-    }
-
-    if (mResumeSelected)
-    {
+        break;
+    case static_cast<unsigned int>(States::ID::GAME):
+        SDL_Log("PauseState: Resuming game...");
         requestStackPop();
+        break;
+    case static_cast<unsigned int>(States::ID::MENU):
+        SDL_Log("Menu selected from PauseState, clearing states and returning to MenuState");
+        // Pop pause state
+        requestStackPop();
+        // Pop game state
+        requestStackPop();
+        // Push menu state
+        requestStackPush(States::ID::MENU);
+        break;
+    default: break;
     }
 
     return true;
@@ -94,7 +114,7 @@ bool PauseState::handleEvent(const SDL_Event& event) noexcept
         {
             SDL_Log("PauseState: Escape Key pressed, returning to previous state");
 
-            // requestStackPop();
+            mSelectedMenuItem = static_cast<unsigned int>(States::ID::GAME);
         }
     }
 

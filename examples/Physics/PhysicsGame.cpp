@@ -20,7 +20,7 @@
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
-#include "nunito_sans.h"
+#include "resources/nunito_sans.h"
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
@@ -32,6 +32,7 @@
 #include "MenuState.hpp"
 #include "Player.hpp"
 #include "PauseState.hpp"
+#include "SettingsState.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
@@ -229,6 +230,7 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->registerState<LoadingState>(States::ID::LOADING, resourcePath);
         stateStack->registerState<MenuState>(States::ID::MENU);
         stateStack->registerState<PauseState>(States::ID::PAUSE);
+        stateStack->registerState<SettingsState>(States::ID::SETTINGS);
         stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
 }; // impl
@@ -279,7 +281,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
-  gamePtr->stateStack->update(0.0f);
+    gamePtr->stateStack->update(0.0f);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
