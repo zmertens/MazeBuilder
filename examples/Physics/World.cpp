@@ -4,6 +4,7 @@
 #include "JsonUtils.hpp"
 #include "Pathfinder.hpp"
 #include "RenderWindow.hpp"
+#include "ResourceManager.hpp"
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
@@ -12,9 +13,10 @@
 
 #include <SDL3/SDL.h>
 
-World::World(RenderWindow& window, TextureManager& textures)
+World::World(RenderWindow& window, FontManager& fonts, TextureManager& textures)
     : mWindow{window}
       , mWorldView{window.getView()}
+      , mFonts{fonts}
       , mTextures{textures}
       , mSceneGraph{}
       , mSceneLayers{}

@@ -7,7 +7,6 @@
 #include "PhysicsGame.hpp"
 
 #include <cmath>
-#include <cstdint>
 #include <functional>
 #include <future>
 #include <memory>
@@ -21,11 +20,13 @@
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
+#include "nunito_sans.h"
+
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/json_helper.h>
-#include <MazeBuilder/randomizer.h>
 
+#include "Font.hpp"
 #include "GameState.hpp"
 #include "LoadingState.hpp"
 #include "MenuState.hpp"
@@ -60,6 +61,8 @@ struct PhysicsGame::PhysicsGameImpl
     std::unique_ptr<RenderWindow> window;
 
     SDLHelper sdlHelper;
+
+    FontManager fonts;
 
     TextureManager textures;
 
@@ -96,10 +99,15 @@ struct PhysicsGame::PhysicsGameImpl
 
         initDearImGui();
 
-        stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
+        stateStack = std::make_unique<StateStack>(State::Context{*window,
+            std::ref(fonts),
+            std::ref(textures),
+            std::ref(p1)});
 
         // Load initial textures needed for loading/splash screens
         loadSplashTextures();
+
+        loadFonts();
 
         registerStates();
 
@@ -113,6 +121,7 @@ struct PhysicsGame::PhysicsGameImpl
         if (auto& sdl = this->sdlHelper; sdl.window || sdl.renderer)
         {
             this->stateStack->clearStates();
+            this->fonts.clear();
             this->textures.clear();
             sdl.destroyAndQuit();
         }
@@ -173,6 +182,15 @@ struct PhysicsGame::PhysicsGameImpl
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load initial textures: %s", e.what());
         }
+    }
+
+    void loadFonts() noexcept
+    {
+        static constexpr auto FONT_PIXEL_SIZE = 18.f;
+        fonts.load(Fonts::ID::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
+
+        // Build font atlas after adding fonts
+        ImGui::GetIO().Fonts->Build();
     }
 
     void processInput()

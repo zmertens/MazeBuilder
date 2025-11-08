@@ -4,8 +4,9 @@
 
 #include <SDL3/SDL.h>
 
-State::State::Context::Context(RenderWindow& window, TextureManager& textures, Player& player)
+State::Context::Context(RenderWindow& window, FontManager& fonts, TextureManager& textures, Player& player)
     : window{&window}
+      , fonts{&fonts}
       , textures{&textures}
       , player{&player}
 {

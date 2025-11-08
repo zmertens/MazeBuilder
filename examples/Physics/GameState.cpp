@@ -13,7 +13,7 @@
 
 GameState::GameState(StateStack& stack, State::Context context)
     : State{stack, context}
-      , mWorld{*context.window, *context.textures}
+      , mWorld{*context.window, *context.fonts, *context.textures}
       , mPlayer{*context.player}
 {
     mWorld.init();
@@ -45,7 +45,6 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
             requestStackPush(States::ID::PAUSE);
-            requestStackPush(States::ID::MENU);
         }
     }
 

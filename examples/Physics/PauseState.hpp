@@ -16,6 +16,9 @@ public:
 
 private:
     SDL_Rect mBackgroundShape;
+
+    mutable bool mExitSelected;
+    mutable bool mResumeSelected;
 };
 
 #endif // PAUSE_STATE_HPP

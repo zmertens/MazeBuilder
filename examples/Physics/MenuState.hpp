@@ -17,6 +17,10 @@ private:
     Sprite mBackgroundSprite;
 
     bool mShowText;
+
+    // Navigation state variables
+    mutable int mSelectedMenuItem;
+    mutable bool mShowMenuWindow;
 };
 
 #endif // MENU_STATE_HPP

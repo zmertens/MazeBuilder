@@ -8,6 +8,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Ball.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandQueue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Entity.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Font.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GameState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LoadingState.cpp

@@ -4,14 +4,11 @@
 #include <box2d/id.h>
 
 #include <array>
-#include <cstdint>
 #include <vector>
 
-#include "Command.hpp"
 #include "CommandQueue.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
-#include "ResourceManager.hpp"
 #include "SceneNode.hpp"
 #include "View.hpp"
 
@@ -21,7 +18,7 @@ class RenderWindow;
 class World final
 {
 public:
-    explicit World(RenderWindow& window, TextureManager& textures);
+    explicit World(RenderWindow& window, FontManager& fonts, TextureManager& textures);
 
     void init() noexcept;
 
@@ -51,6 +48,7 @@ private:
 
     RenderWindow& mWindow;
     View mWorldView;
+    FontManager& mFonts;
     TextureManager& mTextures;
 
     SceneNode mSceneGraph;

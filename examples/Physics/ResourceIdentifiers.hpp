@@ -23,18 +23,18 @@ namespace Fonts
     enum class ID
     {
         MAIN = 0,
-        DM_SANS_TTF = 1
+        NUNITO_SANS = 1
     };
 }
 
 class Texture;
-// class Font;
+class Font;
 
 // Forward declaration and a few type definitions
 template <typename Resource, typename Identifier>
 class ResourceManager;
 
 typedef ResourceManager<Texture, Textures::ID> TextureManager;
-// typedef ResourceHolder<Font, Fonts::ID> FontHolder;
+typedef ResourceManager<Font, Fonts::ID> FontManager;
 
 #endif // RESOURCE_IDENTIFIERS_HPP

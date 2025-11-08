@@ -18,9 +18,10 @@ public:
 
     struct Context
     {
-        explicit Context(RenderWindow& window, TextureManager& textures, Player& player);
+        explicit Context(RenderWindow& window, FontManager& fonts, TextureManager& textures, Player& player);
 
         RenderWindow* window;
+        FontManager* fonts;
         TextureManager* textures;
         Player* player;
     };
