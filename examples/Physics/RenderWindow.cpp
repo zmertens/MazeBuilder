@@ -1,9 +1,10 @@
 #include "RenderWindow.hpp"
 
-#include <MazeBuilder/singleton_base.h>
-
-#include "SDLHelper.hpp"
 #include "View.hpp"
+
+#include <dearimgui/imgui.h>
+#include <dearimgui/backends/imgui_impl_sdl3.h>
+#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include <SDL3/SDL.h>
 
@@ -37,7 +38,15 @@ void RenderWindow::display() const noexcept
     {
         return;
     }
+
+    ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui::NewFrame();
+
     SDL_RenderPresent(mRenderer);
+
+    ImGui::Render();
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), mRenderer);
 }
 
 bool RenderWindow::isOpen() const noexcept

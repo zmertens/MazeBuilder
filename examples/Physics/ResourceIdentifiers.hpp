@@ -22,8 +22,9 @@ namespace Fonts
 {
     enum class ID
     {
-        MAIN = 0,
-        NUNITO_SANS = 1
+        COUSINE_REGULAR,
+        LIMELIGHT,
+        NUNITO_SANS
     };
 }
 

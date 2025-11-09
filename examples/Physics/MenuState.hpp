@@ -4,6 +4,8 @@
 #include "Sprite.hpp"
 #include "State.hpp"
 
+#include <array>
+
 class MenuState : public State
 {
 public:
@@ -14,13 +16,24 @@ public:
     bool handleEvent(const SDL_Event& event) noexcept override;
 
 private:
+    enum class MenuItem : unsigned int
+    {
+        CONTINUE = 0,
+        NEW_GAME = 1,
+        SETTINGS = 2,
+        SPLASH = 3,
+        QUIT = 4,
+        COUNT = 5
+    };
+
     Sprite mBackgroundSprite;
 
-    bool mShowText;
-
     // Navigation state variables
-    mutable int mSelectedMenuItem;
-    mutable bool mShowMenuWindow;
+    mutable MenuItem mSelectedMenuItem;
+
+    mutable bool mShowMainMenu;
+
+    mutable std::array<bool, static_cast<size_t>(MenuItem::COUNT)> mItemSelectedFlags;
 };
 
 #endif // MENU_STATE_HPP

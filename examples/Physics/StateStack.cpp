@@ -48,17 +48,17 @@ void StateStack::handleEvent(const SDL_Event& event) noexcept
 
 void StateStack::pushState(States::ID stateID)
 {
-    mPendingList.push_back(PendingChange(Action::PUSH, stateID));
+    mPendingList.emplace_back(Action::PUSH, stateID);
 }
 
 void StateStack::popState()
 {
-    mPendingList.push_back(PendingChange(Action::POP));
+    mPendingList.emplace_back(Action::POP);
 }
 
 void StateStack::clearStates()
 {
-    mPendingList.push_back(PendingChange(Action::CLEAR));
+    mPendingList.emplace_back(Action::CLEAR);
 }
 
 bool StateStack::isEmpty() const noexcept

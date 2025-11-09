@@ -2,6 +2,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <array>
+#include <string>
+
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
@@ -14,169 +17,196 @@
 
 MenuState::MenuState(StateStack& stack, Context context)
     : State(stack, context)
-      , mShowText{true}
-      , mSelectedMenuItem(0), mShowMenuWindow(true), mBackgroundSprite{context.textures->get(Textures::ID::SDL_BLOCKS)}
+      , mBackgroundSprite{context.textures->get(Textures::ID::SDL_BLOCKS)}, mSelectedMenuItem(MenuItem::CONTINUE)
+      , mShowMainMenu(true), mItemSelectedFlags{}
 {
+    // initialize selection flags so UI shows correct selected item
+    mItemSelectedFlags.fill(false);
+    mItemSelectedFlags[static_cast<size_t>(mSelectedMenuItem)] = true;
 }
 
 void MenuState::draw() const noexcept
 {
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-    ImGui::PushFont(getContext().fonts->get(Fonts::ID::NUNITO_SANS).get());
+    if (!mShowMainMenu) {
+
+        return;
+    }
+
+    using std::array;
+    using std::size_t;
+    using std::string;
+
+    ImGui::PushFont(getContext().fonts->get(Fonts::ID::LIMELIGHT).get());
 
     static auto showDemoWindow{true};
+#if defined(MAZE_DEBUG)
+
     if (showDemoWindow) {
         ImGui::ShowDemoWindow(&showDemoWindow);
     }
+#endif
 
-    // Custom navigation menu window with color schema
-    if (mShowMenuWindow) {
-        // Apply color schema
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f)); // #040c06
-        ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f)); // #112318
-        ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f)); // #1e3a29
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f)); // #305d42
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
-        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f)); // #bedc7f
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f)); // #eeffcc
+    // Apply color schema
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f)); // #040c06
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f)); // #112318
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f)); // #1e3a29
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f)); // #305d42
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f)); // #bedc7f
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f)); // #eeffcc
 
-        ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
 
-        if (ImGui::Begin("Main Menu", &mShowMenuWindow, ImGuiWindowFlags_NoCollapse)) {
-            ImGui::Text("Welcome to MazeBuilder Physics");
-            ImGui::Separator();
-            ImGui::Spacing();
+    if (ImGui::Begin("Main Menu", &mShowMainMenu, ImGuiWindowFlags_NoCollapse)) {
+        ImGui::Text("Welcome to MazeBuilder Physics");
+        ImGui::Separator();
+        ImGui::Spacing();
 
-            // Navigation options
-            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
-            ImGui::Spacing();
+        // Navigation options
+        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
+        ImGui::Spacing();
 
-            if (ImGui::Selectable("Start Game", mSelectedMenuItem == static_cast<unsigned int>(States::ID::GAME))) {
-                mSelectedMenuItem = static_cast<unsigned int>(States::ID::GAME);
-                SDL_Log("Navigation: Start Game selected");
+        const array<string, static_cast<size_t>(MenuItem::COUNT)> menuItems = {"Resume", "New Game", "Settings", "Splash screen", "Quit"};
+
+        // Use Selectable with bool* overload so ImGui keeps a consistent toggled state
+        for (size_t i = 0; i < menuItems.size(); ++i)
+        {
+            bool* flag = &mItemSelectedFlags[i];
+            if (ImGui::Selectable(menuItems[i].c_str(), flag))
+            {
+                // When an item is selected, clear others and set the selected index
+                for (auto& f : mItemSelectedFlags)
+                {
+                    f = false;
+                }
+                *flag = true;
+                mSelectedMenuItem = static_cast<MenuItem>(i);
+                SDL_Log("Navigation: %s selected", menuItems[i].c_str());
             }
             ImGui::Spacing();
-
-            if (ImGui::Selectable("Settings", mSelectedMenuItem == static_cast<unsigned int>(States::ID::SETTINGS))) {
-                mSelectedMenuItem = static_cast<unsigned int>(States::ID::SETTINGS);
-                SDL_Log("Navigation: Settings selected");
-            }
-            ImGui::Spacing();
-
-            if (ImGui::Selectable("Splash screen (about)", mSelectedMenuItem == static_cast<unsigned int>(States::ID::SPLASH))) {
-                mSelectedMenuItem = static_cast<unsigned int>(States::ID::SPLASH);
-                SDL_Log("Navigation: About selected");
-            }
-            ImGui::Spacing();
-
-            if (ImGui::Selectable("Exit", mSelectedMenuItem == 4)) {
-                mSelectedMenuItem = 4;
-                SDL_Log("Navigation: Exit selected");
-            }
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            // Display selected menu info
-            ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
-            ImGui::SameLine();
-            const char* menuItems[] = {"Start Game", "Settings", "Splash screen", "Exit"};
-            if (mSelectedMenuItem >= 0 && mSelectedMenuItem < 4) {
-                ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "%s", menuItems[mSelectedMenuItem]);
-            }
-
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
-
-            // Action buttons
-            if (ImGui::Button("Confirm Selection", ImVec2(180, 40))) {
-                SDL_Log("Confirmed selection: %d", mSelectedMenuItem);
-                // Close menu window to trigger state transition in update()
-                mShowMenuWindow = false;
-            }
-
-            ImGui::SameLine();
-
-            if (ImGui::Button("Toggle Demo", ImVec2(180, 40))) {
-                showDemoWindow = !showDemoWindow;
-            }
         }
-        ImGui::End();
 
-        ImGui::PopStyleColor(10);
+        // Debug: show flags and selection index for troubleshooting
+        ImGui::Separator();
+        ImGui::Text("Debug: selected index = %u", static_cast<unsigned int>(mSelectedMenuItem));
+        ImGui::SameLine();
+        ImGui::Text("flags =");
+        for (bool flag : mItemSelectedFlags) {
+            ImGui::SameLine(); ImGui::Text("%d", flag);
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Display selected menu info
+        ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
+        ImGui::SameLine();
+        if (static_cast<unsigned int>(mSelectedMenuItem) < static_cast<unsigned int>(MenuItem::COUNT)) {
+            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "%s", menuItems.at(static_cast<unsigned int>(mSelectedMenuItem)).c_str());
+        }
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        // Action buttons
+        if (ImGui::Button("Confirm Selection", ImVec2(180, 40))) {
+            SDL_Log("Confirmed selection: %u", static_cast<unsigned int>(mSelectedMenuItem));
+            // Close the menu window to trigger state transition in update()
+            mShowMainMenu = false;
+        }
+
+        ImGui::SameLine();
+
+#if defined(MAZE_DEBUG)
+
+        if (ImGui::Button("Toggle Demo", ImVec2(180, 40))) {
+            showDemoWindow = !showDemoWindow;
+        }
+#endif
+
     }
+    ImGui::End();
+
+    ImGui::PopStyleColor(10);
 
     ImGui::PopFont();
 
-    ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
-
+    // Draw the game background first so ImGui renders on top of it
     auto& window = *getContext().window;
-
     window.draw(mBackgroundSprite);
 }
 
 bool MenuState::update(float dt) noexcept
 {
-    // Only transition when menu is closed (confirmed or cancelled)
-    if (!mShowMenuWindow)
-    {
-        // Handle state transition based on selected menu item
-        switch (static_cast<States::ID>(mSelectedMenuItem)) {
-            case States::ID::GAME:
-                // Check if Pause state is underneath
-                if (auto isPauseState = getStack().peekState<PauseState*>(); isPauseState)
-                {
-                    requestStackPop(); // Pop MenuState
-                    // Resume the game by popping PauseState
-                }
-                else
-                {
-                    requestStackPop(); // Pop MenuState
-                    requestStackPush(States::ID::GAME);
-                }
-                break;
+    // If menu is visible, just keep it showing (no transitions yet)
+    if (mShowMainMenu) {
 
-            case States::ID::SETTINGS:
-                requestStackPush(States::ID::SETTINGS);
-                // Reset menu window to show when we return
-                mShowMenuWindow = true;
-                break;
-
-            case States::ID::SPLASH:
-                requestStackPush(States::ID::SPLASH);
-                // Reset menu window to show when we return
-                mShowMenuWindow = true;
-                break;
-
-            default:
-                // Exit or unknown selection
-                requestStackPop();
-                break;
-        }
+        return true;
     }
 
+    // Menu was closed by user - process the selected action
+    switch (mSelectedMenuItem) {
+        case MenuItem::CONTINUE:
+            // Check if Pause state is underneath
+            if (auto isPauseState = getStack().peekState<PauseState*>(); isPauseState)
+            {
+                // Pop menu state, returning to paused game
+                requestStackPop();
+            }
+            else
+            {
+                requestStackPop();
+                requestStackPush(States::ID::GAME);
+            }
+            break;
+
+        case MenuItem::NEW_GAME:
+            requestStackPop();
+            requestStackPush(States::ID::GAME);
+            break;
+
+        case MenuItem::SETTINGS:
+            requestStackPop();
+            requestStackPush(States::ID::SETTINGS);
+            return true;
+
+        case MenuItem::SPLASH:
+            requestStackPush(States::ID::SPLASH);
+            return true;
+
+        case MenuItem::QUIT:
+            requestStateClear();
+            break;
+
+        default:
+            break;
+    }
+
+    // Reset the menu visibility for next time state is entered (after full state transitions)
+    mShowMainMenu = true;
     return true;
 }
 
 bool MenuState::handleEvent(const SDL_Event& event) noexcept
 {
+    if (!mShowMainMenu) {
+        mShowMainMenu = true;
+        return true;
+    }
+
     ImGui_ImplSDL3_ProcessEvent(&event);
 
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
-
-            mShowMenuWindow = !mShowMenuWindow;
+            // Close menu and return to previous state (or quit if this is root menu)
+            mShowMainMenu = false;
         }
     }
 

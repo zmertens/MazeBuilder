@@ -21,30 +21,28 @@ SettingsState::SettingsState(StateStack& stack, Context context)
 
 void SettingsState::draw() const noexcept
 {
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-    ImGui::PushFont(getContext().fonts->get(Fonts::ID::NUNITO_SANS).get());
+    // ImGui_ImplSDL3_NewFrame();
+    // ImGui_ImplSDLRenderer3_NewFrame();
+    // ImGui::NewFrame();
+    ImGui::PushFont(getContext().fonts->get(Fonts::ID::LIMELIGHT).get());
 
-    // Custom settings window with color schema
-    if (mShowSettingsWindow) {
-        // Apply color schema (matching MenuState)
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f)); // #040c06
-        ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f)); // #112318
-        ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f)); // #1e3a29
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f)); // #305d42
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
-        ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
-        ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
-        ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f)); // #bedc7f
-        ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f)); // #eeffcc
+    // Apply color schema (matching MenuState)
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f)); // #040c06
+    ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f)); // #112318
+    ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f)); // #1e3a29
+    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f)); // #305d42
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
+    ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f)); // #4d8061
+    ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f)); // #89a257
+    ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f)); // #bedc7f
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f)); // #eeffcc
 
-        ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
-        ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
 
-        if (ImGui::Begin("Settings", &mShowSettingsWindow, ImGuiWindowFlags_NoCollapse)) {
-            ImGui::Text("Game Settings");
+    if (ImGui::Begin("Settings", &mShowSettingsWindow, ImGuiWindowFlags_NoCollapse)) {
+        ImGui::Text("Game Settings");
             ImGui::Separator();
             ImGui::Spacing();
 
@@ -124,28 +122,35 @@ void SettingsState::draw() const noexcept
                 SDL_Log("Returning to menu");
                 mShowSettingsWindow = false;
             }
-        }
-        ImGui::End();
-
-        ImGui::PopStyleColor(10);
     }
+    ImGui::End();
+
+    ImGui::PopStyleColor(10);
 
     ImGui::PopFont();
 
-    ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
-
+    // Draw the game background first so ImGui renders on top of it
     auto& window = *getContext().window;
 
     window.draw(mBackgroundSprite);
+    //
+    // ImGui::Render();
+    // ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
 }
 
 bool SettingsState::update(float dt) noexcept
 {
-    if (!mShowSettingsWindow)
+    if (mShowSettingsWindow)
     {
-        requestStackPop();
+        return true;
     }
+
+    // User has closed the window, pop back to menu
+    requestStackPop();
+    // requestStackPush(States::ID::MENU);
+
+    // Reset the window visibility for next time state is entered
+    mShowSettingsWindow = true;
 
     return true;
 }

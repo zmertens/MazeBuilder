@@ -28,7 +28,7 @@ public:
     /// @brief Set the current view (camera) for rendering
     void setView(const View& view);
 
-    View getView() const noexcept;
+    [[nodiscard]] View getView() const noexcept;
 
     /// @brief Draw a drawable object (like RenderWindow)
     /// @tparam T Any type with a draw(RenderStates) method
@@ -46,10 +46,10 @@ public:
     void close() noexcept;
 
     /// @brief Get the SDL renderer for direct access
-    SDL_Renderer* getRenderer() const noexcept { return mRenderer; }
+    [[nodiscard]] SDL_Renderer* getRenderer() const noexcept { return mRenderer; }
 
     /// @brief Get the SDL window for direct access
-    SDL_Window* getSDLWindow() const noexcept { return mWindow; }
+    [[nodiscard]] SDL_Window* getSDLWindow() const noexcept { return mWindow; }
 
 private:
     SDL_Renderer* mRenderer;
@@ -57,7 +57,6 @@ private:
     View mCurrentView;
 };
 
-// Template implementation
 template <typename T>
 void RenderWindow::draw(const T& drawable) const noexcept
 {

@@ -20,6 +20,8 @@
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
+#include "resources/Cousine_Regular.h"
+#include "resources/Limelight_Regular.h"
 #include "resources/nunito_sans.h"
 
 #include <MazeBuilder/configurator.h>
@@ -188,7 +190,9 @@ struct PhysicsGame::PhysicsGameImpl
     void loadFonts() noexcept
     {
         static constexpr auto FONT_PIXEL_SIZE = 18.f;
+        fonts.load(Fonts::ID::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size, FONT_PIXEL_SIZE);
         fonts.load(Fonts::ID::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::COUSINE_REGULAR, Cousine_Regular_compressed_data, Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
 
         // Build font atlas after adding fonts
         ImGui::GetIO().Fonts->Build();
