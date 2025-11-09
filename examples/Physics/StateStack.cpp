@@ -27,9 +27,29 @@ void StateStack::update(float dt) noexcept
 
 void StateStack::draw() const noexcept
 {
-    for (const auto& state : mStack)
+    if (mStack.empty())
     {
-        state->draw();
+        return;
+    }
+
+    // Find the first opaque state from the top of the stack
+    auto firstOpaque = mStack.begin();
+    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
+    {
+        if ((*it)->isOpaque())
+        {
+            // Convert reverse iterator to forward iterator
+            // .base() returns an iterator one position after what the reverse iterator points to
+            // So we need to decrement to get the actual opaque state
+            firstOpaque = std::prev(it.base());
+            break;
+        }
+    }
+
+    // Draw from the first opaque state to the top
+    for (auto it = firstOpaque; it != mStack.end(); ++it)
+    {
+        (*it)->draw();
     }
 }
 

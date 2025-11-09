@@ -3,8 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include <dearimgui/imgui.h>
-#include <dearimgui/backends/imgui_impl_sdl3.h>
-#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include "Font.hpp"
 #include "MenuState.hpp"
@@ -18,9 +16,6 @@ PauseState::PauseState(StateStack& stack, Context context)
 
 void PauseState::draw() const noexcept
 {
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
     ImGui::PushFont(getContext().fonts->get(Fonts::ID::NUNITO_SANS).get());
 
     // Apply color schema
@@ -72,10 +67,8 @@ void PauseState::draw() const noexcept
     ImGui::PopStyleColor(10);
     ImGui::PopFont();
 
-    ImGui::Render();
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
-
     // auto& window = *getContext().window;
+    // window.draw(mBackgroundShape);
 }
 
 bool PauseState::update(float dt) noexcept
@@ -106,7 +99,6 @@ bool PauseState::update(float dt) noexcept
 
 bool PauseState::handleEvent(const SDL_Event& event) noexcept
 {
-    ImGui_ImplSDL3_ProcessEvent(&event);
 
     if (event.type == SDL_EVENT_KEY_DOWN)
     {

@@ -42,3 +42,8 @@ StateStack& State::getStack() const noexcept
 {
     return *mStack;
 }
+
+bool State::isOpaque() const noexcept
+{
+    return true;
+}

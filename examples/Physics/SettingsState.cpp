@@ -3,8 +3,6 @@
 #include <SDL3/SDL.h>
 
 #include <dearimgui/imgui.h>
-#include <dearimgui/backends/imgui_impl_sdl3.h>
-#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include "Font.hpp"
 #include "ResourceIdentifiers.hpp"
@@ -21,9 +19,10 @@ SettingsState::SettingsState(StateStack& stack, Context context)
 
 void SettingsState::draw() const noexcept
 {
-    // ImGui_ImplSDL3_NewFrame();
-    // ImGui_ImplSDLRenderer3_NewFrame();
-    // ImGui::NewFrame();
+    // Draw the game background FIRST, before any ImGui calls
+    auto& window = *getContext().window;
+    window.draw(mBackgroundSprite);
+
     ImGui::PushFont(getContext().fonts->get(Fonts::ID::LIMELIGHT).get());
 
     // Apply color schema (matching MenuState)
@@ -41,101 +40,104 @@ void SettingsState::draw() const noexcept
     ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowSize(ImVec2(500, 600), ImGuiCond_FirstUseEver);
 
-    if (ImGui::Begin("Settings", &mShowSettingsWindow, ImGuiWindowFlags_NoCollapse)) {
-        ImGui::Text("Game Settings");
-            ImGui::Separator();
-            ImGui::Spacing();
+    bool windowOpen = mShowSettingsWindow;
+    if (ImGui::Begin("Settings", &windowOpen, ImGuiWindowFlags_NoCollapse))
+    {
+        ImGui::Text("Settings");
+        ImGui::Separator();
+        ImGui::Spacing();
 
-            // Audio Settings Section
-            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Audio Settings:");
-            ImGui::Spacing();
+        // Audio Settings Section
+        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Audio Settings:");
+        ImGui::Spacing();
 
-            static float masterVolume = 100.0f;
-            static float musicVolume = 80.0f;
-            static float sfxVolume = 90.0f;
+        static float masterVolume = 100.0f;
+        static float musicVolume = 80.0f;
+        static float sfxVolume = 90.0f;
 
-            ImGui::SliderFloat("Master Volume", &masterVolume, 0.0f, 100.0f, "%.0f%%");
-            ImGui::SliderFloat("Music Volume", &musicVolume, 0.0f, 100.0f, "%.0f%%");
-            ImGui::SliderFloat("SFX Volume", &sfxVolume, 0.0f, 100.0f, "%.0f%%");
+        ImGui::SliderFloat("Master Volume", &masterVolume, 0.0f, 100.0f, "%.0f%%");
+        ImGui::SliderFloat("Music Volume", &musicVolume, 0.0f, 100.0f, "%.0f%%");
+        ImGui::SliderFloat("SFX Volume", &sfxVolume, 0.0f, 100.0f, "%.0f%%");
 
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
 
-            // Graphics Settings Section
-            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Graphics Settings:");
-            ImGui::Spacing();
+        // Graphics Settings Section
+        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Graphics Settings:");
+        ImGui::Spacing();
 
-            static bool vsync = true;
-            static bool fullscreen = false;
-            static int selectedResolution = 0;
-            const char* resolutions[] = {"800x600", "1024x768", "1280x720", "1920x1080"};
+        static bool vsync = true;
+        static bool fullscreen = false;
+        static int selectedResolution = 0;
+        const char* resolutions[] = {"800x600", "1024x768", "1280x720", "1920x1080"};
 
-            ImGui::Checkbox("VSync", &vsync);
-            ImGui::Checkbox("Fullscreen", &fullscreen);
-            ImGui::Combo("Resolution", &selectedResolution, resolutions, IM_ARRAYSIZE(resolutions));
+        ImGui::Checkbox("VSync", &vsync);
+        ImGui::Checkbox("Fullscreen", &fullscreen);
+        ImGui::Combo("Resolution", &selectedResolution, resolutions, IM_ARRAYSIZE(resolutions));
 
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
 
-            // Gameplay Settings Section
-            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Gameplay Settings:");
-            ImGui::Spacing();
+        // Gameplay Settings Section
+        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Gameplay Settings:");
+        ImGui::Spacing();
 
-            static float difficulty = 50.0f;
-            static bool showFPS = true;
-            static bool showDebugInfo = false;
+        static float difficulty = 50.0f;
+        static bool showFPS = true;
+        static bool showDebugInfo = false;
 
-            ImGui::SliderFloat("Difficulty", &difficulty, 0.0f, 100.0f, "%.0f%%");
-            ImGui::Checkbox("Show FPS", &showFPS);
-            ImGui::Checkbox("Show Debug Info", &showDebugInfo);
+        ImGui::SliderFloat("Difficulty", &difficulty, 0.0f, 100.0f, "%.0f%%");
+        ImGui::Checkbox("Show FPS", &showFPS);
+        ImGui::Checkbox("Show Debug Info", &showDebugInfo);
 
-            ImGui::Spacing();
-            ImGui::Separator();
-            ImGui::Spacing();
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
 
-            // Action buttons
-            if (ImGui::Button("Apply Settings", ImVec2(150, 40))) {
-                SDL_Log("Settings applied");
-                // Add logic to apply settings
-            }
+        // Action buttons
+        if (ImGui::Button("Apply Settings", ImVec2(150, 40)))
+        {
+            SDL_Log("Settings applied");
+            // Add logic to apply settings
+        }
 
-            ImGui::SameLine();
+        ImGui::SameLine();
 
-            if (ImGui::Button("Reset to Default", ImVec2(150, 40))) {
-                SDL_Log("Settings reset to default");
-                masterVolume = 100.0f;
-                musicVolume = 80.0f;
-                sfxVolume = 90.0f;
-                vsync = true;
-                fullscreen = false;
-                selectedResolution = 0;
-                difficulty = 50.0f;
-                showFPS = true;
-                showDebugInfo = false;
-            }
+        if (ImGui::Button("Reset to Default", ImVec2(150, 40)))
+        {
+            SDL_Log("Settings reset to default");
+            masterVolume = 100.0f;
+            musicVolume = 80.0f;
+            sfxVolume = 90.0f;
+            vsync = true;
+            fullscreen = false;
+            selectedResolution = 0;
+            difficulty = 50.0f;
+            showFPS = true;
+            showDebugInfo = false;
+        }
 
-            ImGui::SameLine();
+        ImGui::SameLine();
 
-            if (ImGui::Button("Back to Menu", ImVec2(150, 40))) {
-                SDL_Log("Returning to menu");
-                mShowSettingsWindow = false;
-            }
+        if (ImGui::Button("Back to Menu", ImVec2(150, 40)))
+        {
+            SDL_Log("Returning to menu");
+            mShowSettingsWindow = false;
+        }
     }
     ImGui::End();
+
+    // If user closed the window via the X button, update our state
+    if (!windowOpen)
+    {
+        mShowSettingsWindow = false;
+    }
 
     ImGui::PopStyleColor(10);
 
     ImGui::PopFont();
-
-    // Draw the game background first so ImGui renders on top of it
-    auto& window = *getContext().window;
-
-    window.draw(mBackgroundSprite);
-    //
-    // ImGui::Render();
-    // ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), getContext().window->getRenderer());
 }
 
 bool SettingsState::update(float dt) noexcept
@@ -147,18 +149,15 @@ bool SettingsState::update(float dt) noexcept
 
     // User has closed the window, pop back to menu
     requestStackPop();
-    // requestStackPush(States::ID::MENU);
 
-    // Reset the window visibility for next time state is entered
-    mShowSettingsWindow = true;
-
-    return true;
+    // Return false to stop processing states below
+    // This prevents MenuState from being updated in the same frame
+    // before the pop actually happens
+    return false;
 }
 
 bool SettingsState::handleEvent(const SDL_Event& event) noexcept
 {
-    ImGui_ImplSDL3_ProcessEvent(&event);
-
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)

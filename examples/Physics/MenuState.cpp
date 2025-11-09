@@ -6,8 +6,6 @@
 #include <string>
 
 #include <dearimgui/imgui.h>
-#include <dearimgui/backends/imgui_impl_sdl3.h>
-#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
 
 #include "Font.hpp"
 #include "PauseState.hpp"
@@ -36,7 +34,7 @@ void MenuState::draw() const noexcept
     using std::size_t;
     using std::string;
 
-    ImGui::PushFont(getContext().fonts->get(Fonts::ID::LIMELIGHT).get());
+    ImGui::PushFont(getContext().fonts->get(Fonts::ID::NUNITO_SANS).get());
 
     static auto showDemoWindow{true};
 #if defined(MAZE_DEBUG)
@@ -171,11 +169,11 @@ bool MenuState::update(float dt) noexcept
             break;
 
         case MenuItem::SETTINGS:
-            requestStackPop();
             requestStackPush(States::ID::SETTINGS);
-            return true;
+            break;
 
         case MenuItem::SPLASH:
+            mShowMainMenu = false;
             requestStackPush(States::ID::SPLASH);
             return true;
 
@@ -187,26 +185,19 @@ bool MenuState::update(float dt) noexcept
             break;
     }
 
-    // Reset the menu visibility for next time state is entered (after full state transitions)
     mShowMainMenu = true;
     return true;
 }
 
 bool MenuState::handleEvent(const SDL_Event& event) noexcept
 {
-    if (!mShowMainMenu) {
-        mShowMainMenu = true;
-        return true;
-    }
-
-    ImGui_ImplSDL3_ProcessEvent(&event);
 
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
-            // Close menu and return to previous state (or quit if this is root menu)
-            mShowMainMenu = false;
+            // Commented because returning to Menu from Settings with ESCAPE causes fallthrough effect
+            // mShowMainMenu = false;
         }
     }
 

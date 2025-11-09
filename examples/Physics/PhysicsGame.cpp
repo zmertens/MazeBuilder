@@ -198,13 +198,16 @@ struct PhysicsGame::PhysicsGameImpl
         ImGui::GetIO().Fonts->Build();
     }
 
-    void processInput()
+    void processInput() const noexcept
     {
         SDL_Event event;
 
         while (SDL_PollEvent(&event))
         {
-            // Let the state stack handle events
+            // Let ImGui process the event first
+            ImGui_ImplSDL3_ProcessEvent(&event);
+
+            // Then let the state stack handle events
             stateStack->handleEvent(event);
 
             if (event.type == SDL_EVENT_QUIT)
@@ -215,7 +218,7 @@ struct PhysicsGame::PhysicsGameImpl
         }
     }
 
-    void update(float dt, int subSteps = 4)
+    void update(float dt, int subSteps = 4) const noexcept
     {
         stateStack->update(dt);
     }
@@ -224,6 +227,7 @@ struct PhysicsGame::PhysicsGameImpl
     {
         // Clear, draw, and present (like SFML)
         window->clear();
+        window->beginFrame();
         stateStack->draw();
         window->display();
     }
@@ -250,10 +254,7 @@ PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, i
 {
 }
 
-PhysicsGame::~PhysicsGame()
-{
-    // Unique pointer will automatically clean up
-}
+PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
 bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
@@ -279,7 +280,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         return false;
     }
 
-    double previous = static_cast<double>(SDL_GetTicks());
+    auto previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
 
     SDL_Log("Entering game loop...\n");
@@ -295,8 +296,8 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     {
         // Expected milliseconds per frame (16.67ms)
         static constexpr auto FIXED_TIME_STEP = 1000.0 / 60.0;
-        auto current = static_cast<double>(SDL_GetTicks());
-        auto elapsed = current - previous;
+        const auto current = static_cast<double>(SDL_GetTicks());
+        const auto elapsed = current - previous;
         previous = current;
         accumulator += elapsed;
 

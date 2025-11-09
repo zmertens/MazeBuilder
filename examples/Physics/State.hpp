@@ -44,6 +44,8 @@ public:
     virtual bool update(float dt) noexcept = 0;
     virtual bool handleEvent(const SDL_Event& event) noexcept = 0;
 
+    virtual bool isOpaque() const noexcept;
+
 protected:
     void requestStackPush(States::ID stateID);
     void requestStackPop();

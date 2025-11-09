@@ -23,6 +23,18 @@ View RenderWindow::getView() const noexcept
     return mCurrentView;
 }
 
+void RenderWindow::beginFrame() const noexcept
+{
+    if (!mRenderer || !mWindow)
+    {
+        return;
+    }
+
+    ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui::NewFrame();
+}
+
 void RenderWindow::clear() const noexcept
 {
     if (!mRenderer || !mWindow)
@@ -39,14 +51,10 @@ void RenderWindow::display() const noexcept
         return;
     }
 
-    ImGui_ImplSDL3_NewFrame();
-    ImGui_ImplSDLRenderer3_NewFrame();
-    ImGui::NewFrame();
-
-    SDL_RenderPresent(mRenderer);
-
     ImGui::Render();
+    SDL_SetRenderScale(mRenderer, ImGui::GetIO().DisplayFramebufferScale.x, ImGui::GetIO().DisplayFramebufferScale.y);
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), mRenderer);
+    SDL_RenderPresent(mRenderer);
 }
 
 bool RenderWindow::isOpen() const noexcept

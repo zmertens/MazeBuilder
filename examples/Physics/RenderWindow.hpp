@@ -35,6 +35,8 @@ public:
     template <typename T>
     void draw(const T& drawable) const noexcept;
 
+    void beginFrame() const noexcept;
+
     /// @brief Clear the render target
     void clear() const noexcept;
 
