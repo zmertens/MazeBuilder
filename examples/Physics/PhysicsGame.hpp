@@ -25,7 +25,7 @@ public:
 
     ~PhysicsGame() override;
 
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept;
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
 private:
     struct PhysicsGameImpl;
