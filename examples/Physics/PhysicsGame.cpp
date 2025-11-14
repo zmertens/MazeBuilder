@@ -136,7 +136,7 @@ struct PhysicsGame::PhysicsGameImpl
         sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
-    void initDearImGui() noexcept
+    void initDearImGui() const noexcept
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -189,7 +189,7 @@ struct PhysicsGame::PhysicsGameImpl
 
     void loadFonts() noexcept
     {
-        static constexpr auto FONT_PIXEL_SIZE = 18.f;
+        static constexpr auto FONT_PIXEL_SIZE = 28.f;
         fonts.load(Fonts::ID::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size, FONT_PIXEL_SIZE);
         fonts.load(Fonts::ID::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
         fonts.load(Fonts::ID::COUSINE_REGULAR, Cousine_Regular_compressed_data, Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);

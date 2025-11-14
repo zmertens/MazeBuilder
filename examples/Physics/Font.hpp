@@ -11,10 +11,10 @@ public:
     // Load font from memory (compressed data)
     bool loadFromMemoryCompressedTTF(const void* compressedData, std::size_t compressedSize, float pixelSize);
 
-    ImFont* get() const;
+    [[nodiscard]] ImFont* get() const;
 
 private:
-    ImFont* mFont;
+    ImFont* mFont = nullptr;
 };
 
 #endif // FONT_HPP

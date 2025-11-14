@@ -1,4 +1,8 @@
 {
+	// fix texture loading in c++ code
+	// WorkerConcurrent maze generation and data tables
+	// buildScene and keeping track of games on the stack
+	
     "resources_dir": "resources",
     "music_ogg": ["generate.ogg"],
     "music_wav": ["loading.wav"],
@@ -11,7 +15,7 @@
 	"ball_normal": "bomb.png",
 	"wall_horizontal": "brick_brown.png",
 	"player_hitpoints": 100,
-	"enemy_hitpoints": 50
+	"enemy_hitpoints": 50,
 	"config1": {
 		"rows": 9,
 		"columns": 19,

@@ -1,6 +1,7 @@
 #include "World.hpp"
 
 #include "Ball.hpp"
+#include "Entity.hpp"
 #include "JsonUtils.hpp"
 #include "Pathfinder.hpp"
 #include "RenderWindow.hpp"
@@ -8,6 +9,9 @@
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
+
+#include "Physics.hpp"
+#include "PhysicsContactListener.hpp"
 
 #include <box2d/box2d.h>
 
@@ -29,8 +33,14 @@ World::World(RenderWindow& window, FontManager& fonts, TextureManager& textures)
 void World::init() noexcept
 {
     b2WorldDef worldDef = b2DefaultWorldDef();
-    worldDef.gravity = {.x = 0.0f, .y = FORCE_DUE_TO_GRAVITY};
+    worldDef.gravity = {0.0f, FORCE_DUE_TO_GRAVITY};
+
     mWorldId = b2CreateWorld(&worldDef);
+
+#if defined(MAZE_DEBUG)
+    SDL_Log("Physics world created: valid=%d, gravity=(%.1f, %.1f)",
+            b2World_IsValid(mWorldId), worldDef.gravity.x, worldDef.gravity.y);
+#endif
 
     mPlayerPathfinder = nullptr;
 
@@ -41,6 +51,78 @@ void World::update(float dt)
 {
     mWindow.setView(mWorldView);
 
+    // Fixed timestep accumulator for stable physics (60 Hz)
+    static const float timeStep = 1.0f / 60.0f;
+    static float accumulator = 0.0f;
+    accumulator += dt;
+
+    const int32_t maxSteps = 5;  // Prevent spiral of death
+    int32_t steps = 0;
+
+    while (accumulator >= timeStep && steps < maxSteps)
+    {
+        if (b2World_IsValid(mWorldId))
+        {
+            b2World_Step(mWorldId, timeStep, 4);
+
+#if defined(MAZE_DEBUG)
+            static int stepCounter = 0;
+            if (stepCounter++ % 60 == 0)
+            {
+                b2Counters counters = b2World_GetCounters(mWorldId);
+                SDL_Log("Physics step #%d: bodies=%d, contacts=%d", stepCounter, counters.bodyCount, counters.contactCount);
+            }
+#endif
+
+            // Poll contact events after stepping
+            b2ContactEvents events = b2World_GetContactEvents(mWorldId);
+
+            // Process begin contact events
+            for (int i = 0; i < events.beginCount; ++i)
+            {
+                b2ContactBeginTouchEvent* beginEvent = events.beginEvents + i;
+                b2BodyId bodyIdA = b2Shape_GetBody(beginEvent->shapeIdA);
+                b2BodyId bodyIdB = b2Shape_GetBody(beginEvent->shapeIdB);
+
+                if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
+                {
+                    void* userDataA = b2Body_GetUserData(bodyIdA);
+                    void* userDataB = b2Body_GetUserData(bodyIdB);
+
+                    Entity* entityA = static_cast<Entity*>(userDataA);
+                    Entity* entityB = static_cast<Entity*>(userDataB);
+
+                    if (entityA) entityA->onBeginContact(entityB);
+                    if (entityB) entityB->onBeginContact(entityA);
+                }
+            }
+
+            // Process end contact events
+            for (int i = 0; i < events.endCount; ++i)
+            {
+                b2ContactEndTouchEvent* endEvent = events.endEvents + i;
+                b2BodyId bodyIdA = b2Shape_GetBody(endEvent->shapeIdA);
+                b2BodyId bodyIdB = b2Shape_GetBody(endEvent->shapeIdB);
+
+                if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
+                {
+                    void* userDataA = b2Body_GetUserData(bodyIdA);
+                    void* userDataB = b2Body_GetUserData(bodyIdB);
+
+                    Entity* entityA = static_cast<Entity*>(userDataA);
+                    Entity* entityB = static_cast<Entity*>(userDataB);
+
+                    if (entityA) entityA->onEndContact(entityB);
+                    if (entityB) entityB->onEndContact(entityA);
+                }
+            }
+        }
+
+        accumulator -= timeStep;
+        ++steps;
+    }
+
+    // Update scene graph (this calls Entity::updateCurrent which syncs transforms)
     mSceneGraph.update(dt);
 }
 
@@ -67,64 +149,171 @@ void World::buildScene()
 {
     using std::cref;
     using std::make_unique;
-    using std::move;
     using std::size_t;
     using std::unique_ptr;
 
     for (size_t i = 0; i < static_cast<size_t>(Layer::LAYER_COUNT); ++i)
     {
-        SceneNode::Ptr layer = make_unique<SceneNode>();
+        auto layer = make_unique<SceneNode>();
         mSceneLayers[i] = layer.get();
-        mSceneGraph.attachChild(move(layer));
+        mSceneGraph.attachChild(std::move(layer));
     }
 
     auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
     mPlayerPathfinder = leader.get();
     mPlayerPathfinder->setPosition(0.f, 0.f);
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(leader));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(leader));
 
     // Create and add entities directly to scene graph - positioned to be visible
     auto ballNormal = make_unique<Ball>(Ball::Type::NORMAL, mTextures);
     auto* ballNormalPtr = ballNormal.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballNormal));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(ballNormal));
     ballNormalPtr->setPosition(100.0f, 550.0f); // Below splash screen
 
     auto ballHeavy = make_unique<Ball>(Ball::Type::HEAVY, mTextures);
     auto* ballHeavyPtr = ballHeavy.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballHeavy));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(ballHeavy));
     ballHeavyPtr->setPosition(250.0f, 550.0f); // Below splash screen
 
     auto ballLight = make_unique<Ball>(Ball::Type::LIGHT, mTextures);
     auto* ballLightPtr = ballLight.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballLight));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(ballLight));
     ballLightPtr->setPosition(400.0f, 550.0f); // Below splash screen
 
     auto ballExplosive = make_unique<Ball>(Ball::Type::EXPLOSIVE, mTextures);
     auto* ballExplosivePtr = ballExplosive.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(ballExplosive));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(ballExplosive));
     ballExplosivePtr->setPosition(550.0f, 550.0f); // Below splash screen
 
     auto wallHorizontal = make_unique<Wall>(Wall::Orientation::HORIZONTAL, mTextures);
     auto* wallHorizontalPtr = wallHorizontal.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallHorizontal));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(wallHorizontal));
     wallHorizontalPtr->setPosition(100.0f, 700.0f); // Below balls
 
     auto wallVertical = make_unique<Wall>(Wall::Orientation::VERTICAL, mTextures);
     auto* wallVerticalPtr = wallVertical.get();
-    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(move(wallVertical));
+    mSceneLayers[static_cast<size_t>(Layer::FOREGROUND)]->attachChild(std::move(wallVertical));
     wallVerticalPtr->setPosition(250.0f, 700.0f); // Below balls
+
+    // Create physics bodies for the created entities
+    if (b2World_IsValid(mWorldId))
+    {
+        // Helper lambda to create a dynamic circular ball
+        auto createBallBody = [&](Ball* b, Ball::Type type, float radiusPx, float density, float restitution, float friction, bool bullet)
+        {
+            b2BodyDef bodyDef = b2DefaultBodyDef();
+            bodyDef.type = b2_dynamicBody;
+            b2Vec2 posMeters = physics::toMetersVec(b->getPosition());
+            bodyDef.position = posMeters;
+            bodyDef.linearDamping = 0.2f;
+            bodyDef.angularDamping = 0.4f;
+            bodyDef.isBullet = bullet;
+
+            b->createBody(mWorldId, &bodyDef);
+            b2BodyId bodyId = b->getBodyId();
+            if (!b2Body_IsValid(bodyId))
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create ball body!");
+                return;
+            }
+
+            b2ShapeDef shapeDef = b2DefaultShapeDef();
+            shapeDef.density = density;
+
+            b2Circle circle = {{0.0f, 0.0f}, physics::toMeters(radiusPx)};
+            b2ShapeId shapeId = b2CreateCircleShape(bodyId, &shapeDef, &circle);
+
+            // Set friction and restitution after creation
+            b2Shape_SetFriction(shapeId, friction);
+            b2Shape_SetRestitution(shapeId, restitution);
+
+            b2Body_SetAwake(bodyId, true);
+
+#if defined(MAZE_DEBUG)
+            SDL_Log("Created ball body at pixels (%.1f, %.1f) -> meters (%.2f, %.2f), radius=%.2fm, density=%.1f",
+                    b->getPosition().x, b->getPosition().y, posMeters.x, posMeters.y,
+                    physics::toMeters(radiusPx), density);
+#endif
+        };
+
+        // Create the balls
+        createBallBody(ballNormalPtr, Ball::Type::NORMAL, 16.0f, 1.0f, 0.6f, 0.3f, true);
+        createBallBody(ballHeavyPtr, Ball::Type::HEAVY, 20.0f, 3.0f, 0.4f, 0.25f, true);
+        createBallBody(ballLightPtr, Ball::Type::LIGHT, 14.0f, 0.6f, 0.7f, 0.2f, true);
+        createBallBody(ballExplosivePtr, Ball::Type::EXPLOSIVE, 18.0f, 1.5f, 0.5f, 0.25f, true);
+
+        // Create walls as static boxes
+        auto createWallBody = [&](Wall* w, float halfWidthPx, float halfHeightPx)
+        {
+            b2BodyDef bodyDef = b2DefaultBodyDef();
+            bodyDef.type = b2_staticBody;
+            bodyDef.position = physics::toMetersVec(w->getPosition());
+
+            w->createBody(mWorldId, &bodyDef);
+            b2BodyId bodyId = w->getBodyId();
+            if (!b2Body_IsValid(bodyId)) return;
+
+            b2ShapeDef shapeDef = b2DefaultShapeDef();
+            shapeDef.density = 0.0f;
+
+            b2Polygon box = b2MakeBox(physics::toMeters(halfWidthPx), physics::toMeters(halfHeightPx));
+            b2ShapeId shapeId = b2CreatePolygonShape(bodyId, &shapeDef, &box);
+
+            // Set friction and restitution after creation
+            b2Shape_SetFriction(shapeId, 0.8f);
+            b2Shape_SetRestitution(shapeId, 0.0f);
+        };
+
+        // horizontal wall: wide and short
+        createWallBody(wallHorizontalPtr, 120.0f, 10.0f);
+        // vertical wall: tall and narrow
+        createWallBody(wallVerticalPtr, 10.0f, 120.0f);
+
+        // Create pathfinder as a kinematic body for direct control
+        if (mPlayerPathfinder)
+        {
+            b2BodyDef bodyDef = b2DefaultBodyDef();
+            bodyDef.type = b2_kinematicBody;
+            bodyDef.position = physics::toMetersVec(mPlayerPathfinder->getPosition());
+
+            mPlayerPathfinder->createBody(mWorldId, &bodyDef);
+            b2BodyId bodyId = mPlayerPathfinder->getBodyId();
+            if (b2Body_IsValid(bodyId))
+            {
+                b2ShapeDef shapeDef = b2DefaultShapeDef();
+                shapeDef.density = 1.0f;
+
+                // small box for the pathfinder
+                b2Polygon box = b2MakeBox(physics::toMeters(16.0f), physics::toMeters(24.0f));
+                b2ShapeId shapeId = b2CreatePolygonShape(bodyId, &shapeDef, &box);
+
+                // Set friction and restitution after creation
+                b2Shape_SetFriction(shapeId, 0.4f);
+                b2Shape_SetRestitution(shapeId, 0.1f);
+
+                b2Body_SetAwake(bodyId, true);
+            }
+        }
+
+#if defined(MAZE_DEBUG)
+        b2Counters counters = b2World_GetCounters(mWorldId);
+        SDL_Log("Physics bodies created: total=%d (should be 7: 4 balls + 2 walls + 1 pathfinder)",
+                counters.bodyCount);
+#endif
+    }
 
     // maze
     // set the texture that was procedurally generated from MazeBuilder in PhysicsGame
-    auto& mazeTexture = mTextures.get(Textures::ID::SPLASH_SCREEN);
-    SDL_Rect mazeRect = {0, 0, mazeTexture.getWidth(), mazeTexture.getHeight()};
-    auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
-    mazeSprite->setPosition(0.0f, 0.0f);
-    SceneNode::Ptr mazeNode = std::move(mazeSprite);
-    mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(move(mazeNode));
+    // auto& mazeTexture = mTextures.get(Textures::ID::SPLASH_SCREEN);
+    // SDL_Rect mazeRect = {0, 0, mazeTexture.getWidth(), mazeTexture.getHeight()};
+    // auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
+    // mazeSprite->setPosition(0.0f, 0.0f);
+    // SceneNode::Ptr mazeNode = std::move(mazeSprite);
+    // mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(std::move(mazeNode));
 
 #if defined(MAZE_DEBUG)
 
     SDL_Log("World::buildScene - Scene built successfully");
 #endif
 }
+

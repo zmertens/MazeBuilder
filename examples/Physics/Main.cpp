@@ -2,6 +2,7 @@
 // Includes most game engine features like graphics and window management,
 // input handling, state management, and resource loading, audio, and network
 // Player verses computer AI gameplay with physics simulation
+// Scoring system based on survivability (time) and efficiency (resources)
 
 #include <iostream>
 #include <exception>
@@ -84,11 +85,9 @@ int main(int argc, char* argv[])
 
     try
     {
-        randomizer rng;
+        const auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H);
 
-        auto inst = singleton_base<PhysicsGame>::instance(TITLE_STR, VERSION_STR, configPath, WINDOW_W, WINDOW_H);
-
-        if (!inst->run(nullptr, ref(rng)))
+        if (randomizer rng; !inst->run(nullptr, ref(rng)))
         {
             throw runtime_error("Error: PhysicsGame encountered an error during execution");
         }

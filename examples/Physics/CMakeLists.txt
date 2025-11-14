@@ -16,6 +16,7 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/MenuState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Pathfinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PauseState.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsContactListener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RenderWindow.cpp

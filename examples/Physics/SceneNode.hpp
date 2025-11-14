@@ -21,12 +21,9 @@ public:
     explicit SceneNode();
     virtual ~SceneNode() = default;
 
-    // Delete copy constructor and copy assignment operator
-    // because SceneNode contains std::unique_ptr which is not copyable
     SceneNode(const SceneNode&) = delete;
     SceneNode& operator=(const SceneNode&) = delete;
 
-    // Allow move constructor and move assignment operator
     SceneNode(SceneNode&&) = default;
     SceneNode& operator=(SceneNode&&) = default;
 
@@ -52,7 +49,6 @@ private:
     virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept;
     void drawChildren(SDL_Renderer* renderer, RenderStates states) const noexcept;
 
-private:
     std::vector<Ptr> mChildren;
     SceneNode* mParent;
 };

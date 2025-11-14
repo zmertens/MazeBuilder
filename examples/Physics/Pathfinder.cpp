@@ -5,7 +5,7 @@
 
 Pathfinder::Pathfinder(Type type, const TextureManager& textures)
     : mType(type)
-      , mSprite(textures.get(getTextureID()))
+      , mSprite(textures.get(Pathfinder::getTextureID()))
 {
 }
 
