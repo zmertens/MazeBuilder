@@ -29,6 +29,8 @@ scripts/*.JPEG
 scripts/*.bmp
 !scripts/sample_icon.bmp
 !scripts/sample_maze.png
+!scripts/BreakingWallsMask.png
+!scripts/mask.txt
 
 # Ruby
 Gemfile.lock

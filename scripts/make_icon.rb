@@ -322,8 +322,42 @@ class Mask
         loop do
             row = rand(@rows)
             col = rand(@columns)
-            return [row][col] if @bits[row][col]
+            return [row, col] if @bits[row][col]
         end
+    end
+
+    def self.from_png(file)
+        image = ChunkyPNG::Image.from_file(file)
+        mask = Mask.new(image.height, image.width)
+
+        mask.rows.times do |row|
+            mask.columns.times do |col|
+                if image[col, row] == ChunkyPNG::Color::BLACK
+                    mask[row, col] = false
+                else
+                    mask[row, col] = true
+                end
+            end
+        end
+        mask
+    end
+
+    def self.from_txt(file)
+        lines = File.readlines(file).map { |line| line.strip }
+        lines.pop while lines.last.length < 1
+        rows = lines.length
+        columns = lines.first.length
+        mask = Mask.new(rows, columns)
+        mask.rows.times do |row|
+            mask.columns.times do |col|
+                if lines[row][col] == "X"
+                    mask[row, col] = false
+                else
+                    mask[row, col] = true
+                end
+            end
+        end
+        mask
     end
 
     def self.from_png(file)
@@ -501,20 +535,29 @@ class RecursiveBacktracker
     end
 end
 
-2.times do |n|
+# Method to demonstrate killing cells - orphaning them from their neighbors
+def killing_cells
+    grid = Grid.new(5, 5)
+    
+    # orphan the cell in the northwest corner...
+    grid[0, 0].east.west = nil
+    grid[0, 0].south.north = nil
+    
+    # ...and the one in the southeast corner
+    grid[4, 4].west.east = nil
+    grid[4, 4].north.south = nil
+    
+    grid
+end
 
-    grid = ColoredGrid.new(10, 10)
-    Wilsons.on(grid)
+1.times do |n|
+    abort "Please specify a text file to use as a template" if ARGV.empty?
 
-    end1 = grid[0, 0]
-    start1 = grid[grid.rows - 1, grid.columns - 1]
+    mask = Mask.from_png(ARGV.first)
+    grid = MaskedGrid.new(mask)
+    RecursiveBacktracker.on(grid)
 
-    grid.distances = end1.distances.path_to(start1)
-
-    filename = "sample_maze%02d.png" % n
-    grid.to_png(cell_size: 2).save(filename)
-
-    #puts grid
-    puts "writing to: #{filename}"
-    puts "Deadends: #{grid.deadends.count}"
+    filename = "masked%02d.png" % n
+    grid.to_png(cell_size: 5).save(filename)
+    puts "saved image to #{filename}"
 end
