@@ -51,75 +51,61 @@ void World::update(float dt)
 {
     mWindow.setView(mWorldView);
 
-    // Fixed timestep accumulator for stable physics (60 Hz)
-    static const float timeStep = 1.0f / 60.0f;
-    static float accumulator = 0.0f;
-    accumulator += dt;
-
-    const int32_t maxSteps = 5;  // Prevent spiral of death
-    int32_t steps = 0;
-
-    while (accumulator >= timeStep && steps < maxSteps)
+    if (b2World_IsValid(mWorldId))
     {
-        if (b2World_IsValid(mWorldId))
-        {
-            b2World_Step(mWorldId, timeStep, 4);
+        b2World_Step(mWorldId, dt, 4);
 
 #if defined(MAZE_DEBUG)
-            static int stepCounter = 0;
-            if (stepCounter++ % 60 == 0)
-            {
-                b2Counters counters = b2World_GetCounters(mWorldId);
-                SDL_Log("Physics step #%d: bodies=%d, contacts=%d", stepCounter, counters.bodyCount, counters.contactCount);
-            }
+        static int stepCounter = 0;
+        if (stepCounter++ % 60 == 0)
+        {
+            b2Counters counters = b2World_GetCounters(mWorldId);
+            SDL_Log("Physics step #%d: bodies=%d, contacts=%d", stepCounter, counters.bodyCount, counters.contactCount);
+        }
 #endif
 
-            // Poll contact events after stepping
-            b2ContactEvents events = b2World_GetContactEvents(mWorldId);
+        // Poll contact events after stepping
+        b2ContactEvents events = b2World_GetContactEvents(mWorldId);
 
-            // Process begin contact events
-            for (int i = 0; i < events.beginCount; ++i)
+        // Process begin contact events
+        for (int i = 0; i < events.beginCount; ++i)
+        {
+            b2ContactBeginTouchEvent* beginEvent = events.beginEvents + i;
+            b2BodyId bodyIdA = b2Shape_GetBody(beginEvent->shapeIdA);
+            b2BodyId bodyIdB = b2Shape_GetBody(beginEvent->shapeIdB);
+
+            if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
             {
-                b2ContactBeginTouchEvent* beginEvent = events.beginEvents + i;
-                b2BodyId bodyIdA = b2Shape_GetBody(beginEvent->shapeIdA);
-                b2BodyId bodyIdB = b2Shape_GetBody(beginEvent->shapeIdB);
+                void* userDataA = b2Body_GetUserData(bodyIdA);
+                void* userDataB = b2Body_GetUserData(bodyIdB);
 
-                if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
-                {
-                    void* userDataA = b2Body_GetUserData(bodyIdA);
-                    void* userDataB = b2Body_GetUserData(bodyIdB);
+                Entity* entityA = static_cast<Entity*>(userDataA);
+                Entity* entityB = static_cast<Entity*>(userDataB);
 
-                    Entity* entityA = static_cast<Entity*>(userDataA);
-                    Entity* entityB = static_cast<Entity*>(userDataB);
-
-                    if (entityA) entityA->onBeginContact(entityB);
-                    if (entityB) entityB->onBeginContact(entityA);
-                }
-            }
-
-            // Process end contact events
-            for (int i = 0; i < events.endCount; ++i)
-            {
-                b2ContactEndTouchEvent* endEvent = events.endEvents + i;
-                b2BodyId bodyIdA = b2Shape_GetBody(endEvent->shapeIdA);
-                b2BodyId bodyIdB = b2Shape_GetBody(endEvent->shapeIdB);
-
-                if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
-                {
-                    void* userDataA = b2Body_GetUserData(bodyIdA);
-                    void* userDataB = b2Body_GetUserData(bodyIdB);
-
-                    Entity* entityA = static_cast<Entity*>(userDataA);
-                    Entity* entityB = static_cast<Entity*>(userDataB);
-
-                    if (entityA) entityA->onEndContact(entityB);
-                    if (entityB) entityB->onEndContact(entityA);
-                }
+                if (entityA) entityA->onBeginContact(entityB);
+                if (entityB) entityB->onBeginContact(entityA);
             }
         }
 
-        accumulator -= timeStep;
-        ++steps;
+        // Process end contact events
+        for (int i = 0; i < events.endCount; ++i)
+        {
+            b2ContactEndTouchEvent* endEvent = events.endEvents + i;
+            b2BodyId bodyIdA = b2Shape_GetBody(endEvent->shapeIdA);
+            b2BodyId bodyIdB = b2Shape_GetBody(endEvent->shapeIdB);
+
+            if (b2Body_IsValid(bodyIdA) && b2Body_IsValid(bodyIdB))
+            {
+                void* userDataA = b2Body_GetUserData(bodyIdA);
+                void* userDataB = b2Body_GetUserData(bodyIdB);
+
+                Entity* entityA = static_cast<Entity*>(userDataA);
+                Entity* entityB = static_cast<Entity*>(userDataB);
+
+                if (entityA) entityA->onEndContact(entityB);
+                if (entityB) entityB->onEndContact(entityA);
+            }
+        }
     }
 
     // Update scene graph (this calls Entity::updateCurrent which syncs transforms)

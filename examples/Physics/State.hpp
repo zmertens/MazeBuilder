@@ -26,7 +26,6 @@ public:
         Player* player;
     };
 
-public:
     explicit State(StateStack& stack, Context context);
 
     virtual ~State() = default;

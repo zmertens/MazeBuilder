@@ -1,14 +1,9 @@
 {
-	// fix texture loading in c++ code
-	// WorkerConcurrent maze generation and data tables
-	// buildScene and keeping track of games on the stack
-	
     "resources_dir": "resources",
     "music_ogg": ["generate.ogg"],
     "music_wav": ["loading.wav"],
     "sdl_blocks": "sdl blocks.png",
 	"network_url": "http://localhost:3000",
-    "icon_image": "icon.bmp",
 	"astronaut": "character_beige_front.png",
     "fonts_ttf": "DMSans.ttf",
     "window_icon": "icon.bmp",

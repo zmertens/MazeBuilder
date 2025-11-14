@@ -9,6 +9,8 @@
 
 #include <SDL3/SDL_atomic.h>
 
+#include "ResourceIdentifiers.hpp"
+
 struct SDL_Thread;
 struct SDL_Mutex;
 struct SDL_Condition;
@@ -36,10 +38,10 @@ public:
 
     explicit WorkerConcurrent();
     ~WorkerConcurrent();
-    WorkerConcurrent(const WorkerConcurrent& other);
-    WorkerConcurrent& operator=(const WorkerConcurrent& other);
-    WorkerConcurrent(WorkerConcurrent&& other) noexcept;
-    WorkerConcurrent& operator=(WorkerConcurrent&& other) noexcept;
+    WorkerConcurrent(const WorkerConcurrent& other) = delete;
+    WorkerConcurrent& operator=(const WorkerConcurrent& other) = delete;
+    WorkerConcurrent(WorkerConcurrent&& other) noexcept = default;
+    WorkerConcurrent& operator=(WorkerConcurrent&& other) = delete;
 
     void initThreads() noexcept;
     void generate(std::string_view resourcePath) noexcept;
@@ -58,6 +60,12 @@ public:
 private:
     struct WorkItem
     {
+        struct JSONKeyMapping
+        {
+            std::string_view key;
+            Textures::ID id;
+        };
+
         std::string key;
         std::string value;
         int index;
@@ -67,12 +75,14 @@ private:
 
     void doWork(WorkItem const& workItem) noexcept;
 
-    std::deque<WorkItem> workQueue;
-    std::vector<SDL_Thread*> threads;
-    SDL_Mutex* gameMtx;
-    SDL_Condition* gameCond;
-    int pendingWorkCount;
-    SDL_AtomicInt shouldExit;
+    const std::vector<WorkItem::JSONKeyMapping> mConfigMappings;
+
+    std::deque<WorkItem> mWorkQueue;
+    std::vector<SDL_Thread*> mThreads;
+    SDL_Mutex* mGameMtx;
+    SDL_Condition* mGameCond;
+    int mPendingWorkCount;
+    SDL_AtomicInt mShouldExit;
 
     // Store loaded resources
     std::unordered_map<std::string, std::string> mResources;

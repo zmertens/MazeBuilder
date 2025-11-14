@@ -31,22 +31,28 @@ WorkerConcurrent::TextureLoadRequest::TextureLoadRequest(Textures::ID id, std::s
 
 // Constructor
 WorkerConcurrent::WorkerConcurrent()
-    : gameMtx(SDL_CreateMutex())
-      , gameCond(SDL_CreateCondition())
-      , pendingWorkCount(0)
-      , shouldExit{}
+    : mConfigMappings({
+          {JSONKeys::ASTRONAUT, Textures::ID::ASTRONAUT},
+          {JSONKeys::BALL_NORMAL, Textures::ID::BALL_NORMAL},
+          {JSONKeys::SDL_BLOCKS, Textures::ID::SDL_BLOCKS},
+          {JSONKeys::WALL_HORIZONTAL, Textures::ID::WALL_HORIZONTAL},
+          {JSONKeys::WINDOW_ICON, Textures::ID::WINDOW_ICON}
+      }), mGameMtx(SDL_CreateMutex())
+      , mGameCond(SDL_CreateCondition())
+      , mPendingWorkCount(0)
+      , mShouldExit{}
       , mResources{}
       , mTotalWorkItems(0)
 {
     // Initialize atomic int to 0 (false)
-    SDL_SetAtomicInt(&shouldExit, 0);
+    SDL_SetAtomicInt(&mShouldExit, 0);
 
-    if (!gameCond)
+    if (!mGameCond)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating condition variable: %s\n", SDL_GetError());
     }
 
-    if (!gameMtx)
+    if (!mGameMtx)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating mutex: %s\n", SDL_GetError());
     }
@@ -55,152 +61,55 @@ WorkerConcurrent::WorkerConcurrent()
 // Destructor
 WorkerConcurrent::~WorkerConcurrent()
 {
-    // Signal threads to exit using atomic operation
-    SDL_SetAtomicInt(&shouldExit, 1);
+    // Signal mThreads to exit using atomic operation
+    SDL_SetAtomicInt(&mShouldExit, 1);
 
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
     // Clear work queue to prevent any new work from being picked up
-    workQueue.clear();
-    pendingWorkCount = 0;
-    SDL_BroadcastCondition(gameCond);
-    SDL_UnlockMutex(gameMtx);
+    mWorkQueue.clear();
+    mPendingWorkCount = 0;
+    SDL_BroadcastCondition(mGameCond);
+    SDL_UnlockMutex(mGameMtx);
 
-    // Give threads a moment to see the exit signal
+    // Give mThreads a moment to see the exit signal
     SDL_Delay(50);
 
-    // Wait for all threads to finish
-    for (auto t : threads)
+    // Wait for all mThreads to finish
+    for (const auto t : mThreads)
     {
         if (t)
         {
-            auto name = SDL_GetThreadName(t);
+            const auto name = SDL_GetThreadName(t);
             int status = 0;
             SDL_WaitThread(t, &status);
             SDL_Log("Worker thread with status [ %s | %d ] finished\n", name, status);
         }
     }
 
-    // Clear threads vector
-    threads.clear();
+    // Clear mThreads vector
+    mThreads.clear();
 
     // Now it's safe to destroy synchronization primitives
-    if (gameMtx)
+    if (mGameMtx)
     {
-        SDL_DestroyMutex(gameMtx);
-        gameMtx = nullptr;
+        SDL_DestroyMutex(mGameMtx);
+        mGameMtx = nullptr;
     }
 
-    if (gameCond)
+    if (mGameCond)
     {
-        SDL_DestroyCondition(gameCond);
-        gameCond = nullptr;
+        SDL_DestroyCondition(mGameCond);
+        mGameCond = nullptr;
     }
 }
 
-// Copy Constructor
-WorkerConcurrent::WorkerConcurrent(const WorkerConcurrent& other)
-    : workQueue(other.workQueue), pendingWorkCount(other.pendingWorkCount)
-{
-    gameMtx = SDL_CreateMutex();
-    gameCond = SDL_CreateCondition();
-
-    if (!gameMtx || !gameCond)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating SDL concurrency objects: %s\n", SDL_GetError());
-    }
-    // Threads are not copied as they cannot be shared between instances
-}
-
-// Copy Assignment Operator
-WorkerConcurrent& WorkerConcurrent::operator=(const WorkerConcurrent& other)
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    // Clean up existing resources
-    for (auto thread : threads)
-    {
-        if (thread)
-        {
-            SDL_WaitThread(thread, nullptr);
-        }
-    }
-    SDL_DestroyMutex(gameMtx);
-    SDL_DestroyCondition(gameCond);
-
-    // Copy data
-    for (auto&& item : other.workQueue)
-    {
-        workQueue.push_back(item);
-    }
-    pendingWorkCount = other.pendingWorkCount;
-
-    // Reinitialize mutex and condition variable
-    gameMtx = SDL_CreateMutex();
-    gameCond = SDL_CreateCondition();
-
-    if (!gameMtx || !gameCond)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL Error creating SDL concurrency objects: %s\n", SDL_GetError());
-    }
-
-    return *this;
-}
-
-// Move Constructor
-WorkerConcurrent::WorkerConcurrent(WorkerConcurrent&& other) noexcept
-    : workQueue(std::move(other.workQueue))
-      , threads(std::move(other.threads))
-      , gameMtx(other.gameMtx)
-      , gameCond(other.gameCond)
-      , pendingWorkCount(other.pendingWorkCount)
-{
-    other.gameMtx = nullptr;
-    other.gameCond = nullptr;
-}
-
-// Move Assignment Operator
-WorkerConcurrent& WorkerConcurrent::operator=(WorkerConcurrent&& other) noexcept
-{
-    if (this == &other)
-    {
-        return *this;
-    }
-
-    // Clean up existing resources
-    for (auto thread : threads)
-    {
-        if (thread)
-        {
-            SDL_WaitThread(thread, nullptr);
-        }
-    }
-
-    SDL_DestroyMutex(gameMtx);
-    SDL_DestroyCondition(gameCond);
-
-    // Move data
-    workQueue = std::move(other.workQueue);
-    threads = std::move(other.threads);
-    gameMtx = other.gameMtx;
-    gameCond = other.gameCond;
-    pendingWorkCount = other.pendingWorkCount;
-
-    // Nullify other's resources
-    other.gameMtx = nullptr;
-    other.gameCond = nullptr;
-
-    return *this;
-}
-
-// Initialize worker threads
+// Initialize worker mThreads
 void WorkerConcurrent::initThreads() noexcept
 {
     using std::back_inserter;
     using std::copy;
     using std::cref;
+    using std::optional;
     using std::ref;
     using std::string;
     using std::to_string;
@@ -208,54 +117,54 @@ void WorkerConcurrent::initThreads() noexcept
 
     auto threadFunc = [](void* data) -> int
     {
-        if (auto workerPtr = reinterpret_cast<WorkerConcurrent*>(data))
+        if (const auto workerPtr = static_cast<WorkerConcurrent*>(data))
         {
-            while (SDL_GetAtomicInt(&workerPtr->shouldExit) == 0)
+            while (SDL_GetAtomicInt(&workerPtr->mShouldExit) == 0)
             {
-                SDL_LockMutex(workerPtr->gameMtx);
+                SDL_LockMutex(workerPtr->mGameMtx);
 
-                while (workerPtr->workQueue.empty() && SDL_GetAtomicInt(&workerPtr->shouldExit) == 0)
+                while (workerPtr->mWorkQueue.empty() && SDL_GetAtomicInt(&workerPtr->mShouldExit) == 0)
                 {
-                    SDL_WaitCondition(workerPtr->gameCond, workerPtr->gameMtx);
+                    SDL_WaitCondition(workerPtr->mGameCond, workerPtr->mGameMtx);
                 }
 
                 // Check if we should exit before processing
-                if (SDL_GetAtomicInt(&workerPtr->shouldExit) != 0)
+                if (SDL_GetAtomicInt(&workerPtr->mShouldExit) != 0)
                 {
-                    SDL_UnlockMutex(workerPtr->gameMtx);
+                    SDL_UnlockMutex(workerPtr->mGameMtx);
                     break;
                 }
 
-                std::optional<WorkItem> tempWorker;
+                optional<WorkItem> tempWorker;
                 bool hasWork = false;
 
-                if (!workerPtr->workQueue.empty())
+                if (!workerPtr->mWorkQueue.empty())
                 {
-                    tempWorker = workerPtr->workQueue.front();
-                    workerPtr->workQueue.pop_front();
+                    tempWorker = workerPtr->mWorkQueue.front();
+                    workerPtr->mWorkQueue.pop_front();
                     hasWork = true;
                 }
 
-                SDL_UnlockMutex(workerPtr->gameMtx);
+                SDL_UnlockMutex(workerPtr->mGameMtx);
 
                 // Process work outside the lock
-                if (hasWork && SDL_GetAtomicInt(&workerPtr->shouldExit) == 0 && tempWorker.has_value())
+                if (hasWork && SDL_GetAtomicInt(&workerPtr->mShouldExit) == 0 && tempWorker.has_value())
                 {
-                    workerPtr->doWork(tempWorker.value());
+                    workerPtr->doWork(cref(tempWorker.value()));
                 }
 
                 // Update pending work count
-                SDL_LockMutex(workerPtr->gameMtx);
+                SDL_LockMutex(workerPtr->mGameMtx);
                 if (hasWork)
                 {
-                    workerPtr->pendingWorkCount -= 1;
+                    workerPtr->mPendingWorkCount -= 1;
 
-                    if (workerPtr->pendingWorkCount <= 0)
+                    if (workerPtr->mPendingWorkCount <= 0)
                     {
-                        SDL_SignalCondition(workerPtr->gameCond);
+                        SDL_SignalCondition(workerPtr->mGameCond);
                     }
                 }
-                SDL_UnlockMutex(workerPtr->gameMtx);
+                SDL_UnlockMutex(workerPtr->mGameMtx);
             }
 
             return 0;
@@ -265,10 +174,9 @@ void WorkerConcurrent::initThreads() noexcept
         return -1;
     }; // lambda
 
-
     static constexpr auto NUM_WORKERS = 4;
 
-    // Create worker threads
+    // Create worker mThreads
     for (auto w{0}; w < NUM_WORKERS; w++)
     {
         string name = {"thread: " + to_string(w)};
@@ -280,12 +188,14 @@ void WorkerConcurrent::initThreads() noexcept
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateThread failed: %s\n", SDL_GetError());
         }
 
-        threads.push_back(t);
+        mThreads.push_back(t);
     }
 }
 
 void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
 {
+    using std::exception;
+    using std::ref;
     using std::string;
     using std::unordered_map;
 
@@ -295,25 +205,29 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
         return;
     }
 
-    SDL_LockMutex(gameMtx);
-    workQueue.clear();
+    SDL_LockMutex(mGameMtx);
+    mWorkQueue.clear();
     mResources.clear();
-    mProcessedConfigs.clear(); // Clear processed configs tracking
-    mTextureLoadRequests.clear(); // Clear texture load requests
-    SDL_UnlockMutex(gameMtx);
+    mProcessedConfigs.clear();
+    mTextureLoadRequests.clear();
+    SDL_UnlockMutex(mGameMtx);
 
-    // Store the resource path prefix for use in worker threads
-    mResourcePathPrefix = mazes::io_utils::getDirectoryPath(std::string(resourcePath)) + "/";
+    // Store the resource path prefix for use in worker mThreads
+    mResourcePathPrefix = mazes::io_utils::getDirectoryPath(string{resourcePath}) + "/";
 
     // Load JSON configuration
     unordered_map<string, string> resources{};
 
     try
     {
-        JsonUtils::loadConfiguration(string(resourcePath), resources);
+        JsonUtils::loadConfiguration(string{resourcePath}, ref(resources));
+
+#if defined(MAZE_DEBUG)
+
         SDL_Log("Loaded %zu resources from %s\n", resources.size(), resourcePath.data());
+#endif
     }
-    catch (const std::exception& e)
+    catch (const exception& e)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load resources: %s\n", e.what());
         return;
@@ -326,158 +240,119 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
     }
 
     // Create work items - distribute resources among workers
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
 
     int index = 0;
     for (const auto& [key, value] : resources)
     {
-        workQueue.emplace_back(key, value, index++);
+        mWorkQueue.emplace_back(key, value, index++);
     }
 
-    mTotalWorkItems = static_cast<int>(workQueue.size());
-    pendingWorkCount = mTotalWorkItems;
+    mTotalWorkItems = static_cast<int>(mWorkQueue.size());
+    mPendingWorkCount = mTotalWorkItems;
+
+#if defined(MAZE_DEBUG)
 
     SDL_Log("Created %d work items for resource loading\n", mTotalWorkItems);
+#endif
 
-    SDL_BroadcastCondition(gameCond);
-    SDL_UnlockMutex(gameMtx);
+    SDL_BroadcastCondition(mGameCond);
+    SDL_UnlockMutex(mGameMtx);
 }
 
-void WorkerConcurrent::doWork(WorkItem const& item) noexcept
+void WorkerConcurrent::doWork(WorkItem const& workItem) noexcept
 {
     // Early exit check before any work
-    if (SDL_GetAtomicInt(&shouldExit) != 0)
+    if (SDL_GetAtomicInt(&mShouldExit) != 0)
     {
         return;
     }
 
 #if defined(MAZE_DEBUG)
 
-    SDL_Log("Processing resource [%d]: %s = %s\n", item.index, item.key.c_str(), item.value.c_str());
+    SDL_Log("Processing resource [%d]: %s = %s\n", workItem.index, workItem.key.c_str(), workItem.value.c_str());
 #endif
 
     // Check if this is a config* key before acquiring expensive locks
     bool isConfigKey = false;
-    if (item.key.size() >= 7 && item.key.substr(0, 6) == "config")
+    if (workItem.key.size() >= 7 && workItem.key.substr(0, 6) == "config")
     {
-        char nextChar = item.key[6];
+        const char nextChar = workItem.key[6];
         isConfigKey = (nextChar >= '0' && nextChar <= '9');
     }
 
     // Store the processed resource in a thread-safe manner
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
 
     // Double-check if we're shutting down
-    if (SDL_GetAtomicInt(&shouldExit) != 0)
+    if (SDL_GetAtomicInt(&mShouldExit) != 0)
     {
-        SDL_UnlockMutex(gameMtx);
+        SDL_UnlockMutex(mGameMtx);
         return;
     }
 
-    mResources[item.key] = item.value;
+    mResources[workItem.key] = workItem.value;
 
-    // Check if this is a texture resource and collect the load request
-    std::string extractedValue = JsonUtils::extractJsonValue(item.value);
-    std::string fullPath = mResourcePathPrefix + extractedValue;
-
-    if (item.key == "sdl_blocks")
-    {
-        mTextureLoadRequests.emplace_back(Textures::ID::SDL_BLOCKS, fullPath);
-    }
-    else if (item.key == "astronaut")
-    {
-        mTextureLoadRequests.emplace_back(Textures::ID::ASTRONAUT, fullPath);
-    }
-    else if (item.key == "ball_normal")
-    {
-        mTextureLoadRequests.emplace_back(Textures::ID::BALL_NORMAL, fullPath);
-    }
-    else if (item.key == "wall_horizontal")
-    {
-        mTextureLoadRequests.emplace_back(Textures::ID::WALL_HORIZONTAL, fullPath);
+    for (const auto& [key, id] : mConfigMappings) {
+        if (workItem.key == key) {
+            mTextureLoadRequests.emplace_back(id, mResourcePathPrefix + JsonUtils::extractJsonValue(workItem.value));
+            break;
+        }
     }
 
-    bool alreadyProcessed = mProcessedConfigs.find(item.key) != mProcessedConfigs.end();
-
-    if (isConfigKey && !alreadyProcessed)
+    if (const bool alreadyProcessed = mProcessedConfigs.contains(workItem.key); isConfigKey && !alreadyProcessed)
     {
         // Mark as processed immediately to prevent duplicate processing
-        mProcessedConfigs[item.key] = true;
-
-        // Get the JSON value while we still hold the lock
-        std::string jsonValue = item.value;
-
-        // Release mutex before doing expensive work
-        SDL_UnlockMutex(gameMtx);
-
-        // Check again if we're shutting down before expensive operation
-        if (SDL_GetAtomicInt(&shouldExit) != 0)
-        {
-            return;
-        }
-
-        // Call create() and log the result
-        try
-        {
-            [[maybe_unused]]
-                std::string mazeStr = mazes::create(JsonUtils::jsonToConfigurator(jsonValue));
-        }
-        catch (const std::exception& e)
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze for %s: %s\n", item.key.c_str(), e.what());
-        }
+        mProcessedConfigs[workItem.key] = true;
     }
-    else
-    {
-        SDL_UnlockMutex(gameMtx);
-    }
+
+    SDL_UnlockMutex(mGameMtx);
 }
 
 bool WorkerConcurrent::isDone() const noexcept
 {
-    SDL_LockMutex(this->gameMtx);
-    bool done = (this->pendingWorkCount <= 0);
-    SDL_UnlockMutex(this->gameMtx);
+    SDL_LockMutex(this->mGameMtx);
+    const bool done = (this->mPendingWorkCount <= 0);
+    SDL_UnlockMutex(this->mGameMtx);
 
     return done;
 }
 
 float WorkerConcurrent::getCompletion() const noexcept
 {
-    SDL_LockMutex(this->gameMtx);
+    SDL_LockMutex(this->mGameMtx);
     float completion = 0.0f;
     if (mTotalWorkItems > 0)
     {
-        int completed = mTotalWorkItems - pendingWorkCount;
+        const int completed = mTotalWorkItems - mPendingWorkCount;
         completion = static_cast<float>(completed) / static_cast<float>(mTotalWorkItems);
     }
-    SDL_UnlockMutex(this->gameMtx);
+    SDL_UnlockMutex(this->mGameMtx);
 
     return completion;
 }
 
 std::unordered_map<std::string, std::string> WorkerConcurrent::getResources() const noexcept
 {
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
     auto resourcesCopy = mResources;
-    SDL_UnlockMutex(gameMtx);
+    SDL_UnlockMutex(mGameMtx);
 
     return resourcesCopy;
 }
 
 std::vector<WorkerConcurrent::TextureLoadRequest> WorkerConcurrent::getTextureLoadRequests() const noexcept
 {
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
     auto requestsCopy = mTextureLoadRequests;
-    SDL_UnlockMutex(gameMtx);
+    SDL_UnlockMutex(mGameMtx);
 
     return requestsCopy;
 }
 
 void WorkerConcurrent::setResourcePathPrefix(std::string_view prefix) noexcept
 {
-    SDL_LockMutex(gameMtx);
+    SDL_LockMutex(mGameMtx);
     mResourcePathPrefix = prefix;
-    SDL_UnlockMutex(gameMtx);
+    SDL_UnlockMutex(mGameMtx);
 }
-

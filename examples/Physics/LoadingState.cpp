@@ -10,9 +10,9 @@
 #include "StateStack.hpp"
 #include "Texture.hpp"
 
-/// @brief 
-/// @param stack 
-/// @param context 
+/// @brief
+/// @param stack
+/// @param context
 /// @param resourcePath ""
 LoadingState::LoadingState(StateStack& stack, State::Context context, std::string_view resourcePath)
     : State(stack, context)
@@ -132,7 +132,7 @@ void LoadingState::loadWindowIcon(const std::unordered_map<std::string, std::str
     // Window icon is special case, no need to save the texture in the manager
     if (auto windowIconKey = resources.find("window_icon"); windowIconKey != resources.cend())
     {
-        string windowIconPath = resourcePathPrefix + jsonUtils.extractJsonValue(windowIconKey->second);
+        string windowIconPath = resourcePathPrefix + JsonUtils::extractJsonValue(windowIconKey->second);
 
         if (SDL_Surface* icon = SDL_LoadBMP(windowIconPath.c_str()); icon != nullptr)
         {

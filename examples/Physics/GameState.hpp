@@ -11,11 +11,11 @@ union SDL_Event;
 class GameState : public State
 {
 public:
-    explicit GameState(StateStack& stack, State::Context context);
+    explicit GameState(StateStack& stack, Context context);
 
-    virtual void draw() const noexcept override;
-    virtual bool update(float dt) noexcept override;
-    virtual bool handleEvent(const SDL_Event& event) noexcept override;
+    void draw() const noexcept override;
+    bool update(float dt) noexcept override;
+    bool handleEvent(const SDL_Event& event) noexcept override;
 
 private:
     World mWorld;
