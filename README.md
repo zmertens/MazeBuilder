@@ -1,4 +1,4 @@
-![Release screenshot](examples/Voxels/textures/maze_in_green_32x32.bmp)
+![Sample](scripts/bright_green_icon.bmp)
 
 # Maze Builder
 
@@ -189,15 +189,11 @@ cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstrea
 
 ## Scripts
 
-The Ruby script `make_icon.rb` generates PNG images of mazes which are used as a window icons and textures.
-It is a good place to start learning about the maze-generating algorithms.
-
-**Script dependencies:**
-  - `gem install chunky_png`
+See [README Scripts](scripts/README.md)
 
 ---
 
-#### Helpful Resources on Mazes
+## Helpful Resources on Mazes
 
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
  - [codebox maze generator](https://codebox.net/pages/maze-generator/online)

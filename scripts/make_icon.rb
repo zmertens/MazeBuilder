@@ -3,6 +3,8 @@
 # Running the program outputs PNG files in the current directory
 # Its also output to make an ASCII representation of the maze to the console
 
+# Dependencies: chunky_png gem
+# Install via: gem install chunky_png
 require 'chunky_png'
 
 # Measure distances between grid cells
@@ -499,29 +501,20 @@ class RecursiveBacktracker
     end
 end
 
-1.times do |n|
+2.times do |n|
 
-    grid = ColoredGrid.new(50, 35)
-    RecursiveBacktracker.on(grid)
+    grid = ColoredGrid.new(10, 10)
+    Wilsons.on(grid)
 
-    end1 = grid[grid.rows / 2, grid.columns / 2]
+    end1 = grid[0, 0]
     start1 = grid[grid.rows - 1, grid.columns - 1]
 
     grid.distances = end1.distances.path_to(start1)
 
-    filename = "recbak%02d.png" % n
-    grid.to_png.save(filename)
+    filename = "sample_maze%02d.png" % n
+    grid.to_png(cell_size: 2).save(filename)
 
-    #filename = "mask.png"
-
-    #mask = Mask.from_png(filename)
-    #grid = MaskedGrid.new(mask)
-
-    #Sidewinder.on(grid)
-
-    #grid.to_png(cell_size: 5).save("output2.png")
-
-    puts grid
+    #puts grid
     puts "writing to: #{filename}"
     puts "Deadends: #{grid.deadends.count}"
 end
