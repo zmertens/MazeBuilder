@@ -75,6 +75,12 @@ struct PhysicsGame::PhysicsGameImpl
     // Game-specific variables
     int score = 0;
 
+    // FPS smoothing variables
+    mutable double fpsUpdateTimer = 0.0;
+    mutable int smoothedFps = 0;
+    mutable float smoothedFrameTime = 0.0f;
+    static constexpr double FPS_UPDATE_INTERVAL = 250.0; // Update display every 250ms
+
     std::string title;
     std::string version;
     std::string resourcePath;
@@ -228,12 +234,21 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->update(dt, subSteps);
     }
 
-    void render() const noexcept
+    void render(double& currentTimeStep, const double elapsed) const noexcept
     {
         // Clear, draw, and present (like SFML)
         window->clear();
         window->beginFrame();
         stateStack->draw();
+
+#if defined(MAZE_DEBUG)
+        // Window might be closed during draw calls/events
+        if (window->isOpen())
+        {
+            this->handleFPS(std::ref(currentTimeStep), elapsed);
+        }
+#endif
+
         window->display();
     }
 
@@ -247,15 +262,49 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
 
-    static void handleFPS(double& currentTimeStep, const double elapsed) noexcept
+    void handleFPS(double& currentTimeStep, const double elapsed) const noexcept
     {
+        // Calculate instantaneous FPS and frame time
+        const auto fps = static_cast<int>(1000.0 / elapsed);
+        const auto frameTime = static_cast<float>(elapsed);
+
+        // Update smoothed values periodically for display
+        fpsUpdateTimer += elapsed;
+        if (fpsUpdateTimer >= FPS_UPDATE_INTERVAL)
+        {
+            smoothedFps = fps;
+            smoothedFrameTime = frameTime;
+            fpsUpdateTimer = 0.0;
+        }
+
         if (currentTimeStep >= 1000.0)
         {
-            // Calculate frames per second (elapsed is in milliseconds)
-            SDL_Log("FPS: %d\n", static_cast<int>(1000.0 / elapsed));
-            // Calculate milliseconds per frame
-            SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
+            SDL_Log("FPS: %d\n", smoothedFps);
+            SDL_Log("Frame Time: %.3f ms/frame\n", smoothedFrameTime);
+
             currentTimeStep = 0.0;
+        }
+
+        // Create ImGui overlay window
+        // Set window position to top-right corner
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+
+        // Set window background to be semi-transparent
+        ImGui::SetNextWindowBgAlpha(0.65f);
+
+        // Create window with no title bar, no resize, no move, auto-resize
+        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+                                       ImGuiWindowFlags_AlwaysAutoResize |
+                                       ImGuiWindowFlags_NoSavedSettings |
+                                       ImGuiWindowFlags_NoFocusOnAppearing |
+                                       ImGuiWindowFlags_NoNav |
+                                       ImGuiWindowFlags_NoMove;
+
+        if (ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        {
+            ImGui::Text("FPS: %d", smoothedFps);
+            ImGui::Text("Frame Time: %.2f ms", smoothedFrameTime);
+            ImGui::End();
         }
     }
 }; // impl
@@ -304,7 +353,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
-    gamePtr->stateStack->update(0.0f, 4);
+    gamePtr->stateStack->update(0.1f, 4);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -336,16 +385,13 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
             gamePtr->window->close();
         }
 
-        gamePtr->render();
+        gamePtr->render(ref(currentTimeStep), elapsed);
 
         // Cap frame rate at 60 FPS if VSync doesn't work
         if (auto frameTime = static_cast<double>(SDL_GetTicks()) - current; frameTime < FIXED_TIME_STEP)
         {
             SDL_Delay(static_cast<std::uint32_t>(FIXED_TIME_STEP - frameTime));
         }
-
-        // FPS counter
-        PhysicsGameImpl::handleFPS(ref(currentTimeStep), cref(elapsed));
     }
 
 #if defined(__EMSCRIPTEN__)

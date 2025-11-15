@@ -74,7 +74,8 @@ void MenuState::draw() const noexcept
         };
 
         // Use Selectable with bool* overload so ImGui keeps a consistent toggled state
-        for (size_t i{static_cast<size_t>(getContext().player->isActive() ? 0 : 1)}; i < menuItems.size(); ++i)
+        const auto active = static_cast<size_t>(getContext().player->isActive());
+        for (size_t i{static_cast<size_t>(active ? 0 : 1)}; i < (active ? menuItems.size() : menuItems.size() - 1); ++i)
         {
             if (bool* flag = &mItemSelectedFlags[i]; ImGui::Selectable(menuItems[i].c_str(), flag))
             {
