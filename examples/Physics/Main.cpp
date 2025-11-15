@@ -16,7 +16,7 @@
 
 static std::string TITLE_STR = "Breaking Walls";
 
-static std::string VERSION_STR = "v0.2.0";
+static std::string VERSION_STR = "v0.3.0";
 
 static constexpr auto WINDOW_W = 1280;
 static constexpr auto WINDOW_H = 720;

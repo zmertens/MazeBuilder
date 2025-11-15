@@ -39,11 +39,7 @@ void StateStack::draw() const noexcept
     {
         if ((*it)->isOpaque())
         {
-            // Convert reverse iterator to forward iterator
-            // .base() returns an iterator one position after what the reverse iterator points to
-            // We need to get the actual position of the opaque state
-            auto base = it.base();
-            if (base != mStack.begin())
+            if (auto base = it.base(); base != mStack.begin())
             {
                 firstOpaque = std::prev(base);
             }

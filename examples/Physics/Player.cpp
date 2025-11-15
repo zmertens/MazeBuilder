@@ -124,3 +124,13 @@ std::uint32_t Player::getAssignedKey(Action action) const
 
     return SDL_SCANCODE_UNKNOWN;
 }
+
+bool Player::isActive() const noexcept
+{
+    return mIsActive;
+}
+
+void Player::setActive(bool active) noexcept
+{
+    this->mIsActive = active;
+}

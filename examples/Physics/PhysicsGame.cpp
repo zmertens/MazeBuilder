@@ -246,6 +246,18 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->registerState<SettingsState>(States::ID::SETTINGS);
         stateStack->registerState<SplashState>(States::ID::SPLASH);
     }
+
+    static void handleFPS(double& currentTimeStep, const double elapsed) noexcept
+    {
+        if (currentTimeStep >= 1000.0)
+        {
+            // Calculate frames per second (elapsed is in milliseconds)
+            SDL_Log("FPS: %d\n", static_cast<int>(1000.0 / elapsed));
+            // Calculate milliseconds per frame
+            SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
+            currentTimeStep = 0.0;
+        }
+    }
 }; // impl
 
 PhysicsGame::PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h)
@@ -265,6 +277,7 @@ PhysicsGame::~PhysicsGame() = default;
 bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
     using std::async;
+    using std::cref;
     using std::launch;
     using std::make_unique;
     using std::move;
@@ -332,14 +345,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         }
 
         // FPS counter
-        if (currentTimeStep >= 1000.0)
-        {
-            // Calculate frames per second (elapsed is in milliseconds)
-            SDL_Log("FPS: %d\n", static_cast<int>(1000.0 / elapsed));
-            // Calculate milliseconds per frame
-            SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
-            currentTimeStep = 0.0;
-        }
+        PhysicsGameImpl::handleFPS(ref(currentTimeStep), cref(elapsed));
     }
 
 #if defined(__EMSCRIPTEN__)

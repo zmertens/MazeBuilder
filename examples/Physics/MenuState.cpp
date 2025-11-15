@@ -9,6 +9,7 @@
 
 #include "Font.hpp"
 #include "PauseState.hpp"
+#include "Player.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "StateStack.hpp"
@@ -36,7 +37,7 @@ void MenuState::draw() const noexcept
 
     ImGui::PushFont(getContext().fonts->get(Fonts::ID::NUNITO_SANS).get());
 
-    static auto showDemoWindow{true};
+    static auto showDemoWindow{false};
 #if defined(MAZE_DEBUG)
 
     if (showDemoWindow) {
@@ -68,13 +69,14 @@ void MenuState::draw() const noexcept
         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
         ImGui::Spacing();
 
-        const array<string, static_cast<size_t>(MenuItem::COUNT)> menuItems = {"Resume", "New Game", "Settings", "Splash screen", "Quit"};
+        const array<string, static_cast<size_t>(MenuItem::COUNT)> menuItems = {
+            "Resume", "New Game", "Settings", "Splash screen", "Quit"
+        };
 
         // Use Selectable with bool* overload so ImGui keeps a consistent toggled state
-        for (size_t i = 0; i < menuItems.size(); ++i)
+        for (size_t i{static_cast<size_t>(getContext().player->isActive() ? 0 : 1)}; i < menuItems.size(); ++i)
         {
-            bool* flag = &mItemSelectedFlags[i];
-            if (ImGui::Selectable(menuItems[i].c_str(), flag))
+            if (bool* flag = &mItemSelectedFlags[i]; ImGui::Selectable(menuItems[i].c_str(), flag))
             {
                 // When an item is selected, clear others and set the selected index
                 for (auto& f : mItemSelectedFlags)
@@ -94,7 +96,8 @@ void MenuState::draw() const noexcept
         ImGui::SameLine();
         ImGui::Text("flags =");
         for (bool flag : mItemSelectedFlags) {
-            ImGui::SameLine(); ImGui::Text("%d", flag);
+            ImGui::SameLine();
+            ImGui::Text("%d", flag);
         }
 
         ImGui::Separator();
@@ -104,7 +107,8 @@ void MenuState::draw() const noexcept
         ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
         ImGui::SameLine();
         if (static_cast<unsigned int>(mSelectedMenuItem) < static_cast<unsigned int>(MenuItem::COUNT)) {
-            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "%s", menuItems.at(static_cast<unsigned int>(mSelectedMenuItem)).c_str());
+            ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "%s",
+                menuItems.at(static_cast<unsigned int>(mSelectedMenuItem)).c_str());
         }
 
         ImGui::Spacing();

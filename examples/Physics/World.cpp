@@ -214,12 +214,6 @@ void World::buildScene()
             b2Shape_SetRestitution(shapeId, restitution);
 
             b2Body_SetAwake(bodyId, true);
-
-#if defined(MAZE_DEBUG)
-            SDL_Log("Created ball body at pixels (%.1f, %.1f) -> meters (%.2f, %.2f), radius=%.2fm, density=%.1f",
-                    b->getPosition().x, b->getPosition().y, posMeters.x, posMeters.y,
-                    physics::toMeters(radiusPx), density);
-#endif
         };
 
         // Create the balls
@@ -280,26 +274,6 @@ void World::buildScene()
                 b2Body_SetAwake(bodyId, true);
             }
         }
-
-#if defined(MAZE_DEBUG)
-        b2Counters counters = b2World_GetCounters(mWorldId);
-        SDL_Log("Physics bodies created: total=%d (should be 7: 4 balls + 2 walls + 1 pathfinder)",
-                counters.bodyCount);
-#endif
     }
-
-    // maze
-    // set the texture that was procedurally generated from MazeBuilder in PhysicsGame
-    // auto& mazeTexture = mTextures.get(Textures::ID::SPLASH_SCREEN);
-    // SDL_Rect mazeRect = {0, 0, mazeTexture.getWidth(), mazeTexture.getHeight()};
-    // auto mazeSprite = make_unique<SpriteNode>(mazeTexture, mazeRect);
-    // mazeSprite->setPosition(0.0f, 0.0f);
-    // SceneNode::Ptr mazeNode = std::move(mazeSprite);
-    // mSceneLayers[static_cast<std::size_t>(Layer::BACKGROUND)]->attachChild(std::move(mazeNode));
-
-#if defined(MAZE_DEBUG)
-
-    SDL_Log("World::buildScene - Scene built successfully");
-#endif
 }
 

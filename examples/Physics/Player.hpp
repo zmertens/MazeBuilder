@@ -22,22 +22,24 @@ public:
         ACTION_COUNT
     };
 
-public:
     explicit Player();
 
     void handleEvent(const SDL_Event& event, CommandQueue& commands);
     void handleRealtimeInput(CommandQueue& commands);
 
     void assignKey(Action action, std::uint32_t key);
-    std::uint32_t getAssignedKey(Action action) const;
+    [[nodiscard]] std::uint32_t getAssignedKey(Action action) const;
+
+    bool isActive() const noexcept;
+    void setActive(bool active) noexcept;
 
 private:
     void initializeActions();
     static bool isRealtimeAction(Action action);
 
-private:
     std::map<std::uint32_t, Action> mKeyBinding;
     std::map<Action, Command> mActionBinding;
+    bool mIsActive;
 };
 
 #endif // PLAYER_HPP

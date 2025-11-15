@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "LoadingState.hpp"
+#include "Player.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "StateStack.hpp"
@@ -12,6 +13,7 @@ SplashState::SplashState(StateStack& stack, Context context)
       , mShowText{true}
       , mSplashSprite{context.textures->get(Textures::ID::LEVEL_ONE)}
 {
+    getContext().player->setActive(false);
 }
 
 void SplashState::draw() const noexcept

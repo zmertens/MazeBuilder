@@ -11,11 +11,12 @@
 #include "StateStack.hpp"
 #include "Texture.hpp"
 
-GameState::GameState(StateStack& stack, State::Context context)
+GameState::GameState(StateStack& stack, Context context)
     : State{stack, context}
       , mWorld{*context.window, *context.fonts, *context.textures}
       , mPlayer{*context.player}
 {
+    mPlayer.setActive(true);
     mWorld.init();
 }
 
