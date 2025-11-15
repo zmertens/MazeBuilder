@@ -13,7 +13,7 @@ SettingsState::SettingsState(StateStack& stack, Context context)
     : State(stack, context)
       , mShowText{true}
       , mShowSettingsWindow(true)
-      , mBackgroundSprite{context.textures->get(Textures::ID::SDL_BLOCKS)}
+      , mBackgroundSprite{context.textures->get(Textures::ID::SPLASH_TITLE_IMAGE)}
 {
 }
 
@@ -140,7 +140,7 @@ void SettingsState::draw() const noexcept
     ImGui::PopFont();
 }
 
-bool SettingsState::update(float dt) noexcept
+bool SettingsState::update(float dt, unsigned int subSteps) noexcept
 {
     if (mShowSettingsWindow)
     {

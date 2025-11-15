@@ -10,6 +10,7 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <stdexcept>
 #include <string_view>
 #include <string>
 #include <vector>
@@ -102,13 +103,15 @@ struct PhysicsGame::PhysicsGameImpl
 
         initDearImGui();
 
-        stateStack = std::make_unique<StateStack>(State::Context{*window,
+        stateStack = std::make_unique<StateStack>(State::Context{
+            *window,
             std::ref(fonts),
             std::ref(textures),
-            std::ref(p1)});
+            std::ref(p1)
+        });
 
         // Load initial textures needed for loading/splash screens
-        loadSplashTextures();
+        generateLevelOne();
 
         loadFonts();
 
@@ -119,8 +122,8 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->pushState(States::ID::SPLASH);
     }
 
-    ~PhysicsGameImpl() {
-
+    ~PhysicsGameImpl()
+    {
         if (auto& sdl = this->sdlHelper; sdl.window || sdl.renderer)
         {
             this->stateStack->clearStates();
@@ -150,49 +153,51 @@ struct PhysicsGame::PhysicsGameImpl
         ImGui_ImplSDLRenderer3_Init(this->sdlHelper.renderer);
     }
 
-    void loadSplashTextures() noexcept
+    void generateLevelOne() noexcept
     {
         using std::string;
 
-        // Configure and generate maze for loading/splash screens
         mazes::configurator config{};
-        config.rows(INIT_WINDOW_H).columns(INIT_WINDOW_W).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
+        config.rows(INIT_WINDOW_H)
+              .columns(INIT_WINDOW_W)
+              .levels(1)
+              .algo_id(mazes::algo::BINARY_TREE)
+              .seed(42)
+              .distances(true);
 
         try
         {
-            // Generate maze and create texture from it
-            SDL_Log("DEBUG: Generating initial maze with dimensions %dx%d", config.rows(), config.columns());
-            string mazeString = mazes::create(config);
-
-            if (!mazeString.empty())
+            if (const auto mazeStr = mazes::create(config); !mazeStr.empty())
             {
-                SDL_Log("DEBUG: Maze generated successfully, length: %zu characters", mazeString.size());
-
                 // Load the maze texture from the generated string
-                constexpr int cellSize = 4; // Pixels per character in the maze
-                textures.load(sdlHelper.renderer, Textures::ID::SPLASH_SCREEN, mazeString, cellSize);
-
-                auto& mazeTexture = textures.get(Textures::ID::SPLASH_SCREEN);
-                SDL_Log("DEBUG: Maze texture created successfully: %dx%d",
-                        mazeTexture.getWidth(), mazeTexture.getHeight());
+                textures.load(sdlHelper.renderer, Textures::ID::LEVEL_ONE, mazeStr, 4);
             }
             else
             {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze string");
+                throw std::runtime_error("Failed to create maze:\n" + mazeStr);
             }
         }
         catch (const std::exception& e)
         {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load initial textures: %s", e.what());
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate level one: %s", e.what());
         }
     }
 
     void loadFonts() noexcept
     {
         static constexpr auto FONT_PIXEL_SIZE = 28.f;
-        fonts.load(Fonts::ID::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size, FONT_PIXEL_SIZE);
-        fonts.load(Fonts::ID::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
-        fonts.load(Fonts::ID::COUSINE_REGULAR, Cousine_Regular_compressed_data, Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::LIMELIGHT,
+            Limelight_Regular_compressed_data,
+            Limelight_Regular_compressed_size,
+                   FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::NUNITO_SANS,
+            NunitoSans_compressed_data,
+            NunitoSans_compressed_size,
+            FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::COUSINE_REGULAR,
+            Cousine_Regular_compressed_data,
+            Cousine_Regular_compressed_size,
+                   FONT_PIXEL_SIZE);
 
         // Build font atlas after adding fonts
         ImGui::GetIO().Fonts->Build();
@@ -220,7 +225,7 @@ struct PhysicsGame::PhysicsGameImpl
 
     void update(float dt, int subSteps = 4) const noexcept
     {
-        stateStack->update(dt);
+        stateStack->update(dt, subSteps);
     }
 
     void render() const noexcept
@@ -286,7 +291,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
-    gamePtr->stateStack->update(0.0f);
+    gamePtr->stateStack->update(0.0f, 4);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN

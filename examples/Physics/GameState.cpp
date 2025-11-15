@@ -24,7 +24,7 @@ void GameState::draw() const noexcept
     mWorld.draw();
 }
 
-bool GameState::update(float dt) noexcept
+bool GameState::update(float dt, unsigned int subSteps) noexcept
 {
     mWorld.update(dt);
 

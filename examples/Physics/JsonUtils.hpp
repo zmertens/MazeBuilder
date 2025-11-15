@@ -17,7 +17,7 @@
 /// @file JsonUtils.hpp
 /// @brief Utility functions for JSON handling
 
-class JsonUtils
+class JSONUtils
 {
 public:
     [[nodiscard]] std::string getValue(const std::string& key, const std::unordered_map<std::string, std::string>& resourceMap) const

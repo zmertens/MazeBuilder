@@ -18,7 +18,7 @@ struct SDL_Vertex;
 
 namespace Textures
 {
-    enum class ID;
+    enum class ID : unsigned int;
 }
 
 /// @brief Provides concurrent worker threads for string processing
@@ -56,6 +56,9 @@ public:
 
     // Set the resource path prefix for resolving relative paths
     void setResourcePathPrefix(std::string_view prefix) noexcept;
+
+    // Get composed maze strings (thread-safe)
+    std::unordered_map<Textures::ID, std::string> getComposedMazeStrings() const noexcept;
 
 private:
     struct WorkItem
@@ -96,6 +99,9 @@ private:
 
     // Resource path prefix for resolving relative paths
     std::string mResourcePathPrefix;
+
+    // Composed maze strings for level textures (ID -> maze string)
+    std::unordered_map<Textures::ID, std::string> mComposedMazeStrings;
 };
 
 #endif // WORKER_CONCURRENT

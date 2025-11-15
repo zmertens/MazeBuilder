@@ -71,7 +71,7 @@ void PauseState::draw() const noexcept
     // window.draw(mBackgroundShape);
 }
 
-bool PauseState::update(float dt) noexcept
+bool PauseState::update(float dt, unsigned int subSteps) noexcept
 {
     switch (mSelectedMenuItem)
     {

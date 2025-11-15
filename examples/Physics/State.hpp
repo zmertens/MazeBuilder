@@ -40,7 +40,7 @@ public:
     State& operator=(State&&) = default;
 
     virtual void draw() const noexcept = 0;
-    virtual bool update(float dt) noexcept = 0;
+    virtual bool update(float dt, unsigned int subSteps) noexcept = 0;
     virtual bool handleEvent(const SDL_Event& event) noexcept = 0;
 
     virtual bool isOpaque() const noexcept;

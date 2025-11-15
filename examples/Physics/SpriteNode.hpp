@@ -14,9 +14,8 @@ public:
     explicit SpriteNode(const Texture& texture, const SDL_Rect& textureRect);
 
 private:
-    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
+    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-private:
     Sprite mSprite;
 };
 

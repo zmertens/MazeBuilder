@@ -15,6 +15,7 @@
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/create2.h>
 #include <MazeBuilder/io_utils.h>
+#include <MazeBuilder/json_helper.h>
 
 #include "JsonUtils.hpp"
 #include "ResourceIdentifiers.hpp"
@@ -32,9 +33,15 @@ WorkerConcurrent::TextureLoadRequest::TextureLoadRequest(Textures::ID id, std::s
 // Constructor
 WorkerConcurrent::WorkerConcurrent()
     : mConfigMappings({
-          {JSONKeys::ASTRONAUT, Textures::ID::ASTRONAUT},
           {JSONKeys::BALL_NORMAL, Textures::ID::BALL_NORMAL},
-          {JSONKeys::SDL_BLOCKS, Textures::ID::SDL_BLOCKS},
+          {JSONKeys::CHARACTER_IMAGE, Textures::ID::CHARACTER},
+          {JSONKeys::LEVEL_DEFAULTS, Textures::ID::LEVEL_TWO},
+          {JSONKeys::CHARACTERS_SPRITE_SHEET, Textures::ID::CHARACTER_SPRITE_SHEET},
+          {JSONKeys::CHARACTER_IMAGE, Textures::ID::CHARACTER},
+          {JSONKeys::CHARACTER_IMAGE, Textures::ID::CHARACTER},
+          {JSONKeys::SPLASH_IMAGE, Textures::ID::SPLASH_TITLE_IMAGE},
+          {JSONKeys::SDL_LOGO, Textures::ID::SDL_LOGO},
+          {JSONKeys::SFML_LOGO, Textures::ID::SFML_LOGO},
           {JSONKeys::WALL_HORIZONTAL, Textures::ID::WALL_HORIZONTAL},
           {JSONKeys::WINDOW_ICON, Textures::ID::WINDOW_ICON}
       }), mGameMtx(SDL_CreateMutex())
@@ -210,6 +217,7 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
     mResources.clear();
     mProcessedConfigs.clear();
     mTextureLoadRequests.clear();
+    mComposedMazeStrings.clear();
     SDL_UnlockMutex(mGameMtx);
 
     // Store the resource path prefix for use in worker mThreads
@@ -220,7 +228,7 @@ void WorkerConcurrent::generate(std::string_view resourcePath) noexcept
 
     try
     {
-        JsonUtils::loadConfiguration(string{resourcePath}, ref(resources));
+        JSONUtils::loadConfiguration(string{resourcePath}, ref(resources));
 
 #if defined(MAZE_DEBUG)
 
@@ -273,14 +281,6 @@ void WorkerConcurrent::doWork(WorkItem const& workItem) noexcept
     SDL_Log("Processing resource [%d]: %s = %s\n", workItem.index, workItem.key.c_str(), workItem.value.c_str());
 #endif
 
-    // Check if this is a config* key before acquiring expensive locks
-    bool isConfigKey = false;
-    if (workItem.key.size() >= 7 && workItem.key.substr(0, 6) == "config")
-    {
-        const char nextChar = workItem.key[6];
-        isConfigKey = (nextChar >= '0' && nextChar <= '9');
-    }
-
     // Store the processed resource in a thread-safe manner
     SDL_LockMutex(mGameMtx);
 
@@ -293,14 +293,150 @@ void WorkerConcurrent::doWork(WorkItem const& workItem) noexcept
 
     mResources[workItem.key] = workItem.value;
 
-    for (const auto& [key, id] : mConfigMappings) {
-        if (workItem.key == key) {
-            mTextureLoadRequests.emplace_back(id, mResourcePathPrefix + JsonUtils::extractJsonValue(workItem.value));
-            break;
+    // Special handling for level_defaults - it's an array of maze configurations
+    if (workItem.key == JSONKeys::LEVEL_DEFAULTS)
+    {
+        SDL_UnlockMutex(mGameMtx);
+
+        // Process level configurations outside the lock (expensive operation)
+        std::vector<std::unordered_map<std::string, std::string>> levelConfigs;
+        mazes::json_helper jh{};
+
+        if (jh.from_array(workItem.value, levelConfigs))
+        {
+            std::string composedMazeString;
+
+#if defined(MAZE_DEBUG)
+            SDL_Log("Processing %zu level configurations from level_defaults\n", levelConfigs.size());
+#endif
+
+            // Create maze for each configuration
+            for (size_t i = 0; i < levelConfigs.size(); ++i)
+            {
+                try
+                {
+                    // Convert the config map to a configurator
+                    mazes::configurator config;
+
+                    for (const auto& [key, value] : levelConfigs[i])
+                    {
+                        // Parse integer fields
+                        if (key == "rows" || key == "columns" || key == "seed")
+                        {
+                            try
+                            {
+                                int intValue = std::stoi(JSONUtils::extractJsonValue(value));
+                                if (key == "rows")
+                                    config.rows(static_cast<unsigned int>(intValue));
+                                else if (key == "columns")
+                                    config.columns(static_cast<unsigned int>(intValue));
+                                else if (key == "seed")
+                                    config.seed(static_cast<unsigned int>(intValue));
+                            }
+                            catch (...)
+                            {
+                                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse %s from level config %zu\n", key.c_str(), i);
+                            }
+                        }
+                        // Parse algo string
+                        else if (key == "algo")
+                        {
+                            std::string algoStr = JSONUtils::extractJsonValue(value);
+                            config.algo_id(mazes::to_algo_from_sv(algoStr));
+                        }
+                        // Parse distances boolean
+                        else if (key == "distances")
+                        {
+                            // nlohmann::json dumps booleans as "true" or "false" (no quotes)
+                            // But extractJsonValue might add/remove quotes, so check both
+                            std::string distValue = value;
+                            // Remove any quotes or whitespace
+                            distValue.erase(std::remove_if(distValue.begin(), distValue.end(),
+                                [](char c) { return c == '"' || c == '\'' || std::isspace(static_cast<unsigned char>(c)); }),
+                                distValue.end());
+
+                            bool showDistances = (distValue == "true" || distValue == "1");
+                            if (showDistances)
+                            {
+                                config.distances("[0:-1]");
+                            }
+                        }
+                    }
+
+                    // Create maze from configuration
+                    std::string mazeStr = mazes::create(config);
+
+                    if (!mazeStr.empty())
+                    {
+                        // Add separator between mazes if not the first one
+                        if (!composedMazeString.empty())
+                        {
+                            composedMazeString += "\n\n";
+                        }
+                        composedMazeString += mazeStr;
+
+#if defined(MAZE_DEBUG)
+                        SDL_Log("Generated maze %zu: %zu characters\n", i, mazeStr.size());
+#endif
+                    }
+                }
+                catch (const std::exception& e)
+                {
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze from config %zu: %s\n", i, e.what());
+                }
+            }
+
+            // Store the composed maze string
+            if (!composedMazeString.empty())
+            {
+                SDL_LockMutex(mGameMtx);
+                // Use LEVEL_TWO as the ID for the composed maze (you can change this mapping)
+                mComposedMazeStrings[Textures::ID::LEVEL_TWO] = composedMazeString;
+
+#if defined(MAZE_DEBUG)
+                SDL_Log("Composed maze string: %zu total characters\n", composedMazeString.size());
+#endif
+
+                SDL_UnlockMutex(mGameMtx);
+            }
+        }
+        else
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to parse level_defaults array\n");
+        }
+
+        SDL_LockMutex(mGameMtx);
+    }
+    else if (workItem.key == JSONKeys::PLAYER_HITPOINTS_DEFAULT)
+    {
+
+    }
+    else if (workItem.key == JSONKeys::PLAYER_SPEED_DEFAULT)
+    {
+
+    }
+    else if (workItem.key == JSONKeys::ENEMY_HITPOINTS_DEFAULT)
+    {
+
+    }
+    else if (workItem.key == JSONKeys::ENEMY_SPEED_DEFAULT)
+    {
+
+    }
+    else
+    {
+        // Regular texture path handling
+        for (const auto& [key, id] : mConfigMappings)
+        {
+            if (workItem.key == key)
+            {
+                mTextureLoadRequests.emplace_back(id, mResourcePathPrefix + JSONUtils::extractJsonValue(workItem.value));
+                break;
+            }
         }
     }
 
-    if (const bool alreadyProcessed = mProcessedConfigs.contains(workItem.key); isConfigKey && !alreadyProcessed)
+    if (const bool alreadyProcessed = mProcessedConfigs.contains(workItem.key); !alreadyProcessed)
     {
         // Mark as processed immediately to prevent duplicate processing
         mProcessedConfigs[workItem.key] = true;
@@ -356,3 +492,13 @@ void WorkerConcurrent::setResourcePathPrefix(std::string_view prefix) noexcept
     mResourcePathPrefix = prefix;
     SDL_UnlockMutex(mGameMtx);
 }
+
+std::unordered_map<Textures::ID, std::string> WorkerConcurrent::getComposedMazeStrings() const noexcept
+{
+    SDL_LockMutex(mGameMtx);
+    auto mazesCopy = mComposedMazeStrings;
+    SDL_UnlockMutex(mGameMtx);
+
+    return mazesCopy;
+}
+

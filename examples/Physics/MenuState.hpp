@@ -12,7 +12,7 @@ public:
     explicit MenuState(StateStack& stack, Context context);
 
     void draw() const noexcept override;
-    bool update(float dt) noexcept override;
+    bool update(float dt, unsigned int subSteps) noexcept override;
     bool handleEvent(const SDL_Event& event) noexcept override;
 
 private:

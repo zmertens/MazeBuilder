@@ -40,7 +40,7 @@ public:
     template <typename T, typename ResourcePath>
     void registerState(States::ID stateID, ResourcePath&& resourcePath);
 
-    void update(float dt) noexcept;
+    void update(float dt, unsigned int subSteps) noexcept;
 
     void draw() const noexcept;
 

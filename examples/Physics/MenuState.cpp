@@ -15,7 +15,7 @@
 
 MenuState::MenuState(StateStack& stack, Context context)
     : State(stack, context)
-      , mBackgroundSprite{context.textures->get(Textures::ID::SDL_BLOCKS)}, mSelectedMenuItem(MenuItem::CONTINUE)
+      , mBackgroundSprite{context.textures->get(Textures::ID::SPLASH_TITLE_IMAGE)}, mSelectedMenuItem(MenuItem::CONTINUE)
       , mShowMainMenu(true), mItemSelectedFlags{}
 {
     // initialize selection flags so UI shows correct selected item
@@ -139,7 +139,7 @@ void MenuState::draw() const noexcept
     window.draw(mBackgroundSprite);
 }
 
-bool MenuState::update(float dt) noexcept
+bool MenuState::update(float dt, unsigned int subSteps) noexcept
 {
     // If menu is visible, just keep it showing (no transitions yet)
     if (mShowMainMenu) {

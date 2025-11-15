@@ -20,14 +20,14 @@ public:
 
     virtual ~Pathfinder() = default;
 
-    virtual Category::Type getCategory() const noexcept override;
+    [[nodiscard]] Category::Type getCategory() const noexcept override;
 
 private:
-    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
+    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-    Textures::ID getTextureID() const noexcept override;
+    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
 
-    virtual void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt) noexcept override;
 
     Type mType;
     Sprite mSprite;

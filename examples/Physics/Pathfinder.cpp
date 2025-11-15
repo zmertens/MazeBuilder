@@ -44,15 +44,15 @@ Textures::ID Pathfinder::getTextureID() const noexcept
     {
     case Type::ALLY:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     case Type::ENEMY:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     default:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     }
 }

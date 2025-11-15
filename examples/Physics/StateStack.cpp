@@ -12,11 +12,11 @@ StateStack::StateStack(State::Context context)
 {
 }
 
-void StateStack::update(float dt) noexcept
+void StateStack::update(float dt, unsigned int subSteps) noexcept
 {
     for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
     {
-        if (!(*it)->update(dt))
+        if (!(*it)->update(dt, subSteps))
         {
             break;
         }
@@ -34,14 +34,23 @@ void StateStack::draw() const noexcept
 
     // Find the first opaque state from the top of the stack
     auto firstOpaque = mStack.begin();
+
     for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
     {
         if ((*it)->isOpaque())
         {
             // Convert reverse iterator to forward iterator
             // .base() returns an iterator one position after what the reverse iterator points to
-            // So we need to decrement to get the actual opaque state
-            firstOpaque = std::prev(it.base());
+            // We need to get the actual position of the opaque state
+            auto base = it.base();
+            if (base != mStack.begin())
+            {
+                firstOpaque = std::prev(base);
+            }
+            else
+            {
+                firstOpaque = mStack.begin();
+            }
             break;
         }
     }

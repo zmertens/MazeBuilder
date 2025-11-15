@@ -1,32 +1,41 @@
 {
-    "resources_dir": "resources",
-    "music_ogg": ["generate.ogg"],
-    "music_wav": ["loading.wav"],
-    "sdl_blocks": "sdl blocks.png",
+	"window_icon": "icon.bmp",
+    "splash_image": "splash title.png",
+    "ogg_files": ["generate.ogg", "sfx_select.ogg", "sfx_throw.ogg"],
+    "wav_files": ["loading.wav"],
+    "SDL_logo": "SDL_logo.png",
+	"SFML_logo": "SFML_logo.png",
 	"network_url": "http://localhost:3000",
-	"astronaut": "character_beige_front.png",
-    "fonts_ttf": "DMSans.ttf",
-    "window_icon": "icon.bmp",
+	"character_default_image": "character_beige_front.png",
+	"characters_spritesheet": "spritesheet-characters-default.png",
+	"explosion_spritesheet": "Explosion.png",
 	"ball_normal": "bomb.png",
 	"wall_horizontal": "brick_brown.png",
-	"player_hitpoints": 100,
-	"enemy_hitpoints": 50,
-	"config1": {
-		"rows": 9,
-		"columns": 19,
-		"seed": 50,
-		"algo": "dfs"
-	},
-	"config2": {
-		"rows": 5,
-		"columns": 6,
-		"seed": 23,
-		"algo": "binary_tree"
-	},
-	"config3": {
-		"rows": 15,
-		"columns": 10,
-		"seed": 50,
-		"algo": "sidewinder"
-	}
+	"player_hitpoints_default": 100,
+	"player_speed_default": 0.3451,
+	"enemy_hitpoints_default": 50,
+	"enemy_speed_default": 0.3451,
+	"level_defaults": [
+		{
+			"rows": 100,
+			"columns": 78,
+			"seed": 50,
+			"algo": "dfs",
+			"distances": true
+		},
+		{
+			"rows": 5,
+			"columns": 6,
+			"seed": 23,
+			"algo": "binary_tree",
+			"distances": false
+		},
+		{
+			"rows": 15,
+			"columns": 10,
+			"seed": 50,
+			"algo": "sidewinder",
+			"distances": true
+		}
+	]
 }

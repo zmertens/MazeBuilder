@@ -10,7 +10,7 @@
 SplashState::SplashState(StateStack& stack, Context context)
     : State(stack, context)
       , mShowText{true}
-      , mSplashSprite{context.textures->get(Textures::ID::SPLASH_SCREEN)}
+      , mSplashSprite{context.textures->get(Textures::ID::LEVEL_ONE)}
 {
 }
 
@@ -21,7 +21,7 @@ void SplashState::draw() const noexcept
     window.draw(mSplashSprite);
 }
 
-bool SplashState::update(float dt) noexcept
+bool SplashState::update(float dt, unsigned int subSteps) noexcept
 {
     return true;
 }
