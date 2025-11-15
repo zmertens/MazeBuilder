@@ -1,4 +1,4 @@
-![Sample](scripts/bright_green_icon.bmp)
+![Sample](scripts/sample_icon.bmp)
 
 # Maze Builder
 
