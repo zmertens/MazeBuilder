@@ -164,19 +164,21 @@ struct PhysicsGame::PhysicsGameImpl
         using std::string;
 
         mazes::configurator config{};
-        config.rows(INIT_WINDOW_H)
-              .columns(INIT_WINDOW_W)
+        config.rows(mazes::configurator::MAX_ROWS)
+              .columns(mazes::configurator::MAX_COLUMNS)
               .levels(1)
               .algo_id(mazes::algo::BINARY_TREE)
               .seed(42)
-              .distances(true);
+              .distances(true)
+              .distances_start(0)
+              .distances_end(-1);
 
         try
         {
             if (const auto mazeStr = mazes::create(config); !mazeStr.empty())
             {
                 // Load the maze texture from the generated string
-                textures.load(sdlHelper.renderer, Textures::ID::LEVEL_ONE, mazeStr, 4);
+                textures.load(sdlHelper.renderer, Textures::ID::LEVEL_ONE, mazeStr, 12);
             }
             else
             {
@@ -277,13 +279,13 @@ struct PhysicsGame::PhysicsGameImpl
             fpsUpdateTimer = 0.0;
         }
 
-        if (currentTimeStep >= 1000.0)
-        {
-            SDL_Log("FPS: %d\n", smoothedFps);
-            SDL_Log("Frame Time: %.3f ms/frame\n", smoothedFrameTime);
-
-            currentTimeStep = 0.0;
-        }
+        // if (currentTimeStep >= 1000.0)
+        // {
+        //     SDL_Log("FPS: %d\n", smoothedFps);
+        //     SDL_Log("Frame Time: %.3f ms/frame\n", smoothedFrameTime);
+        //
+        //     currentTimeStep = 0.0;
+        // }
 
         // Create ImGui overlay window
         // Set window position to top-right corner
@@ -386,12 +388,6 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         }
 
         gamePtr->render(ref(currentTimeStep), elapsed);
-
-        // Cap frame rate at 60 FPS if VSync doesn't work
-        if (auto frameTime = static_cast<double>(SDL_GetTicks()) - current; frameTime < FIXED_TIME_STEP)
-        {
-            SDL_Delay(static_cast<std::uint32_t>(FIXED_TIME_STEP - frameTime));
-        }
     }
 
 #if defined(__EMSCRIPTEN__)
