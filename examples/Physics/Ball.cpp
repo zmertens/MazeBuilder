@@ -10,7 +10,7 @@
 #include "ResourceManager.hpp"
 
 Ball::Ball(Type type, const TextureManager& textureManager)
-    : mType{type}, mSprite{textureManager.get(getTextureID())}
+    : mType{type}, mSprite{textureManager.get(Ball::getTextureID())}
 {
 }
 
@@ -55,7 +55,7 @@ Ball::Ball(Type type, const TextureManager& textureManager)
 // shapeId = ballShapeId;
 // isActive = true;
 
-void Ball::updateCurrent(float dt) noexcept
+void Ball::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
 {
 }
 

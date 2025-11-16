@@ -2,6 +2,8 @@
 
 #include "ResourceManager.hpp"
 #include "Texture.hpp"
+#include "Wall.hpp"
+#include "Player.hpp"
 
 Pathfinder::Pathfinder(Type type, const TextureManager& textures)
     : mType(type)
@@ -28,7 +30,7 @@ Category::Type Pathfinder::getCategory() const noexcept
     }
 }
 
-void Pathfinder::updateCurrent(float dt) noexcept
+void Pathfinder::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
 {
     // Update logic for Pathfinder can be implemented here
 }

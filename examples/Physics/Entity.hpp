@@ -6,6 +6,8 @@
 
 #include <box2d/box2d.h>
 
+class CommandQueue;
+
 class Entity : public SceneNode
 {
 public:
@@ -17,13 +19,13 @@ public:
 
     void setVelocity(b2Vec2 velocity);
     void setVelocity(float vx, float vy);
-    b2Vec2 getVelocity() const;
+    [[nodiscard]] b2Vec2 getVelocity() const;
 
     // Physics body lifecycle (C API)
     void createBody(b2WorldId worldId, const b2BodyDef* bodyDef) noexcept;
     void destroyBody(b2WorldId worldId) noexcept;
 
-    b2BodyId getBodyId() const noexcept { return mBodyId; }
+    [[nodiscard]] b2BodyId getBodyId() const noexcept { return mBodyId; }
 
     // Contact callbacks (override in subclasses as needed)
     virtual void onBeginContact(Entity* other) noexcept;
@@ -31,9 +33,9 @@ public:
     virtual void onPostSolve(Entity* other, float impulse) noexcept;
 
 private:
-    virtual Textures::ID getTextureID() const noexcept = 0;
+    [[nodiscard]] virtual Textures::ID getTextureID() const noexcept = 0;
 
-    void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt, CommandQueue&) noexcept override;
 
     b2Vec2 mVelocity;
     b2BodyId mBodyId;

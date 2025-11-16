@@ -9,6 +9,7 @@
 union SDL_Event;
 
 class CommandQueue;
+class Entity;
 
 class Player
 {
@@ -17,8 +18,7 @@ public:
     {
         MOVE_LEFT,
         MOVE_RIGHT,
-        MOVE_UP,
-        MOVE_DOWN,
+        JUMP,
         ACTION_COUNT
     };
 
@@ -30,6 +30,12 @@ public:
     void assignKey(Action action, std::uint32_t key);
     [[nodiscard]] std::uint32_t getAssignedKey(Action action) const;
 
+    void onBeginContact(Entity* other) noexcept;
+    void onEndContact(Entity* other) noexcept;
+
+    void setGroundContact(bool contact);
+    bool hasGroundContact() const;
+
     bool isActive() const noexcept;
     void setActive(bool active) noexcept;
 
@@ -40,6 +46,7 @@ private:
     std::map<std::uint32_t, Action> mKeyBinding;
     std::map<Action, Command> mActionBinding;
     bool mIsActive;
+    bool mIsOnGround;
 };
 
 #endif // PLAYER_HPP

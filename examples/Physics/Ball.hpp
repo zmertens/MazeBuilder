@@ -24,9 +24,9 @@ public:
 private:
     void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-    Textures::ID getTextureID() const noexcept override;
+    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
 
-    void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt, CommandQueue&) noexcept override;
 
     Type mType;
     Sprite mSprite;

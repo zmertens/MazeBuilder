@@ -1,4 +1,6 @@
 #include "Entity.hpp"
+
+#include "CommandQueue.hpp"
 #include "Physics.hpp"
 
 #include <box2d/box2d.h>
@@ -97,7 +99,7 @@ void Entity::onPostSolve(Entity* /*other*/, float /*impulse*/) noexcept
     // default: do nothing
 }
 
-void Entity::updateCurrent(float dt) noexcept
+void Entity::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
 {
     if (b2Body_IsValid(mBodyId))
     {

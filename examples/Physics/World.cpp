@@ -13,6 +13,8 @@
 #include "Physics.hpp"
 #include "PhysicsContactListener.hpp"
 
+#include <MazeBuilder/create.h>
+
 #include <box2d/box2d.h>
 
 #include <SDL3/SDL.h>
@@ -27,6 +29,8 @@ World::World(RenderWindow& window, FontManager& fonts, TextureManager& textures)
       , mWorldId{b2_nullWorldId}
       , mCommandQueue{}
       , mPlayerPathfinder{nullptr}
+      , mIsPanning{false}
+      , mLastMousePosition{0.f, 0.f}
 {
 }
 
@@ -49,6 +53,11 @@ void World::init() noexcept
 
 void World::update(float dt)
 {
+    if (mPlayerPathfinder)
+    {
+        mWorldView.setCenter(mPlayerPathfinder->getPosition().x, mPlayerPathfinder->getPosition().y);
+    }
+
     mWindow.setView(mWorldView);
 
     if (b2World_IsValid(mWorldId))
@@ -79,8 +88,8 @@ void World::update(float dt)
                 void* userDataA = b2Body_GetUserData(bodyIdA);
                 void* userDataB = b2Body_GetUserData(bodyIdB);
 
-                Entity* entityA = static_cast<Entity*>(userDataA);
-                Entity* entityB = static_cast<Entity*>(userDataB);
+                auto* entityA = static_cast<Entity*>(userDataA);
+                auto* entityB = static_cast<Entity*>(userDataB);
 
                 if (entityA) entityA->onBeginContact(entityB);
                 if (entityB) entityB->onBeginContact(entityA);
@@ -108,8 +117,15 @@ void World::update(float dt)
         }
     }
 
+    // Process commands from the queue
+    while (!mCommandQueue.isEmpty())
+    {
+        Command command = mCommandQueue.pop();
+        mSceneGraph.onCommand(command, dt);
+    }
+
     // Update scene graph (this calls Entity::updateCurrent which syncs transforms)
-    mSceneGraph.update(dt);
+    mSceneGraph.update(dt, std::ref(mCommandQueue));
 }
 
 void World::draw() const noexcept
@@ -122,12 +138,63 @@ CommandQueue& World::getCommandQueue() noexcept
     return mCommandQueue;
 }
 
+void World::handleEvent(const SDL_Event& event)
+{
+    switch (event.type)
+    {
+    case SDL_EVENT_MOUSE_WHEEL:
+        if (event.wheel.y > 0)
+            mWorldView.zoom(1.1f);
+        else if (event.wheel.y < 0)
+            mWorldView.zoom(0.9f);
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        if (event.button.button == SDL_BUTTON_MIDDLE)
+        {
+            mIsPanning = true;
+            mLastMousePosition = {static_cast<float>(event.button.x), static_cast<float>(event.button.y)};
+        }
+        break;
+    case SDL_EVENT_MOUSE_BUTTON_UP:
+        if (event.button.button == SDL_BUTTON_MIDDLE)
+        {
+            mIsPanning = false;
+        }
+        break;
+    case SDL_EVENT_MOUSE_MOTION:
+        if (mIsPanning)
+        {
+            SDL_FPoint currentMousePosition = {static_cast<float>(event.motion.x), static_cast<float>(event.motion.y)};
+            SDL_FPoint delta = {currentMousePosition.x - mLastMousePosition.x, currentMousePosition.y - mLastMousePosition.y};
+            mLastMousePosition = currentMousePosition;
+
+            if (SDL_GetModState() & SDL_KMOD_SHIFT)
+            {
+                mWorldView.rotate(delta.x);
+            }
+            else
+            {
+                mWorldView.move(-delta.x, -delta.y);
+            }
+        }
+        break;
+    }
+}
+
 void World::destroyWorld()
 {
     if (b2World_IsValid(mWorldId))
     {
         b2DestroyWorld(mWorldId);
         mWorldId = b2_nullWorldId;
+    }
+}
+
+void World::setPlayer(Player* player)
+{
+    if (mPlayerPathfinder)
+    {
+        // mPlayerPathfinder->setPosition(player->)
     }
 }
 
@@ -144,6 +211,10 @@ void World::buildScene()
         mSceneLayers[i] = layer.get();
         mSceneGraph.attachChild(std::move(layer));
     }
+
+    auto backgroundSprite = make_unique<SpriteNode>(mTextures.get(Textures::ID::LEVEL_ONE));
+    backgroundSprite->setPosition(0, 0);
+    mSceneLayers[static_cast<size_t>(Layer::BACKGROUND)]->attachChild(std::move(backgroundSprite));
 
     auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
     mPlayerPathfinder = leader.get();
@@ -184,6 +255,11 @@ void World::buildScene()
     // Create physics bodies for the created entities
     if (b2World_IsValid(mWorldId))
     {
+        b2BodyDef backgroundBodyDef = b2DefaultBodyDef();
+        backgroundBodyDef.type = b2_staticBody;
+        backgroundBodyDef.position = {0, 0};
+        b2BodyId backgroundBodyId = b2CreateBody(mWorldId, &backgroundBodyDef);
+
         // Helper lambda to create a dynamic circular ball
         auto createBallBody = [&](Ball* b, Ball::Type type, float radiusPx, float density, float restitution, float friction, bool bullet)
         {
@@ -253,8 +329,9 @@ void World::buildScene()
         if (mPlayerPathfinder)
         {
             b2BodyDef bodyDef = b2DefaultBodyDef();
-            bodyDef.type = b2_kinematicBody;
+            bodyDef.type = b2_dynamicBody;
             bodyDef.position = physics::toMetersVec(mPlayerPathfinder->getPosition());
+            bodyDef.fixedRotation = true;
 
             mPlayerPathfinder->createBody(mWorldId, &bodyDef);
             b2BodyId bodyId = mPlayerPathfinder->getBodyId();
@@ -276,4 +353,3 @@ void World::buildScene()
         }
     }
 }
-

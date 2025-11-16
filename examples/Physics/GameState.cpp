@@ -18,6 +18,7 @@ GameState::GameState(StateStack& stack, Context context)
 {
     mPlayer.setActive(true);
     mWorld.init();
+    mWorld.setPlayer(context.player);
 }
 
 void GameState::draw() const noexcept
@@ -40,6 +41,7 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
     auto& commands = mWorld.getCommandQueue();
 
     mPlayer.handleEvent(event, std::ref(commands));
+    mWorld.handleEvent(event);
 
     if (event.type == SDL_EVENT_KEY_DOWN)
     {

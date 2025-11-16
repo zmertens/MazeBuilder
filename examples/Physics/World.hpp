@@ -13,6 +13,7 @@
 #include "View.hpp"
 
 class Pathfinder;
+class Player;
 class RenderWindow;
 
 class World final
@@ -32,6 +33,10 @@ public:
 
     // Destroy the world
     void destroyWorld();
+
+    void handleEvent(const SDL_Event& event);
+
+    void setPlayer(Player* player);
 
 private:
     // Build the scene (initialize scene graph and layers)
@@ -59,6 +64,9 @@ private:
     CommandQueue mCommandQueue;
 
     Pathfinder* mPlayerPathfinder;
+
+    bool mIsPanning;
+    SDL_FPoint mLastMousePosition;
 };
 
 #endif // WORLD_HPP

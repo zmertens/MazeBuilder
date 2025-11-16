@@ -1,14 +1,19 @@
 #include "Player.hpp"
 
 #include "CommandQueue.hpp"
+#include "Entity.hpp"
 #include "Pathfinder.hpp"
+#include "Wall.hpp"
+
+#include <box2d/box2d.h>
 
 #include <SDL3/SDL.h>
 
-Player::Player()
+Player::Player() : mIsActive(true), mIsOnGround(false)
 {
-    mKeyBinding[SDL_SCANCODE_A] = Action::MOVE_LEFT;
-    mKeyBinding[SDL_SCANCODE_D] = Action::MOVE_RIGHT;
+    mKeyBinding[SDL_SCANCODE_LEFT] = Action::MOVE_LEFT;
+    mKeyBinding[SDL_SCANCODE_RIGHT] = Action::MOVE_RIGHT;
+    mKeyBinding[SDL_SCANCODE_SPACE] = Action::JUMP;
 
     initializeActions();
 
@@ -26,6 +31,10 @@ void Player::handleEvent(const SDL_Event& event, CommandQueue& commands)
 
         if (found != mKeyBinding.cend() && !isRealtimeAction(found->second))
         {
+            if (found->second == Action::JUMP && !mIsOnGround)
+            {
+                return; // do not jump if not on ground
+            }
             commands.push(mActionBinding[found->second]);
         }
     }
@@ -38,9 +47,10 @@ void Player::handleRealtimeInput(CommandQueue& commands)
     {
         if (isRealtimeAction(pair.second))
         {
-            const auto* keyState = SDL_GetKeyboardState(nullptr);
+            int numKeys = 0;
+            const auto* keyState = SDL_GetKeyboardState(&numKeys);
 
-            if (pair.first < SDL_arraysize(keyState) && keyState[pair.first])
+            if (keyState && pair.first < static_cast<std::uint32_t>(numKeys) && keyState[pair.first])
             {
                 commands.push(mActionBinding[pair.second]);
             }
@@ -54,8 +64,6 @@ bool Player::isRealtimeAction(Action action)
     {
     case Action::MOVE_LEFT:
     case Action::MOVE_RIGHT:
-    case Action::MOVE_UP:
-    case Action::MOVE_DOWN:
         return true;
     default:
         return false;
@@ -65,34 +73,30 @@ bool Player::isRealtimeAction(Action action)
 void Player::initializeActions()
 {
     static constexpr auto playerSpeed = 200.f;
+    static constexpr auto jumpForce = -500.f;
 
-    // Define movement functor similar to SFML's AircraftMover
-    // Lambda captures velocity and applies it to Pathfinder
     mActionBinding[Action::MOVE_LEFT].action = derivedAction<Pathfinder>(
-        [](Pathfinder& pathfinder, float dt)
+        [](Pathfinder& pathfinder, float)
         {
-            pathfinder.accelerate(-playerSpeed * dt, 0.f);
+            b2Body_ApplyForceToCenter(pathfinder.getBodyId(), {-playerSpeed, 0.f}, true);
         }
     );
 
     mActionBinding[Action::MOVE_RIGHT].action = derivedAction<Pathfinder>(
-        [](Pathfinder& pathfinder, float dt)
+        [](Pathfinder& pathfinder, float)
         {
-            pathfinder.accelerate(+playerSpeed * dt, 0.f);
+            b2Body_ApplyForceToCenter(pathfinder.getBodyId(), {+playerSpeed, 0.f}, true);
         }
     );
 
-    mActionBinding[Action::MOVE_UP].action = derivedAction<Pathfinder>(
-        [](Pathfinder& pathfinder, float dt)
+    mActionBinding[Action::JUMP].action = derivedAction<Pathfinder>(
+        [this](Pathfinder& pathfinder, float)
         {
-            pathfinder.accelerate(0.f, -playerSpeed * dt);
-        }
-    );
-
-    mActionBinding[Action::MOVE_DOWN].action = derivedAction<Pathfinder>(
-        [](Pathfinder& pathfinder, float dt)
-        {
-            pathfinder.accelerate(0.f, +playerSpeed * dt);
+            if (mIsOnGround)
+            {
+                b2Body_ApplyLinearImpulseToCenter(pathfinder.getBodyId(), {0.f, jumpForce}, true);
+                setGroundContact(false);
+            }
         }
     );
 }
@@ -100,12 +104,12 @@ void Player::initializeActions()
 void Player::assignKey(Action action, std::uint32_t key)
 {
     // Remove all keys that already map to action
-    for (auto itr = mKeyBinding.begin(); itr != mKeyBinding.end();)
+    for (auto it = mKeyBinding.begin(); it != mKeyBinding.end();)
     {
-        if (itr->second == action)
-            mKeyBinding.erase(itr++);
+        if (it->second == action)
+            it = mKeyBinding.erase(it);
         else
-            ++itr;
+            ++it;
     }
 
     // Insert new binding
@@ -114,15 +118,46 @@ void Player::assignKey(Action action, std::uint32_t key)
 
 std::uint32_t Player::getAssignedKey(Action action) const
 {
-    for (const auto& pair : mKeyBinding)
+    for (auto& pair : mKeyBinding)
     {
         if (pair.second == action)
-        {
             return pair.first;
-        }
     }
 
     return SDL_SCANCODE_UNKNOWN;
+}
+
+void Player::onBeginContact(Entity* other) noexcept
+{
+    if (const auto* wall = dynamic_cast<Wall*>(other))
+    {
+        if (wall->getOrientation() == Wall::Orientation::HORIZONTAL)
+        {
+            this->setGroundContact(true);
+        }
+    }
+}
+
+void Player::onEndContact(Entity* other) noexcept
+{
+    if (const auto* wall = dynamic_cast<Wall*>(other))
+    {
+        if (wall->getOrientation() == Wall::Orientation::HORIZONTAL)
+        {
+            this->setGroundContact(false);
+        }
+    }
+}
+
+
+void Player::setGroundContact(bool contact)
+{
+    mIsOnGround = contact;
+}
+
+bool Player::hasGroundContact() const
+{
+    return mIsOnGround;
 }
 
 bool Player::isActive() const noexcept
@@ -132,5 +167,5 @@ bool Player::isActive() const noexcept
 
 void Player::setActive(bool active) noexcept
 {
-    this->mIsActive = active;
+    mIsActive = active;
 }
