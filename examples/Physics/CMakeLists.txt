@@ -21,6 +21,9 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsContactListener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PostProcessingManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RenderTexture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RenderWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp

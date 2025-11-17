@@ -43,10 +43,20 @@ void World::init() noexcept
 
     mWorldId = b2CreateWorld(&worldDef);
 
-#if defined(MAZE_DEBUG)
-    SDL_Log("Physics world created: valid=%d, gravity=(%.1f, %.1f)",
-            b2World_IsValid(mWorldId), worldDef.gravity.x, worldDef.gravity.y);
-#endif
+    mPostProcessingManager = std::make_unique<PostProcessingManager>();
+    if (!mPostProcessingManager->initialize(mWindow.getRenderer(),
+        static_cast<int>(mWindow.getView().getSize().x),
+        static_cast<int>(mWindow.getView().getSize().y))) {
+        SDL_Log("WARNING: Failed to initialize post-processing");
+        mPostProcessingManager.reset(); // Continue without effects
+    }
+
+    // Optional: Configure effects
+    if (mPostProcessingManager) {
+        mPostProcessingManager->setBlurRadius(2);
+        mPostProcessingManager->setBloomThreshold(0.75f);
+        mPostProcessingManager->setBloomIntensity(1.2f);
+    }
 
     mPlayerPathfinder = nullptr;
 
@@ -137,7 +147,20 @@ void World::update(float dt)
 
 void World::draw() const noexcept
 {
-    mWindow.draw(mSceneGraph);
+    if (mPostProcessingManager->isReady())
+    {
+        auto* renderer = mWindow.getRenderer();
+
+        mPostProcessingManager->beginScene();
+
+        mWindow.draw(mSceneGraph);
+
+        mPostProcessingManager->endScene();
+
+        mWindow.clear();
+
+        mPostProcessingManager->present(renderer);
+    }
 }
 
 CommandQueue& World::getCommandQueue() noexcept

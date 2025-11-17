@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "CommandQueue.hpp"
+#include "PostProcessingManager.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "SceneNode.hpp"
@@ -67,6 +68,8 @@ private:
 
     bool mIsPanning;
     SDL_FPoint mLastMousePosition;
+
+    std::unique_ptr<PostProcessingManager> mPostProcessingManager;
 };
 
 #endif // WORLD_HPP

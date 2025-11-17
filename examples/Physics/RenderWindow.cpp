@@ -11,6 +11,14 @@
 RenderWindow::RenderWindow(SDL_Renderer* renderer, SDL_Window* window)
     : mRenderer(renderer), mWindow(window), mCurrentView()
 {
+    // Initialize view with window dimensions
+    if (mWindow)
+    {
+        int width = 0, height = 0;
+        SDL_GetWindowSize(mWindow, &width, &height);
+        mCurrentView.setSize(static_cast<float>(width), static_cast<float>(height));
+        mCurrentView.setCenter(static_cast<float>(width) / 2.0f, static_cast<float>(height) / 2.0f);
+    }
 }
 
 void RenderWindow::setView(const View& view)
