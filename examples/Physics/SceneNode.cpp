@@ -103,8 +103,9 @@ Transformable SceneNode::getWorldTransform() const
 
 void SceneNode::onCommand(const Command& command, float dt) noexcept
 {
-    // Check if the command applies to this node
-    if (command.category == getCategory())
+    // Check if the command applies to this node using bitwise AND
+    // This allows a single command to target multiple category types
+    if (static_cast<unsigned int>(command.category) & static_cast<unsigned int>(getCategory()))
     {
         command.action(*this, dt);
     }

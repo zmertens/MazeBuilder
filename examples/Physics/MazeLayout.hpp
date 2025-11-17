@@ -41,19 +41,19 @@ public:
 
     static MazeLayout fromString(std::string_view mazeStr, int cellSize);
 
-    int getRows() const noexcept { return mRows; }
-    int getColumns() const noexcept { return mColumns; }
+    [[nodiscard]] int getRows() const noexcept { return mRows; }
+    [[nodiscard]] int getColumns() const noexcept { return mColumns; }
     int getCellSize() const noexcept { return mCellSize; }
 
     int getPixelWidth() const noexcept { return mColumns * mCellSize; }
     int getPixelHeight() const noexcept { return mRows * mCellSize; }
 
-    const Cell& at(int row, int col) const noexcept
+    [[nodiscard]] const Cell& at(int row, int col) const noexcept
     {
         return mCells[static_cast<std::size_t>(row) * mColumns + col];
     }
 
-    SDL_Surface* buildSurface() const noexcept;
+    [[nodiscard]] SDL_Surface* buildSurface() const noexcept;
 
 private:
     int mRows{0};

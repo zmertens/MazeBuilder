@@ -110,15 +110,6 @@ void Entity::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
         b2Vec2 pixelPos = physics::toPixelsVec(pos);
         setPosition(pixelPos);
         setRotation(rot);
-
-#if defined(MAZE_DEBUG)
-        static int debugCounter = 0;
-        if (debugCounter++ % 60 == 0) // Log once per second at 60 FPS
-        {
-            SDL_Log("Entity update: physics pos (%.2f, %.2f) meters -> render pos (%.1f, %.1f) pixels",
-                    pos.x, pos.y, pixelPos.x, pixelPos.y);
-        }
-#endif
     }
     else
     {

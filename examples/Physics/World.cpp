@@ -55,13 +55,24 @@ void World::init() noexcept
 
 void World::update(float dt)
 {
+    // Reset player velocity before processing commands (like SFML does)
     if (mPlayerPathfinder)
     {
+        mPlayerPathfinder->setVelocity(0.f, 0.f);
         mWorldView.setCenter(mPlayerPathfinder->getPosition().x, mPlayerPathfinder->getPosition().y);
     }
 
     mWindow.setView(mWorldView);
 
+    // Process commands from the queue BEFORE physics step (like SFML does)
+    // This ensures player input forces are applied in the same frame
+    while (!mCommandQueue.isEmpty())
+    {
+        Command command = mCommandQueue.pop();
+        mSceneGraph.onCommand(command, dt);
+    }
+
+    // Step physics simulation (integrates forces applied by commands)
     if (b2World_IsValid(mWorldId))
     {
         b2World_Step(mWorldId, dt, 4);
@@ -119,12 +130,6 @@ void World::update(float dt)
         }
     }
 
-    // Process commands from the queue
-    while (!mCommandQueue.isEmpty())
-    {
-        Command command = mCommandQueue.pop();
-        mSceneGraph.onCommand(command, dt);
-    }
 
     // Update scene graph (this calls Entity::updateCurrent which syncs transforms)
     mSceneGraph.update(dt, std::ref(mCommandQueue));

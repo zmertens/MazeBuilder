@@ -30,9 +30,12 @@ Category::Type Pathfinder::getCategory() const noexcept
     }
 }
 
-void Pathfinder::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
+void Pathfinder::updateCurrent(float dt, CommandQueue& commands) noexcept
 {
-    // Update logic for Pathfinder can be implemented here
+    // Call base class to sync physics body position to scene node transform
+    Entity::updateCurrent(dt, commands);
+
+    // Additional Pathfinder-specific update logic can be added here
 }
 
 void Pathfinder::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept

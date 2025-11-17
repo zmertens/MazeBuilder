@@ -32,10 +32,12 @@ public:
     virtual void onEndContact(Entity* other) noexcept;
     virtual void onPostSolve(Entity* other, float impulse) noexcept;
 
-private:
-    [[nodiscard]] virtual Textures::ID getTextureID() const noexcept = 0;
+protected:
 
     void updateCurrent(float dt, CommandQueue&) noexcept override;
+
+private:
+    [[nodiscard]] virtual Textures::ID getTextureID() const noexcept = 0;
 
     b2Vec2 mVelocity;
     b2BodyId mBodyId;

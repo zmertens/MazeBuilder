@@ -55,8 +55,10 @@ Ball::Ball(Type type, const TextureManager& textureManager)
 // shapeId = ballShapeId;
 // isActive = true;
 
-void Ball::updateCurrent(float dt, [[maybe_unused]] CommandQueue&) noexcept
+void Ball::updateCurrent(float dt, CommandQueue& commands) noexcept
 {
+    // Call base class to sync physics body position to scene node transform
+    Entity::updateCurrent(dt, commands);
 }
 
 
