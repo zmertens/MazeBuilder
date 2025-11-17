@@ -5,6 +5,7 @@
 #include <MazeBuilder/io_utils.h>
 
 #include "JsonUtils.hpp"
+#include "MazeLayout.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "StateStack.hpp"
@@ -141,7 +142,7 @@ void LoadingState::loadMazeTexturesFromComposedStrings() const noexcept
         {
             // Load texture from maze string with a cell size of 10 pixels
             constexpr int CELL_SIZE = 10;
-            textures.load(renderer, id, mazeString, CELL_SIZE);
+            textures.load(renderer, id, MazeLayout::fromString(mazeString, CELL_SIZE));
             SDL_Log("DEBUG: Loaded maze texture ID %d (%zu characters)\n", static_cast<int>(id), mazeString.size());
         }
     }

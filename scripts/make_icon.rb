@@ -4,7 +4,7 @@
 # Its also output to make an ASCII representation of the maze to the console
 
 # Dependencies: chunky_png gem
-# Install via: gem install chunky_png
+# Install via: bundle install
 require 'chunky_png'
 
 # Measure distances between grid cells
@@ -518,26 +518,28 @@ class RecursiveBacktracker
     end
 end
 
-1.times do |n|
-    abort "Please specify a text file to use as a template" if ARGV.empty?
+# 1.times do |n|
+#     abort "Please specify a text file to use as a template" if ARGV.empty?
 
-    mask = Mask.from_png(ARGV.first)
-    grid = MaskedGrid.new(mask)
-    RecursiveBacktracker.on(grid)
+#     mask = Mask.from_png(ARGV.first)
+#     grid = MaskedGrid.new(mask)
+#     RecursiveBacktracker.on(grid)
 
-    filename = "masked%02d.png" % n
-    grid.to_png(cell_size: 5).save(filename)
-    puts "saved image to #{filename}"
-end
+#     filename = "masked%02d.png" % n
+#     grid.to_png(cell_size: 5).save(filename)
+#     puts "saved image to #{filename}"
+# end
 
-grid = ColoredGrid.new(20, 25)
+grid = ColoredGrid.new(40, 40)
 
-Sidewinder.on(grid)
+Wilsons.on(grid)
 
-end1 = grid[grid.rows / 2, grid.columns / 2]
+end1 = grid[0, 0]
 start1 = grid[grid.rows - 1, grid.columns - 1]
 
 grid.distances = end1.distances.path_to(start1)
 
-grid.to_png(cell_size: 2).save("sidewinder_colored.png")
-puts "saved colored_maze.png"
+filename = "wilsons_01.png"
+
+grid.to_png(cell_size: 20).save(filename)
+puts "saved #{filename}"

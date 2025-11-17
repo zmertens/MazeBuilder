@@ -220,18 +220,18 @@ struct PhysicsGame::PhysicsGameImpl
             // Let ImGui process the event first
             ImGui_ImplSDL3_ProcessEvent(&event);
 
-            // Then let the state stack handle events
-            stateStack->handleEvent(event);
-
             if (event.type == SDL_EVENT_QUIT)
             {
                 stateStack->clearStates();
                 break;
             }
+
+            // Then let the state stack handle events
+            stateStack->handleEvent(event);
         }
     }
 
-    void update(float dt, int subSteps = 4) const noexcept
+    void update(const float dt, int subSteps = 4) const noexcept
     {
         stateStack->update(dt, subSteps);
     }

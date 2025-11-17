@@ -9,6 +9,8 @@
 #include "SpriteNode.hpp"
 #include "Texture.hpp"
 #include "Wall.hpp"
+#include "MazeLayout.hpp"
+#include "MazeNode.hpp"
 
 #include "Physics.hpp"
 #include "PhysicsContactListener.hpp"
@@ -212,9 +214,9 @@ void World::buildScene()
         mSceneGraph.attachChild(std::move(layer));
     }
 
-    auto backgroundSprite = make_unique<SpriteNode>(mTextures.get(Textures::ID::LEVEL_ONE));
-    backgroundSprite->setPosition(0, 0);
-    mSceneLayers[static_cast<size_t>(Layer::BACKGROUND)]->attachChild(std::move(backgroundSprite));
+    auto mazeNode = make_unique<MazeNode>(  mTextures.get(Textures::ID::LEVEL_TWO));
+    mazeNode->setPosition(0.f, 0.f);
+    mSceneLayers[static_cast<size_t>(Layer::BACKGROUND)]->attachChild(std::move(mazeNode));
 
     auto leader = make_unique<Pathfinder>(Pathfinder::Type::ALLY, cref(mTextures));
     mPlayerPathfinder = leader.get();

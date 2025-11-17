@@ -25,6 +25,9 @@ public:
     template <typename Parameter1, typename Parameter2, typename PixelSize = float>
     void load(Identifier id, const Parameter1& param1, const Parameter2& param2, const PixelSize& pixelSize);
 
+    template <typename Texture>
+    void load(SDL_Renderer* renderer, Identifier id, const Texture& texture);
+
     Resource& get(Identifier id);
     const Resource& get(Identifier id) const;
 
@@ -82,6 +85,19 @@ void ResourceManager<Resource, Identifier>::load(Identifier id, const Parameter1
     if (!resource->loadFromMemoryCompressedTTF(param1, param2, pixelSize))
     {
         throw std::runtime_error("ResourceManager::load - Failed to load font from memory");
+    }
+
+    insertResource(id, std::move(resource));
+}
+
+template <typename Resource, typename Identifier>
+template <typename Texture>
+void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const Texture& texture)
+{
+    auto resource = std::make_unique<Resource>();
+    if (!resource->loadFromMaze(renderer, texture))
+    {
+        throw std::runtime_error("ResourceManager::load - Failed to load from texture");
     }
 
     insertResource(id, std::move(resource));
