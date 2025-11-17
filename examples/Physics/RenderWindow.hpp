@@ -43,9 +43,13 @@ public:
     /// @brief Present the rendered frame
     void display() const noexcept;
 
-    bool isOpen() const noexcept;
+    [[nodiscard]] bool isOpen() const noexcept;
 
     void close() noexcept;
+
+    void setFullscreen(bool fullscreen) const noexcept;
+
+    [[nodiscard]] bool isFullscreen() const noexcept;
 
     /// @brief Get the SDL renderer for direct access
     [[nodiscard]] SDL_Renderer* getRenderer() const noexcept { return mRenderer; }

@@ -101,6 +101,8 @@ void SettingsState::draw() const noexcept
         {
             SDL_Log("Settings applied");
             // Add logic to apply settings
+            getContext().window->setFullscreen(fullscreen);
+
         }
 
         ImGui::SameLine();

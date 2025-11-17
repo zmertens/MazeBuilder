@@ -530,7 +530,7 @@ end
 #     puts "saved image to #{filename}"
 # end
 
-grid = ColoredGrid.new(40, 40)
+grid = ColoredGrid.new(8, 10)
 
 Wilsons.on(grid)
 
@@ -539,7 +539,7 @@ start1 = grid[grid.rows - 1, grid.columns - 1]
 
 grid.distances = end1.distances.path_to(start1)
 
-filename = "wilsons_01.png"
+filename = "wilsons_8x10.png"
 
 grid.to_png(cell_size: 20).save(filename)
 puts "saved #{filename}"

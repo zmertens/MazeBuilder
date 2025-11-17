@@ -80,3 +80,21 @@ void RenderWindow::close() noexcept
     mRenderer = nullptr;
     mWindow = nullptr;
 }
+
+void RenderWindow::setFullscreen(bool fullscreen) const noexcept
+{
+    if (const auto flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0; !isFullscreen() && flags != 0)
+    {
+        SDL_SetWindowFullscreen(mWindow, flags);
+    }
+    else if (isFullscreen() && !fullscreen)
+    {
+        SDL_SetWindowFullscreen(mWindow, false);
+    }
+}
+
+bool RenderWindow::isFullscreen() const noexcept
+{
+    const auto flags = SDL_GetWindowFlags(mWindow);
+    return (flags & SDL_WINDOW_FULLSCREEN) != 0;
+}

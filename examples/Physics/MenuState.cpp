@@ -16,7 +16,8 @@
 
 MenuState::MenuState(StateStack& stack, Context context)
     : State(stack, context)
-      , mBackgroundSprite{context.textures->get(Textures::ID::SPLASH_TITLE_IMAGE)}, mSelectedMenuItem(MenuItem::CONTINUE)
+      , mBackgroundSprite{context.textures->get(Textures::ID::SPLASH_TITLE_IMAGE)}
+      , mSelectedMenuItem(MenuItem::NEW_GAME)
       , mShowMainMenu(true), mItemSelectedFlags{}
 {
     // initialize selection flags so UI shows correct selected item
@@ -89,16 +90,6 @@ void MenuState::draw() const noexcept
                 SDL_Log("Navigation: %s selected", menuItems[i].c_str());
             }
             ImGui::Spacing();
-        }
-
-        // Debug: show flags and selection index for troubleshooting
-        ImGui::Separator();
-        ImGui::Text("Debug: selected index = %u", static_cast<unsigned int>(mSelectedMenuItem));
-        ImGui::SameLine();
-        ImGui::Text("flags =");
-        for (bool flag : mItemSelectedFlags) {
-            ImGui::SameLine();
-            ImGui::Text("%d", flag);
         }
 
         ImGui::Separator();
