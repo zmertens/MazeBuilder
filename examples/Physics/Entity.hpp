@@ -12,7 +12,7 @@ class Entity : public SceneNode
 {
 public:
     Entity() noexcept;
-    virtual ~Entity() noexcept;
+    ~Entity() noexcept override;
 
     void accelerate(b2Vec2 velocityChange) noexcept;
     void accelerate(float vx, float vy) noexcept;

@@ -14,7 +14,6 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/LoadingState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MazeLayout.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/MazeNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MenuState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Pathfinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PauseState.cpp

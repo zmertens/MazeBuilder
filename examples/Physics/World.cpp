@@ -10,7 +10,6 @@
 #include "Texture.hpp"
 #include "Wall.hpp"
 #include "MazeLayout.hpp"
-#include "MazeNode.hpp"
 
 #include "Physics.hpp"
 #include "PhysicsContactListener.hpp"
@@ -242,7 +241,7 @@ void World::buildScene()
         mSceneGraph.attachChild(std::move(layer));
     }
 
-    auto mazeNode = make_unique<MazeNode>(  mTextures.get(Textures::ID::LEVEL_TWO));
+    auto mazeNode = make_unique<SpriteNode>(  mTextures.get(Textures::ID::LEVEL_TWO));
     mazeNode->setPosition(0.f, 0.f);
     mSceneLayers[static_cast<size_t>(Layer::BACKGROUND)]->attachChild(std::move(mazeNode));
 
