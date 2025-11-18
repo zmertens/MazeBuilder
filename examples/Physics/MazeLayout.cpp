@@ -72,39 +72,44 @@ MazeLayout MazeLayout::fromString(std::string_view mazeStr, int cellSize)
         std::size_t index = static_cast<std::size_t>(row) * maxWidth + col;
         Cell& cell = layout.mCells[index];
 
-        // Default background color
-        cell.r = 255;
-        cell.g = 255;
-        cell.b = 255;
-        cell.a = 255;
+        // Default to transparent for empty cells
+        cell.r = 0;
+        cell.g = 0;
+        cell.b = 0;
+        cell.a = 0;
 
         if (c == static_cast<char>(mazes::barriers::CORNER))
         {
             cell.type = CellType::Wall;
             cell.barrier = BarrierType::Corner;
             cell.r = cell.g = cell.b = 0;
+            cell.a = 255; // Opaque black for walls
         }
         else if (c == static_cast<char>(mazes::barriers::HORIZONTAL))
         {
             cell.type = CellType::Wall;
             cell.barrier = BarrierType::Horizontal;
             cell.r = cell.g = cell.b = 0;
+            cell.a = 255; // Opaque black for walls
         }
         else if (c == static_cast<char>(mazes::barriers::VERTICAL))
         {
             cell.type = CellType::Wall;
             cell.barrier = BarrierType::Vertical;
             cell.r = cell.g = cell.b = 0;
+            cell.a = 255; // Opaque black for walls
         }
         else if (c == ' ')
         {
             cell.type = CellType::Empty;
             cell.barrier = BarrierType::None;
+            // Already transparent from default
         }
         else
         {
             cell.type = CellType::Other;
             cell.barrier = BarrierType::None;
+            // Keep transparent for other/unknown cell types
         }
 
         ++col;
@@ -131,7 +136,8 @@ SDL_Surface* MazeLayout::buildSurface() const noexcept
         return nullptr;
     }
 
-    SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGBA(surface, 255, 255, 255, 255));
+    // Fill with transparent background to enable blending with parallax layers
+    SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGBA(surface, 0, 0, 0, 0));
 
     for (int row = 0; row < mRows; ++row)
     {

@@ -45,9 +45,12 @@ private:
 
     enum class Layer
     {
-        BACKGROUND = 0,
-        FOREGROUND = 1,
-        LAYER_COUNT = 2
+        PARALLAX_BACK = 0,
+        PARALLAX_MID = 1,
+        PARALLAX_FORE = 2,
+        BACKGROUND = 3,
+        FOREGROUND = 4,
+        LAYER_COUNT = 5
     };
 
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
