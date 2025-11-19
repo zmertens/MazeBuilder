@@ -9,6 +9,7 @@
 #include <vector>
 #include <box2d/math_functions.h>
 
+class CommandQueue;
 struct Command;
 struct SDL_Renderer;
 
@@ -21,19 +22,16 @@ public:
     explicit SceneNode();
     virtual ~SceneNode() = default;
 
-    // Delete copy constructor and copy assignment operator
-    // because SceneNode contains std::unique_ptr which is not copyable
     SceneNode(const SceneNode&) = delete;
     SceneNode& operator=(const SceneNode&) = delete;
 
-    // Allow move constructor and move assignment operator
     SceneNode(SceneNode&&) = default;
     SceneNode& operator=(SceneNode&&) = default;
 
     void attachChild(Ptr child);
     Ptr detachChild(const SceneNode& node);
 
-    void update(float dt) noexcept;
+    void update(float dt, CommandQueue& commands) noexcept;
 
     // Public draw method for Drawable interface (like sf::Drawable)
     void draw(SDL_Renderer* renderer, RenderStates states) const noexcept;
@@ -46,15 +44,16 @@ public:
     virtual Category::Type getCategory() const noexcept;
 
 private:
-    virtual void updateCurrent(float dt) noexcept;
-    void updateChildren(float dt) noexcept;
+    virtual void updateCurrent(float dt, CommandQueue& commands) noexcept;
+    void updateChildren(float dt, CommandQueue& commands) noexcept;
 
     virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept;
     void drawChildren(SDL_Renderer* renderer, RenderStates states) const noexcept;
 
-private:
     std::vector<Ptr> mChildren;
     SceneNode* mParent;
+
+    Category::Type mDefaultCategory;
 };
 
 #endif // SCENE_NODE_HPP

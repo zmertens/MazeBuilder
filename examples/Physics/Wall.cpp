@@ -1,9 +1,6 @@
 #include "Wall.hpp"
 
-#include <algorithm>
-#include <cmath>
-#include <random>
-
+#include "CommandQueue.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 
@@ -30,9 +27,10 @@ void Wall::setRow(int row) { this->row = row; }
 void Wall::setCol(int col) { this->col = col; }
 void Wall::setOrientation(Orientation orientation) { this->orientation = orientation; }
 
-void Wall::updateCurrent(float dt) noexcept
+void Wall::updateCurrent(float dt, CommandQueue& commands) noexcept
 {
-    // Walls do not have children to update
+    // Call base class to sync physics body position to scene node transform
+    Entity::updateCurrent(dt, commands);
 }
 
 void Wall::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept

@@ -1,6 +1,6 @@
 include(BuildInfo)
 
-set(CPP_BASE64_SRCS ${PROJECT_SOURCE_DIR}/deps/cpp-base64/base64.cpp)
+set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
 
 # Don't include this source file in Visual Studio projects
 set_source_files_properties(${CPP_BASE64_SRCS} PROPERTIES 

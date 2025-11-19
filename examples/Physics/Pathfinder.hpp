@@ -7,7 +7,7 @@
 #include "ResourceIdentifiers.hpp"
 #include "Sprite.hpp"
 
-class Pathfinder : public Entity
+class Pathfinder final : public Entity
 {
 public:
     enum class Type
@@ -18,16 +18,16 @@ public:
 
     explicit Pathfinder(Type type, const TextureManager& textures);
 
-    virtual ~Pathfinder() = default;
+    ~Pathfinder() override = default;
 
-    virtual Category::Type getCategory() const noexcept override;
+    [[nodiscard]] Category::Type getCategory() const noexcept override;
 
 private:
-    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
+    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-    Textures::ID getTextureID() const noexcept override;
+    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
 
-    virtual void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt, CommandQueue&) noexcept override;
 
     Type mType;
     Sprite mSprite;

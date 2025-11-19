@@ -1,4 +1,4 @@
-![Release screenshot](examples/Voxels/textures/maze_in_green_32x32.bmp)
+![Sample](scripts/sample_icon.bmp)
 
 # Maze Builder
 
@@ -189,17 +189,11 @@ cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstrea
 
 ## Scripts
 
-The Ruby script `mazes.rb` generates PNG images of mazes using algorithms and methods similar to the C++ library.
-It is a good place to start learning about the maze-generating algorithms.
-The Python script `solver.py` plays with the maze generation by loading PNG files and finding paths and networks.
-
-**Script dependencies:**
-  - `gem install chunky_png`
-  - `pip install numpy pillow networkx`
+See [README Scripts](scripts/README.md)
 
 ---
 
-#### Helpful Resources on Mazes
+## Helpful Resources on Mazes
 
  - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
-
+ - [codebox maze generator](https://codebox.net/pages/maze-generator/online)

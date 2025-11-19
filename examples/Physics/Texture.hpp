@@ -6,6 +6,8 @@
 struct SDL_Texture;
 struct SDL_Renderer;
 
+class MazeLayout;
+
 /// @file Texture.hpp
 /// @brief Texture class for SDL3
 /// @details This class wraps SDL_Texture and provides methods for loading, rendering, and freeing textures.
@@ -46,11 +48,11 @@ public:
 
     void free() noexcept;
 
-    SDL_Texture* get() const noexcept;
+    [[nodiscard]] SDL_Texture* get() const noexcept;
 
-    int getWidth() const noexcept { return width; }
+    [[nodiscard]] int getWidth() const noexcept { return width; }
 
-    int getHeight() const noexcept { return height; }
+    [[nodiscard]] int getHeight() const noexcept { return height; }
 
     bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
 
@@ -59,6 +61,8 @@ public:
     bool loadImageTexture(SDL_Renderer* renderer, std::string_view imagePath) noexcept;
 
     bool loadFromStr(SDL_Renderer* renderer, std::string_view str, int cellSize = 10) noexcept;
+
+    bool loadFromMaze(SDL_Renderer* renderer, const MazeLayout& maze) noexcept;
 
 private:
     SDL_Texture* texture = nullptr;

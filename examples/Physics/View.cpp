@@ -1,26 +1,47 @@
 #include "View.hpp"
 
-View::View() : m_viewport({})
+View::View() : m_center({0.f, 0.f}), m_size({0.f, 0.f}), m_rotation(0.f)
 {
-    m_viewport.x = 0;
-    m_viewport.y = 0;
-    m_viewport.w = 0;
-    m_viewport.h = 0;
 }
 
 void View::setCenter(float x, float y)
 {
-    m_viewport.x = x - m_viewport.w / 2;
-    m_viewport.y = y - m_viewport.h / 2;
+    m_center = {x, y};
 }
 
 void View::setSize(float width, float height)
 {
-    m_viewport.w = width;
-    m_viewport.h = height;
+    m_size = {width, height};
 }
 
-const SDL_FRect& View::getViewport() const
+void View::zoom(float factor)
 {
-    return m_viewport;
+    m_size.x *= factor;
+    m_size.y *= factor;
+}
+
+void View::move(float offsetX, float offsetY)
+{
+    m_center.x += offsetX;
+    m_center.y += offsetY;
+}
+
+void View::rotate(float angle)
+{
+    m_rotation += angle;
+}
+
+SDL_FPoint View::getCenter() const
+{
+    return m_center;
+}
+
+SDL_FPoint View::getSize() const
+{
+    return m_size;
+}
+
+float View::getRotation() const
+{
+    return m_rotation;
 }

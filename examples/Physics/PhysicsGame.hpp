@@ -16,7 +16,7 @@ namespace mazes
 
 class PhysicsGame : public mazes::algo_interface, public mazes::singleton_base<PhysicsGame>
 {
-    friend class mazes::singleton_base<PhysicsGame>;
+    friend class singleton_base;
 
 public:
     PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h);
@@ -25,7 +25,7 @@ public:
 
     ~PhysicsGame() override;
 
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept;
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
 private:
     struct PhysicsGameImpl;

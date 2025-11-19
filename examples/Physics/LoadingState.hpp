@@ -17,9 +17,9 @@ class LoadingState : public State
 public:
     explicit LoadingState(StateStack& stack, State::Context context, std::string_view resourcePath = "");
 
-    virtual void draw() const noexcept override;
-    virtual bool update(float dt) noexcept override;
-    virtual bool handleEvent(const SDL_Event& event) noexcept override;
+    void draw() const noexcept override;
+    bool update(float dt, unsigned int subSteps) noexcept override;
+    bool handleEvent(const SDL_Event& event) noexcept override;
 
     // Check if loading has completed
     bool isFinished() const noexcept;
@@ -27,7 +27,11 @@ public:
 private:
     void loadResources() noexcept;
 
-    void loadTexturesFromResources(const std::unordered_map<std::string, std::string>& resources) noexcept;
+    void loadTexturesFromWorkerRequests() const noexcept;
+
+    void loadMazeTexturesFromComposedStrings() const noexcept;
+
+    void loadWindowIcon(const std::unordered_map<std::string, std::string>& resources) noexcept;
 
     void setCompletion(float percent) noexcept;
 

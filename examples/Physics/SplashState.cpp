@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "LoadingState.hpp"
+#include "Player.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
 #include "StateStack.hpp"
@@ -10,8 +11,9 @@
 SplashState::SplashState(StateStack& stack, Context context)
     : State(stack, context)
       , mShowText{true}
-      , mSplashSprite{context.textures->get(Textures::ID::SPLASH_SCREEN)}
+      , mSplashSprite{context.textures->get(Textures::ID::LEVEL_ONE)}
 {
+    getContext().player->setActive(false);
 }
 
 void SplashState::draw() const noexcept
@@ -21,7 +23,7 @@ void SplashState::draw() const noexcept
     window.draw(mSplashSprite);
 }
 
-bool SplashState::update(float dt) noexcept
+bool SplashState::update(float dt, unsigned int subSteps) noexcept
 {
     return true;
 }
@@ -30,16 +32,17 @@ bool SplashState::handleEvent(const SDL_Event& event) noexcept
 {
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
-        SDL_Log("SplashState: Key pressed, checking if loading is complete...");
-
         // Only allow transition if loading is complete
         if (!isLoadingComplete())
         {
+#if defined(MAZE_DEBUG)
+
             SDL_Log("Loading not complete yet, please wait...");
+#endif
+
             return true;
         }
 
-        SDL_Log("SplashState: Loading complete! Transitioning to menu state...");
         // Pop the splash state
         requestStackPop();
         // Pop the loading state underneath

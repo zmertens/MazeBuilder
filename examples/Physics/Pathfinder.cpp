@@ -2,10 +2,12 @@
 
 #include "ResourceManager.hpp"
 #include "Texture.hpp"
+#include "Wall.hpp"
+#include "Player.hpp"
 
 Pathfinder::Pathfinder(Type type, const TextureManager& textures)
     : mType(type)
-      , mSprite(textures.get(getTextureID()))
+      , mSprite(textures.get(Pathfinder::getTextureID()))
 {
 }
 
@@ -28,9 +30,12 @@ Category::Type Pathfinder::getCategory() const noexcept
     }
 }
 
-void Pathfinder::updateCurrent(float dt) noexcept
+void Pathfinder::updateCurrent(float dt, CommandQueue& commands) noexcept
 {
-    // Update logic for Pathfinder can be implemented here
+    // Call base class to sync physics body position to scene node transform
+    Entity::updateCurrent(dt, commands);
+
+    // Additional Pathfinder-specific update logic can be added here
 }
 
 void Pathfinder::drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept
@@ -44,15 +49,15 @@ Textures::ID Pathfinder::getTextureID() const noexcept
     {
     case Type::ALLY:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     case Type::ENEMY:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     default:
         {
-            return Textures::ID::ASTRONAUT;
+            return Textures::ID::CHARACTER;
         }
     }
 }

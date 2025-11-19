@@ -12,11 +12,11 @@ StateStack::StateStack(State::Context context)
 {
 }
 
-void StateStack::update(float dt) noexcept
+void StateStack::update(float dt, unsigned int subSteps) noexcept
 {
     for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
     {
-        if (!(*it)->update(dt))
+        if (!(*it)->update(dt, subSteps))
         {
             break;
         }
@@ -27,9 +27,34 @@ void StateStack::update(float dt) noexcept
 
 void StateStack::draw() const noexcept
 {
-    for (const auto& state : mStack)
+    if (mStack.empty())
     {
-        state->draw();
+        return;
+    }
+
+    // Find the first opaque state from the top of the stack
+    auto firstOpaque = mStack.begin();
+
+    for (auto it = mStack.rbegin(); it != mStack.rend(); ++it)
+    {
+        if ((*it)->isOpaque())
+        {
+            if (auto base = it.base(); base != mStack.begin())
+            {
+                firstOpaque = std::prev(base);
+            }
+            else
+            {
+                firstOpaque = mStack.begin();
+            }
+            break;
+        }
+    }
+
+    // Draw from the first opaque state to the top
+    for (auto it = firstOpaque; it != mStack.end(); ++it)
+    {
+        (*it)->draw();
     }
 }
 
@@ -48,17 +73,17 @@ void StateStack::handleEvent(const SDL_Event& event) noexcept
 
 void StateStack::pushState(States::ID stateID)
 {
-    mPendingList.push_back(PendingChange(Action::PUSH, stateID));
+    mPendingList.emplace_back(Action::PUSH, stateID);
 }
 
 void StateStack::popState()
 {
-    mPendingList.push_back(PendingChange(Action::POP));
+    mPendingList.emplace_back(Action::POP);
 }
 
 void StateStack::clearStates()
 {
-    mPendingList.push_back(PendingChange(Action::CLEAR));
+    mPendingList.emplace_back(Action::CLEAR);
 }
 
 bool StateStack::isEmpty() const noexcept

@@ -11,12 +11,14 @@
 #include "StateStack.hpp"
 #include "Texture.hpp"
 
-GameState::GameState(StateStack& stack, State::Context context)
+GameState::GameState(StateStack& stack, Context context)
     : State{stack, context}
-      , mWorld{*context.window, *context.textures}
+      , mWorld{*context.window, *context.fonts, *context.textures}
       , mPlayer{*context.player}
 {
+    mPlayer.setActive(true);
     mWorld.init();
+    mWorld.setPlayer(context.player);
 }
 
 void GameState::draw() const noexcept
@@ -24,7 +26,7 @@ void GameState::draw() const noexcept
     mWorld.draw();
 }
 
-bool GameState::update(float dt) noexcept
+bool GameState::update(float dt, unsigned int subSteps) noexcept
 {
     mWorld.update(dt);
 
@@ -39,13 +41,13 @@ bool GameState::handleEvent(const SDL_Event& event) noexcept
     auto& commands = mWorld.getCommandQueue();
 
     mPlayer.handleEvent(event, std::ref(commands));
+    mWorld.handleEvent(event);
 
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
         if (event.key.scancode == SDL_SCANCODE_ESCAPE)
         {
             requestStackPush(States::ID::PAUSE);
-            requestStackPush(States::ID::MENU);
         }
     }
 

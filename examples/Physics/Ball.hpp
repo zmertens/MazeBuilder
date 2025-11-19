@@ -22,14 +22,12 @@ public:
     explicit Ball(Type type, const TextureManager& textureManager);
 
 private:
-    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
+    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-private:
-    virtual Textures::ID getTextureID() const noexcept override;
+    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
 
-    virtual void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt, CommandQueue&) noexcept override;
 
-private:
     Type mType;
     Sprite mSprite;
 };

@@ -2,24 +2,25 @@
 if(MAZE_BUILDER_EXAMPLES)
 
     set(DEAR_IMGUI_SOURCES
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui_demo.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui_draw.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui_tables.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui_widgets.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_sdl3.cpp
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.cpp)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_demo.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_draw.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_tables.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_widgets.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdl3.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdlrenderer3.cpp)
 
     set(DEAR_IMGUI_HEADERS
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imconfig.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imgui_internal.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imstb_rectpack.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imstb_textedit.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/imstb_truetype.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_sdl3.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3.h
-        ${CMAKE_SOURCE_DIR}/deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imconfig.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_internal.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_rectpack.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_textedit.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_truetype.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdl3.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
 
     if(EMSCRIPTEN)
         message(INFO ": Building examples for the Web!")

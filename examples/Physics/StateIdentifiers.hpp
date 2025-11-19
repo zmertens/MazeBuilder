@@ -4,16 +4,16 @@
 
 namespace States
 {
-    enum class ID
+    enum class ID : unsigned int
     {
-        NONE,
-        SPLASH,
-        LOADING,
-        MENU,
-        GAME,
-        PAUSE,
-        SETTINGS,
-        DONE,
+        DONE = 0,
+        GAME = 1,
+        LOADING = 2,
+        MENU = 3,
+        PAUSE = 4,
+        RESETTING = 5,
+        SETTINGS = 6,
+        SPLASH = 7,
     };
 }
 

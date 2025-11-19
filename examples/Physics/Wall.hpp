@@ -30,12 +30,11 @@ public:
     void setOrientation(Orientation orientation);
 
 private:
-    virtual void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
+    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
 
-private:
-    Textures::ID getTextureID() const noexcept override;
+    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
 
-    virtual void updateCurrent(float dt) noexcept override;
+    void updateCurrent(float dt, CommandQueue&) noexcept override;
 
     int hitCount;
     bool isDestroyed;

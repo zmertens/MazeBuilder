@@ -1,31 +1,28 @@
 #ifndef WORLD_HPP
 #define WORLD_HPP
 
-#include <box2d/id.h>
+#include <box2d/box2d.h>
 
 #include <array>
-#include <cstdint>
 #include <vector>
 
-#include "Command.hpp"
 #include "CommandQueue.hpp"
+#include "PostProcessingManager.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
-#include "ResourceManager.hpp"
 #include "SceneNode.hpp"
 #include "View.hpp"
 
 class Pathfinder;
+class Player;
 class RenderWindow;
 
 class World final
 {
 public:
-    explicit World(RenderWindow& window, TextureManager& textures);
+    explicit World(RenderWindow& window, FontManager& fonts, TextureManager& textures);
 
     void init() noexcept;
-
-    void destroy() noexcept;
 
     // Update the world (update physics and entities)
     void update(float dt);
@@ -38,23 +35,29 @@ public:
     // Destroy the world
     void destroyWorld();
 
+    void handleEvent(const SDL_Event& event);
+
+    void setPlayer(Player* player);
+
 private:
     // Build the scene (initialize scene graph and layers)
     void buildScene();
 
-private:
     enum class Layer
     {
-        BACKGROUND = 0,
-        FOREGROUND = 1,
-        LAYER_COUNT = 2
+        PARALLAX_BACK = 0,
+        PARALLAX_MID = 1,
+        PARALLAX_FORE = 2,
+        BACKGROUND = 3,
+        FOREGROUND = 4,
+        LAYER_COUNT = 5
     };
 
-private:
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
     RenderWindow& mWindow;
     View mWorldView;
+    FontManager& mFonts;
     TextureManager& mTextures;
 
     SceneNode mSceneGraph;
@@ -65,6 +68,11 @@ private:
     CommandQueue mCommandQueue;
 
     Pathfinder* mPlayerPathfinder;
+
+    bool mIsPanning;
+    SDL_FPoint mLastMousePosition;
+
+    std::unique_ptr<PostProcessingManager> mPostProcessingManager;
 };
 
 #endif // WORLD_HPP

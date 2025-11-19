@@ -10,7 +10,7 @@
 #include "ResourceManager.hpp"
 
 Ball::Ball(Type type, const TextureManager& textureManager)
-    : mType{type}, mSprite{textureManager.get(getTextureID())}
+    : mType{type}, mSprite{textureManager.get(Ball::getTextureID())}
 {
 }
 
@@ -55,8 +55,10 @@ Ball::Ball(Type type, const TextureManager& textureManager)
 // shapeId = ballShapeId;
 // isActive = true;
 
-void Ball::updateCurrent(float dt) noexcept
+void Ball::updateCurrent(float dt, CommandQueue& commands) noexcept
 {
+    // Call base class to sync physics body position to scene node transform
+    Entity::updateCurrent(dt, commands);
 }
 
 

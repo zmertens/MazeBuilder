@@ -40,7 +40,7 @@ public:
     template <typename T, typename ResourcePath>
     void registerState(States::ID stateID, ResourcePath&& resourcePath);
 
-    void update(float dt) noexcept;
+    void update(float dt, unsigned int subSteps) noexcept;
 
     void draw() const noexcept;
 
@@ -64,7 +64,7 @@ private:
 private:
     struct PendingChange
     {
-        explicit PendingChange(Action action, States::ID stateID = States::ID::NONE);
+        explicit PendingChange(Action action, States::ID stateID = States::ID::DONE);
 
         Action action;
         States::ID stateID;

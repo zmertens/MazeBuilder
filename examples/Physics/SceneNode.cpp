@@ -1,6 +1,7 @@
 #include "SceneNode.hpp"
 
 #include "Command.hpp"
+#include "CommandQueue.hpp"
 #include "RenderStates.hpp"
 
 #include <box2d/math_functions.h>
@@ -12,7 +13,7 @@
 #include <cassert>
 
 SceneNode::SceneNode()
-    : mChildren{}, mParent(nullptr)
+    : mChildren{}, mParent(nullptr), mDefaultCategory(Category::Type::PICKUP)
 {
 }
 
@@ -33,22 +34,22 @@ SceneNode::Ptr SceneNode::detachChild(const SceneNode& node)
     return result;
 }
 
-void SceneNode::update(float dt) noexcept
+void SceneNode::update(float dt, CommandQueue& commands) noexcept
 {
-    updateCurrent(dt);
-    updateChildren(dt);
+    updateCurrent(dt, std::ref(commands));
+    updateChildren(dt, std::ref(commands));
 }
 
-void SceneNode::updateCurrent(float) noexcept
+void SceneNode::updateCurrent(float, CommandQueue& commands) noexcept
 {
     // Do nothing by default
 }
 
-void SceneNode::updateChildren(float dt) noexcept
+void SceneNode::updateChildren(float dt, CommandQueue& commands) noexcept
 {
     for (auto& child : mChildren)
     {
-        child->update(dt);
+        child->update(dt, std::ref(commands));
     }
 }
 
@@ -102,8 +103,9 @@ Transformable SceneNode::getWorldTransform() const
 
 void SceneNode::onCommand(const Command& command, float dt) noexcept
 {
-    // Check if the command applies to this node
-    if (command.category == getCategory())
+    // Check if the command applies to this node using bitwise AND
+    // This allows a single command to target multiple category types
+    if (static_cast<unsigned int>(command.category) & static_cast<unsigned int>(getCategory()))
     {
         command.action(*this, dt);
     }

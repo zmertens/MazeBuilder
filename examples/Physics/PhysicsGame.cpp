@@ -7,28 +7,35 @@
 #include "PhysicsGame.hpp"
 
 #include <cmath>
-#include <cstdint>
 #include <functional>
 #include <future>
 #include <memory>
+#include <stdexcept>
 #include <string_view>
 #include <string>
 #include <vector>
 
 #include <SDL3/SDL.h>
-#include <SFML/Audio.hpp>
 
+#include <dearimgui/imgui.h>
+#include <dearimgui/backends/imgui_impl_sdl3.h>
+#include <dearimgui/backends/imgui_impl_sdlrenderer3.h>
+
+#include "resources/Cousine_Regular.h"
+#include "resources/Limelight_Regular.h"
+#include "resources/nunito_sans.h"
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 #include <MazeBuilder/json_helper.h>
-#include <MazeBuilder/randomizer.h>
 
+#include "Font.hpp"
 #include "GameState.hpp"
 #include "LoadingState.hpp"
 #include "MenuState.hpp"
 #include "Player.hpp"
 #include "PauseState.hpp"
+#include "SettingsState.hpp"
 #include "RenderWindow.hpp"
 #include "ResourceIdentifiers.hpp"
 #include "ResourceManager.hpp"
@@ -59,12 +66,20 @@ struct PhysicsGame::PhysicsGameImpl
 
     SDLHelper sdlHelper;
 
+    FontManager fonts;
+
     TextureManager textures;
 
     std::unique_ptr<StateStack> stateStack;
 
     // Game-specific variables
     int score = 0;
+
+    // FPS smoothing variables
+    mutable double fpsUpdateTimer = 0.0;
+    mutable int smoothedFps = 0;
+    mutable float smoothedFrameTime = 0.0f;
+    static constexpr double FPS_UPDATE_INTERVAL = 250.0; // Update display every 250ms
 
     std::string title;
     std::string version;
@@ -92,10 +107,19 @@ struct PhysicsGame::PhysicsGameImpl
 
         window = std::make_unique<RenderWindow>(sdlHelper.renderer, sdlHelper.window);
 
-        stateStack = std::make_unique<StateStack>(State::Context{*window, textures, p1});
+        initDearImGui();
+
+        stateStack = std::make_unique<StateStack>(State::Context{
+            *window,
+            std::ref(fonts),
+            std::ref(textures),
+            std::ref(p1)
+        });
 
         // Load initial textures needed for loading/splash screens
-        loadSplashTextures();
+        generateLevelOne();
+
+        loadFonts();
 
         registerStates();
 
@@ -104,11 +128,12 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->pushState(States::ID::SPLASH);
     }
 
-    ~PhysicsGameImpl() {
-
+    ~PhysicsGameImpl()
+    {
         if (auto& sdl = this->sdlHelper; sdl.window || sdl.renderer)
         {
             this->stateStack->clearStates();
+            this->fonts.clear();
             this->textures.clear();
             sdl.destroyAndQuit();
         }
@@ -120,70 +145,112 @@ struct PhysicsGame::PhysicsGameImpl
         sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
-    void loadSplashTextures() noexcept
+    void initDearImGui() const noexcept
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
+        ImGui::GetIO().IniFilename = nullptr;
+
+        // Setup ImGui Platform/Renderer backends
+        ImGui_ImplSDL3_InitForSDLRenderer(this->sdlHelper.window, this->sdlHelper.renderer);
+        ImGui_ImplSDLRenderer3_Init(this->sdlHelper.renderer);
+    }
+
+    void generateLevelOne() noexcept
     {
         using std::string;
 
-        // Configure and generate maze for loading/splash screens
         mazes::configurator config{};
-        config.rows(INIT_WINDOW_H).columns(INIT_WINDOW_W).levels(1).algo_id(mazes::algo::BINARY_TREE).seed(42);
+        config.rows(mazes::configurator::MAX_ROWS)
+              .columns(mazes::configurator::MAX_COLUMNS)
+              .levels(1)
+              .algo_id(mazes::algo::BINARY_TREE)
+              .seed(42)
+              .distances(true)
+              .distances_start(0)
+              .distances_end(-1);
 
         try
         {
-            // Generate maze and create texture from it
-            SDL_Log("DEBUG: Generating initial maze with dimensions %dx%d", config.rows(), config.columns());
-            string mazeString = mazes::create(config);
-
-            if (!mazeString.empty())
+            if (const auto mazeStr = mazes::create(config); !mazeStr.empty())
             {
-                SDL_Log("DEBUG: Maze generated successfully, length: %zu characters", mazeString.size());
-
                 // Load the maze texture from the generated string
-                constexpr int cellSize = 4; // Pixels per character in the maze
-                textures.load(sdlHelper.renderer, Textures::ID::SPLASH_SCREEN, mazeString, cellSize);
-
-                auto& mazeTexture = textures.get(Textures::ID::SPLASH_SCREEN);
-                SDL_Log("DEBUG: Maze texture created successfully: %dx%d",
-                        mazeTexture.getWidth(), mazeTexture.getHeight());
+                textures.load(sdlHelper.renderer, Textures::ID::LEVEL_ONE, mazeStr, 12);
             }
             else
             {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze string");
+                throw std::runtime_error("Failed to create maze:\n" + mazeStr);
             }
         }
         catch (const std::exception& e)
         {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load initial textures: %s", e.what());
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate level one: %s", e.what());
         }
     }
 
-    void processInput()
+    void loadFonts() noexcept
+    {
+        static constexpr auto FONT_PIXEL_SIZE = 28.f;
+        fonts.load(Fonts::ID::LIMELIGHT,
+            Limelight_Regular_compressed_data,
+            Limelight_Regular_compressed_size,
+                   FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::NUNITO_SANS,
+            NunitoSans_compressed_data,
+            NunitoSans_compressed_size,
+            FONT_PIXEL_SIZE);
+        fonts.load(Fonts::ID::COUSINE_REGULAR,
+            Cousine_Regular_compressed_data,
+            Cousine_Regular_compressed_size,
+                   FONT_PIXEL_SIZE);
+
+        // Build font atlas after adding fonts
+        ImGui::GetIO().Fonts->Build();
+    }
+
+    void processInput() const noexcept
     {
         SDL_Event event;
 
         while (SDL_PollEvent(&event))
         {
-            // Let the state stack handle events
-            stateStack->handleEvent(event);
+            // Let ImGui process the event first
+            ImGui_ImplSDL3_ProcessEvent(&event);
 
             if (event.type == SDL_EVENT_QUIT)
             {
                 stateStack->clearStates();
                 break;
             }
+
+            // Then let the state stack handle events
+            stateStack->handleEvent(event);
         }
     }
 
-    void update(float dt, int subSteps = 4)
+    void update(const float dt, int subSteps = 4) const noexcept
     {
-        stateStack->update(dt);
+        stateStack->update(dt, subSteps);
     }
 
-    void render() const noexcept
+    void render(double& currentTimeStep, const double elapsed) const noexcept
     {
         // Clear, draw, and present (like SFML)
         window->clear();
+        window->beginFrame();
         stateStack->draw();
+
+#if defined(MAZE_DEBUG)
+        // Window might be closed during draw calls/events
+        if (window->isOpen())
+        {
+            this->handleFPS(std::ref(currentTimeStep), elapsed);
+        }
+#endif
+
         window->display();
     }
 
@@ -193,7 +260,54 @@ struct PhysicsGame::PhysicsGameImpl
         stateStack->registerState<LoadingState>(States::ID::LOADING, resourcePath);
         stateStack->registerState<MenuState>(States::ID::MENU);
         stateStack->registerState<PauseState>(States::ID::PAUSE);
+        stateStack->registerState<SettingsState>(States::ID::SETTINGS);
         stateStack->registerState<SplashState>(States::ID::SPLASH);
+    }
+
+    void handleFPS(double& currentTimeStep, const double elapsed) const noexcept
+    {
+        // Calculate instantaneous FPS and frame time
+        const auto fps = static_cast<int>(1000.0 / elapsed);
+        const auto frameTime = static_cast<float>(elapsed);
+
+        // Update smoothed values periodically for display
+        fpsUpdateTimer += elapsed;
+        if (fpsUpdateTimer >= FPS_UPDATE_INTERVAL)
+        {
+            smoothedFps = fps;
+            smoothedFrameTime = frameTime;
+            fpsUpdateTimer = 0.0;
+        }
+
+        // if (currentTimeStep >= 1000.0)
+        // {
+        //     SDL_Log("FPS: %d\n", smoothedFps);
+        //     SDL_Log("Frame Time: %.3f ms/frame\n", smoothedFrameTime);
+        //
+        //     currentTimeStep = 0.0;
+        // }
+
+        // Create ImGui overlay window
+        // Set window position to top-right corner
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+
+        // Set window background to be semi-transparent
+        ImGui::SetNextWindowBgAlpha(0.65f);
+
+        // Create window with no title bar, no resize, no move, auto-resize
+        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+                                       ImGuiWindowFlags_AlwaysAutoResize |
+                                       ImGuiWindowFlags_NoSavedSettings |
+                                       ImGuiWindowFlags_NoFocusOnAppearing |
+                                       ImGuiWindowFlags_NoNav |
+                                       ImGuiWindowFlags_NoMove;
+
+        if (ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        {
+            ImGui::Text("FPS: %d", smoothedFps);
+            ImGui::Text("Frame Time: %.2f ms", smoothedFrameTime);
+            ImGui::End();
+        }
     }
 }; // impl
 
@@ -208,15 +322,13 @@ PhysicsGame::PhysicsGame(const std::string& title, const std::string& version, i
 {
 }
 
-PhysicsGame::~PhysicsGame()
-{
-    // Unique pointer will automatically clean up
-}
+PhysicsGame::~PhysicsGame() = default;
 
 // Main game loop
 bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
     using std::async;
+    using std::cref;
     using std::launch;
     using std::make_unique;
     using std::move;
@@ -237,13 +349,13 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
         return false;
     }
 
-    double previous = static_cast<double>(SDL_GetTicks());
+    auto previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
 
     SDL_Log("Entering game loop...\n");
 
     // Apply pending state changes (push SPLASH state onto stack)
-  gamePtr->stateStack->update(0.0f);
+    gamePtr->stateStack->update(0.1f, 4);
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
@@ -253,8 +365,8 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
     {
         // Expected milliseconds per frame (16.67ms)
         static constexpr auto FIXED_TIME_STEP = 1000.0 / 60.0;
-        auto current = static_cast<double>(SDL_GetTicks());
-        auto elapsed = current - previous;
+        const auto current = static_cast<double>(SDL_GetTicks());
+        const auto elapsed = current - previous;
         previous = current;
         accumulator += elapsed;
 
@@ -275,23 +387,7 @@ bool PhysicsGame::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomiz
             gamePtr->window->close();
         }
 
-        gamePtr->render();
-
-        // Cap frame rate at 60 FPS if VSync doesn't work
-        if (auto frameTime = static_cast<double>(SDL_GetTicks()) - current; frameTime < FIXED_TIME_STEP)
-        {
-            SDL_Delay(static_cast<std::uint32_t>(FIXED_TIME_STEP - frameTime));
-        }
-
-        // FPS counter
-        if (currentTimeStep >= 1000.0)
-        {
-            // Calculate frames per second (elapsed is in milliseconds)
-            SDL_Log("FPS: %d\n", static_cast<int>(1000.0 / elapsed));
-            // Calculate milliseconds per frame
-            SDL_Log("Frame Time: %.3f ms/frame\n", elapsed);
-            currentTimeStep = 0.0;
-        }
+        gamePtr->render(ref(currentTimeStep), elapsed);
     }
 
 #if defined(__EMSCRIPTEN__)

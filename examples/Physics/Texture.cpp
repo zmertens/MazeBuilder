@@ -7,6 +7,8 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
+#include "MazeLayout.hpp"
+
 void Texture::free() noexcept
 {
     if (this->texture)
@@ -142,100 +144,35 @@ bool Texture::loadFromStr(SDL_Renderer* renderer, std::string_view str, int cell
         return false;
     }
 
-    // Parse the maze string to determine dimensions
-    int mazeWidth = 0;
-    int mazeHeight = 0;
-    int currentLineWidth = 0;
+    MazeLayout maze = MazeLayout::fromString(str, cellSize);
 
-    for (char c : str)
+    if (maze.getRows() == 0 || maze.getColumns() == 0)
     {
-        if (c == '\n')
-        {
-            mazeHeight++;
-            if (currentLineWidth > mazeWidth)
-            {
-                mazeWidth = currentLineWidth;
-            }
-            currentLineWidth = 0;
-        }
-        else
-        {
-            currentLineWidth++;
-        }
-    }
-
-    // Handle last line if it doesn't end with newline
-    if (currentLineWidth > 0)
-    {
-        mazeHeight++;
-        if (currentLineWidth > mazeWidth)
-        {
-            mazeWidth = currentLineWidth;
-        }
-    }
-
-    if (mazeWidth == 0 || mazeHeight == 0)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze dimensions: %dx%d", mazeWidth, mazeHeight);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze generated from string");
         return false;
     }
 
-    // Create a surface to render the maze onto
-    this->width = mazeWidth * cellSize;
-    this->height = mazeHeight * cellSize;
+    return loadFromMaze(renderer, maze);
+}
 
-    SDL_Surface* surface = SDL_CreateSurface(this->width, this->height, SDL_PIXELFORMAT_RGBA8888);
+bool Texture::loadFromMaze(SDL_Renderer* renderer, const MazeLayout& maze) noexcept
+{
+    this->free();
+
+    if (maze.getRows() <= 0 || maze.getColumns() <= 0 || maze.getCellSize() <= 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "MazeLayout has invalid dimensions");
+        return false;
+    }
+
+    SDL_Surface* surface = maze.buildSurface();
 
     if (!surface)
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create surface for maze: %s", SDL_GetError());
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to build surface from MazeLayout");
         return false;
     }
 
-    // Fill with white background
-    SDL_FillSurfaceRect(surface, nullptr, SDL_MapSurfaceRGBA(surface, 255, 255, 255, 255));
-
-    // Draw the maze character by character
-    int row = 0;
-    int col = 0;
-
-    for (char c : str)
-    {
-        if (c == '\n')
-        {
-            row++;
-            col = 0;
-            continue;
-        }
-
-        // Determine color based on character
-        SDL_Rect charRect = {col * cellSize, row * cellSize, cellSize, cellSize};
-
-        std::uint8_t r = 255, g = 255, b = 255, a = 255;
-
-        if (c == static_cast<char>(mazes::barriers::CORNER)
-            || c == static_cast<char>(mazes::barriers::HORIZONTAL)
-            || c == static_cast<char>(mazes::barriers::VERTICAL))
-        {
-            // Walls are black
-            r = 0;
-            g = 0;
-            b = 0;
-        }
-        else if (c == ' ')
-        {
-            // Paths are white (already the background color)
-            r = 255;
-            g = 255;
-            b = 255;
-        }
-
-        SDL_FillSurfaceRect(surface, &charRect, SDL_MapSurfaceRGBA(surface, r, g, b, a));
-
-        col++;
-    }
-
-    // Create texture from surface
     this->texture = SDL_CreateTextureFromSurface(renderer, surface);
 
     if (!this->texture)
@@ -246,6 +183,9 @@ bool Texture::loadFromStr(SDL_Renderer* renderer, std::string_view str, int cell
     }
 
     SDL_SetTextureBlendMode(this->texture, SDL_BLENDMODE_BLEND);
+
+    this->width = maze.getPixelWidth();
+    this->height = maze.getPixelHeight();
 
     SDL_DestroySurface(surface);
 

@@ -8,19 +8,27 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Ball.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/CommandQueue.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Entity.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Font.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/GameState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/HttpClient.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/LoadingState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/MazeLayout.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/MenuState.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/ParallaxNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Pathfinder.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PauseState.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsContactListener.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/PhysicsGame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Player.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PostProcessing.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/PostProcessingManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/RenderTexture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/RenderWindow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SceneNode.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SDLHelper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SessionHelper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/SettingsState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SplashState.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Sprite.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/SpriteNode.cpp

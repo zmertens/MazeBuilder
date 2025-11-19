@@ -26,7 +26,11 @@ scripts/*.jpg
 scripts/*.jpeg
 scripts/*.JPG
 scripts/*.JPEG
-!scripts/mask.png
+scripts/*.bmp
+!scripts/sample_icon.bmp
+!scripts/sample_maze.png
+!scripts/BreakingWallsMask.png
+!scripts/mask.txt
 
 # Ruby
 Gemfile.lock
@@ -37,6 +41,7 @@ Gemfile.lock
 
 # Python
 .venv
+scripts/__pycache__/
 
 # Cppcheck XML
 sources/cppcheck.xml
