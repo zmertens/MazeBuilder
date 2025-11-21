@@ -4,12 +4,10 @@
 #include <mutex>
 #include <string_view>
 
-#include "State.hpp"
-
 struct SDL_Window;
 struct SDL_Renderer;
 
-class SDLHelper
+class sdl_helper
 {
 public:
     SDL_Window* window;

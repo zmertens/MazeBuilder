@@ -1,8 +1,8 @@
-#include "SDLHelper.hpp"
+#include "sdl_helper.h"
 
 #include <SDL3/SDL.h>
 
-void SDLHelper::init(std::string_view title, int width, int height) noexcept
+void sdl_helper::init(std::string_view title, int width, int height) noexcept
 {
     auto initFunc = [this, title, width, height]()
     {
@@ -67,7 +67,7 @@ void SDLHelper::init(std::string_view title, int width, int height) noexcept
     }
 }
 
-void SDLHelper::destroyAndQuit() noexcept
+void sdl_helper::destroyAndQuit() noexcept
 {
     // Prevent double-destruction
     if (!this->window && !this->renderer)

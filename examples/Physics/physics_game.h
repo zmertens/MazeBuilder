@@ -14,22 +14,22 @@ namespace mazes
     class randomizer;
 }
 
-class PhysicsGame : public mazes::algo_interface, public mazes::singleton_base<PhysicsGame>
+class physics_game : public mazes::algo_interface, public mazes::singleton_base<physics_game>
 {
     friend class singleton_base;
 
 public:
-    PhysicsGame(std::string_view title, std::string_view version, std::string_view resourcePath, int w, int h);
+    physics_game(std::string_view title, std::string_view version, int w, int h);
 
-    PhysicsGame(const std::string& title, const std::string& version, int w, int h);
+    physics_game(const std::string& title, const std::string& version, int w, int h);
 
-    ~PhysicsGame() override;
+    ~physics_game() override;
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
 private:
-    struct PhysicsGameImpl;
-    std::unique_ptr<PhysicsGameImpl> m_impl;
+    struct physics_game_impl;
+    std::unique_ptr<physics_game_impl> m_impl;
 };
 
 #endif // PHYSICS_GAME_HPP

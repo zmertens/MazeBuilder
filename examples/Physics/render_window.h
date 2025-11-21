@@ -1,37 +1,29 @@
 #ifndef RENDER_WINDOW_HPP
 #define RENDER_WINDOW_HPP
 
-#include "RenderStates.hpp"
-#include "View.hpp"
-
 struct SDL_Renderer;
 struct SDL_Window;
 class View;
 
 /// @brief SDL-based RenderWindow that mimics SFML's sf::RenderWindow interface
-class RenderWindow
+class render_window
 {
 public:
-    explicit RenderWindow(SDL_Renderer* renderer, SDL_Window* window);
+    explicit render_window(SDL_Renderer* renderer, SDL_Window* window);
 
-    virtual ~RenderWindow() = default;
+    virtual ~render_window() = default;
 
     // Delete copy constructor and copy assignment operator
     // because RenderWindow contains std::unique_ptr which is not copyable
-    RenderWindow(const RenderWindow&) = delete;
-    RenderWindow& operator=(const RenderWindow&) = delete;
+    render_window(const render_window&) = delete;
+    render_window& operator=(const render_window&) = delete;
 
     // Allow move constructor and move assignment operator
-    RenderWindow(RenderWindow&&) = default;
-    RenderWindow& operator=(RenderWindow&&) = default;
-
-    /// @brief Set the current view (camera) for rendering
-    void setView(const View& view);
-
-    [[nodiscard]] View getView() const noexcept;
+    render_window(render_window&&) = default;
+    render_window& operator=(render_window&&) = default;
 
     /// @brief Draw a drawable object (like RenderWindow)
-    /// @tparam T Any type with a draw(RenderStates) method
+    /// @tparam T Any type with a draw method
     template <typename T>
     void draw(const T& drawable) const noexcept;
 
@@ -60,16 +52,12 @@ public:
 private:
     SDL_Renderer* mRenderer;
     SDL_Window* mWindow;
-    View mCurrentView;
 };
 
 template <typename T>
-void RenderWindow::draw(const T& drawable) const noexcept
+void render_window::draw(const T& drawable) const noexcept
 {
-    RenderStates states;
-    // Apply view transform if needed (for camera/scrolling)
-    // states.transform could be modified based on mCurrentView here
-    drawable.draw(mRenderer, states);
+    drawable.draw(mRenderer);
 }
 
 #endif // RENDER_WINDOW_HPP
