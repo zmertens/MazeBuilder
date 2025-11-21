@@ -2,12 +2,6 @@ include(BuildInfo)
 
 set(CPP_BASE64_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/../deps/cpp-base64/base64.cpp)
 
-# Don't include this source file in Visual Studio projects
-set_source_files_properties(${CPP_BASE64_SRCS} PROPERTIES 
-    VS_TOOL_OVERRIDE "None"
-    HEADER_FILE_ONLY FALSE
-)
-
 message(INFO ": Configuring ${PROJECT_NAME} v${MAZE_BUILDER_VERSION}")
 
 set(MAZE_BUILDER_CORE_SRCS
@@ -35,17 +29,17 @@ set(MAZE_BUILDER_CORE_SRCS
 
 if(MAZE_BUILDER_COVERAGE)
     message(STATUS "Building ${PROJECT_NAME} with code coverage")
-    
+
     # Include CppCheck module first
     include(CppCheck)
-    
+
     # Find cppcheck executable
     find_program(CPPCHECK_EXECUTABLE cppcheck)
     if(NOT CPPCHECK_EXECUTABLE)
         message(WARNING "cppcheck not found, static analysis will be skipped")
     else()
         message(STATUS "Found CppCheck: ${CPPCHECK_EXECUTABLE}")
-        
+
         # Create the custom target with proper executable reference
         set(RUN_CPPCHECK "run_cppcheck")
         add_custom_target(${RUN_CPPCHECK}
@@ -54,7 +48,7 @@ if(MAZE_BUILDER_COVERAGE)
             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
             COMMENT "Running CppCheck on ${PROJECT_NAME} sources"
         )
-        
+
         # No need to call AddCppCheck on the custom target
         # The AddCppCheck function is designed for actual library/executable targets
         # AddCppCheck(${MAZE_BUILDER_LIB_OUT}_obj)
