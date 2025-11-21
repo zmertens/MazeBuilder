@@ -1,33 +1,43 @@
-include(FetchGitRepo)
-
 # Setup dependencies
 set(EXE_NAME "mazebuilderphysics")
 
+set(DEAR_IMGUI_DEP_PATH ${CMAKE_SOURCE_DIR}/deps/dearimgui)
+set(DEAR_IMGUI_BACKENDS_PATH ${DEAR_IMGUI_DEP_PATH}/backends)
+
 set(EXE_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/physics_game.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/render_window.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/sdl_helper.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/physics_game.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/render_window.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdl_helper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp)
+
+add_executable(${EXE_NAME} ${DEAR_IMGUI_SOURCES} ${EXE_SOURCES})
+
+target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
+target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
+
+target_include_directories(${EXE_NAME} PRIVATE
+    $<BUILD_INTERFACE:${DEAR_IMGUI_BACKENDS_PATH}>
+    $<BUILD_INTERFACE:${DEAR_IMGUI_DEP_PATH}>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps/stb>
+    $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>
+    $<INSTALL_INTERFACE:include>
+    $<INSTALL_INTERFACE:deps/dearimgui>
+    $<INSTALL_INTERFACE:deps/stb>)
+
+target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d)
 
 if(EMSCRIPTEN)
-    message(INFO ": Building ${EXE_NAME} examples for the Web!")
+    message(INFO ": Building ${EXE_NAME} for the Web!")
 
-    add_executable(${EXE_NAME} ${DEAR_IMGUI_SOURCES} ${EXE_SOURCES})
     set_target_properties(${EXE_NAME} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
-    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 SFML::Audio SFML::Network box2d::box2d)
-    target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local)
-    target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
-    target_compile_options(${EXE_NAME} PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
-    target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/glad/include>)
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
+
+    set(EMSCRIPTEN_DEP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../deps/emscripten_local)
+    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/emscripten_local> $<BUILD_INTERFACE:${EMSCRIPTEN_DEP_PATH}>)
 
     target_link_options(${EXE_NAME} PRIVATE
-        "SHELL:-s PTHREAD_POOL_SIZE=5 -s WASM=1 -s USE_PTHREADS -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
-        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
+        "SHELL:-s WASM=1 -s MODULARIZE=1 -s EXPORT_ES6=1"
         "SHELL:--shell-file ${CMAKE_CURRENT_SOURCE_DIR}/../../deps/emscripten_local/shell_minimal.html"
         "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/resources@/resources")
 
@@ -37,14 +47,6 @@ if(EMSCRIPTEN)
 else()
     message(INFO ": Building ${EXE_NAME} for the Desktop!")
 
-    add_executable(${EXE_NAME} ${EXE_SOURCES} ${DEAR_IMGUI_SOURCES})
-    target_link_libraries(${EXE_NAME} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3 box2d::box2d SFML::Audio SFML::Network)
-    target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
-    target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
-    target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
-    target_include_directories(${EXE_NAME} PRIVATE $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
-
     file(COPY "resources" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 	# Copy shared/dlls on Windows only
@@ -52,16 +54,6 @@ else()
 		add_custom_command(
 			TARGET ${EXE_NAME} POST_BUILD
 			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:${EXE_NAME}>
-			VERBATIM
-		)
-		add_custom_command(
-			TARGET ${EXE_NAME} POST_BUILD
-			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Audio> $<TARGET_FILE_DIR:${EXE_NAME}>
-			VERBATIM
-		)
-        add_custom_command(
-			TARGET ${EXE_NAME} POST_BUILD
-			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SFML::Network> $<TARGET_FILE_DIR:${EXE_NAME}>
 			VERBATIM
 		)
 	endif()

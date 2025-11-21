@@ -6,9 +6,9 @@
 #include "Sprite.hpp"
 
 /// @file Ball.hpp
-/// @class Ball
+/// @class ball
 /// @brief Data class for a ball with physics properties
-class Ball : public Entity
+class ball : public Entity
 {
 public:
     enum class Type
@@ -19,7 +19,7 @@ public:
         EXPLOSIVE
     };
 
-    explicit Ball(Type type, const TextureManager& textureManager);
+    explicit ball(Type type, const TextureManager& textureManager);
 
 private:
     void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;

@@ -30,6 +30,8 @@
 #include "sdl_helper.h"
 #include "texture.h"
 
+#include "resources/Cousine_Regular.h"
+
 #if defined(__EMSCRIPTEN__)
 
 #include <emscripten_local/emscripten_mainloop_stub.h>
@@ -67,8 +69,8 @@ struct physics_game::physics_game_impl
 
     // Box2D world and physics components
     b2WorldId worldId = b2_nullWorldId; // Box2D world identifier
-    float timeStep = 1.0f / 60.0f; // Physics time step (60Hz)
-    float pixelsPerMeter = 40.0f; // Scale factor for Box2D (which uses meters)
+    // Scale factor for Box2D (which uses meters)
+    float pixelsPerMeter = 40.0f;
 
     // Game state
     int score = 0;
@@ -115,7 +117,7 @@ struct physics_game::physics_game_impl
 
     void initSDL() noexcept
     {
-        auto windowTitle = title + " - " + version;
+        const auto windowTitle = title + " - " + version;
         this->sdlHelper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
@@ -131,6 +133,10 @@ struct physics_game::physics_game_impl
         // Setup ImGui Platform/Renderer backends
         ImGui_ImplSDL3_InitForSDLRenderer(this->sdlHelper.window, this->sdlHelper.renderer);
         ImGui_ImplSDLRenderer3_Init(this->sdlHelper.renderer);
+
+        ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(Cousine_Regular_compressed_data,
+                                                             Cousine_Regular_compressed_size,
+                                                             35.f);
     }
 
     void processInput() const noexcept
@@ -210,6 +216,8 @@ struct physics_game::physics_game_impl
             fpsUpdateTimer = 0.0;
         }
 
+        ImGui::PushFont(ImGui::GetIO().Fonts->Fonts[0]);
+
         // Create ImGui overlay window
         // Set window position to top-right corner
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always,
@@ -232,6 +240,8 @@ struct physics_game::physics_game_impl
             ImGui::Text("Frame Time: %.2f ms", smoothedFrameTime);
             ImGui::End();
         }
+
+        ImGui::PopFont();
     }
 
     // ============================================================================
@@ -256,8 +266,7 @@ struct physics_game::physics_game_impl
         worldId = b2CreateWorld(&worldDef);
 
         // Set physics simulation parameters
-        timeStep = 1.0f / 60.0f; // 60Hz simulation
-        pixelsPerMeter = 40.0f; // Good scaling for visibility
+        pixelsPerMeter = 40.0f;
 
         // Clear body tracking
         wallBodies.clear();
@@ -948,27 +957,9 @@ physics_game::~physics_game() = default;
 // Main game loop
 bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
-    using std::async;
-    using std::cref;
-    using std::launch;
-    using std::make_unique;
-    using std::move;
-    using std::optional;
     using std::ref;
-    using std::string;
-    using std::string_view;
-    using std::unique_ptr;
-    using std::unordered_map;
-    using std::vector;
 
     auto&& gamePtr = this->m_impl;
-
-    // Check if initialization succeeded before entering game loop
-    if (!gamePtr->window)
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Game initialization failed - cannot run");
-        return false;
-    }
 
     auto previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0, currentTimeStep = 0.0;
@@ -976,7 +967,7 @@ bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomi
     SDL_Log("Entering game loop...\n");
 
     // Create maze physics
-    gamePtr->createMazePhysics(mazes::create(mazes::configurator().rows(10).columns(10)), 40.0f);
+    gamePtr->createMazePhysics(mazes::create(mazes::configurator().rows(10).columns(10)), 10.0f);
 
     // Create some test balls to see the simulation
     gamePtr->createTestBalls();

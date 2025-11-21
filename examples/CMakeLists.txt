@@ -29,19 +29,19 @@ if(MAZE_BUILDER_EXAMPLES)
         if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
             message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE is not set. Please specify the path to the Emscripten toolchain file.")
         endif()
-    
+
         # Set global compile flags that will be inherited by all targets
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory -pthread")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory -pthread")
-        
+
         # Set threading flags for Emscripten
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
         set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pthread")
-        
+
         # Fix for Emscripten/WebAssembly type detection issues in Ogg/Vorbis
         set(SIZEOF_SHORT 2 CACHE INTERNAL "Size of short")
         set(SIZEOF_INT 4 CACHE INTERNAL "Size of int")
-        set(SIZEOF_LONG 4 CACHE INTERNAL "Size of long") 
+        set(SIZEOF_LONG 4 CACHE INTERNAL "Size of long")
         set(SIZEOF_LONG_LONG 8 CACHE INTERNAL "Size of long long")
 
         set(HAVE_STDINT_H 1 CACHE INTERNAL "Have stdint.h")
@@ -59,12 +59,12 @@ if(MAZE_BUILDER_EXAMPLES)
             set_property(TARGET Threads::Threads PROPERTY INTERFACE_COMPILE_OPTIONS "-pthread")
             set_property(TARGET Threads::Threads PROPERTY INTERFACE_LINK_LIBRARIES "-pthread")
         endif()
-        
+
         # Set variables that FindThreads would normally set
         set(Threads_FOUND TRUE)
         set(CMAKE_THREAD_LIBS_INIT "-pthread")
         set(CMAKE_USE_PTHREADS_INIT TRUE)
-        
+
         list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory;-pthread>")
 
         include(FetchGitRepo)
@@ -100,10 +100,10 @@ if(MAZE_BUILDER_EXAMPLES)
 
     else(EMSCRIPTEN)
         message(INFO ": Building examples for the Desktop!")
-        
+
         # Find threads normally for desktop builds
         find_package(Threads REQUIRED)
-        
+
         include(FetchGitRepo)
 
         # Add Box2D dependency

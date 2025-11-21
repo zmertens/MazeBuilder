@@ -5,7 +5,7 @@
 #include "ResourceIdentifiers.hpp"
 #include "Sprite.hpp"
 
-class Wall : public Entity
+class wall : public Entity
 {
 public:
     enum class Orientation
@@ -13,7 +13,7 @@ public:
         HORIZONTAL, VERTICAL, CORNER
     };
 
-    explicit Wall(Orientation orientation, const TextureManager& textureManager);
+    explicit wall(Orientation orientation, const TextureManager& textureManager);
 
     // Getters
     int getHitCount() const;
