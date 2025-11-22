@@ -1,8 +1,6 @@
-// Basic application of Maze Builder as a level generator in a game setting
+// Basic application of Maze Builder as a physics simulation
 // Includes most game engine features like graphics and window management,
-// input handling, state management, and resource loading, audio, and network
-// Player verses computer AI gameplay with physics simulation
-// Scoring system based on survivability (time) and efficiency (resources)
+// input handling, state management, and resource loading
 
 #include <iostream>
 #include <exception>
@@ -39,7 +37,7 @@ EMSCRIPTEN_BINDINGS (maze_builder_module)
 }
 #endif
 
-int main(int argc, char* argv[])
+int main()
 {
     using std::cerr;
     using std::cout;

@@ -6,9 +6,7 @@
 struct SDL_Texture;
 struct SDL_Renderer;
 
-class MazeLayout;
-
-/// @file Texture.hpp
+/// @file texture.h
 /// @brief Texture class for SDL3
 /// @details This class wraps SDL_Texture and provides methods for loading, rendering, and freeing textures.
 class texture

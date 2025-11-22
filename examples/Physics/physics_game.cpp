@@ -10,7 +10,7 @@
 #include <functional>
 #include <future>
 #include <memory>
-#include <stdexcept>
+#include <ranges>
 #include <string_view>
 #include <string>
 #include <vector>
@@ -26,9 +26,12 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create.h>
 
+#include "ball.h"
+#include "mouse_states.h"
 #include "render_window.h"
 #include "sdl_helper.h"
 #include "texture.h"
+#include "wall.h"
 
 #include "resources/Cousine_Regular.h"
 
@@ -42,7 +45,7 @@ struct physics_game::physics_game_impl
     static constexpr auto COMMON_RESOURCE_PATH_PREFIX = "resources";
 
     // Game-specific constants
-    static constexpr float WALL_HIT_THRESHOLD = 4.0f; // Number of hits before a wall breaks
+    static constexpr float WALL_HIT_THRESHOLD = 4.0f;
     static constexpr float WALL_WIDTH = 0.1f;
 
     static constexpr int MAX_BALLS = 10;
@@ -55,34 +58,30 @@ struct physics_game::physics_game_impl
     mutable double fpsUpdateTimer = 0.0;
     mutable int smoothedFps = 0;
     mutable float smoothedFrameTime = 0.0f;
-    static constexpr double FPS_UPDATE_INTERVAL = 250.0; // Update display every 250ms
+    // Update display every 250ms
+    static constexpr double FPS_UPDATE_INTERVAL = 250.0;
 
     const std::string title, version;
     const int INIT_WINDOW_W, INIT_WINDOW_H;
 
     // Maze rendering variables for physics coordinate system
-    float cellSize = 0.0f; // Size of a maze cell in pixels
-    float offsetX = 0.0f; // X offset for centering the maze
-    float offsetY = 0.0f; // Y offset for centering the maze
-    int maxCols = 0; // Number of columns in the maze
-    int maxRows = 0; // Number of rows in the maze
+    float cellSize = 0.0f;
+    float offsetX = 0.0f;
+    float offsetY = 0.0f;
+    int maxCols = 0;
+    int maxRows = 0;
 
     // Box2D world and physics components
-    b2WorldId worldId = b2_nullWorldId; // Box2D world identifier
+    b2WorldId worldId = b2_nullWorldId;
     // Scale factor for Box2D (which uses meters)
     float pixelsPerMeter = 40.0f;
 
     // Game state
     int score = 0;
 
-    // Mouse/touch interaction state
-    bool isDragging = false;
-    int draggedBallIndex = -1;
-    b2Vec2 lastMousePos = {0.0f, 0.0f};
-
     // Body tracking for rendering
     std::vector<b2BodyId> wallBodies;
-    std::vector<b2BodyId> ballBodies;
+    std::vector<ball> ballBodies;
     b2BodyId boundaryBodyId = b2_nullBodyId;
 
     physics_game_impl(std::string_view title, std::string_view version, int w, int h)
@@ -136,29 +135,27 @@ struct physics_game::physics_game_impl
 
         ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(Cousine_Regular_compressed_data,
                                                              Cousine_Regular_compressed_size,
-                                                             35.f);
+                                                             pixelsPerMeter);
     }
 
     void processInput() const noexcept
     {
         SDL_Event event;
 
+        // Let ImGui process the event first
+        ImGui_ImplSDL3_ProcessEvent(&event);
+
         while (SDL_PollEvent(&event))
         {
-            // Let ImGui process the event first
-            ImGui_ImplSDL3_ProcessEvent(&event);
-
             if (event.type == SDL_EVENT_QUIT)
             {
                 this->window->close();
                 break;
             }
-
-            // Then let the state stack handle events
         }
     }
 
-    void update(const float dt, int subSteps = 4) noexcept
+    void update(const float dt, mazes::randomizer& rng, int subSteps = 4) noexcept
     {
         // Step the Box2D physics world if initialized
         if (B2_IS_NON_NULL(worldId))
@@ -172,13 +169,24 @@ struct physics_game::physics_game_impl
 
             // Handle mouse dragging
             float mouseX, mouseY;
-            auto mouseState = SDL_GetMouseState(&mouseX, &mouseY);
-            bool isMouseDown = (mouseState & SDL_BUTTON_LMASK) != 0;
-            updateBallDrag(mouseX, mouseY, isMouseDown);
+            const auto mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+            const auto mousePhysicsPos = screenToPhysics(mouseX, mouseY);
+            const bool isMouseDown = (mouseState & SDL_BUTTON_LMASK) != 0;
+            const mouse_states mice {
+                isMouseDown ? mouse_states::button_state::DOWN : mouse_states::button_state::UP,
+                mouse_states::button_state::UP,
+                static_cast<int>(mousePhysicsPos.x),
+                static_cast<int>(mousePhysicsPos.y)
+            };
+
+            for (auto& b : ballBodies)
+            {
+                b.update(dt, std::cref(mice), std::ref(rng));
+            }
         }
     }
 
-    void render(double& currentTimeStep, const double elapsed) noexcept
+    void render(const double elapsed) noexcept
     {
         // Clear, draw, and present (like SFML)
         window->clear();
@@ -194,14 +202,14 @@ struct physics_game::physics_game_impl
         // Window might be closed during draw calls/events
         if (window->isOpen())
         {
-            this->handleFPS(std::ref(currentTimeStep), elapsed);
+            this->handleFPS(elapsed);
         }
 #endif
 
         window->display();
     }
 
-    void handleFPS(double& currentTimeStep, const double elapsed) const noexcept
+    void handleFPS(const double elapsed) const noexcept
     {
         // Calculate instantaneous FPS and frame time
         const auto fps = static_cast<int>(1000.0 / elapsed);
@@ -244,10 +252,6 @@ struct physics_game::physics_game_impl
         ImGui::PopFont();
     }
 
-    // ============================================================================
-    // PHYSICS SYSTEM METHODS
-    // ============================================================================
-
     /// @brief Initialize the Box2D physics world with gravity
     /// @details Creates a new Box2D world with downward gravity (9.8 m/s²) and
     ///          sets up simulation parameters for 60Hz physics updates.
@@ -262,7 +266,7 @@ struct physics_game::physics_game_impl
 
         // Create Box2D world with gravity pointing down
         b2WorldDef worldDef = b2DefaultWorldDef();
-        worldDef.gravity = {0.0f, 9.8f}; // Gravity in meters/second²
+        worldDef.gravity = {0.0f, 9.8f};
         worldId = b2CreateWorld(&worldDef);
 
         // Set physics simulation parameters
@@ -286,8 +290,8 @@ struct physics_game::physics_game_impl
     {
         // Convert from screen coordinates to physics coordinates
         // by accounting for offset and scale
-        float physX = (screenX - offsetX) / pixelsPerMeter;
-        float physY = (screenY - offsetY) / pixelsPerMeter;
+        const float physX = (screenX - offsetX) / pixelsPerMeter;
+        const float physY = (screenY - offsetY) / pixelsPerMeter;
 
         return {physX, physY};
     }
@@ -457,7 +461,7 @@ struct physics_game::physics_game_impl
                 b2BodyDef wallDef = b2DefaultBodyDef();
                 wallDef.type = b2_staticBody;
                 wallDef.position = {physX, physY};
-                wallDef.userData = reinterpret_cast<void*>(1000 + wallCount); // Unique wall ID
+                wallDef.userData = reinterpret_cast<void*>(1000 + wallCount);
                 b2BodyId wallBodyId = b2CreateBody(worldId, &wallDef);
 
                 // Wake up the body
@@ -472,8 +476,8 @@ struct physics_game::physics_game_impl
                 if (c == '-')
                 {
                     // Horizontal wall: full width, thin height
-                    float halfWidth = (cellSize / pixelsPerMeter) * 0.5f;
-                    float halfHeight = (cellSize / pixelsPerMeter) * 0.1f;
+                    const float halfWidth = (cellSize / pixelsPerMeter) * 0.5f;
+                    const float halfHeight = (cellSize / pixelsPerMeter) * 0.1f;
                     b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
                     b2CreatePolygonShape(wallBodyId, &shapeDef, &boxShape);
                 }
@@ -518,7 +522,7 @@ struct physics_game::physics_game_impl
         }
 
         // Get collision events from Box2D
-        b2ContactEvents contactEvents = b2World_GetContactEvents(worldId);
+        const b2ContactEvents contactEvents = b2World_GetContactEvents(worldId);
 
         // Handle hit events (impacts)
         for (int i = 0; i < contactEvents.hitCount; ++i)
@@ -530,17 +534,6 @@ struct physics_game::physics_game_impl
             // Check both orderings for wall collisions
             handleWallCollision(bodyA, bodyB);
             handleWallCollision(bodyB, bodyA);
-        }
-
-        // Handle begin contact events (for sensors/triggers)
-        for (int i = 0; i < contactEvents.beginCount; ++i)
-        {
-            b2ContactBeginTouchEvent* beginEvent = &contactEvents.beginEvents[i];
-            b2BodyId bodyA = b2Shape_GetBody(beginEvent->shapeIdA);
-            b2BodyId bodyB = b2Shape_GetBody(beginEvent->shapeIdB);
-
-            // TODO: Handle goal/exit detection here
-            // Check if a ball reached the exit using userData
         }
     }
 
@@ -560,12 +553,11 @@ struct physics_game::physics_game_impl
         }
 
         void* wallUserData = b2Body_GetUserData(possibleWallId);
-        uintptr_t wallValue = reinterpret_cast<uintptr_t>(wallUserData);
 
         // Check if this is a wall (IDs 1000-1999)
-        if (wallValue >= 1000 && wallValue < 2000)
+        if (const auto wallValue = reinterpret_cast<uintptr_t>(wallUserData); wallValue >= 1000 && wallValue < 2000)
         {
-            int wallIndex = static_cast<int>(wallValue - 1000);
+            const int wallIndex = static_cast<int>(wallValue - 1000);
 
             // Get ball velocity to check impact speed
             b2Vec2 ballVel = b2Body_GetLinearVelocity(possibleBallId);
@@ -606,186 +598,38 @@ struct physics_game::physics_game_impl
         }
     }
 
-    /// @brief Handle mouse/touch dragging of physics balls
-    /// @param mouseX Screen X coordinate of mouse/touch
-    /// @param mouseY Screen Y coordinate of mouse/touch
-    /// @param isMouseDown Whether mouse button is pressed
-    /// @details Allows player to drag balls around the screen by:
-    ///          - Detecting which ball is under the cursor
-    ///          - Applying forces to move ball toward mouse position
-    ///          - Setting velocity directly for responsive control
-    ///          This creates a "mouse joint" effect without actual joints.
-    void updateBallDrag(float mouseX, float mouseY, bool isMouseDown) noexcept
-    {
-        // Convert screen position to physics coordinates
-        b2Vec2 mousePhysicsPos = screenToPhysics(mouseX, mouseY);
-
-        if (isMouseDown)
-        {
-            if (!isDragging)
-            {
-                // Try to find a ball to start dragging - search from front to back
-                for (int i = 0; i < static_cast<int>(ballBodies.size()); ++i)
-                {
-                    b2BodyId ballId = ballBodies[i];
-                    if (B2_IS_NULL(ballId))
-                    {
-                        continue;
-                    }
-
-                    // Get ball position
-                    b2Vec2 ballPos = b2Body_GetPosition(ballId);
-
-                    // Get ball radius
-                    int shapeCount = b2Body_GetShapeCount(ballId);
-                    if (shapeCount == 0)
-                    {
-                        continue;
-                    }
-
-                    b2ShapeId shapeIds[1];
-                    b2Body_GetShapes(ballId, shapeIds, 1);
-                    b2ShapeId shapeId = shapeIds[0];
-
-                    if (B2_IS_NULL(shapeId))
-                    {
-                        continue;
-                    }
-
-                    b2Circle circle = b2Shape_GetCircle(shapeId);
-                    float radius = circle.radius;
-
-                    // Calculate distance from mouse to ball center
-                    float dx = mousePhysicsPos.x - ballPos.x;
-                    float dy = mousePhysicsPos.y - ballPos.y;
-                    float distance = sqrtf(dx * dx + dy * dy);
-
-                    // Check if mouse is over this ball (with improved hit detection)
-                    if (distance <= radius * 2.0f)
-                    {
-                        // Start dragging this ball
-                        isDragging = true;
-                        draggedBallIndex = i;
-                        lastMousePos = mousePhysicsPos;
-
-                        // Wake up the body to ensure it responds to forces
-                        b2Body_SetAwake(ballId, true);
-
-                        // Apply a small impulse to "pick up" the ball
-                        b2Vec2 impulse = {0.0f, -0.5f};
-                        b2Body_ApplyLinearImpulseToCenter(ballId, impulse, true);
-
-                        SDL_Log("Ball %d selected for dragging at physics pos (%.2f, %.2f)",
-                                i, ballPos.x, ballPos.y);
-                        break;
-                    }
-                }
-            }
-            else if (draggedBallIndex >= 0 && draggedBallIndex < static_cast<int>(ballBodies.size()))
-            {
-                // Continue dragging the selected ball
-                b2BodyId ballId = ballBodies[draggedBallIndex];
-
-                if (B2_IS_NON_NULL(ballId))
-                {
-                    // Get ball position
-                    b2Vec2 ballPos = b2Body_GetPosition(ballId);
-
-                    // Calculate vector from ball to mouse
-                    b2Vec2 toTarget = {
-                        mousePhysicsPos.x - ballPos.x,
-                        mousePhysicsPos.y - ballPos.y
-                    };
-
-                    // Apply strong force for responsive dragging
-                    float forceScale = 220.0f;
-                    b2Vec2 force = {toTarget.x * forceScale, toTarget.y * forceScale};
-                    b2Body_ApplyForceToCenter(ballId, force, true);
-
-                    // Set target velocity for more direct control
-                    float speedFactor = 15.0f;
-                    b2Vec2 targetVelocity = {toTarget.x * speedFactor, toTarget.y * speedFactor};
-
-                    // Limit max velocity for stability
-                    float maxSpeed = 25.0f;
-                    float currentSpeed = b2Length(targetVelocity);
-                    if (currentSpeed > maxSpeed)
-                    {
-                        targetVelocity.x = targetVelocity.x * (maxSpeed / currentSpeed);
-                        targetVelocity.y = targetVelocity.y * (maxSpeed / currentSpeed);
-                    }
-
-                    b2Body_SetLinearVelocity(ballId, targetVelocity);
-
-                    // Log dragging for debugging (less frequently)
-                    static int logCounter = 0;
-                    if (++logCounter % 30 == 0)
-                    {
-                        SDL_Log("Dragging ball %d: mouse=(%.2f,%.2f), ball=(%.2f,%.2f), force=(%.2f,%.2f)",
-                                draggedBallIndex, mousePhysicsPos.x, mousePhysicsPos.y,
-                                ballPos.x, ballPos.y, force.x, force.y);
-                    }
-
-                    // Store current position for next frame
-                    lastMousePos = mousePhysicsPos;
-                }
-            }
-        }
-        else
-        {
-            // Mouse released - stop dragging
-            if (isDragging && draggedBallIndex >= 0 && draggedBallIndex < static_cast<int>(ballBodies.size()))
-            {
-                b2BodyId ballId = ballBodies[draggedBallIndex];
-                if (B2_IS_NON_NULL(ballId))
-                {
-                    // Apply release velocity based on recent movement
-                    b2Vec2 currentVel = b2Body_GetLinearVelocity(ballId);
-                    // Keep some of the current velocity for natural release feel
-                    b2Vec2 releaseVel = {currentVel.x * 0.8f, currentVel.y * 0.8f};
-                    b2Body_SetLinearVelocity(ballId, releaseVel);
-                }
-
-                SDL_Log("Released ball %d", draggedBallIndex);
-            }
-
-            isDragging = false;
-            draggedBallIndex = -1;
-        }
-    }
-
     /// @brief Create a dynamic ball at the specified physics position
     /// @param physX X position in physics world (meters)
     /// @param physY Y position in physics world (meters)
     /// @param radius Ball radius in meters
     /// @return b2BodyId of the created ball
-    b2BodyId createBall(float physX, float physY, float radius = 0.3f) noexcept
+    void createBall(float physX, float physY, float radius = 0.3f) noexcept
     {
         if (B2_IS_NULL(worldId))
         {
-            return b2_nullBodyId;
+            return;
         }
 
         // Create dynamic body for the ball
         b2BodyDef ballDef = b2DefaultBodyDef();
         ballDef.type = b2_dynamicBody;
         ballDef.position = {physX, physY};
-        ballDef.linearDamping = 0.1f; // Small damping for realistic motion
+        ballDef.linearDamping = 0.1f;   // Small damping for realistic motion
         ballDef.angularDamping = 0.1f;
-        b2BodyId ballId = b2CreateBody(worldId, &ballDef);
+        b2BodyId ballBodyId = b2CreateBody(worldId, &ballDef);
 
         // Create circle shape
         b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = 1.0f; // Standard density
+        shapeDef.density = 1.0f;  // Standard density
 
         b2Circle circle = {{0.0f, 0.0f}, radius};
-        b2CreateCircleShape(ballId, &shapeDef, &circle);
+        b2CreateCircleShape(ballBodyId, &shapeDef, &circle);
 
-        // Store ball body for rendering
-        ballBodies.push_back(ballId);
+        // Create ball object and assign the body ID
+        ballBodies.emplace_back(physX, physY, radius, nullptr);
+        ballBodies.back().setBodyId(ballBodyId);
 
         SDL_Log("Created ball at physics pos (%.2f, %.2f) with radius %.2f", physX, physY, radius);
-        return ballId;
     }
 
     /// @brief Create several test balls in the maze
@@ -799,17 +643,18 @@ struct physics_game::physics_game_impl
         }
 
         // Calculate world dimensions in meters
-        float worldWidth = (maxCols * cellSize) / pixelsPerMeter;
-        float worldHeight = (maxRows * cellSize) / pixelsPerMeter;
+        const float worldWidth = (maxCols * cellSize) / pixelsPerMeter;
+        const float worldHeight = (maxRows * cellSize) / pixelsPerMeter;
 
         // Create a few balls at different positions
-        int numBalls = 3;
+        constexpr int numBalls = 3;
         for (int i = 0; i < numBalls; ++i)
         {
             // Place balls at even spacing across the top of the maze
-            float x = worldWidth * (i + 1.0f) / (numBalls + 1.0f);
+            float x = worldWidth * (static_cast<float>(i) + 1.0f) / (numBalls + 1.0f);
             float y = worldHeight * 0.2f; // Near the top
-            createBall(x, y, 0.55f);
+            // Radius should be about 40% of a cell for good visibility
+            createBall(x, y, 0.4f);
         }
 
         SDL_Log("Created %d test balls", numBalls);
@@ -892,52 +737,11 @@ struct physics_game::physics_game_impl
             }
         }
 
-        // Draw balls (blue)
-        SDL_SetRenderDrawColor(renderer, 0, 100, 255, 255);
-        for (const auto& ballId : ballBodies)
-        {
-            if (B2_IS_NULL(ballId))
-            {
-                continue;
-            }
-
-            b2Vec2 position = b2Body_GetPosition(ballId);
-
-            // Get the shape
-            int shapeCount = b2Body_GetShapeCount(ballId);
-            if (shapeCount == 0)
-            {
-                continue;
-            }
-
-            b2ShapeId shapeIds[1];
-            b2Body_GetShapes(ballId, shapeIds, 1);
-            b2ShapeId shapeId = shapeIds[0];
-
-            if (B2_IS_NULL(shapeId))
-            {
-                continue;
-            }
-
-            // Get circle shape
-            b2Circle circle = b2Shape_GetCircle(shapeId);
-            b2Vec2 worldCenter = b2Add(position, circle.center);
-            SDL_FPoint screenCenter = physicsToScreen(worldCenter.x, worldCenter.y);
-            float screenRadius = circle.radius * pixelsPerMeter;
-
-            // Draw filled circle using simple pixel filling
-            int iRadius = static_cast<int>(screenRadius);
-            for (int y = -iRadius; y <= iRadius; ++y)
-            {
-                for (int x = -iRadius; x <= iRadius; ++x)
-                {
-                    if (x * x + y * y <= iRadius * iRadius)
-                    {
-                        SDL_RenderPoint(renderer, screenCenter.x + x, screenCenter.y + y);
-                    }
-                }
-            }
-        }
+      // Draw balls with proper coordinate transformation
+      std::ranges::for_each(std::as_const(ballBodies), [this](const ball& b)
+      {
+          b.draw(this->sdlHelper.renderer, this->pixelsPerMeter, this->offsetX, this->offsetY);
+      });
     }
 }; // impl
 
@@ -962,7 +766,7 @@ bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomi
     auto&& gamePtr = this->m_impl;
 
     auto previous = static_cast<double>(SDL_GetTicks());
-    double accumulator = 0.0, currentTimeStep = 0.0;
+    double accumulator = 0.0;
 
     SDL_Log("Entering game loop...\n");
 
@@ -992,12 +796,10 @@ bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomi
 
             accumulator -= FIXED_TIME_STEP;
 
-            currentTimeStep += FIXED_TIME_STEP;
-
-            gamePtr->update(static_cast<float>(FIXED_TIME_STEP) / 1000.f);
+            gamePtr->update(static_cast<float>(FIXED_TIME_STEP) / 1000.f, std::ref(rng));
         }
 
-        gamePtr->render(ref(currentTimeStep), elapsed);
+        gamePtr->render(elapsed);
     }
 
 #if defined(__EMSCRIPTEN__)

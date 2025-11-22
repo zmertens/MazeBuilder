@@ -1,35 +1,44 @@
-#ifndef BALL_HPP
-#define BALL_HPP
+#ifndef BALL_H
+#define BALL_H
 
-#include "Entity.hpp"
-#include "ResourceIdentifiers.hpp"
-#include "Sprite.hpp"
+#include <memory>
 
-/// @file Ball.hpp
+#include <box2d/id.h>
+
+struct SDL_Renderer;
+namespace mazes
+{
+    class randomizer;
+}
+
+struct mouse_states;
+class texture;
+
+/// @file ball.h
 /// @class ball
 /// @brief Data class for a ball with physics properties
-class ball : public Entity
+class ball
 {
 public:
-    enum class Type
-    {
-        NORMAL,
-        HEAVY,
-        LIGHT,
-        EXPLOSIVE
-    };
 
-    explicit ball(Type type, const TextureManager& textureManager);
+    explicit ball(float x, float y, float radius, std::unique_ptr<texture> t);
+
+    void draw(SDL_Renderer* renderer, float pixelsPerMeter, float offsetX, float offsetY) const noexcept;
+
+    void update(float elapsed, const mouse_states& mice, mazes::randomizer& rng) noexcept;
+
+    // Setters
+    void setBodyId(b2BodyId bodyId) noexcept { m_bodyId = bodyId; }
+
+    // Getters
+    [[nodiscard]] b2BodyId getBodyId() const noexcept { return m_bodyId; }
+    [[nodiscard]] float getRadius() const noexcept { return m_radius; }
 
 private:
-    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
-
-    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
-
-    void updateCurrent(float dt, CommandQueue&) noexcept override;
-
-    Type mType;
-    Sprite mSprite;
+    float m_pos_x, m_pos_y, m_radius;
+    b2BodyId m_bodyId = b2_nullBodyId;  // Initialize to null!
+    std::unique_ptr<texture> m_texture;
+    bool m_isDragging = false;
 };
 
-#endif // BALL_HPP
+#endif // BALL_H

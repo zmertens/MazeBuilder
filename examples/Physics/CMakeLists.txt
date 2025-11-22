@@ -5,11 +5,13 @@ set(DEAR_IMGUI_DEP_PATH ${CMAKE_SOURCE_DIR}/deps/dearimgui)
 set(DEAR_IMGUI_BACKENDS_PATH ${DEAR_IMGUI_DEP_PATH}/backends)
 
 set(EXE_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/ball.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/physics_game.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/render_window.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sdl_helper.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/wall.cpp)
 
 add_executable(${EXE_NAME} ${DEAR_IMGUI_SOURCES} ${EXE_SOURCES})
 

@@ -1,47 +1,30 @@
-#ifndef WALL_HPP
-#define WALL_HPP
+#ifndef WALL_H
+#define WALL_H
 
-#include "Entity.hpp"
-#include "ResourceIdentifiers.hpp"
-#include "Sprite.hpp"
+#include <memory>
 
-class wall : public Entity
+struct SDL_Renderer;
+namespace mazes
+{
+    class randomizer;
+}
+class texture;
+
+/// @file wall.h
+/// @class wall
+/// @brief Data class for a wall with physics properties
+class wall
 {
 public:
-    enum class Orientation
-    {
-        HORIZONTAL, VERTICAL, CORNER
-    };
 
-    explicit wall(Orientation orientation, const TextureManager& textureManager);
+    explicit wall(std::unique_ptr<texture> t);
 
-    // Getters
-    int getHitCount() const;
-    bool getIsDestroyed() const;
-    int getRow() const;
-    int getCol() const;
-    Orientation getOrientation() const;
+    void draw(SDL_Renderer* renderer) const noexcept;
 
-    // Setters
-    void setHitCount(int hitCount);
-    void setIsDestroyed(bool isDestroyed);
-    void setRow(int row);
-    void setCol(int col);
-    void setOrientation(Orientation orientation);
+    void update(float elapsed, mazes::randomizer& rng) noexcept;
 
 private:
-    void drawCurrent(SDL_Renderer* renderer, RenderStates states) const noexcept override;
-
-    [[nodiscard]] Textures::ID getTextureID() const noexcept override;
-
-    void updateCurrent(float dt, CommandQueue&) noexcept override;
-
-    int hitCount;
-    bool isDestroyed;
-    int row;
-    int col;
-    Orientation orientation;
-    Sprite mSprite;
+    std::unique_ptr<texture> m_texture;
 };
 
-#endif // WALL_HPP
+#endif // WALL_H
