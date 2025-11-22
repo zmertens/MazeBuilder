@@ -27,7 +27,7 @@ public:
     template <typename T>
     void draw(const T& drawable) const noexcept;
 
-    void beginFrame() const noexcept;
+    void begin_frame() const noexcept;
 
     /// @brief Clear the render target
     void clear() const noexcept;
@@ -35,29 +35,29 @@ public:
     /// @brief Present the rendered frame
     void display() const noexcept;
 
-    [[nodiscard]] bool isOpen() const noexcept;
+    [[nodiscard]] bool is_open() const noexcept;
 
     void close() noexcept;
 
-    void setFullscreen(bool fullscreen) const noexcept;
+    void set_fullscreen(bool fullscreen) const noexcept;
 
-    [[nodiscard]] bool isFullscreen() const noexcept;
+    [[nodiscard]] bool is_fullscreen() const noexcept;
 
     /// @brief Get the SDL renderer for direct access
-    [[nodiscard]] SDL_Renderer* getRenderer() const noexcept { return mRenderer; }
+    [[nodiscard]] SDL_Renderer* get_renderer() const noexcept;
 
     /// @brief Get the SDL window for direct access
-    [[nodiscard]] SDL_Window* getSDLWindow() const noexcept { return mWindow; }
+    [[nodiscard]] SDL_Window* get_window() const noexcept;
 
 private:
-    SDL_Renderer* mRenderer;
-    SDL_Window* mWindow;
+    SDL_Renderer* m_renderer;
+    SDL_Window* m_window;
 };
 
 template <typename T>
 void render_window::draw(const T& drawable) const noexcept
 {
-    drawable.draw(mRenderer);
+    drawable.draw(m_renderer);
 }
 
 #endif // RENDER_WINDOW_HPP

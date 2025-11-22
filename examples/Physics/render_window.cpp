@@ -7,19 +7,19 @@
 #include <SDL3/SDL.h>
 
 render_window::render_window(SDL_Renderer* renderer, SDL_Window* window)
-    : mRenderer(renderer), mWindow(window)
+    : m_renderer(renderer), m_window(window)
 {
     // Initialize view with window dimensions
-    if (mWindow)
+    if (m_window)
     {
         int width = 0, height = 0;
-        SDL_GetWindowSize(mWindow, &width, &height);
+        SDL_GetWindowSize(m_window, &width, &height);
     }
 }
 
-void render_window::beginFrame() const noexcept
+void render_window::begin_frame() const noexcept
 {
-    if (!mRenderer || !mWindow)
+    if (!m_renderer || !m_window)
     {
         return;
     }
@@ -31,29 +31,29 @@ void render_window::beginFrame() const noexcept
 
 void render_window::clear() const noexcept
 {
-    if (!mRenderer || !mWindow)
+    if (!m_renderer || !m_window)
     {
         return;
     }
-    SDL_RenderClear(mRenderer);
+    SDL_RenderClear(m_renderer);
 }
 
 void render_window::display() const noexcept
 {
-    if (!mRenderer || !mWindow)
+    if (!m_renderer || !m_window)
     {
         return;
     }
 
     ImGui::Render();
-    SDL_SetRenderScale(mRenderer, ImGui::GetIO().DisplayFramebufferScale.x, ImGui::GetIO().DisplayFramebufferScale.y);
-    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), mRenderer);
-    SDL_RenderPresent(mRenderer);
+    SDL_SetRenderScale(m_renderer, ImGui::GetIO().DisplayFramebufferScale.x, ImGui::GetIO().DisplayFramebufferScale.y);
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    SDL_RenderPresent(m_renderer);
 }
 
-bool render_window::isOpen() const noexcept
+bool render_window::is_open() const noexcept
 {
-    return mRenderer != nullptr && mWindow != nullptr;
+    return m_renderer != nullptr && m_window != nullptr;
 }
 
 void render_window::close() noexcept
@@ -63,24 +63,35 @@ void render_window::close() noexcept
     // during proper cleanup in its destructor
     SDL_Log("RenderWindow::close() - Marking window as closed\n");
 
-    mRenderer = nullptr;
-    mWindow = nullptr;
+    m_renderer = nullptr;
+    m_window = nullptr;
 }
 
-void render_window::setFullscreen(bool fullscreen) const noexcept
+void render_window::set_fullscreen(bool fullscreen) const noexcept
 {
-    if (const auto flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0; !isFullscreen() && flags != 0)
+    if (const auto flags = fullscreen ? SDL_WINDOW_FULLSCREEN : 0; !is_fullscreen() && flags != 0)
     {
-        SDL_SetWindowFullscreen(mWindow, flags);
+        SDL_SetWindowFullscreen(m_window, flags);
     }
-    else if (isFullscreen() && !fullscreen)
+    else if (is_fullscreen() && !fullscreen)
     {
-        SDL_SetWindowFullscreen(mWindow, false);
+        SDL_SetWindowFullscreen(m_window, false);
     }
 }
 
-bool render_window::isFullscreen() const noexcept
+bool render_window::is_fullscreen() const noexcept
 {
-    const auto flags = SDL_GetWindowFlags(mWindow);
+    const auto flags = SDL_GetWindowFlags(m_window);
     return (flags & SDL_WINDOW_FULLSCREEN) != 0;
+}
+
+SDL_Renderer* render_window::get_renderer() const noexcept
+{
+    return m_renderer;
+}
+
+/// @brief Get the SDL window for direct access
+SDL_Window* render_window::get_window() const noexcept
+{
+    return m_window;
 }

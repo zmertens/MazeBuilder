@@ -15,6 +15,15 @@ texture::texture(texture&& other) noexcept : m_texture(other.m_texture), m_width
     other.m_height = 0;
 }
 
+texture::~texture() noexcept
+{
+    if (m_texture)
+    {
+        this->free();
+    }
+}
+
+
 texture& texture::operator=(texture&& other) noexcept
 {
     if (this != &other)
@@ -155,4 +164,15 @@ bool texture::loadImageTexture(SDL_Renderer* renderer, std::string_view imagePat
 
     return true;
 }
+
+int texture::get_width() const noexcept
+{
+    return m_width;
+}
+
+int texture::get_height() const noexcept
+{
+    return m_height;
+}
+
 

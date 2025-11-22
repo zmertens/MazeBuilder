@@ -14,7 +14,7 @@ class texture
 public:
     texture() = default;
 
-    ~texture() noexcept { free(); }
+    ~texture() noexcept;
 
     texture(const texture&) = delete;
     texture& operator=(const texture&) = delete;
@@ -27,9 +27,9 @@ public:
 
     [[nodiscard]] SDL_Texture* get() const noexcept;
 
-    [[nodiscard]] int getWidth() const noexcept { return m_width; }
+    [[nodiscard]] int get_width() const noexcept;
 
-    [[nodiscard]] int getHeight() const noexcept { return m_height; }
+    [[nodiscard]] int get_height() const noexcept;
 
     bool loadTarget(SDL_Renderer* renderer, int w, int h) noexcept;
 
