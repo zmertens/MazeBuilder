@@ -50,16 +50,9 @@
 #include "matrix.h"
 
 #include "craft_utils.h"
-#include "craft_types.h"
-#include "world_manager.h"
-#include "gl_types.h"
-#include "gl_buffer_manager.h"
-#include "gl_renderer.h"
-
 // Modern rendering systems (in craft_rendering namespace to avoid conflict)
 #include "gl_resource_manager.h"
 #include "bloom_effects.h"
-#include "render_pipeline.h"
 #include "stencil_renderer.h"
 #include "maze_projector.h"
 
@@ -407,12 +400,31 @@ struct craft::craft_impl {
 
     std::string m_json_data;
 
+    // Modern rendering systems
+    std::unique_ptr<craft_rendering::BloomEffects> m_bloom_effects;
+    std::unique_ptr<craft_rendering::StencilRenderer> m_stencil_renderer;
+    std::unique_ptr<craft_rendering::MazeProjector> m_maze_projector;
+
+    // Maze preview state
+    struct MazePreviewState {
+        bool enabled{false};
+        bool is_hovering{false};
+        int hovered_x{0}, hovered_y{0}, hovered_z{0};
+        int hovered_face{0};
+        std::optional<mazes::grid> preview_maze;
+        craft_rendering::MazeProjector::MazeGeometry preview_geometry;
+        int last_rows{0};
+        int last_columns{0};
+        int last_seed{0};
+    } m_maze_preview;
+
     craft_impl(const std::string& title, int w, int h)
         : m_title(title)
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
-        , m_gui{ make_unique<Gui>() } {
+        , m_gui{ make_unique<Gui>() }
+    {
         this->reset_model();
     }
 
@@ -2174,6 +2186,36 @@ struct craft::craft_impl {
                     }
                     s->ry = SDL_max(s->ry, -RADIANS(90));
                     s->ry = SDL_min(s->ry, RADIANS(90));
+
+                    // Maze preview hover detection
+                    if (m_maze_preview.enabled) {
+                        int hx, hy, hz, face;
+                        int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+
+                        if (hw > 0 && hy > 0 && hy < 256 && is_obstacle(hw)) {
+                            // Check if position changed
+                            bool position_changed = (hx != m_maze_preview.hovered_x ||
+                                                    hy != m_maze_preview.hovered_y ||
+                                                    hz != m_maze_preview.hovered_z);
+
+                            m_maze_preview.is_hovering = true;
+                            m_maze_preview.hovered_x = hx;
+                            m_maze_preview.hovered_y = hy;
+                            m_maze_preview.hovered_z = hz;
+
+                            // Get face direction
+                            if (hit_test_face(&this->m_model->player, &hx, &hy, &hz, &face)) {
+                                m_maze_preview.hovered_face = face;
+                            }
+
+                            // Invalidate geometry if position changed
+                            if (position_changed) {
+                                m_maze_preview.preview_geometry.is_valid = false;
+                            }
+                        } else {
+                            m_maze_preview.is_hovering = false;
+                        }
+                    }
                 }
                 break;
             }
@@ -2382,7 +2424,8 @@ craft::~craft() = default;
 bool craft::run(mazes::randomizer& rng) const noexcept {
 
     if (!SDL_SetAppMetadata("Maze builder with voxels", mazes::VERSION.c_str(), MY_GITHUB_REPO)) {
-        return SDL_APP_FAILURE;
+
+        return false;
     }
 
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, MY_GITHUB_REPO);
@@ -2555,6 +2598,29 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     skybox_attrib.matrix = glGetUniformLocation(program, "matrix");
     skybox_attrib.sampler = glGetUniformLocation(program, "skybox");
 
+    // MODERN RENDERING SYSTEMS INIT (optional - don't crash if fails)
+    SDL_Log("Initializing modern rendering systems...\n");
+
+    try {
+        // Initialize stencil renderer
+        if (this->m_impl->m_stencil_renderer && this->m_impl->m_stencil_renderer->initialize()) {
+            SDL_Log("Stencil renderer initialized\n");
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Stencil renderer initialization failed (feature disabled)\n");
+        }
+
+        // Initialize maze projector
+        if (this->m_impl->m_maze_projector && this->m_impl->m_maze_projector->initialize()) {
+            SDL_Log("Maze projector initialized\n");
+        } else {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Maze projector initialization failed (feature disabled)\n");
+        }
+    } catch (const std::exception& e) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Exception during rendering system init: %s\n", e.what());
+    }
+
+    SDL_Log("Modern rendering systems initialization complete\n");
+
     // DEAR IMGUI INIT - Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -2667,6 +2733,10 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     glBindVertexArray(0);
 
     craft_impl::BloomTools bloom_tools{};
+
+    this->m_impl->m_bloom_effects = std::make_unique<craft_rendering::BloomEffects>();
+    this->m_impl->m_stencil_renderer = std::make_unique<craft_rendering::StencilRenderer>();
+    this->m_impl->m_maze_projector = std::make_unique<craft_rendering::MazeProjector>();
 
     craft_impl::Player* me = &m_impl->m_model->player;
     craft_impl::State* p_state = &m_impl->m_model->player.state;
@@ -2924,6 +2994,43 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                     ImGui::Checkbox("Apply Bloom Effect", &gui->apply_bloom_effect);
                     ImGui::SliderFloat("Exp", &gui->exposure, 0.1f, 1.0f, "%.2f");
 
+                    ImGui::Separator();
+                    ImGui::Text("Maze Preview:");
+                    ImGui::Checkbox("Enable Maze Preview", &this->m_impl->m_maze_preview.enabled);
+
+                    if (this->m_impl->m_maze_preview.enabled) {
+                        ImGui::Indent();
+                        ImGui::Text("Hover over a voxel to see maze preview");
+
+                        if (this->m_impl->m_maze_preview.is_hovering) {
+                            ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f),
+                                "Hovering: (%d, %d, %d) Face: %d",
+                                this->m_impl->m_maze_preview.hovered_x,
+                                this->m_impl->m_maze_preview.hovered_y,
+                                this->m_impl->m_maze_preview.hovered_z,
+                                this->m_impl->m_maze_preview.hovered_face);
+                        }
+
+                        ImGui::SliderInt("Preview Face", &this->m_impl->m_maze_preview.hovered_face, 0, 5);
+                        ImGui::Text("0=Left, 1=Right, 2=Back, 3=Front, 4=Bottom, 5=Top");
+
+                        if (ImGui::Button("Regenerate Maze")) {
+                            this->m_impl->m_maze_preview.preview_maze.reset();
+                            this->m_impl->m_maze_preview.preview_geometry.is_valid = false;
+                        }
+
+                        if (this->m_impl->m_maze_preview.is_hovering &&
+                            this->m_impl->m_maze_preview.preview_geometry.is_valid) {
+                            if (ImGui::Button("Build Maze Here")) {
+                                SDL_Log("Building maze at (%d, %d, %d) - Feature coming soon!\n",
+                                    this->m_impl->m_maze_preview.hovered_x,
+                                    this->m_impl->m_maze_preview.hovered_y,
+                                    this->m_impl->m_maze_preview.hovered_z);
+                            }
+                        }
+                        ImGui::Unindent();
+                    }
+
                     ImGui::EndTabItem();
                 }
                 if (ImGui::BeginTabItem("Commands")) {
@@ -3021,6 +3128,89 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
         if (gui->show_wireframes) {
             m_impl->render_wireframe(&line_attrib, me);
+        }
+
+        // Maze preview rendering
+        if (this->m_impl->m_maze_preview.enabled && this->m_impl->m_maze_preview.is_hovering) {
+            // Generate maze if needed or if parameters changed
+            bool need_new_maze = !this->m_impl->m_maze_preview.preview_maze.has_value() ||
+                                 this->m_impl->m_maze_preview.last_rows != gui->rows ||
+                                 this->m_impl->m_maze_preview.last_columns != gui->columns ||
+                                 this->m_impl->m_maze_preview.last_seed != gui->seed;
+
+            if (need_new_maze) {
+                try {
+                    // Create maze grid
+                    mazes::grid maze_grid(gui->rows, gui->columns, 1);
+
+                    // Configure and generate maze
+                    mazes::configurator config;
+                    config.rows(gui->rows)
+                          .columns(gui->columns)
+                          .levels(1)
+                          .algo_id(mazes::algo::DFS)
+                          .seed(gui->seed);
+
+                    // Generate maze (this modifies maze_grid internally via the lab)
+                    auto maze_str = mazes::create(config);
+
+                    // Store the grid
+                    this->m_impl->m_maze_preview.preview_maze = std::move(maze_grid);
+                    this->m_impl->m_maze_preview.last_rows = gui->rows;
+                    this->m_impl->m_maze_preview.last_columns = gui->columns;
+                    this->m_impl->m_maze_preview.last_seed = gui->seed;
+                    this->m_impl->m_maze_preview.preview_geometry.is_valid = false;
+
+                    SDL_Log("Generated maze for preview: %dx%d\n", gui->rows, gui->columns);
+                } catch (const std::exception& e) {
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze: %s\n", e.what());
+                    this->m_impl->m_maze_preview.preview_maze.reset();
+                }
+            }
+
+            // Generate projection geometry if needed
+            if (this->m_impl->m_maze_preview.preview_maze.has_value() &&
+                !this->m_impl->m_maze_preview.preview_geometry.is_valid) {
+
+                craft_rendering::MazeProjector::ProjectionConfig proj_config;
+                proj_config.target_x = this->m_impl->m_maze_preview.hovered_x;
+                proj_config.target_y = this->m_impl->m_maze_preview.hovered_y;
+                proj_config.target_z = this->m_impl->m_maze_preview.hovered_z;
+                proj_config.face = this->m_impl->m_maze_preview.hovered_face;
+                proj_config.scale = 3.0f;
+                proj_config.rows = gui->rows;
+                proj_config.columns = gui->columns;
+
+                this->m_impl->m_maze_preview.preview_geometry =
+                    this->m_impl->m_maze_projector->project_maze(
+                        this->m_impl->m_maze_preview.preview_maze.value(), proj_config);
+
+                if (this->m_impl->m_maze_preview.preview_geometry.is_valid) {
+                    SDL_Log("Projected maze onto voxel face %d\n", proj_config.face);
+                }
+            }
+
+            // Render the preview
+            if (this->m_impl->m_maze_preview.preview_geometry.is_valid) {
+                float matrix[16];
+                set_matrix_3d(matrix, model->voxel_scene_w, model->voxel_scene_h,
+                             p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry,
+                             model->fov, static_cast<int>(model->is_ortho), model->render_radius);
+
+                // Enable blending for semi-transparent preview
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                glDisable(GL_DEPTH_TEST);
+                glLineWidth(2.0f);
+
+                this->m_impl->m_maze_projector->render_maze_geometry(
+                    this->m_impl->m_maze_preview.preview_geometry, matrix);
+
+                // Restore state
+                glLineWidth(1.0f);
+                glDisable(GL_BLEND);
+                glEnable(GL_DEPTH_TEST);
+            }
         }
 
         if (gui->show_crosshairs) {

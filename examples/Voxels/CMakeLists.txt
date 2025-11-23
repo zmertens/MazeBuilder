@@ -4,13 +4,11 @@ set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/bloom_effects.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/chunk_manager.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/craft_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/event_handler.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/gl_resource_manager.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/gl_resource_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/map.cpp
@@ -21,7 +19,7 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stencil_renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/world_manager.cpp)
+)
 
 set(VOXELS_EXE "mazebuildervoxels")
 

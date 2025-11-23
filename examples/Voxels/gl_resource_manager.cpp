@@ -10,7 +10,7 @@ namespace gl {
 // ============================================================================
 
 GlFramebuffer::GlFramebuffer() : m_fbo(0) {
-    glGenFramebuffers(1, &m_fbo);
+    // Don't call OpenGL functions in constructor - call generate() after GL context is ready
 }
 
 GlFramebuffer::~GlFramebuffer() {
@@ -35,6 +35,10 @@ GlFramebuffer& GlFramebuffer::operator=(GlFramebuffer&& other) noexcept {
 }
 
 void GlFramebuffer::bind() const {
+    if (m_fbo == 0) {
+        // Lazy initialization - generate framebuffer on first use
+        glGenFramebuffers(1, const_cast<GLuint*>(&m_fbo));
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
 }
 
@@ -81,7 +85,7 @@ void GlFramebuffer::check_status() {
 // ============================================================================
 
 GlTexture::GlTexture() : m_texture(0) {
-    glGenTextures(1, &m_texture);
+    // Don't call OpenGL functions in constructor
 }
 
 GlTexture::~GlTexture() {
@@ -106,6 +110,10 @@ GlTexture& GlTexture::operator=(GlTexture&& other) noexcept {
 }
 
 void GlTexture::bind(GLenum target) const {
+    if (m_texture == 0) {
+        // Lazy initialization - generate texture on first use
+        glGenTextures(1, const_cast<GLuint*>(&m_texture));
+    }
     glBindTexture(target, m_texture);
 }
 
@@ -134,7 +142,7 @@ void GlTexture::allocate_2d_float(GLsizei width, GLsizei height, GLenum internal
 // ============================================================================
 
 GlRenderbuffer::GlRenderbuffer() : m_rbo(0) {
-    glGenRenderbuffers(1, &m_rbo);
+    // Don't call OpenGL functions in constructor
 }
 
 GlRenderbuffer::~GlRenderbuffer() {
@@ -159,6 +167,10 @@ GlRenderbuffer& GlRenderbuffer::operator=(GlRenderbuffer&& other) noexcept {
 }
 
 void GlRenderbuffer::bind() const {
+    if (m_rbo == 0) {
+        // Lazy initialization - generate renderbuffer on first use
+        glGenRenderbuffers(1, const_cast<GLuint*>(&m_rbo));
+    }
     glBindRenderbuffer(GL_RENDERBUFFER, m_rbo);
 }
 
@@ -176,7 +188,7 @@ void GlRenderbuffer::allocate_storage(GLenum internal_format, GLsizei width, GLs
 // ============================================================================
 
 GlVertexArray::GlVertexArray() : m_vao(0) {
-    glGenVertexArrays(1, &m_vao);
+    // Don't call OpenGL functions in constructor
 }
 
 GlVertexArray::~GlVertexArray() {
@@ -201,6 +213,10 @@ GlVertexArray& GlVertexArray::operator=(GlVertexArray&& other) noexcept {
 }
 
 void GlVertexArray::bind() const {
+    if (m_vao == 0) {
+        // Lazy initialization - generate vertex array on first use
+        glGenVertexArrays(1, const_cast<GLuint*>(&m_vao));
+    }
     glBindVertexArray(m_vao);
 }
 
@@ -213,7 +229,7 @@ void GlVertexArray::unbind() const {
 // ============================================================================
 
 GlBuffer::GlBuffer() : m_buffer(0) {
-    glGenBuffers(1, &m_buffer);
+    // Don't call OpenGL functions in constructor - call init() after GL context is ready
 }
 
 GlBuffer::~GlBuffer() {
@@ -238,6 +254,10 @@ GlBuffer& GlBuffer::operator=(GlBuffer&& other) noexcept {
 }
 
 void GlBuffer::bind(GLenum target) const {
+    if (m_buffer == 0) {
+        // Lazy initialization - generate buffer on first use
+        glGenBuffers(1, const_cast<GLuint*>(&m_buffer));
+    }
     glBindBuffer(target, m_buffer);
 }
 

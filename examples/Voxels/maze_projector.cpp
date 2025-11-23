@@ -250,56 +250,77 @@ void MazeProjector::calculate_face_transform(int face, float x, float y, float z
 void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
                                        std::vector<float>& vertices,
                                        std::vector<unsigned int>& indices) {
-    // Use objectify to generate 3D mesh data from maze
-    mazes::objectify obj_generator;
-    mazes::randomizer rng; // Unused but required by API
-
-    // Create a mutable copy to work with objectify
-    mazes::grid maze_copy = maze_data;
-
-    // Generate vertices and faces using objectify
-    if (!obj_generator.run(&maze_copy, rng)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze geometry\n");
-        return;
-    }
-
-    // Get the generated vertices and faces from grid operations
-    const auto& grid_ops = maze_copy.operations();
-    const auto& obj_vertices = grid_ops.get_vertices();
-    const auto& obj_faces = grid_ops.get_faces();
-
-    if (obj_vertices.empty() || obj_faces.empty()) {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No geometry generated from maze\n");
-        return;
-    }
-
-    // Convert vertices to float array (normalize coordinates)
     auto [rows, columns, levels] = maze_data.get_dimensions();
-    float scale = 1.0f / static_cast<float>(std::max(rows, columns));
+
+    // Check if maze has any cells
+    if (rows == 0 || columns == 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze dimensions: %u x %u\n", rows, columns);
+        return;
+    }
+
+    // Cell size normalized to 1.0 unit space
+    float cell_size = 1.0f / static_cast<float>(std::max(rows, columns));
     float offset_x = -0.5f;
-    float offset_y = -0.5f;
     float offset_z = -0.5f;
 
-    for (const auto& vert : obj_vertices) {
-        // Extract x, y, z from tuple (w is ignored for now)
-        auto [x, y, z, w] = vert;
+    unsigned int vertex_index = 0;
+    int num_cells = maze_data.operations().num_cells();
 
-        // Normalize and center coordinates
-        float nx = offset_x + x * scale;
-        float ny = offset_y + y * scale;
-        float nz = offset_z + z * scale;
+    // Iterate through all cells using search method
+    for (int cell_index = 0; cell_index < num_cells; ++cell_index) {
+        auto cell = maze_data.operations().search(cell_index);
+        if (!cell) continue;
 
-        vertices.push_back(nx);
-        vertices.push_back(ny);
-        vertices.push_back(nz);
+        // Calculate row/col from index (assuming row-major ordering)
+        int row = cell_index / columns;
+        int col = cell_index % columns;
+
+        float x = offset_x + col * cell_size;
+        float z = offset_z + row * cell_size;
+
+        // Get neighbors using grid_operations
+        const auto& grid_ops = maze_data.operations();
+        auto north = grid_ops.get_north(cell);
+        auto east = grid_ops.get_east(cell);
+        auto south = grid_ops.get_south(cell);
+        auto west = grid_ops.get_west(cell);
+
+        // Check each direction and draw wall if no link exists
+        // North wall
+        if (!north || !cell->is_linked(north)) {
+            vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z);
+            vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z);
+            indices.push_back(vertex_index++);
+            indices.push_back(vertex_index++);
+        }
+
+        // East wall
+        if (!east || !cell->is_linked(east)) {
+            vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z);
+            vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
+            indices.push_back(vertex_index++);
+            indices.push_back(vertex_index++);
+        }
+
+        // South wall
+        if (!south || !cell->is_linked(south)) {
+            vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
+            vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
+            indices.push_back(vertex_index++);
+            indices.push_back(vertex_index++);
+        }
+
+        // West wall
+        if (!west || !cell->is_linked(west)) {
+            vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
+            vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z);
+            indices.push_back(vertex_index++);
+            indices.push_back(vertex_index++);
+        }
     }
 
-    // Convert faces to indices (flatten triangles)
-    for (const auto& face : obj_faces) {
-        for (const auto& idx : face) {
-            // OBJ format is 1-indexed, convert to 0-indexed
-            indices.push_back(idx - 1);
-        }
+    if (vertices.empty()) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No maze walls generated - maze may be empty or all cells connected\n");
     }
 }
 
