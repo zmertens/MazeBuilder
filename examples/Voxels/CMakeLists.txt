@@ -10,12 +10,16 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/event_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/gl_resource_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/map.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/maze_projector.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/render_pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/stencil_renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world_manager.cpp)
 

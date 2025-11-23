@@ -56,7 +56,17 @@
 #include "gl_buffer_manager.h"
 #include "gl_renderer.h"
 
+// Modern rendering systems (in craft_rendering namespace to avoid conflict)
+#include "gl_resource_manager.h"
+#include "bloom_effects.h"
+#include "render_pipeline.h"
+#include "stencil_renderer.h"
+#include "maze_projector.h"
+
 #include <MazeBuilder/maze_builder.h>
+
+// Namespace alias for convenience
+namespace cr = craft_rendering;
 
 // Movement configurations
 #define KEY_FORWARD SDL_SCANCODE_W
