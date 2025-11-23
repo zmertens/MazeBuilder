@@ -77,24 +77,22 @@ mazebuildercli.exe --help
 
 **Commands are case-sensitive!**
 
-## C++ API 
+## C++ API
 
 Interface with the C++ API in a modern C++ program:
 
 ```cpp
 #include <iostream>
 #include <string>
-    
+
 // Get all the headers from Maze Builder
 #include <MazeBuilder/maze_builder.h>
 
 int main() {
-  
-  auto rows{10}, cols{10};
 
-  auto maze_str = mazes::create(rows, cols);
+  auto maze_str = mazes::create(mazes::configurator().rows(10).columns(10));
 
-  std::cout << mazes::string_utils::format("output: {}\n", maze_str);
+  std::cout << maze_str << std::endl;
 
   return 0;
 }
@@ -102,28 +100,25 @@ int main() {
 
 ---
 
-## Voxels
-
-![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
-
-  - The Voxels app is set in a 3D voxel world and enables interactive maze generation and downloading of Wavefront object files.
-
-[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
-
-The web app can be run locally with the provided [secure_http_server.py](scripts/secure_http_server.py) script.
-Once the script is running, open the browser to `http://localhost:8000`.
-
 ## HTTP Network
 
   - User can connect with [Corners](https://github.com/zmertens/Corners), the maze building service, to create mazes
 
 ## Physics
 
-  - Simple scoring system that includes maintaining a string of highlighted bricks
-  - Balls interact with the bricks and break them after repeated bounces
-  - Updated event handling (mouse, touch, keyboard)
-  - Maintains high scores via a network connection with [Corners](https://github.com/zmertens/Corners) or locally on harddrive
-  - Spatialized sound effects in 2D
+![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMnBkc3ZhODZwdWV0eG8wOXZjZzB4NTNucjJlY21xcmh5cm5nbm1kOSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/drKQ8LIwH5ZJQi2jMV/giphy.gif)
+
+  - Physics sandbox for testing maze creation with physical properties
+  - Spawn balls that interact with the bricks and other balls
+  - Event handling with mouse and keyboard support
+
+## Voxels
+
+![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
+
+- The Voxels app is set in a 3D voxel world and enables interactive maze generation and downloading of Wavefront object files.
+
+[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
 
 ---
 
@@ -170,7 +165,7 @@ The shared and static files have different naming conventions depending on the p
 
 ### Testing
 
-Configure the project for testing: 
+Configure the project for testing:
 `cmake -S . -B build-tests -DMAZE_BUILDER_TESTS:BOOL=ON`
 
 Run the tests: `ctest --test-dir build-tests/tests --verbose -C Debug`
