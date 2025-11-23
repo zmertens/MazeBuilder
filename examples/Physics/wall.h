@@ -1,7 +1,6 @@
 #ifndef WALL_H
 #define WALL_H
 
-#include <memory>
 
 #include <box2d/id.h>
 

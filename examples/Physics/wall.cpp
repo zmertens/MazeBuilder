@@ -6,6 +6,9 @@
 
 #include <MazeBuilder/randomizer.h>
 
+#include <algorithm>
+#include <cstdint>
+
 #include "coordinates.h"
 
 wall::wall(float x, float y, unsigned int counter, const b2WorldId& world_id)
@@ -15,7 +18,7 @@ wall::wall(float x, float y, unsigned int counter, const b2WorldId& world_id)
     b2BodyDef wall_def = b2DefaultBodyDef();
     wall_def.type = b2_staticBody;
     wall_def.position = {x, y};
-    wall_def.userData = reinterpret_cast<void*>(1000u + counter);
+    wall_def.userData = reinterpret_cast<void*>(static_cast<std::uintptr_t>(1000u + counter));
     m_body_id = b2CreateBody(world_id, &wall_def);
 
     // Wake up the body
@@ -74,10 +77,12 @@ void wall::draw(SDL_Renderer* renderer, float pixels_per_meter, float offset_x, 
     // Draw filled rectangle
     if (polygon.count == 4)
     {
-        const float min_x = std::min({points[0].x, points[1].x, points[2].x, points[3].x});
-        const float max_x = std::max({points[0].x, points[1].x, points[2].x, points[3].x});
-        const float min_y = std::min({points[0].y, points[1].y, points[2].y, points[3].y});
-        const float max_y = std::max({points[0].y, points[1].y, points[2].y, points[3].y});
+        float xs[4] = {points[0].x, points[1].x, points[2].x, points[3].x};
+        float ys[4] = {points[0].y, points[1].y, points[2].y, points[3].y};
+        const float min_x = *std::min_element(xs, xs + 4);
+        const float max_x = *std::max_element(xs, xs + 4);
+        const float min_y = *std::min_element(ys, ys + 4);
+        const float max_y = *std::max_element(ys, ys + 4);
 
         const SDL_FRect rect = {min_x, min_y, max_x - min_x, max_y - min_y};
         SDL_RenderFillRect(renderer, &rect);

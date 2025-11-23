@@ -142,7 +142,7 @@ struct physics_game::physics_game_impl
 
         ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(Cousine_Regular_compressed_data,
                                                              Cousine_Regular_compressed_size,
-                                                             pixels_per_meter);
+                                                             pixels_per_meter - 5.f);
     }
 
     void init_textures() const noexcept
