@@ -6,6 +6,7 @@
 
 #include "physics_game.h"
 
+#include <array>
 #include <cmath>
 #include <functional>
 #include <future>
@@ -83,19 +84,31 @@ struct physics_game::physics_game_impl
     // Scale factor for Box2D (which uses meters)
     float pixels_per_meter = 40.0f;
 
+    std::function<std::string(mazes::randomizer&)> level_generator;
+    bool level_loaded = false;
+
     // Body tracking for rendering
     std::vector<ball> ball_bodies;
     std::vector<wall> wall_bodies;
 
     physics_game_impl(std::string_view title, std::string_view version, int w, int h)
-        : title{title}
-          , version{version}
-          , INIT_WINDOW_W{w}, INIT_WINDOW_H{h}
-          , window{nullptr}
-          , sdl{}
+        : sdl{}
           , sdl_logo{std::make_unique<texture>()}
           , sfml_logo{std::make_unique<texture>()}
+          , window{nullptr}
+          , title{title}
+          , version{version}
+          , INIT_WINDOW_W{w}
+          , INIT_WINDOW_H{h}
     {
+        level_generator = [](mazes::randomizer& rng) -> std::string
+        {
+            return mazes::create(mazes::configurator()
+                                .algo_id(rng(0, 1) == 0 ? mazes::algo::BINARY_TREE : mazes::algo::DFS)
+                                .rows(rng(5, 25))
+                                .columns(rng(5, 25)));
+        };
+
         init_sdl();
 
         // Check if SDL initialization succeeded
@@ -171,7 +184,7 @@ struct physics_game::physics_game_impl
         }
     }
 
-    void processInput() const noexcept
+    void processInput() noexcept
     {
         SDL_Event event;
 
@@ -184,6 +197,11 @@ struct physics_game::physics_game_impl
             {
                 this->window->close();
                 break;
+            }
+
+            if (level_loaded && event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_B)
+            {
+                level_loaded = false;
             }
         }
     }
@@ -204,7 +222,7 @@ struct physics_game::physics_game_impl
             float mouse_x, mouse_y;
             const auto mouseState = SDL_GetMouseState(&mouse_x, &mouse_y);
             const auto [x, y] = screen_to_physics_coords(mouse_x, mouse_y,
-                offset_x, offset_y, pixels_per_meter);
+                                                         offset_x, offset_y, pixels_per_meter);
             const bool is_mouse_down = (mouseState & SDL_BUTTON_LMASK) != 0;
             const mouse_states mice{
                 is_mouse_down ? mouse_states::button_state::DOWN : mouse_states::button_state::UP,
@@ -280,6 +298,7 @@ struct physics_game::physics_game_impl
         {
             ImGui::Text("FPS: %d", smoothed_fps);
             ImGui::Text("Frame Time: %.2f ms", smoothed_frame_time);
+            ImGui::Text("Press \'B\' to rebuild level");
             ImGui::End();
         }
 
@@ -325,7 +344,8 @@ struct physics_game::physics_game_impl
     ///          - '|' : Vertical walls
     ///          - ' ' : Empty path cells
     ///          Also creates boundary walls around the entire maze to contain balls.
-    void create_physics_objects(const std::string_view maze_string, const float cell_size_param, mazes::randomizer& rng) noexcept
+    void create_physics_objects(const std::string_view maze_string, const float cell_size_param,
+                                mazes::randomizer& rng) noexcept
     {
         if (maze_string.empty())
         {
@@ -337,28 +357,28 @@ struct physics_game::physics_game_impl
         init_physics();
 
         // Calculate maze dimensions by parsing the string
-        const auto* mazeData = maze_string.data();
-        const auto mazeLen = maze_string.size();
-        int currentRow = 0;
-        int colCount = 0;
+        const auto* maze_data = maze_string.data();
+        const auto maze_len = maze_string.size();
+        int current_row = 0;
+        int col_count = 0;
 
         max_cols = 0;
         max_rows = 0;
 
-        for (size_t i = 0; i < mazeLen; i++)
+        for (size_t i = 0; i < maze_len; i++)
         {
-            if (mazeData[i] == '\n')
+            if (maze_data[i] == '\n')
             {
-                max_cols = std::max(max_cols, colCount);
-                colCount = 0;
-                currentRow++;
+                max_cols = std::max(max_cols, col_count);
+                col_count = 0;
+                current_row++;
             }
             else
             {
-                colCount++;
+                col_count++;
             }
         }
-        max_rows = currentRow + 1;
+        max_rows = current_row + 1;
 
         SDL_Log("Maze dimensions: %d rows x %d columns", max_rows, max_cols);
 
@@ -366,10 +386,10 @@ struct physics_game::physics_game_impl
         cell_size = cell_size_param;
         pixels_per_meter = cell_size; // Use cell size as the meter scale
 
-        const auto mazeWidth = static_cast<float>(max_cols) * cell_size;
-        const auto mazeHeight = static_cast<float>(max_rows) * cell_size;
-        offset_x = std::max(0.0f, (static_cast<float>(INIT_WINDOW_W) - mazeWidth) / 2.0f);
-        offset_y = std::max(0.0f, (static_cast<float>(INIT_WINDOW_H) - mazeHeight) / 2.0f);
+        const auto maze_width = static_cast<float>(max_cols) * cell_size;
+        const auto maze_height = static_cast<float>(max_rows) * cell_size;
+        offset_x = std::max(0.0f, (static_cast<float>(INIT_WINDOW_W) - maze_width) / 2.0f);
+        offset_y = std::max(0.0f, (static_cast<float>(INIT_WINDOW_H) - maze_height) / 2.0f);
 
         // Calculate world dimensions in physics units (meters)
         const auto world_width = (static_cast<float>(max_cols) * cell_size) / pixels_per_meter;
@@ -404,8 +424,6 @@ struct physics_game::physics_game_impl
         // Shape properties for boundaries
         b2ShapeDef boundary_shape_def = b2DefaultShapeDef();
         boundary_shape_def.density = 0.0f;
-        // Note: In Box2D 3.0, friction and restitution are set differently
-        // They can be set on the shape after creation if needed
 
         // Define boundary positions with a small margin
         constexpr float margin = 1.0f;
@@ -415,19 +433,19 @@ struct physics_game::physics_game_impl
         const float bottom = world_height + margin;
 
         // Top boundary
-        b2Segment top_seg = {{left, top}, {right, top}};
+        const b2Segment top_seg = {{left, top}, {right, top}};
         b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &top_seg);
 
         // Bottom boundary
-        b2Segment bottom_seg = {{left, bottom}, {right, bottom}};
+        const b2Segment bottom_seg = {{left, bottom}, {right, bottom}};
         b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &bottom_seg);
 
         // Left boundary
-        b2Segment left_seg = {{left, top}, {left, bottom}};
+        const b2Segment left_seg = {{left, top}, {left, bottom}};
         b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &left_seg);
 
         // Right boundary
-        b2Segment right_seg = {{right, top}, {right, bottom}};
+        const b2Segment right_seg = {{right, top}, {right, bottom}};
         b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &right_seg);
 
         SDL_Log("Created world boundaries at: (%.1f, %.1f) to (%.1f, %.1f)",
@@ -642,7 +660,7 @@ struct physics_game::physics_game_impl
             const float x = world_width * (static_cast<float>(i) + 1.0f) / (num_balls + 1.0f);
             const float y = world_height * 0.2f;
             // Radius should be about 40% of a cell for good visibility
-            create_ball(x, y, 0.4f);
+            create_ball(x, y, static_cast<float>(rng(4, 7)) * 0.1f);
         }
 
         SDL_Log("Created %d test balls", num_balls);
@@ -724,8 +742,6 @@ bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomi
 {
     auto&& gamePtr = this->m_impl;
 
-    gamePtr->create_physics_objects(mazes::create(mazes::configurator().rows(10).columns(10)), 10.0f, std::ref(rng));
-
     auto previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0;
 
@@ -755,6 +771,14 @@ bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomi
         }
 
         gamePtr->render(elapsed);
+
+        if (!gamePtr->level_loaded)
+        {
+            gamePtr->create_physics_objects(gamePtr->level_generator(std::ref(rng)),
+                static_cast<float>(rng(7, 12)),
+                std::ref(rng));
+            gamePtr->level_loaded = true;
+        }
     }
 
 #if defined(__EMSCRIPTEN__)
