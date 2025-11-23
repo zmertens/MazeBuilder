@@ -36,7 +36,7 @@ void sdl_helper::init(std::string_view title, int width, int height) noexcept
             return;
         }
 
-        if (auto props = SDL_GetRendererProperties(this->renderer); props != 0)
+        if (const auto props = SDL_GetRendererProperties(this->renderer); props != 0)
         {
             SDL_Log("Renderer created: %s\n", SDL_GetStringProperty(props, SDL_PROP_RENDERER_NAME_STRING, "default"));
         }
@@ -53,13 +53,13 @@ void sdl_helper::init(std::string_view title, int width, int height) noexcept
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         SDL_RenderClear(renderer);
         SDL_RenderPresent(renderer);
-        SDL_Log("SDLHelper::init - Test render complete");
+        SDL_Log("sdl_helper::init - Test render complete");
     };
 
     // SDL_Init returns true on SUCCESS (SDL3 behavior)
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
-        std::call_once(sdlInitializedFlag, initFunc);
+        std::call_once(sdl_initialized_flag, initFunc);
     }
     else
     {
@@ -67,19 +67,19 @@ void sdl_helper::init(std::string_view title, int width, int height) noexcept
     }
 }
 
-void sdl_helper::destroyAndQuit() noexcept
+void sdl_helper::destroy_and_quit() noexcept
 {
     // Prevent double-destruction
     if (!this->window && !this->renderer)
     {
-        SDL_Log("SDLHelper::destroyAndQuit() - Already destroyed, skipping\n");
+        SDL_Log("sdl_helper::destroy_and_quit() - Already destroyed, skipping\n");
         return;
     }
 
     if (renderer)
     {
 #if defined(MAZE_DEBUG)
-        SDL_Log("SDLHelper::destroyAndQuit() - Destroying renderer %p\n", static_cast<void*>(renderer));
+        SDL_Log("sdl_helper::destroy_and_quit() - Destroying renderer %p\n", static_cast<void*>(renderer));
 #endif
         SDL_DestroyRenderer(renderer);
         renderer = nullptr;
@@ -88,7 +88,7 @@ void sdl_helper::destroyAndQuit() noexcept
     if (window)
     {
 #if defined(MAZE_DEBUG)
-        SDL_Log("SDLHelper::destroyAndQuit() - Destroying window %p\n", static_cast<void*>(window));
+        SDL_Log("sdl_helper::destroy_and_quit() - Destroying window %p\n", static_cast<void*>(window));
 #endif
         SDL_DestroyWindow(window);
         window = nullptr;
@@ -97,7 +97,7 @@ void sdl_helper::destroyAndQuit() noexcept
     // Only call SDL_Quit() if we actually destroyed something
     if (SDL_WasInit(0) != 0)
     {
-        SDL_Log("SDLHelper::destroyAndQuit() - Calling SDL_Quit()\n");
+        SDL_Log("sdl_helper::destroy_and_quit() - Calling SDL_Quit()\n");
         SDL_Quit();
     }
 }

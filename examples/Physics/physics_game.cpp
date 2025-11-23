@@ -27,6 +27,7 @@
 #include <MazeBuilder/create.h>
 
 #include "ball.h"
+#include "coordinates.h"
 #include "mouse_states.h"
 #include "render_window.h"
 #include "sdl_helper.h"
@@ -52,7 +53,7 @@ struct physics_game::physics_game_impl
 
     static constexpr auto MAX_BALLS = 10;
 
-    sdl_helper sdl_helper;
+    sdl_helper sdl;
 
     std::unique_ptr<texture> sdl_logo;
     std::unique_ptr<texture> sfml_logo;
@@ -77,7 +78,7 @@ struct physics_game::physics_game_impl
     int max_rows = 0;
 
     // Box2D world and physics components
-    b2BodyId boundaryBodyId = b2_nullBodyId;
+    b2BodyId boundary_body_id = b2_nullBodyId;
     b2WorldId world_id = b2_nullWorldId;
     // Scale factor for Box2D (which uses meters)
     float pixels_per_meter = 40.0f;
@@ -91,21 +92,21 @@ struct physics_game::physics_game_impl
           , version{version}
           , INIT_WINDOW_W{w}, INIT_WINDOW_H{h}
           , window{nullptr}
-          , sdl_helper{}
+          , sdl{}
           , sdl_logo{std::make_unique<texture>()}
           , sfml_logo{std::make_unique<texture>()}
     {
         init_sdl();
 
         // Check if SDL initialization succeeded
-        if (!sdl_helper.window || !sdl_helper.renderer)
+        if (!sdl.window || !sdl.renderer)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create SDL window or renderer - cannot continue");
             // Don't initialize further objects if SDL failed
             return;
         }
 
-        this->window = std::make_unique<render_window>(sdl_helper.renderer, sdl_helper.window);
+        this->window = std::make_unique<render_window>(sdl.renderer, sdl.window);
 
         init_dear_imgui();
 
@@ -114,16 +115,16 @@ struct physics_game::physics_game_impl
 
     ~physics_game_impl()
     {
-        if (auto& sdl = this->sdl_helper; sdl.window || sdl.renderer)
+        if (sdl.window || sdl.renderer)
         {
-            sdl.destroyAndQuit();
+            sdl.destroy_and_quit();
         }
     }
 
     void init_sdl() noexcept
     {
-        const auto windowTitle = title + " - " + version;
-        this->sdl_helper.init(windowTitle, INIT_WINDOW_W, INIT_WINDOW_H);
+        const auto window_title = title + " - " + version;
+        this->sdl.init(window_title, INIT_WINDOW_W, INIT_WINDOW_H);
     }
 
     void init_dear_imgui() const noexcept
@@ -136,8 +137,8 @@ struct physics_game::physics_game_impl
         ImGui::GetIO().IniFilename = nullptr;
 
         // Setup ImGui Platform/Renderer backends
-        ImGui_ImplSDL3_InitForSDLRenderer(this->sdl_helper.window, this->sdl_helper.renderer);
-        ImGui_ImplSDLRenderer3_Init(this->sdl_helper.renderer);
+        ImGui_ImplSDL3_InitForSDLRenderer(this->sdl.window, this->sdl.renderer);
+        ImGui_ImplSDLRenderer3_Init(this->sdl.renderer);
 
         ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(Cousine_Regular_compressed_data,
                                                              Cousine_Regular_compressed_size,
@@ -146,13 +147,13 @@ struct physics_game::physics_game_impl
 
     void init_textures() const noexcept
     {
-        if (!sdl_logo->loadFromFile(sdl_helper.renderer, SDL_LOGO_FILEPATH))
+        if (!sdl_logo->loadFromFile(sdl.renderer, SDL_LOGO_FILEPATH))
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load SDL logo texture from %s",
                          SDL_LOGO_FILEPATH.data());
         }
 
-        if (!sfml_logo->loadFromFile(sdl_helper.renderer, SFML_LOGO_FILEPATH))
+        if (!sfml_logo->loadFromFile(sdl.renderer, SFML_LOGO_FILEPATH))
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load SFML logo texture from %s",
                          SFML_LOGO_FILEPATH.data());
@@ -160,7 +161,7 @@ struct physics_game::physics_game_impl
 
         if (SDL_Surface* bmp_surface = SDL_LoadBMP(WINDOW_ICON_FILEPATH.data()))
         {
-            SDL_SetWindowIcon(sdl_helper.window, bmp_surface);
+            SDL_SetWindowIcon(sdl.window, bmp_surface);
             SDL_DestroySurface(bmp_surface);
         }
         else
@@ -187,22 +188,23 @@ struct physics_game::physics_game_impl
         }
     }
 
-    void update(const float dt, mazes::randomizer& rng, int subSteps = 4) noexcept
+    void update(const float dt, mazes::randomizer& rng, const int sub_steps = 4) noexcept
     {
         // Step the Box2D physics world if initialized
         if (B2_IS_NON_NULL(world_id))
         {
             // Step physics with substeps for stability
             // Substeps help with collision accuracy at high velocities
-            b2World_Step(world_id, dt, subSteps);
+            b2World_Step(world_id, dt, sub_steps);
 
             // Process collision events and game logic
-            process_physics_collisions();
+            process_physics_collisions(std::ref(rng));
 
             // Handle mouse dragging
             float mouse_x, mouse_y;
             const auto mouseState = SDL_GetMouseState(&mouse_x, &mouse_y);
-            const auto [x, y] = screen_to_physics_coords(mouse_x, mouse_y);
+            const auto [x, y] = screen_to_physics_coords(mouse_x, mouse_y,
+                offset_x, offset_y, pixels_per_meter);
             const bool is_mouse_down = (mouseState & SDL_BUTTON_LMASK) != 0;
             const mouse_states mice{
                 is_mouse_down ? mouse_states::button_state::DOWN : mouse_states::button_state::UP,
@@ -297,9 +299,9 @@ struct physics_game::physics_game_impl
         }
 
         // Create Box2D world with gravity pointing down
-        b2WorldDef worldDef = b2DefaultWorldDef();
-        worldDef.gravity = {0.0f, 9.8f};
-        world_id = b2CreateWorld(&worldDef);
+        b2WorldDef world_def = b2DefaultWorldDef();
+        world_def.gravity = {0.0f, 9.8f};
+        world_id = b2CreateWorld(&world_def);
 
         // Set physics simulation parameters
         pixels_per_meter = 40.0f;
@@ -307,40 +309,15 @@ struct physics_game::physics_game_impl
         // Clear body tracking
         wall_bodies.clear();
         ball_bodies.clear();
-        boundaryBodyId = b2_nullBodyId;
+        boundary_body_id = b2_nullBodyId;
 
         SDL_Log("Physics world initialized with gravity: (0.0, 9.8)");
-    }
-
-    /// @brief Convert screen coordinates to Box2D physics world coordinates
-    /// @param screen_x X coordinate in screen/pixel space
-    /// @param screen_y Y coordinate in screen/pixel space
-    /// @return b2Vec2 position in physics world space (meters)
-    /// @details This accounts for the maze offset and pixel-to-meter conversion.
-    ///          Essential for mouse interaction with physics objects.
-    b2Vec2 screen_to_physics_coords(float screen_x, float screen_y) const noexcept
-    {
-        // Convert from screen coordinates to physics coordinates
-        // by accounting for offset and scale
-        const float phys_x = (screen_x - offset_x) / pixels_per_meter;
-        const float phys_y = (screen_y - offset_y) / pixels_per_meter;
-
-        return {phys_x, phys_y};
-    }
-
-    /// @brief Convert Box2D physics coordinates to screen coordinates
-    /// @param phys_x X position in physics world (meters)
-    /// @param phys_y Y position in physics world (meters)
-    /// @return SDL_FPoint position in screen/pixel space
-    /// @details Used for rendering physics objects at correct screen positions
-    SDL_FPoint physics_to_screen(float phys_x, float phys_y) const noexcept
-    {
-        return {phys_x * pixels_per_meter + offset_x, phys_y * pixels_per_meter + offset_y};
     }
 
     /// @brief Create maze physics objects from ASCII maze string
     /// @param maze_string ASCII representation of the maze ('+', '-', '|', ' ')
     /// @param cell_size_param Size of each cell in pixels
+    /// @param rng
     /// @details Parses the maze string and creates Box2D static bodies for walls.
     ///          Walls are represented as:
     ///          - '+' : Corner joints (small squares)
@@ -348,7 +325,7 @@ struct physics_game::physics_game_impl
     ///          - '|' : Vertical walls
     ///          - ' ' : Empty path cells
     ///          Also creates boundary walls around the entire maze to contain balls.
-    void create_physics_objects(std::string_view maze_string, float cell_size_param) noexcept
+    void create_physics_objects(const std::string_view maze_string, const float cell_size_param, mazes::randomizer& rng) noexcept
     {
         if (maze_string.empty())
         {
@@ -360,8 +337,8 @@ struct physics_game::physics_game_impl
         init_physics();
 
         // Calculate maze dimensions by parsing the string
-        const char* mazeData = maze_string.data();
-        size_t mazeLen = maze_string.size();
+        const auto* mazeData = maze_string.data();
+        const auto mazeLen = maze_string.size();
         int currentRow = 0;
         int colCount = 0;
 
@@ -389,25 +366,26 @@ struct physics_game::physics_game_impl
         cell_size = cell_size_param;
         pixels_per_meter = cell_size; // Use cell size as the meter scale
 
-        float mazeWidth = max_cols * cell_size;
-        float mazeHeight = max_rows * cell_size;
-        offset_x = std::max(0.0f, (INIT_WINDOW_W - mazeWidth) / 2.0f);
-        offset_y = std::max(0.0f, (INIT_WINDOW_H - mazeHeight) / 2.0f);
+        const auto mazeWidth = static_cast<float>(max_cols) * cell_size;
+        const auto mazeHeight = static_cast<float>(max_rows) * cell_size;
+        offset_x = std::max(0.0f, (static_cast<float>(INIT_WINDOW_W) - mazeWidth) / 2.0f);
+        offset_y = std::max(0.0f, (static_cast<float>(INIT_WINDOW_H) - mazeHeight) / 2.0f);
 
         // Calculate world dimensions in physics units (meters)
-        float worldWidth = (max_cols * cell_size) / pixels_per_meter;
-        float worldHeight = (max_rows * cell_size) / pixels_per_meter;
+        const auto world_width = (static_cast<float>(max_cols) * cell_size) / pixels_per_meter;
+        const auto world_height = (static_cast<float>(max_rows) * cell_size) / pixels_per_meter;
 
-        SDL_Log("Physics world size: %.2f x %.2f meters", worldWidth, worldHeight);
+        SDL_Log("Physics world size: %.2f x %.2f meters", world_width, world_height);
         SDL_Log("Cell size: %.2f pixels, pixelsPerMeter: %.2f", cell_size, pixels_per_meter);
 
         // Create boundary walls around the entire world
-        create_world_boundaries(worldWidth, worldHeight);
+        create_world_boundaries(world_width, world_height);
 
         // Parse maze and create wall bodies
         create_walls(maze_string);
 
-        SDL_Log("Maze physics creation complete");
+        // Create some test balls to see the simulation
+        create_ball_bodies(std::ref(rng));
     }
 
     /// @brief Create static boundary walls around the physics world
@@ -415,17 +393,17 @@ struct physics_game::physics_game_impl
     /// @param world_height Height of the world in meters
     /// @details Creates 4 edge segments (top, bottom, left, right) to prevent
     ///          balls from escaping the play area. These are sensor boundaries.
-    void create_world_boundaries(float world_width, float world_height) noexcept
+    void create_world_boundaries(const float world_width, const float world_height) noexcept
     {
         // Create a static body for boundaries
-        b2BodyDef boundaryDef = b2DefaultBodyDef();
-        boundaryDef.type = b2_staticBody;
-        boundaryDef.userData = reinterpret_cast<void*>(3000);
-        boundaryBodyId = b2CreateBody(world_id, &boundaryDef);
+        b2BodyDef boundary_def = b2DefaultBodyDef();
+        boundary_def.type = b2_staticBody;
+        boundary_def.userData = reinterpret_cast<void*>(3000);
+        boundary_body_id = b2CreateBody(world_id, &boundary_def);
 
         // Shape properties for boundaries
-        b2ShapeDef boundaryShapeDef = b2DefaultShapeDef();
-        boundaryShapeDef.density = 0.0f;
+        b2ShapeDef boundary_shape_def = b2DefaultShapeDef();
+        boundary_shape_def.density = 0.0f;
         // Note: In Box2D 3.0, friction and restitution are set differently
         // They can be set on the shape after creation if needed
 
@@ -437,20 +415,20 @@ struct physics_game::physics_game_impl
         const float bottom = world_height + margin;
 
         // Top boundary
-        b2Segment topSeg = {{left, top}, {right, top}};
-        b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &topSeg);
+        b2Segment top_seg = {{left, top}, {right, top}};
+        b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &top_seg);
 
         // Bottom boundary
-        b2Segment bottomSeg = {{left, bottom}, {right, bottom}};
-        b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &bottomSeg);
+        b2Segment bottom_seg = {{left, bottom}, {right, bottom}};
+        b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &bottom_seg);
 
         // Left boundary
-        b2Segment leftSeg = {{left, top}, {left, bottom}};
-        b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &leftSeg);
+        b2Segment left_seg = {{left, top}, {left, bottom}};
+        b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &left_seg);
 
         // Right boundary
-        b2Segment rightSeg = {{right, top}, {right, bottom}};
-        b2CreateSegmentShape(boundaryBodyId, &boundaryShapeDef, &rightSeg);
+        b2Segment right_seg = {{right, top}, {right, bottom}};
+        b2CreateSegmentShape(boundary_body_id, &boundary_shape_def, &right_seg);
 
         SDL_Log("Created world boundaries at: (%.1f, %.1f) to (%.1f, %.1f)",
                 left, top, right, bottom);
@@ -463,19 +441,16 @@ struct physics_game::physics_game_impl
     ///          - Vertical walls ('|'): Thin width, full height
     ///          - Corners ('+'): Small square boxes
     ///          Walls are given unique user data IDs (1000+) for collision detection.
-    void create_walls(std::string_view maze_string) noexcept
+    void create_walls(const std::string_view maze_string) noexcept
     {
-        const auto* maze_data = maze_string.data();
         auto maze_len = maze_string.size();
         int current_row = 0;
         int current_col = 0;
         int wall_count = 0;
 
-        for (size_t i = 0; i < maze_len; i++)
+        for (auto itr{maze_string.cbegin()}; itr != maze_string.cend(); ++itr, ++maze_len)
         {
-            char c = maze_data[i];
-
-            if (c == '\n')
+            if (*itr == '\n')
             {
                 current_col = 0;
                 current_row++;
@@ -483,18 +458,18 @@ struct physics_game::physics_game_impl
             }
 
             // Only create bodies for wall characters
-            if (c == static_cast<unsigned char>(mazes::barriers::SINGLE_SPACE))
+            if (*itr == static_cast<unsigned char>(mazes::barriers::SINGLE_SPACE))
             {
                 current_col++;
                 continue;;
             }
 
             // Calculate physics position (center of cell)
-            float physX = (current_col * cell_size) / pixels_per_meter;
-            float physY = (current_row * cell_size) / pixels_per_meter;
+            float phys_x = (static_cast<float>(current_col) * cell_size) / pixels_per_meter;
+            float phys_y = (static_cast<float>(current_row) * cell_size) / pixels_per_meter;
 
             // Pass nullptr for texture - walls render themselves and don't need individual texture ownership
-            wall_bodies.emplace_back(physX, physY, 1000u + wall_count, nullptr, this->world_id);
+            wall_bodies.emplace_back(phys_x, phys_y, 1000u + wall_count, this->world_id);
 
             const auto& wall_id{wall_bodies.back().get_body_id()};
 
@@ -503,27 +478,27 @@ struct physics_game::physics_game_impl
             shapeDef.density = 0.0f;
 
             // Create appropriate shape based on wall type
-            if (c == static_cast<unsigned char>(mazes::barriers::HORIZONTAL))
+            if (*itr == static_cast<unsigned char>(mazes::barriers::HORIZONTAL))
             {
                 // Horizontal wall: full width, thicker height for visibility
-                const float halfWidth = (cell_size / pixels_per_meter) * 0.5f;
-                const float halfHeight = (cell_size / pixels_per_meter) * 0.2f; // Increased from 0.1 to 0.2
-                b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
+                const auto half_width = (cell_size / pixels_per_meter) * 0.5f;
+                const auto half_height = (cell_size / pixels_per_meter) * 0.2f;
+                b2Polygon boxShape = b2MakeBox(half_width, half_height);
                 b2CreatePolygonShape(wall_id, &shapeDef, &boxShape);
             }
-            else if (c == static_cast<unsigned char>(mazes::barriers::VERTICAL))
+            else if (*itr == static_cast<unsigned char>(mazes::barriers::VERTICAL))
             {
                 // Vertical wall: thicker width for visibility, full height
-                float halfWidth = (cell_size / pixels_per_meter) * 0.2f; // Increased from 0.1 to 0.2
-                float halfHeight = (cell_size / pixels_per_meter) * 0.5f;
-                b2Polygon boxShape = b2MakeBox(halfWidth, halfHeight);
-                b2CreatePolygonShape(wall_id, &shapeDef, &boxShape);
+                const auto half_width = (cell_size / pixels_per_meter) * 0.2f;
+                const auto half_height = (cell_size / pixels_per_meter) * 0.5f;
+                b2Polygon box_shape = b2MakeBox(half_width, half_height);
+                b2CreatePolygonShape(wall_id, &shapeDef, &box_shape);
             }
-            else if (c == static_cast<unsigned char>(mazes::barriers::CORNER))
+            else if (*itr == static_cast<unsigned char>(mazes::barriers::CORNER))
             {
                 // Corner: square at intersection
-                float halfSize = (cell_size / pixels_per_meter) * 0.2f; // Increased from 0.15 to 0.2
-                b2Polygon boxShape = b2MakeBox(halfSize, halfSize);
+                const float half_size = (cell_size / pixels_per_meter) * 0.2f;
+                b2Polygon boxShape = b2MakeBox(half_size, half_size);
                 b2CreatePolygonShape(wall_id, &shapeDef, &boxShape);
             }
             else
@@ -531,10 +506,10 @@ struct physics_game::physics_game_impl
                 // Fallback: create a small square for unrecognized characters
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                             "Unknown wall character '%c' (0x%02X) at (%d, %d) - creating default shape",
-                            c, static_cast<unsigned char>(c), current_col, current_row);
-                float halfSize = (cell_size / pixels_per_meter) * 0.15f;
-                b2Polygon boxShape = b2MakeBox(halfSize, halfSize);
-                b2CreatePolygonShape(wall_id, &shapeDef, &boxShape);
+                            *itr, static_cast<unsigned char>(*itr), current_col, current_row);
+                const auto half_size = (cell_size / pixels_per_meter) * 0.15f;
+                b2Polygon box_shape = b2MakeBox(half_size, half_size);
+                b2CreatePolygonShape(wall_id, &shapeDef, &box_shape);
             }
 
             current_col++;
@@ -550,7 +525,7 @@ struct physics_game::physics_game_impl
     ///          - Ball-to-ball collision handling
     ///          - Exit/goal detection
     ///          This should be called every physics step.
-    void process_physics_collisions() const noexcept
+    void process_physics_collisions(mazes::randomizer& rng) const noexcept
     {
         if (B2_IS_NULL(world_id))
         {
@@ -558,73 +533,73 @@ struct physics_game::physics_game_impl
         }
 
         // Get collision events from Box2D
-        const b2ContactEvents contactEvents = b2World_GetContactEvents(world_id);
+        const b2ContactEvents contact_events = b2World_GetContactEvents(world_id);
 
         // Handle hit events (impacts)
-        for (int i = 0; i < contactEvents.hitCount; ++i)
+        for (int i = 0; i < contact_events.hitCount; ++i)
         {
-            b2ContactHitEvent* hitEvent = &contactEvents.hitEvents[i];
-            b2BodyId bodyA = b2Shape_GetBody(hitEvent->shapeIdA);
-            b2BodyId bodyB = b2Shape_GetBody(hitEvent->shapeIdB);
+            const b2ContactHitEvent* hit_event = &contact_events.hitEvents[i];
+            const b2BodyId body_a = b2Shape_GetBody(hit_event->shapeIdA);
+            const b2BodyId body_b = b2Shape_GetBody(hit_event->shapeIdB);
 
             // Check both orderings for wall collisions
-            handle_wall_collision(bodyA, bodyB);
-            handle_wall_collision(bodyB, bodyA);
+            handle_wall_collision(body_a, body_b, std::ref(rng));
+            handle_wall_collision(body_b, body_a, std::ref(rng));
         }
     }
 
     /// @brief Handle collision between a ball and a wall
-    /// @param possibleWallId Body ID that might be a wall
-    /// @param possibleBallId Body ID that might be a ball
+    /// @param possible_wall_id Body ID that might be a wall
+    /// @param possible_ball_id Body ID that might be a ball
+    /// @param rng
     /// @details Checks user data to identify walls (ID 1000-1999) and applies:
     ///          - Damage to the wall (incrementing hit count)
     ///          - Dynamic collision response (impulses, spin)
     ///          - Wall destruction when hit threshold is reached
-    ///          - Score increments
-    static void handle_wall_collision(b2BodyId possibleWallId, b2BodyId possibleBallId) noexcept
+    static void handle_wall_collision(b2BodyId possible_wall_id, b2BodyId possible_ball_id,
+                                      mazes::randomizer& rng) noexcept
     {
-        if (B2_IS_NULL(possibleWallId) || B2_IS_NULL(possibleBallId))
+        if (B2_IS_NULL(possible_wall_id) || B2_IS_NULL(possible_ball_id))
         {
             return;
         }
 
-        void* wallUserData = b2Body_GetUserData(possibleWallId);
+        void* wallUserData = b2Body_GetUserData(possible_wall_id);
 
         // Check if this is a wall (IDs 1000-1999)
-        if (const auto wallValue = reinterpret_cast<uintptr_t>(wallUserData); wallValue >= 1000 && wallValue < 2000)
+        if (const auto wall_value = reinterpret_cast<uintptr_t>(wallUserData); wall_value >= 1000 && wall_value < 2000)
         {
-            const int wallIndex = static_cast<int>(wallValue - 1000);
+            const int wall_index = static_cast<int>(wall_value - 1000);
 
             // Get ball velocity to check impact speed
-            b2Vec2 ballVel = b2Body_GetLinearVelocity(possibleBallId);
-            float impactSpeed = b2Length(ballVel);
+            const b2Vec2 ball_velocity = b2Body_GetLinearVelocity(possible_ball_id);
 
             // Only count significant impacts
-            if (impactSpeed > 0.5f)
+            if (const float impact_speed = b2Length(ball_velocity); impact_speed > 0.5f)
             {
-                SDL_Log("Wall %d hit! Impact speed: %.2f", wallIndex, impactSpeed);
+                SDL_Log("Wall %d hit! Impact speed: %.2f", wall_index, impact_speed);
 
                 // Apply impulse for dynamic collision response
-                if (impactSpeed > 0)
+                if (impact_speed > 0)
                 {
-                    b2Vec2 normalizedVel = b2Normalize(ballVel);
+                    const auto [x, y] = b2Normalize(ball_velocity);
 
                     // Add randomness to bounce
-                    float randomAngle = ((rand() % 20) - 10) * 0.01f;
-                    float cosR = cosf(randomAngle);
-                    float sinR = sinf(randomAngle);
-                    b2Vec2 adjustedDir = {
-                        normalizedVel.x * cosR - normalizedVel.y * sinR,
-                        normalizedVel.x * sinR + normalizedVel.y * cosR
+                    const auto random_angle = static_cast<float>(rng(10, 20)) * 0.01f;
+                    const auto cos_r = SDL_cosf(random_angle);
+                    const auto sin_r = SDL_sinf(random_angle);
+                    b2Vec2 adjusted_dir = {
+                        x * cos_r - y * sin_r,
+                        x * sin_r + y * cos_r
                     };
 
                     // Apply opposing force
-                    b2Vec2 opposingForce = b2MulSV(-0.7f * impactSpeed, adjustedDir);
-                    b2Body_ApplyLinearImpulseToCenter(possibleBallId, opposingForce, true);
+                    const b2Vec2 opposing_force = b2MulSV(-0.7f * impact_speed, adjusted_dir);
+                    b2Body_ApplyLinearImpulseToCenter(possible_ball_id, opposing_force, true);
 
                     // Add spin for visual interest
-                    float spin = (rand() % 10) * 0.3f;
-                    b2Body_ApplyAngularImpulse(possibleBallId, spin, true);
+                    const auto spin = static_cast<float>(rng(1, 10)) * 0.3f;
+                    b2Body_ApplyAngularImpulse(possible_ball_id, spin, true);
                 }
             }
         }
@@ -642,16 +617,12 @@ struct physics_game::physics_game_impl
             return;
         }
 
-        // Create ball object - pass nullptr for texture since balls render themselves
-        // and don't need to own a texture
-        ball_bodies.emplace_back(phys_x, phys_y, radius, nullptr, this->world_id);
-
-        SDL_Log("Created ball at physics pos (%.2f, %.2f) with radius %.2f", phys_x, phys_y, radius);
+        ball_bodies.emplace_back(phys_x, phys_y, radius, this->world_id);
     }
 
     /// @brief Create several test balls in the maze
     /// @details Places balls at various positions in the maze for testing
-    void create_test_balls() noexcept
+    void create_ball_bodies(mazes::randomizer& rng) noexcept
     {
         if (B2_IS_NULL(world_id) || max_cols == 0 || max_rows == 0)
         {
@@ -660,21 +631,21 @@ struct physics_game::physics_game_impl
         }
 
         // Calculate world dimensions in meters
-        const float worldWidth = (max_cols * cell_size) / pixels_per_meter;
-        const float worldHeight = (max_rows * cell_size) / pixels_per_meter;
+        const float world_width = (static_cast<float>(max_cols) * cell_size) / pixels_per_meter;
+        const float world_height = (static_cast<float>(max_rows) * cell_size) / pixels_per_meter;
 
         // Create a few balls at different positions
-        constexpr int numBalls = 3;
-        for (int i = 0; i < numBalls; ++i)
+        constexpr int num_balls = 100;
+        for (int i = 0; i < num_balls; ++i)
         {
             // Place balls at even spacing across the top of the maze
-            float x = worldWidth * (static_cast<float>(i) + 1.0f) / (numBalls + 1.0f);
-            float y = worldHeight * 0.2f; // Near the top
+            const float x = world_width * (static_cast<float>(i) + 1.0f) / (num_balls + 1.0f);
+            const float y = world_height * 0.2f;
             // Radius should be about 40% of a cell for good visibility
             create_ball(x, y, 0.4f);
         }
 
-        SDL_Log("Created %d test balls", numBalls);
+        SDL_Log("Created %d test balls", num_balls);
     }
 
     /// @brief Render all physics bodies in the world
@@ -687,7 +658,7 @@ struct physics_game::physics_game_impl
             return;
         }
 
-        SDL_Renderer* renderer = sdl_helper.renderer;
+        SDL_Renderer* renderer = sdl.renderer;
         if (!renderer)
         {
             return;
@@ -700,25 +671,22 @@ struct physics_game::physics_game_impl
         // Render SDL logo in top-left corner if available
         if (sdl_logo && sdl_logo->get())
         {
-            // Get logo dimensions
             const int logo_w = sdl_logo->get_width();
             const int logo_h = sdl_logo->get_height();
 
             // Position in top-left corner with small margin
             constexpr float margin = 10.0f;
-            float logo_x = margin;
-            float logo_y = margin;
+            constexpr float logo_x = margin;
+            constexpr float logo_y = margin;
 
-            // Set proper blend mode to fix color issue
             SDL_SetTextureBlendMode(sdl_logo->get(), SDL_BLENDMODE_BLEND);
 
-            // Set color mod to white (no tinting) - fixes light blue issue
             SDL_SetTextureColorMod(sdl_logo->get(), 255, 255, 255);
 
             // Draw the logo with some transparency so maze is still visible
-            SDL_SetTextureAlphaMod(sdl_logo->get(), 128); // 50% transparency
+            SDL_SetTextureAlphaMod(sdl_logo->get(), 128);
 
-            SDL_FRect dst_rect = {logo_x, logo_y, static_cast<float>(logo_w), static_cast<float>(logo_h)};
+            const SDL_FRect dst_rect = {logo_x, logo_y, static_cast<float>(logo_w), static_cast<float>(logo_h)};
             SDL_RenderTexture(renderer, sdl_logo->get(), nullptr, &dst_rect);
 
             // Reset alpha for other rendering
@@ -727,13 +695,13 @@ struct physics_game::physics_game_impl
 
         std::ranges::for_each(std::as_const(wall_bodies), [this](const wall& w)
         {
-            w.draw(this->sdl_helper.renderer, this->pixels_per_meter, this->offset_x, this->offset_y);
+            w.draw(this->sdl.renderer, this->pixels_per_meter, this->offset_x, this->offset_y);
         });
 
         // Draw balls with proper coordinate transformation
         std::ranges::for_each(std::as_const(ball_bodies), [this](const ball& b)
         {
-            b.draw(this->sdl_helper.renderer, this->pixels_per_meter, this->offset_x, this->offset_y);
+            b.draw(this->sdl.renderer, this->pixels_per_meter, this->offset_x, this->offset_y);
         });
     }
 }; // impl
@@ -754,20 +722,14 @@ physics_game::~physics_game() = default;
 // Main game loop
 bool physics_game::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
-    using std::ref;
-
     auto&& gamePtr = this->m_impl;
+
+    gamePtr->create_physics_objects(mazes::create(mazes::configurator().rows(10).columns(10)), 10.0f, std::ref(rng));
 
     auto previous = static_cast<double>(SDL_GetTicks());
     double accumulator = 0.0;
 
     SDL_Log("Entering game loop...\n");
-
-    // Create maze physics
-    gamePtr->create_physics_objects(mazes::create(mazes::configurator().rows(10).columns(10)), 10.0f);
-
-    // Create some test balls to see the simulation
-    gamePtr->create_test_balls();
 
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN

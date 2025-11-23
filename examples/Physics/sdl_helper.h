@@ -1,5 +1,5 @@
-#ifndef SDLHELPER_HPP
-#define SDLHELPER_HPP
+#ifndef SDL_HELPER_H
+#define SDL_HELPER_H
 
 #include <mutex>
 #include <string_view>
@@ -14,13 +14,12 @@ public:
 
     SDL_Renderer* renderer;
 
-private:
-    std::once_flag sdlInitializedFlag;
-
-public:
     void init(std::string_view title, int width, int height) noexcept;
 
-    void destroyAndQuit() noexcept;
-}; // SDLHelper class
+    void destroy_and_quit() noexcept;
 
-#endif // SDLHELPER_HPP
+private:
+    std::once_flag sdl_initialized_flag;
+};
+
+#endif // SDL_HELPER_H

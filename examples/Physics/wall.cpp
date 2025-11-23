@@ -4,12 +4,12 @@
 
 #include <SDL3/SDL.h>
 
-#include "texture.h"
-
 #include <MazeBuilder/randomizer.h>
 
-wall::wall(float x, float y, unsigned int counter, std::unique_ptr<texture> t, const b2WorldId& world_id)
-    : m_texture{std::move(t)}, m_body_id{b2_nullBodyId}
+#include "coordinates.h"
+
+wall::wall(float x, float y, unsigned int counter, const b2WorldId& world_id)
+    : m_body_id{b2_nullBodyId}
 {
     // Create static wall body
     b2BodyDef wall_def = b2DefaultBodyDef();
@@ -67,9 +67,8 @@ void wall::draw(SDL_Renderer* renderer, float pixels_per_meter, float offset_x, 
         const b2Vec2 rotated = b2RotateVector(rotation, polygon.vertices[i]);
         // Translate to position
         auto [x, y] = b2Add(position, rotated);
-        // Convert to screen: physics_coords * scale + offset
-        points[i].x = x * pixels_per_meter + offset_x;
-        points[i].y = y * pixels_per_meter + offset_y;
+
+        points[i] = physics_to_screen(x, y, offset_x, offset_y, pixels_per_meter);
     }
 
     // Draw filled rectangle

@@ -5,13 +5,9 @@
 #include <SDL3/SDL.h>
 
 #include "mouse_states.h"
-#include "texture.h"
 
-#include <MazeBuilder/randomizer.h>
-
-ball::ball(float x, float y, float radius, std::unique_ptr<texture> t, const b2WorldId& world_id)
+ball::ball(float x, float y, float radius, const b2WorldId& world_id)
     : m_pos_x{x}, m_pos_y{y}, m_radius{radius}
-    , m_texture{std::move(t)}
     , m_body_id{b2_nullBodyId}
     , m_is_dragging{false}
 {
@@ -29,7 +25,7 @@ ball::ball(float x, float y, float radius, std::unique_ptr<texture> t, const b2W
     b2ShapeDef shapeDef = b2DefaultShapeDef();
     shapeDef.density = 1.0f;  // Standard density
 
-    b2Circle circle = {{0.0f, 0.0f}, radius};
+    const b2Circle circle = {{0.0f, 0.0f}, radius};
     b2CreateCircleShape(m_body_id, &shapeDef, &circle);
 }
 
