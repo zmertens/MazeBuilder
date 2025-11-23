@@ -1,6 +1,7 @@
 #ifndef TEXTURE_HPP
 #define TEXTURE_HPP
 
+#include <string>
 #include <string_view>
 
 struct SDL_Texture;

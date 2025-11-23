@@ -95,15 +95,13 @@ bool texture::loadFromFile(SDL_Renderer* renderer, std::string_view path) noexce
     }
 
     // Create surface from image data (force RGBA format)
-    SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_RGBA8888, imageData, width * 4);
+    SDL_Surface* surface = SDL_CreateSurfaceFrom(width, height, SDL_PIXELFORMAT_ABGR8888, imageData, width * 4);
 
     if (!surface)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create surface: %s\n", SDL_GetError());
 
         stbi_image_free(imageData);
-
-        SDL_DestroySurface(surface);
 
         return false;
     }
@@ -115,11 +113,20 @@ bool texture::loadFromFile(SDL_Renderer* renderer, std::string_view path) noexce
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create texture: %s\n", SDL_GetError());
 
+        SDL_DestroySurface(surface);
+        stbi_image_free(imageData);
+
         return false;
     }
 
     // Set blend mode for transparency
     SDL_SetTextureBlendMode(this->m_texture, SDL_BLENDMODE_BLEND);
+
+    // Reset color modulation to ensure no tinting
+    SDL_SetTextureColorMod(this->m_texture, 255, 255, 255);
+
+    // Reset alpha modulation
+    SDL_SetTextureAlphaMod(this->m_texture, 255);
 
     // Clean up
     SDL_DestroySurface(surface);
