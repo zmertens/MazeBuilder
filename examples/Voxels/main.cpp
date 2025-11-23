@@ -1,7 +1,5 @@
-#include <random>
-#include <stdexcept>
 #include <iostream>
-#include <algorithm>
+#include <stdexcept>
 #include <string>
 
 #include <MazeBuilder/maze_builder.h>
@@ -22,26 +20,25 @@ EMSCRIPTEN_BINDINGS(maze_builder_module) {
 }
 #endif
 
-int main(int argc, char* argv[]) {
-
-    using namespace std;
-
-    mazes::randomizer rng;
+int main() {
 
     try {
+        mazes::randomizer rng;
 
-        bool success = false;
         // Run the SDL app
-        static constexpr int window_w = 800, window_h = 600;
-        string my_title { "Maze Builder 🔧" };
-        auto&& voxel_engine = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
-        success = voxel_engine->run(std::ref(rng));
-        if (!success) {
-            std::cerr << "ERROR: Running SDL app failed." << std::endl;
+        static constexpr int window_w = 1080, window_h = 720;
+
+        const auto my_title{ "Maze Builder 🔧 " + mazes::VERSION };
+
+        if (const auto voxel_engine = craft::get_instance(my_title, window_w, window_h);
+            !voxel_engine->run(std::ref(rng))) {
+
+            throw std::runtime_error("ERROR: Running SDL app failed.");
         }
 
     } catch (std::exception& ex) {
-        std::cerr << ex.what() << std::endl; 
+
+        std::cerr << ex.what() << std::endl;
     }
 
     return EXIT_SUCCESS;

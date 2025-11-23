@@ -2,6 +2,7 @@
 #define WALL_H
 
 #include <memory>
+#include <memory>
 
 #include <box2d/id.h>
 

@@ -160,7 +160,7 @@ struct craft::craft_impl {
     public:
         GLuint fbo_hdr, fbo_pingpong[2], fbo_final;
         GLuint rbo_bloom_depth;
-        // Hold 2 floating point color buffers (1 for normal rendering, 
+        // Hold 2 floating point color buffers (1 for normal rendering,
         //  the other one for brightness treshold values)
         GLuint color_buffers[2], color_buffers_pingpong[2], color_final;
 
@@ -390,7 +390,6 @@ struct craft::craft_impl {
 
     // Note: These are public members
     const std::string& m_title;
-    const std::string& m_version;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     unique_ptr<Model> m_model;
@@ -398,9 +397,8 @@ struct craft::craft_impl {
 
     std::string m_json_data;
 
-    craft_impl(const std::string& title, const std::string& version, int w, int h)
+    craft_impl(const std::string& title, int w, int h)
         : m_title(title)
-        , m_version(version)
         , INIT_WINDOW_WIDTH(w)
         , INIT_WINDOW_HEIGHT(h)
         , m_model{ make_unique<Model>() }
@@ -2108,7 +2106,7 @@ struct craft::craft_impl {
                 }
                 case KEY_ITEM_NEXT: {
                     if (this->m_gui->capture_mouse) {
-                        this->m_model->item_index = (this->m_model->item_index + 1) % item_count; 
+                        this->m_model->item_index = (this->m_model->item_index + 1) % item_count;
                     }
                     break;
                 }
@@ -2309,9 +2307,9 @@ struct craft::craft_impl {
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-        Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
+        const Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE;
         char title_formatted[32];
-        SDL_snprintf(title_formatted, 32, "%s - %s\n", this->m_title.c_str(), this->m_version.c_str());
+        SDL_snprintf(title_formatted, 32, "%s\n", this->m_title.c_str());
         this->m_model->window = SDL_CreateWindow(title_formatted, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT, window_flags);
         if (this->m_model->window == nullptr) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
@@ -2361,8 +2359,8 @@ struct craft::craft_impl {
 
 }; // craft_impl
 
-craft::craft(const std::string& title, const std::string& version, const int w, const int h)
-    : m_pimpl{ std::make_unique<craft_impl>(cref(title), cref(version), w, h) } {
+craft::craft(const std::string& title, const int w, const int h)
+    : m_impl{ std::make_unique<craft_impl>(cref(title), w, h) } {
 }
 
 craft::~craft() = default;
@@ -2373,11 +2371,11 @@ craft::~craft() = default;
 */
 bool craft::run(mazes::randomizer& rng) const noexcept {
 
-    if (!SDL_SetAppMetadata("Maze builder with voxels", mazes::VERSION.c_str(), ZACHS_GH_REPO)) {
+    if (!SDL_SetAppMetadata("Maze builder with voxels", mazes::VERSION.c_str(), MY_GITHUB_REPO)) {
         return SDL_APP_FAILURE;
     }
 
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, ZACHS_GH_REPO);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, MY_GITHUB_REPO);
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "flipsAndAle");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "MIT License");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "simulation;game;voxel");
@@ -2389,9 +2387,9 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
         return false;
     }
 
-    this->m_pimpl->create_window_and_context();
+    this->m_impl->create_window_and_context();
 
-    auto&& sdl_window = this->m_pimpl->m_model->window;
+    auto&& sdl_window = this->m_impl->m_model->window;
 
     if (!sdl_window) {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Window failed (%s)\n", SDL_GetError());
@@ -2427,14 +2425,6 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     SDL_Log("GL Version   : %d.%d\n", major, minor);
     SDL_Log("GLSL Version : %s\n", glslVersion);
     SDL_Log("-------------------------------------------------------------\n");
-    bool dump_exts = false;
-    if (dump_exts) {
-        GLint nExtensions;
-        glGetIntegerv(GL_NUM_EXTENSIONS, &nExtensions);
-        for (int i = 0; i < nExtensions; i++) {
-            SDL_Log("%s\n", glGetStringi(GL_EXTENSIONS, i));
-        }
-    }
 
     // LOAD TEXTURES
     GLuint texture;
@@ -2462,12 +2452,12 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     load_png_texture("textures/font.png");
 
     // Cubemaps
-    static vector<string> cubemap_files = {"textures/right.jpg", "textures/left.jpg", 
-        "textures/top.jpg", "textures/bottom.jpg", 
+    static vector<string> cubemap_files = {"textures/right.jpg", "textures/left.jpg",
+        "textures/top.jpg", "textures/bottom.jpg",
         "textures/front.jpg", "textures/back.jpg"};
     GLuint cubemap_texture_id = load_cubemap(cref(cubemap_files));
 
-    // LOAD SHADERS 
+    // LOAD SHADERS
     craft_impl::Attrib block_attrib = { 0 };
     craft_impl::Attrib line_attrib = { 0 };
     craft_impl::Attrib text_attrib = { 0 };
@@ -2564,7 +2554,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     ImGui::GetIO().IniFilename = nullptr;
 
     // Setup ImGui Platform/Renderer backends
-    ImGui_ImplSDL3_InitForOpenGL(sdl_window, this->m_pimpl->m_model->context);
+    ImGui_ImplSDL3_InitForOpenGL(sdl_window, this->m_impl->m_model->context);
     string glsl_version = "";
 #if defined(__EMSCRIPTEN__)
     glsl_version = "#version 100";
@@ -2577,10 +2567,10 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
     IM_ASSERT(nunito_sans_font != nullptr);
 
-    // DATABASE INITIALIZATION 
+    // DATABASE INITIALIZATION
     if (USE_CACHE) {
         db_enable();
-        if (db_init(this->m_pimpl->m_model->db_path)) {
+        if (db_init(this->m_impl->m_model->db_path)) {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "db_init failed\n");
             return false;
         }
@@ -2611,7 +2601,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     glBindVertexArray(0);
 
     static constexpr float skybox_vertices[] = {
-        // positions          
+        // positions
         -1.0f,  1.0f, -1.0f,
         -1.0f, -1.0f, -1.0f,
         1.0f, -1.0f, -1.0f,
@@ -2668,13 +2658,13 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
     craft_impl::BloomTools bloom_tools{};
 
-    craft_impl::Player* me = &m_pimpl->m_model->player;
-    craft_impl::State* p_state = &m_pimpl->m_model->player.state;
+    craft_impl::Player* me = &m_impl->m_model->player;
+    craft_impl::State* p_state = &m_impl->m_model->player.state;
 
-    // LOAD STATE FROM DATABASE 
+    // LOAD STATE FROM DATABASE
     int loaded = db_load_state(&p_state->x, &p_state->y, &p_state->z, &p_state->rx, &p_state->ry);
     if (!loaded) {
-        p_state->y = this->m_pimpl->highest_block(p_state->x, p_state->z);
+        p_state->y = this->m_impl->highest_block(p_state->x, p_state->z);
     }
 
     // Init some local vars for handling maze duties
@@ -2685,17 +2675,17 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
     // Make some references
     auto my_maze_type = to_algo_from_sv(algo_list.front());
-    auto&& gui = this->m_pimpl->m_gui;
-    auto&& model = this->m_pimpl->m_model;
+    auto&& gui = this->m_impl->m_gui;
+    auto&& model = this->m_impl->m_model;
 
     mazes::lab my_mazes;
 
     // INITIALIZE WORKER THREADS
-    m_pimpl->init_worker_threads(cref(my_mazes));
+    m_impl->init_worker_threads(cref(my_mazes));
 
     me->id = 0;
     me->name = "Wade Watts";
-    me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
+    me->buffer = this->m_impl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
 
     vector<uint8_t> current_maze_pixels;
 
@@ -2718,7 +2708,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     while (running)
 #endif
     {
-        // FRAME RATE 
+        // FRAME RATE
         uint64_t now = SDL_GetTicks();
         double elapsed = static_cast<double>(now - previous) / 1000.0;
         elapsed = SDL_min(elapsed, 0.2);
@@ -2743,7 +2733,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
         time_accum += elapsed;
         while (time_accum >= FIXED_TIME_STEP) {
             // Handle SDL events and motion (keyboard, mouse, etc.)
-            running = this->m_pimpl->handle_events_and_motion(FIXED_TIME_STEP, ref(window_resizes));
+            running = this->m_impl->handle_events_and_motion(FIXED_TIME_STEP, ref(window_resizes));
             time_accum -= FIXED_TIME_STEP;
             time_step += FIXED_TIME_STEP;
         }
@@ -2860,7 +2850,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                             // The JSON data for the Web API - GET /mazes/
                             //this->m_pimpl->m_json_data = my_mazes.back()->to_json_str();
                             // Resetting the model reloads the chunks - show the new maze
-                            this->m_pimpl->reset_model();
+                            this->m_impl->reset_model();
                             gui->reset();
                         }
                         ImGui::SameLine();
@@ -2995,9 +2985,9 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
             bloom_tools.gen_framebuffers(sdl_display_w, sdl_display_h);
         }
 
-        m_pimpl->delete_chunks();
-        m_pimpl->del_buffer(me->buffer);
-        me->buffer = this->m_pimpl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
+        m_impl->delete_chunks();
+        m_impl->del_buffer(me->buffer);
+        me->buffer = this->m_impl->gen_player_buffer(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
 
         // Bind the FBO that will store the 3D scene
         glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -3010,21 +3000,21 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
         glCullFace(GL_BACK);
         glFrontFace(GL_CCW);
 
-        triangle_faces = m_pimpl->render_chunks(&block_attrib, me, texture, cref(my_mazes));
+        triangle_faces = m_impl->render_chunks(&block_attrib, me, texture, cref(my_mazes));
 
         if (gui->show_items) {
-            m_pimpl->render_item(&block_attrib, texture);
+            m_impl->render_item(&block_attrib, texture);
         }
 
-        m_pimpl->render_signs(&text_attrib, me, sign);
-        m_pimpl->render_sign(&text_attrib, me, sign);
+        m_impl->render_signs(&text_attrib, me, sign);
+        m_impl->render_sign(&text_attrib, me, sign);
 
         if (gui->show_wireframes) {
-            m_pimpl->render_wireframe(&line_attrib, me);
+            m_impl->render_wireframe(&line_attrib, me);
         }
 
         if (gui->show_crosshairs) {
-            m_pimpl->render_crosshairs(&line_attrib);
+            m_impl->render_crosshairs(&line_attrib);
         }
 
         if (gui->show_info_text) {
@@ -3040,25 +3030,25 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                 text_buffer, 1024,
                 "%.3f ms/frame %.1f FPS",
                 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            this->m_impl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
 
             ty -= ts * 2.f;
             SDL_memset(text_buffer, 0, TEXT_BUFFER_LENGTH);
             SDL_snprintf(text_buffer, TEXT_BUFFER_LENGTH,
                 "triangle faces %d", triangle_faces * 2);
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            this->m_impl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
 
             ty -= ts * 2.f;
             SDL_memset(text_buffer, 0, TEXT_BUFFER_LENGTH);
             SDL_snprintf(
                 text_buffer, TEXT_BUFFER_LENGTH, "loc %d %d %d",
-                this->m_pimpl->chunked(p_state->x),
-                this->m_pimpl->chunked(p_state->y),
-                this->m_pimpl->chunked(p_state->z));
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+                this->m_impl->chunked(p_state->x),
+                this->m_impl->chunked(p_state->y),
+                this->m_impl->chunked(p_state->z));
+            this->m_impl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
 
             // Check the time
-            int hour = static_cast<int>(this->m_pimpl->time_of_day()) * 24;
+            int hour = static_cast<int>(this->m_impl->time_of_day()) * 24;
             char am_pm = hour < 12 ? 'a' : 'p';
             hour = hour % 12;
             hour = hour ? hour : 12;
@@ -3067,14 +3057,14 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
             SDL_snprintf(
                 text_buffer, TEXT_BUFFER_LENGTH,
                 "%d:%02d %cm",
-                hour, static_cast<int>(this->m_pimpl->time_of_day() * 60), am_pm);
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+                hour, static_cast<int>(this->m_impl->time_of_day() * 60), am_pm);
+            this->m_impl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
 
             ty -= ts * 2.f;
             SDL_memset(text_buffer, 0, TEXT_BUFFER_LENGTH);
             SDL_snprintf(text_buffer, TEXT_BUFFER_LENGTH,
                 "chunks %d", model->chunk_count);
-            this->m_pimpl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
+            this->m_impl->render_text(&text_attrib, font, 0, tx, ty, ts, text_buffer);
         }
 
         // Let the skybox pos.z coord determine depth test in shader
@@ -3155,7 +3145,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     emscripten_cancel_main_loop();
 #endif
 
-    m_pimpl->cleanup_worker_threads();
+    m_impl->cleanup_worker_threads();
 
     SDL_Log("Closing DB. . .\n");
     SDL_Log("Cleaning up ImGui objects. . .");
@@ -3166,8 +3156,8 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     db_close();
     db_disable();
 
-    m_pimpl->delete_all_chunks();
-    m_pimpl->delete_all_players();
+    m_impl->delete_all_chunks();
+    m_impl->delete_all_players();
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -3195,7 +3185,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     glDeleteProgram(blur_attrib.program);
     glDeleteProgram(skybox_attrib.program);
 
-    SDL_GL_DestroyContext(this->m_pimpl->m_model->context);
+    SDL_GL_DestroyContext(this->m_impl->m_model->context);
     SDL_DestroyWindow(sdl_window);
     SDL_Quit();
 
@@ -3209,7 +3199,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
  * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
  */
 std::string craft::mazes() const noexcept {
-    return this->m_pimpl->m_json_data;
+    return this->m_impl->m_json_data;
 }
 
 /**
@@ -3217,5 +3207,5 @@ std::string craft::mazes() const noexcept {
  *
  */
 void craft::toggle_mouse() const noexcept {
-    this->m_pimpl->m_gui->capture_mouse = !this->m_pimpl->m_gui->capture_mouse;
+    this->m_impl->m_gui->capture_mouse = !this->m_impl->m_gui->capture_mouse;
 }
