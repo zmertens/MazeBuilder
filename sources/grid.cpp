@@ -40,7 +40,7 @@ grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
 
 // Copy constructor
 grid::grid(const grid &other)
-    : m_dimensions(other.m_dimensions)
+    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
 {
 
 }
@@ -55,12 +55,14 @@ grid &grid::operator=(const grid &other)
 
     m_dimensions = other.m_dimensions;
 
+    m_cells = other.m_cells;
+
     return *this;
 }
 
 // Move constructor
 grid::grid(grid &&other) noexcept
-    : m_dimensions(other.m_dimensions)
+    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
 {
 
 }
@@ -75,6 +77,8 @@ grid &grid::operator=(grid &&other) noexcept
 
     m_dimensions = other.m_dimensions;
 
+    m_cells = other.m_cells;
+
     return *this;
 }
 
@@ -83,7 +87,7 @@ grid::~grid()
 {
 
     // First clean up cell references
-    clear_cells();
+    grid::clear_cells();
 }
 
 void grid::clear_cells() noexcept

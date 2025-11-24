@@ -411,7 +411,7 @@ struct craft::craft_impl {
         bool is_hovering{false};
         int hovered_x{0}, hovered_y{0}, hovered_z{0};
         int hovered_face{0};
-        std::optional<mazes::grid> preview_maze;
+        std::optional<std::unique_ptr<mazes::grid>> preview_maze;
         craft_rendering::MazeProjector::MazeGeometry preview_geometry;
         int last_rows{0};
         int last_columns{0};
@@ -3140,28 +3140,51 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
             if (need_new_maze) {
                 try {
-                    // Create maze grid
-                    mazes::grid maze_grid(gui->rows, gui->columns, 1);
+                    // Create grid
+                    std::unique_ptr<mazes::grid> maze_grid = std::make_unique<mazes::grid>(gui->rows, gui->columns, 1);
 
-                    // Configure and generate maze
+                    SDL_Log("Generating maze using DFS: %dx%d with seed %d\n", gui->rows, gui->columns, gui->seed);
+
+                    // Create configurator for maze generation
                     mazes::configurator config;
                     config.rows(gui->rows)
                           .columns(gui->columns)
                           .levels(1)
-                          .algo_id(mazes::algo::DFS)
+                          .algo_id(mazes::algo::DFS)  // Use DFS algorithm for better mazes
                           .seed(gui->seed);
 
-                    // Generate maze (this modifies maze_grid internally via the lab)
-                    auto maze_str = mazes::create(config);
+                    // Create randomizer with seed
+                    mazes::randomizer rng;
+                    rng.seed(gui->seed);
 
-                    // Store the grid
-                    this->m_impl->m_maze_preview.preview_maze = std::move(maze_grid);
-                    this->m_impl->m_maze_preview.last_rows = gui->rows;
-                    this->m_impl->m_maze_preview.last_columns = gui->columns;
-                    this->m_impl->m_maze_preview.last_seed = gui->seed;
-                    this->m_impl->m_maze_preview.preview_geometry.is_valid = false;
+                    // Generate the maze using DFS algorithm
+                    mazes::dfs dfs_algo;
+                    bool success = dfs_algo.run(maze_grid.get(), rng);
 
-                    SDL_Log("Generated maze for preview: %dx%d\n", gui->rows, gui->columns);
+                    if (success) {
+                        int num_cells_before = maze_grid->operations().num_cells();
+                        SDL_Log("Maze generated with %d cells before storing\n", num_cells_before);
+
+                        // Copy the grid instead of moving to preserve internal state
+                        this->m_impl->m_maze_preview.preview_maze = std::make_optional(std::move(maze_grid));
+
+                        // Now check the stored grid
+                        if (this->m_impl->m_maze_preview.preview_maze.has_value()) {
+                            int num_cells = this->m_impl->m_maze_preview.preview_maze.value()->operations().num_cells();
+                            SDL_Log("Successfully stored maze with %d cells\n", num_cells);
+
+                            this->m_impl->m_maze_preview.last_rows = gui->rows;
+                            this->m_impl->m_maze_preview.last_columns = gui->columns;
+                            this->m_impl->m_maze_preview.last_seed = gui->seed;
+                            this->m_impl->m_maze_preview.preview_geometry.is_valid = false;
+                        } else {
+                            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to store maze grid\n");
+                        }
+                    } else {
+                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "DFS algorithm failed to generate maze\n");
+                        this->m_impl->m_maze_preview.preview_maze.reset();
+                    }
+
                 } catch (const std::exception& e) {
                     SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze: %s\n", e.what());
                     this->m_impl->m_maze_preview.preview_maze.reset();
@@ -3171,6 +3194,11 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
             // Generate projection geometry if needed
             if (this->m_impl->m_maze_preview.preview_maze.has_value() &&
                 !this->m_impl->m_maze_preview.preview_geometry.is_valid) {
+
+                // Verify grid has cells before projecting
+                const auto& grid_ref = this->m_impl->m_maze_preview.preview_maze.value();
+                int verify_cells = grid_ref->operations().num_cells();
+                SDL_Log("About to project maze with %d cells\n", verify_cells);
 
                 craft_rendering::MazeProjector::ProjectionConfig proj_config;
                 proj_config.target_x = this->m_impl->m_maze_preview.hovered_x;
@@ -3182,8 +3210,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
                 proj_config.columns = gui->columns;
 
                 this->m_impl->m_maze_preview.preview_geometry =
-                    this->m_impl->m_maze_projector->project_maze(
-                        this->m_impl->m_maze_preview.preview_maze.value(), proj_config);
+                    this->m_impl->m_maze_projector->project_maze(*grid_ref, proj_config);
 
                 if (this->m_impl->m_maze_preview.preview_geometry.is_valid) {
                     SDL_Log("Projected maze onto voxel face %d\n", proj_config.face);

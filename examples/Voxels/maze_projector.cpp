@@ -265,11 +265,20 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
 
     unsigned int vertex_index = 0;
     int num_cells = maze_data.operations().num_cells();
+    int wall_count = 0;
+    int checked_cells = 0;
+
+    SDL_Log("Extracting maze walls from %dx%d grid (%d cells)\n", rows, columns, num_cells);
 
     // Iterate through all cells using search method
     for (int cell_index = 0; cell_index < num_cells; ++cell_index) {
         auto cell = maze_data.operations().search(cell_index);
-        if (!cell) continue;
+        if (!cell) {
+            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Cell %d is null\n", cell_index);
+            continue;
+        }
+
+        checked_cells++;
 
         // Calculate row/col from index (assuming row-major ordering)
         int row = cell_index / columns;
@@ -285,6 +294,19 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
         auto south = grid_ops.get_south(cell);
         auto west = grid_ops.get_west(cell);
 
+        // Debug first cell
+        if (cell_index == 0) {
+            auto links = cell->get_links();
+            SDL_Log("Cell 0 has %zu links\n", links.size());
+            SDL_Log("Cell 0 neighbors - North: %s, East: %s, South: %s, West: %s\n",
+                   north ? "yes" : "no", east ? "yes" : "no",
+                   south ? "yes" : "no", west ? "yes" : "no");
+            if (north) SDL_Log("  North linked: %s\n", cell->is_linked(north) ? "yes" : "no");
+            if (east) SDL_Log("  East linked: %s\n", cell->is_linked(east) ? "yes" : "no");
+            if (south) SDL_Log("  South linked: %s\n", cell->is_linked(south) ? "yes" : "no");
+            if (west) SDL_Log("  West linked: %s\n", cell->is_linked(west) ? "yes" : "no");
+        }
+
         // Check each direction and draw wall if no link exists
         // North wall
         if (!north || !cell->is_linked(north)) {
@@ -292,6 +314,7 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
             vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z);
             indices.push_back(vertex_index++);
             indices.push_back(vertex_index++);
+            wall_count++;
         }
 
         // East wall
@@ -300,6 +323,7 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
             vertices.push_back(x + cell_size); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
             indices.push_back(vertex_index++);
             indices.push_back(vertex_index++);
+            wall_count++;
         }
 
         // South wall
@@ -308,6 +332,7 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
             vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z + cell_size);
             indices.push_back(vertex_index++);
             indices.push_back(vertex_index++);
+            wall_count++;
         }
 
         // West wall
@@ -316,8 +341,12 @@ void MazeProjector::extract_maze_walls(const mazes::grid& maze_data,
             vertices.push_back(x); vertices.push_back(0.0f); vertices.push_back(z);
             indices.push_back(vertex_index++);
             indices.push_back(vertex_index++);
+            wall_count++;
         }
     }
+
+    SDL_Log("Checked %d cells, generated %d walls, %zu vertices\n",
+            checked_cells, wall_count, vertices.size() / 3);
 
     if (vertices.empty()) {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No maze walls generated - maze may be empty or all cells connected\n");
