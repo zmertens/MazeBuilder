@@ -28,10 +28,10 @@ int main() {
         // Run the SDL app
         static constexpr int window_w = 1080, window_h = 720;
 
-        const auto my_title{ "Maze Builder 🔧 " + mazes::VERSION };
+        const auto title{ "Maze Builder 🔧 " + mazes::VERSION };
 
-        if (const auto voxel_engine = craft::get_instance(my_title, window_w, window_h);
-            !voxel_engine->run(std::ref(rng))) {
+        if (const auto voxel_engine = mazes::singleton_base<craft>::instance(title, window_w, window_h);
+            !voxel_engine->run(nullptr, std::ref(rng))) {
 
             throw std::runtime_error("ERROR: Running SDL app failed.");
         }

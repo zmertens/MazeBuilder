@@ -6,31 +6,27 @@
 #include <random>
 #include <string>
 
+#include <MazeBuilder/algo_interface.h>
 #include <MazeBuilder/singleton_base.h>
 
 namespace mazes
 {
+    class grid_interface;
     class randomizer;
 }
 
 /// @brief Monolithic class to handle running a voxel engine
-class craft final : public mazes::singleton_base<craft> {
+class craft final : public mazes::algo_interface, mazes::singleton_base<craft> {
     friend class singleton_base;
 public:
     craft(const std::string& title, int w, int h);
     ~craft() override;
 
-    bool run(mazes::randomizer& rng) const noexcept;
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
     // Web interaction
     [[nodiscard]] std::string mazes() const noexcept;
     void toggle_mouse() const noexcept;
-
-    /// @brief Static method to access the singleton instance of the craft class.
-    static std::shared_ptr<craft> get_instance(const std::string& title, int w, int h) noexcept {
-        static auto instance = std::make_shared<craft>(std::cref(title), w, h);
-        return instance;
-    }
 
 private:
     struct craft_impl;
