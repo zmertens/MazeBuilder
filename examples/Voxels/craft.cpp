@@ -2598,6 +2598,11 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
     skybox_attrib.matrix = glGetUniformLocation(program, "matrix");
     skybox_attrib.sampler = glGetUniformLocation(program, "skybox");
 
+    // CREATE MODERN RENDERING OBJECTS (before initialization)
+    this->m_impl->m_bloom_effects = std::make_unique<craft_rendering::BloomEffects>();
+    this->m_impl->m_stencil_renderer = std::make_unique<craft_rendering::StencilRenderer>();
+    this->m_impl->m_maze_projector = std::make_unique<craft_rendering::MazeProjector>();
+
     // MODERN RENDERING SYSTEMS INIT (optional - don't crash if fails)
     SDL_Log("Initializing modern rendering systems...\n");
 
@@ -2734,9 +2739,7 @@ bool craft::run(mazes::randomizer& rng) const noexcept {
 
     craft_impl::BloomTools bloom_tools{};
 
-    this->m_impl->m_bloom_effects = std::make_unique<craft_rendering::BloomEffects>();
-    this->m_impl->m_stencil_renderer = std::make_unique<craft_rendering::StencilRenderer>();
-    this->m_impl->m_maze_projector = std::make_unique<craft_rendering::MazeProjector>();
+    // Modern rendering objects already created and initialized earlier
 
     craft_impl::Player* me = &m_impl->m_model->player;
     craft_impl::State* p_state = &m_impl->m_model->player.state;

@@ -21,10 +21,24 @@ bool MazeProjector::initialize() {
     const char* fragment_path = "shaders/maze_fragment.glsl";
 #endif
 
+    SDL_Log("MazeProjector: Loading shaders from %s and %s\n", vertex_path, fragment_path);
+
     if (!m_maze_shader.load_from_files(vertex_path, fragment_path)) {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load maze projection shaders\n");
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load maze projection shaders from %s and %s\n",
+                    vertex_path, fragment_path);
+        m_initialized = false;
         return false;
     }
+
+    // Verify shader program is valid
+    GLuint program_id = m_maze_shader.get();
+    if (program_id == 0) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "MazeProjector: Shader program ID is 0\n");
+        m_initialized = false;
+        return false;
+    }
+
+    SDL_Log("MazeProjector: Shader program loaded successfully (ID: %u)\n", program_id);
 
     m_initialized = true;
     SDL_Log("MazeProjector: Initialized successfully\n");
@@ -186,11 +200,50 @@ void MazeProjector::render_maze_geometry(const MazeGeometry& geometry, const flo
         return;
     }
 
+    if (!m_initialized) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_RENDER, "MazeProjector: Attempting to render without initialization\n");
+        return;
+    }
+
     m_maze_shader.use();
+
+    // Check if shader is valid
+    GLenum error = glGetError();
+    if (error != GL_NO_ERROR) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "OpenGL error after shader use: 0x%X\n", error);
+        return;
+    }
+
     m_maze_shader.set_uniform_matrix4fv("matrix", matrix);
 
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "OpenGL error after setting uniform: 0x%X\n", error);
+        return;
+    }
+
     geometry.vao.bind();
+
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "OpenGL error after VAO bind: 0x%X\n", error);
+        return;
+    }
+
+    // Verify we have indices to draw
+    if (geometry.index_count == 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_RENDER, "MazeProjector: No indices to draw\n");
+        geometry.vao.unbind();
+        return;
+    }
+
     glDrawElements(GL_LINES, static_cast<GLsizei>(geometry.index_count), GL_UNSIGNED_INT, nullptr);
+
+    error = glGetError();
+    if (error != GL_NO_ERROR) {
+        SDL_LogError(SDL_LOG_CATEGORY_RENDER, "OpenGL error after glDrawElements: 0x%X\n", error);
+    }
+
     geometry.vao.unbind();
 }
 
