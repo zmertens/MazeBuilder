@@ -3155,9 +3155,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
                           .levels(1)
                           .algo_id(mazes::algo::DFS)  // Use DFS algorithm for better mazes
                           .seed(gui->seed);
-
-                    // Create randomizer with seed
-                    mazes::randomizer rng;
+                    
                     rng.seed(gui->seed);
 
                     // Generate the maze using DFS algorithm
