@@ -33,7 +33,7 @@ private:
 
     std::unique_ptr<craft_impl> m_impl;
 
-    static constexpr auto MY_GITHUB_REPO = R"gh(https://github.com/zmertens/MazeBuilder)gh";
+    static constexpr auto MY_GITHUB_REPO = "https://github.com/zmertens/MazeBuilder";
 };
 
 #endif // CRAFT_H

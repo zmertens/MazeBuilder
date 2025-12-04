@@ -13,6 +13,7 @@ log.txt
 
 build/
 build-*/
+cmake-build-*/
 .vscode
 .vs
 

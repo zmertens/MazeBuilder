@@ -16,6 +16,7 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/maze_projector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/render_pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdl_helpers.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/stencil_renderer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
