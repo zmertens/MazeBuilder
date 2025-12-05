@@ -5,6 +5,34 @@
 
 namespace gl {
 
+// free functions
+
+void del_buffer(GLuint buffer)
+{
+glDeleteBuffers(1, &buffer);
+}
+
+GLuint gen_buffer(GLsizei size, GLfloat *data)
+{
+GLuint buffer;
+glGenBuffers(1, &buffer);
+glBindBuffer(GL_ARRAY_BUFFER, buffer);
+glBufferData(GL_ARRAY_BUFFER, size, data, GL_STATIC_DRAW);
+glBindBuffer(GL_ARRAY_BUFFER, 0);
+return buffer;
+}
+
+GLfloat *malloc_faces(std::size_t components, std::size_t faces)
+{
+return (GLfloat *)SDL_malloc(sizeof(GLfloat) * 6 * components * faces);
+}
+
+GLuint gen_faces(GLsizei components, GLsizei faces, GLfloat *data)
+{
+GLuint buffer = gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
+return buffer;
+}
+
 // ============================================================================
 // GlFramebuffer Implementation
 // ============================================================================

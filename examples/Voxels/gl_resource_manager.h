@@ -14,6 +14,14 @@
 
 namespace gl {
 
+     void del_buffer(GLuint buffer);
+
+    GLuint gen_buffer(GLsizei size, GLfloat *data);
+
+    GLfloat *malloc_faces(std::size_t components, std::size_t faces);
+
+    GLuint gen_faces(GLsizei components, GLsizei faces, GLfloat *data);
+
 /// @brief RAII wrapper for OpenGL framebuffer objects
 class GlFramebuffer {
 public:

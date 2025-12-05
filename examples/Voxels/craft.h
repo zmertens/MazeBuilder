@@ -32,8 +32,6 @@ private:
     struct craft_impl;
 
     std::unique_ptr<craft_impl> m_impl;
-
-    static constexpr auto MY_GITHUB_REPO = "https://github.com/zmertens/MazeBuilder";
 };
 
 #endif // CRAFT_H

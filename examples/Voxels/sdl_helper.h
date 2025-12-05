@@ -4,22 +4,30 @@
 #include <mutex>
 #include <string_view>
 
+#include <SDL3/SDL.h>
+
 struct SDL_Window;
-struct SDL_Renderer;
 
 class sdl_helper
 {
 public:
     SDL_Window* window;
+    SDL_GLContext gl_context;
 
-    SDL_Renderer* renderer;
-
-    void init(std::string_view title, int width, int height) noexcept;
+    bool initialize(std::string_view title, int width, int height) noexcept;
 
     void destroy_and_quit() noexcept;
 
+    std::int32_t get_scale_factor() const noexcept;
+
+    void print_display_modes() const noexcept;
+
+    void print_opengl_info() const noexcept;
+
+    void set_window_icon(std::string_view icon_path) noexcept;
+
 private:
-    std::once_flag sdl_initialized_flag;
+    std::once_flag m_initialized_flag;
 };
 
 #endif // SDL_HELPER_H
