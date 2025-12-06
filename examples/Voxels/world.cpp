@@ -53,7 +53,7 @@ world::world(SDL_Window* window, font_manager& fonts, texture_manager& textures)
 
 world::~world()
 {
-
+    destroy_world();
 }
 
 void world::init() noexcept
@@ -79,7 +79,13 @@ command_queue& world::get_command_queue() noexcept
 
 void world::destroy_world()
 {
+    // Cleanup worker threads and chunks
+    cleanup_worker_threads();
+    delete_all_chunks();
+    delete_all_players();
 
+    // DO NOT clear m_fonts or m_textures - they are references to shared managers
+    // owned by craft_impl and will be cleaned up by craft_impl
 }
 
 void world::handle_event(SDL_Event& event) noexcept

@@ -249,22 +249,6 @@ struct craft::craft_impl
             m_pending_list.emplace_back(StackAction::CLEAR);
         }
 
-        [[nodiscard]] bool is_empty() const noexcept
-        {
-            return m_stack.empty();
-        }
-
-    private:
-        state::ptr create_state(StateIdentifier state_id)
-        {
-            if (const auto found = m_factories.find(state_id); found != m_factories.cend())
-            {
-                return found->second();
-            }
-
-            throw std::runtime_error("StateStack::createState - No factory found for state ID");
-        }
-
         void apply_pending_changes()
         {
             if (!m_pending_list.empty())
@@ -288,12 +272,29 @@ struct craft::craft_impl
                     break;
                 case StackAction::CLEAR:
                     SDL_Log("State Stack: CLEARING all states (stack size: %zu -> 0)\n", m_stack.size());
+                    // clear() will properly destroy all unique_ptrs in reverse order
                     m_stack.clear();
                     break;
                 }
             }
 
             m_pending_list.clear();
+        }
+
+        [[nodiscard]] bool is_empty() const noexcept
+        {
+            return m_stack.empty();
+        }
+
+    private:
+        state::ptr create_state(StateIdentifier state_id)
+        {
+            if (const auto found = m_factories.find(state_id); found != m_factories.cend())
+            {
+                return found->second();
+            }
+
+            throw std::runtime_error("StateStack::createState - No factory found for state ID");
         }
     }; // state_stack
 
@@ -311,6 +312,16 @@ struct craft::craft_impl
         explicit editor_state(state_stack& stack, const context& _context)
             : state{stack, _context}, m_player{*_context.m_player}
         {
+        }
+
+        ~editor_state() override
+        {
+            if (m_world.has_value())
+            {
+                SDL_Log("Editor: Destroying world resources\n");
+                // world destructor will call destroy_world() automatically
+                m_world.reset();
+            }
         }
 
         void draw() const noexcept override
@@ -332,7 +343,8 @@ struct craft::craft_impl
                 ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
                 ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
 
-                if (ImGui::Begin("Initializing", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+                if (ImGui::Begin("Initializing", nullptr,
+                                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
                 {
                     ImGui::Spacing();
                     const char* init_text = "Initializing World...";
@@ -410,9 +422,8 @@ struct craft::craft_impl
             switch (event.type)
             {
             case SDL_EVENT_QUIT:
-                m_world->destroy_world();
+                SDL_Log("Editor: Received SDL_QUIT event - clearing stack\n");
                 m_player.set_active(false);
-                request_stack_pop();
                 return false;
 
             case SDL_EVENT_KEY_DOWN:
@@ -501,7 +512,8 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
 
-            if (ImGui::Begin("Loading", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+            if (ImGui::Begin("Loading", nullptr,
+                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
             {
                 ImGui::Spacing();
                 ImGui::Spacing();
@@ -560,7 +572,8 @@ struct craft::craft_impl
     // Handles GUI options
     class menu_state final : public state
     {
-        mutable bool m_should_quit{false};
+        mutable bool m_should_close{false};
+
     public:
         explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
@@ -627,10 +640,10 @@ struct craft::craft_impl
                 }
                 ImGui::Spacing();
 
-                // Quit button - exit application
-                if (ImGui::Button("Quit", ImVec2(200, 40)))
+                // Close button - exit application
+                if (ImGui::Button("Close", ImVec2(200, 40)))
                 {
-                    m_should_quit = true;
+                    m_should_close = true;
                 }
 
                 ImGui::Separator();
@@ -657,8 +670,9 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            if (m_should_quit)
+            if (m_should_close)
             {
+                SDL_Log("Menu: Quit button clicked - clearing stack\n");
                 request_stack_pop();
             }
             // Pause underlying states (editor) while menu is active
@@ -671,6 +685,7 @@ struct craft::craft_impl
             {
                 SDL_Log("Menu: Received SDL_QUIT event - popping menu state\n");
                 get_context().m_player->set_active(false);
+                request_stack_clear();
                 return false; // Stop event propagation
             }
 
@@ -841,7 +856,7 @@ struct craft::craft_impl
             // - ImGui doesn't want to capture it
             bool should_forward_event =
                 (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP &&
-                 event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
+                    event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
                 (!imgui_wants_keyboard && !imgui_wants_mouse);
 
             if (should_forward_event)
@@ -965,6 +980,9 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     if (!this->m_impl->m_crafting_states->is_empty())
     {
         this->m_impl->m_crafting_states->clear_states();
+        // CRITICAL: Apply the pending CLEAR action to actually destroy states
+        // This calls editor_state destructor which properly destroys the world
+        this->m_impl->m_crafting_states->apply_pending_changes();
     }
 
     // Cleanup ImGui
