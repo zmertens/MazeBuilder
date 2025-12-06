@@ -20,6 +20,12 @@
 
 #include <SDL3/SDL.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
+#include <glad/glad.h>
+#endif
+
 #include "command_queue.h"
 #include "db.h"
 #include "resource_manager.h"
@@ -36,6 +42,7 @@
 #include <functional>
 #include <memory>
 #include <map>
+#include <optional>
 
 namespace
 {
@@ -98,7 +105,7 @@ struct craft::craft_impl
         virtual bool handle_event(SDL_Event& event) noexcept = 0;
 
     protected:
-        void request_stack_push(StateIdentifier state_id) const
+        void request_stack_push(const StateIdentifier state_id) const
         {
             m_stack->push_state(state_id);
         }
@@ -204,10 +211,19 @@ struct craft::craft_impl
 
         void handle_event(SDL_Event& event) noexcept
         {
+            if (event.type == SDL_EVENT_KEY_DOWN)
+            {
+                SDL_Log("State Stack: Handling KEY_DOWN event (stack size: %zu)\n", m_stack.size());
+            }
+
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
                 if (!(*it)->handle_event(event))
                 {
+                    if (event.type == SDL_EVENT_KEY_DOWN)
+                    {
+                        SDL_Log("State Stack: State returned false, stopping propagation\n");
+                    }
                     break;
                 }
             }
@@ -217,20 +233,23 @@ struct craft::craft_impl
 
         void push_state(StateIdentifier state_id)
         {
+            SDL_Log("State Stack: Queuing PUSH for state ID %d\n", static_cast<int>(state_id));
             m_pending_list.emplace_back(StackAction::PUSH, state_id);
         }
 
         void pop_state()
         {
+            SDL_Log("State Stack: Queuing POP\n");
             m_pending_list.emplace_back(StackAction::POP);
         }
 
         void clear_states()
         {
+            SDL_Log("State Stack: Queuing CLEAR\n");
             m_pending_list.emplace_back(StackAction::CLEAR);
         }
 
-        bool is_empty() const noexcept
+        [[nodiscard]] bool is_empty() const noexcept
         {
             return m_stack.empty();
         }
@@ -238,7 +257,7 @@ struct craft::craft_impl
     private:
         state::ptr create_state(StateIdentifier state_id)
         {
-            if (auto found = m_factories.find(state_id); found != m_factories.cend())
+            if (const auto found = m_factories.find(state_id); found != m_factories.cend())
             {
                 return found->second();
             }
@@ -248,17 +267,27 @@ struct craft::craft_impl
 
         void apply_pending_changes()
         {
+            if (!m_pending_list.empty())
+            {
+                SDL_Log("State Stack: Applying %zu pending change(s)\n", m_pending_list.size());
+            }
+
             for (const pending_change& change : m_pending_list)
             {
                 switch (change.action)
                 {
                 case StackAction::PUSH:
+                    SDL_Log("State Stack: PUSHING state ID %d (stack size: %zu -> %zu)\n",
+                            static_cast<int>(change.state_id), m_stack.size(), m_stack.size() + 1);
                     m_stack.push_back(create_state(change.state_id));
                     break;
                 case StackAction::POP:
+                    SDL_Log("State Stack: POPPING state (stack size: %zu -> %zu)\n",
+                            m_stack.size(), m_stack.size() - 1);
                     m_stack.pop_back();
                     break;
                 case StackAction::CLEAR:
+                    SDL_Log("State Stack: CLEARING all states (stack size: %zu -> 0)\n", m_stack.size());
                     m_stack.clear();
                     break;
                 }
@@ -268,72 +297,145 @@ struct craft::craft_impl
         }
     }; // state_stack
 
+    // Forward declarations
+    class loading_state;
+
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
     class editor_state final : public state
     {
     private:
         player& m_player;
-        world m_world;
+        std::optional<world> m_world;
         float m_mouse_movement{};
 
     public:
         explicit editor_state(state_stack& stack, const context& _context)
-            : state{stack, _context}, m_player{*_context.m_player},
-              m_world{_context.m_window, *_context.m_fonts, *_context.m_textures}
+            : state{stack, _context}, m_player{*_context.m_player}
         {
         }
 
         void draw() const noexcept override
         {
-            m_world.draw();
+            if (m_world.has_value())
+            {
+                m_world->draw();
+            }
+            else
+            {
+                // Show "Initializing World..." message while waiting for resources (uses default font)
+                // This screen is only visible for one frame after loading completes
+                ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+                ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+                ImGui::SetNextWindowSize(ImVec2(350, 150), ImGuiCond_Always);
+
+                ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
+                ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+
+                if (ImGui::Begin("Initializing", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+                {
+                    ImGui::Spacing();
+                    const char* init_text = "Initializing World...";
+                    float text_width = ImGui::CalcTextSize(init_text).x;
+                    ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
+                    ImGui::Text("%s", init_text);
+
+                    ImGui::Spacing();
+                    ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "");
+                }
+                ImGui::End();
+
+                ImGui::PopStyleColor(4);
+            }
         }
 
         bool update(const float delta_time, mazes::randomizer& rng) noexcept override
         {
-            m_world.update(delta_time, std::ref(rng));
+            // Initialize world only after loading state has finished
+            if (!m_world.has_value())
+            {
+                if (const auto* loading = get_stack().peek_state<loading_state*>())
+                {
+                    if (loading->is_finished())
+                    {
+                        m_world.emplace(get_context().m_window, *get_context().m_fonts, *get_context().m_textures);
 
-            auto& commands = m_world.get_command_queue();
-            m_player.handle_realtime_input(std::ref(commands));
+                        // Enable mouse capture for editor
+                        SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+
+                        SDL_Log("Editor: World initialized after loading completed\n");
+                    }
+                }
+                // Loading state might already be popped, initialize if it's not in the stack
+                else
+                {
+                    m_world.emplace(get_context().m_window, *get_context().m_fonts, *get_context().m_textures);
+
+                    // Enable mouse capture for editor
+                    SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+
+                    SDL_Log("Editor: World initialized (loading state not found)\n");
+                }
+            }
+
+            if (m_world.has_value())
+            {
+                // Re-enable mouse capture when returning from menu
+                if (!SDL_GetWindowRelativeMouseMode(get_context().m_window))
+                {
+                    SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+                }
+
+                m_world->update(delta_time, std::ref(rng));
+
+                auto& commands = m_world->get_command_queue();
+                m_player.handle_realtime_input(std::ref(commands));
+            }
 
             return true;
         }
 
         bool handle_event(SDL_Event& event) noexcept override
         {
-            auto& commands = m_world.get_command_queue();
-            m_player.handle_event(event, std::ref(commands));
-            m_world.handle_event(event);
-
-            auto current_scancode = SDL_SCANCODE_UNKNOWN;
-
-            while (SDL_PollEvent(&event))
+            if (event.type == SDL_EVENT_KEY_DOWN)
             {
-                switch (event.type)
+                SDL_Log("Editor: Received KEY_DOWN event, scancode=%d, world_initialized=%s\n",
+                        event.key.scancode, m_world.has_value() ? "true" : "false");
+            }
+
+            // Handle state-specific events FIRST before passing to player/world
+            // This ensures ESCAPE is not consumed by game logic
+            switch (event.type)
+            {
+            case SDL_EVENT_QUIT:
+                request_stack_clear();
+                return false;
+
+            case SDL_EVENT_KEY_DOWN:
+                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                 {
-                case SDL_EVENT_QUIT:
-                    request_stack_clear();
-                    break;
-                case SDL_EVENT_KEY_DOWN:
-                    {
-                        current_scancode = event.key.scancode;
-                        switch (current_scancode)
-                        {
-                        case SDL_SCANCODE_ESCAPE:
-                            {
-                                SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
+                    SDL_Log("Editor: ESCAPE pressed - opening menu\n");
+                    // Disable mouse capture when going to menu
+                    SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
+                    request_stack_push(StateIdentifier::MENU);
+                    return false;
+                }
+                break;
 
-                                request_stack_push(StateIdentifier::MENU);
-                                break;
-                            }
-                        default: ;
-                        }
-                        break;
-                    }
-                default: ;
-                } // switch
-            } // SDL_Event
+            default:
+                break;
+            }
 
-            return true;
+            // Pass other events to world/player if world is initialized
+            if (m_world.has_value())
+            {
+                auto& commands = m_world->get_command_queue();
+                m_player.handle_event(event, std::ref(commands));
+                m_world->handle_event(event);
+            }
+
+            return true; // Continue event propagation to lower states
         } // handle_events_and_motion
     }; // editor_state
 
@@ -373,10 +475,6 @@ struct craft::craft_impl
 #endif
         }
 
-        static void set_completion(float percent) noexcept
-        {
-        }
-
         bool m_has_finished;
 
     public:
@@ -387,9 +485,46 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
-            const auto& window = *get_context().m_window;
+            // Display loading screen with ImGui (using default font since custom fonts aren't loaded yet)
 
-            // window.draw(mLoadingSprite);
+            // Center the loading window
+            ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_Always);
+
+            // Style the loading window
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+
+            if (ImGui::Begin("Loading", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+            {
+                ImGui::Spacing();
+                ImGui::Spacing();
+
+                // Center the text
+                const char* loading_text = "Loading Resources...";
+                float text_width = ImGui::CalcTextSize(loading_text).x;
+                ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
+                ImGui::Text("%s", loading_text);
+
+                ImGui::Spacing();
+                ImGui::Spacing();
+
+                // Show a simple progress bar or spinner effect
+                ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "");
+
+                ImGui::Spacing();
+
+                const char* status_text = m_has_finished ? "Complete!" : "Please wait...";
+                float status_width = ImGui::CalcTextSize(status_text).x;
+                ImGui::SetCursorPosX((ImGui::GetWindowSize().x - status_width) * 0.5f);
+                ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "%s", status_text);
+            }
+            ImGui::End();
+
+            ImGui::PopStyleColor(4);
         }
 
         bool update(const float delta_time, mazes::randomizer& rng) noexcept override
@@ -398,6 +533,11 @@ struct craft::craft_impl
             {
                 load_resources();
                 m_has_finished = true;
+
+                // Pop loading state once loading is complete
+                // Editor state is already on the stack below us
+                SDL_Log("Loading: Resources loaded, popping loading state\n");
+                request_stack_pop();
             }
 
             return true;
@@ -442,7 +582,7 @@ struct craft::craft_impl
             ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
             ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
 
-            if (ImGui::Begin("Main Menu", &m_exit, ImGuiWindowFlags_NoCollapse))
+            if (ImGui::Begin("Main Menu", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_Modal))
             {
                 ImGui::Text("Welcome to MazeBuilder Physics");
                 ImGui::Separator();
@@ -452,30 +592,50 @@ struct craft::craft_impl
                 ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
                 ImGui::Spacing();
 
-                const std::array<std::string, static_cast<std::size_t>(MenuItem::COUNT)> menuItems = {
-                    "Resume", "New Game", "Settings", "Splash screen", "Quit"
-                };
-
-                // Use Selectable with bool* overload so ImGui keeps a consistent toggled state
-                const auto active = static_cast<size_t>(get_context().m_player->is_active());
-                for (std::size_t i{static_cast<std::size_t>(active ? 0 : 1)}; i < menuItems.size(); ++i)
+                // Resume button - return to game
+                if (ImGui::Button("Resume", ImVec2(200, 40)))
                 {
-                    ImGui::Spacing();
+                    request_stack_pop();
+                }
+                ImGui::Spacing();
+
+                // New Game button - placeholder for now
+                if (ImGui::Button("New Game", ImVec2(200, 40)))
+                {
+                    // TODO: Implement new game functionality
+                    SDL_Log("New Game - Not yet implemented\n");
+                }
+                ImGui::Spacing();
+
+                // Settings button - placeholder for now
+                if (ImGui::Button("Settings", ImVec2(200, 40)))
+                {
+                    // TODO: Implement settings functionality
+                    SDL_Log("Settings - Not yet implemented\n");
+                }
+                ImGui::Spacing();
+
+                // Splash Screen button - placeholder for now
+                if (ImGui::Button("Splash Screen", ImVec2(200, 40)))
+                {
+                    // TODO: Implement splash screen functionality
+                    SDL_Log("Splash Screen - Not yet implemented\n");
+                }
+                ImGui::Spacing();
+
+                // Quit button - exit application
+                if (ImGui::Button("Quit", ImVec2(200, 40)))
+                {
+                    request_stack_clear();
                 }
 
                 ImGui::Separator();
                 ImGui::Spacing();
 
-                // Display selected menu info
-                ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
-                ImGui::SameLine();
-
-                ImGui::Spacing();
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                ImGui::SameLine();
+                // Display controls help
+                ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Press ESC to return to game");
             }
+
             ImGui::End();
 
             ImGui::PopStyleColor(10);
@@ -485,24 +645,15 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            return true;
+            // Pause underlying states (editor) while menu is active
+            return false;
         }
 
         bool handle_event(SDL_Event& event) noexcept override
         {
-            if (event.type == SDL_EVENT_KEY_DOWN)
-            {
-                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
-                {
-                    request_stack_pop();
-                }
-            }
-
-            return true;
+            // Let ImGui handle all events while in menu
+            return false;
         }
-
-    private:
-        mutable bool m_exit{false};
     }; // menu_state
 
     const std::string& INIT_WINDOW_TITLE;
@@ -534,8 +685,11 @@ struct craft::craft_impl
 
         register_states();
 
-        m_crafting_states->push_state(StateIdentifier::LOADING);
+        // Push editor first (bottom of stack), then loading (top of stack)
+        // States are drawn/updated in reverse order (rbegin to rend)
+        // So loading will be processed first and draw on top
         m_crafting_states->push_state(StateIdentifier::EDITOR);
+        m_crafting_states->push_state(StateIdentifier::LOADING);
     }
 
     void register_states() const noexcept
@@ -640,7 +794,35 @@ struct craft::craft_impl
                 break;
             }
 
-            m_crafting_states->handle_event(event);
+            // Check if ImGui wants to capture this event
+            ImGuiIO& io = ImGui::GetIO();
+            bool imgui_wants_keyboard = io.WantCaptureKeyboard;
+            bool imgui_wants_mouse = io.WantCaptureMouse;
+
+            // Always allow ESCAPE key to go through to states for menu navigation
+            bool is_escape_key = (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE);
+
+            if (is_escape_key)
+            {
+                SDL_Log("ESCAPE key pressed - forwarding to state stack\n");
+                // ESCAPE always goes through for menu navigation
+                m_crafting_states->handle_event(event);
+                continue; // Skip other event logic
+            }
+
+            // For other events, check if ImGui wants to capture them
+            // Pass event to states if:
+            // - It's not a keyboard/mouse event
+            // - ImGui doesn't want to capture it
+            bool should_forward_event =
+                (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP &&
+                 event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
+                (!imgui_wants_keyboard && !imgui_wants_mouse);
+
+            if (should_forward_event)
+            {
+                m_crafting_states->handle_event(event);
+            }
         }
     }
 
@@ -651,6 +833,10 @@ struct craft::craft_impl
 
     void render(double& current_time_step, const double elapsed) const noexcept
     {
+        // Clear the screen before drawing
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         ImGui_ImplSDL3_NewFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();

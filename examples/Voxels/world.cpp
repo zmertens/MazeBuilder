@@ -57,7 +57,8 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
 
 void world::draw() const noexcept
 {
-
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 }
 
 command_queue& world::get_command_queue() noexcept
