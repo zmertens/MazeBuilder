@@ -14,6 +14,7 @@ enum class PlayerAction
     MOVE_LEFT,
     MOVE_RIGHT,
     JUMP,
+    DONE,
     COUNT
 };
 
@@ -26,7 +27,7 @@ public:
     struct state
     {
         float x, y, z, rx, ry, t;
-    } s1, s2, s3;
+    } s1{}, s2{}, s3{};
 
     explicit player();
 
@@ -35,7 +36,7 @@ public:
     player(const player&) = delete;
     player& operator=(const player&) = delete;
 
-    player(player&&) = default;
+    player(player&&)  noexcept = default;
     player& operator=(player&&) = default;
 
     void handle_event(SDL_Event &event, command_queue &commands) noexcept;
@@ -46,7 +47,7 @@ public:
 
     [[nodiscard]] std::uint32_t get_assigned_key(PlayerAction action) const;
 
-    bool is_active() const noexcept;
+    [[nodiscard]] bool is_active() const noexcept;
 
     void set_active(bool active) noexcept;
 
@@ -62,7 +63,7 @@ private:
     bool m_is_active;
 
     std::string m_name;
-    std::uint32_t m_buffer;
+    std::uint32_t m_buffer{};
 };
 
 #endif // PLAYER_H

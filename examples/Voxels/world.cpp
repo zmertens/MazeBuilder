@@ -51,9 +51,14 @@ world::world(SDL_Window* window, font_manager& fonts, texture_manager& textures)
 {
 }
 
-void world::init() noexcept
+world::~world()
 {
 
+}
+
+void world::init() noexcept
+{
+    init_worker_threads();
 }
 
 void world::update(float delta_time, mazes::randomizer& rng) noexcept
@@ -77,9 +82,13 @@ void world::destroy_world()
 
 }
 
-void world::handle_event(SDL_Event& event)
+void world::handle_event(SDL_Event& event) noexcept
 {
 
+    if (event.type == SDL_EVENT_QUIT)
+    {
+
+    }
 }
 
 void set_player(player* player)
@@ -485,11 +494,11 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
         draw_item(attrib, buffer, 24);
     }
 
-    void world::draw_player(const Attrib* attrib, const player* _player) const noexcept {
+    void world::draw_player(const Attrib* attrib, const Player* _player) const noexcept {
         // draw_cube(attrib, _player->buffer);
     }
 
-const world::player* world::find_player(const int id) const noexcept {
+const world::Player* world::find_player(const int id) const noexcept {
         for (int i = 0; i < this->m_model.player_count; i++) {
             if (auto* p = &m_model.player; p->id == id) {
                 return p;
@@ -506,9 +515,10 @@ const world::player* world::find_player(const int id) const noexcept {
         m_model.player_count = 0;
     }
 
-    std::optional<Chunk*> world::find_chunk(const int p, const int q) const noexcept {
+    std::optional<world::Chunk*> world::find_chunk(const int p, const int q) const noexcept {
         for (int i = 0; i < m_model.chunk_count; i++) {
-            if (const Chunk* chunk = m_model.chunks + i; chunk->p == p && chunk->q == q) {
+            Chunk* chunk = const_cast<Chunk*>(m_model.chunks + i);
+            if (chunk->p == p && chunk->q == q) {
                 return chunk;
             }
         }
@@ -676,11 +686,12 @@ const world::player* world::find_player(const int id) const noexcept {
         int result = 0;
         int p = this->chunked(*x);
         int q = this->chunked(*z);
-        const Chunk* chunk = find_chunk(p, q);
-        if (!chunk) {
+        auto chunk_opt = find_chunk(p, q);
+        if (!chunk_opt.has_value()) {
             SDL_Log("Could find chunk: %d %d", p, q);
             return result;
         }
+        const Chunk* chunk = chunk_opt.value();
         const Map* map = &chunk->map;
         int nx = static_cast<int>(SDL_roundf(*x));
         int ny = static_cast<int>(SDL_roundf(*y));
@@ -897,7 +908,12 @@ const world::player* world::find_player(const int id) const noexcept {
             for (int dq = -1; dq <= 1; dq++) {
                 Chunk* other = chunk;
                 if (dp || dq) {
-                    other = this->find_chunk(chunk->p + dp, chunk->q + dq);
+                    auto other_opt = this->find_chunk(chunk->p + dp, chunk->q + dq);
+                    if (!other_opt.has_value()) {
+                        other = nullptr;
+                    } else {
+                        other = other_opt.value();
+                    }
                 }
                 if (!other) {
                     continue;
@@ -915,8 +931,9 @@ const world::player* world::find_player(const int id) const noexcept {
         if (has_lights(chunk)) {
             for (int dp = -1; dp <= 1; dp++) {
                 for (int dq = -1; dq <= 1; dq++) {
-                    if (Chunk* other = find_chunk(chunk->p + dp, chunk->q + dq)) {
-                        other->dirty = 1;
+                    auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                    if (other_opt.has_value()) {
+                        other_opt.value()->dirty = 1;
                     }
                 }
             }
@@ -1193,7 +1210,12 @@ const world::player* world::find_player(const int id) const noexcept {
             for (int dq = -1; dq <= 1; dq++) {
                 Chunk* other = chunk;
                 if (dp || dq) {
-                    other = find_chunk(chunk->p + dp, chunk->q + dq).value();
+                    auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                    if (!other_opt.has_value()) {
+                        other = nullptr;
+                    } else {
+                        other = other_opt.value();
+                    }
                 }
                 if (other) {
                     item->block_maps[dp + 1][dq + 1] = &other->map;
@@ -1235,7 +1257,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         chunk->buffer = 0;
         chunk->sign_buffer = 0;
         dirty_chunk(chunk);
-        SignList* signs = &chunk->signs;
+        SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
         sign_list_alloc(signs, 16);
         db_load_signs(signs, p, q);
         Map* block_map = &chunk->map;
@@ -1275,7 +1297,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             if (remove_chunk) {
                 map_free(&chunk->map);
                 map_free(&chunk->lights);
-                sign_list_free(&chunk->signs);
+                sign_list_free(reinterpret_cast<::SignList*>(&chunk->signs));
                 del_buffer(chunk->buffer);
                 del_buffer(chunk->sign_buffer);
                 Chunk* other = this->m_model.chunks + (--count);
@@ -1290,7 +1312,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             Chunk* chunk = this->m_model.chunks + i;
             map_free(&chunk->map);
             map_free(&chunk->lights);
-            sign_list_free(&chunk->signs);
+            sign_list_free(reinterpret_cast<::SignList*>(&chunk->signs));
             del_buffer(chunk->buffer);
             del_buffer(chunk->sign_buffer);
         }
@@ -1302,8 +1324,9 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             worker->mtx.lock();
             if (worker->state == WORKER_DONE) {
                 WorkerItem* item = &worker->item;
-                Chunk* chunk = find_chunk(item->p, item->q);
-                if (chunk) {
+                auto chunk_opt = find_chunk(item->p, item->q);
+                if (chunk_opt.has_value()) {
+                    Chunk* chunk = chunk_opt.value();
                     if (item->load) {
                         Map* block_map = item->block_maps[1][1];
                         Map* light_map = item->light_maps[1][1];
@@ -1343,13 +1366,14 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             for (int dq = -r; dq <= r; dq++) {
                 int a = p + dp;
                 int b = q + dq;
-                Chunk* chunk = find_chunk(a, b);
-                if (chunk) {
+                auto chunk_opt = find_chunk(a, b);
+                if (chunk_opt.has_value()) {
+                    Chunk* chunk = chunk_opt.value();
                     if (chunk->dirty) {
                         gen_chunk_buffer(chunk);
                     }
                 } else if (this->m_model.chunk_count < MAX_CHUNKS) {
-                    chunk = this->m_model.chunks + this->m_model.chunk_count++;
+                    Chunk* chunk = this->m_model.chunks + this->m_model.chunk_count++;
                     create_chunk(chunk, a, b);
                     gen_chunk_buffer(chunk);
                 }
@@ -1380,14 +1404,15 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
                 if (index != worker->index) {
                     continue;
                 }
-                Chunk* chunk = find_chunk(a, b);
-                if (chunk && !chunk->dirty) {
+                auto chunk_opt = find_chunk(a, b);
+                if (chunk_opt.has_value() && !chunk_opt.value()->dirty) {
                     continue;
                 }
                 int distance = SDL_max(SDL_abs(dp), SDL_abs(dq));
                 int invisible = ~chunk_visible(planes, a, b, 0, 256);
                 int priority = 0;
-                if (chunk) {
+                if (chunk_opt.has_value()) {
+                    Chunk* chunk = chunk_opt.value();
                     priority = chunk->buffer & chunk->dirty;
                 }
                 // Check for chunk to update based on lowest score
@@ -1405,9 +1430,10 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         int a = best_a;
         int b = best_b;
         int load = 0;
-        Chunk* chunk = find_chunk(a, b);
+        auto chunk_opt = find_chunk(a, b);
+        Chunk* chunk = nullptr;
         // Check if the chunk is already loaded
-        if (!chunk) {
+        if (!chunk_opt.has_value()) {
             load = 1;
             if (this->m_model.chunk_count < MAX_CHUNKS) {
                 chunk = this->m_model.chunks + this->m_model.chunk_count++;
@@ -1415,6 +1441,8 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             } else {
                 return;
             }
+        } else {
+            chunk = chunk_opt.value();
         }
         WorkerItem* item = &worker->item;
         item->p = chunk->p;
@@ -1424,7 +1452,12 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             for (int dq = -1; dq <= 1; dq++) {
                 Chunk* other = chunk;
                 if (dp || dq) {
-                    other = find_chunk(chunk->p + dp, chunk->q + dq);
+                    auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                    if (!other_opt.has_value()) {
+                        other = nullptr;
+                    } else {
+                        other = other_opt.value();
+                    }
                 }
                 if (other) {
                     // These maps are freed using C-library free function
@@ -1460,9 +1493,10 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     void world::unset_sign(int x, int y, int z) const noexcept {
         int p = chunked(static_cast<float>(x));
         int q = chunked(static_cast<float>(z));
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
-            SignList* signs = &chunk->signs;
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
+            ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
             if (sign_list_remove_all(signs, x, y, z)) {
                 chunk->dirty = 1;
                 db_delete_signs(x, y, z);
@@ -1475,9 +1509,10 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     void world::unset_sign_face(int x, int y, int z, int face) const noexcept {
         int p = chunked(static_cast<float>(x));
         int q = chunked(static_cast<float>(z));
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
-            SignList* signs = &chunk->signs;
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
+            ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
             if (sign_list_remove(signs, x, y, z, face)) {
                 chunk->dirty = 1;
                 db_delete_sign(x, y, z, face);
@@ -1492,9 +1527,10 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
             unset_sign_face(x, y, z, face);
             return;
         }
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
-            SignList* signs = &chunk->signs;
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
+            ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
             sign_list_add(signs, x, y, z, face, text.data());
             if (dirty) {
                 chunk->dirty = 1;
@@ -1512,8 +1548,9 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     void world::toggle_light(int x, int y, int z) const noexcept {
         int p = chunked(static_cast<float>(x));
         int q = chunked(static_cast<float>(z));
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
             Map* map = &chunk->lights;
             int w = map_get(map, x, y, z) ? 0 : 15;
             map_set(map, x, y, z, w);
@@ -1523,8 +1560,9 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     }
 
     void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept {
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
             Map* map = &chunk->lights;
             if (map_set(map, x, y, z, w)) {
                 dirty_chunk(chunk);
@@ -1536,8 +1574,9 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     }
 
     void world::_set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept {
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
             Map* map = &chunk->map;
             if (map_set(map, x, y, z, w)) {
                 if (dirty) {
@@ -1585,8 +1624,9 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
     int world::get_block(int x, int y, int z) noexcept {
         int p = chunked(static_cast<float>(x));
         int q = chunked(static_cast<float>(z));
-        Chunk* chunk = find_chunk(p, q);
-        if (chunk) {
+        auto chunk_opt = find_chunk(p, q);
+        if (chunk_opt.has_value()) {
+            Chunk* chunk = chunk_opt.value();
             Map* map = &chunk->map;
             return map_get(map, x, y, z);
         }
@@ -1715,10 +1755,8 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         glUniform1i(attrib->sampler, 0);
         glUniform1f(attrib->timer, time_of_day());
         for (int i = 0; i < this->m_model.player_count; i++) {
-            player* other = &this->m_model.player;
-            if (other != _player) {
-                draw_player(attrib, other);
-            }
+            Player* other = &this->m_model.player;
+            draw_player(attrib, other);
         }
     }
 

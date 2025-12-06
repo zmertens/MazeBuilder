@@ -13,6 +13,7 @@
 
 #include "map.h"
 #include "resource_identifiers.h"
+#include "sign.h"
 #include "glad/glad.h"
 
 #define KEY_FORWARD SDL_SCANCODE_W
@@ -78,6 +79,8 @@ class world final {
 public:
     explicit world(SDL_Window* window, font_manager& fonts, texture_manager& textures);
 
+    ~world();
+
     void init() noexcept;
 
     void update(float dt, mazes::randomizer& rng) noexcept;
@@ -89,9 +92,7 @@ public:
     // Destroy the world
     void destroy_world();
 
-    void handle_event(SDL_Event& event);
-
-    void set_player(player* player);
+    void handle_event(SDL_Event& event) noexcept;
 
     static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
 
@@ -100,20 +101,6 @@ private:
     void build_scene();
 
 #define MAX_SIGN_LENGTH 16
-
-    typedef struct {
-        int x;
-        int y;
-        int z;
-        int face;
-        char text[MAX_SIGN_LENGTH];
-    } Sign;
-
-    typedef struct {
-        std::size_t capacity;
-        std::size_t size;
-        Sign *data;
-    } SignList;
 
     struct Chunk {
         Map map;

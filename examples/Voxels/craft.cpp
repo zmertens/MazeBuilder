@@ -303,7 +303,6 @@ struct craft::craft_impl
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
     class editor_state final : public state
     {
-    private:
         player& m_player;
         std::optional<world> m_world;
         float m_mouse_movement{};
@@ -361,6 +360,8 @@ struct craft::craft_impl
                     {
                         m_world.emplace(get_context().m_window, *get_context().m_fonts, *get_context().m_textures);
 
+                        m_world.value().init();
+
                         // Enable mouse capture for editor
                         SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
 
@@ -409,7 +410,9 @@ struct craft::craft_impl
             switch (event.type)
             {
             case SDL_EVENT_QUIT:
-                request_stack_clear();
+                m_world->destroy_world();
+                m_player.set_active(false);
+                request_stack_pop();
                 return false;
 
             case SDL_EVENT_KEY_DOWN:
@@ -557,6 +560,7 @@ struct craft::craft_impl
     // Handles GUI options
     class menu_state final : public state
     {
+        mutable bool m_should_quit{false};
     public:
         explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
@@ -626,7 +630,7 @@ struct craft::craft_impl
                 // Quit button - exit application
                 if (ImGui::Button("Quit", ImVec2(200, 40)))
                 {
-                    request_stack_clear();
+                    m_should_quit = true;
                 }
 
                 ImGui::Separator();
@@ -634,6 +638,14 @@ struct craft::craft_impl
 
                 // Display controls help
                 ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Press ESC to return to game");
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Controls:");
+                ImGui::BulletText("WASD - Move");
+                ImGui::BulletText("Space - Jump");
+                ImGui::BulletText("Tab - Toggle Fly Mode");
+                ImGui::BulletText("E/R - Cycle Blocks");
+                ImGui::BulletText("Left Click - Break Block");
+                ImGui::BulletText("Right Click - Place Block");
             }
 
             ImGui::End();
@@ -645,13 +657,33 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
+            if (m_should_quit)
+            {
+                request_stack_pop();
+            }
             // Pause underlying states (editor) while menu is active
             return false;
         }
 
         bool handle_event(SDL_Event& event) noexcept override
         {
-            // Let ImGui handle all events while in menu
+            if (SDL_EVENT_QUIT == event.type)
+            {
+                SDL_Log("Menu: Received SDL_QUIT event - popping menu state\n");
+                get_context().m_player->set_active(false);
+                return false; // Stop event propagation
+            }
+
+            // Handle ESCAPE to return to game
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
+            {
+                SDL_Log("Menu: ESCAPE pressed - returning to editor\n");
+                request_stack_pop();
+                return false; // Stop event propagation
+            }
+
+            // Let ImGui handle all other events while in menu
+            // Return false to prevent underlying states from processing events
             return false;
         }
     }; // menu_state
@@ -782,7 +814,8 @@ struct craft::craft_impl
             if (event.type == SDL_EVENT_QUIT)
             {
                 SDL_Log("Received SDL_QUIT event. Exiting main loop.\n");
-                m_crafting_states->clear_states();
+                m_crafting_states->handle_event(event);
+
                 break;
             }
 
@@ -862,13 +895,11 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
         return false;
     }
 
-    static constexpr auto USE_CACHE = true;
-    static constexpr auto COMMIT_INTERVAL = 5000;
     if (USE_CACHE)
     {
         db_enable();
 
-        static constexpr auto DB_FILE = "craft.db";
+        const char* DB_FILE = "craft.db";
         if (db_init(const_cast<char*>(DB_FILE)) != 0)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Database initialization failed\n");
@@ -889,7 +920,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (!this->m_impl->m_crafting_states->is_empty())
+    while (this->m_impl->m_player.is_active() && !this->m_impl->m_crafting_states->is_empty())
 #endif
     {
         // FRAME RATE
@@ -926,15 +957,32 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     emscripten_cancel_main_loop();
 #endif
 
+    SDL_Log("Main loop ended, beginning cleanup...\n");
+
+    // Clear all states first to ensure proper destruction order
+    // This ensures world and other state resources are cleaned up before ImGui/SDL
+    SDL_Log("Clearing state stack...\n");
+    if (!this->m_impl->m_crafting_states->is_empty())
+    {
+        this->m_impl->m_crafting_states->clear_states();
+    }
+
+    // Cleanup ImGui
+    SDL_Log("Shutting down ImGui...\n");
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
 
-    this->m_impl->m_sdl.destroy_and_quit();
-
-    // db_save_state(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
+    // Cleanup database
+    SDL_Log("Closing database...\n");
     db_close();
     db_disable();
+
+    // Cleanup SDL (this must be last)
+    SDL_Log("Shutting down SDL...\n");
+    this->m_impl->m_sdl.destroy_and_quit();
+
+    SDL_Log("Cleanup complete, exiting gracefully.\n");
 
     return true;
 } // run

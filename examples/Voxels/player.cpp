@@ -1,10 +1,12 @@
 #include "player.h"
 
+#include <ranges>
+
 #include "command_queue.h"
 #include "entity.h"
 // #include "scene_node.h"
 
-player::player() : m_is_active(true)
+player::player() : m_is_active{true}
 {
     m_key_binding[SDL_SCANCODE_LEFT] = PlayerAction::MOVE_LEFT;
     m_key_binding[SDL_SCANCODE_RIGHT] = PlayerAction::MOVE_RIGHT;
@@ -12,32 +14,33 @@ player::player() : m_is_active(true)
 
     initialize_actions();
 
-    for (auto &pair : m_action_binding)
+    for (auto& [action, category] : m_action_binding | std::views::values)
     {
-        pair.second.category = Entity::PLAYER;
+        category = Entity::PLAYER;
     }
 }
 
 void player::handle_event(SDL_Event &event, command_queue &commands) noexcept
 {
-    while (SDL_PollEvent(&event))
+    if (event.type == SDL_EVENT_QUIT)
     {
-        if (event.type == SDL_EVENT_KEY_DOWN)
-        {
-            auto found = m_key_binding.find(event.key.scancode);
+        m_is_active = false;
+    }
+    if (event.type == SDL_EVENT_KEY_DOWN)
+    {
+        auto found = m_key_binding.find(event.key.scancode);
 
-            if (found != m_key_binding.cend() && !is_realtime_action(found->second))
-            {
-                if (found->second == PlayerAction::JUMP)
-                {
-                    return; // do not jump if not on ground
-                }
-                commands.push(m_action_binding[found->second]);
-            }
-        }
-        if (event.type == SDL_SCANCODE_RETURN)
+        if (found != m_key_binding.cend() && !is_realtime_action(found->second))
         {
+            if (found->second == PlayerAction::JUMP)
+            {
+                return; // do not jump if not on ground
+            }
+            commands.push(m_action_binding[found->second]);
         }
+    }
+    if (event.type == SDL_SCANCODE_RETURN)
+    {
     }
 }
 void player::handle_realtime_input(command_queue &commands)
