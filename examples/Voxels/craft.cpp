@@ -731,7 +731,7 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
-    void handle_FPS(double& time_step, const double elapsed) const noexcept
+    void handle_FPS(const double elapsed) const noexcept
     {
         // Calculate instantaneous FPS and frame time
         const auto fps = static_cast<int>(1000.0 / elapsed);
@@ -744,14 +744,6 @@ struct craft::craft_impl
             smoothed_fps = fps;
             smoothed_frame_time = frame_time;
             fps_update_timer = 0.0;
-        }
-
-        if (time_step >= 1000.0)
-        {
-            SDL_Log("FPS: %d\n", smoothed_fps);
-            SDL_Log("Frame Time: %.3f ms/frame\n", smoothed_frame_time);
-
-            time_step = 0.0;
         }
 
         // Create ImGui overlay window
@@ -831,7 +823,7 @@ struct craft::craft_impl
         m_crafting_states->update(delta_time, std::ref(rng));
     }
 
-    void render(double& current_time_step, const double elapsed) const noexcept
+    void render(const double elapsed) const noexcept
     {
         // Clear the screen before drawing
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -843,7 +835,7 @@ struct craft::craft_impl
 
         m_crafting_states->draw();
 
-        handle_FPS(current_time_step, elapsed);
+        handle_FPS(elapsed);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -924,7 +916,9 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
             this->m_impl->update(FIXED_TIME_STEP, rng);
         }
 
-        this->m_impl->render(time_step, elapsed);
+        this->m_impl->render(elapsed);
+
+        time_step = time_step >= 1000.0 ? 0.0 : time_step;
     } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)

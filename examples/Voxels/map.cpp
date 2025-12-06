@@ -77,7 +77,7 @@ int map_set(Map *map, int x, int y, int z, int w) {
     return 0;
 }
 
-int map_get(Map *map, int x, int y, int z) {
+int map_get(const Map *map, int x, int y, int z) {
     unsigned int index = hash(x, y, z) & map->mask;
     x -= map->dx;
     y -= map->dy;
