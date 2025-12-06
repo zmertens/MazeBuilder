@@ -2,10 +2,49 @@
 
 #include <noise/noise.h>
 
-using namespace std;
-using namespace mazes;
+#include "command_queue.h"
+#include "resource_manager.h"
+#include "font.h"
+#include "texture.h"
+#include "resource_identifiers.h"
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size, const mazes::lab& mazes) const noexcept {
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
+#include <glad/glad.h>
+#endif
+
+#include <SDL3/SDL.h>
+
+std::string _check_for_gl_err(const char* file, int line) noexcept {
+    GLenum error_code;
+    std::string error_str = "";
+    while ((error_code = glGetError()) != GL_NO_ERROR) {
+        switch (error_code) {
+        case GL_INVALID_ENUM: error_str += "INVALID_ENUM";
+        case GL_INVALID_VALUE: error_str += "INVALID_VALUE";
+        case GL_INVALID_OPERATION: error_str += "INVALID_OPERATION";
+        case GL_OUT_OF_MEMORY: error_str += "OUT_OF_MEMORY";
+        case GL_INVALID_FRAMEBUFFER_OPERATION: error_str += "INVALID_FRAMEBUFFER_OPERATION";
+        }
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+            "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error_str.c_str(), file, line);
+    }
+    return error_code == GL_NO_ERROR ? "" : error_str;
+}
+
+world::world(SDL_Window* window, font_manager& fonts, texture_manager& textures)
+    : m_window{window}
+      , m_fonts{fonts}
+      , m_textures{textures}
+    //   , mSceneGraph{}
+    //   , mSceneLayers{}
+      , m_command_queue{}
+      , m_player{nullptr}
+{
+}
+
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) const noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {

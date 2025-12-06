@@ -8,7 +8,10 @@
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
-#include "nunito_sans.h"
+
+#include "fonts/Cousine_Regular.h"
+#include "fonts/nunito_sans.h"
+#include "fonts/Limelight_Regular.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <emscripten_local/emscripten_mainloop_stub.h>
@@ -17,93 +20,26 @@
 
 #include <SDL3/SDL.h>
 
-#include <algorithm>
-#include <condition_variable>
-#include <chrono>
-#include <cstdint>
-#include <cstring>
-#include <list>
-#include <map>
-#include <mutex>
-#include <queue>
-#include <random>
-#include <utility>
-#include <thread>
-#include <tuple>
-#include <string>
-#include <string_view>
-#include <vector>
-
 #include <noise/noise.h>
 
-#include "craft_utils.h"
-#include "cube.h"
+#include "command_queue.h"
 #include "db.h"
-#include "world.h"
-#include "sign.h"
+#include "resource_manager.h"
+#include "font.h"
 #include "item.h"
 #include "map.h"
-#include "matrix.h"
+#include "player.h"
+#include "resource_identifiers.h"
 #include "sdl_helper.h"
+#include "texture.h"
+#include "world.h"
 
-#include "gl_resource_manager.h"
-#include "bloom_effects.h"
-#include "stencil_renderer.h"
-#include "maze_projector.h"
-
-#include <MazeBuilder/maze_builder.h>
-
-// Namespace alias for convenience
-namespace cr = craft_rendering;
-
-// Movement configurations
-#define KEY_FORWARD SDL_SCANCODE_W
-#define KEY_BACKWARD SDL_SCANCODE_S
-#define KEY_LEFT SDL_SCANCODE_A
-#define KEY_RIGHT SDL_SCANCODE_D
-#define KEY_JUMP SDL_SCANCODE_SPACE
-#define KEY_FLY SDL_SCANCODE_TAB
-#define KEY_ITEM_NEXT SDL_SCANCODE_E
-#define KEY_ITEM_PREV SDL_SCANCODE_R
-#define KEY_ZOOM SDL_SCANCODE_LSHIFT
-#define KEY_ORTHO SDL_SCANCODE_F
-#define KEY_TAG SDL_SCANCODE_T
-
-// World configs
-#define SCROLL_THRESHOLD 0.1
-#define MAX_DB_PATH_LEN 64
-#define USE_CACHE true
-#define DAY_LENGTH 600
-#define INVERT_MOUSE 0
-#define MAX_TEXT_LENGTH 256
-
-// Advanced options
-#define COMMIT_INTERVAL 7
-#define CREATE_CHUNK_RADIUS 10
-#define RENDER_CHUNK_RADIUS 20
-#define RENDER_SIGN_RADIUS 4
-#define DELETE_CHUNK_RADIUS 14
-#define MAX_CHUNKS 8192
-#define MAX_PLAYERS 1
-#define NUM_WORKERS 4
-
-#define WORKER_IDLE 0
-#define WORKER_BUSY 1
-#define WORKER_DONE 2
+#include <functional>
+#include <memory>
+#include <map>
 
 namespace
 {
-    enum class Entity : unsigned int
-    {
-        NONE = 0,
-        SCENE = 1 << 0,
-        PLAYER = 1 << 1,
-        ENEMY = 1 << 2,
-        PROJECTILE = 1 << 3,
-        PICKUP = 1 << 4,
-        ALL = 1 << 5
-    };
-
     enum class MenuItem : unsigned int
     {
         CONTINUE = 0,
@@ -112,14 +48,6 @@ namespace
         SPLASH = 3,
         QUIT = 4,
         COUNT = 5
-    };
-
-    enum class PlayerAction
-    {
-        MOVE_LEFT,
-        MOVE_RIGHT,
-        JUMP,
-        COUNT
     };
 
     enum class StackAction : unsigned int
@@ -138,347 +66,9 @@ namespace
     };
 }
 
+// Implement the states used in the voxel engine when running
 struct craft::craft_impl
 {
-
-    typedef struct
-    {
-        Map map;
-        Map lights;
-        SignList signs;
-        int p;
-        int q;
-        int faces;
-        int sign_faces;
-        int dirty;
-        int miny;
-        int maxy;
-        GLuint buffer;
-        GLuint sign_buffer;
-    } Chunk;
-
-    struct WorkerItem
-    {
-        int p;
-        int q;
-        int load;
-        Map *block_maps[3][3];
-        Map *light_maps[3][3];
-        int miny;
-        int maxy;
-        int faces;
-        GLfloat *data;
-        WorkerItem()
-        {
-        }
-    };
-
-    typedef struct
-    {
-        int index;
-        int state;
-        std::thread thrd;
-        std::mutex mtx;
-        std::condition_variable cnd;
-        WorkerItem item;
-        bool should_stop;
-    } Worker;
-
-    typedef struct
-    {
-        int x;
-        int y;
-        int z;
-        int w;
-    } Block;
-
-    typedef struct
-    {
-        float x;
-        float y;
-        float z;
-        float rx;
-        float ry;
-        float t;
-    } State;
-
-    typedef struct
-    {
-        GLuint program;
-        GLuint position;
-        GLuint normal;
-        GLuint uv;
-        GLuint matrix;
-        GLuint sampler;
-        GLuint camera;
-        GLuint timer;
-        GLuint extra1;
-        GLuint extra2;
-        GLuint extra3;
-        GLuint extra4;
-    } Attrib;
-
-    typedef struct
-    {
-        std::vector<std::unique_ptr<Worker>> workers;
-        Chunk chunks[MAX_CHUNKS];
-        int chunk_count;
-        int create_radius;
-        int render_radius;
-        int delete_radius;
-        int sign_radius;
-        int player_count;
-        int voxel_scene_w;
-        int voxel_scene_h;
-        bool flying;
-        int item_index;
-        int scale;
-        bool is_ortho;
-        float fov;
-        char db_path[MAX_DB_PATH_LEN];
-        int day_length;
-        int start_time;
-        int start_ticks;
-        Block block0;
-        Block block1;
-        Block copy0;
-        Block copy1;
-    } Model;
-
-    class gui_options
-    {
-    public:
-        bool fullscreen;
-        bool vsync;
-        bool color_mode_dark;
-        bool capture_mouse;
-        int chunk_size;
-        bool show_items;
-        bool show_wireframes;
-        bool show_crosshairs;
-        bool show_info_text;
-        bool apply_bloom_effect;
-        float exposure;
-        char outfile[64];
-        int seed;
-        int rows;
-        int height;
-        int columns;
-        int offset_x;
-        int offset_z;
-        std::string algo;
-        int view;
-        char tag[MAX_SIGN_LENGTH];
-
-        void reset()
-        {
-            for (auto i = 0; i < IM_ARRAYSIZE(outfile); ++i)
-            {
-                outfile[i] = '\0';
-            }
-            outfile[0] = '.';
-            outfile[1] = 'o';
-            outfile[2] = 'b';
-            outfile[3] = 'j';
-            rows = 15;
-            height = 5;
-            columns = 28;
-            view = 20;
-            algo = "binary_tree";
-            seed = 10;
-            chunk_size = 8;
-            tag[0] = 'H';
-            tag[1] = 'i';
-            show_crosshairs = true;
-            show_info_text = true;
-            show_items = true;
-            show_wireframes = true;
-            capture_mouse = false;
-        }
-    }; // class
-
-    class scene_node;
-
-    struct command
-    {
-        std::function<void(scene_node &, float)> action;
-        Entity category;
-    };
-
-    template <typename GameObject, typename Function>
-    std::function<void(scene_node &, float)> derived_action(Function fn)
-    {
-        return [=](scene_node &node, float dt)
-        {
-            // Ensure that the cast is safe
-            if constexpr (std::is_base_of_v<GameObject, scene_node>)
-            {
-                fn(static_cast<GameObject &>(node), dt);
-            }
-        };
-    }
-
-    class command_queue
-    {
-    public:
-        void push(const command &command)
-        {
-            commands.push(command);
-        }
-
-        command pop()
-        {
-            command cmd = commands.front();
-            commands.pop();
-            return cmd;
-        }
-
-        bool is_empty() const
-        {
-            return commands.empty();
-        }
-
-    private:
-        std::queue<command> commands;
-    };
-
-    class player
-    {
-    public:
-        std::map<std::uint32_t, PlayerAction> m_key_binding;
-
-        std::map<PlayerAction, command> m_action_binding;
-
-        bool m_is_active;
-
-        std::string m_name;
-        State m_state;
-        State m_state1;
-        State m_state2;
-        GLuint m_buffer;
-
-    public:
-        explicit player() : m_is_active(true)
-        {
-            m_key_binding[SDL_SCANCODE_LEFT] = PlayerAction::MOVE_LEFT;
-            m_key_binding[SDL_SCANCODE_RIGHT] = PlayerAction::MOVE_RIGHT;
-            m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
-
-            initialize_actions();
-
-            for (auto &pair : m_action_binding)
-            {
-                pair.second.category = Entity::PLAYER;
-            }
-        }
-
-        void handle_event(SDL_Event &event, command_queue &commands) noexcept
-        {
-            while (SDL_PollEvent(&event))
-            {
-                if (event.type == SDL_EVENT_KEY_DOWN)
-                {
-                    auto found = m_key_binding.find(event.key.scancode);
-
-                    if (found != m_key_binding.cend() && !is_realtime_action(found->second))
-                    {
-                        if (found->second == PlayerAction::JUMP)
-                        {
-                            return; // do not jump if not on ground
-                        }
-                        commands.push(m_action_binding[found->second]);
-                    }
-                }
-                if (event.type == SDL_SCANCODE_RETURN)
-                {
-                }
-            }
-        }
-        void handle_realtime_input(command_queue &commands)
-        {
-            for (auto &pair : m_key_binding)
-            {
-                if (is_realtime_action(pair.second))
-                {
-                    int numKeys = 0;
-                    const auto *keyState = SDL_GetKeyboardState(&numKeys);
-
-                    if (keyState && pair.first < static_cast<std::uint32_t>(numKeys) && keyState[pair.first])
-                    {
-                        commands.push(m_action_binding[pair.second]);
-                    }
-                }
-            }
-        }
-
-        void assign_key(PlayerAction action, std::uint32_t key)
-        {
-            // Remove all keys that already map to action
-            for (auto it = m_key_binding.begin(); it != m_key_binding.end();)
-            {
-                if (it->second == action)
-                    it = m_key_binding.erase(it);
-                else
-                    ++it;
-            }
-
-            // Insert new binding
-            m_key_binding[key] = action;
-        }
-
-        [[nodiscard]] std::uint32_t get_assigned_key(PlayerAction action) const
-        {
-            for (auto &pair : m_key_binding)
-            {
-                if (pair.second == action)
-                    return pair.first;
-            }
-
-            return SDL_SCANCODE_UNKNOWN;
-        }
-
-        bool is_active() const noexcept
-        {
-            return m_is_active;
-        }
-        void set_active(bool active) noexcept
-        {
-            m_is_active = active;
-        }
-
-    private:
-        void initialize_actions()
-        {
-            static constexpr auto playerSpeed = 200.f;
-            static constexpr auto jumpForce = -500.f;
-
-            // Note: derived_action is a member function of craft_impl,
-            // so we'll use a simple lambda instead
-            m_action_binding[PlayerAction::MOVE_LEFT].action = [](scene_node &node, float dt)
-            {
-                // Do something for move left action
-            };
-
-            // on create block
-
-            // on destroy block
-
-            // on copy block
-        }
-
-        static bool is_realtime_action(PlayerAction action)
-        {
-            switch (action)
-            {
-            case PlayerAction::MOVE_LEFT:
-            case PlayerAction::MOVE_RIGHT:
-                return true;
-            default:
-                return false;
-            }
-        }
-    };
-
     class state_stack;
 
     class state
@@ -488,15 +78,15 @@ struct craft::craft_impl
 
         struct context
         {
-            explicit context(SDL_Window *window /*, FontManager& fonts, TextureManager& textures*/, player &p)
-                : window{window}, p{&p}
+            explicit context(SDL_Window *window, font_manager &fonts, texture_manager &textures, player &p)
+                : m_window{window}, m_fonts{&fonts}, m_textures{&textures}, m_player{&p}
             {
             }
 
-            SDL_Window *window;
-            // FontManager* fonts;
-            // TextureManager* textures;
-            player *p;
+            SDL_Window *m_window;
+            font_manager *m_fonts;
+            texture_manager *m_textures;
+            player *m_player;
         };
 
         explicit state(state_stack &stack, context context) : m_stack{&stack}, m_context{context}
@@ -567,13 +157,6 @@ struct craft::craft_impl
         {
             m_factories.insert_or_assign(state_id, [this]()
                                          { return state::ptr(std::make_unique<T>(*this, m_context)); });
-        }
-
-        template <typename T, typename ResourcePath>
-        void register_state(StateIdentifier state_id, ResourcePath &&resource_path)
-        {
-            m_factories.insert_or_assign(state_id, [this, resource_path = std::forward<ResourcePath>(resource_path)]()
-                                         { return state::ptr(std::make_unique<T>(*this, m_context, resource_path)); });
         }
 
         template <typename Pointer>
@@ -688,23 +271,19 @@ struct craft::craft_impl
     class editor_state : public state
     {
     private:
-        player m_player;
-        // World mWorld;
-        gui_options m_gui;
+        player *m_player;
+        world m_world;
         float m_mouse_movement;
 
     public:
-        explicit editor_state(state_stack &stack, context context)
-            : state{stack, context}
-              //   , mWorld{*context.window, *context.fonts, *context.textures}
-              ,
-              m_player{*context.p}
+        explicit editor_state(state_stack &stack, context _context)
+            : state{stack, _context}, m_world{_context.m_window, *_context.m_fonts, *_context.m_textures}, m_player{_context.m_player}
         {
         }
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().window;
+            const auto &window = *get_context().m_window;
 
             //    mWorld.draw();
         }
@@ -729,7 +308,7 @@ struct craft::craft_impl
             // mWorld.handle_event(event);
 
             static float dy = 0;
-            State *s = &m_player.m_state;
+            player::state *s = &m_player->s1;
             int sz = 0;
             int sx = 0;
             constexpr float directional_movement = 0.025f;
@@ -751,9 +330,8 @@ struct craft::craft_impl
                     {
                     case SDL_SCANCODE_ESCAPE:
                     {
-                        SDL_SetWindowRelativeMouseMode(get_context().window, false);
-                        this->m_gui.capture_mouse = false;
-                        this->m_gui.fullscreen = false;
+                        SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
+
                         request_stack_push(StateIdentifier::MENU);
                         break;
                     }
@@ -776,13 +354,28 @@ struct craft::craft_impl
 
     class loading_state : public state
     {
-    private:
-        void load_resources() noexcept
-        {
-        }
 
-        void load_window_icon(const std::unordered_map<std::string, std::string> &resources) noexcept
+        void load_resources() const noexcept
         {
+            static constexpr auto FONT_PIXEL_SIZE = 28.f;
+
+            auto &&fonts = get_context().m_fonts;
+
+            fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data, Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
+            fonts->load(FontIdentifier::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size, FONT_PIXEL_SIZE);
+            fonts->load(FontIdentifier::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
+
+            constexpr std::string_view atlas_path = "textures/atlas.png";
+            constexpr std::string_view bitmap_font_path = "textures/bitmap_font.png";
+            constexpr std::string_view window_icon_path = "textures/icon.bmp";
+            constexpr std::string_view signs_path = "textures/signs.png";
+
+            auto &&textures = get_context().m_textures;
+
+            textures->load(TextureIdentifier::ATLAS, atlas_path, 0);
+            textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path, 1);
+            textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
+            textures->load(TextureIdentifier::SIGNS, signs_path, 2);
         }
 
         void set_completion(float percent) noexcept
@@ -791,26 +384,27 @@ struct craft::craft_impl
 
         bool m_has_finished;
 
-        std::string m_resource_path;
-
     public:
-        explicit loading_state(state_stack &_stack, state::context _context, std::string_view resource_path = "resources")
-            : state(_stack, _context), m_has_finished{false}, m_resource_path{resource_path}
+        explicit loading_state(state_stack &_stack, state::context _context)
+            : state(_stack, _context), m_has_finished{false}
         {
-
-            SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "LoadingState: resource path is: %s\n", m_resource_path.data());
-            m_has_finished = true;
         }
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().window;
+            const auto &window = *get_context().m_window;
 
             // window.draw(mLoadingSprite);
         }
 
         bool update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept override
         {
+            if (!m_has_finished)
+            {
+                load_resources();
+                m_has_finished = true;
+            }
+
             return true;
         }
 
@@ -836,7 +430,7 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().window;
+            const auto &window = *get_context().m_window;
 
             // window.draw(mLoadingSprite);
         }
@@ -852,16 +446,6 @@ struct craft::craft_impl
             {
                 if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                 {
-                    // set flag
-
-                    /*
-
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-
-    destroy_and_quit();
-                    */
                 }
             }
 
@@ -873,6 +457,9 @@ struct craft::craft_impl
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     std::unique_ptr<state_stack> m_crafting_states;
+
+    font_manager m_fonts;
+    texture_manager m_textures;
 
     player m_player;
 
@@ -889,7 +476,7 @@ struct craft::craft_impl
 
         setup_imgui();
 
-        m_crafting_states = std::make_unique<state_stack>(state::context{m_sdl.window, /*m_fonts, m_textures,*/ m_player});
+        m_crafting_states = std::make_unique<state_stack>(state::context{m_sdl.window, std::ref(m_fonts), std::ref(m_textures), std::ref(m_player)});
 
         register_states();
 
@@ -899,9 +486,8 @@ struct craft::craft_impl
 
     void register_states() noexcept
     {
-        constexpr std::string_view resource_path = "resources";
         m_crafting_states->register_state<editor_state>(StateIdentifier::EDITOR);
-        m_crafting_states->register_state<loading_state>(StateIdentifier::LOADING, resource_path);
+        m_crafting_states->register_state<loading_state>(StateIdentifier::LOADING);
         m_crafting_states->register_state<menu_state>(StateIdentifier::MENU);
     }
 
@@ -1041,8 +627,8 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
         return false;
     }
 
-    CHECK_GL_ERR();
-
+    static constexpr auto USE_CACHE = true;
+    static constexpr auto COMMIT_INTERVAL = 5000;
     if (USE_CACHE)
     {
         db_enable();
@@ -1096,9 +682,6 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
         }
 
         this->m_impl->render(time_step, elapsed);
-
-        CHECK_GL_ERR();
-
     } // EVENT LOOP
 
 #if defined(__EMSCRIPTEN__)
@@ -1106,7 +689,11 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
     emscripten_cancel_main_loop();
 #endif
 
-    SDL_Log("Closing DB. . .\n");
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+
+    this->m_impl->m_sdl.destroy_and_quit();
 
     // db_save_state(p_state->x, p_state->y, p_state->z, p_state->rx, p_state->ry);
     db_close();

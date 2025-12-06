@@ -1,6 +1,14 @@
 #ifndef _cube_h_
 #define _cube_h_
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define DEGREES(radians) ((radians) * 180 / M_PI)
+#define RADIANS(degrees) ((degrees) * M_PI / 180)
+#define SIGN(x) (((x) > 0) - ((x) < 0))
+
 void make_cube_faces(
     float *data, float ao[6][4], float light[6][4],
     int left, int right, int top, int bottom, int front, int back,

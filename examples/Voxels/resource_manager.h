@@ -5,127 +5,106 @@
 #include <map>
 #include <memory>
 #include <stdexcept>
-#include <string>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
 #include <dearimgui/imgui.h>
 
-struct SDL_Renderer;
+struct SDL_Window;
 
 template <typename Resource, typename Identifier>
-class ResourceManager
+class resource_manager
 {
 public:
-    void load(SDL_Renderer* renderer, Identifier id, const std::string& filename);
+    void load(SDL_Window* window, Identifier id, std::string_view filename);
 
-    template <typename Parameter>
-    void load(SDL_Renderer* renderer, Identifier id, const std::string& filename, const Parameter& secondParam);
+    void load(Identifier id, std::string_view filename, std::uint32_t channel_offset = 0);
 
     template <typename Parameter1, typename Parameter2, typename PixelSize = float>
     void load(Identifier id, const Parameter1& param1, const Parameter2& param2, const PixelSize& pixelSize);
-
-    template <typename Texture>
-    void load(SDL_Renderer* renderer, Identifier id, const Texture& texture);
 
     Resource& get(Identifier id);
     const Resource& get(Identifier id) const;
 
     void clear() noexcept
     {
-        mResourceMap.clear();
+        m_resources_map.clear();
     }
 
-    bool isEmpty() const noexcept { return mResourceMap.empty(); }
+    [[nodiscard]] bool isEmpty() const noexcept { return m_resources_map.empty(); }
 
 private:
-    void insertResource(Identifier id, std::unique_ptr<Resource> resource);
-
-private:
-    std::map<Identifier, std::unique_ptr<Resource>> mResourceMap;
+    void insert_resource(Identifier id, std::unique_ptr<Resource> resource);
+    std::map<Identifier, std::unique_ptr<Resource>> m_resources_map;
 };
 
-
 template <typename Resource, typename Identifier>
-void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const std::string& filename)
+void resource_manager<Resource, Identifier>::load(SDL_Window* window, Identifier id, std::string_view filename)
 {
     // Create and load resource
     auto resource = std::make_unique<Resource>();
 
-    if (!resource->loadFromFile(renderer, filename))
+    if (!resource->load_bmp_icon(window, filename))
     {
-        throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
+        throw std::runtime_error("resource_manager::load - Failed to load " + std::string(filename));
     }
 
     // If loading successful, insert resource to map
-    insertResource(id, std::move(resource));
+    insert_resource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>
-template <typename Parameter>
-void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const std::string& filename,
-                                                 const Parameter& secondParam)
+void resource_manager<Resource, Identifier>::load(Identifier id, std::string_view filename, std::uint32_t channel_offset)
 {
     // Create and load resource
     auto resource = std::make_unique<Resource>();
-    if (!resource->loadFromStr(renderer, filename, secondParam))
+
+    if (!resource->load_from_file(filename, channel_offset))
     {
-        throw std::runtime_error("ResourceManager::load - Failed to load " + filename);
+        throw std::runtime_error("resource_manager::load - Failed to load " + std::string(filename));
     }
 
     // If loading successful, insert resource to map
-    insertResource(id, std::move(resource));
+    insert_resource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>
 template <typename Parameter1, typename Parameter2, typename PixelSize>
-void ResourceManager<Resource, Identifier>::load(Identifier id, const Parameter1& param1, const Parameter2& param2, const PixelSize& pixelSize)
+void resource_manager<Resource, Identifier>::load(Identifier id, const Parameter1& param1, const Parameter2& param2, const PixelSize& pixelSize)
 {
     auto resource = std::make_unique<Resource>();
     if (!resource->loadFromMemoryCompressedTTF(param1, param2, pixelSize))
     {
-        throw std::runtime_error("ResourceManager::load - Failed to load font from memory");
+        throw std::runtime_error("resource_manager::load - Failed to load font from memory");
     }
 
-    insertResource(id, std::move(resource));
+    insert_resource(id, std::move(resource));
 }
 
 template <typename Resource, typename Identifier>
-template <typename Texture>
-void ResourceManager<Resource, Identifier>::load(SDL_Renderer* renderer, Identifier id, const Texture& texture)
+Resource& resource_manager<Resource, Identifier>::get(Identifier id)
 {
-    auto resource = std::make_unique<Resource>();
-    if (!resource->loadFromMaze(renderer, texture))
-    {
-        throw std::runtime_error("ResourceManager::load - Failed to load from texture");
-    }
-
-    insertResource(id, std::move(resource));
-}
-
-template <typename Resource, typename Identifier>
-Resource& ResourceManager<Resource, Identifier>::get(Identifier id)
-{
-    auto found = mResourceMap.find(id);
-    assert(found != mResourceMap.cend());
+    auto found = m_resources_map.find(id);
+    assert(found != m_resources_map.cend());
 
     return *found->second;
 }
 
 template <typename Resource, typename Identifier>
-const Resource& ResourceManager<Resource, Identifier>::get(Identifier id) const
+const Resource& resource_manager<Resource, Identifier>::get(Identifier id) const
 {
-    auto found = mResourceMap.find(id);
-    assert(found != mResourceMap.cend());
+    auto found = m_resources_map.find(id);
+    assert(found != m_resources_map.cend());
 
     return *found->second;
 }
 
 template <typename Resource, typename Identifier>
-void ResourceManager<Resource, Identifier>::insertResource(Identifier id, std::unique_ptr<Resource> resource)
+void resource_manager<Resource, Identifier>::insert_resource(Identifier id, std::unique_ptr<Resource> resource)
 {
     // Insert and check success
-    auto inserted = mResourceMap.insert(std::make_pair(id, std::move(resource)));
+    auto inserted = m_resources_map.insert(std::make_pair(id, std::move(resource)));
     assert(inserted.second);
 }
 

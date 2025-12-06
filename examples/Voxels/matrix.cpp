@@ -1,6 +1,8 @@
 #include "matrix.h"
 
-#include "craft_utils.h"
+#include "cube.h"
+
+#include <cmath>
 
 void normalize(float *x, float *y, float *z) {
     float d = sqrtf((*x) * (*x) + (*y) * (*y) + (*z) * (*z));
