@@ -13,9 +13,9 @@
 
 union SDL_Event;
 
-std::string _check_for_gl_err(const char* file, int line) noexcept;
+std::string gl_error_checker(const char* file, int line) noexcept;
 
-#define CHECK_GL_ERR() _check_for_gl_err(__FILE__, __LINE__)
+#define CHECK_GL_ERR() gl_error_checker(__FILE__, __LINE__)
 
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
@@ -23,13 +23,17 @@ class command_queue;
 class player;
 struct SDL_Window;
 
+namespace mazes {
+    class randomizer;
+}
+
 class world final {
 public:
     explicit world(SDL_Window* window, font_manager& fonts, texture_manager& textures);
 
     void init() noexcept;
 
-    void update(float dt);
+    void update(float dt, mazes::randomizer& rng) noexcept;
 
     void draw() const noexcept;
 
@@ -42,7 +46,7 @@ public:
 
     void set_player(player* player);
 
-    void create_world(int p, int q, world_func func, Map *m, int chunk_size) const noexcept;
+    static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
 
 private:
     // Build the scene (initialize scene graph and layers)

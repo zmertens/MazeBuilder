@@ -20,8 +20,6 @@
 
 #include <SDL3/SDL.h>
 
-#include <noise/noise.h>
-
 #include "command_queue.h"
 #include "db.h"
 #include "resource_manager.h"
@@ -34,6 +32,7 @@
 #include "texture.h"
 #include "world.h"
 
+#include <array>
 #include <functional>
 #include <memory>
 #include <map>
@@ -74,57 +73,58 @@ struct craft::craft_impl
     class state
     {
     public:
+        virtual ~state() = default;
         typedef std::unique_ptr<state> ptr;
 
         struct context
         {
-            explicit context(SDL_Window *window, font_manager &fonts, texture_manager &textures, player &p)
+            explicit context(SDL_Window* window, font_manager& fonts, texture_manager& textures, player& p)
                 : m_window{window}, m_fonts{&fonts}, m_textures{&textures}, m_player{&p}
             {
             }
 
-            SDL_Window *m_window;
-            font_manager *m_fonts;
-            texture_manager *m_textures;
-            player *m_player;
+            SDL_Window* m_window;
+            font_manager* m_fonts;
+            texture_manager* m_textures;
+            player* m_player;
         };
 
-        explicit state(state_stack &stack, context context) : m_stack{&stack}, m_context{context}
+        explicit state(state_stack& stack, context context) : m_stack{&stack}, m_context{context}
         {
         }
 
         virtual void draw() const noexcept = 0;
-        virtual bool update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept = 0;
-        virtual bool handle_event(SDL_Event &event) noexcept = 0;
+        virtual bool update(float delta_time, mazes::randomizer& rng) noexcept = 0;
+        virtual bool handle_event(SDL_Event& event) noexcept = 0;
 
     protected:
-        void request_stack_push(StateIdentifier state_id)
+        void request_stack_push(StateIdentifier state_id) const
         {
             m_stack->push_state(state_id);
         }
 
-        void request_stack_pop()
+        void request_stack_pop() const
         {
             m_stack->pop_state();
         }
 
-        void request_stack_clear()
+        void request_stack_clear() const
         {
             m_stack->clear_states();
         }
 
-        context get_context() const noexcept
+        [[nodiscard]] context get_context() const noexcept
         {
             return m_context;
         }
 
-        state_stack &get_stack() const noexcept
+        [[nodiscard]] state_stack& get_stack() const noexcept
         {
             return *m_stack;
         }
 
     private:
-        state_stack *m_stack;
+        state_stack* m_stack;
         context m_context;
     };
 
@@ -147,7 +147,7 @@ struct craft::craft_impl
         std::map<StateIdentifier, std::function<state::ptr()>> m_factories;
 
     public:
-        explicit state_stack(state::context _context)
+        explicit state_stack(const state::context& _context)
             : m_stack(), m_pending_list(), m_context(_context), m_factories()
         {
         }
@@ -156,7 +156,9 @@ struct craft::craft_impl
         void register_state(StateIdentifier state_id)
         {
             m_factories.insert_or_assign(state_id, [this]()
-                                         { return state::ptr(std::make_unique<T>(*this, m_context)); });
+            {
+                return state::ptr(std::make_unique<T>(*this, m_context));
+            });
         }
 
         template <typename Pointer>
@@ -174,11 +176,11 @@ struct craft::craft_impl
             return nullptr;
         }
 
-        void update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept
+        void update(const float delta_time, mazes::randomizer& rng) noexcept
         {
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
-                if (!(*it)->update(dt, sub_steps, std::ref(rng)))
+                if (!(*it)->update(delta_time, std::ref(rng)))
                 {
                     break;
                 }
@@ -189,7 +191,6 @@ struct craft::craft_impl
 
         void draw() const noexcept
         {
-
             if (m_stack.empty())
             {
                 return;
@@ -201,7 +202,7 @@ struct craft::craft_impl
             }
         }
 
-        void handle_event(SDL_Event &event) noexcept
+        void handle_event(SDL_Event& event) noexcept
         {
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
@@ -247,7 +248,7 @@ struct craft::craft_impl
 
         void apply_pending_changes()
         {
-            for (const pending_change &change : m_pending_list)
+            for (const pending_change& change : m_pending_list)
             {
                 switch (change.action)
                 {
@@ -268,53 +269,42 @@ struct craft::craft_impl
     }; // state_stack
 
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
-    class editor_state : public state
+    class editor_state final : public state
     {
     private:
-        player *m_player;
+        player& m_player;
         world m_world;
-        float m_mouse_movement;
+        float m_mouse_movement{};
 
     public:
-        explicit editor_state(state_stack &stack, context _context)
-            : state{stack, _context}, m_world{_context.m_window, *_context.m_fonts, *_context.m_textures}, m_player{_context.m_player}
+        explicit editor_state(state_stack& stack, const context& _context)
+            : state{stack, _context}, m_player{*_context.m_player},
+              m_world{_context.m_window, *_context.m_fonts, *_context.m_textures}
         {
         }
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().m_window;
-
-            //    mWorld.draw();
+            m_world.draw();
         }
 
-        bool update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept override
+        bool update(const float delta_time, mazes::randomizer& rng) noexcept override
         {
-            // mWorld.update(dt);
+            m_world.update(delta_time, std::ref(rng));
 
-            // auto& commands = mWorld.getCommandQueue();
-            // m_player.handle_realtime_input(std::ref(commands));
-
-            m_mouse_movement = SDL_min(0.0025, dt);
+            auto& commands = m_world.get_command_queue();
+            m_player.handle_realtime_input(std::ref(commands));
 
             return true;
         }
 
-        bool handle_event(SDL_Event &event) noexcept override
+        bool handle_event(SDL_Event& event) noexcept override
         {
-            // auto& commands = mWorld.getCommandQueue();
+            auto& commands = m_world.get_command_queue();
+            m_player.handle_event(event, std::ref(commands));
+            m_world.handle_event(event);
 
-            // m_player.handle_event(event, std::ref(commands));
-            // mWorld.handle_event(event);
-
-            static float dy = 0;
-            player::state *s = &m_player->s1;
-            int sz = 0;
-            int sx = 0;
-            constexpr float directional_movement = 0.025f;
             auto current_scancode = SDL_SCANCODE_UNKNOWN;
-
-            SDL_Keymod mod_state = SDL_GetModState();
 
             while (SDL_PollEvent(&event))
             {
@@ -324,80 +314,85 @@ struct craft::craft_impl
                     request_stack_clear();
                     break;
                 case SDL_EVENT_KEY_DOWN:
-                {
-                    current_scancode = event.key.scancode;
-                    switch (current_scancode)
                     {
-                    case SDL_SCANCODE_ESCAPE:
-                    {
-                        SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
+                        current_scancode = event.key.scancode;
+                        switch (current_scancode)
+                        {
+                        case SDL_SCANCODE_ESCAPE:
+                            {
+                                SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
 
-                        request_stack_push(StateIdentifier::MENU);
+                                request_stack_push(StateIdentifier::MENU);
+                                break;
+                            }
+                        default: ;
+                        }
                         break;
                     }
-
-                    case SDL_SCANCODE_TAB:
-                    {
-                        // this->m_model->flying = !this->m_model->flying;
-                        break;
-                    }
-                    break;
-                    }
-                    break;
-                }
+                default: ;
                 } // switch
             } // SDL_Event
 
             return true;
         } // handle_events_and_motion
-    };
+    }; // editor_state
 
-    class loading_state : public state
+    class loading_state final : public state
     {
-
         void load_resources() const noexcept
         {
             static constexpr auto FONT_PIXEL_SIZE = 28.f;
 
-            auto &&fonts = get_context().m_fonts;
+            auto&& fonts = get_context().m_fonts;
 
-            fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data, Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
-            fonts->load(FontIdentifier::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size, FONT_PIXEL_SIZE);
-            fonts->load(FontIdentifier::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size, FONT_PIXEL_SIZE);
+            fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data,
+                        Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
+            fonts->load(FontIdentifier::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size,
+                        FONT_PIXEL_SIZE);
+            fonts->load(FontIdentifier::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size,
+                        FONT_PIXEL_SIZE);
 
             constexpr std::string_view atlas_path = "textures/atlas.png";
             constexpr std::string_view bitmap_font_path = "textures/bitmap_font.png";
             constexpr std::string_view window_icon_path = "textures/icon.bmp";
             constexpr std::string_view signs_path = "textures/signs.png";
 
-            auto &&textures = get_context().m_textures;
+            auto&& textures = get_context().m_textures;
 
             textures->load(TextureIdentifier::ATLAS, atlas_path, 0);
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path, 1);
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
             textures->load(TextureIdentifier::SIGNS, signs_path, 2);
+
+#if defined(MAZE_DEBUG)
+
+            SDL_Log("Loaded fonts\nCousine Regular\nLimelight Regular\nNunito Sans\n");
+
+            SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n", atlas_path.data(),
+                    bitmap_font_path.data(), window_icon_path.data(), signs_path.data());
+#endif
         }
 
-        void set_completion(float percent) noexcept
+        static void set_completion(float percent) noexcept
         {
         }
 
         bool m_has_finished;
 
     public:
-        explicit loading_state(state_stack &_stack, state::context _context)
+        explicit loading_state(state_stack& _stack, state::context _context)
             : state(_stack, _context), m_has_finished{false}
         {
         }
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().m_window;
+            const auto& window = *get_context().m_window;
 
             // window.draw(mLoadingSprite);
         }
 
-        bool update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept override
+        bool update(const float delta_time, mazes::randomizer& rng) noexcept override
         {
             if (!m_has_finished)
             {
@@ -408,52 +403,109 @@ struct craft::craft_impl
             return true;
         }
 
-        bool handle_event(SDL_Event &event) noexcept override
+        bool handle_event(SDL_Event& event) noexcept override
         {
             return true;
         }
 
-        bool is_finished() const noexcept
+        [[nodiscard]] bool is_finished() const noexcept
         {
             return m_has_finished;
         }
     };
 
     // Handles GUI options
-    class menu_state : public state
+    class menu_state final : public state
     {
     public:
-        explicit menu_state(state_stack &stack, context context)
+        explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
         {
         }
 
         void draw() const noexcept override
         {
-            const auto &window = *get_context().m_window;
+            ImGui::PushFont(get_context().m_fonts->get(FontIdentifier::LIMELIGHT).get());
 
-            // window.draw(mLoadingSprite);
+            // Apply color schema
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
+
+            ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
+            ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
+
+            if (ImGui::Begin("Main Menu", &m_exit, ImGuiWindowFlags_NoCollapse))
+            {
+                ImGui::Text("Welcome to MazeBuilder Physics");
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Navigation options
+                ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
+                ImGui::Spacing();
+
+                const std::array<std::string, static_cast<std::size_t>(MenuItem::COUNT)> menuItems = {
+                    "Resume", "New Game", "Settings", "Splash screen", "Quit"
+                };
+
+                // Use Selectable with bool* overload so ImGui keeps a consistent toggled state
+                const auto active = static_cast<size_t>(get_context().m_player->is_active());
+                for (std::size_t i{static_cast<std::size_t>(active ? 0 : 1)}; i < menuItems.size(); ++i)
+                {
+                    ImGui::Spacing();
+                }
+
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Display selected menu info
+                ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Selected: ");
+                ImGui::SameLine();
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                ImGui::SameLine();
+            }
+            ImGui::End();
+
+            ImGui::PopStyleColor(10);
+
+            ImGui::PopFont();
         }
 
-        bool update(float dt, unsigned int sub_steps, mazes::randomizer &rng) noexcept override
+        bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
             return true;
         }
 
-        bool handle_event(SDL_Event &event) noexcept override
+        bool handle_event(SDL_Event& event) noexcept override
         {
             if (event.type == SDL_EVENT_KEY_DOWN)
             {
                 if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                 {
+                    request_stack_pop();
                 }
             }
 
             return true;
         }
+
+    private:
+        mutable bool m_exit{false};
     }; // menu_state
 
-    const std::string &INIT_WINDOW_TITLE;
+    const std::string& INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     std::unique_ptr<state_stack> m_crafting_states;
@@ -465,18 +517,20 @@ struct craft::craft_impl
 
     sdl_helper m_sdl;
 
-    mutable double fps_update_timer = 0.0;
-    mutable int smoothed_fps = 0;
-    mutable float smoothed_frame_time = 0.0f;
+    mutable double fps_update_timer{0.0};
+    mutable int smoothed_fps{0};
+    mutable float smoothed_frame_time{0.0f};
 
-    craft_impl(const std::string &title, int w, int h)
+    craft_impl(const std::string& title, const int w, const int h)
         : INIT_WINDOW_TITLE(title), INIT_WINDOW_WIDTH(w), INIT_WINDOW_HEIGHT(h)
     {
         start_SDL();
 
         setup_imgui();
 
-        m_crafting_states = std::make_unique<state_stack>(state::context{m_sdl.window, std::ref(m_fonts), std::ref(m_textures), std::ref(m_player)});
+        m_crafting_states = std::make_unique<state_stack>(state::context{
+            m_sdl.window, std::ref(m_fonts), std::ref(m_textures), std::ref(m_player)
+        });
 
         register_states();
 
@@ -484,7 +538,7 @@ struct craft::craft_impl
         m_crafting_states->push_state(StateIdentifier::EDITOR);
     }
 
-    void register_states() noexcept
+    void register_states() const noexcept
     {
         m_crafting_states->register_state<editor_state>(StateIdentifier::EDITOR);
         m_crafting_states->register_state<loading_state>(StateIdentifier::LOADING);
@@ -493,13 +547,13 @@ struct craft::craft_impl
 
     void start_SDL() noexcept
     {
-        if (m_sdl.initialize(INIT_WINDOW_TITLE.c_str(), INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT))
+        if (m_sdl.initialize(INIT_WINDOW_TITLE, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT))
         {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "SDL initialized successfully.\n");
         }
     }
 
-    void setup_imgui() noexcept
+    void setup_imgui() const noexcept
     {
         // DEAR IMGUI INIT - Setup Dear ImGui context
         IMGUI_CHECKVERSION();
@@ -511,53 +565,56 @@ struct craft::craft_impl
 
         // Setup ImGui Platform/Renderer backends
         ImGui_ImplSDL3_InitForOpenGL(m_sdl.window, m_sdl.gl_context);
-        std::string glsl_version = "";
+
+        std::string glsl_version;
+
 #if defined(__EMSCRIPTEN__)
         glsl_version = "#version 100";
 #else
         glsl_version = "#version 130";
 #endif
+
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
-    void handle_FPS(double &currentTimeStep, const double elapsed) const noexcept
+    void handle_FPS(double& time_step, const double elapsed) const noexcept
     {
-        constexpr double FPS_UPDATE_INTERVAL = 250.0;
         // Calculate instantaneous FPS and frame time
         const auto fps = static_cast<int>(1000.0 / elapsed);
         const auto frame_time = static_cast<float>(elapsed);
 
         // Update smoothed values periodically for display
         fps_update_timer += elapsed;
-        if (fps_update_timer >= FPS_UPDATE_INTERVAL)
+        if (constexpr double FPS_UPDATE_INTERVAL = 250.0; fps_update_timer >= FPS_UPDATE_INTERVAL)
         {
             smoothed_fps = fps;
             smoothed_frame_time = frame_time;
             fps_update_timer = 0.0;
         }
 
-        if (currentTimeStep >= 1000.0)
+        if (time_step >= 1000.0)
         {
             SDL_Log("FPS: %d\n", smoothed_fps);
             SDL_Log("Frame Time: %.3f ms/frame\n", smoothed_frame_time);
 
-            currentTimeStep = 0.0;
+            time_step = 0.0;
         }
 
         // Create ImGui overlay window
         // Set window position to top-right corner
-        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+        ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always,
+                                ImVec2(1.0f, 0.0f));
 
         // Set window background to be semi-transparent
         ImGui::SetNextWindowBgAlpha(0.65f);
 
         // Create window with no title bar, no resize, no move, auto-resize
         ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
-                                       ImGuiWindowFlags_AlwaysAutoResize |
-                                       ImGuiWindowFlags_NoSavedSettings |
-                                       ImGuiWindowFlags_NoFocusOnAppearing |
-                                       ImGuiWindowFlags_NoNav |
-                                       ImGuiWindowFlags_NoMove;
+            ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoSavedSettings |
+            ImGuiWindowFlags_NoFocusOnAppearing |
+            ImGuiWindowFlags_NoNav |
+            ImGuiWindowFlags_NoMove;
 
         if (ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
@@ -567,7 +624,7 @@ struct craft::craft_impl
         }
     }
 
-    void process_input() noexcept
+    void process_input() const noexcept
     {
         SDL_Event event;
 
@@ -587,12 +644,12 @@ struct craft::craft_impl
         }
     }
 
-    void update(float dt, double time_step, mazes::randomizer &rng) noexcept
+    void update(const float delta_time, mazes::randomizer& rng) const noexcept
     {
-        m_crafting_states->update(dt, time_step, std::ref(rng));
+        m_crafting_states->update(delta_time, std::ref(rng));
     }
 
-    void render(double &current_time_step, const double elapsed) const noexcept
+    void render(double& current_time_step, const double elapsed) const noexcept
     {
         ImGui_ImplSDL3_NewFrame();
         ImGui_ImplOpenGL3_NewFrame();
@@ -609,7 +666,7 @@ struct craft::craft_impl
     }
 }; // craft_impl
 
-craft::craft(const std::string &title, const int w, const int h)
+craft::craft(const std::string& title, const int w, const int h)
     : m_impl{std::make_unique<craft_impl>(cref(title), w, h)}
 {
 }
@@ -619,7 +676,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open
  */
-bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rng) const noexcept
+bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
     if (!this->m_impl->m_sdl.window)
     {
@@ -634,7 +691,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
         db_enable();
 
         static constexpr auto DB_FILE = "craft.db";
-        if (db_init(const_cast<char *>(DB_FILE)) != 0)
+        if (db_init(const_cast<char*>(DB_FILE)) != 0)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Database initialization failed\n");
             return false;
@@ -648,7 +705,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
     double time_step = 0.0;
     double accumulator = 0.0;
 
-    this->m_impl->m_crafting_states->update(0.0f, 0, rng);
+    this->m_impl->m_crafting_states->update(0.0f, rng);
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -678,7 +735,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
             time_step += FIXED_TIME_STEP;
             accumulator -= FIXED_TIME_STEP;
 
-            this->m_impl->update(static_cast<float>(FIXED_TIME_STEP), time_step, rng);
+            this->m_impl->update(FIXED_TIME_STEP, rng);
         }
 
         this->m_impl->render(time_step, elapsed);

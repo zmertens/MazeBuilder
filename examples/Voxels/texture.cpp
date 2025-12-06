@@ -89,8 +89,6 @@ bool texture::load_from_file(std::string_view filepath, std::uint32_t channel_of
                  GL_UNSIGNED_BYTE, data);
     stbi_image_free(data);
 
-    SDL_Log("Texture loaded successfully: %dx%d from %s", width, height, filepath.data());
-
     return true;
 }
 
@@ -100,6 +98,7 @@ bool texture::load_bmp_icon(SDL_Window *window, std::string_view filepath) noexc
     {
         SDL_SetWindowIcon(window, bmp_surface);
         SDL_DestroySurface(bmp_surface);
+
         return true;
     }
 

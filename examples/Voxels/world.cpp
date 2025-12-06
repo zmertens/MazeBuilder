@@ -16,9 +16,9 @@
 
 #include <SDL3/SDL.h>
 
-std::string _check_for_gl_err(const char* file, int line) noexcept {
+std::string gl_error_checker(const char* file, const int line) noexcept {
     GLenum error_code;
-    std::string error_str = "";
+    std::string error_str;
     while ((error_code = glGetError()) != GL_NO_ERROR) {
         switch (error_code) {
         case GL_INVALID_ENUM: error_str += "INVALID_ENUM";
@@ -26,6 +26,7 @@ std::string _check_for_gl_err(const char* file, int line) noexcept {
         case GL_INVALID_OPERATION: error_str += "INVALID_OPERATION";
         case GL_OUT_OF_MEMORY: error_str += "OUT_OF_MEMORY";
         case GL_INVALID_FRAMEBUFFER_OPERATION: error_str += "INVALID_FRAMEBUFFER_OPERATION";
+        default: ;
         }
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
             "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error_str.c_str(), file, line);
@@ -44,7 +45,42 @@ world::world(SDL_Window* window, font_manager& fonts, texture_manager& textures)
 {
 }
 
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) const noexcept {
+void world::init() noexcept
+{
+
+}
+
+void world::update(float delta_time, mazes::randomizer& rng) noexcept
+{
+
+}
+
+void world::draw() const noexcept
+{
+
+}
+
+command_queue& world::get_command_queue() noexcept
+{
+    return m_command_queue;
+}
+
+void world::destroy_world()
+{
+
+}
+
+void world::handle_event(SDL_Event& event)
+{
+
+}
+
+void set_player(player* player)
+{
+
+}
+
+void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) noexcept {
 
     int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++) {
@@ -80,11 +116,11 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
             //    continue;
             //}
 
-            // sand and grass terrain            
+            // sand and grass terrain
             for (int y = 0; y < PLANT_HEIGHT_MAX; y++) {
                 func(x, y, z, w * flag, m);
             }
-            
+
             if (w == 1) {
                 // grass
                 if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6) {
