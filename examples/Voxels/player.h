@@ -51,6 +51,9 @@ public:
 
     void set_active(bool active) noexcept;
 
+    [[nodiscard]] std::uint32_t get_buffer() const noexcept;
+    void set_buffer(std::uint32_t value) noexcept;
+
 private:
     void initialize_actions();
 

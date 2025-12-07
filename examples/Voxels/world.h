@@ -255,9 +255,10 @@ private:
     int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) const noexcept;
 
     [[nodiscard]] int highest_block(float x, float z) const noexcept;
-    static int _hit_test(Map* map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept;
-    int hit_test(int previous, float x, float y, float z, float rx, float ry, int* bx, int* by, int* bz) noexcept;
-    int hit_test_face(player* _player, int* x, int* y, int* z, int* face) noexcept;
+    static int _hit_test(const Map* map, float max_distance, int previous,
+        float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept;
+    int hit_test(int previous, float x, float y, float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept;
+    int hit_test_face(player* _player, int* x, int* y, int* z, int* face) const noexcept;
     int collide(int height, float* x, float* y, float* z) const noexcept;
     [[nodiscard]] int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const noexcept;
 
@@ -278,9 +279,9 @@ private:
 
     static void map_set_func(int x, int y, int z, int w, Map* m) noexcept;
 
-    void load_chunk(WorkerItem* item) noexcept;
-    void init_chunk(Chunk* chunk, int p, int q) noexcept;
-    void create_chunk(Chunk* chunk, int p, int q) noexcept;
+    void load_chunk(WorkerItem* item) const noexcept;
+    void init_chunk(Chunk* chunk, int p, int q) const noexcept;
+    void create_chunk(Chunk* chunk, int p, int q) const noexcept;
     void delete_chunks() noexcept;
     void delete_all_chunks() noexcept;
     void force_chunks(player* player) noexcept;
@@ -302,14 +303,14 @@ private:
     int get_block(int x, int y, int z) noexcept;
     void builder_block(int x, int y, int z, int w) noexcept;
 
-    int render_chunks(Attrib* attrib, player* _player, std::uint32_t texture) noexcept;
-    void render_signs(Attrib* attrib, player* _player, std::uint32_t sign) noexcept;
-    void render_sign(Attrib* attrib, player* _player, std::uint32_t sign) noexcept;
-    void render_players(Attrib* attrib, player* _player) noexcept;
-    void render_wireframe(Attrib* attrib, player* _player) noexcept;
-    void render_crosshairs(Attrib* attrib) noexcept;
-    void render_item(Attrib* attrib, std::uint32_t texture) noexcept;
-    void render_text(Attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) noexcept;
+    int render_chunks(const Attrib* attrib, player* _player, std::uint32_t texture) const noexcept;
+    void render_signs(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
+    void render_sign(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
+    void render_players(const Attrib* attrib, player* _player) const noexcept;
+    void render_wireframe(const Attrib* attrib, player* _player) const noexcept;
+    void render_crosshairs(const Attrib* attrib) const noexcept;
+    void render_item(const Attrib* attrib, std::uint32_t texture) const noexcept;
+    void render_text(const Attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
 
     void on_light() noexcept;
     void on_left_click() noexcept;

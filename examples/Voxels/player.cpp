@@ -95,6 +95,15 @@ void player::set_active(bool active) noexcept
     m_is_active = active;
 }
 
+std::uint32_t player::get_buffer() const noexcept
+{
+    return this->m_buffer;
+}
+void player::set_buffer(std::uint32_t value) noexcept
+{
+    this->m_buffer = value;
+}
+
 void player::initialize_actions()
 {
     static constexpr auto playerSpeed = 200.f;

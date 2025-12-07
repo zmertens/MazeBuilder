@@ -12,6 +12,8 @@
 #include "player.h"
 #include "texture.h"
 #include "resource_identifiers.h"
+#include "sdl_helper.h"
+#include "shader.h"
 #include "sign.h"
 
 #if defined(__EMSCRIPTEN__)
@@ -61,17 +63,66 @@ world::~world()
 void world::init() noexcept
 {
     init_worker_threads();
+
+    m_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
+    m_block_attrib.position = 0;
+    m_block_attrib.normal = 1;
+    m_block_attrib.uv = 2;
+    m_block_attrib.matrix = glGetUniformLocation(m_block_attrib.program, "matrix");
+    m_block_attrib.sampler = glGetUniformLocation(m_block_attrib.program, "sampler");
+    m_block_attrib.extra1 = glGetUniformLocation(m_block_attrib.program, "sky_sampler");
+    m_block_attrib.extra2 = glGetUniformLocation(m_block_attrib.program, "daylight");
+    m_block_attrib.extra3 = glGetUniformLocation(m_block_attrib.program, "fog_distance");
+    m_block_attrib.extra4 = glGetUniformLocation(m_block_attrib.program, "is_ortho");
+    m_block_attrib.camera = glGetUniformLocation(m_block_attrib.program, "camera");
+    m_block_attrib.timer = glGetUniformLocation(m_block_attrib.program, "timer");
+
+    m_line_attrib.program = m_shaders.get(ShaderIdentifier::LINE_SHADER).get();
+    m_line_attrib.position = 0;
+    m_line_attrib.matrix = glGetUniformLocation(m_line_attrib.program, "matrix");
+
+    m_text_attrib.program = m_shaders.get(ShaderIdentifier::TEXT_SHADER).get();
+    m_text_attrib.position = 0;
+    m_text_attrib.uv = 1;
+    m_text_attrib.matrix = glGetUniformLocation(m_text_attrib.program, "matrix");
+    m_text_attrib.sampler = glGetUniformLocation(m_text_attrib.program, "sampler");
+    m_text_attrib.extra1 = glGetUniformLocation(m_text_attrib.program, "is_sign");
 }
 
 void world::update(float delta_time, mazes::randomizer& rng) noexcept
 {
+    auto get_scale_factor = [this]() noexcept -> int {
+        int window_width, window_height;
+        int buffer_width, buffer_height;
+        SDL_GetWindowSize(this->m_window, &window_width, &window_height);
+        SDL_GetWindowSizeInPixels(this->m_window, &buffer_width, &buffer_height);
+        return buffer_width / window_width;
+    };
 
+    m_model.scale = get_scale_factor();
+    delete_chunks();
+    del_buffer(m_player->get_buffer());
+    ensure_chunks(m_player);
 }
 
 void world::draw() const noexcept
 {
+    CHECK_GL_ERR();
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+    auto triangle_faces = render_chunks(&m_block_attrib, m_player, m_block_attrib.program);
+
+    render_item(&m_block_attrib, m_block_attrib.program);
+
+    render_signs(&m_text_attrib, m_player, m_text_attrib.program);
+    render_sign(&m_text_attrib, m_player, m_text_attrib.program);
+
+    render_wireframe(&m_line_attrib, m_player);
+
+    render_crosshairs(&m_line_attrib);
+
 }
 
 command_queue& world::get_command_queue() noexcept
@@ -600,7 +651,8 @@ const world::Player* world::find_player(const int id) const noexcept {
         return result;
     }
 
-    int world::_hit_test(Map* map, float max_distance, int previous, float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept {
+    int world::_hit_test(const Map* map, const float max_distance, const int previous,
+        float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept {
         static constexpr int m = 32;
         int px = 0;
         int py = 0;
@@ -626,7 +678,8 @@ const world::Player* world::find_player(const int id) const noexcept {
         return 0;
     } // _hit_test
 
-    int world::hit_test(const int previous, const float x, const float y, float z, float rx, float ry, int* bx, int* by, int* bz) noexcept {
+    int world::hit_test(const int previous, const float x, const float y,
+        float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept {
         int result = 0;
         float best = 0;
         const int p = chunked(x);
@@ -636,7 +689,7 @@ const world::Player* world::find_player(const int id) const noexcept {
         compute_sight_vector(rx, ry, &vx, &vy, &vz);
 
         for (int i = 0; i < m_model.chunk_count; i++) {
-            Chunk* chunk = m_model.chunks + i;
+            const Chunk* chunk = m_model.chunks + i;
             if (chunk_distance(chunk, p, q) > 1) {
                 continue;
             }
@@ -654,7 +707,7 @@ const world::Player* world::find_player(const int id) const noexcept {
         return result;
     } // hit_test
 
-    int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) noexcept {
+    int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) const noexcept {
         const player::state* s = &_player->s1;
         // item.h -> is_obstacle
         if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z); is_obstacle(w)) {
@@ -1245,7 +1298,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
 
     // Create a chunk that represents a unique portion of the world
     // p, q represents the chunk key
-    void world::load_chunk(WorkerItem* item) noexcept {
+    void world::load_chunk(WorkerItem* item) const noexcept {
         int p = item->p;
         int q = item->q;
 
@@ -1257,7 +1310,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         db_load_lights(light_map, p, q);
     }
 
-    void world::init_chunk(Chunk* chunk, int p, int q) noexcept {
+    void world::init_chunk(Chunk* chunk, int p, int q) const noexcept {
         chunk->p = p;
         chunk->q = q;
         chunk->faces = 0;
@@ -1277,7 +1330,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         map_alloc(light_map, dx, dy, dz, 0xf);
     }
 
-    void world::create_chunk(Chunk* chunk, int p, int q) noexcept {
+    void world::create_chunk(Chunk* chunk, int p, int q) const noexcept {
         init_chunk(chunk, p, q);
 
         WorkerItem _item;
@@ -1292,7 +1345,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
 
     void world::delete_chunks() noexcept {
         int count = this->m_model.chunk_count;
-        State* s1 = &this->m_model.player.state;
+        const player::state* s1 = &m_player->s1;
         for (int i = 0; i < count; i++) {
             Chunk* chunk = this->m_model.chunks + i;
             int remove_chunk = 1;
@@ -1653,10 +1706,10 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         }
     }
 
-    int world::render_chunks(Attrib* attrib, player* _player, std::uint32_t texture) noexcept {
+    int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t texture) const noexcept {
         int result = 0;
         player::state* s = &_player->s1;
-        ensure_chunks(_player);
+        // ensure_chunks(_player);
         int p = this->chunked(s->x);
         int q = this->chunked(s->z);
         float light = this->get_daylight();
@@ -1679,11 +1732,11 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         glUniform1f(attrib->timer, this->time_of_day());
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         for (int i = 0; i < this->m_model.chunk_count; i++) {
-            Chunk* chunk = this->m_model.chunks + i;
-            if (this->chunk_distance(chunk, p, q) > this->m_model.render_radius) {
+            const Chunk* chunk = this->m_model.chunks + i;
+            if (chunk_distance(chunk, p, q) > this->m_model.render_radius) {
                 continue;
             }
-            if (!this->chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy)) {
+            if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy)) {
                 continue;
             }
             this->draw_chunk(attrib, chunk);
@@ -1692,7 +1745,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         return result;
     }
 
-    void world::render_signs(Attrib* attrib, player* _player, std::uint32_t sign) noexcept {
+    void world::render_signs(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept {
         player::state* s = &_player->s1;
         int p = chunked(s->x);
         int q = chunked(s->z);
@@ -1711,7 +1764,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         glUniform1i(attrib->extra1, 1);
 
         for (int i = 0; i < this->m_model.chunk_count; i++) {
-            Chunk* chunk = this->m_model.chunks + i;
+            const Chunk* chunk = this->m_model.chunks + i;
             if (chunk_distance(chunk, p, q) > this->m_model.sign_radius) {
                 continue;
             }
@@ -1724,7 +1777,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         }
     }
 
-    void world::render_sign(Attrib* attrib, player* _player, const std::uint32_t sign) noexcept {
+    void world::render_sign(const Attrib* attrib, player* _player, const std::uint32_t sign) const noexcept {
         int x, y, z, face;
         if (!hit_test_face(_player, &x, &y, &z, &face)) {
             return;
@@ -1751,7 +1804,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         del_buffer(buffer);
     }
 
-    void world::render_players(Attrib* attrib, player* _player) noexcept {
+    void world::render_players(const Attrib* attrib, player* _player) const noexcept {
         player::state* s = &_player->s1;
         float matrix[16];
         set_matrix_3d(
@@ -1763,19 +1816,19 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         glUniform1i(attrib->sampler, 0);
         glUniform1f(attrib->timer, time_of_day());
         for (int i = 0; i < this->m_model.player_count; i++) {
-            Player* other = &this->m_model.player;
+            const Player* other = &this->m_model.player;
             draw_player(attrib, other);
         }
     }
 
-    void world::render_wireframe(Attrib* attrib, player* _player) noexcept {
+    void world::render_wireframe(const Attrib* attrib, player* _player) const noexcept {
         player::state* s = &_player->s1;
         float matrix[16];
         set_matrix_3d(
             matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
             s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho), this->m_model.render_radius);
         int hx, hy, hz;
-        int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         if (is_obstacle(hw)) {
             glUseProgram(attrib->program);
             glLineWidth(1);
@@ -1786,7 +1839,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         }
     }
 
-    void world::render_crosshairs(Attrib* attrib) noexcept {
+    void world::render_crosshairs(const Attrib* attrib) const noexcept {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h);
         glUseProgram(attrib->program);
@@ -1797,7 +1850,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         del_buffer(crosshair_buffer);
     }
 
-    void world::render_item(Attrib* attrib, std::uint32_t texture) noexcept {
+    void world::render_item(const Attrib* attrib, std::uint32_t texture) const noexcept {
         float matrix[16];
         set_matrix_item(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h, this->m_model.scale);
         glUseProgram(attrib->program);
@@ -1819,7 +1872,8 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         }
     }
 
-    void world::render_text(Attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) noexcept {
+    void world::render_text(const Attrib* attrib, std::uint32_t font,
+        int justify, float x, float y, float n, std::string_view text) const noexcept {
         float matrix[16];
         set_matrix_2d(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h);
         glUseProgram(attrib->program);
