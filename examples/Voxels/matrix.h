@@ -1,6 +1,14 @@
 #ifndef _matrix_h_
 #define _matrix_h_
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define DEGREES(radians) ((radians) * 180 / M_PI)
+#define RADIANS(degrees) ((degrees) * M_PI / 180)
+#define SIGN(x) (((x) > 0) - ((x) < 0))
+
 void normalize(float *x, float *y, float *z);
 void mat_identity(float *matrix);
 void mat_translate(float *matrix, float dx, float dy, float dz);

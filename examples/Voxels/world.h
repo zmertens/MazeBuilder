@@ -51,14 +51,6 @@
 #define WORKER_BUSY 1
 #define WORKER_DONE 2
 
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
-
-#define DEGREES(radians) ((radians) * 180 / M_PI)
-#define RADIANS(degrees) ((degrees) * M_PI / 180)
-#define SIGN(x) (((x) > 0) - ((x) < 0))
-
 union SDL_Event;
 
 std::string gl_error_checker(const char* file, int line) noexcept;

@@ -112,6 +112,9 @@ void world::init() noexcept
     // Set player Y position to proper height above terrain
     m_player->s1.y = static_cast<float>(highest_block(m_player->s1.x, m_player->s1.z) + 2);
 
+    SDL_Log("World initialized: Player starting position (%.2f, %.2f, %.2f), rotation (%.2f, %.2f)",
+            m_player->s1.x, m_player->s1.y, m_player->s1.z, m_player->s1.rx, m_player->s1.ry);
+
     m_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     m_block_attrib.position = 0;
     m_block_attrib.normal = 1;
@@ -149,6 +152,10 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     };
 
     m_model.scale = get_scale_factor();
+
+    // Update window dimensions to ensure accurate viewport and projection matrix
+    SDL_GetWindowSizeInPixels(m_window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
+
     delete_chunks();
     del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
@@ -158,13 +165,48 @@ void world::draw() const noexcept
 {
     CHECK_GL_ERR();
 
+    // Set viewport to match window dimensions
+    int viewport_width, viewport_height;
+    SDL_GetWindowSizeInPixels(m_window, &viewport_width, &viewport_height);
+    glViewport(0, 0, viewport_width, viewport_height);
+
+    // Verify OpenGL state
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+
+    glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Sky blue for better visibility
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Get texture IDs from texture manager
     auto atlas_texture = m_textures.get(TextureIdentifier::ATLAS).get();
     auto signs_texture = m_textures.get(TextureIdentifier::SIGNS).get();
 
+    // Debug: Verify textures are loaded
+    static bool texture_logged = false;
+    if (!texture_logged) {
+        SDL_Log("Atlas texture ID: %u", atlas_texture);
+        SDL_Log("Signs texture ID: %u", signs_texture);
+        if (atlas_texture == 0) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Atlas texture not loaded!");
+        }
+        if (signs_texture == 0) {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Signs texture not loaded!");
+        }
+        texture_logged = true;
+    }
+
     auto triangle_faces = render_chunks(&m_block_attrib, m_player, atlas_texture);
+
+    // Debug logging (can be commented out after testing)
+    static int frame_count = 0;
+    if (frame_count++ % 60 == 0) {
+        SDL_Log("Frame %d: Rendered %d triangle faces, player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f)",
+                frame_count, triangle_faces,
+                m_player->s1.x, m_player->s1.y, m_player->s1.z,
+                m_player->s1.rx, m_player->s1.ry);
+    }
 
     render_item(&m_block_attrib, atlas_texture);
 
@@ -2102,6 +2144,15 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
         matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
         s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
         this->m_model.render_radius);
+
+    // Debug: Log matrix and view parameters periodically
+    static int render_frame = 0;
+    if (render_frame++ % 120 == 0) {
+        SDL_Log("render_chunks: viewport=%dx%d, pos=(%.2f,%.2f,%.2f), rot=(%.2f,%.2f), fov=%.1f, chunks=%d",
+                this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
+                s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, this->m_model.chunk_count);
+    }
+
     float planes[6][4];
     // matrix.cpp -> frustum_planes
     frustum_planes(planes, this->m_model.render_radius, matrix);
@@ -2115,20 +2166,35 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
     glUniform1i(attrib->extra4, static_cast<int>(this->m_model.is_ortho));
     glUniform1f(attrib->timer, this->time_of_day());
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+
+    int chunks_rendered = 0;
+    int chunks_culled_distance = 0;
+    int chunks_culled_frustum = 0;
+
     for (int i = 0; i < this->m_model.chunk_count; i++)
     {
         const Chunk* chunk = this->m_model.chunks + i;
         if (chunk_distance(chunk, p, q) > this->m_model.render_radius)
         {
+            chunks_culled_distance++;
             continue;
         }
         if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
         {
+            chunks_culled_frustum++;
             continue;
         }
         this->draw_chunk(attrib, chunk);
         result += chunk->faces;
+        chunks_rendered++;
     }
+
+    // Debug: Log culling statistics
+    if (render_frame % 120 == 0) {
+        SDL_Log("Chunk stats: total=%d, rendered=%d, culled_distance=%d, culled_frustum=%d",
+                this->m_model.chunk_count, chunks_rendered, chunks_culled_distance, chunks_culled_frustum);
+    }
+
     return result;
 }
 

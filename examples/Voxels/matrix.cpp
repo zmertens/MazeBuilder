@@ -219,6 +219,12 @@ void set_matrix_3d(
     float aspect = (float)width / height;
     float znear = 0.125;
     float zfar = radius * 32 + 64;
+
+    // Debug: Log matrix parameters periodically
+    static int matrix_call_count = 0;
+    if (matrix_call_count++ % 120 == 0) {
+    }
+
     mat_identity(a);
     mat_translate(b, -x, -y, -z);
     mat_multiply(a, b, a);
