@@ -51,7 +51,8 @@ world::world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, t
     //   , mSceneLayers{}
       , m_command_queue{}
       , m_player{nullptr}
-, m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
+      , m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
+      , m_model{} // Initialize m_model to zero-initialize all members
 {
 }
 
@@ -62,7 +63,41 @@ world::~world()
 
 void world::init() noexcept
 {
+    // Initialize model fields to ensure proper state
+    m_model.chunk_count = 0;
+    m_model.create_radius = CREATE_CHUNK_RADIUS;
+    m_model.render_radius = RENDER_CHUNK_RADIUS;
+    m_model.delete_radius = DELETE_CHUNK_RADIUS;
+    m_model.sign_radius = RENDER_SIGN_RADIUS;
+    m_model.flying = false;
+    m_model.item_index = 0;
+    m_model.is_ortho = false;
+    m_model.fov = 65.0f;
+    m_model.day_length = DAY_LENGTH;
+
+    // Initialize all chunks to have null/zero state
+    for (auto& chunk : m_model.chunks) {
+        chunk.map.data = nullptr;
+        chunk.map.size = 0;
+        chunk.lights.data = nullptr;
+        chunk.lights.size = 0;
+        chunk.signs.data = nullptr;
+        chunk.signs.size = 0;
+        chunk.signs.capacity = 0;
+        chunk.buffer = 0;
+        chunk.sign_buffer = 0;
+    }
+
     init_worker_threads();
+
+    // Initialize player to prevent nullptr dereference
+    m_player = new player();
+    m_player->s1.x = 0.0f;
+    m_player->s1.y = 0.0f;
+    m_player->s1.z = 0.0f;
+    m_player->s1.rx = 0.0f;
+    m_player->s1.ry = 0.0f;
+    m_player->s1.t = 0.0f;
 
     m_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     m_block_attrib.position = 0;
@@ -136,6 +171,12 @@ void world::destroy_world()
     cleanup_worker_threads();
     delete_all_chunks();
     delete_all_players();
+
+    // Cleanup player
+    if (m_player != nullptr) {
+        delete m_player;
+        m_player = nullptr;
+    }
 
     // DO NOT clear m_fonts or m_textures - they are references to shared managers
     // owned by craft_impl and will be cleaned up by craft_impl
@@ -270,8 +311,9 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
             auto worker = std::make_unique<Worker>();
             worker->index = i;
             worker->state = WORKER_IDLE;
-            worker->thrd = std::thread([this](void* arg) { this->worker_run(arg); }, worker.get());
             this->m_model.workers.emplace_back(std::move(worker));
+            Worker* worker_ptr = this->m_model.workers.back().get();
+            worker_ptr->thrd = std::thread([this, worker_ptr]() { this->worker_run(worker_ptr); });
         }
     }
 
@@ -873,7 +915,7 @@ const world::Player* world::find_player(const int id) const noexcept {
                     strncat(output, "\n", max_length - strlen(output) - 1);
                     line = tokenize(NULL, "\r\n", &key1);
                 }
-                free(str);
+                SDL_free(str);
                 return line_number;
             };
 
@@ -1318,7 +1360,7 @@ void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept {
         chunk->buffer = 0;
         chunk->sign_buffer = 0;
         dirty_chunk(chunk);
-        SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
+        auto* signs = &chunk->signs;
         sign_list_alloc(signs, 16);
         db_load_signs(signs, p, q);
         Map* block_map = &chunk->map;
