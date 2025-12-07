@@ -14,6 +14,7 @@ set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sdl_helper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)

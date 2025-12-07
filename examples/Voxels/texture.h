@@ -5,7 +5,7 @@
 
 struct SDL_Window;
 
-/// @file texture.hpp
+/// @file texture.h
 /// @brief texture class for SDL3/OpenGL
 /// @details This class wraps OpenGL texture requirements
 class texture

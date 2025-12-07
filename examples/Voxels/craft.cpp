@@ -35,6 +35,7 @@
 #include "player.h"
 #include "resource_identifiers.h"
 #include "sdl_helper.h"
+#include "shader.h"
 #include "texture.h"
 #include "world.h"
 
@@ -85,13 +86,15 @@ struct craft::craft_impl
 
         struct context
         {
-            explicit context(SDL_Window* window, font_manager& fonts, texture_manager& textures, player& p)
-                : m_window{window}, m_fonts{&fonts}, m_textures{&textures}, m_player{&p}
+            explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
+                , texture_manager& textures, player& p)
+                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}
             {
             }
 
             SDL_Window* m_window;
             font_manager* m_fonts;
+            shader_manager* m_shaders;
             texture_manager* m_textures;
             player* m_player;
         };
@@ -323,9 +326,7 @@ struct craft::craft_impl
             }
             else
             {
-                // Show "Initializing World..." message while waiting for resources (uses default font)
-                // This screen is only visible for one frame after loading completes
-                ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+                const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
                 ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
                 ImGui::SetNextWindowSize(ImVec2(350, 150), ImGuiCond_Always);
 
@@ -338,8 +339,8 @@ struct craft::craft_impl
                                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
                 {
                     ImGui::Spacing();
-                    const char* init_text = "Initializing World...";
-                    float text_width = ImGui::CalcTextSize(init_text).x;
+                    const auto init_text = "Initializing World...";
+                    const float text_width = ImGui::CalcTextSize(init_text).x;
                     ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
                     ImGui::Text("%s", init_text);
 
@@ -361,7 +362,8 @@ struct craft::craft_impl
                 {
                     if (loading->is_finished())
                     {
-                        m_world.emplace(get_context().m_window, *get_context().m_fonts, *get_context().m_textures);
+                        m_world.emplace(get_context().m_window, *get_context().m_fonts,
+                            *get_context().m_shaders,*get_context().m_textures);
 
                         m_world.value().init();
 
@@ -374,7 +376,8 @@ struct craft::craft_impl
                 // Loading state might already be popped, initialize if it's not in the stack
                 else
                 {
-                    m_world.emplace(get_context().m_window, *get_context().m_fonts, *get_context().m_textures);
+                    m_world.emplace(get_context().m_window, *get_context().m_fonts,
+                        *get_context().m_shaders, *get_context().m_textures);
 
                     // Enable mouse capture for editor
                     SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
@@ -448,6 +451,7 @@ struct craft::craft_impl
     {
         void load_resources() const noexcept
         {
+            // fonts
             static constexpr auto FONT_PIXEL_SIZE = 28.f;
 
             auto&& fonts = get_context().m_fonts;
@@ -459,6 +463,40 @@ struct craft::craft_impl
             fonts->load(FontIdentifier::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size,
                         FONT_PIXEL_SIZE);
 
+            // shaders
+            std::pair<std::string, std::string> shader_programs{};
+#if defined(__EMSCRIPTEN__)
+            shader_programs.first = "shaders/es/block_vertex.es.glsl";
+            shader_programs.second = "shaders/es/block_fragment.es.glsl";
+#else
+            shader_programs.first = "shaders/block_vertex.glsl";
+            shader_programs.second = "shaders/block_fragment.glsl";
+#endif
+
+            auto&& shaders = get_context().m_shaders;
+            shaders->load(ShaderIdentifier::BLOCK_SHADER, shader_programs.first, shader_programs.second);
+
+#if defined(__EMSCRIPTEN__)
+            shader_programs.first = "shaders/es/line_vertex.es.glsl";
+            shader_programs.second = "shaders/es/line_fragment.es.glsl";
+#else
+            shader_programs.first = "shaders/line_vertex.glsl";
+            shader_programs.second = "shaders/line_fragment.glsl";
+#endif
+
+            shaders->load(ShaderIdentifier::LINE_SHADER, shader_programs.first, shader_programs.second);
+
+#if defined(__EMSCRIPTEN__)
+            shader_programs.first = "shaders/es/text_vertex.es.glsl";
+            shader_programs.second = "shaders/es/text_fragment.es.glsl";
+#else
+            shader_programs.first = "shaders/text_vertex.glsl";
+            shader_programs.second = "shaders/text_fragment.glsl";
+#endif
+
+            shaders->load(ShaderIdentifier::TEXT_SHADER, shader_programs.first, shader_programs.second);
+
+            // textures
             constexpr std::string_view atlas_path = "textures/atlas.png";
             constexpr std::string_view bitmap_font_path = "textures/bitmap_font.png";
             constexpr std::string_view window_icon_path = "textures/icon.bmp";
@@ -690,6 +728,7 @@ struct craft::craft_impl
     std::unique_ptr<state_stack> m_crafting_states;
 
     font_manager m_fonts;
+    shader_manager m_shaders;
     texture_manager m_textures;
 
     player m_player;
@@ -708,7 +747,7 @@ struct craft::craft_impl
         setup_imgui();
 
         m_crafting_states = std::make_unique<state_stack>(state::context{
-            m_sdl.window, std::ref(m_fonts), std::ref(m_textures), std::ref(m_player)
+            m_sdl.window, std::ref(m_fonts), std::ref(m_shaders), std::ref(m_textures), std::ref(m_player)
         });
 
         register_states();

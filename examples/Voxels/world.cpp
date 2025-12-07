@@ -40,14 +40,16 @@ std::string gl_error_checker(const char* file, const int line) noexcept {
     return error_code == GL_NO_ERROR ? "" : error_str;
 }
 
-world::world(SDL_Window* window, font_manager& fonts, texture_manager& textures)
+world::world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, texture_manager& textures)
     : m_window{window}
       , m_fonts{fonts}
+      , m_shaders{shaders}
       , m_textures{textures}
     //   , mSceneGraph{}
     //   , mSceneLayers{}
       , m_command_queue{}
       , m_player{nullptr}
+, m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
 {
 }
 

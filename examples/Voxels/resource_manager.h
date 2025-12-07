@@ -21,6 +21,8 @@ public:
 
     void load(Identifier id, std::string_view filename, std::uint32_t channel_offset = 0);
 
+    void load(Identifier id, std::string_view v, std::string_view f);
+
     template <typename Parameter1, typename Parameter2, typename PixelSize = float>
     void load(Identifier id, const Parameter1& param1, const Parameter2& param2, const PixelSize& pixelSize);
 
@@ -63,6 +65,21 @@ void resource_manager<Resource, Identifier>::load(Identifier id, std::string_vie
     if (!resource->load_from_file(filename, channel_offset))
     {
         throw std::runtime_error("resource_manager::load - Failed to load " + std::string(filename));
+    }
+
+    // If loading successful, insert resource to map
+    insert_resource(id, std::move(resource));
+}
+
+template <typename Resource, typename Identifier>
+void resource_manager<Resource, Identifier>::load(Identifier id, std::string_view v, std::string_view f)
+{
+    // Create and load resource
+    auto resource = std::make_unique<Resource>();
+
+    if (!resource->load_program(v, f))
+    {
+        throw std::runtime_error("resource_manager::load - Failed to load " + std::string(v) + " and " + std::string(f));
     }
 
     // If loading successful, insert resource to map

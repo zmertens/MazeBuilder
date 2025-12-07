@@ -77,7 +77,7 @@ namespace mazes {
 
 class world final {
 public:
-    explicit world(SDL_Window* window, font_manager& fonts, texture_manager& textures);
+    explicit world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, texture_manager& textures);
 
     ~world();
 
@@ -331,12 +331,18 @@ private:
     SDL_Window* m_window;
 
     font_manager& m_fonts;
+    shader_manager& m_shaders;
     texture_manager& m_textures;
     // SceneNode mSceneGraph;
     // std::array<SceneNode*, static_cast<std::size_t>(Layer::LAYER_COUNT)> mSceneLayers;
 
     command_queue m_command_queue;
     player* m_player;
+
+    Attrib m_block_attrib;
+    Attrib m_line_attrib;
+    Attrib m_text_attrib;
+    Attrib m_sky_attrib;
 
     Model m_model;
 };
