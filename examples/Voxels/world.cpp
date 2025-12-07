@@ -45,7 +45,10 @@ std::string gl_error_checker(const char* file, const int line) noexcept
     return error_code == GL_NO_ERROR ? "" : error_str;
 }
 
-world::world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, texture_manager& textures)
+world::world(SDL_Window* window, font_manager& fonts,
+        player* p,
+        shader_manager& shaders,
+        texture_manager& textures)
     : m_window{window}
       , m_fonts{fonts}
       , m_shaders{shaders}
@@ -53,7 +56,7 @@ world::world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, t
       //   , mSceneGraph{}
       //   , mSceneLayers{}
       , m_command_queue{}
-      , m_player{nullptr}
+      , m_player{p}
       , m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
       , m_model{} // Initialize m_model to zero-initialize all members
 {
@@ -102,15 +105,6 @@ void world::init() noexcept
     }
 
     init_worker_threads();
-
-    // Initialize player to prevent nullptr dereference
-    m_player = new player();
-    m_player->s1.x = 0.0f;
-    m_player->s1.y = 0.0f; // Will be set after force_chunks
-    m_player->s1.z = 0.0f;
-    m_player->s1.rx = 0.0f;
-    m_player->s1.ry = 0.0f;
-    m_player->s1.t = 0.0f;
 
     // Force create initial chunks around player
     force_chunks(m_player);
@@ -193,16 +187,6 @@ void world::destroy_world()
     cleanup_worker_threads();
     delete_all_chunks();
     delete_all_players();
-
-    // Cleanup player
-    if (m_player != nullptr)
-    {
-        delete m_player;
-        m_player = nullptr;
-    }
-
-    // DO NOT clear m_fonts or m_textures - they are references to shared managers
-    // owned by craft_impl and will be cleaned up by craft_impl
 }
 
 void world::handle_event(SDL_Event& event) noexcept
@@ -691,18 +675,18 @@ void world::draw_plant(const Attrib* attrib, const std::uint32_t buffer) const n
     draw_item(attrib, buffer, 24);
 }
 
-void world::draw_player(const Attrib* attrib, const Player* _player) const noexcept
+void world::draw_player(const Attrib* attrib, const player* _player) const noexcept
 {
-    // draw_cube(attrib, _player->buffer);
+    draw_cube(attrib, _player->get_buffer());
 }
 
-const world::Player* world::find_player(const int id) const noexcept
+const player* world::find_player(const int id) const noexcept
 {
     for (int i = 0; i < this->m_model.player_count; i++)
     {
-        if (auto* p = &m_model.player; p->id == id)
+        if (auto* p = &m_player; m_player->is_active())
         {
-            return p;
+            return *p;
         }
     }
     return nullptr;
@@ -712,8 +696,7 @@ void world::delete_all_players() noexcept
 {
     for (int i = 0; i < m_model.player_count; i++)
     {
-        const auto* player = &m_model.player;
-        this->del_buffer(player->buffer);
+        this->del_buffer(m_player->get_buffer());
     }
     m_model.player_count = 0;
 }
@@ -1069,7 +1052,7 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
         while (line)
         {
             int line_width = 0;
-            char* token = tokenize(line, " ", &key2);
+            const char* token = tokenize(line, " ", &key2);
             while (token)
             {
                 int token_width = string_width(token);
@@ -2231,7 +2214,7 @@ void world::render_players(const Attrib* attrib, player* _player) const noexcept
     glUniform1f(attrib->timer, time_of_day());
     for (int i = 0; i < this->m_model.player_count; i++)
     {
-        const Player* other = &this->m_model.player;
+        const player* other = m_player;
         draw_player(attrib, other);
     }
 }
@@ -2316,10 +2299,10 @@ void world::render_text(const Attrib* attrib, std::uint32_t font,
 
 void world::on_light() noexcept
 {
-    State* s = &this->m_model.player.state;
+    player::state* s = &this->m_player->s1;
     int hx, hy, hz;
-    int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    if (hy > 0 && hy < 256 && is_destructable(hw))
+    if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && is_destructable(hw))
     {
         toggle_light(hx, hy, hz);
     }
@@ -2327,10 +2310,10 @@ void world::on_light() noexcept
 
 void world::on_left_click() noexcept
 {
-    State* s = &this->m_model.player.state;
+    const player::state* s = &this->m_player->s1;
     int hx, hy, hz;
-    int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    if (hy > 0 && hy < 256 && is_destructable(hw))
+    if (const auto hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && is_destructable(hw))
     {
         set_block(hx, hy, hz, 0);
         record_block(hx, hy, hz, 0);
@@ -2346,7 +2329,7 @@ void world::on_left_click() noexcept
 
 void world::on_right_click() noexcept
 {
-    State* s = &this->m_model.player.state;
+    const player::state* s = &this->m_player->s1;
     int hx, hy, hz;
     int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
     if (hy > 0 && hy < 256 && is_obstacle(hw))
@@ -2365,9 +2348,9 @@ void world::on_right_click() noexcept
 
 void world::on_middle_click() noexcept
 {
-    State* s = &this->m_model.player.state;
+    const player::state* s = &this->m_player->s1;
     int hx, hy, hz;
-    int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
     for (int i = 0; i < item_count; i++)
     {
         if (items[i] == hw)

@@ -77,7 +77,11 @@ namespace mazes {
 
 class world final {
 public:
-    explicit world(SDL_Window* window, font_manager& fonts, shader_manager& shaders, texture_manager& textures);
+    explicit world(SDL_Window* window,
+        font_manager& fonts,
+        player* p,
+        shader_manager& shaders,
+        texture_manager& textures);
 
     ~world();
 
@@ -158,15 +162,6 @@ private:
     } State;
 
     typedef struct {
-        int id;
-        std::string name;
-        State state;
-        State state1;
-        State state2;
-        std::uint32_t buffer;
-    } Player;
-
-    typedef struct {
         std::uint32_t program;
         std::uint32_t position;
         std::uint32_t normal;
@@ -189,7 +184,6 @@ private:
         int render_radius;
         int delete_radius;
         int sign_radius;
-        Player player;
         int player_count;
         int voxel_scene_w;
         int voxel_scene_h;
@@ -245,9 +239,9 @@ private:
     void draw_sign(const Attrib* attrib, GLuint buffer, int length) const noexcept;
     void draw_cube(const Attrib* attrib, GLuint buffer) const noexcept;
     void draw_plant(const Attrib* attrib, std::uint32_t buffer) const noexcept;
-    void draw_player(const Attrib* attrib, const Player* player) const noexcept;
+    void draw_player(const Attrib* attrib, const player* player) const noexcept;
 
-    [[nodiscard]] const Player* find_player(int id) const noexcept;
+    [[nodiscard]] const player* find_player(int id) const noexcept;
     void delete_all_players() noexcept;
 
     [[nodiscard]] std::optional<Chunk*> find_chunk(int p, int q) const noexcept;

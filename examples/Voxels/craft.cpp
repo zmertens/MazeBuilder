@@ -363,7 +363,7 @@ struct craft::craft_impl
                     if (loading->is_finished())
                     {
                         m_world.emplace(get_context().m_window, *get_context().m_fonts,
-                            *get_context().m_shaders,*get_context().m_textures);
+                            &m_player, *get_context().m_shaders,*get_context().m_textures);
 
                         m_world.value().init();
 
@@ -376,7 +376,8 @@ struct craft::craft_impl
                 // Loading state might already be popped, initialize if it's not in the stack
                 else
                 {
-                    m_world.emplace(get_context().m_window, *get_context().m_fonts,
+                    m_world.emplace(get_context().m_window,
+                        *get_context().m_fonts, &m_player,
                         *get_context().m_shaders, *get_context().m_textures);
 
                     // Enable mouse capture for editor
