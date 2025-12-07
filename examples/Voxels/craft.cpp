@@ -43,17 +43,17 @@
 #include <memory>
 #include <map>
 #include <optional>
+#include <ranges>
 
 namespace
 {
     enum class MenuItem : unsigned int
     {
         CONTINUE = 0,
-        NEW_GAME = 1,
+        NEW_EDITOR = 1,
         SETTINGS = 2,
-        SPLASH = 3,
-        QUIT = 4,
-        COUNT = 5
+        CLOSE = 3,
+        COUNT = 4
     };
 
     enum class StackAction : unsigned int
@@ -96,7 +96,7 @@ struct craft::craft_impl
             player* m_player;
         };
 
-        explicit state(state_stack& stack, context context) : m_stack{&stack}, m_context{context}
+        explicit state(state_stack& stack, const context& _context) : m_stack{&stack}, m_context{_context}
         {
         }
 
@@ -155,7 +155,7 @@ struct craft::craft_impl
 
     public:
         explicit state_stack(const state::context& _context)
-            : m_stack(), m_pending_list(), m_context(_context), m_factories()
+            : m_context(_context)
         {
         }
 
@@ -169,15 +169,18 @@ struct craft::craft_impl
         }
 
         template <typename Pointer>
-        Pointer peek_state() const noexcept
+        [[nodiscard]] Pointer peek_state() const noexcept
         {
-            for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
+            // Use C++20 ranges to find the first matching state in reverse order
+            auto reversed = m_stack | std::views::reverse;
+
+            auto it = std::ranges::find_if(reversed, [](const auto& state_ptr) {
+                return dynamic_cast<Pointer>(state_ptr.get()) != nullptr;
+            });
+
+            if (it != std::ranges::end(reversed))
             {
-                // @TODO C++20: use std::ranges::find_if / constexpr
-                if (auto state_ptr = dynamic_cast<Pointer>((*it).get()))
-                {
-                    return state_ptr;
-                }
+                return dynamic_cast<Pointer>(it->get());
             }
 
             return nullptr;
@@ -211,19 +214,10 @@ struct craft::craft_impl
 
         void handle_event(SDL_Event& event) noexcept
         {
-            if (event.type == SDL_EVENT_KEY_DOWN)
-            {
-                SDL_Log("State Stack: Handling KEY_DOWN event (stack size: %zu)\n", m_stack.size());
-            }
-
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
                 if (!(*it)->handle_event(event))
                 {
-                    if (event.type == SDL_EVENT_KEY_DOWN)
-                    {
-                        SDL_Log("State Stack: State returned false, stopping propagation\n");
-                    }
                     break;
                 }
             }
@@ -233,19 +227,16 @@ struct craft::craft_impl
 
         void push_state(StateIdentifier state_id)
         {
-            SDL_Log("State Stack: Queuing PUSH for state ID %d\n", static_cast<int>(state_id));
             m_pending_list.emplace_back(StackAction::PUSH, state_id);
         }
 
         void pop_state()
         {
-            SDL_Log("State Stack: Queuing POP\n");
             m_pending_list.emplace_back(StackAction::POP);
         }
 
         void clear_states()
         {
-            SDL_Log("State Stack: Queuing CLEAR\n");
             m_pending_list.emplace_back(StackAction::CLEAR);
         }
 
@@ -492,7 +483,7 @@ struct craft::craft_impl
         bool m_has_finished;
 
     public:
-        explicit loading_state(state_stack& _stack, state::context _context)
+        explicit loading_state(state_stack& _stack, const context& _context)
             : state(_stack, _context), m_has_finished{false}
         {
         }
@@ -502,7 +493,7 @@ struct craft::craft_impl
             // Display loading screen with ImGui (using default font since custom fonts aren't loaded yet)
 
             // Center the loading window
-            ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+            const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
             ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_Always);
 
@@ -519,8 +510,8 @@ struct craft::craft_impl
                 ImGui::Spacing();
 
                 // Center the text
-                const char* loading_text = "Loading Resources...";
-                float text_width = ImGui::CalcTextSize(loading_text).x;
+                const auto loading_text = "Loading Resources...";
+                const float text_width = ImGui::CalcTextSize(loading_text).x;
                 ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
                 ImGui::Text("%s", loading_text);
 
@@ -533,7 +524,7 @@ struct craft::craft_impl
                 ImGui::Spacing();
 
                 const char* status_text = m_has_finished ? "Complete!" : "Please wait...";
-                float status_width = ImGui::CalcTextSize(status_text).x;
+                const float status_width = ImGui::CalcTextSize(status_text).x;
                 ImGui::SetCursorPosX((ImGui::GetWindowSize().x - status_width) * 0.5f);
                 ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "%s", status_text);
             }
@@ -632,14 +623,6 @@ struct craft::craft_impl
                 }
                 ImGui::Spacing();
 
-                // Splash Screen button - placeholder for now
-                if (ImGui::Button("Splash Screen", ImVec2(200, 40)))
-                {
-                    // TODO: Implement splash screen functionality
-                    SDL_Log("Splash Screen - Not yet implemented\n");
-                }
-                ImGui::Spacing();
-
                 // Close button - exit application
                 if (ImGui::Button("Close", ImVec2(200, 40)))
                 {
@@ -675,7 +658,7 @@ struct craft::craft_impl
                 SDL_Log("Menu: Quit button clicked - clearing stack\n");
                 request_stack_pop();
             }
-            // Pause underlying states (editor) while menu is active
+
             return false;
         }
 
@@ -686,7 +669,7 @@ struct craft::craft_impl
                 SDL_Log("Menu: Received SDL_QUIT event - popping menu state\n");
                 get_context().m_player->set_active(false);
                 request_stack_clear();
-                return false; // Stop event propagation
+                return false;
             }
 
             // Handle ESCAPE to return to game
@@ -694,11 +677,9 @@ struct craft::craft_impl
             {
                 SDL_Log("Menu: ESCAPE pressed - returning to editor\n");
                 request_stack_pop();
-                return false; // Stop event propagation
+                return false;
             }
 
-            // Let ImGui handle all other events while in menu
-            // Return false to prevent underlying states from processing events
             return false;
         }
     }; // menu_state
@@ -835,26 +816,20 @@ struct craft::craft_impl
             }
 
             // Check if ImGui wants to capture this event
-            ImGuiIO& io = ImGui::GetIO();
-            bool imgui_wants_keyboard = io.WantCaptureKeyboard;
-            bool imgui_wants_mouse = io.WantCaptureMouse;
+            const ImGuiIO& io = ImGui::GetIO();
+            const bool imgui_wants_keyboard = io.WantCaptureKeyboard;
+            const bool imgui_wants_mouse = io.WantCaptureMouse;
 
             // Always allow ESCAPE key to go through to states for menu navigation
-            bool is_escape_key = (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE);
 
-            if (is_escape_key)
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
             {
                 SDL_Log("ESCAPE key pressed - forwarding to state stack\n");
-                // ESCAPE always goes through for menu navigation
                 m_crafting_states->handle_event(event);
-                continue; // Skip other event logic
+                continue;
             }
 
-            // For other events, check if ImGui wants to capture them
-            // Pass event to states if:
-            // - It's not a keyboard/mouse event
-            // - ImGui doesn't want to capture it
-            bool should_forward_event =
+            const bool should_forward_event =
                 (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP &&
                     event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
                 (!imgui_wants_keyboard && !imgui_wants_mouse);
@@ -910,12 +885,11 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
         return false;
     }
 
-    if (USE_CACHE)
+    if constexpr (USE_CACHE)
     {
         db_enable();
 
-        const char* DB_FILE = "craft.db";
-        if (db_init(const_cast<char*>(DB_FILE)) != 0)
+        if (const auto DB_FILE = "craft.db"; db_init(const_cast<char*>(DB_FILE)) != 0)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Database initialization failed\n");
             return false;
