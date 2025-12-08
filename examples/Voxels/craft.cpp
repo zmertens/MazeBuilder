@@ -61,7 +61,7 @@ namespace
     {
         PUSH = 0,
         POP = 1,
-        CLEAR = 2,
+        CLEAR = 2
     };
 
     enum class StateIdentifier : unsigned int
@@ -70,10 +70,10 @@ namespace
         EDITOR = 1,
         LOADING = 2,
         MENU = 3,
+        TOTAL = 4
     };
 }
 
-// Implement the states used in the voxel engine when running
 struct craft::craft_impl
 {
     class state_stack;
@@ -87,7 +87,7 @@ struct craft::craft_impl
         struct context
         {
             explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
-                , texture_manager& textures, player& p)
+                             , texture_manager& textures, player& p)
                 : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}
             {
             }
@@ -174,10 +174,10 @@ struct craft::craft_impl
         template <typename Pointer>
         [[nodiscard]] Pointer peek_state() const noexcept
         {
-            // Use C++20 ranges to find the first matching state in reverse order
             auto reversed = m_stack | std::views::reverse;
 
-            auto it = std::ranges::find_if(reversed, [](const auto& state_ptr) {
+            auto it = std::ranges::find_if(reversed, [](const auto& state_ptr)
+            {
                 return dynamic_cast<Pointer>(state_ptr.get()) != nullptr;
             });
 
@@ -245,28 +245,17 @@ struct craft::craft_impl
 
         void apply_pending_changes()
         {
-            if (!m_pending_list.empty())
-            {
-                SDL_Log("State Stack: Applying %zu pending change(s)\n", m_pending_list.size());
-            }
-
             for (const pending_change& change : m_pending_list)
             {
                 switch (change.action)
                 {
                 case StackAction::PUSH:
-                    SDL_Log("State Stack: PUSHING state ID %d (stack size: %zu -> %zu)\n",
-                            static_cast<int>(change.state_id), m_stack.size(), m_stack.size() + 1);
                     m_stack.push_back(create_state(change.state_id));
                     break;
                 case StackAction::POP:
-                    SDL_Log("State Stack: POPPING state (stack size: %zu -> %zu)\n",
-                            m_stack.size(), m_stack.size() - 1);
                     m_stack.pop_back();
                     break;
                 case StackAction::CLEAR:
-                    SDL_Log("State Stack: CLEARING all states (stack size: %zu -> 0)\n", m_stack.size());
-                    // clear() will properly destroy all unique_ptrs in reverse order
                     m_stack.clear();
                     break;
                 }
@@ -281,18 +270,17 @@ struct craft::craft_impl
         }
 
     private:
-        state::ptr create_state(StateIdentifier state_id)
+        state::ptr create_state(const StateIdentifier state_id)
         {
             if (const auto found = m_factories.find(state_id); found != m_factories.cend())
             {
                 return found->second();
             }
 
-            throw std::runtime_error("StateStack::createState - No factory found for state ID");
+            throw std::runtime_error("state_stack::create_state - No factory found for state ID");
         }
     }; // state_stack
 
-    // Forward declarations
     class loading_state;
 
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
@@ -312,8 +300,6 @@ struct craft::craft_impl
         {
             if (m_world.has_value())
             {
-                SDL_Log("Editor: Destroying world resources\n");
-                // world destructor will call destroy_world() automatically
                 m_world.reset();
             }
         }
@@ -323,34 +309,34 @@ struct craft::craft_impl
             if (m_world.has_value())
             {
                 m_world->draw();
+
+                return;
             }
-            else
+
+            const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            ImGui::SetNextWindowSize(ImVec2(350, 150), ImGuiCond_Always);
+
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+
+            if (ImGui::Begin("Initializing", nullptr,
+                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
             {
-                const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
-                ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-                ImGui::SetNextWindowSize(ImVec2(350, 150), ImGuiCond_Always);
+                ImGui::Spacing();
+                const auto init_text = "Initializing World...";
+                const float text_width = ImGui::CalcTextSize(init_text).x;
+                ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
+                ImGui::Text("%s", init_text);
 
-                ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
-                ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
-                ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-
-                if (ImGui::Begin("Initializing", nullptr,
-                                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
-                {
-                    ImGui::Spacing();
-                    const auto init_text = "Initializing World...";
-                    const float text_width = ImGui::CalcTextSize(init_text).x;
-                    ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
-                    ImGui::Text("%s", init_text);
-
-                    ImGui::Spacing();
-                    ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "");
-                }
-                ImGui::End();
-
-                ImGui::PopStyleColor(4);
+                ImGui::Spacing();
+                ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "");
             }
+            ImGui::End();
+
+            ImGui::PopStyleColor(4);
         }
 
         bool update(const float delta_time, mazes::randomizer& rng) noexcept override
@@ -363,7 +349,7 @@ struct craft::craft_impl
                     if (loading->is_finished())
                     {
                         m_world.emplace(get_context().m_window, *get_context().m_fonts,
-                            &m_player, *get_context().m_shaders,*get_context().m_textures);
+                                        &m_player, *get_context().m_shaders, *get_context().m_textures);
 
                         m_world.value().init();
 
@@ -377,8 +363,8 @@ struct craft::craft_impl
                 else
                 {
                     m_world.emplace(get_context().m_window,
-                        *get_context().m_fonts, &m_player,
-                        *get_context().m_shaders, *get_context().m_textures);
+                                    *get_context().m_fonts, &m_player,
+                                    *get_context().m_shaders, *get_context().m_textures);
 
                     // Enable mouse capture for editor
                     SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
@@ -406,14 +392,6 @@ struct craft::craft_impl
 
         bool handle_event(SDL_Event& event) noexcept override
         {
-            if (event.type == SDL_EVENT_KEY_DOWN)
-            {
-                SDL_Log("Editor: Received KEY_DOWN event, scancode=%d, world_initialized=%s\n",
-                        event.key.scancode, m_world.has_value() ? "true" : "false");
-            }
-
-            // Handle state-specific events FIRST before passing to player/world
-            // This ensures ESCAPE is not consumed by game logic
             switch (event.type)
             {
             case SDL_EVENT_QUIT:
@@ -424,8 +402,6 @@ struct craft::craft_impl
             case SDL_EVENT_KEY_DOWN:
                 if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                 {
-                    SDL_Log("Editor: ESCAPE pressed - opening menu\n");
-                    // Disable mouse capture when going to menu
                     SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
                     request_stack_push(StateIdentifier::MENU);
                     return false;
@@ -436,7 +412,6 @@ struct craft::craft_impl
                 break;
             }
 
-            // Pass other events to world/player if world is initialized
             if (m_world.has_value())
             {
                 auto& commands = m_world->get_command_queue();
@@ -444,8 +419,8 @@ struct craft::craft_impl
                 m_world->handle_event(event);
             }
 
-            return true; // Continue event propagation to lower states
-        } // handle_events_and_motion
+            return true;
+        } // handle_event
     }; // editor_state
 
     class loading_state final : public state
@@ -465,37 +440,56 @@ struct craft::craft_impl
                         FONT_PIXEL_SIZE);
 
             // shaders
-            std::pair<std::string, std::string> shader_programs{};
+            std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_programs{
+                {
+                    ShaderIdentifier::BLOCK_SHADER,
+                    "shaders/block_vertex.glsl",
+                    "shaders/block_fragment.glsl"
+                },
+                {
+                    ShaderIdentifier::LINE_SHADER,
+                    "shaders/line_vertex.glsl",
+                    "shaders/line_fragment.glsl"
+                },
+                {
+                    ShaderIdentifier::TEXT_SHADER,
+                    "shaders/text_vertex.glsl",
+                    "shaders/text_fragment.glsl"
+                }
+            };
+
+            std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_gles_programs{
+                {
+                    ShaderIdentifier::BLOCK_SHADER,
+                    "shaders/es/block_vertex.es.glsl",
+                    "shaders/es/block_fragment.es.glsl"
+                },
+                {
+                    ShaderIdentifier::LINE_SHADER,
+                    "shaders/es/line_vertex.es.glsl",
+                    "shaders/es/line_fragment.es.glsl"
+                },
+                {
+                    ShaderIdentifier::TEXT_SHADER,
+                    "shaders/es/text_vertex.es.glsl",
+                    "shaders/es/text_fragment.es.glsl"
+                }
+            };
+
 #if defined(__EMSCRIPTEN__)
-            shader_programs.first = "shaders/es/block_vertex.es.glsl";
-            shader_programs.second = "shaders/es/block_fragment.es.glsl";
+            for (const auto& [id, vertex_path, fragment_path] : shader_gles_programs)
 #else
-            shader_programs.first = "shaders/block_vertex.glsl";
-            shader_programs.second = "shaders/block_fragment.glsl";
+            for (const auto& [id, vertex_path, fragment_path] : shader_programs)
 #endif
+            {
+                get_context().m_shaders->load(id, vertex_path, fragment_path);
 
-            auto&& shaders = get_context().m_shaders;
-            shaders->load(ShaderIdentifier::BLOCK_SHADER, shader_programs.first, shader_programs.second);
-
-#if defined(__EMSCRIPTEN__)
-            shader_programs.first = "shaders/es/line_vertex.es.glsl";
-            shader_programs.second = "shaders/es/line_fragment.es.glsl";
-#else
-            shader_programs.first = "shaders/line_vertex.glsl";
-            shader_programs.second = "shaders/line_fragment.glsl";
+#if defined(MAZE_DEBUG)
+                SDL_Log("Loaded shader: %d ( %s , %s )\n", static_cast<int>(id),
+                        vertex_path.c_str(), fragment_path.c_str());
 #endif
+            }
 
-            shaders->load(ShaderIdentifier::LINE_SHADER, shader_programs.first, shader_programs.second);
-
-#if defined(__EMSCRIPTEN__)
-            shader_programs.first = "shaders/es/text_vertex.es.glsl";
-            shader_programs.second = "shaders/es/text_fragment.es.glsl";
-#else
-            shader_programs.first = "shaders/text_vertex.glsl";
-            shader_programs.second = "shaders/text_fragment.glsl";
-#endif
-
-            shaders->load(ShaderIdentifier::TEXT_SHADER, shader_programs.first, shader_programs.second);
 
             // textures
             constexpr std::string_view atlas_path = "textures/atlas.png";
@@ -516,21 +510,20 @@ struct craft::craft_impl
 
             SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n", atlas_path.data(),
                     bitmap_font_path.data(), window_icon_path.data(), signs_path.data());
+            // TODO: print shaders
 #endif
-        }
+        } // load_resources
 
-        bool m_has_finished;
+        bool m_has_finished{false};
 
     public:
         explicit loading_state(state_stack& _stack, const context& _context)
-            : state(_stack, _context), m_has_finished{false}
+            : state(_stack, _context)
         {
         }
 
         void draw() const noexcept override
         {
-            // Display loading screen with ImGui (using default font since custom fonts aren't loaded yet)
-
             // Center the loading window
             const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
             ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -579,9 +572,6 @@ struct craft::craft_impl
                 load_resources();
                 m_has_finished = true;
 
-                // Pop loading state once loading is complete
-                // Editor state is already on the stack below us
-                SDL_Log("Loading: Resources loaded, popping loading state\n");
                 request_stack_pop();
             }
 
@@ -631,7 +621,7 @@ struct craft::craft_impl
 
             if (ImGui::Begin("Main Menu", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_Modal))
             {
-                ImGui::Text("Welcome to MazeBuilder Physics");
+                ImGui::Text("Welcome to Maze Builder");
                 ImGui::Separator();
                 ImGui::Spacing();
 
@@ -824,7 +814,7 @@ struct craft::craft_impl
         ImGui::SetNextWindowBgAlpha(0.65f);
 
         // Create window with no title bar, no resize, no move, auto-resize
-        const ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+        constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
             ImGuiWindowFlags_AlwaysAutoResize |
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoFocusOnAppearing |
@@ -850,26 +840,20 @@ struct craft::craft_impl
 
             if (event.type == SDL_EVENT_QUIT)
             {
-                SDL_Log("Received SDL_QUIT event. Exiting main loop.\n");
                 m_crafting_states->handle_event(event);
-
                 break;
+            }
+
+            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
+            {
+                m_crafting_states->handle_event(event);
+                continue;
             }
 
             // Check if ImGui wants to capture this event
             const ImGuiIO& io = ImGui::GetIO();
             const bool imgui_wants_keyboard = io.WantCaptureKeyboard;
             const bool imgui_wants_mouse = io.WantCaptureMouse;
-
-            // Always allow ESCAPE key to go through to states for menu navigation
-
-            if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
-            {
-                SDL_Log("ESCAPE key pressed - forwarding to state stack\n");
-                m_crafting_states->handle_event(event);
-                continue;
-            }
-
             const bool should_forward_event =
                 (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP &&
                     event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||

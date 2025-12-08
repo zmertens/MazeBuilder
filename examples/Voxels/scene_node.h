@@ -23,7 +23,7 @@ public:
     }
 
 protected:
-    void set_category(Entity category) noexcept
+    void set_category(const Entity category) noexcept
     {
         m_category = category;
     }

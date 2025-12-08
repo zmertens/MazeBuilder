@@ -134,15 +134,10 @@ std::uint32_t shader::make_program(std::uint32_t shader1, std::uint32_t shader2)
 
 std::uint32_t shader::load_program(std::string_view vertex_shader_path, std::string_view fragment_shader_path)
 {
-    GLuint shader1 = load_shader(vertex_shader_path);
+    const GLuint shader1 = load_shader(vertex_shader_path);
     GLuint shader2 = load_shader(fragment_shader_path);
     GLuint program = make_program(shader1, shader2);
     this->m_program = program;
-
-#if defined(MAZE_DEBUG)
-
-    SDL_Log("Loaded shader: %s and %s\n", vertex_shader_path.data(), fragment_shader_path.data());
-#endif
 
     return program;
 }
