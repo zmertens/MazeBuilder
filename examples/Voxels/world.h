@@ -289,15 +289,15 @@ private:
     void builder_block(int x, int y, int z, int w) noexcept;
 
     int render_chunks(const Attrib* attrib, player* _player, std::uint32_t texture) const noexcept;
-    void render_signs(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
+    void render_signs(const Attrib* attrib, const player* _player, std::uint32_t sign) const noexcept;
     void render_sign(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
     void render_players(const Attrib* attrib, player* _player) const noexcept;
-    void render_wireframe(const Attrib* attrib, player* _player) const noexcept;
+    void render_wireframe(const Attrib* attrib, const player* _player) const noexcept;
     void render_crosshairs(const Attrib* attrib) const noexcept;
     void render_item(const Attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const Attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
 
-    void on_light() noexcept;
+    void on_light() const noexcept;
     void on_left_click() noexcept;
     void on_right_click() noexcept;
     void on_middle_click() noexcept;

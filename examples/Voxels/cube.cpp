@@ -160,9 +160,9 @@ void make_plant(
 
 void make_player(
     float *data,
-    float x, float y, float z, float rx, float ry)
+    const float x, const float y, const float z, const float rx, const float ry)
 {
-    float ao[6][4] = {0};
+    float ao[6][4]{};
     float light[6][4] = {
         {0.8, 0.8, 0.8, 0.8},
         {0.8, 0.8, 0.8, 0.8},
@@ -189,7 +189,7 @@ void make_player(
     mat_apply(data, ma, 36, 0, 10);
 }
 
-void make_cube_wireframe(float *data, float x, float y, float z, float n) {
+void make_cube_wireframe(float *data, const float x, const float y, const float z, const float n) {
     static const float positions[8][3] = {
         {-1, -1, -1},
         {-1, -1, +1},
@@ -216,15 +216,15 @@ void make_cube_wireframe(float *data, float x, float y, float z, float n) {
 
 void make_character(
     float *data,
-    float x, float y, float n, float m, char c)
+    const float x, const float y, const float n, const float m, const char c)
 {
     float *d = data;
-    float s = 0.0625;
-    float a = s;
-    float b = s * 2;
-    int w = c - 32;
-    float du = (w % 16) * a;
-    float dv = 1 - (w / 16) * b - b;
+    constexpr float s = 0.0625;
+    constexpr float a = s;
+    constexpr float b = s * 2;
+    const int w = c - 32;
+    const float du = (w % 16) * a;
+    const float dv = 1 - (w / 16) * b - b;
     *(d++) = x - n; *(d++) = y - m;
     *(d++) = du + 0; *(d++) = dv;
     *(d++) = x + n; *(d++) = y - m;

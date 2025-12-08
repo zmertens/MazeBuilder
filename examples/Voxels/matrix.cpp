@@ -218,7 +218,7 @@ void set_matrix_3d(
     mat_identity(a);
     mat_translate(b, -x, -y, -z);
     mat_multiply(a, b, a);
-    mat_rotate(b, cosf(rx), 0, sinf(rx), ry);
+    mat_rotate(b, SDL_cosf(rx), 0, SDL_sinf(rx), ry);
     mat_multiply(a, b, a);
     mat_rotate(b, 0, 1, 0, -rx);
     mat_multiply(a, b, a);

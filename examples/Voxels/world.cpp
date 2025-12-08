@@ -1937,16 +1937,14 @@ void world::ensure_chunks(player* _player) noexcept
     }
 }
 
-void world::unset_sign(int x, int y, int z) const noexcept
+void world::unset_sign(const int x, const int y, const int z) const noexcept
 {
-    int p = chunked(static_cast<float>(x));
-    int q = chunked(static_cast<float>(z));
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    const int p = chunked(static_cast<float>(x));
+    const int q = chunked(static_cast<float>(z));
+    if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         Chunk* chunk = chunk_opt.value();
-        ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
-        if (sign_list_remove_all(signs, x, y, z))
+        if (auto* signs = &chunk->signs; sign_list_remove_all(signs, x, y, z))
         {
             chunk->dirty = 1;
             db_delete_signs(x, y, z);
@@ -1958,16 +1956,14 @@ void world::unset_sign(int x, int y, int z) const noexcept
     }
 }
 
-void world::unset_sign_face(int x, int y, int z, int face) const noexcept
+void world::unset_sign_face(const int x, const int y, const int z, const int face) const noexcept
 {
-    int p = chunked(static_cast<float>(x));
-    int q = chunked(static_cast<float>(z));
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    const int p = chunked(static_cast<float>(x));
+    const int q = chunked(static_cast<float>(z));
+    if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         Chunk* chunk = chunk_opt.value();
-        ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
-        if (sign_list_remove(signs, x, y, z, face))
+        if (auto* signs = &chunk->signs; sign_list_remove(signs, x, y, z, face))
         {
             chunk->dirty = 1;
             db_delete_sign(x, y, z, face);
@@ -1979,18 +1975,18 @@ void world::unset_sign_face(int x, int y, int z, int face) const noexcept
     }
 }
 
-void world::_set_sign(int p, int q, int x, int y, int z, int face, std::string_view text, int dirty) const noexcept
+void world::_set_sign(const int p, const int q, const int x, const int y, const int z,
+    const int face, const std::string_view text, const int dirty) const noexcept
 {
     if (text.length() == 0)
     {
         unset_sign_face(x, y, z, face);
         return;
     }
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         Chunk* chunk = chunk_opt.value();
-        ::SignList* signs = reinterpret_cast<::SignList*>(&chunk->signs);
+        auto* signs = &chunk->signs;
         sign_list_add(signs, x, y, z, face, text.data());
         if (dirty)
         {
@@ -2000,7 +1996,7 @@ void world::_set_sign(int p, int q, int x, int y, int z, int face, std::string_v
     db_insert_sign(p, q, x, y, z, face, text.data());
 }
 
-void world::set_sign(int x, int y, int z, int face, std::string_view text) const noexcept
+void world::set_sign(const int x, const int y, const int z, const int face, const std::string_view text) const noexcept
 {
     int p = chunked(static_cast<float>(x));
     int q = chunked(static_cast<float>(z));
@@ -2009,14 +2005,13 @@ void world::set_sign(int x, int y, int z, int face, std::string_view text) const
 
 void world::toggle_light(int x, int y, int z) const noexcept
 {
-    int p = chunked(static_cast<float>(x));
-    int q = chunked(static_cast<float>(z));
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    const int p = chunked(static_cast<float>(x));
+    const int q = chunked(static_cast<float>(z));
+    if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         Chunk* chunk = chunk_opt.value();
         Map* map = &chunk->lights;
-        int w = map_get(map, x, y, z) ? 0 : 15;
+        const int w = map_get(map, x, y, z) ? 0 : 15;
         map_set(map, x, y, z, w);
         db_insert_light(p, q, x, y, z, w);
         dirty_chunk(chunk);
@@ -2134,43 +2129,42 @@ void world::builder_block(int x, int y, int z, int w) noexcept
     }
 }
 
-int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t texture) const noexcept
+int world::render_chunks(const Attrib* attrib, player* _player, const std::uint32_t texture) const noexcept
 {
     int result = 0;
-    player::state* s = &_player->s1;
-    // ensure_chunks(_player);
-    int p = this->chunked(s->x);
-    int q = this->chunked(s->z);
-    float light = this->get_daylight();
+    const player::state* s = &_player->s1;
+    const int p = chunked(s->x);
+    const int q = chunked(s->z);
+    const float light = get_daylight();
     float matrix[16];
     // matrix.cpp -> set_matrix_3d
     set_matrix_3d(
-        matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-        s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
-        this->m_model.render_radius);
+        matrix, m_model.voxel_scene_w, m_model.voxel_scene_h,
+        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        m_model.render_radius);
 
     float planes[6][4];
     // matrix.cpp -> frustum_planes
-    frustum_planes(planes, this->m_model.render_radius, matrix);
+    frustum_planes(planes, m_model.render_radius, matrix);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniform3f(attrib->camera, s->x, s->y, s->z);
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->extra2, light);
-    glUniform1f(attrib->extra3, static_cast<GLfloat>(this->m_model.render_radius * BUILD_CHUNK_SIZE));
-    glUniform1i(attrib->extra4, static_cast<int>(this->m_model.is_ortho));
-    glUniform1f(attrib->timer, this->time_of_day());
+    glUniform1f(attrib->extra3, static_cast<GLfloat>(m_model.render_radius * BUILD_CHUNK_SIZE));
+    glUniform1i(attrib->extra4, static_cast<int>(m_model.is_ortho));
+    glUniform1f(attrib->timer, time_of_day());
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
 
     int chunks_rendered = 0;
     int chunks_culled_distance = 0;
     int chunks_culled_frustum = 0;
 
-    for (int i = 0; i < this->m_model.chunk_count; i++)
+    for (int i = 0; i < m_model.chunk_count; i++)
     {
-        const Chunk* chunk = this->m_model.chunks + i;
-        if (chunk_distance(chunk, p, q) > this->m_model.render_radius)
+        const Chunk* chunk = m_model.chunks + i;
+        if (chunk_distance(chunk, p, q) > m_model.render_radius)
         {
             chunks_culled_distance++;
             continue;
@@ -2180,7 +2174,7 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
             chunks_culled_frustum++;
             continue;
         }
-        this->draw_chunk(attrib, chunk);
+        draw_chunk(attrib, chunk);
         result += chunk->faces;
         chunks_rendered++;
     }
@@ -2188,18 +2182,18 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
     return result;
 }
 
-void world::render_signs(const Attrib* attrib, player* _player, std::uint32_t sign) const noexcept
+void world::render_signs(const Attrib* attrib, const player* _player, const std::uint32_t sign) const noexcept
 {
-    player::state* s = &_player->s1;
-    int p = chunked(s->x);
-    int q = chunked(s->z);
+    const player::state* s = &_player->s1;
+    const int p = chunked(s->x);
+    const int q = chunked(s->z);
     float matrix[16];
     set_matrix_3d(
-        matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-        s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
-        this->m_model.render_radius);
+        matrix, m_model.voxel_scene_w, m_model.voxel_scene_h,
+        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        m_model.render_radius);
     float planes[6][4];
-    frustum_planes(planes, this->m_model.render_radius, matrix);
+    frustum_planes(planes, m_model.render_radius, matrix);
 
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE2);
@@ -2208,10 +2202,10 @@ void world::render_signs(const Attrib* attrib, player* _player, std::uint32_t si
     glUniform1i(attrib->sampler, 2);
     glUniform1i(attrib->extra1, 1);
 
-    for (int i = 0; i < this->m_model.chunk_count; i++)
+    for (int i = 0; i < m_model.chunk_count; i++)
     {
-        const Chunk* chunk = this->m_model.chunks + i;
-        if (chunk_distance(chunk, p, q) > this->m_model.sign_radius)
+        const Chunk* chunk = m_model.chunks + i;
+        if (chunk_distance(chunk, p, q) > m_model.sign_radius)
         {
             continue;
         }
@@ -2232,12 +2226,12 @@ void world::render_sign(const Attrib* attrib, player* _player, const std::uint32
         return;
     }
 
-    player::state* s = &_player->s1;
+    const player::state* s = &_player->s1;
     float matrix[16];
     set_matrix_3d(
-        matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-        s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
-        this->m_model.render_radius);
+        matrix, m_model.voxel_scene_w, m_model.voxel_scene_h,
+        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        m_model.render_radius);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, sign);
@@ -2248,9 +2242,9 @@ void world::render_sign(const Attrib* attrib, player* _player, const std::uint32
     SDL_strlcpy(text, "put maze here", MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
     GLfloat* data = malloc_faces(5, SDL_strlen(text));
-    int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
+    const int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
                                   text);
-    GLuint buffer = gen_faces(5, length, data);
+    const GLuint buffer = gen_faces(5, length, data);
     draw_sign(attrib, buffer, length);
     del_buffer(buffer);
 }
@@ -2260,37 +2254,36 @@ void world::render_players(const Attrib* attrib, player* _player) const noexcept
     player::state* s = &_player->s1;
     float matrix[16];
     set_matrix_3d(
-        matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-        s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
-        this->m_model.render_radius);
+        matrix, m_model.voxel_scene_w, m_model.voxel_scene_h,
+        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        m_model.render_radius);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     glUniform3f(attrib->camera, s->x, s->y, s->z);
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
-    for (int i = 0; i < this->m_model.player_count; i++)
+    for (int i = 0; i < m_model.player_count; i++)
     {
         const player* other = m_player;
         draw_player(attrib, other);
     }
 }
 
-void world::render_wireframe(const Attrib* attrib, player* _player) const noexcept
+void world::render_wireframe(const Attrib* attrib, const player* _player) const noexcept
 {
-    player::state* s = &_player->s1;
+    const player::state* s = &_player->s1;
     float matrix[16];
     set_matrix_3d(
-        matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-        s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
-        this->m_model.render_radius);
+        matrix, m_model.voxel_scene_w, m_model.voxel_scene_h,
+        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        m_model.render_radius);
     int hx, hy, hz;
-    const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    if (is_obstacle(hw))
+    if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz); is_obstacle(hw))
     {
         glUseProgram(attrib->program);
         glLineWidth(1);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
+        const GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
                                                        static_cast<float>(hz), 0.53f);
         draw_lines(attrib, wireframe_buffer, 3, 24);
         del_buffer(wireframe_buffer);
@@ -2300,19 +2293,19 @@ void world::render_wireframe(const Attrib* attrib, player* _player) const noexce
 void world::render_crosshairs(const Attrib* attrib) const noexcept
 {
     float matrix[16];
-    set_matrix_2d(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h);
+    set_matrix_2d(matrix, m_model.voxel_scene_w, m_model.voxel_scene_h);
     glUseProgram(attrib->program);
-    glLineWidth(static_cast<GLfloat>(4 * this->m_model.scale));
+    glLineWidth(static_cast<GLfloat>(4 * m_model.scale));
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    GLuint crosshair_buffer = gen_crosshair_buffer();
+    const GLuint crosshair_buffer = gen_crosshair_buffer();
     draw_lines(attrib, crosshair_buffer, 2, 4);
     del_buffer(crosshair_buffer);
 }
 
-void world::render_item(const Attrib* attrib, std::uint32_t texture) const noexcept
+void world::render_item(const Attrib* attrib, const std::uint32_t texture) const noexcept
 {
     float matrix[16];
-    set_matrix_item(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h, this->m_model.scale);
+    set_matrix_item(matrix, m_model.voxel_scene_w, m_model.voxel_scene_h, m_model.scale);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -2320,42 +2313,41 @@ void world::render_item(const Attrib* attrib, std::uint32_t texture) const noexc
     glUniform3f(attrib->camera, 0, 0, 5);
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
-    int w = items[this->m_model.item_index];
-    if (is_plant(w))
+    if (const int w = items[m_model.item_index]; is_plant(w))
     {
-        GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
+        const GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
         draw_plant(attrib, buffer);
         del_buffer(buffer);
     }
     else
     {
-        GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
+        const GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
         draw_cube(attrib, buffer);
         del_buffer(buffer);
     }
 }
 
-void world::render_text(const Attrib* attrib, std::uint32_t font,
-                        int justify, float x, float y, float n, std::string_view text) const noexcept
+void world::render_text(const Attrib* attrib, const std::uint32_t font,
+                        const int justify, float x, const float y, const float n, const std::string_view text) const noexcept
 {
     float matrix[16];
-    set_matrix_2d(matrix, this->m_model.voxel_scene_w, this->m_model.voxel_scene_h);
+    set_matrix_2d(matrix, m_model.voxel_scene_w, m_model.voxel_scene_h);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     glUniform1i(attrib->sampler, 3);
     glUniform1i(attrib->extra1, 0);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, font);
-    GLsizei length = static_cast<GLsizei>(text.length());
+    const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;
-    GLuint buffer = gen_text_buffer(x, y, n, text);
+    const GLuint buffer = gen_text_buffer(x, y, n, text);
     draw_text(attrib, buffer, length);
     del_buffer(buffer);
 }
 
-void world::on_light() noexcept
+void world::on_light() const noexcept
 {
-    player::state* s = &this->m_player->s1;
+    const player::state* s = &m_player->s1;
     int hx, hy, hz;
     if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < 256 && is_destructable(hw))
@@ -2366,7 +2358,7 @@ void world::on_light() noexcept
 
 void world::on_left_click() noexcept
 {
-    const player::state* s = &this->m_player->s1;
+    const player::state* s = &m_player->s1;
     int hx, hy, hz;
     if (const auto hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < 256 && is_destructable(hw))
@@ -2374,7 +2366,7 @@ void world::on_left_click() noexcept
         set_block(hx, hy, hz, 0);
         record_block(hx, hy, hz, 0);
 #if defined(MAZE_DEBUG)
-        SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[this->m_model.item_index]);
+        SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[m_model.item_index]);
 #endif
         if (is_plant(get_block(hx, hy + 1, hz)))
         {
@@ -2385,18 +2377,18 @@ void world::on_left_click() noexcept
 
 void world::on_right_click() noexcept
 {
-    const player::state* s = &this->m_player->s1;
+    const player::state* s = &m_player->s1;
     int hx, hy, hz;
-    int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    if (hy > 0 && hy < 256 && is_obstacle(hw))
+    if (const int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && is_obstacle(hw))
     {
         if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
         {
-            set_block(hx, hy, hz, items[this->m_model.item_index]);
-            record_block(hx, hy, hz, items[this->m_model.item_index]);
+            set_block(hx, hy, hz, items[m_model.item_index]);
+            record_block(hx, hy, hz, items[m_model.item_index]);
 #if defined(MAZE_DEBUG)
             SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw,
-                    items[this->m_model.item_index]);
+                    items[m_model.item_index]);
 #endif
         }
     }
@@ -2404,14 +2396,14 @@ void world::on_right_click() noexcept
 
 void world::on_middle_click() noexcept
 {
-    const player::state* s = &this->m_player->s1;
+    const player::state* s = &m_player->s1;
     int hx, hy, hz;
     const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
     for (int i = 0; i < item_count; i++)
     {
         if (items[i] == hw)
         {
-            this->m_model.item_index = i;
+            m_model.item_index = i;
 #if defined(MAZE_DEBUG)
             SDL_Log("Copying item index: %d\n", i);
 #endif
