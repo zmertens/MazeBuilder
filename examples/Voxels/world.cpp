@@ -371,7 +371,7 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
             //}
 
             // sand and grass terrain
-            for (int y = 0; y < PLANT_HEIGHT_MAX; y++)
+            for (int y = 0; y < h; y++)
             {
                 func(x, y, z, w * flag, m);
             }
