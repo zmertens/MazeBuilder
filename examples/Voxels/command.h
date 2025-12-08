@@ -6,8 +6,7 @@
 #include <type_traits>
 
 #include "entity.h"
-
-class scene_node;
+#include "scene_node.h"
 
 struct command
 {
@@ -20,8 +19,8 @@ std::function<void(scene_node &, float)> derived_action(Function fn)
 {
     return [=](scene_node &node, float dt)
     {
-        // Ensure that the cast is safe
-        if constexpr (std::is_base_of_v<GameObject, scene_node>)
+        // Ensure that the cast is safe - check if scene_node is base of GameObject
+        if constexpr (std::is_base_of_v<scene_node, GameObject>)
         {
             fn(static_cast<GameObject &>(node), dt);
         }

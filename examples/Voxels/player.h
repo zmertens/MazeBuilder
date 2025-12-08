@@ -5,33 +5,44 @@
 #include <map>
 #include <string>
 
-#include <SDL3/SDL.h>
-
 #include "command.h"
 
 enum class PlayerAction
 {
     MOVE_LEFT,
     MOVE_RIGHT,
+    MOVE_FORWARD,
+    MOVE_BACKWARD,
     JUMP,
+    FLY,
+    BUILD_BLOCK,
+    DESTROY_BLOCK,
     DONE,
     COUNT
 };
 
 class command_queue;
-class scene_node;
+union SDL_Event;
+class world;
 
-class player
+class player : public scene_node
 {
+    // Access to world private methods
+    friend class world;
 public:
     struct state
     {
         float x, y, z, rx, ry, t;
     } s1{};
 
+    struct velocity
+    {
+        float vx, vy, vz;
+    } vel{};
+
     explicit player();
 
-    ~player() = default;
+    ~player() override = default;
 
     player(const player&) = delete;
     player& operator=(const player&) = delete;
@@ -54,6 +65,9 @@ public:
     [[nodiscard]] std::uint32_t get_buffer() const noexcept;
     void set_buffer(std::uint32_t value) noexcept;
 
+    void set_world(world* w) noexcept;
+    [[nodiscard]] bool is_on_ground() const noexcept;
+
 private:
     void initialize_actions();
 
@@ -64,9 +78,12 @@ private:
     std::map<PlayerAction, command> m_action_binding;
 
     bool m_is_active;
+    bool m_on_ground;
 
     std::string m_name;
     std::uint32_t m_buffer;
+
+    world* m_world;
 };
 
 #endif // PLAYER_H

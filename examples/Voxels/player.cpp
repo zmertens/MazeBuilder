@@ -5,16 +5,30 @@
 #include "command_queue.h"
 #include "entity.h"
 #include "matrix.h"
+#include "world.h"
 
-player::player() : m_is_active{true}, m_buffer{}
+#include <SDL3/SDL.h>
+
+player::player()
+    : scene_node{}
+    , m_is_active{true}
+    , m_on_ground{false}
+    , m_buffer{}
+    , m_world{nullptr}
 {
-    m_key_binding[SDL_SCANCODE_LEFT] = PlayerAction::MOVE_LEFT;
-    m_key_binding[SDL_SCANCODE_RIGHT] = PlayerAction::MOVE_RIGHT;
+    set_category(Entity::PLAYER);
+
+    // Movement key bindings
+    m_key_binding[SDL_SCANCODE_A] = PlayerAction::MOVE_LEFT;
+    m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
+    m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
+    m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
     m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
+    m_key_binding[SDL_SCANCODE_TAB] = PlayerAction::FLY;
 
     initialize_actions();
 
-    for (auto& [action, category] : m_action_binding | std::views::values)
+    for (auto& [_, category] : m_action_binding | std::views::values)
     {
         category = Entity::PLAYER;
     }
@@ -22,12 +36,7 @@ player::player() : m_is_active{true}, m_buffer{}
 
 void player::handle_event(const SDL_Event &event, command_queue &commands) noexcept
 {
-    static float dy = 0;
     state* s = &this->s1;
-    int sz = 0;
-    int sx = 0;
-    float dir_mv = 0.025f;
-    int sc = -1;
 
     if (event.type == SDL_EVENT_QUIT)
     {
@@ -40,36 +49,27 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         {
             if (found->second == PlayerAction::JUMP)
             {
-                SDL_Log("Player JUMP action (ignored - not on ground)");
-                return; // do not jump if not on ground
+                // Only allow jumping when on ground
+                if (m_on_ground)
+                {
+                    commands.push(m_action_binding[found->second]);
+                }
+                return;
             }
-            SDL_Log("Player action queued: %d", static_cast<int>(found->second));
             commands.push(m_action_binding[found->second]);
         }
     }
-    if (event.type == SDL_SCANCODE_RETURN)
-    {
-    }
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
-        constexpr auto WINDOW_W = 1020;
-        constexpr auto WINDOW_H = 720;
+        constexpr float mouse_sensitivity = 0.0025f;
 
-        constexpr bool INVERT_MOUSE = false;
-        constexpr float mouse_mv = 0.0025f;
-        // Adjust mouse motion based on relative center of voxel_scene_size
-        float adjusted_xrel = event.motion.xrel - static_cast<float>(WINDOW_W) / 2.f;
-        float adjusted_yrel = event.motion.yrel - static_cast<float>(WINDOW_H) / 2.f;
-
-        float old_rx = s->rx;
-        float old_ry = s->ry;
-
-        s->rx += event.motion.xrel * mouse_mv;
+        s->rx += event.motion.xrel * mouse_sensitivity;
         if (INVERT_MOUSE) {
-            s->ry += event.motion.yrel * mouse_mv;
-        } else {
-            s->ry -= event.motion.yrel * mouse_mv;
+            s->ry += event.motion.yrel * mouse_sensitivity;
         }
+        s->ry -= event.motion.yrel * mouse_sensitivity;
+
+        // Keep rotation within bounds
         if (s->rx < 0) {
             s->rx += RADIANS(360);
         }
@@ -78,42 +78,31 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         }
         s->ry = SDL_max(s->ry, -RADIANS(90));
         s->ry = SDL_min(s->ry, RADIANS(90));
-
-        // Debug: Log camera rotation changes periodically
-        static int mouse_event_count = 0;
-        if (mouse_event_count++ % 100 == 0) {
-            SDL_Log("Camera rotation: rx=%.3f (delta=%.3f), ry=%.3f (delta=%.3f)",
-                    s->rx, s->rx - old_rx, s->ry, s->ry - old_ry);
-        }
     }
 }
 void player::handle_realtime_input(command_queue &commands)
 {
-    static int realtime_frame_count = 0;
-    bool any_action = false;
+    static int frame_counter = 0;
+    bool any_key_pressed = false;
 
-    for (auto &pair : m_key_binding)
+    for (auto & [fst, snd] : m_key_binding)
     {
-        if (is_realtime_action(pair.second))
+        if (is_realtime_action(snd))
         {
             int numKeys = 0;
-            const auto *keyState = SDL_GetKeyboardState(&numKeys);
 
-            if (keyState && pair.first < static_cast<std::uint32_t>(numKeys) && keyState[pair.first])
+            if (const auto *keyState = SDL_GetKeyboardState(&numKeys);
+                keyState && fst < static_cast<std::uint32_t>(numKeys) && keyState[fst])
             {
-                commands.push(m_action_binding[pair.second]);
-                any_action = true;
-
-                // Debug: Log realtime actions periodically
-                if (realtime_frame_count % 60 == 0) {
-                    SDL_Log("Realtime action: %d (key=%d)", static_cast<int>(pair.second), pair.first);
-                }
+                commands.push(m_action_binding[snd]);
+                any_key_pressed = true;
             }
         }
     }
 
-    if (any_action) {
-        realtime_frame_count++;
+    if (any_key_pressed)
+    {
+        frame_counter++;
     }
 }
 
@@ -156,26 +145,120 @@ std::uint32_t player::get_buffer() const noexcept
 {
     return this->m_buffer;
 }
+
 void player::set_buffer(const std::uint32_t value) noexcept
 {
     this->m_buffer = value;
 }
 
+void player::set_world(world* w) noexcept
+{
+    m_world = w;
+}
+
+bool player::is_on_ground() const noexcept
+{
+    return m_on_ground;
+}
+
 void player::initialize_actions()
 {
-    static constexpr auto playerSpeed = 200.f;
-    static constexpr auto jumpForce = -500.f;
+    m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (!p.m_world) {
+                SDL_Log("MOVE_FORWARD: No world reference!");
+                return;
+            }
 
-    m_action_binding[PlayerAction::MOVE_LEFT].action = [](scene_node &node, float dt)
+            constexpr float moveSpeed = 0.1f;
+            float old_x = p.s1.x;
+            float old_z = p.s1.z;
+            float dx = -SDL_sinf(p.s1.rx) * moveSpeed;
+            float dz = SDL_cosf(p.s1.rx) * moveSpeed;
+
+            p.s1.x += dx;
+            p.s1.z += dz;
+
+            static int move_count = 0;
+            if (move_count++ % 60 == 0) {
+                SDL_Log("MOVE_FORWARD executed: (%.2f, %.2f) -> (%.2f, %.2f)", old_x, old_z, p.s1.x, p.s1.z);
+            }
+        });
+
+    m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (!p.m_world) return;
+
+            constexpr float moveSpeed = 0.1f;
+            const float dx = SDL_sinf(p.s1.rx) * moveSpeed;
+            const float dz = -SDL_cosf(p.s1.rx) * moveSpeed;
+
+            p.s1.x += dx;
+            p.s1.z += dz;
+        });
+
+    m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (!p.m_world) return;
+
+            constexpr float moveSpeed = 0.1f;
+            const float dx = -SDL_cosf(p.s1.rx) * moveSpeed;
+            const float dz = -SDL_sinf(p.s1.rx) * moveSpeed;
+
+            p.s1.x += dx;
+            p.s1.z += dz;
+        });
+
+    m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (!p.m_world) return;
+
+            constexpr float moveSpeed = 0.1f;
+            float dx = SDL_cosf(p.s1.rx) * moveSpeed;
+            float dz = SDL_sinf(p.s1.rx) * moveSpeed;
+
+            p.s1.x += dx;
+            p.s1.z += dz;
+        });
+
+    m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (p.m_on_ground)
+            {
+                constexpr float jumpVelocity = 8.0f;
+                p.vel.vy = jumpVelocity;
+                p.m_on_ground = false;
+            }
+        });
+
+    m_action_binding[PlayerAction::FLY].action = derived_action<player>(
+    [](player& p, float dt)
     {
-        // Do something for move left action
-    };
+        p.m_on_ground = !p.m_on_ground;
+    });
 
-    // on create block
+    m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (p.m_world)
+            {
+                p.m_world->on_right_click();
+            }
+        });
 
-    // on destroy block
-
-    // on copy block
+    m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (p.m_world)
+            {
+                p.m_world->on_left_click();
+            }
+        });
 }
 
 bool player::is_realtime_action(const PlayerAction action) noexcept
@@ -184,6 +267,8 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
     {
     case PlayerAction::MOVE_LEFT:
     case PlayerAction::MOVE_RIGHT:
+    case PlayerAction::MOVE_FORWARD:
+    case PlayerAction::MOVE_BACKWARD:
         return true;
     default:
         return false;

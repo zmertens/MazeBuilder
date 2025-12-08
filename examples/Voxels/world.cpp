@@ -16,6 +16,18 @@
 #include "shader.h"
 #include "sign.h"
 
+#define KEY_FORWARD SDL_SCANCODE_W
+#define KEY_BACKWARD SDL_SCANCODE_S
+#define KEY_LEFT SDL_SCANCODE_A
+#define KEY_RIGHT SDL_SCANCODE_D
+#define KEY_JUMP SDL_SCANCODE_SPACE
+#define KEY_FLY SDL_SCANCODE_TAB
+#define KEY_ITEM_NEXT SDL_SCANCODE_E
+#define KEY_ITEM_PREV SDL_SCANCODE_R
+#define KEY_ZOOM SDL_SCANCODE_LSHIFT
+#define KEY_ORTHO SDL_SCANCODE_F
+#define KEY_TAG SDL_SCANCODE_T
+
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
 #else
@@ -60,6 +72,11 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
       , m_model{} // Initialize m_model to zero-initialize all members
 {
+    // Set bidirectional reference between player and world
+    if (m_player)
+    {
+        m_player->set_world(this);
+    }
 }
 
 world::~world()
@@ -160,6 +177,54 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     // Update window dimensions to ensure accurate viewport and projection matrix
     SDL_GetWindowSizeInPixels(m_window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
 
+    // Process all commands in the queue
+    static int update_frame = 0;
+    int commands_processed = 0;
+    float old_x = m_player->s1.x;
+    float old_z = m_player->s1.z;
+
+    while (!m_command_queue.is_empty())
+    {
+        command cmd = m_command_queue.pop();
+        cmd.action(*m_player, delta_time);
+        commands_processed++;
+    }
+
+    if (commands_processed > 0 && update_frame % 60 == 0)
+    {
+        SDL_Log("Processed %d commands, player moved from (%.2f, %.2f) to (%.2f, %.2f)",
+                commands_processed, old_x, old_z, m_player->s1.x, m_player->s1.z);
+    }
+    update_frame++;
+
+    // Apply gravity as continuous force (convert delta_time from ms to seconds)
+    const float dt_seconds = delta_time / 1000.0f;
+    m_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
+
+    // Apply velocity to position
+    m_player->s1.y += m_player->vel.vy * dt_seconds;
+
+    // Apply collision detection (height = 2 blocks for player)
+    float before_collision_x = m_player->s1.x;
+    float before_collision_z = m_player->s1.z;
+    const int collision_result = collide(2, &m_player->s1.x, &m_player->s1.y, &m_player->s1.z);
+
+    if (update_frame % 60 == 0 && (before_collision_x != m_player->s1.x || before_collision_z != m_player->s1.z)) {
+        SDL_Log("Collision adjusted position from (%.2f, %.2f) to (%.2f, %.2f)",
+                before_collision_x, before_collision_z, m_player->s1.x, m_player->s1.z);
+    }
+
+    // Update ground state based on collision via helper (world is friend of player)
+    if (collision_result == 1)
+    {
+        m_player->vel.vy = 0.0f;  // Stop vertical velocity on collision
+        m_player->m_on_ground = true;
+    }
+    else
+    {
+        m_player->m_on_ground = false;
+    }
+
     delete_chunks();
     del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
@@ -239,6 +304,25 @@ void world::handle_event(SDL_Event& event) noexcept
 {
     if (event.type == SDL_EVENT_QUIT)
     {
+        // Handle quit event if needed
+    }
+    else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+    {
+        if (event.button.button == SDL_BUTTON_LEFT)
+        {
+            // Left click - destroy block
+            on_left_click();
+        }
+        else if (event.button.button == SDL_BUTTON_RIGHT)
+        {
+            // Right click - build block
+            on_right_click();
+        }
+        else if (event.button.button == SDL_BUTTON_MIDDLE)
+        {
+            // Middle click - copy block
+            on_middle_click();
+        }
     }
 }
 

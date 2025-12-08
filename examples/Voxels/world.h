@@ -15,18 +15,6 @@
 #include "resource_identifiers.h"
 #include "sign.h"
 
-#define KEY_FORWARD SDL_SCANCODE_W
-#define KEY_BACKWARD SDL_SCANCODE_S
-#define KEY_LEFT SDL_SCANCODE_A
-#define KEY_RIGHT SDL_SCANCODE_D
-#define KEY_JUMP SDL_SCANCODE_SPACE
-#define KEY_FLY SDL_SCANCODE_TAB
-#define KEY_ITEM_NEXT SDL_SCANCODE_E
-#define KEY_ITEM_PREV SDL_SCANCODE_R
-#define KEY_ZOOM SDL_SCANCODE_LSHIFT
-#define KEY_ORTHO SDL_SCANCODE_F
-#define KEY_TAG SDL_SCANCODE_T
-
 // World configs
 #define SCROLL_THRESHOLD 0.1
 #define MAX_DB_PATH_LEN 64
@@ -90,6 +78,12 @@ public:
     void handle_event(SDL_Event& event) noexcept;
 
     static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
+
+    // Block manipulation methods (public for player actions)
+    void on_light() const noexcept;
+    void on_left_click() noexcept;
+    void on_right_click() noexcept;
+    void on_middle_click() noexcept;
 
 private:
     // Build the scene (initialize scene graph and layers)
@@ -297,10 +291,6 @@ private:
     void render_item(const Attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const Attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
 
-    void on_light() const noexcept;
-    void on_left_click() noexcept;
-    void on_right_click() noexcept;
-    void on_middle_click() noexcept;
 
     enum class Layer
     {
