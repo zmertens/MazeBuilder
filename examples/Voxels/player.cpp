@@ -6,7 +6,7 @@
 #include "entity.h"
 #include "matrix.h"
 
-player::player() : m_is_active{true}
+player::player() : m_is_active{true}, m_buffer{}
 {
     m_key_binding[SDL_SCANCODE_LEFT] = PlayerAction::MOVE_LEFT;
     m_key_binding[SDL_SCANCODE_RIGHT] = PlayerAction::MOVE_RIGHT;
@@ -20,7 +20,7 @@ player::player() : m_is_active{true}
     }
 }
 
-void player::handle_event(SDL_Event &event, command_queue &commands) noexcept
+void player::handle_event(const SDL_Event &event, command_queue &commands) noexcept
 {
     static float dy = 0;
     state* s = &this->s1;
@@ -35,9 +35,8 @@ void player::handle_event(SDL_Event &event, command_queue &commands) noexcept
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
-        auto found = m_key_binding.find(event.key.scancode);
-
-        if (found != m_key_binding.cend() && !is_realtime_action(found->second))
+        if (const auto found = m_key_binding.find(event.key.scancode);
+            found != m_key_binding.cend() && !is_realtime_action(found->second))
         {
             if (found->second == PlayerAction::JUMP)
             {
@@ -118,7 +117,7 @@ void player::handle_realtime_input(command_queue &commands)
     }
 }
 
-void player::assign_key(PlayerAction action, std::uint32_t key)
+void player::assign_key(const PlayerAction action, const std::uint32_t key)
 {
     // Remove all keys that already map to action
     for (auto it = m_key_binding.begin(); it != m_key_binding.end();)
@@ -148,7 +147,7 @@ bool player::is_active() const noexcept
 {
     return m_is_active;
 }
-void player::set_active(bool active) noexcept
+void player::set_active(const bool active) noexcept
 {
     m_is_active = active;
 }
@@ -157,7 +156,7 @@ std::uint32_t player::get_buffer() const noexcept
 {
     return this->m_buffer;
 }
-void player::set_buffer(std::uint32_t value) noexcept
+void player::set_buffer(const std::uint32_t value) noexcept
 {
     this->m_buffer = value;
 }
@@ -167,8 +166,6 @@ void player::initialize_actions()
     static constexpr auto playerSpeed = 200.f;
     static constexpr auto jumpForce = -500.f;
 
-    // Note: derived_action is a member function of craft_impl,
-    // so we'll use a simple lambda instead
     m_action_binding[PlayerAction::MOVE_LEFT].action = [](scene_node &node, float dt)
     {
         // Do something for move left action
@@ -181,7 +178,7 @@ void player::initialize_actions()
     // on copy block
 }
 
-bool player::is_realtime_action(PlayerAction action) noexcept
+bool player::is_realtime_action(const PlayerAction action) noexcept
 {
     switch (action)
     {

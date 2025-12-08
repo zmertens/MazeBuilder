@@ -7,7 +7,7 @@
 /// @param compressedSize Size of the compressed data in bytes
 /// @param pixelSize Desired pixel size for the font
 /// @return true if the font was loaded successfully, false otherwise
-bool font::loadFromMemoryCompressedTTF(const void* compressedData, std::size_t compressedSize, float pixelSize)
+bool font::loadFromMemoryCompressedTTF(const void* compressedData, const std::size_t compressedSize, const float pixelSize)
 {
     m_font = ImGui::GetIO().Fonts->AddFontFromMemoryCompressedTTF(compressedData, static_cast<int>(compressedSize),
                                                                  pixelSize);

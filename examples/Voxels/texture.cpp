@@ -73,15 +73,15 @@ int texture::get_height() const noexcept
 }
 
 // Load an image file using stb_image and create an SDL texture
-bool texture::load_from_file(std::string_view filepath, std::uint32_t channel_offset) noexcept
+bool texture::load_from_file(const std::string_view filepath, const std::uint32_t channel_offset) noexcept
 {
     this->free();
 
-    // CRITICAL: Set flip BEFORE loading the image
     stbi_set_flip_vertically_on_load(true);
 
     int width, height;
-    int n; // n stores number of components (channels)
+    // n stores number of components (channels)
+    int n;
 
     // Force RGBA (4 components) for consistency
     auto *data = stbi_load(filepath.data(), &width, &height, &n, 4);
@@ -114,8 +114,7 @@ bool texture::load_from_file(std::string_view filepath, std::uint32_t channel_of
     glGenerateMipmap(GL_TEXTURE_2D);
 
     // Check for OpenGL errors
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR)
+    if (const GLenum error = glGetError(); error != GL_NO_ERROR)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error after loading %s: 0x%x\n",
                      filepath.data(), error);
@@ -132,7 +131,7 @@ bool texture::load_from_file(std::string_view filepath, std::uint32_t channel_of
     return true;
 }
 
-bool texture::load_target(int w, int h) noexcept
+bool texture::load_target(const int w, const int h) noexcept
 {
     this->free();
 
@@ -148,10 +147,10 @@ bool texture::load_target(int w, int h) noexcept
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     // Create empty texture for render target
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+        w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
-    GLenum error = glGetError();
-    if (error != GL_NO_ERROR)
+    if (const GLenum error = glGetError(); error != GL_NO_ERROR)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error creating render target %dx%d: 0x%x\n", w, h, error);
         return false;
@@ -159,14 +158,6 @@ bool texture::load_target(int w, int h) noexcept
 
     SDL_Log("Created render target texture %u: %dx%d", m_texture, w, h);
     return true;
-}
-
-bool texture::load_from_str(std::string_view str, int cellSize) noexcept
-{
-    // This method appears to be for creating textures from string data
-    // Implementation would depend on specific use case
-    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "load_from_str not yet implemented");
-    return false;
 }
 
 bool texture::load_bmp_icon(SDL_Window *window, std::string_view filepath) noexcept

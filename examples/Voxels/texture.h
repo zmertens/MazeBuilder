@@ -33,9 +33,7 @@ public:
 
     bool load_from_file(std::string_view filepath, std::uint32_t channel_offset = 0) noexcept;
 
-    bool load_bmp_icon(SDL_Window* window,std::string_view filepath) noexcept;
-
-    bool load_from_str(std::string_view str, int cellSize = 10) noexcept;
+    static bool load_bmp_icon(SDL_Window* window,std::string_view filepath) noexcept;
 
 private:
     std::uint32_t m_texture;

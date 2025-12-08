@@ -1,9 +1,7 @@
 #ifndef CRAFT_H
 #define CRAFT_H
 
-#include <functional>
 #include <memory>
-#include <random>
 #include <string>
 
 #include <MazeBuilder/algo_interface.h>

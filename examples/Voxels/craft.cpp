@@ -748,14 +748,15 @@ struct craft::craft_impl
         setup_imgui();
 
         m_crafting_states = std::make_unique<state_stack>(state::context{
-            m_sdl.window, std::ref(m_fonts), std::ref(m_shaders), std::ref(m_textures), std::ref(m_player)
+            m_sdl.window,
+            std::ref(m_fonts),
+            std::ref(m_shaders),
+            std::ref(m_textures),
+            std::ref(m_player)
         });
 
         register_states();
 
-        // Push editor first (bottom of stack), then loading (top of stack)
-        // States are drawn/updated in reverse order (rbegin to rend)
-        // So loading will be processed first and draw on top
         m_crafting_states->push_state(StateIdentifier::EDITOR);
         m_crafting_states->push_state(StateIdentifier::LOADING);
     }
@@ -823,7 +824,7 @@ struct craft::craft_impl
         ImGui::SetNextWindowBgAlpha(0.65f);
 
         // Create window with no title bar, no resize, no move, auto-resize
-        ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+        const ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
             ImGuiWindowFlags_AlwaysAutoResize |
             ImGuiWindowFlags_NoSavedSettings |
             ImGuiWindowFlags_NoFocusOnAppearing |

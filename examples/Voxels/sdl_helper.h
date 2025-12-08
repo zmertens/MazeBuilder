@@ -20,9 +20,9 @@ public:
 
     std::int32_t get_scale_factor() const noexcept;
 
-    void print_display_modes() const noexcept;
+    static void print_display_modes() noexcept;
 
-    void print_opengl_info() const noexcept;
+    static void print_opengl_info() noexcept;
 
     void set_window_icon(std::string_view icon_path) noexcept;
 

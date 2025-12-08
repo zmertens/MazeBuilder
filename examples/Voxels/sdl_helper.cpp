@@ -44,10 +44,10 @@ bool sdl_helper::initialize(std::string_view title, int width, int height) noexc
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-        const Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS;
-        
+        constexpr auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE | SDL_WINDOW_INPUT_FOCUS;
+
         this->window = SDL_CreateWindow(title.data(), width, height, window_flags);
-        
+
         if (!this->window)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_CreateWindow failed (%s)\n", SDL_GetError());
@@ -71,13 +71,15 @@ bool sdl_helper::initialize(std::string_view title, int width, int height) noexc
         SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
 
 #if !defined(__EMSCRIPTEN__)
-        if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress))
+        if (!gladLoadGLLoader(reinterpret_cast<GLADloadproc>(SDL_GL_GetProcAddress)))
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL loader failed (%s)\n", SDL_GetError());
             SDL_Quit();
             return false;
         }
 #endif
+
+        print_opengl_info();
 
         return true;
     };
@@ -87,11 +89,8 @@ bool sdl_helper::initialize(std::string_view title, int width, int height) noexc
         std::call_once(m_initialized_flag, init_func);
         return true;
     }
-    else
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed: %s\n", SDL_GetError());
-        return false;
-    }
+    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_Init failed: %s\n", SDL_GetError());
+    return false;
 }
 
 void sdl_helper::destroy_and_quit() noexcept
@@ -146,12 +145,11 @@ std::int32_t sdl_helper::get_scale_factor() const noexcept
     return buffer_width / window_width;
 }
 
-void sdl_helper::print_display_modes() const noexcept
+void sdl_helper::print_display_modes() noexcept
 {
-    SDL_DisplayID display = SDL_GetPrimaryDisplay();
+    const SDL_DisplayID display = SDL_GetPrimaryDisplay();
     int num_modes = 0;
-    const SDL_DisplayMode *const *modes = SDL_GetFullscreenDisplayModes(display, &num_modes);
-    if (modes)
+    if (const SDL_DisplayMode *const *modes = SDL_GetFullscreenDisplayModes(display, &num_modes))
     {
         for (int i = 0; i < num_modes; ++i)
         {
@@ -162,7 +160,7 @@ void sdl_helper::print_display_modes() const noexcept
     }
 }
 
-void sdl_helper::print_opengl_info() const noexcept
+void sdl_helper::print_opengl_info() noexcept
 {
      const GLubyte *renderer = glGetString(GL_RENDERER);
     const GLubyte *vendor = glGetString(GL_VENDOR);

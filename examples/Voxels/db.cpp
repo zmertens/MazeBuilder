@@ -1,11 +1,15 @@
-#include <string.h>
 #include "db.h"
+
+#include "map.h"
 #include "ring.h"
+#include "sign.h"
+
 #include <sqlite/sqlite3.h>
 
-#include <thread>
-#include <mutex>
 #include <condition_variable>
+#include <mutex>
+#include <string>
+#include <thread>
 
 static int db_enabled = 0;
 
@@ -23,12 +27,10 @@ static sqlite3_stmt *set_key_stmt;
 
 static Ring ring;
 
-using namespace std;
-
-static thread thrd;
-static mutex mtx;
-static condition_variable cnd;
-static mutex load_mtx;
+static std::thread db_thread;
+static std::mutex mtx;
+static std::condition_variable cnd;
+static std::mutex load_mtx;
 
 void db_enable() {
     db_enabled = 1;
@@ -42,11 +44,11 @@ int get_db_enabled() {
     return db_enabled;
 }
 
-int db_init(char *path) {
+int db_init(const char *path) {
     if (!db_enabled) {
         return 0;
     }
-    static const char *create_query =
+    static auto create_query =
         "create table if not exists state ("
         "   x float not null,"
         "   y float not null,"
@@ -89,28 +91,28 @@ int db_init(char *path) {
         "create unique index if not exists key_pq_idx on key (p, q);"
         "create unique index if not exists sign_xyzface_idx on sign (x, y, z, face);"
         "create index if not exists sign_pq_idx on sign (p, q);";
-    static const char *insert_block_query =
+    static auto insert_block_query =
         "insert or replace into block (p, q, x, y, z, w) "
         "values (?, ?, ?, ?, ?, ?);";
-    static const char *insert_light_query =
+    static auto insert_light_query =
         "insert or replace into light (p, q, x, y, z, w) "
         "values (?, ?, ?, ?, ?, ?);";
-    static const char *insert_sign_query =
+    static auto insert_sign_query =
         "insert or replace into sign (p, q, x, y, z, face, text) "
         "values (?, ?, ?, ?, ?, ?, ?);";
-    static const char *delete_sign_query =
+    static auto delete_sign_query =
         "delete from sign where x = ? and y = ? and z = ? and face = ?;";
-    static const char *delete_signs_query =
+    static auto delete_signs_query =
         "delete from sign where x = ? and y = ? and z = ?;";
-    static const char *load_blocks_query =
+    static auto load_blocks_query =
         "select x, y, z, w from block where p = ? and q = ?;";
-    static const char *load_lights_query =
+    static auto load_lights_query =
         "select x, y, z, w from light where p = ? and q = ?;";
-    static const char *load_signs_query =
+    static auto load_signs_query =
         "select x, y, z, face, text from sign where p = ? and q = ?;";
-    static const char *get_key_query =
+    static auto get_key_query =
         "select key from key where p = ? and q = ?;";
-    static const char *set_key_query =
+    static auto set_key_query =
         "insert or replace into key (p, q, key) "
         "values (?, ?, ?);";
     int rc;
@@ -386,17 +388,16 @@ void db_load_signs(SignList *list, int p, int q) {
     sqlite3_bind_int(load_signs_stmt, 1, p);
     sqlite3_bind_int(load_signs_stmt, 2, q);
     while (sqlite3_step(load_signs_stmt) == SQLITE_ROW) {
-        int x = sqlite3_column_int(load_signs_stmt, 0);
-        int y = sqlite3_column_int(load_signs_stmt, 1);
-        int z = sqlite3_column_int(load_signs_stmt, 2);
-        int face = sqlite3_column_int(load_signs_stmt, 3);
-        const char *text = (const char *)sqlite3_column_text(
-            load_signs_stmt, 4);
+        const int x = sqlite3_column_int(load_signs_stmt, 0);
+        const int y = sqlite3_column_int(load_signs_stmt, 1);
+        const int z = sqlite3_column_int(load_signs_stmt, 2);
+        const int face = sqlite3_column_int(load_signs_stmt, 3);
+        const auto text = reinterpret_cast<const char*>(sqlite3_column_text(load_signs_stmt, 4));
         sign_list_add(list, x, y, z, face, text);
     }
 }
 
-int db_get_key(int p, int q) {
+int db_get_key(const int p, const int q) {
     if (!db_enabled) {
         return 0;
     }
@@ -409,7 +410,7 @@ int db_get_key(int p, int q) {
     return 0;
 }
 
-void db_set_key(int p, int q, int key) {
+void db_set_key(int p, int q, const int key) {
     if (!db_enabled) {
         return;
     }
@@ -419,7 +420,7 @@ void db_set_key(int p, int q, int key) {
     mtx.unlock();
 }
 
-void _db_set_key(int p, int q, int key) {
+void _db_set_key(const int p, const int q, const int key) {
     sqlite3_reset(set_key_stmt);
     sqlite3_bind_int(set_key_stmt, 1, p);
     sqlite3_bind_int(set_key_stmt, 2, q);
@@ -433,8 +434,8 @@ void db_worker_start(const char *path) {
     }
     ring_alloc(&ring, 1024);
 
-    thrd = thread([](const char* p) {
-        db_worker_run(reinterpret_cast<void*>(const_cast<char*>(p)));
+    db_thread = std::thread([](const char* p) {
+        db_worker_run(const_cast<char*>(p));
     }, path);
 }
 
@@ -450,7 +451,7 @@ void db_worker_stop() {
 
     mtx.unlock();
 
-    thrd.join();
+    db_thread.join();
 
     ring_free(&ring);
 }
@@ -461,27 +462,27 @@ int db_worker_run(void *arg) {
         RingEntry e;
 
         while (!ring_get(&ring, &e)) {
-            unique_lock<mutex> u_lck (mtx);
-            cnd.wait(u_lck);
+            std::unique_lock my_lock (mtx);
+            cnd.wait(my_lock);
         }
 
         switch (e.type) {
-            case BLOCK:
+            case RingEntryType::BLOCK:
                 _db_insert_block(e.p, e.q, e.x, e.y, e.z, e.w);
                 break;
-            case BLOCKS:
+            case RingEntryType::BLOCKS:
 				_db_insert_blocks(e.blocks);
 				break;
-            case LIGHT:
+            case RingEntryType::LIGHT:
                 _db_insert_light(e.p, e.q, e.x, e.y, e.z, e.w);
                 break;
-            case KEY:
+            case RingEntryType::KEY:
                 _db_set_key(e.p, e.q, e.key);
                 break;
-            case COMMIT:
+            case RingEntryType::COMMIT:
                 _db_commit();
                 break;
-            case EXIT:
+            case RingEntryType::EXIT:
                 running = 0;
                 break;
         }

@@ -87,7 +87,11 @@ void world::init() noexcept
     // Set up OpenGL state (critical for rendering)
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
+#if !defined(__EMSCRIPTEN__)
+
     glLogicOp(GL_INVERT);
+#endif
+
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     // Initialize all chunks to have null/zero state
@@ -2145,14 +2149,6 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
         s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, static_cast<int>(this->m_model.is_ortho),
         this->m_model.render_radius);
 
-    // Debug: Log matrix and view parameters periodically
-    static int render_frame = 0;
-    if (render_frame++ % 120 == 0) {
-        SDL_Log("render_chunks: viewport=%dx%d, pos=(%.2f,%.2f,%.2f), rot=(%.2f,%.2f), fov=%.1f, chunks=%d",
-                this->m_model.voxel_scene_w, this->m_model.voxel_scene_h,
-                s->x, s->y, s->z, s->rx, s->ry, this->m_model.fov, this->m_model.chunk_count);
-    }
-
     float planes[6][4];
     // matrix.cpp -> frustum_planes
     frustum_planes(planes, this->m_model.render_radius, matrix);
@@ -2187,12 +2183,6 @@ int world::render_chunks(const Attrib* attrib, player* _player, std::uint32_t te
         this->draw_chunk(attrib, chunk);
         result += chunk->faces;
         chunks_rendered++;
-    }
-
-    // Debug: Log culling statistics
-    if (render_frame % 120 == 0) {
-        SDL_Log("Chunk stats: total=%d, rendered=%d, culled_distance=%d, culled_frustum=%d",
-                this->m_model.chunk_count, chunks_rendered, chunks_culled_distance, chunks_culled_frustum);
     }
 
     return result;

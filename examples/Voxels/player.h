@@ -27,7 +27,7 @@ public:
     struct state
     {
         float x, y, z, rx, ry, t;
-    } s1{}, s2{}, s3{};
+    } s1{};
 
     explicit player();
 
@@ -39,7 +39,7 @@ public:
     player(player&&)  noexcept = default;
     player& operator=(player&&) = default;
 
-    void handle_event(SDL_Event &event, command_queue &commands) noexcept;
+    void handle_event(const SDL_Event &event, command_queue &commands) noexcept;
 
     void handle_realtime_input(command_queue &commands);
 
@@ -66,7 +66,7 @@ private:
     bool m_is_active;
 
     std::string m_name;
-    std::uint32_t m_buffer{};
+    std::uint32_t m_buffer;
 };
 
 #endif // PLAYER_H

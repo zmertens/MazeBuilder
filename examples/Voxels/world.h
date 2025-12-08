@@ -14,7 +14,6 @@
 #include "map.h"
 #include "resource_identifiers.h"
 #include "sign.h"
-#include "glad/glad.h"
 
 #define KEY_FORWARD SDL_SCANCODE_W
 #define KEY_BACKWARD SDL_SCANCODE_S
@@ -228,8 +227,8 @@ private:
     void draw_item(const Attrib* attrib, std::uint32_t buffer, int count) const noexcept;
     void draw_text(const Attrib* attrib, std::uint32_t buffer, std::size_t length) const noexcept;
     void draw_signs(const Attrib* attrib, const Chunk* chunk) const noexcept;
-    void draw_sign(const Attrib* attrib, GLuint buffer, int length) const noexcept;
-    void draw_cube(const Attrib* attrib, GLuint buffer) const noexcept;
+    void draw_sign(const Attrib* attrib, std::uint32_t buffer, int length) const noexcept;
+    void draw_cube(const Attrib* attrib, std::uint32_t buffer) const noexcept;
     void draw_plant(const Attrib* attrib, std::uint32_t buffer) const noexcept;
     void draw_player(const Attrib* attrib, const player* player) const noexcept;
 

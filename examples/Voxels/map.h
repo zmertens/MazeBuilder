@@ -1,5 +1,5 @@
-#ifndef _map_h_
-#define _map_h_
+#ifndef MAP_H
+#define MAP_H
 
 #define EMPTY_ENTRY(entry) ((entry)->value == 0)
 
@@ -26,14 +26,14 @@ typedef union {
     } e;
 } MapEntry;
 
-typedef struct {
+struct Map {
     int dx;
     int dy;
     int dz;
     unsigned int mask;
     unsigned int size;
     MapEntry *data;
-} Map;
+};
 
 void map_alloc(Map *map, int dx, int dy, int dz, int mask);
 void map_free(Map *map);
