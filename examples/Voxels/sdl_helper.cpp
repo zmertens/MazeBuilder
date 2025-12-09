@@ -193,3 +193,29 @@ void sdl_helper::set_window_icon(std::string_view icon_path) noexcept
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "(SDL) Couldn't load icon at %s\n", icon_path.data());
     }
 }
+
+void sdl_helper::del_buffer(const std::uint32_t buffer) noexcept
+{
+    glDeleteBuffers(1, &buffer);
+}
+
+std::uint32_t sdl_helper::gen_buffer(const std::size_t size, const float* data) noexcept
+{
+    GLuint buffer;
+    glGenBuffers(1, &buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(size), data, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    return buffer;
+}
+
+float* sdl_helper::malloc_faces(const std::size_t components, const std::size_t faces) noexcept
+{
+    return static_cast<GLfloat*>(SDL_malloc(sizeof(GLfloat) * 6 * components * faces));
+}
+
+std::uint32_t sdl_helper::gen_faces(const std::size_t components, const std::size_t faces, const float* data) noexcept
+{
+    const GLuint buffer = gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
+    return buffer;
+}

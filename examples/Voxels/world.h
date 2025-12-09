@@ -34,9 +34,12 @@
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
 
-#define WORKER_IDLE 0
-#define WORKER_BUSY 1
-#define WORKER_DONE 2
+enum class WorkerState : int
+{
+    IDLE = 0,
+    BUSY = 1,
+    DONE = 2
+};
 
 union SDL_Event;
 
@@ -75,7 +78,7 @@ public:
     // Destroy the world
     void destroy_world();
 
-    void handle_event(SDL_Event& event) noexcept;
+    void handle_event(const SDL_Event& event) noexcept;
 
     static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
 
@@ -122,7 +125,7 @@ private:
 
     typedef struct {
         int index;
-        int state;
+        WorkerState state;
         std::thread thrd;
         std::mutex mtx;
         std::condition_variable cnd;

@@ -13,6 +13,7 @@ player::player()
     : scene_node{}
     , m_is_active{true}
     , m_on_ground{false}
+, m_is_flying{false}
     , m_buffer{}
     , m_world{nullptr}
 {
@@ -23,7 +24,8 @@ player::player()
     m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
     m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
     m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
-    m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
+    m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;  // Also used for UP in flying mode
+    m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;  // Down in flying mode
     m_key_binding[SDL_SCANCODE_TAB] = PlayerAction::FLY;
 
     initialize_actions();
@@ -87,7 +89,8 @@ void player::handle_realtime_input(command_queue &commands)
 
     for (auto & [fst, snd] : m_key_binding)
     {
-        if (is_realtime_action(snd))
+        // Regular realtime actions OR JUMP when flying
+        if (is_realtime_action(snd) || (snd == PlayerAction::JUMP && m_is_flying))
         {
             int numKeys = 0;
 
@@ -228,18 +231,48 @@ void player::initialize_actions()
     m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
         [](player& p, float dt)
         {
-            if (p.m_on_ground)
+            if (p.m_is_flying)
             {
+                // In flying mode, move up
+                constexpr float flySpeed = 0.15f;
+                p.vel.vy = flySpeed;
+            }
+            else if (p.m_on_ground)
+            {
+                // Normal jump when on ground
                 constexpr float jumpVelocity = 8.0f;
                 p.vel.vy = jumpVelocity;
                 p.m_on_ground = false;
             }
         });
 
+    // MOVE_DOWN action for flying mode (Left Shift)
+    m_action_binding[PlayerAction::MOVE_DOWN].action = derived_action<player>(
+        [](player& p, float dt)
+        {
+            if (p.m_is_flying)
+            {
+                // In flying mode, move down
+                constexpr float flySpeed = 0.15f;
+                p.vel.vy = -flySpeed;
+            }
+        });
+
     m_action_binding[PlayerAction::FLY].action = derived_action<player>(
     [](player& p, float dt)
     {
-        p.m_on_ground = !p.m_on_ground;
+        p.m_is_flying = !p.m_is_flying;
+
+        if (p.m_is_flying)
+        {
+            // When entering flying mode, zero out vertical velocity
+            p.vel.vy = 0.0f;
+            SDL_Log("Flying mode: ENABLED");
+        }
+        else
+        {
+            SDL_Log("Flying mode: DISABLED");
+        }
     });
 
     m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
@@ -269,6 +302,7 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
     case PlayerAction::MOVE_RIGHT:
     case PlayerAction::MOVE_FORWARD:
     case PlayerAction::MOVE_BACKWARD:
+    case PlayerAction::MOVE_DOWN:  // Hold Shift to descend in flying mode
         return true;
     default:
         return false;

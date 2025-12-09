@@ -13,6 +13,8 @@ enum class PlayerAction
     MOVE_RIGHT,
     MOVE_FORWARD,
     MOVE_BACKWARD,
+    MOVE_UP,      // For flying mode - ascend
+    MOVE_DOWN,    // For flying mode - descend
     JUMP,
     FLY,
     BUILD_BLOCK,
@@ -79,6 +81,7 @@ private:
 
     bool m_is_active;
     bool m_on_ground;
+    bool m_is_flying;
 
     std::string m_name;
     std::uint32_t m_buffer;

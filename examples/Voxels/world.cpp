@@ -133,9 +133,6 @@ void world::init() noexcept
     // Set player Y position to proper height above terrain
     m_player->s1.y = static_cast<float>(highest_block(m_player->s1.x, m_player->s1.z) + 2);
 
-    SDL_Log("World initialized: Player starting position (%.2f, %.2f, %.2f), rotation (%.2f, %.2f)",
-            m_player->s1.x, m_player->s1.y, m_player->s1.z, m_player->s1.rx, m_player->s1.ry);
-
     m_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     m_block_attrib.position = 0;
     m_block_attrib.normal = 1;
@@ -180,8 +177,6 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     // Process all commands in the queue
     static int update_frame = 0;
     int commands_processed = 0;
-    float old_x = m_player->s1.x;
-    float old_z = m_player->s1.z;
 
     while (!m_command_queue.is_empty())
     {
@@ -190,43 +185,50 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
         commands_processed++;
     }
 
-    if (commands_processed > 0 && update_frame % 60 == 0)
-    {
-        SDL_Log("Processed %d commands, player moved from (%.2f, %.2f) to (%.2f, %.2f)",
-                commands_processed, old_x, old_z, m_player->s1.x, m_player->s1.z);
-    }
     update_frame++;
 
     // Apply gravity as continuous force (convert delta_time from ms to seconds)
     const float dt_seconds = delta_time / 1000.0f;
-    m_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
+
+    // Only apply gravity when not flying
+    if (!m_player->m_is_flying)
+    {
+        m_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
+    }
+    else
+    {
+        // In flying mode, apply damping to vertical velocity to stop floating
+        m_player->vel.vy *= 0.85f;
+    }
 
     // Apply velocity to position
     m_player->s1.y += m_player->vel.vy * dt_seconds;
 
     // Apply collision detection (height = 2 blocks for player)
-    float before_collision_x = m_player->s1.x;
-    float before_collision_z = m_player->s1.z;
-    const int collision_result = collide(2, &m_player->s1.x, &m_player->s1.y, &m_player->s1.z);
-
-    if (update_frame % 60 == 0 && (before_collision_x != m_player->s1.x || before_collision_z != m_player->s1.z)) {
-        SDL_Log("Collision adjusted position from (%.2f, %.2f) to (%.2f, %.2f)",
-                before_collision_x, before_collision_z, m_player->s1.x, m_player->s1.z);
-    }
-
-    // Update ground state based on collision via helper (world is friend of player)
-    if (collision_result == 1)
+    // Skip collision when flying (allows clipping through blocks)
+    if (!m_player->m_is_flying)
     {
-        m_player->vel.vy = 0.0f;  // Stop vertical velocity on collision
-        m_player->m_on_ground = true;
+        const int collision_result = collide(2, &m_player->s1.x, &m_player->s1.y, &m_player->s1.z);
+
+        // Update ground state based on collision via helper (world is friend of player)
+        if (collision_result == 1)
+        {
+            m_player->vel.vy = 0.0f;  // Stop vertical velocity on collision
+            m_player->m_on_ground = true;
+        }
+        else
+        {
+            m_player->m_on_ground = false;
+        }
     }
     else
     {
+        // When flying, not on ground
         m_player->m_on_ground = false;
     }
 
     delete_chunks();
-    del_buffer(m_player->get_buffer());
+    sdl_helper::del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
 }
 
@@ -245,7 +247,7 @@ void world::draw() const noexcept
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    glClearColor(0.53f, 0.81f, 0.92f, 1.0f); // Sky blue for better visibility
+    glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Get texture IDs from texture manager
@@ -300,7 +302,7 @@ void world::destroy_world()
     delete_all_players();
 }
 
-void world::handle_event(SDL_Event& event) noexcept
+void world::handle_event(const SDL_Event& event) noexcept
 {
     if (event.type == SDL_EVENT_QUIT)
     {
@@ -438,7 +440,7 @@ bool world::worker_run(void* arg) noexcept
     auto* worker = reinterpret_cast<Worker*>(arg);
     while (true)
     {
-        while (worker->state != WORKER_BUSY && !worker->should_stop)
+        while (worker->state != WorkerState::BUSY && !worker->should_stop)
         {
             std::unique_lock<std::mutex> my_lock(worker->mtx);
             worker->cnd.wait(my_lock);
@@ -456,7 +458,7 @@ bool world::worker_run(void* arg) noexcept
         this->compute_chunk(worker_item);
 
         worker->mtx.lock();
-        worker->state = WORKER_DONE;
+        worker->state = WorkerState::DONE;
         worker->mtx.unlock();
     }
     return true;
@@ -469,7 +471,7 @@ void world::init_worker_threads() noexcept
     {
         auto worker = std::make_unique<Worker>();
         worker->index = i;
-        worker->state = WORKER_IDLE;
+        worker->state = WorkerState::IDLE;
         this->m_model.workers.emplace_back(std::move(worker));
         Worker* worker_ptr = this->m_model.workers.back().get();
         worker_ptr->thrd = std::thread([this, worker_ptr]() { this->worker_run(worker_ptr); });
@@ -496,35 +498,6 @@ void world::cleanup_worker_threads() noexcept
     }
     // Clear the vector after all threads have been joined
     this->m_model.workers.clear();
-}
-
-void world::del_buffer(const std::uint32_t buffer) const noexcept
-{
-    glDeleteBuffers(1, &buffer);
-}
-
-std::uint32_t world::gen_buffer(const std::size_t size, const float* data) const noexcept
-{
-    GLuint buffer;
-    glGenBuffers(1, &buffer);
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(size), data, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-    return buffer;
-}
-
-float* world::malloc_faces(const std::size_t components, const std::size_t faces) const noexcept
-{
-    return static_cast<GLfloat*>(SDL_malloc(sizeof(GLfloat) * 6 * components * faces));
-}
-
-/**
- * Generate a buffer for faces - data is not freed here
- */
-std::uint32_t world::gen_faces(const std::size_t components, const std::size_t faces, const float* data) const noexcept
-{
-    const GLuint buffer = this->gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
-    return buffer;
 }
 
 int world::chunked(const float x) const noexcept
@@ -620,7 +593,7 @@ std::uint32_t world::gen_crosshair_buffer() const noexcept
         x, y - p, x, y + p,
         x - p, y, x + p, y
     };
-    return gen_buffer(sizeof(data), data);
+    return sdl_helper::gen_buffer(sizeof(data), data);
 }
 
 std::uint32_t world::gen_wireframe_buffer(float x, float y, float z, float n) const noexcept
@@ -628,12 +601,12 @@ std::uint32_t world::gen_wireframe_buffer(float x, float y, float z, float n) co
     float data[72];
     // cube.h -> make_cube_wireframe
     make_cube_wireframe(data, x, y, z, n);
-    return gen_buffer(sizeof(data), data);
+    return sdl_helper::gen_buffer(sizeof(data), data);
 }
 
 std::uint32_t world::gen_cube_buffer(const float x, float y, float z, float n, int w) const noexcept
 {
-    GLfloat* data = malloc_faces(10, 6);
+    GLfloat* data = sdl_helper::malloc_faces(10, 6);
     float ao[6][4] = {0};
     float light[6][4] = {
         {0.5, 0.5, 0.5, 0.5},
@@ -644,37 +617,37 @@ std::uint32_t world::gen_cube_buffer(const float x, float y, float z, float n, i
         {0.5, 0.5, 0.5, 0.5}
     };
     make_cube(data, ao, light, 1, 1, 1, 1, 1, 1, x, y, z, n, w);
-    return gen_faces(10, 6, data);
+    return sdl_helper::gen_faces(10, 6, data);
 }
 
 std::uint32_t world::gen_plant_buffer(const float x, const float y, const float z, const float n,
                                       const int w) const noexcept
 {
-    GLfloat* data = malloc_faces(10, 4);
+    GLfloat* data = sdl_helper::malloc_faces(10, 4);
     float ao = 0;
     float light = 1;
     make_plant(data, ao, light, x, y, z, n, w, 45);
-    return gen_faces(10, 4, data);
+    return sdl_helper::gen_faces(10, 4, data);
 }
 
 std::uint32_t world::gen_player_buffer(const float x, const float y, const float z, const float rx,
                                        const float ry) const noexcept
 {
-    GLfloat* data = malloc_faces(10, 6);
+    GLfloat* data = sdl_helper::malloc_faces(10, 6);
     make_player(data, x, y, z, rx, ry);
-    return gen_faces(10, 6, data);
+    return sdl_helper::gen_faces(10, 6, data);
 }
 
 std::uint32_t world::gen_text_buffer(float x, const float y, const float n, const std::string_view text) const noexcept
 {
     const auto length = static_cast<GLsizei>(text.size());
-    GLfloat* data = malloc_faces(4, length);
+    GLfloat* data = sdl_helper::malloc_faces(4, length);
     for (int i = 0; i < length; i++)
     {
         make_character(data + i * 24, x, y, n / 2, n, text[i]);
         x += n;
     }
-    return gen_faces(4, length, data);
+    return sdl_helper::gen_faces(4, length, data);
 }
 
 void world::draw_triangles_3d_ao(const Attrib* attrib, const std::uint32_t buffer, const int count) const noexcept
@@ -826,7 +799,7 @@ void world::delete_all_players() noexcept
 {
     for (int i = 0; i < m_model.player_count; i++)
     {
-        this->del_buffer(m_player->get_buffer());
+        sdl_helper::del_buffer(m_player->get_buffer());
     }
     m_model.player_count = 0;
 }
@@ -1291,7 +1264,7 @@ void world::gen_sign_buffer(Chunk* chunk) const noexcept
     }
 
     // second pass - generate geometry
-    GLfloat* data = malloc_faces(5, max_faces);
+    GLfloat* data = sdl_helper::malloc_faces(5, max_faces);
     std::size_t faces = 0;
     for (int i = 0; i < signs->size; i++)
     {
@@ -1302,8 +1275,8 @@ void world::gen_sign_buffer(Chunk* chunk) const noexcept
                                                            static_cast<float>(e->z), e->face, e->text));
     }
 
-    this->del_buffer(chunk->sign_buffer);
-    chunk->sign_buffer = gen_faces(5, static_cast<GLsizei>(faces), data);
+    sdl_helper::del_buffer(chunk->sign_buffer);
+    chunk->sign_buffer = sdl_helper::gen_faces(5, static_cast<GLsizei>(faces), data);
     chunk->sign_faces = static_cast<int>(faces);
 }
 
@@ -1566,7 +1539,7 @@ void world::compute_chunk(WorkerItem* item) const noexcept
     // generate geometry
     // each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
     static constexpr int components = 10;
-    GLfloat* data = malloc_faces(components, faces);
+    GLfloat* data = sdl_helper::malloc_faces(components, faces);
     int offset = 0;
     MAP_FOR_EACH(block_map, ex, ey, ez, ew)
         {
@@ -1665,8 +1638,8 @@ void world::generate_chunk(Chunk* chunk, WorkerItem* item) const noexcept
     chunk->miny = item->miny;
     chunk->maxy = item->maxy;
     chunk->faces = item->faces;
-    this->del_buffer(chunk->buffer);
-    chunk->buffer = this->gen_faces(10, item->faces, item->data);
+    sdl_helper::del_buffer(chunk->buffer);
+    chunk->buffer = sdl_helper::gen_faces(10, item->faces, item->data);
     this->gen_sign_buffer(chunk);
 }
 
@@ -1784,10 +1757,10 @@ void world::delete_chunks() noexcept
         {
             map_free(&chunk->map);
             map_free(&chunk->lights);
-            sign_list_free(reinterpret_cast<::SignList*>(&chunk->signs));
-            del_buffer(chunk->buffer);
-            del_buffer(chunk->sign_buffer);
-            Chunk* other = this->m_model.chunks + (--count);
+            sign_list_free(&chunk->signs);
+            sdl_helper::del_buffer(chunk->buffer);
+            sdl_helper::del_buffer(chunk->sign_buffer);
+            const Chunk* other = this->m_model.chunks + (--count);
             SDL_memcpy(chunk, other, sizeof(Chunk));
         }
     }
@@ -1801,9 +1774,9 @@ void world::delete_all_chunks() noexcept
         Chunk* chunk = this->m_model.chunks + i;
         map_free(&chunk->map);
         map_free(&chunk->lights);
-        sign_list_free(reinterpret_cast<::SignList*>(&chunk->signs));
-        del_buffer(chunk->buffer);
-        del_buffer(chunk->sign_buffer);
+        sign_list_free(&chunk->signs);
+        sdl_helper::del_buffer(chunk->buffer);
+        sdl_helper::del_buffer(chunk->sign_buffer);
     }
     this->m_model.chunk_count = 0;
 }
@@ -1813,7 +1786,7 @@ void world::check_workers() noexcept
     for (auto&& worker : this->m_model.workers)
     {
         worker->mtx.lock();
-        if (worker->state == WORKER_DONE)
+        if (worker->state == WorkerState::DONE)
         {
             WorkerItem* item = &worker->item;
             auto chunk_opt = find_chunk(item->p, item->q);
@@ -1847,7 +1820,7 @@ void world::check_workers() noexcept
                     }
                 }
             }
-            worker->state = WORKER_IDLE;
+            worker->state = WorkerState::IDLE;
         }
         worker->mtx.unlock();
     }
@@ -2002,7 +1975,7 @@ void world::ensure_chunks_worker(player* _player, Worker* worker) noexcept
         }
     }
     chunk->dirty = 0;
-    worker->state = WORKER_BUSY;
+    worker->state = WorkerState::BUSY;
     worker->cnd.notify_one();
 } // ensure chunks worker
 
@@ -2013,7 +1986,7 @@ void world::ensure_chunks(player* _player) noexcept
     for (auto&& worker : m_model.workers)
     {
         worker->mtx.lock();
-        if (worker->state == WORKER_IDLE)
+        if (worker->state == WorkerState::IDLE)
         {
             ensure_chunks_worker(_player, worker.get());
         }
@@ -2062,7 +2035,7 @@ void world::unset_sign_face(const int x, const int y, const int z, const int fac
 void world::_set_sign(const int p, const int q, const int x, const int y, const int z,
     const int face, const std::string_view text, const int dirty) const noexcept
 {
-    if (text.length() == 0)
+    if (text.empty())
     {
         unset_sign_face(x, y, z, face);
         return;
@@ -2325,12 +2298,12 @@ void world::render_sign(const Attrib* attrib, player* _player, const std::uint32
     char text[MAX_SIGN_LENGTH];
     SDL_strlcpy(text, "put maze here", MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
-    GLfloat* data = malloc_faces(5, SDL_strlen(text));
+    GLfloat* data = sdl_helper::malloc_faces(5, SDL_strlen(text));
     const int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
                                   text);
-    const GLuint buffer = gen_faces(5, length, data);
+    const GLuint buffer = sdl_helper::gen_faces(5, length, data);
     draw_sign(attrib, buffer, length);
-    del_buffer(buffer);
+    sdl_helper::del_buffer(buffer);
 }
 
 void world::render_players(const Attrib* attrib, player* _player) const noexcept
@@ -2370,7 +2343,7 @@ void world::render_wireframe(const Attrib* attrib, const player* _player) const 
         const GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
                                                        static_cast<float>(hz), 0.53f);
         draw_lines(attrib, wireframe_buffer, 3, 24);
-        del_buffer(wireframe_buffer);
+        sdl_helper::del_buffer(wireframe_buffer);
     }
 }
 
@@ -2383,7 +2356,7 @@ void world::render_crosshairs(const Attrib* attrib) const noexcept
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     const GLuint crosshair_buffer = gen_crosshair_buffer();
     draw_lines(attrib, crosshair_buffer, 2, 4);
-    del_buffer(crosshair_buffer);
+    sdl_helper::del_buffer(crosshair_buffer);
 }
 
 void world::render_item(const Attrib* attrib, const std::uint32_t texture) const noexcept
@@ -2401,13 +2374,13 @@ void world::render_item(const Attrib* attrib, const std::uint32_t texture) const
     {
         const GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
         draw_plant(attrib, buffer);
-        del_buffer(buffer);
+        sdl_helper::del_buffer(buffer);
     }
     else
     {
         const GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
         draw_cube(attrib, buffer);
-        del_buffer(buffer);
+        sdl_helper::del_buffer(buffer);
     }
 }
 
@@ -2426,7 +2399,7 @@ void world::render_text(const Attrib* attrib, const std::uint32_t font,
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = gen_text_buffer(x, y, n, text);
     draw_text(attrib, buffer, length);
-    del_buffer(buffer);
+    sdl_helper::del_buffer(buffer);
 }
 
 void world::on_light() const noexcept

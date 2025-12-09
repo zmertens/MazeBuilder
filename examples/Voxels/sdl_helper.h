@@ -26,6 +26,14 @@ public:
 
     void set_window_icon(std::string_view icon_path) noexcept;
 
+    static void del_buffer(std::uint32_t buffer) noexcept;
+
+    static std::uint32_t gen_buffer(std::size_t size, const float* data) noexcept;
+
+    static float* malloc_faces(std::size_t components, std::size_t faces) noexcept;
+
+    static std::uint32_t gen_faces(std::size_t components, std::size_t faces, const float* data) noexcept;
+
 private:
     std::once_flag m_initialized_flag;
 };
