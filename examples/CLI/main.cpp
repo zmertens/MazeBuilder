@@ -10,6 +10,7 @@
 #include <functional>
 #include <stdexcept>
 #include <string>
+#include <sstream>
 #include <vector>
 
 #include <MazeBuilder/configurator.h>
@@ -57,6 +58,7 @@ int main(const int argc, char* argv[])
     {
         if (const auto my_cli = mazes::singleton_base<cli>::instance())
         {
+            std::stringstream stream;
             mazes::configurator user_options;
             if (const auto str = my_cli->convert(std::cref(args_vec), std::ref(user_options));
                 !str.empty())
@@ -68,7 +70,7 @@ int main(const int argc, char* argv[])
                 if (const auto output_fmt = user_options.output_format_id();
                     output_fmt == mazes::output_format::PNG || output_fmt == mazes::output_format::JPEG)
                 {
-                    auto filename = user_options.output_filename();
+                    const auto filename = user_options.output_filename();
                     if (user_options.output_format_id() == mazes::output_format::PNG)
                     {
                         write_success = writer.write_png(filename, cli::string_to_bytes(std::cref(str)),
@@ -83,27 +85,33 @@ int main(const int argc, char* argv[])
                                                           user_options.image_height(),
                                                           4);
                     }
+
+                    stream << "Wrote file: " << filename << std::endl;
+                    stream << "Image dimensions: " << user_options.image_width() << "x"
+                           << user_options.image_height() << std::endl;
                 }
                 else
                 {
                     // Check if we have a specific output filename
                     if (const auto filename = user_options.output_filename(); !filename.empty())
                     {
-                        if (mazes::to_output_format_from_sv(mazes::string_utils::get_file_extension(filename)) ==
-                            mazes::output_format::STDOUT)
+                        if (user_options.output_format_id() == mazes::output_format::STDOUT)
                         {
                             // Write to stdout
                             write_success = writer.write(std::cout, str);
+                            stream << "Wrote to standard output." << std::endl;
                         }
                         else
                         {
                             // Write to file
                             write_success = writer.write_file(user_options.output_filename(), str);
+                            stream << "Wrote file: " << filename << std::endl;
                         }
                     }
                     else
                     {
                         write_success = writer.write(std::cout, str);
+                        stream << "Wrote to standard output." << std::endl;
                     }
                 }
 
@@ -111,6 +119,9 @@ int main(const int argc, char* argv[])
                 {
                     throw std::runtime_error("Failed to write output.");
                 }
+
+                std::cout << stream.str() << std::endl;
+
             }
             else
             {

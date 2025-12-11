@@ -61,8 +61,6 @@ static std::string get_cli_help_str()
         "\t-v, --version      display program version\n";
 }
 
-std::string cli::m_debug_str;
-
 std::string cli::m_help_str = get_cli_help_str();
 
 std::string cli::m_title_str = get_cli_title_str();
@@ -73,7 +71,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 {
 #if defined(MAZE_DEBUG)
 
-    m_debug_str = m_version_str + " - DEBUG";
+    m_version_str += " - DEBUG";
 #endif
 
     if (args_vec.empty())
@@ -98,13 +96,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
                 mazes::args::VERSION_WORD_STR;
         }); need_version != args_vec.cend())
         {
-#if defined(MAZE_DEBUG)
-
-            return m_debug_str;
-#else
-
             return m_version_str;
-#endif
         }
 
         mazes::configurator user_options;
@@ -112,10 +104,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
     }
     catch (const std::exception& ex)
     {
-#if defined(MAZE_DEBUG)
-
-        std::cerr << "CLI Error: " << ex.what() << std::endl;
-#endif
+        std::cerr << "CLI convert error: " << ex.what() << std::endl;
     }
 
     return "";
@@ -193,7 +182,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec, mazes::config
             }
 
             // Get pixel vector and convert to string for transmission/storage
-            auto pixel_vec = product.value()->operations().get_pixels();
+            const auto pixel_vec = product.value()->operations().get_pixels();
 
             // Compute and store image size into configurator
             compute_and_store_image_size(product.value().get(), user_options);
@@ -206,7 +195,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec, mazes::config
         }
         else
         {
-            if (mazes::stringify s; !s.run(product.value().get(), rng))
+            if (const mazes::stringify s; !s.run(product.value().get(), rng))
             {
                 return "Failed to stringify";
             }
@@ -366,10 +355,19 @@ void cli::apply(mazes::grid_interface* g, mazes::randomizer& rng, const mazes::a
 
                 // If end index is -1 (default), use the last cell
                 const int max_cell_index = (config.rows() * config.columns()) - 1;
-                if (end_idx == -1)
-                {
-                    end_idx = max_cell_index;
-                }
+
+                // Resolve negative end indices by counting backwards from the last cell:
+                // -1 -> last cell (max_cell_index), -2 -> second-to-last, etc.
+                const auto resolve_end_idx = [max_cell_index](int given_end) noexcept -> int {
+                    if (given_end >= 0) {
+                        return given_end;
+                    }
+                    // Translate negative index into 0-based index from the end
+                    // Example: given_end == -1 -> (max_cell_index + 1) - 1 == max_cell_index
+                    return (max_cell_index + 1) + given_end;
+                };
+
+                end_idx = resolve_end_idx(end_idx);
 
                 // Ensure indices are within valid range
                 start_idx = std::clamp(start_idx, 0, max_cell_index);

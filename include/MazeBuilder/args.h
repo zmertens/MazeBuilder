@@ -111,7 +111,7 @@ namespace mazes
         /// @param arguments Command-line arguments
         /// @param has_program_name_as_first_arg Whether the first argument is the program name
         /// @return True if parsing was successful
-        bool parse(const std::vector<std::string> &arguments, bool has_program_name_as_first_arg = false) noexcept;
+        bool parse(const std::vector<std::string> &arguments, bool has_program_name_as_first_arg = false) const noexcept;
 
         /// @brief Parse program arguments from a string
         /// @param arguments Space-delimited command-line arguments
@@ -127,7 +127,7 @@ namespace mazes
         bool parse(int argc, char **argv, bool has_program_name_as_first_arg = false) noexcept;
 
         /// @brief Clear the arguments map
-        void clear() noexcept;
+        void clear() const noexcept;
 
         /// @brief Get a value from the args map (from front)
         /// @param key The key to look up
