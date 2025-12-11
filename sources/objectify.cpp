@@ -29,7 +29,7 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
     // Get the grid operations to access dimensions and other methods
     const auto &grid_ops = g->operations();
-    auto dimensions = grid_ops.get_dimensions();
+    const auto dimensions = grid_ops.get_dimensions();
     if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0)
     {
         // Handle invalid dimensions
@@ -37,7 +37,7 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
     }
 
     // Get the string representation of the maze
-    std::string str = grid_ops.get_str();
+    const std::string str = grid_ops.get_str();
     if (str.empty())
     {
         return false;

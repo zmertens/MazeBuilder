@@ -1,79 +1,143 @@
+#include <algorithm>
 #include <MazeBuilder/pixels.h>
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/stringify.h>
+
+#include <cmath>
+#include <sstream>
+#include <string>
+#include <vector>
 
 using namespace mazes;
 
-/// @brief Provide a string representation of the grid
-/// @param g
-/// @param rng
-/// @return
-bool pixels::run([[maybe_unused]] grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+/// @brief Convert ASCII maze representation to pixel data
+/// @param g The grid interface
+/// @param rng The randomizer (unused)
+/// @return True if successful, false otherwise
+bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
 {
-    return false;
-    /*  void string_view_utils::pixels(const std::unique_ptr<maze>&m,
-          std::vector<std::tuple<int, int, int, int>>&vertices,
-          std::vector<std::vector<std::uint32_t>>&faces,
-          std::string_view sv) noexcept {
-          using namespace std;*/
+    if (!g)
+    {
+        return false;
+    }
 
-    //    if (!m) {
-    //        // Handle null maze pointer
-    //        return;
-    //    }
+    // Get the grid operations to access dimensions and other methods
+    auto &grid_ops = g->operations();
 
-    //    auto dimensions = m->get_dimensions();
-    //    if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0) {
-    //        // Handle invalid dimensions
-    //        return;
-    //    }
+    // Ensure we have a string representation first
+    std::string maze_str = grid_ops.get_str();
+    if (maze_str.empty())
+    {
+        // Run stringify if not already done
+        if (stringify stringifier; !stringifier.run(g, rng))
+        {
+            return false;
+        }
+        maze_str = grid_ops.get_str();
 
-    //    auto add_block = [&vertices, &faces](int x, int y, int z, int w, int block_size) {
-    //        // Calculate the base index for the new vertices
-    //        std::uint32_t baseIndex = static_cast<std::uint32_t>(vertices.size() + 1);
-    //        // Define the 8 vertices of the cube
-    //        vertices.emplace_back(x, y, z, w);
-    //        vertices.emplace_back(x + block_size, y, z, w);
-    //        vertices.emplace_back(x + block_size, y + block_size, z, w);
-    //        vertices.emplace_back(x, y + block_size, z, w);
-    //        vertices.emplace_back(x, y, z + block_size, w);
-    //        vertices.emplace_back(x + block_size, y, z + block_size, w);
-    //        vertices.emplace_back(x + block_size, y + block_size, z + block_size, w);
-    //        vertices.emplace_back(x, y + block_size, z + block_size, w);
+        if (maze_str.empty())
+        {
+            return false;
+        }
+    }
 
-    //        // Define faces using the vertices above (12 triangles for 6 faces)
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 1, baseIndex + 2});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 2, baseIndex + 3});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 4, baseIndex + 6, baseIndex + 5});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 4, baseIndex + 7, baseIndex + 6});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 3, baseIndex + 7});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 7, baseIndex + 4});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 1, baseIndex + 5, baseIndex + 6});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 1, baseIndex + 6, baseIndex + 2});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 3, baseIndex + 2, baseIndex + 6});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex + 3, baseIndex + 6, baseIndex + 7});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 4, baseIndex + 5});
-    //        faces.emplace_back(std::initializer_list<std::uint32_t>{baseIndex, baseIndex + 5, baseIndex + 1});
-    //        };
+    // Calculate scale based on grid dimensions
+    auto [rows, columns, levels] = grid_ops.get_dimensions();
 
-    //    int row_x = 0;
+    // Scale formula: sqrt(rows * columns), clamped to reasonable values
+    constexpr unsigned int MIN_SCALE = 1;
+    constexpr unsigned int MAX_SCALE = 50;
 
-    //    int col_z = 0;
-    //    for (size_t i = 0; i < sv.size(); ++i) {
-    //        if (sv[i] == '\n') {
-    //            row_x++;
-    //            col_z = 0;
-    //            continue;
-    //        }
+    auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
 
-    //        if (sv[i] == CORNER || sv[i] == BARRIER1 || sv[i] == BARRIER2) {
-    //            static constexpr auto block_size = 1;
-    //            for (auto h = 0; h < std::get<2>(dimensions); ++h) {
-    //                add_block(row_x, col_z, h, m->get_block_id(), block_size);
-    //            }
-    //        }
-    //        col_z++;
-    //    }
-    //}
+    auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+    // Parse the ASCII string to determine dimensions
+    std::istringstream iss(maze_str);
+    std::string line;
+    std::vector<std::string> lines;
+
+    while (std::getline(iss, line))
+    {
+        lines.push_back(line);
+    }
+
+    if (lines.empty())
+    {
+        return false;
+    }
+
+    // Calculate pixel dimensions
+    const size_t ascii_height = lines.size();
+    const size_t ascii_width = lines[0].length();
+
+    const unsigned int pixel_width = static_cast<unsigned int>(ascii_width * scale);
+    const unsigned int pixel_height = static_cast<unsigned int>(ascii_height * scale);
+
+    // RGBA format - 4 bytes per pixel
+    constexpr unsigned int STRIDE = 4;
+    const size_t pixel_data_size = static_cast<size_t>(pixel_width) * pixel_height * STRIDE;
+
+    std::vector<std::uint8_t> pixel_data(pixel_data_size);
+
+    // Define colors (RGBA format)
+    constexpr std::uint8_t BLACK_R = 0x00;
+    constexpr std::uint8_t BLACK_G = 0x00;
+    constexpr std::uint8_t BLACK_B = 0x00;
+    constexpr std::uint8_t BLACK_A = 0xFF;
+
+    constexpr std::uint8_t WHITE_R = 0xFF;
+    constexpr std::uint8_t WHITE_G = 0xFF;
+    constexpr std::uint8_t WHITE_B = 0xFF;
+    constexpr std::uint8_t WHITE_A = 0xFF;
+
+    // Convert ASCII to pixels
+    for (size_t ascii_y = 0; ascii_y < ascii_height; ++ascii_y)
+    {
+        const std::string &current_line = lines[ascii_y];
+
+        for (size_t ascii_x = 0; ascii_x < ascii_width && ascii_x < current_line.length(); ++ascii_x)
+        {
+            const char ch = current_line[ascii_x];
+
+            // Determine if this is a wall or passage
+            const bool is_wall = (ch == '+' || ch == '-' || ch == '|');
+
+            const std::uint8_t red = is_wall ? BLACK_R : WHITE_R;
+            const std::uint8_t green = is_wall ? BLACK_G : WHITE_G;
+            const std::uint8_t blue = is_wall ? BLACK_B : WHITE_B;
+            const std::uint8_t alpha = is_wall ? BLACK_A : WHITE_A;
+
+            // Fill scaled pixel block
+            for (unsigned int sy = 0; sy < scale; ++sy)
+            {
+                for (unsigned int sx = 0; sx < scale; ++sx)
+                {
+                    const size_t pixel_y = ascii_y * scale + sy;
+                    const size_t pixel_x = ascii_x * scale + sx;
+
+                    if (pixel_y < pixel_height && pixel_x < pixel_width)
+                    {
+                        const size_t pixel_index = (pixel_y * pixel_width + pixel_x) * STRIDE;
+
+                        if (pixel_index + 3 < pixel_data_size)
+                        {
+                            pixel_data[pixel_index + 0] = red;
+                            pixel_data[pixel_index + 1] = green;
+                            pixel_data[pixel_index + 2] = blue;
+                            pixel_data[pixel_index + 3] = alpha;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Store the pixel data in the grid
+    grid_ops.set_pixels(pixel_data);
+
+    return true;
 } // run

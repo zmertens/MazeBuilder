@@ -1,81 +1,77 @@
-#include "parser.h"
+#include "config_mapper.h"
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/enums.h>
+#include <MazeBuilder/string_utils.h>
 
-#include <cstring>
 #include <iostream>
 #include <stdexcept>
 
-bool parser::parse(std::vector<std::string> const& args, mazes::configurator& config) const {
-    
-    using namespace std;
+bool config_mapper::map_args_to_config(std::vector<std::string> const& args, mazes::configurator& config) {
 
-    auto set_config = [&config](const string& key, const string& value) {
+    auto set_config = [&config](const std::string& key, const std::string& value) {
 
         using namespace mazes;
 
         if (key == args::ROW_WORD_STR) {
 
-            config.rows(stoi(value));
+            config.rows(std::stoi(value));
         } else if (key == args::COLUMN_WORD_STR) {
 
-            config.columns(stoi(value));
+            config.columns(std::stoi(value));
         } else if (key == args::LEVEL_WORD_STR) {
 
-            config.levels(stoi(value));
+            config.levels(std::stoi(value));
         } else if (key == args::ALGO_ID_WORD_STR) {
 
             config.algo_id(to_algo_from_sv(value));
         } else if (key == args::SEED_WORD_STR) {
 
-            config.seed(stoi(value));
+            config.seed(std::stoi(value));
         } else if (key == args::BLOCK_ID_WORD_STR) {
 
-            config.block_id(stoi(value));
+            config.block_id(std::stoi(value));
         } else if (key == args::DISTANCES_WORD_STR) {
             // If distances key is present, enable distances
             // The value could be "true" for flag form, or "[start:end]" for range form
-            if (value == args::TRUE_VALUE) {
+            if (value == args::TRUE_VALUE || !value.empty()) {
 
-                config.distances(true);
-            } else if (!value.empty()) {
-
-                // Any non-empty value (like "[0:5]") should enable distances
                 config.distances(true);
             } else {
                 config.distances(false);
             }
         } else if (key == args::DISTANCES_START_STR) {
 
-            config.distances_start(stoi(value));
+            config.distances_start(std::stoi(value));
         } else if (key == args::DISTANCES_END_STR) {
 
-            config.distances_end(stoi(value));
+            config.distances_end(std::stoi(value));
         } else if (key == args::OUTPUT_ID_WORD_STR) {
 
             if (value.empty()) {
 
-                throw runtime_error("Output file name cannot be empty.");
+                throw std::runtime_error("Output file name cannot be empty.");
             }
 
             // Detect if the value looks like a filename or format
             // If it contains a file extension or path separator, treat as filename
             // Otherwise, treat as format
-            if (value.find('.') != string::npos || value.find('/') != string::npos || 
-                value.find('\\') != string::npos || value == "stdout") {
+            if (value.find('.') != std::string::npos || value.find('/') != std::string::npos ||
+                value.find('\\') != std::string::npos || value == "stdout") {
                 // This looks like a filename or special output (stdout)
                 config.output_format_filename(value);
-                
+
                 // Try to infer format from filename extension
                 if (value == "stdout") {
                     config.output_format_id(output_format::STDOUT);
                 } else {
                     size_t dot_pos = value.find_last_of('.');
-                    if (dot_pos != string::npos) {
-                        string extension = value.substr(dot_pos + 1);
+                    if (dot_pos != std::string::npos) {
+                        std::string extension = value.substr(dot_pos + 1);
                         try {
                             config.output_format_id(to_output_format_from_sv(extension));
-                        } catch (const invalid_argument&) {
+                        } catch (const std::invalid_argument&) {
                             // If extension isn't recognized, default to plain text
                             config.output_format_id(output_format::PLAIN_TEXT);
                         }
@@ -94,7 +90,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
         }
         else {
 
-            throw runtime_error("Unknown configuration option: " + key);
+            throw std::runtime_error("Unknown configuration option: " + key);
         }
     };
 
@@ -104,7 +100,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
 
         if (!my_args.parse(args)) {
 
-            throw runtime_error("Failed to parse command line arguments.");
+            throw std::runtime_error("Failed to parse command line arguments.");
         }
 
         // Only process the "word" form of each argument to avoid duplicate processing
@@ -124,7 +120,7 @@ bool parser::parse(std::vector<std::string> const& args, mazes::configurator& co
             mazes::args::OUTPUT_ID_WORD_STR,
             mazes::args::OUTPUT_FILENAME_WORD_STR
         };
-        
+
         // Process only the expected word keys to avoid processing duplicate entries
         for (const auto& key : word_keys) {
 

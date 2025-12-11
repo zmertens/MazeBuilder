@@ -80,6 +80,14 @@ namespace mazes
         /// @brief Set the faces for wavefront object file generation
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept = 0;
+
+        /// @brief Get the pixel data for image generation
+        /// @return A vector of RGBA pixel data
+        virtual std::vector<std::uint8_t> get_pixels() const noexcept = 0;
+
+        /// @brief Set the pixel data for image generation
+        /// @param pixels A vector of RGBA pixel data
+        virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept = 0;
     };
 
 } // namespace mazes

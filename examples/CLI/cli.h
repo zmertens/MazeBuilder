@@ -22,35 +22,41 @@ namespace mazes {
 
 class cli final :  mazes::singleton_base<cli> {
 
-    friend class mazes::singleton_base<cli>;
+    friend class singleton_base<cli>;
 public:
-
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
+
+    std::string convert(std::vector<std::string> const& args_vec,
+        mazes::configurator& user_options) const noexcept;
 
     std::string convert_as_base64(std::vector<std::string> const& args_vec) const noexcept;
 
-    std::string help() const noexcept;
+    std::string help() noexcept;
 
-    std::string version() const noexcept;
-    
-    /// @brief Get the configuration from the last convert call
-    /// @return The configuration object, or nullptr if no valid configuration exists
-    std::shared_ptr<mazes::configurator> get_config() const noexcept;
-    
+    std::string version() noexcept;
+
+    // Helper: copy raw pixel bytes into a std::string for transport/storage
+    static std::string bytes_to_string(const std::vector<std::uint8_t>& bytes);
+
+    // Reverse helper: reconstruct a vector<uint8_t> from a raw bytes string
+    static std::vector<std::uint8_t> string_to_bytes(const std::string& s);
+
+    // Helper: compute image dimensions (width x height) based on grid dimensions and
+    // a reasonable scale and store them into the provided configurator
+    static void compute_and_store_image_size(const mazes::grid_interface* g, mazes::configurator& cfg) noexcept;
 private:
+    static void apply(mazes::grid_interface* g,
+                      mazes::randomizer& rng,
+                      mazes::algo a,
+                      const mazes::configurator& config) noexcept;
 
-    void apply(std::unique_ptr<mazes::grid_interface> const& g, mazes::randomizer& rng, mazes::algo a, const mazes::configurator& config) const noexcept;
+    static std::string m_debug_str;
 
-    static std::string debug_str;
+    static std::string m_help_str;
 
-    static std::string help_str;
+    static std::string m_title_str;
 
-    static std::string title_str;
-
-    static std::string version_str;
-
-    // Store the last configuration
-    mutable std::shared_ptr<mazes::configurator> m_config;
+    static std::string m_version_str;
 
 };
 

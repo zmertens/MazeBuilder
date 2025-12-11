@@ -137,6 +137,14 @@ namespace mazes
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept override;
 
+        /// @brief Get the pixel data for image generation
+        /// @return A vector of RGBA pixel data
+        virtual std::vector<std::uint8_t> get_pixels() const noexcept override;
+
+        /// @brief Set the pixel data for image generation
+        /// @param pixels A vector of RGBA pixel data
+        virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept override;
+
     private:
         std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 
@@ -152,6 +160,9 @@ namespace mazes
         // 3D data
         std::vector<std::tuple<int, int, int, int>> m_vertices;
         std::vector<std::vector<std::uint32_t>> m_faces;
+
+        // Image data
+        std::vector<std::uint8_t> m_pixels;
     };
 
 } // namespace mazes
