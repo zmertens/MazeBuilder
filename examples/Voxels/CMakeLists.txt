@@ -58,11 +58,17 @@ else ()
 
     # Copy shared/dlls on Windows only
     if (WIN32)
-        add_custom_command(
-                TARGET ${VOXELS_EXE} POST_BUILD
-                COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:${VOXELS_EXE}>
-                VERBATIM
-        )
+        # If the SDL3 imported target exists, copy its DLL into the target directory.
+        if (TARGET SDL3::SDL3-shared)
+            add_custom_command(TARGET ${VOXELS_EXE} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${VOXELS_EXE}>"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:SDL3::SDL3-shared>"
+                    "$<TARGET_FILE_DIR:${VOXELS_EXE}>/$<TARGET_FILE_NAME:SDL3::SDL3-shared>"
+                VERBATIM)
+        else()
+            message(WARNING "SDL3::SDL3-shared target not available and fallback DLL not found.")
+        endif()
     endif ()
 
 endif (EMSCRIPTEN)

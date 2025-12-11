@@ -290,10 +290,8 @@ void cli::compute_and_store_image_size(const mazes::grid_interface* g, mazes::co
     const size_t ascii_height = lines.size();
     const size_t ascii_width = lines[0].length();
 
-    // Match pixels::run scaling: sqrt(rows*columns) truncated to unsigned int, clamped
     constexpr unsigned int MIN_SCALE = 1;
-    constexpr unsigned int MAX_SCALE =
-        (mazes::configurator::MAX_ROWS + mazes::configurator::MAX_COLUMNS) / 2;
+    constexpr unsigned int MAX_SCALE = 10;
     const auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
     const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
 

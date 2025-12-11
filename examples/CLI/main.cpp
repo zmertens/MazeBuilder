@@ -120,7 +120,10 @@ int main(const int argc, char* argv[])
                     throw std::runtime_error("Failed to write output.");
                 }
 
+#if defined(MAZE_DEBUG)
+
                 std::cout << stream.str() << std::endl;
+#endif
 
             }
             else

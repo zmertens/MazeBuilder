@@ -47,9 +47,8 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
     // Calculate scale based on grid dimensions
     auto [rows, columns, levels] = grid_ops.get_dimensions();
 
-    // Scale formula: sqrt(rows * columns), clamped to reasonable values
     constexpr unsigned int MIN_SCALE = 1;
-    constexpr unsigned int MAX_SCALE = 50;
+    constexpr unsigned int MAX_SCALE = 10;
 
     auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
 
