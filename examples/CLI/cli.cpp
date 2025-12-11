@@ -44,8 +44,8 @@ static std::string get_cli_help_str()
 {
     return get_cli_title_str() + "\n\n" +
         "Generates mazes and converts to various formats\n\n"
-        "Example: ./cli -r 10 -c 10 -a binary_tree > maze.txt\n\n"
-        "Example: ./cli --rows=10 --columns=10 --algo=dfs -o maze.obj\n\n"
+        "Example: ./cli -r 14 -c 10 -a binary_tree > maze.txt\n\n"
+        "Example: ./cli --rows=5 --columns=6 --algo=dfs -o maze.obj\n\n"
         "Note: Commands are case-sensitive!\n\n"
         "\t-a, --algo         algorithm to generate maze links\n"
         "\t                     [binary_tree, dfs, sidewinder]\n"
@@ -83,7 +83,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
     try
     {
-        if (auto need_help = std::ranges::find_if(args_vec, [](const std::string& arg)
+        if (const auto need_help = std::ranges::find_if(args_vec, [](const std::string& arg)
         {
             return arg == mazes::args::HELP_FLAG_STR || arg == mazes::args::HELP_OPTION_STR || arg ==
                 mazes::args::HELP_WORD_STR;
@@ -92,7 +92,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
             return m_help_str;
         }
 
-        if (auto need_version = std::ranges::find_if(args_vec, [](const std::string& arg)
+        if (const auto need_version = std::ranges::find_if(args_vec, [](const std::string& arg)
         {
             return arg == mazes::args::VERSION_FLAG_STR || arg == mazes::args::VERSION_OPTION_STR || arg ==
                 mazes::args::VERSION_WORD_STR;
@@ -121,7 +121,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
     return "";
 } // convert
 
-std::string cli::convert(std::vector<std::string> const& args_vec, mazes::configurator& user_options) const noexcept
+std::string cli::convert(std::vector<std::string> const& args_vec, mazes::configurator& user_options) noexcept
 {
     try
     {
@@ -187,7 +187,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec, mazes::config
             }
 
             // Run pixels algorithm to convert ASCII to pixel data
-            if (mazes::pixels pixelizer; !pixelizer.run(product.value().get(), rng))
+            if (const mazes::pixels pixelizer; !pixelizer.run(product.value().get(), rng))
             {
                 return "Failed to generate pixel data.";
             }
@@ -240,11 +240,8 @@ std::string cli::bytes_to_string(const std::vector<std::uint8_t>& bytes)
         return std::string{};
     }
 
-    std::string s;
-    s.resize(bytes.size());
-    // Range-based copy
-    std::ranges::copy(bytes, reinterpret_cast<std::uint8_t*>(s.data()));
-    return s;
+    // Construct string directly from bytes (binary-safe)
+    return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 }
 
 std::vector<std::uint8_t> cli::string_to_bytes(const std::string& s)
@@ -254,12 +251,8 @@ std::vector<std::uint8_t> cli::string_to_bytes(const std::string& s)
         return {};
     }
 
-    std::vector<std::uint8_t> v;
-    v.resize(s.size());
-    std::copy_n(reinterpret_cast<const std::uint8_t*>(s.data()),
-              s.size(),
-              v.begin());
-    return v;
+    return std::vector(reinterpret_cast<const std::uint8_t*>(s.data()),
+                                     reinterpret_cast<const std::uint8_t*>(s.data()) + s.size());
 }
 
 // Helper: compute image dimensions and store into configurator
@@ -270,20 +263,56 @@ void cli::compute_and_store_image_size(const mazes::grid_interface* g, mazes::co
         return;
     }
 
-    const auto [rows, cols, _] = g->operations().get_dimensions();
+    const auto &grid_ops = const_cast<mazes::grid_interface*>(g)->operations();
 
-    // Compute a "reasonable" scale based on grid area. Use sqrt(rows*cols) rounded up, but at least 1.
-    const double area = static_cast<double>(rows) * static_cast<double>(cols);
-    const unsigned int scale = static_cast<unsigned int>(std::max(1.0, std::ceil(std::sqrt(area))));
+    // Ensure we have a string representation first
+    std::string maze_str = grid_ops.get_str();
+    if (maze_str.empty())
+    {
+        // Run stringify if not already done
+        mazes::randomizer rng_local;
+        if (const mazes::stringify stringifier; !stringifier.run(const_cast<mazes::grid_interface*>(g), rng_local))
+        {
+            return;
+        }
+        maze_str = grid_ops.get_str();
+        if (maze_str.empty())
+        {
+            return;
+        }
+    }
 
-    // Image width and height in pixels - assume each cell is 'scale' pixels square, and include border lines.
-    // For ASCII-art style maze (using corner and barrier characters), each cell maps to (scale) pixels, but
-    // walls/borders add 1 pixel per boundary; to be conservative, compute: width = cols * scale + (cols + 1);
-    const unsigned int width = cols * scale + (cols + 1);
-    const unsigned int height = rows * scale + (rows + 1);
+    // Get dimensions
+    auto [rows, columns, levels] = grid_ops.get_dimensions();
 
-    cfg.image_width(width);
-    cfg.image_height(height);
+    // Parse ASCII into lines
+    std::istringstream iss(maze_str);
+    std::string line;
+    std::vector<std::string> lines;
+    while (std::getline(iss, line))
+    {
+        lines.push_back(line);
+    }
+    if (lines.empty())
+    {
+        return;
+    }
+
+    const size_t ascii_height = lines.size();
+    const size_t ascii_width = lines[0].length();
+
+    // Match pixels::run scaling: sqrt(rows*columns) truncated to unsigned int, clamped
+    constexpr unsigned int MIN_SCALE = 1;
+    constexpr unsigned int MAX_SCALE =
+        (mazes::configurator::MAX_ROWS + mazes::configurator::MAX_COLUMNS) / 2;
+    const auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
+    const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+    const unsigned int pixel_width = static_cast<unsigned int>(ascii_width * scale);
+    const unsigned int pixel_height = static_cast<unsigned int>(ascii_height * scale);
+
+    cfg.image_width(pixel_width);
+    cfg.image_height(pixel_height);
 }
 
 /// @brief Apply an algorithm to the grid
@@ -294,99 +323,72 @@ void cli::compute_and_store_image_size(const mazes::grid_interface* g, mazes::co
 void cli::apply(mazes::grid_interface* g, mazes::randomizer& rng, const mazes::algo a,
                 const mazes::configurator& config) noexcept
 {
-    using namespace std;
-
     try
     {
         bool success = false;
-
         switch (a)
         {
         case mazes::algo::BINARY_TREE:
             {
                 static mazes::binary_tree bt;
-
-                success = bt.run(g, ref(rng));
-
+                success = bt.run(g, std::ref(rng));
                 break;
             }
         case mazes::algo::SIDEWINDER:
             {
                 static mazes::sidewinder sw;
-
-                success = sw.run(g, ref(rng));
-
+                success = sw.run(g, std::ref(rng));
                 break;
             }
         case mazes::algo::DFS:
             {
                 static mazes::dfs d;
-
-                success = d.run(g, ref(rng));
-
+                success = d.run(g, std::ref(rng));
                 break;
             }
         default:
-
-            throw std::invalid_argument("Unsupported algorithm: " + std::string{mazes::to_sv_from_algo(a)});
+            throw std::runtime_error("Unsupported algorithm: " + std::string{mazes::to_sv_from_algo(a)});
         } // switch
 
         if (!success)
         {
-            throw std::runtime_error("Failed to run algorithm: " + std::string{mazes::to_sv_from_algo(a)});
+            throw std::runtime_error("Algo failed to run: " + std::string{mazes::to_sv_from_algo(a)});
         }
 
         // Calculate distances after maze generation if requested
         if (config.distances())
         {
             // Try to cast to distance_grid to call calculate_distances
-            if (auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(g); distance_grid_ptr != nullptr)
+            if (const auto distance_grid_ptr = dynamic_cast<mazes::distance_grid*>(g))
             {
                 int start_idx = config.distances_start();
                 int end_idx = config.distances_end();
 
                 // If end index is -1 (default), use the last cell
+                const int max_cell_index = (config.rows() * config.columns()) - 1;
                 if (end_idx == -1)
                 {
-                    end_idx = (config.rows() * config.columns()) - 1;
+                    end_idx = max_cell_index;
                 }
 
                 // Ensure indices are within valid range
-                int max_cell_index = (config.rows() * config.columns()) - 1;
-                start_idx = std::max(0, std::min(start_idx, max_cell_index));
-                end_idx = std::max(0, std::min(end_idx, max_cell_index));
-
+                start_idx = std::clamp(start_idx, 0, max_cell_index);
+                end_idx = std::clamp(end_idx, 0, max_cell_index);
                 distance_grid_ptr->calculate_distances(start_idx, end_idx);
 
-#if defined(MAZE_DEBUG)
-
-                std::cerr << "Debug: Calling calculate_distances with start="
-                    << start_idx << ", end=" << end_idx << std::endl;
-
-                if (auto distances = distance_grid_ptr->get_distances())
+                if (const auto distances = distance_grid_ptr->get_distances(); !distances)
                 {
-                    std::cerr << "Debug: Distances object created successfully" << std::endl;
+                    throw std::runtime_error("Distances object is null after calculation.");
                 }
-                else
-                {
-                    std::cerr << "Debug: Failed to create distances object" << std::endl;
-                }
-#endif
             }
             else
             {
-#if defined(MAZE_DEBUG)
-
-                std::cerr << "Debug: Failed to calculate distances" << std::endl;
-#endif
+                throw std::runtime_error{std::string{mazes::to_sv_from_algo(a)}};
             }
         }
     }
     catch (const std::exception& ex)
     {
-#if defined(MAZE_DEBUG)
-
-        std::cerr << "Algorithm Error: " << ex.what() << std::endl;
-#endif
+        std::cerr << "CLI apply failed: " << ex.what() << std::endl;
     } // catch
 } // apply

@@ -26,8 +26,8 @@ class cli final :  mazes::singleton_base<cli> {
 public:
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
 
-    std::string convert(std::vector<std::string> const& args_vec,
-        mazes::configurator& user_options) const noexcept;
+    static std::string convert(std::vector<std::string> const& args_vec,
+                               mazes::configurator& user_options) noexcept;
 
     std::string convert_as_base64(std::vector<std::string> const& args_vec) const noexcept;
 
@@ -40,15 +40,13 @@ public:
 
     // Reverse helper: reconstruct a vector<uint8_t> from a raw bytes string
     static std::vector<std::uint8_t> string_to_bytes(const std::string& s);
-
-    // Helper: compute image dimensions (width x height) based on grid dimensions and
-    // a reasonable scale and store them into the provided configurator
-    static void compute_and_store_image_size(const mazes::grid_interface* g, mazes::configurator& cfg) noexcept;
 private:
     static void apply(mazes::grid_interface* g,
                       mazes::randomizer& rng,
                       mazes::algo a,
                       const mazes::configurator& config) noexcept;
+
+    static void compute_and_store_image_size(const mazes::grid_interface* g, mazes::configurator& cfg) noexcept;
 
     static std::string m_debug_str;
 
