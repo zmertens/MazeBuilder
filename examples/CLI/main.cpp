@@ -13,6 +13,7 @@
 #include <sstream>
 #include <vector>
 
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/enums.h>
 #include <MazeBuilder/io_utils.h>
@@ -73,14 +74,15 @@ int main(const int argc, char* argv[])
                     const auto filename = user_options.output_filename();
                     if (user_options.output_format_id() == mazes::output_format::PNG)
                     {
-                        write_success = writer.write_png(filename, cli::string_to_bytes(std::cref(str)),
+                        write_success = writer.write_png(filename,
+                                                         mazes::bytes::string_to_bytes(str),
                                                          user_options.image_width(),
                                                          user_options.image_height(),
                                                          4);
                     }
                     else if (user_options.output_format_id() == mazes::output_format::JPEG)
                     {
-                        write_success = writer.write_jpeg(filename, cli::string_to_bytes(std::cref(str)),
+                        write_success = writer.write_jpeg(filename, mazes::bytes::string_to_bytes(str),
                                                           user_options.image_width(),
                                                           user_options.image_height(),
                                                           4);
@@ -88,7 +90,7 @@ int main(const int argc, char* argv[])
 
                     stream << "Wrote file: " << filename << std::endl;
                     stream << "Image dimensions: " << user_options.image_width() << "x"
-                           << user_options.image_height() << std::endl;
+                        << user_options.image_height() << std::endl;
                 }
                 else
                 {
@@ -124,7 +126,6 @@ int main(const int argc, char* argv[])
 
                 std::cout << stream.str() << std::endl;
 #endif
-
             }
             else
             {

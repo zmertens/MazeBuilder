@@ -1,7 +1,7 @@
 #include "cli.h"
 
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/base64_helper.h>
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/configurator.h>
@@ -188,10 +188,10 @@ std::string cli::convert(std::vector<std::string> const& args_vec, mazes::config
             compute_and_store_image_size(product.value().get(), user_options);
 
             // Convert bytes to string
-            auto image_data_str = bytes_to_string(pixel_vec);
+            const auto image_data_str = mazes::bytes::bytes_to_string(pixel_vec);
 
             // Replace the previous return of ASCII with the raw image bytes (in string form)
-            return image_data_str;
+            return std::string{image_data_str};
         }
         else
         {
@@ -209,7 +209,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec, mazes::config
 
 std::string cli::convert_as_base64(std::vector<std::string> const& args_vec) const noexcept
 {
-    return mazes::base64_helper::encode(convert(std::cref(args_vec)));
+    return mazes::bytes::encode(convert(std::cref(args_vec)));
 }
 
 std::string cli::help() noexcept
@@ -220,28 +220,6 @@ std::string cli::help() noexcept
 std::string cli::version() noexcept
 {
     return m_version_str;
-}
-
-std::string cli::bytes_to_string(const std::vector<std::uint8_t>& bytes)
-{
-    if (bytes.empty())
-    {
-        return std::string{};
-    }
-
-    // Construct string directly from bytes (binary-safe)
-    return std::string(reinterpret_cast<const char*>(bytes.data()), bytes.size());
-}
-
-std::vector<std::uint8_t> cli::string_to_bytes(const std::string& s)
-{
-    if (s.empty())
-    {
-        return {};
-    }
-
-    return std::vector(reinterpret_cast<const std::uint8_t*>(s.data()),
-                                     reinterpret_cast<const std::uint8_t*>(s.data()) + s.size());
 }
 
 // Helper: compute image dimensions and store into configurator

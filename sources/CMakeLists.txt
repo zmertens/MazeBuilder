@@ -6,7 +6,7 @@ message(INFO ": Configuring ${PROJECT_NAME} v${MAZE_BUILDER_VERSION}")
 
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
-    base64_helper.cpp
+        bytes.cpp
     binary_tree.cpp
     cell.cpp
     colored_grid.cpp

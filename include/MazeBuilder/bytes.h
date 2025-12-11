@@ -1,16 +1,18 @@
-#ifndef BASE64_HELPER_H
-#define BASE64_HELPER_H
+#ifndef BYTES_H
+#define BYTES_H
 
+#include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace mazes
 {
-    /// @file base64_helper.h
-    /// @class base64_helper
+    /// @file bytes.h
+    /// @class bytes
     /// @brief Base64 encoding and decoding helper class
     /// @details This class provides methods to encode and decode strings using the Base64 encoding scheme
-    class base64_helper
+    class bytes
     {
     public:
         /// @brief Transform an input string into base64 characters
@@ -20,8 +22,12 @@ namespace mazes
 
         /// @brief Transform an input string from from base64 characters
         static std::string decode(std::string_view sv) noexcept;
+
+        static std::string_view bytes_to_string(const std::vector<std::uint8_t>& bytes) noexcept;
+
+        static std::vector<std::uint8_t> string_to_bytes(std::string_view sv) noexcept;
     }; // class
 
 } // namespace
 
-#endif // BASE64_HELPER_H
+#endif // BYTES_H
