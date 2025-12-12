@@ -161,7 +161,7 @@ void world::detach_chunk_from_layer(scene_node* chunk) noexcept
     remove_chunk_from_spatial_tree(chunk);
 }
 
-void world::insert_chunk_into_spatial_tree(scene_node* chunk) noexcept
+void world::insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept
 {
     if (chunk == nullptr)
     {
@@ -177,15 +177,8 @@ void world::insert_chunk_into_spatial_tree(scene_node* chunk) noexcept
 
     // For now, use a simple spatial subdivision approach
     // Find or create an appropriate spatial node to hold this chunk
-    scene_node* spatial_parent = find_or_create_spatial_node(
-        root,
-        chunk->bounds_min_x,
-        chunk->bounds_min_z,
-        chunk->bounds_max_x,
-        chunk->bounds_max_z
-    );
 
-    if (spatial_parent != nullptr)
+    if (scene_node* spatial_parent = root; spatial_parent != nullptr)
     {
         chunk->parent = spatial_parent;
 
@@ -209,36 +202,6 @@ void world::remove_chunk_from_spatial_tree(scene_node* chunk) noexcept
     siblings.erase(std::remove(siblings.begin(), siblings.end(), chunk), siblings.end());
 
     chunk->parent = nullptr;
-}
-
-scene_node* world::find_or_create_spatial_node(scene_node* parent, int min_x, int min_z, int max_x, int max_z) noexcept
-{
-    if (parent == nullptr)
-    {
-        return nullptr;
-    }
-
-    // For simplicity in Phase 2, we'll use a grid-based spatial subdivision
-    // Divide the world into regions of 4x4 chunks (128x128 blocks)
-    constexpr int REGION_SIZE = 128; // 4 chunks * 32 blocks
-
-    int region_x = min_x / REGION_SIZE;
-    int region_z = min_z / REGION_SIZE;
-
-    // Look for existing spatial node for this region
-    for (scene_node* child : parent->children)
-    {
-        if (child->get_category() == Entity::SPATIAL &&
-            child->bounds_min_x / REGION_SIZE == region_x &&
-            child->bounds_min_z / REGION_SIZE == region_z)
-        {
-            return child;
-        }
-    }
-
-    // No existing spatial node found, attach directly to parent for now
-    // In a full quadtree implementation, we would create intermediate nodes
-    return parent;
 }
 
 void world::traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept
@@ -318,17 +281,6 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
     };
 
     traverse_node(root);
-}
-
-// Legacy method - now traverses hierarchy instead of flat array
-void traverse_chunks_legacy(const std::function<void(scene_node*)>& callback, const scene_node* chunks, int chunk_count) noexcept
-{
-    // Simple linear traversal of all active chunks (fallback)
-    for (int i = 0; i < chunk_count; i++)
-    {
-        scene_node* chunk = const_cast<scene_node*>(&chunks[i]);
-        callback(chunk);
-    }
 }
 
 void world::init() noexcept
@@ -757,53 +709,6 @@ float world::get_daylight() const noexcept
     }
 }
 
-void world::compute_sight_vector(const float rx, const float ry, float* vx, float* vy, float* vz) const noexcept
-{
-    float m = SDL_cosf(ry);
-    *vx = SDL_cosf(rx - static_cast<float>(RADIANS(90))) * m;
-    *vy = SDL_sinf(ry);
-    *vz = SDL_sinf(rx - static_cast<float>(RADIANS(90))) * m;
-}
-
-void world::compute_motion_vector(const int flying, const int sz, const int sx, const float rx, const float ry,
-                                  float* vx, float* vy, float* vz) noexcept
-{
-    *vx = 0;
-    *vy = 0;
-    *vz = 0;
-    if (!sz && !sx)
-    {
-        return;
-    }
-    const float strafe = SDL_atan2f(static_cast<float>(sz), static_cast<float>(sx));
-    if (flying)
-    {
-        float m = SDL_cosf(ry);
-        float y = SDL_sinf(ry);
-        if (sx)
-        {
-            if (!sz)
-            {
-                y = 0;
-            }
-            m = 1;
-        }
-        if (sz > 0)
-        {
-            y = -y;
-        }
-        *vx = SDL_cosf(rx + strafe) * m;
-        *vy = y;
-        *vz = SDL_sinf(rx + strafe) * m;
-    }
-    else
-    {
-        *vx = SDL_cosf(rx + strafe);
-        *vy = 0;
-        *vz = SDL_sinf(rx + strafe);
-    }
-}
-
 std::uint32_t world::gen_crosshair_buffer() const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
@@ -1020,7 +925,7 @@ int world::hit_test(const int previous, const float x, const float y,
     const int q = chunked(z);
     float vx, vy, vz;
 
-    compute_sight_vector(rx, ry, &vx, &vy, &vz);
+    compute_sight_vector(rx, ry, std::ref(vx), std::ref(vy), std::ref(vz));
 
     const auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
     // NOTE: Start at index 1 because index 0 is the root layer node

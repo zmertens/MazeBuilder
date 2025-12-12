@@ -84,10 +84,7 @@ private:
     void traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept;
     void traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
                                      const std::function<void(scene_node*)>& callback) const noexcept;
-
-    // Spatial partitioning (quadtree)
-    scene_node* find_or_create_spatial_node(scene_node* parent, int min_p, int min_q, int max_p, int max_q) noexcept;
-    void insert_chunk_into_spatial_tree(scene_node* chunk) noexcept;
+    void insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept;
     void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
     struct worker_item {
@@ -145,9 +142,6 @@ private:
     [[nodiscard]] float time_of_day() const noexcept;
     [[nodiscard]] float get_daylight() const noexcept;
 
-    void compute_sight_vector(float rx, float ry, float* vx, float* vy, float* vz) const noexcept;
-    static void compute_motion_vector(int flying, int sz, int sx, float rx, float ry,
-                                      float* vx, float* vy, float* vz) noexcept;
     [[nodiscard]] std::uint32_t gen_crosshair_buffer() const noexcept;
     [[nodiscard]] std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) const noexcept;
     [[nodiscard]] std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) const noexcept;

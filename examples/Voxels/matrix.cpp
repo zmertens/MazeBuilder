@@ -256,3 +256,50 @@ void set_matrix_item(float *matrix, const int width, const int height, const int
     mat_identity(matrix);
     mat_multiply(matrix, a, matrix);
 }
+
+void compute_sight_vector(const float rx, const float ry, float& vx, float& vy, float& vz) noexcept
+{
+    float m = SDL_cosf(ry);
+    vx = SDL_cosf(rx - static_cast<float>(RADIANS(90.0))) * m;
+    vy = SDL_sinf(ry);
+    vz = SDL_sinf(rx - static_cast<float>(RADIANS(90.0))) * m;
+}
+
+void compute_motion_vector(const int flying, const int sz, const int sx, const float rx, const float ry,
+                                  float* vx, float* vy, float* vz) noexcept
+{
+    *vx = 0;
+    *vy = 0;
+    *vz = 0;
+    if (!sz && !sx)
+    {
+        return;
+    }
+    const float strafe = SDL_atan2f(static_cast<float>(sz), static_cast<float>(sx));
+    if (flying)
+    {
+        float m = SDL_cosf(ry);
+        float y = SDL_sinf(ry);
+        if (sx)
+        {
+            if (!sz)
+            {
+                y = 0;
+            }
+            m = 1;
+        }
+        if (sz > 0)
+        {
+            y = -y;
+        }
+        *vx = SDL_cosf(rx + strafe) * m;
+        *vy = y;
+        *vz = SDL_sinf(rx + strafe) * m;
+    }
+    else
+    {
+        *vx = SDL_cosf(rx + strafe);
+        *vy = 0;
+        *vz = SDL_sinf(rx + strafe);
+    }
+}

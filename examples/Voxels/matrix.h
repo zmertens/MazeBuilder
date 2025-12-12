@@ -5,8 +5,8 @@
 #define M_PI 3.14159265358979323846
 #endif
 
-#define DEGREES(radians) ((radians) * 180 / M_PI)
-#define RADIANS(degrees) ((degrees) * M_PI / 180)
+#define DEGREES(radians) ((radians) * 180.0 / M_PI)
+#define RADIANS(degrees) ((degrees) * M_PI / 180.0)
 #define SIGN(x) (((x) > 0) - ((x) < 0))
 
 void normalize(float *x, float *y, float *z);
@@ -32,5 +32,9 @@ void set_matrix_3d(
     float x, float y, float z, float rx, float ry,
     float fov, int ortho, int radius);
 void set_matrix_item(float *matrix, int width, int height, int scale);
+
+void compute_sight_vector(float rx, float ry, float& vx, float& vy, float& vz) noexcept;
+void compute_motion_vector(const int flying, const int sz, const int sx, const float rx, const float ry,
+                                  float* vx, float* vy, float* vz) noexcept;
 
 #endif
