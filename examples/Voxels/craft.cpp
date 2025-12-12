@@ -14,17 +14,13 @@
 #include "fonts/Limelight_Regular.h"
 
 #if defined(__EMSCRIPTEN__)
-#include <emscripten_local/emscripten_mainloop_stub.h>
-#else
-#endif
-
-#include <SDL3/SDL.h>
-
-#if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
+#include <emscripten_local/emscripten_mainloop_stub.h>
 #else
 #include <glad/glad.h>
 #endif
+
+#include <SDL3/SDL.h>
 
 #include "command_queue.h"
 #include "db.h"
@@ -123,7 +119,7 @@ struct craft::craft_impl
             m_stack->clear_states();
         }
 
-        [[nodiscard]] context get_context() const noexcept
+        [[nodiscard]] const context& get_context() const noexcept
         {
             return m_context;
         }
@@ -910,11 +906,12 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
         return false;
     }
 
-    if constexpr (USE_CACHE)
+    static constexpr auto USE_DATABASE = true;
+    if constexpr (USE_DATABASE)
     {
         db_enable();
 
-        if (const auto DB_FILE = "craft.db"; db_init(const_cast<char*>(DB_FILE)) != 0)
+        if (const auto DB_FILE = "craft.db"; db_init(DB_FILE) != 0)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Database initialization failed\n");
             return false;
@@ -945,6 +942,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
         accumulator += elapsed;
 
         // FLUSH DATABASE
+        static constexpr auto COMMIT_INTERVAL = 5000;
         if (current - last_commit > COMMIT_INTERVAL)
         {
             db_commit();
@@ -1004,21 +1002,11 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     return true;
 } // run
 
-/**
- *
- *
- * @brief Used by Emscripten mostly to produce a JSON string containing the vertex data
- * @return returns JSON-encoded string: "{\"name\":\"MyMaze\", \"data\":\"v 1.0 1.0 0.0\\nv -1.0 1.0 0.0\\n...\"}";
- */
-std::string craft::mazes() const noexcept
+std::string craft::artifacts() const noexcept
 {
     return "";
 }
 
-/**
- * @brief Useful on mobile devices to flip mouse/finger capture
- *
- */
-void craft::toggle_mouse() const noexcept
+void craft::show_download_button(bool show) const noexcept
 {
 }

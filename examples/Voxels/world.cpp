@@ -16,6 +16,14 @@
 #include "shader.h"
 #include "sign.h"
 
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
+#include <glad/glad.h>
+#endif
+
+#include <SDL3/SDL.h>
+
 #define KEY_FORWARD SDL_SCANCODE_W
 #define KEY_BACKWARD SDL_SCANCODE_S
 #define KEY_LEFT SDL_SCANCODE_A
@@ -28,13 +36,17 @@
 #define KEY_ORTHO SDL_SCANCODE_F
 #define KEY_TAG SDL_SCANCODE_T
 
-#if defined(__EMSCRIPTEN__)
-#include <GLES3/gl3.h>
-#else
-#include <glad/glad.h>
-#endif
-
-#include <SDL3/SDL.h>
+// World configs
+#define SCROLL_THRESHOLD 0.1
+#define DAY_LENGTH 600
+#define MAX_TEXT_LENGTH 256
+#define CREATE_CHUNK_RADIUS 10
+#define RENDER_CHUNK_RADIUS 20
+#define BUILD_CHUNK_SIZE 32
+#define RENDER_SIGN_RADIUS 4
+#define DELETE_CHUNK_RADIUS 14
+#define MAX_PLAYERS 1
+#define NUM_WORKERS 4
 
 std::string gl_error_checker(const char* file, const int line) noexcept
 {

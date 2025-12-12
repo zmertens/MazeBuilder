@@ -66,6 +66,7 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         constexpr float mouse_sensitivity = 0.0025f;
 
         s->rx += event.motion.xrel * mouse_sensitivity;
+        static constexpr auto INVERT_MOUSE = false;
         if (INVERT_MOUSE) {
             s->ry += event.motion.yrel * mouse_sensitivity;
         }

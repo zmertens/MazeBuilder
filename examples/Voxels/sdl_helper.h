@@ -18,13 +18,13 @@ public:
 
     void destroy_and_quit() noexcept;
 
+    void set_window_icon(std::string_view icon_path) noexcept;
+
     std::int32_t get_scale_factor() const noexcept;
 
     static void print_display_modes() noexcept;
 
     static void print_opengl_info() noexcept;
-
-    void set_window_icon(std::string_view icon_path) noexcept;
 
     static void del_buffer(std::uint32_t buffer) noexcept;
 

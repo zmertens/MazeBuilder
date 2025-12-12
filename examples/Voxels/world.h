@@ -16,25 +16,6 @@
 #include "resource_identifiers.h"
 #include "sign.h"
 
-// World configs
-#define SCROLL_THRESHOLD 0.1
-#define MAX_DB_PATH_LEN 64
-#define USE_CACHE true
-#define DAY_LENGTH 600
-#define INVERT_MOUSE 0
-#define MAX_TEXT_LENGTH 256
-
-// Advanced options
-#define CREATE_CHUNK_RADIUS 10
-#define RENDER_CHUNK_RADIUS 20
-#define BUILD_CHUNK_SIZE 32
-#define RENDER_SIGN_RADIUS 4
-#define DELETE_CHUNK_RADIUS 14
-#define COMMIT_INTERVAL 7
-#define MAX_CHUNKS 8192
-#define MAX_PLAYERS 1
-#define NUM_WORKERS 4
-
 enum class WorkerState : int
 {
     IDLE = 0,
@@ -165,6 +146,9 @@ private:
         std::uint32_t extra4;
     } Attrib;
 
+
+#define MAX_DB_PATH_LEN 64
+#define MAX_CHUNKS 8192
     typedef struct {
         std::vector<std::unique_ptr<Worker>> workers;
         Chunk chunks[MAX_CHUNKS];

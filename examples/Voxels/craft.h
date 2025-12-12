@@ -23,8 +23,8 @@ public:
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
     // Web interaction
-    [[nodiscard]] std::string mazes() const noexcept;
-    void toggle_mouse() const noexcept;
+    [[nodiscard]] std::string artifacts() const noexcept;
+    void show_download_button(bool show) const noexcept;
 
 private:
     struct craft_impl;

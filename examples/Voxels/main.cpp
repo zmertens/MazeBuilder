@@ -29,8 +29,8 @@ EMSCRIPTEN_BINDINGS (craft_module)
     emscripten::class_<craft>("craft")
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
         .constructor<const std::string&, int, int>()
-        .function("mazes", &craft::mazes)
-        .function("toggle_mouse", &craft::toggle_mouse);
+        .function("artifacts", &craft::artifacts)
+        .function("show_download_button", &craft::show_download_button);
 }
 #endif
 
