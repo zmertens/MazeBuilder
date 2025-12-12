@@ -26,7 +26,7 @@ class cli final :  mazes::singleton_base<cli> {
 public:
     std::string convert(std::vector<std::string> const& args_vec) const noexcept;
 
-    static std::string convert(std::vector<std::string> const& args_vec,
+    static std::string convert_with_options(std::vector<std::string> const& args_vec,
                                mazes::configurator& user_options) noexcept;
 
     std::string convert_as_base64(std::vector<std::string> const& args_vec) const noexcept;

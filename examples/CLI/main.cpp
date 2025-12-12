@@ -59,11 +59,12 @@ int main(const int argc, char* argv[])
     {
         if (const auto my_cli = mazes::singleton_base<cli>::instance())
         {
-            std::stringstream stream;
             mazes::configurator user_options;
-            if (const auto str = my_cli->convert(std::cref(args_vec), std::ref(user_options));
+            if (const auto str = my_cli->convert_with_options(std::cref(args_vec),
+                std::ref(user_options));
                 !str.empty())
             {
+                std::stringstream stream;
                 bool write_success{false};
                 constexpr mazes::io_utils writer{};
 

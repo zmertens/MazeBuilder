@@ -100,7 +100,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
         }
 
         mazes::configurator user_options;
-        return this->convert(std::cref(args_vec), std::ref(user_options));
+        return this->convert_with_options(std::cref(args_vec), std::ref(user_options));
     }
     catch (const std::exception& ex)
     {
@@ -110,7 +110,7 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
     return "";
 } // convert
 
-std::string cli::convert(std::vector<std::string> const& args_vec, mazes::configurator& user_options) noexcept
+std::string cli::convert_with_options(std::vector<std::string> const& args_vec, mazes::configurator& user_options) noexcept
 {
     try
     {

@@ -195,11 +195,6 @@ private:
     void init_worker_threads() noexcept;
     void cleanup_worker_threads() noexcept;
 
-    void del_buffer(std::uint32_t buffer) const noexcept;
-    std::uint32_t gen_buffer(std::size_t size, const float* data) const noexcept;
-    [[nodiscard]] float* malloc_faces(std::size_t components, std::size_t faces) const noexcept;
-    std::uint32_t gen_faces(std::size_t components, std::size_t faces, const float* data) const noexcept;
-
     [[nodiscard]] int chunked(float x) const noexcept;
 
     [[nodiscard]] double get_time() const noexcept;
