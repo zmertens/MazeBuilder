@@ -3,16 +3,15 @@
 
 #include <mutex>
 #include <string_view>
+#include <utility>
 
 #include <SDL3/SDL.h>
 
-#include "player.h"
-
-class attrib;
+class player;
 class scene_node;
 struct SDL_Window;
 
-class sdl_helper
+class sdl_gl_helper
 {
 public:
     class attrib {
@@ -40,7 +39,9 @@ public:
 
     void set_window_icon(std::string_view icon_path) noexcept;
 
-    std::int32_t get_scale_factor() const noexcept;
+    [[nodiscard]] std::int32_t get_scale_factor() const noexcept;
+    std::pair<std::int32_t, std::int32_t> get_window_size() const noexcept;
+    std::pair<std::int32_t, std::int32_t> get_window_size_in_pixels() const noexcept;
 
     static void print_display_modes() noexcept;
 

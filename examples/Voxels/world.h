@@ -15,7 +15,7 @@
 
 #include "map.h"
 #include "resource_identifiers.h"
-#include "sdl_helper.h"
+#include "sdl_gl_helper.h"
 #include "sign.h"
 
 enum class WorkerState : int
@@ -36,7 +36,7 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 class attrib;
 class command_queue;
 class player;
-class sdl_helper;
+class sdl_gl_helper;
 
 namespace mazes {
     class randomizer;
@@ -49,7 +49,7 @@ public:
         player* p,
         shader_manager& shaders,
         texture_manager& textures,
-        const sdl_helper* sdl);
+        const sdl_gl_helper* sdl);
 
     ~world();
 
@@ -84,17 +84,13 @@ private:
     void traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept;
     void traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
                                      const std::function<void(scene_node*)>& callback) const noexcept;
-    void draw_chunk(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
-    void draw_signs(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
 
     // Spatial partitioning (quadtree)
     scene_node* find_or_create_spatial_node(scene_node* parent, int min_p, int min_q, int max_p, int max_q) noexcept;
     void insert_chunk_into_spatial_tree(scene_node* chunk) noexcept;
     void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
-#define MAX_SIGN_LENGTH 16
-
-    struct WorkerItem {
+    struct worker_item {
         int p{};
         int q{};
         int load{};
@@ -104,19 +100,17 @@ private:
         int maxy{};
         int faces{};
         float* data{};
-        WorkerItem() {
-        }
     };
 
-    typedef struct {
+    struct worker {
         int index;
         WorkerState state;
         std::thread thrd;
         std::mutex mtx;
         std::condition_variable cnd;
-        WorkerItem item;
+        worker_item item;
         bool should_stop;
-    } Worker;
+    };
 
     typedef struct {
         int x;
@@ -125,25 +119,13 @@ private:
         int w;
     } Block;
 
-#define MAX_DB_PATH_LEN 64
-#define MAX_CHUNKS 8192
     struct model {
-        std::vector<std::unique_ptr<Worker>> workers;
-        scene_node* chunks;  // Dynamically allocated chunk array
-        int chunk_count;
-        int create_radius;
-        int render_radius;
-        int delete_radius;
         int sign_radius;
-        int player_count;
-        int voxel_scene_w;
-        int voxel_scene_h;
         bool flying;
         int item_index;
         int scale;
         bool is_ortho;
         float fov;
-        char db_path[MAX_DB_PATH_LEN];
         int day_length;
         int start_time;
         int start_ticks;
@@ -153,28 +135,25 @@ private:
         Block copy1;
     };
 
-    bool worker_run(void* arg) noexcept;
+    bool worker_run(worker* w) const noexcept;
     void init_worker_threads() noexcept;
     void cleanup_worker_threads() noexcept;
 
-    [[nodiscard]] int chunked(float x) const noexcept;
+    [[nodiscard]] static int chunked(float x) noexcept;
 
     [[nodiscard]] double get_time() const noexcept;
     [[nodiscard]] float time_of_day() const noexcept;
     [[nodiscard]] float get_daylight() const noexcept;
 
     void compute_sight_vector(float rx, float ry, float* vx, float* vy, float* vz) const noexcept;
-    void compute_motion_vector(int flying, int sz, int sx, float rx, float ry,
-        float* vx, float* vy, float* vz) const noexcept;
+    static void compute_motion_vector(int flying, int sz, int sx, float rx, float ry,
+                                      float* vx, float* vy, float* vz) noexcept;
     [[nodiscard]] std::uint32_t gen_crosshair_buffer() const noexcept;
     [[nodiscard]] std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) const noexcept;
     [[nodiscard]] std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) const noexcept;
     [[nodiscard]] std::uint32_t gen_plant_buffer(float x, float y, float z, float n, int w) const noexcept;
     [[nodiscard]] std::uint32_t gen_player_buffer(float x, float y, float z, float rx, float ry) const noexcept;
     [[nodiscard]] std::uint32_t gen_text_buffer(float x, float y, float n, std::string_view text) const noexcept;
-
-    [[nodiscard]] const player* find_player(int id) const noexcept;
-    void delete_all_players() noexcept;
 
     [[nodiscard]] std::optional<scene_node*> find_chunk(int p, int q) const noexcept;
     static int chunk_distance(const scene_node* chunk, int p, int q) noexcept;
@@ -194,26 +173,27 @@ private:
     int has_lights(scene_node* chunk) const noexcept;
 
     void dirty_chunk(scene_node* chunk) const noexcept;
-    void update_dirty_chunks_async() noexcept;  // Process dirty chunks on worker threads
+    // Process dirty chunks on worker threads
+    void update_dirty_chunks_async() noexcept;
 
     static void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) noexcept;
     static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
 
-    void compute_chunk(WorkerItem* item) const noexcept;
+    void compute_chunk(worker_item* item) const noexcept;
 
-    void generate_chunk(scene_node* chunk, WorkerItem* item) const noexcept;
+    void generate_chunk(scene_node* chunk, worker_item* item) const noexcept;
     void gen_chunk_buffer(scene_node* chunk) const noexcept;
 
     static void map_set_func(int x, int y, int z, int w, Map* m) noexcept;
 
-    void load_chunk(WorkerItem* item) const noexcept;
+    void load_chunk(worker_item* item) const noexcept;
     void init_chunk(scene_node* chunk, int p, int q) const noexcept;
     void create_chunk(scene_node* chunk, int p, int q) const noexcept;
     void delete_chunks() noexcept;
     void delete_all_chunks() noexcept;
     void force_chunks(player* player) noexcept;
     void check_workers() noexcept;
-    void ensure_chunks_worker(player* _player, Worker* worker) noexcept;
+    void ensure_chunks_worker(player* _player, worker* w) noexcept;
     void ensure_chunks(player* _player) noexcept;
 
     void unset_sign(int x, int y, int z) const noexcept;
@@ -230,15 +210,14 @@ private:
     int get_block(int x, int y, int z) noexcept;
     void builder_block(int x, int y, int z, int w) noexcept;
 
-    int render_chunks(const sdl_helper::attrib* attrib, player* _player, uint32_t texture) const noexcept;
-    void render_signs(const sdl_helper::attrib* attrib, const player* _player, std::uint32_t sign) const noexcept;
-    void render_sign(const sdl_helper::attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
-    void render_players(const sdl_helper::attrib* attrib, player* _player) const noexcept;
-    void render_wireframe(const sdl_helper::attrib* attrib, const player* _player) const noexcept;
-    void render_crosshairs(const sdl_helper::attrib* attrib) const noexcept;
-    void render_item(const sdl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
-    void render_text(const sdl_helper::attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
-
+    int render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, uint32_t texture) const noexcept;
+    void render_signs(const sdl_gl_helper::attrib* attrib, const player* _player, std::uint32_t sign) const noexcept;
+    void render_sign(const sdl_gl_helper::attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
+    void render_players(const sdl_gl_helper::attrib* attrib, player* _player) const noexcept;
+    void render_wireframe(const sdl_gl_helper::attrib* attrib, const player* _player) const noexcept;
+    void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
+    void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
+    void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
 
     enum class Layer
     {
@@ -249,19 +228,23 @@ private:
 
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
-    const sdl_helper* m_sdl;
+    const sdl_gl_helper* m_sdl;
 
     font_manager& m_fonts;
     shader_manager& m_shaders;
     texture_manager& m_textures;
 
-    scene_node m_scene_graph;
-    std::array<scene_node*, static_cast<std::size_t>(Layer::LAYER_COUNT)> m_scene_layers;
+    static constexpr auto MAX_CHUNKS = 8192;
+    std::array<std::array<scene_node*, MAX_CHUNKS>, static_cast<std::size_t>(Layer::LAYER_COUNT)> m_scene_layers;
+
+    std::size_t m_next_chunk_slot;
 
     command_queue m_command_queue;
     player* m_player;
 
     model m_model;
+
+    std::vector<std::unique_ptr<worker>> m_workers;
 };
 
 #endif // WORLD_H

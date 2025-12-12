@@ -7,7 +7,7 @@
 struct SDL_Window;
 struct SDL_Renderer;
 
-class sdl_helper
+class sdl_gl_helper
 {
 public:
     SDL_Window* window;

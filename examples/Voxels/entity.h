@@ -10,6 +10,7 @@ enum class Entity : unsigned int
     PROJECTILE = 1 << 3,
     PICKUP = 1 << 4,
     CHUNK = 1 << 5,
+    SPATIAL = 1 << 6,
     ALL = 1 << 6
 };
 

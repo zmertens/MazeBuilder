@@ -2,7 +2,7 @@
 
 #include <SDL3/SDL.h>
 
-void sdl_helper::init(std::string_view title, int width, int height) noexcept
+void sdl_gl_helper::init(std::string_view title, int width, int height) noexcept
 {
     auto initFunc = [this, title, width, height]()
     {
@@ -67,7 +67,7 @@ void sdl_helper::init(std::string_view title, int width, int height) noexcept
     }
 }
 
-void sdl_helper::destroy_and_quit() noexcept
+void sdl_gl_helper::destroy_and_quit() noexcept
 {
     // Prevent double-destruction
     if (!this->window && !this->renderer)

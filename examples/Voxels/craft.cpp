@@ -26,11 +26,9 @@
 #include "db.h"
 #include "resource_manager.h"
 #include "font.h"
-#include "item.h"
-#include "map.h"
 #include "player.h"
 #include "resource_identifiers.h"
-#include "sdl_helper.h"
+#include "sdl_gl_helper.h"
 #include "shader.h"
 #include "texture.h"
 #include "world.h"
@@ -83,7 +81,7 @@ struct craft::craft_impl
         struct context
         {
             explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
-                             , texture_manager& textures, player& p, sdl_helper& sdl)
+                             , texture_manager& textures, player& p, sdl_gl_helper& sdl)
                 : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}, m_sdl{&sdl}
             {
             }
@@ -93,7 +91,7 @@ struct craft::craft_impl
             shader_manager* m_shaders;
             texture_manager* m_textures;
             player* m_player;
-            sdl_helper* m_sdl;
+            sdl_gl_helper* m_sdl;
         };
 
         explicit state(state_stack& stack, const context& _context) : m_stack{&stack}, m_context{_context}
@@ -723,7 +721,7 @@ struct craft::craft_impl
 
     player m_player;
 
-    sdl_helper m_sdl;
+    sdl_gl_helper m_sdl;
 
     mutable double fps_update_timer{0.0};
     mutable int smoothed_fps{0};

@@ -54,7 +54,7 @@ struct physics_game::physics_game_impl
 
     static constexpr auto MAX_BALLS = 10;
 
-    sdl_helper sdl;
+    sdl_gl_helper sdl;
 
     std::unique_ptr<texture> sdl_logo;
     std::unique_ptr<texture> sfml_logo;
