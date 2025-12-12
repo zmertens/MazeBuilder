@@ -9,7 +9,8 @@ enum class Entity : unsigned int
     ENEMY = 1 << 2,
     PROJECTILE = 1 << 3,
     PICKUP = 1 << 4,
-    ALL = 1 << 5
+    CHUNK = 1 << 5,
+    ALL = 1 << 6
 };
 
 #endif // ENTITY_H

@@ -12,6 +12,7 @@
 #include "player.h"
 #include "texture.h"
 #include "resource_identifiers.h"
+#include "scene_node.h"
 #include "sdl_helper.h"
 #include "shader.h"
 #include "sign.h"
@@ -48,6 +49,8 @@
 #define MAX_PLAYERS 1
 #define NUM_WORKERS 4
 
+static sdl_helper::attrib s_block_attrib, s_line_attrib, s_text_attrib, s_sky_attrib;
+
 std::string gl_error_checker(const char* file, const int line) noexcept
 {
     GLenum error_code;
@@ -72,17 +75,18 @@ std::string gl_error_checker(const char* file, const int line) noexcept
 world::world(SDL_Window* window, font_manager& fonts,
         player* p,
         shader_manager& shaders,
-        texture_manager& textures)
+        texture_manager& textures,
+        const std::function<std::uint32_t()>& compute_scale_factor)
     : m_window{window}
       , m_fonts{fonts}
       , m_shaders{shaders}
       , m_textures{textures}
-      //   , mSceneGraph{}
-      //   , mSceneLayers{}
+      , m_scene_graph{}
+      , m_scene_layers{}
       , m_command_queue{}
       , m_player{p}
-      , m_block_attrib{}, m_line_attrib{}, m_text_attrib{}, m_sky_attrib{}
-      , m_model{} // Initialize m_model to zero-initialize all members
+      , m_model{}
+        , m_compute_window_scale_factor{compute_scale_factor}
 {
     // Set bidirectional reference between player and world
     if (m_player)
@@ -145,43 +149,34 @@ void world::init() noexcept
     // Set player Y position to proper height above terrain
     m_player->s1.y = static_cast<float>(highest_block(m_player->s1.x, m_player->s1.z) + 2);
 
-    m_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
-    m_block_attrib.position = 0;
-    m_block_attrib.normal = 1;
-    m_block_attrib.uv = 2;
-    m_block_attrib.matrix = glGetUniformLocation(m_block_attrib.program, "matrix");
-    m_block_attrib.sampler = glGetUniformLocation(m_block_attrib.program, "sampler");
-    m_block_attrib.extra1 = glGetUniformLocation(m_block_attrib.program, "sky_sampler");
-    m_block_attrib.extra2 = glGetUniformLocation(m_block_attrib.program, "daylight");
-    m_block_attrib.extra3 = glGetUniformLocation(m_block_attrib.program, "fog_distance");
-    m_block_attrib.extra4 = glGetUniformLocation(m_block_attrib.program, "is_ortho");
-    m_block_attrib.camera = glGetUniformLocation(m_block_attrib.program, "camera");
-    m_block_attrib.timer = glGetUniformLocation(m_block_attrib.program, "timer");
+    s_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
+    s_block_attrib.position = 0;
+    s_block_attrib.normal = 1;
+    s_block_attrib.uv = 2;
+    s_block_attrib.matrix = glGetUniformLocation(s_block_attrib.program, "matrix");
+    s_block_attrib.sampler = glGetUniformLocation(s_block_attrib.program, "sampler");
+    s_block_attrib.extra1 = glGetUniformLocation(s_block_attrib.program, "sky_sampler");
+    s_block_attrib.extra2 = glGetUniformLocation(s_block_attrib.program, "daylight");
+    s_block_attrib.extra3 = glGetUniformLocation(s_block_attrib.program, "fog_distance");
+    s_block_attrib.extra4 = glGetUniformLocation(s_block_attrib.program, "is_ortho");
+    s_block_attrib.camera = glGetUniformLocation(s_block_attrib.program, "camera");
+    s_block_attrib.timer = glGetUniformLocation(s_block_attrib.program, "timer");
 
-    m_line_attrib.program = m_shaders.get(ShaderIdentifier::LINE_SHADER).get();
-    m_line_attrib.position = 0;
-    m_line_attrib.matrix = glGetUniformLocation(m_line_attrib.program, "matrix");
+    s_line_attrib.program = m_shaders.get(ShaderIdentifier::LINE_SHADER).get();
+    s_line_attrib.position = 0;
+    s_line_attrib.matrix = glGetUniformLocation(s_line_attrib.program, "matrix");
 
-    m_text_attrib.program = m_shaders.get(ShaderIdentifier::TEXT_SHADER).get();
-    m_text_attrib.position = 0;
-    m_text_attrib.uv = 1;
-    m_text_attrib.matrix = glGetUniformLocation(m_text_attrib.program, "matrix");
-    m_text_attrib.sampler = glGetUniformLocation(m_text_attrib.program, "sampler");
-    m_text_attrib.extra1 = glGetUniformLocation(m_text_attrib.program, "is_sign");
+    s_text_attrib.program = m_shaders.get(ShaderIdentifier::TEXT_SHADER).get();
+    s_text_attrib.position = 0;
+    s_text_attrib.uv = 1;
+    s_text_attrib.matrix = glGetUniformLocation(s_text_attrib.program, "matrix");
+    s_text_attrib.sampler = glGetUniformLocation(s_text_attrib.program, "sampler");
+    s_text_attrib.extra1 = glGetUniformLocation(s_text_attrib.program, "is_sign");
 }
 
 void world::update(float delta_time, mazes::randomizer& rng) noexcept
 {
-    auto get_scale_factor = [this]() noexcept -> int
-    {
-        int window_width, window_height;
-        int buffer_width, buffer_height;
-        SDL_GetWindowSize(this->m_window, &window_width, &window_height);
-        SDL_GetWindowSizeInPixels(this->m_window, &buffer_width, &buffer_height);
-        return buffer_width / window_width;
-    };
-
-    m_model.scale = get_scale_factor();
+    m_model.scale = m_compute_window_scale_factor();
 
     // Update window dimensions to ensure accurate viewport and projection matrix
     SDL_GetWindowSizeInPixels(m_window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
@@ -280,7 +275,7 @@ void world::draw() const noexcept
         texture_logged = true;
     }
 
-    auto triangle_faces = render_chunks(&m_block_attrib, m_player, atlas_texture);
+    auto triangle_faces = render_chunks(&s_block_attrib, m_player, atlas_texture);
 
     // Debug logging (can be commented out after testing)
     static int frame_count = 0;
@@ -291,14 +286,14 @@ void world::draw() const noexcept
                 m_player->s1.rx, m_player->s1.ry);
     }
 
-    render_item(&m_block_attrib, atlas_texture);
+    render_item(&s_block_attrib, atlas_texture);
 
-    render_signs(&m_text_attrib, m_player, signs_texture);
-    render_sign(&m_text_attrib, m_player, signs_texture);
+    render_signs(&s_text_attrib, m_player, signs_texture);
+    render_sign(&s_text_attrib, m_player, signs_texture);
 
-    render_wireframe(&m_line_attrib, m_player);
+    render_wireframe(&s_line_attrib, m_player);
 
-    render_crosshairs(&m_line_attrib);
+    render_crosshairs(&s_line_attrib);
 }
 
 command_queue& world::get_command_queue() noexcept
@@ -662,139 +657,6 @@ std::uint32_t world::gen_text_buffer(float x, const float y, const float n, cons
     return sdl_helper::gen_faces(4, length, data);
 }
 
-void world::draw_triangles_3d_ao(const Attrib* attrib, const std::uint32_t buffer, const int count) const noexcept
-{
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glEnableVertexAttribArray(attrib->position);
-    glEnableVertexAttribArray(attrib->normal);
-    glEnableVertexAttribArray(attrib->uv);
-    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 10, nullptr);
-    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 10, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
-    glVertexAttribPointer(attrib->uv, 4, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 10, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 6));
-    glDrawArrays(GL_TRIANGLES, 0, count);
-    glDisableVertexAttribArray(attrib->position);
-    glDisableVertexAttribArray(attrib->normal);
-    glDisableVertexAttribArray(attrib->uv);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void world::draw_triangles_3d_text(const Attrib* attrib, const std::uint32_t buffer, const int count) const noexcept
-{
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glEnableVertexAttribArray(attrib->position);
-    glEnableVertexAttribArray(attrib->uv);
-    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 5, nullptr);
-    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 5, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
-    glDrawArrays(GL_TRIANGLES, 0, count);
-    glDisableVertexAttribArray(attrib->position);
-    glDisableVertexAttribArray(attrib->uv);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void world::draw_triangles_3d(const Attrib* attrib, const std::uint32_t buffer, const int count) const noexcept
-{
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-
-    glEnableVertexAttribArray(attrib->position);
-
-    glEnableVertexAttribArray(attrib->normal);
-    glEnableVertexAttribArray(attrib->uv);
-
-    glVertexAttribPointer(attrib->position, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8, nullptr);
-    glVertexAttribPointer(attrib->normal, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8,
-                          reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
-    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8,
-                          reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 6));
-
-    glDrawArrays(GL_TRIANGLES, 0, count);
-
-    glDisableVertexAttribArray(attrib->position);
-    glDisableVertexAttribArray(attrib->normal);
-    glDisableVertexAttribArray(attrib->uv);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void world::draw_triangles_2d(const Attrib* attrib, const std::uint32_t buffer, const std::size_t count) const noexcept
-{
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glEnableVertexAttribArray(attrib->position);
-    glEnableVertexAttribArray(attrib->uv);
-    glVertexAttribPointer(attrib->position, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 4, 0);
-    glVertexAttribPointer(attrib->uv, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(GLfloat) * 4, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 2));
-    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(count));
-    glDisableVertexAttribArray(attrib->position);
-    glDisableVertexAttribArray(attrib->uv);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void world::draw_lines(const Attrib* attrib, const std::uint32_t buffer, const int components,
-                       const int count) const noexcept
-{
-    glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glEnableVertexAttribArray(attrib->position);
-    glVertexAttribPointer(
-        attrib->position, components, GL_FLOAT, GL_FALSE, 0, 0);
-    glDrawArrays(GL_LINES, 0, count);
-    glDisableVertexAttribArray(attrib->position);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
-
-void world::draw_chunk(const Attrib* attrib, const Chunk* chunk) const noexcept
-{
-    draw_triangles_3d_ao(attrib, chunk->buffer, chunk->faces * 6);
-}
-
-void world::draw_item(const Attrib* attrib, const GLuint buffer, const int count) const noexcept
-{
-    draw_triangles_3d_ao(attrib, buffer, count);
-}
-
-void world::draw_text(const Attrib* attrib, const std::uint32_t buffer, const std::size_t length) const noexcept
-{
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    draw_triangles_2d(attrib, buffer, length * 6);
-    glDisable(GL_BLEND);
-}
-
-void world::draw_signs(const Attrib* attrib, const Chunk* chunk) const noexcept
-{
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-8, -1024);
-    draw_triangles_3d_text(attrib, chunk->sign_buffer, chunk->sign_faces * 6);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-}
-
-void world::draw_sign(const Attrib* attrib, const std::uint32_t buffer, const int length) const noexcept
-{
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-8, -1024);
-    draw_triangles_3d_text(attrib, buffer, length * 6);
-    glDisable(GL_POLYGON_OFFSET_FILL);
-}
-
-void world::draw_cube(const Attrib* attrib, const std::uint32_t buffer) const noexcept
-{
-    draw_item(attrib, buffer, 36);
-}
-
-void world::draw_plant(const Attrib* attrib, const std::uint32_t buffer) const noexcept
-{
-    draw_item(attrib, buffer, 24);
-}
-
-void world::draw_player(const Attrib* attrib, const player* _player) const noexcept
-{
-    draw_cube(attrib, _player->get_buffer());
-}
-
 const player* world::find_player(const int id) const noexcept
 {
     for (int i = 0; i < this->m_model.player_count; i++)
@@ -816,11 +678,11 @@ void world::delete_all_players() noexcept
     m_model.player_count = 0;
 }
 
-std::optional<world::Chunk*> world::find_chunk(const int p, const int q) const noexcept
+std::optional<world::scene_node*> world::find_chunk(const int p, const int q) const noexcept
 {
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        Chunk* chunk = const_cast<Chunk*>(m_model.chunks + i);
+        scene_node* chunk = const_cast<scene_node*>(m_model.chunks + i);
         if (chunk->p == p && chunk->q == q)
         {
             return chunk;
@@ -829,7 +691,7 @@ std::optional<world::Chunk*> world::find_chunk(const int p, const int q) const n
     return std::nullopt;
 }
 
-int world::chunk_distance(const Chunk* chunk, const int p, const int q) noexcept
+int world::chunk_distance(const scene_node* chunk, const int p, const int q) noexcept
 {
     const int dp = SDL_abs(chunk->p - p);
     const int dq = SDL_abs(chunk->q - q);
@@ -965,7 +827,7 @@ int world::hit_test(const int previous, const float x, const float y,
 
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        const Chunk* chunk = m_model.chunks + i;
+        const scene_node* chunk = m_model.chunks + i;
         if (chunk_distance(chunk, p, q) > 1)
         {
             continue;
@@ -1048,7 +910,7 @@ int world::collide(int height, float* x, float* y, float* z) const noexcept
         SDL_Log("Could find chunk: %d %d", p, q);
         return result;
     }
-    const Chunk* chunk = chunk_opt.value();
+    const scene_node* chunk = chunk_opt.value();
     const Map* map = &chunk->map;
     int nx = static_cast<int>(SDL_roundf(*x));
     int ny = static_cast<int>(SDL_roundf(*y));
@@ -1263,7 +1125,7 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
     return count;
 }
 
-void world::gen_sign_buffer(Chunk* chunk) const noexcept
+void world::gen_sign_buffer(scene_node* chunk) const noexcept
 {
     const SignList* signs = &chunk->signs;
 
@@ -1292,13 +1154,13 @@ void world::gen_sign_buffer(Chunk* chunk) const noexcept
     chunk->sign_faces = static_cast<int>(faces);
 }
 
-int world::has_lights(Chunk* chunk) const noexcept
+int world::has_lights(scene_node* chunk) const noexcept
 {
     for (int dp = -1; dp <= 1; dp++)
     {
         for (int dq = -1; dq <= 1; dq++)
         {
-            Chunk* other = chunk;
+            scene_node* other = chunk;
             if (dp || dq)
             {
                 auto other_opt = this->find_chunk(chunk->p + dp, chunk->q + dq);
@@ -1324,7 +1186,7 @@ int world::has_lights(Chunk* chunk) const noexcept
     return 0;
 }
 
-void world::dirty_chunk(Chunk* chunk) const noexcept
+void world::dirty_chunk(scene_node* chunk) const noexcept
 {
     chunk->dirty = 1;
     if (has_lights(chunk))
@@ -1645,7 +1507,7 @@ void world::compute_chunk(WorkerItem* item) const noexcept
     item->data = data;
 } // compute_chunk
 
-void world::generate_chunk(Chunk* chunk, WorkerItem* item) const noexcept
+void world::generate_chunk(scene_node* chunk, WorkerItem* item) const noexcept
 {
     chunk->miny = item->miny;
     chunk->maxy = item->maxy;
@@ -1655,7 +1517,7 @@ void world::generate_chunk(Chunk* chunk, WorkerItem* item) const noexcept
     this->gen_sign_buffer(chunk);
 }
 
-void world::gen_chunk_buffer(Chunk* chunk) const noexcept
+void world::gen_chunk_buffer(scene_node* chunk) const noexcept
 {
     WorkerItem _item;
     WorkerItem* item = &_item;
@@ -1665,7 +1527,7 @@ void world::gen_chunk_buffer(Chunk* chunk) const noexcept
     {
         for (int dq = -1; dq <= 1; dq++)
         {
-            Chunk* other = chunk;
+            scene_node* other = chunk;
             if (dp || dq)
             {
                 auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
@@ -1715,7 +1577,7 @@ void world::load_chunk(WorkerItem* item) const noexcept
     db_load_lights(light_map, p, q);
 }
 
-void world::init_chunk(Chunk* chunk, int p, int q) const noexcept
+void world::init_chunk(scene_node* chunk, int p, int q) const noexcept
 {
     chunk->p = p;
     chunk->q = q;
@@ -1736,7 +1598,7 @@ void world::init_chunk(Chunk* chunk, int p, int q) const noexcept
     map_alloc(light_map, dx, dy, dz, 0xf);
 }
 
-void world::create_chunk(Chunk* chunk, int p, int q) const noexcept
+void world::create_chunk(scene_node* chunk, int p, int q) const noexcept
 {
     init_chunk(chunk, p, q);
 
@@ -1756,7 +1618,7 @@ void world::delete_chunks() noexcept
     const player::state* s1 = &m_player->s1;
     for (int i = 0; i < count; i++)
     {
-        Chunk* chunk = this->m_model.chunks + i;
+        scene_node* chunk = this->m_model.chunks + i;
         int remove_chunk = 1;
         int p = chunked(s1->x);
         int q = chunked(s1->z);
@@ -1772,8 +1634,8 @@ void world::delete_chunks() noexcept
             sign_list_free(&chunk->signs);
             sdl_helper::del_buffer(chunk->buffer);
             sdl_helper::del_buffer(chunk->sign_buffer);
-            const Chunk* other = this->m_model.chunks + (--count);
-            SDL_memcpy(chunk, other, sizeof(Chunk));
+            const scene_node* other = this->m_model.chunks + (--count);
+            SDL_memcpy(chunk, other, sizeof(scene_node));
         }
     }
     this->m_model.chunk_count = count;
@@ -1783,7 +1645,7 @@ void world::delete_all_chunks() noexcept
 {
     for (int i = 0; i < this->m_model.chunk_count; i++)
     {
-        Chunk* chunk = this->m_model.chunks + i;
+        scene_node* chunk = this->m_model.chunks + i;
         map_free(&chunk->map);
         map_free(&chunk->lights);
         sign_list_free(&chunk->signs);
@@ -1804,7 +1666,7 @@ void world::check_workers() noexcept
             auto chunk_opt = find_chunk(item->p, item->q);
             if (chunk_opt.has_value())
             {
-                Chunk* chunk = chunk_opt.value();
+                scene_node* chunk = chunk_opt.value();
                 if (item->load)
                 {
                     Map* block_map = item->block_maps[1][1];
@@ -1855,7 +1717,7 @@ void world::force_chunks(player* _player) noexcept
             auto chunk_opt = find_chunk(a, b);
             if (chunk_opt.has_value())
             {
-                Chunk* chunk = chunk_opt.value();
+                scene_node* chunk = chunk_opt.value();
                 if (chunk->dirty)
                 {
                     gen_chunk_buffer(chunk);
@@ -1863,7 +1725,7 @@ void world::force_chunks(player* _player) noexcept
             }
             else if (this->m_model.chunk_count < MAX_CHUNKS)
             {
-                Chunk* chunk = this->m_model.chunks + this->m_model.chunk_count++;
+                scene_node* chunk = this->m_model.chunks + this->m_model.chunk_count++;
                 create_chunk(chunk, a, b);
                 gen_chunk_buffer(chunk);
             }
@@ -1908,7 +1770,7 @@ void world::ensure_chunks_worker(player* _player, Worker* worker) noexcept
             int priority = 0;
             if (chunk_opt.has_value())
             {
-                Chunk* chunk = chunk_opt.value();
+                scene_node* chunk = chunk_opt.value();
                 priority = chunk->buffer & chunk->dirty;
             }
             // Check for chunk to update based on lowest score
@@ -1929,7 +1791,7 @@ void world::ensure_chunks_worker(player* _player, Worker* worker) noexcept
     int b = best_b;
     int load = 0;
     auto chunk_opt = find_chunk(a, b);
-    Chunk* chunk = nullptr;
+    scene_node* chunk = nullptr;
     // Check if the chunk is already loaded
     if (!chunk_opt.has_value())
     {
@@ -1956,7 +1818,7 @@ void world::ensure_chunks_worker(player* _player, Worker* worker) noexcept
     {
         for (int dq = -1; dq <= 1; dq++)
         {
-            Chunk* other = chunk;
+            scene_node* other = chunk;
             if (dp || dq)
             {
                 auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
@@ -2012,7 +1874,7 @@ void world::unset_sign(const int x, const int y, const int z) const noexcept
     const int q = chunked(static_cast<float>(z));
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         if (auto* signs = &chunk->signs; sign_list_remove_all(signs, x, y, z))
         {
             chunk->dirty = 1;
@@ -2031,7 +1893,7 @@ void world::unset_sign_face(const int x, const int y, const int z, const int fac
     const int q = chunked(static_cast<float>(z));
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         if (auto* signs = &chunk->signs; sign_list_remove(signs, x, y, z, face))
         {
             chunk->dirty = 1;
@@ -2054,7 +1916,7 @@ void world::_set_sign(const int p, const int q, const int x, const int y, const 
     }
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         auto* signs = &chunk->signs;
         sign_list_add(signs, x, y, z, face, text.data());
         if (dirty)
@@ -2078,7 +1940,7 @@ void world::toggle_light(int x, int y, int z) const noexcept
     const int q = chunked(static_cast<float>(z));
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         Map* map = &chunk->lights;
         const int w = map_get(map, x, y, z) ? 0 : 15;
         map_set(map, x, y, z, w);
@@ -2092,7 +1954,7 @@ void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept
     auto chunk_opt = find_chunk(p, q);
     if (chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         Map* map = &chunk->lights;
         if (map_set(map, x, y, z, w))
         {
@@ -2111,7 +1973,7 @@ void world::_set_block(int p, int q, int x, int y, int z, int w, int dirty) cons
     auto chunk_opt = find_chunk(p, q);
     if (chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         Map* map = &chunk->map;
         if (map_set(map, x, y, z, w))
         {
@@ -2175,7 +2037,7 @@ int world::get_block(int x, int y, int z) noexcept
     auto chunk_opt = find_chunk(p, q);
     if (chunk_opt.has_value())
     {
-        Chunk* chunk = chunk_opt.value();
+        scene_node* chunk = chunk_opt.value();
         Map* map = &chunk->map;
         return map_get(map, x, y, z);
     }
@@ -2198,7 +2060,7 @@ void world::builder_block(int x, int y, int z, int w) noexcept
     }
 }
 
-int world::render_chunks(const Attrib* attrib, player* _player, const std::uint32_t texture) const noexcept
+int world::render_chunks(const sdl_helper::attrib* attrib, player* _player, const std::uint32_t texture) const noexcept
 {
     int result = 0;
     const player::state* s = &_player->s1;
@@ -2232,7 +2094,7 @@ int world::render_chunks(const Attrib* attrib, player* _player, const std::uint3
 
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        const Chunk* chunk = m_model.chunks + i;
+        const scene_node* chunk = m_model.chunks + i;
         if (chunk_distance(chunk, p, q) > m_model.render_radius)
         {
             chunks_culled_distance++;
@@ -2251,7 +2113,7 @@ int world::render_chunks(const Attrib* attrib, player* _player, const std::uint3
     return result;
 }
 
-void world::render_signs(const Attrib* attrib, const player* _player, const std::uint32_t sign) const noexcept
+void world::render_signs(const sdl_helper::attrib* attrib, const player* _player, const std::uint32_t sign) const noexcept
 {
     const player::state* s = &_player->s1;
     const int p = chunked(s->x);
@@ -2273,7 +2135,7 @@ void world::render_signs(const Attrib* attrib, const player* _player, const std:
 
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        const Chunk* chunk = m_model.chunks + i;
+        const scene_node* chunk = m_model.chunks + i;
         if (chunk_distance(chunk, p, q) > m_model.sign_radius)
         {
             continue;
@@ -2287,7 +2149,7 @@ void world::render_signs(const Attrib* attrib, const player* _player, const std:
     }
 }
 
-void world::render_sign(const Attrib* attrib, player* _player, const std::uint32_t sign) const noexcept
+void world::render_sign(const sdl_helper::attrib* attrib, player* _player, const std::uint32_t sign) const noexcept
 {
     int x, y, z, face;
     if (!hit_test_face(_player, &x, &y, &z, &face))
@@ -2318,7 +2180,7 @@ void world::render_sign(const Attrib* attrib, player* _player, const std::uint32
     sdl_helper::del_buffer(buffer);
 }
 
-void world::render_players(const Attrib* attrib, player* _player) const noexcept
+void world::render_players(const sdl_helper::attrib* attrib, player* _player) const noexcept
 {
     player::state* s = &_player->s1;
     float matrix[16];
@@ -2338,7 +2200,7 @@ void world::render_players(const Attrib* attrib, player* _player) const noexcept
     }
 }
 
-void world::render_wireframe(const Attrib* attrib, const player* _player) const noexcept
+void world::render_wireframe(const sdl_helper::attrib* attrib, const player* _player) const noexcept
 {
     const player::state* s = &_player->s1;
     float matrix[16];
@@ -2359,7 +2221,7 @@ void world::render_wireframe(const Attrib* attrib, const player* _player) const 
     }
 }
 
-void world::render_crosshairs(const Attrib* attrib) const noexcept
+void world::render_crosshairs(const sdl_helper::attrib* attrib) const noexcept
 {
     float matrix[16];
     set_matrix_2d(matrix, m_model.voxel_scene_w, m_model.voxel_scene_h);
@@ -2371,7 +2233,7 @@ void world::render_crosshairs(const Attrib* attrib) const noexcept
     sdl_helper::del_buffer(crosshair_buffer);
 }
 
-void world::render_item(const Attrib* attrib, const std::uint32_t texture) const noexcept
+void world::render_item(const sdl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
 {
     float matrix[16];
     set_matrix_item(matrix, m_model.voxel_scene_w, m_model.voxel_scene_h, m_model.scale);
@@ -2396,7 +2258,7 @@ void world::render_item(const Attrib* attrib, const std::uint32_t texture) const
     }
 }
 
-void world::render_text(const Attrib* attrib, const std::uint32_t font,
+void world::render_text(const sdl_helper::attrib* attrib, const std::uint32_t font,
                         const int justify, float x, const float y, const float n, const std::string_view text) const noexcept
 {
     float matrix[16];

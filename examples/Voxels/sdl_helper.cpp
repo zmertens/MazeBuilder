@@ -8,6 +8,10 @@
 
 #include <SDL3/SDL.h>
 
+#include "player.h"
+#include "scene_node.h"
+#include "shader.h"
+
 bool sdl_helper::initialize(std::string_view title, int width, int height) noexcept
 {
     auto init_func = [this, title, width, height]()
@@ -219,3 +223,137 @@ std::uint32_t sdl_helper::gen_faces(const std::size_t components, const std::siz
     const GLuint buffer = gen_buffer(sizeof(GLfloat) * 6 * components * faces, data);
     return buffer;
 }
+
+void sdl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t buffer, const int count) noexcept
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glEnableVertexAttribArray(a->position);
+    glEnableVertexAttribArray(a->normal);
+    glEnableVertexAttribArray(a->uv);
+    glVertexAttribPointer(a->position, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 10, nullptr);
+    glVertexAttribPointer(a->normal, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 10, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
+    glVertexAttribPointer(a->uv, 4, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 10, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 6));
+    glDrawArrays(GL_TRIANGLES, 0, count);
+    glDisableVertexAttribArray(a->position);
+    glDisableVertexAttribArray(a->normal);
+    glDisableVertexAttribArray(a->uv);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void sdl_helper::draw_triangles_3d_text(const attrib* a, const std::uint32_t buffer, const int count) noexcept
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glEnableVertexAttribArray(a->position);
+    glEnableVertexAttribArray(a->uv);
+    glVertexAttribPointer(a->position, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 5, nullptr);
+    glVertexAttribPointer(a->uv, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 5, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
+    glDrawArrays(GL_TRIANGLES, 0, count);
+    glDisableVertexAttribArray(a->position);
+    glDisableVertexAttribArray(a->uv);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void sdl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffer, const int count) const noexcept
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+
+    glEnableVertexAttribArray(a->position);
+
+    glEnableVertexAttribArray(a->normal);
+    glEnableVertexAttribArray(a->uv);
+
+    glVertexAttribPointer(a->position, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8, nullptr);
+    glVertexAttribPointer(a->normal, 3, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8,
+                          reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 3));
+    glVertexAttribPointer(a->uv, 2, GL_FLOAT, GL_FALSE, sizeof(GLfloat) * 8,
+                          reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 6));
+
+    glDrawArrays(GL_TRIANGLES, 0, count);
+
+    glDisableVertexAttribArray(a->position);
+    glDisableVertexAttribArray(a->normal);
+    glDisableVertexAttribArray(a->uv);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void sdl_helper::draw_triangles_2d(const attrib* a, const std::uint32_t buffer, const std::size_t count) const noexcept
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glEnableVertexAttribArray(a->position);
+    glEnableVertexAttribArray(a->uv);
+    glVertexAttribPointer(a->position, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, 0);
+    glVertexAttribPointer(a->uv, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(GLfloat) * 4, reinterpret_cast<GLvoid*>(sizeof(GLfloat) * 2));
+    glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(count));
+    glDisableVertexAttribArray(a->position);
+    glDisableVertexAttribArray(a->uv);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void sdl_helper::draw_lines(const attrib* a, const std::uint32_t buffer, const int components,
+                       const int count) const noexcept
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buffer);
+    glEnableVertexAttribArray(a->position);
+    glVertexAttribPointer(
+        a->position, components, GL_FLOAT, GL_FALSE, 0, 0);
+    glDrawArrays(GL_LINES, 0, count);
+    glDisableVertexAttribArray(a->position);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void sdl_helper::draw_chunk(const attrib* a, const scene_node* chunk) const noexcept
+{
+    draw_triangles_3d_ao(a, chunk->buffer, chunk->faces * 6);
+}
+
+void sdl_helper::draw_item(const attrib* a, const GLuint buffer, const int count) const noexcept
+{
+    draw_triangles_3d_ao(a, buffer, count);
+}
+
+void sdl_helper::draw_text(const attrib* a, const std::uint32_t buffer, const std::size_t length) const noexcept
+{
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    draw_triangles_2d(a, buffer, length * 6);
+    glDisable(GL_BLEND);
+}
+
+void sdl_helper::draw_signs(const attrib* a, const scene_node* chunk) const noexcept
+{
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-8, -1024);
+    draw_triangles_3d_text(a, chunk->sign_buffer, chunk->sign_faces * 6);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+}
+
+void sdl_helper::draw_sign(const attrib* a, const std::uint32_t buffer, const int length) const noexcept
+{
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-8, -1024);
+    draw_triangles_3d_text(a, buffer, length * 6);
+    glDisable(GL_POLYGON_OFFSET_FILL);
+}
+
+void sdl_helper::draw_cube(const attrib* a, const std::uint32_t buffer) const noexcept
+{
+    draw_item(a, buffer, 36);
+}
+
+void sdl_helper::draw_plant(const attrib* a, const std::uint32_t buffer) const noexcept
+{
+    draw_item(a, buffer, 24);
+}
+
+void sdl_helper::draw_player(const attrib* a, const player* _player) const noexcept
+{
+    draw_cube(a, _player->get_buffer());
+}
+
