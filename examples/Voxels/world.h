@@ -80,9 +80,17 @@ private:
 
     // Scene graph helper methods
     void attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept;
+    void detach_chunk_from_layer(scene_node* chunk) noexcept;
     void traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept;
+    void traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
+                                     const std::function<void(scene_node*)>& callback) const noexcept;
     void draw_chunk(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
     void draw_signs(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
+
+    // Spatial partitioning (quadtree)
+    scene_node* find_or_create_spatial_node(scene_node* parent, int min_p, int min_q, int max_p, int max_q) noexcept;
+    void insert_chunk_into_spatial_tree(scene_node* chunk) noexcept;
+    void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
 #define MAX_SIGN_LENGTH 16
 
@@ -119,7 +127,7 @@ private:
 
 #define MAX_DB_PATH_LEN 64
 #define MAX_CHUNKS 8192
-    typedef struct {
+    struct model {
         std::vector<std::unique_ptr<Worker>> workers;
         scene_node* chunks;  // Dynamically allocated chunk array
         int chunk_count;
@@ -143,7 +151,7 @@ private:
         Block block1;
         Block copy0;
         Block copy1;
-    } Model;
+    };
 
     bool worker_run(void* arg) noexcept;
     void init_worker_threads() noexcept;
@@ -186,9 +194,10 @@ private:
     int has_lights(scene_node* chunk) const noexcept;
 
     void dirty_chunk(scene_node* chunk) const noexcept;
+    void update_dirty_chunks_async() noexcept;  // Process dirty chunks on worker threads
 
-    void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) const noexcept;
-    void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) const noexcept;
+    static void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) noexcept;
+    static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
 
     void compute_chunk(WorkerItem* item) const noexcept;
 
@@ -252,7 +261,7 @@ private:
     command_queue m_command_queue;
     player* m_player;
 
-    Model m_model;
+    model m_model;
 };
 
 #endif // WORLD_H

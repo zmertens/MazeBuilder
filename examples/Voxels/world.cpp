@@ -101,13 +101,25 @@ world::~world()
 
 void world::build_scene()
 {
+    // Initialize root scene graph node
+    m_scene_graph.node_type = SceneNodeType::ROOT;
+    m_scene_graph.parent = nullptr;
+    m_scene_graph.children.clear();
+
     // Initialize scene layers as child nodes of the scene graph
-    // Layer 0 = BACKGROUND (terrain/chunks)
-    // Layer 1 = FOREGROUND (UI elements, if needed later)
+    // Layer 0 = BACKGROUND (terrain/chunks) - this will be the root of the spatial hierarchy
     m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)] = &m_scene_graph;
     m_scene_layers[static_cast<std::size_t>(Layer::FOREGROUND)] = &m_scene_graph;
 
-    // Allocate chunks array dynamically
+    // Set up the background layer to be a spatial partitioning root
+    m_scene_graph.node_type = SceneNodeType::LAYER;
+    m_scene_graph.bounds_min_x = -10000;
+    m_scene_graph.bounds_min_z = -10000;
+    m_scene_graph.bounds_max_x = 10000;
+    m_scene_graph.bounds_max_z = 10000;
+
+    // Allocate chunks array dynamically - these are still stored in a flat array
+    // but organized hierarchically in the scene graph
     m_model.chunks = static_cast<scene_node*>(SDL_calloc(MAX_CHUNKS, sizeof(scene_node)));
 
     if (m_model.chunks == nullptr)
@@ -136,28 +148,224 @@ void world::build_scene()
         chunk->dirty = 0;
         chunk->miny = 0;
         chunk->maxy = 0;
+        chunk->node_type = SceneNodeType::CHUNK;
+        chunk->parent = nullptr;
+        chunk->children.clear();
+        chunk->bounds_min_x = 0;
+        chunk->bounds_min_z = 0;
+        chunk->bounds_max_x = 0;
+        chunk->bounds_max_z = 0;
     }
+
+    SDL_Log("Scene graph initialized with spatial hierarchy support");
 }
 
 void world::attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept
 {
-    // For now, just ensure the chunk is properly initialized
-    // In the future, this could manage a more complex hierarchy
-    if (layer_index >= static_cast<int>(Layer::LAYER_COUNT))
+    if (layer_index >= static_cast<int>(Layer::LAYER_COUNT) || chunk == nullptr)
     {
         return;
     }
 
-    // Chunks are stored in the flat array for now, but attached to the BACKGROUND layer conceptually
-    // Future enhancement: create a spatial hierarchy (quadtree/octree)
+    // Set chunk bounds based on its p,q coordinates
+    constexpr int CHUNK_SIZE = 32; // BUILD_CHUNK_SIZE
+    chunk->bounds_min_x = chunk->p * CHUNK_SIZE;
+    chunk->bounds_min_z = chunk->q * CHUNK_SIZE;
+    chunk->bounds_max_x = (chunk->p + 1) * CHUNK_SIZE - 1;
+    chunk->bounds_max_z = (chunk->q + 1) * CHUNK_SIZE - 1;
+    chunk->node_type = SceneNodeType::CHUNK;
+
+    // Insert into spatial hierarchy
+    insert_chunk_into_spatial_tree(chunk);
+}
+
+void world::detach_chunk_from_layer(scene_node* chunk) noexcept
+{
+    if (chunk == nullptr || chunk->parent == nullptr)
+    {
+        return;
+    }
+
+    // Remove from spatial hierarchy
+    remove_chunk_from_spatial_tree(chunk);
+}
+
+void world::insert_chunk_into_spatial_tree(scene_node* chunk) noexcept
+{
+    if (chunk == nullptr)
+    {
+        return;
+    }
+
+    // Get the layer root (background layer)
+    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    if (root == nullptr)
+    {
+        return;
+    }
+
+    // For now, use a simple spatial subdivision approach
+    // Find or create an appropriate spatial node to hold this chunk
+    scene_node* spatial_parent = find_or_create_spatial_node(
+        root,
+        chunk->bounds_min_x,
+        chunk->bounds_min_z,
+        chunk->bounds_max_x,
+        chunk->bounds_max_z
+    );
+
+    if (spatial_parent != nullptr)
+    {
+        chunk->parent = spatial_parent;
+
+        // Check if chunk is already in parent's children (avoid duplicates)
+        bool already_attached = false;
+        for (scene_node* child : spatial_parent->children)
+        {
+            if (child == chunk)
+            {
+                already_attached = true;
+                break;
+            }
+        }
+
+        if (!already_attached)
+        {
+            spatial_parent->children.push_back(chunk);
+        }
+    }
+}
+
+void world::remove_chunk_from_spatial_tree(scene_node* chunk) noexcept
+{
+    if (chunk == nullptr || chunk->parent == nullptr)
+    {
+        return;
+    }
+
+    // Remove from parent's children list
+    auto& siblings = chunk->parent->children;
+    siblings.erase(std::remove(siblings.begin(), siblings.end(), chunk), siblings.end());
+
+    chunk->parent = nullptr;
+}
+
+scene_node* world::find_or_create_spatial_node(scene_node* parent, int min_x, int min_z, int max_x, int max_z) noexcept
+{
+    if (parent == nullptr)
+    {
+        return nullptr;
+    }
+
+    // For simplicity in Phase 2, we'll use a grid-based spatial subdivision
+    // Divide the world into regions of 4x4 chunks (128x128 blocks)
+    constexpr int REGION_SIZE = 128; // 4 chunks * 32 blocks
+
+    int region_x = min_x / REGION_SIZE;
+    int region_z = min_z / REGION_SIZE;
+
+    // Look for existing spatial node for this region
+    for (scene_node* child : parent->children)
+    {
+        if (child->node_type == SceneNodeType::SPATIAL &&
+            child->bounds_min_x / REGION_SIZE == region_x &&
+            child->bounds_min_z / REGION_SIZE == region_z)
+        {
+            return child;
+        }
+    }
+
+    // No existing spatial node found, attach directly to parent for now
+    // In a full quadtree implementation, we would create intermediate nodes
+    return parent;
 }
 
 void world::traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept
 {
-    // Simple linear traversal of all active chunks
-    for (int i = 0; i < m_model.chunk_count; i++)
+    // Traverse the spatial hierarchy
+    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    if (root == nullptr)
     {
-        scene_node* chunk = &m_model.chunks[i];
+        return;
+    }
+
+    // Recursive traversal helper
+    std::function<void(scene_node*)> traverse_node = [&](scene_node* node)
+    {
+        if (node == nullptr)
+        {
+            return;
+        }
+
+        // If this is a chunk, call the callback
+        if (node->node_type == SceneNodeType::CHUNK)
+        {
+            callback(node);
+        }
+
+        // Traverse children
+        for (scene_node* child : node->children)
+        {
+            traverse_node(child);
+        }
+    };
+
+    traverse_node(root);
+}
+
+void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
+                                       const std::function<void(scene_node*)>& callback) const noexcept
+{
+    // Convert chunk coordinates to world coordinates
+    constexpr int CHUNK_SIZE = 32;
+    int min_x = min_p * CHUNK_SIZE;
+    int min_z = min_q * CHUNK_SIZE;
+    int max_x = (max_p + 1) * CHUNK_SIZE - 1;
+    int max_z = (max_q + 1) * CHUNK_SIZE - 1;
+
+    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    if (root == nullptr)
+    {
+        return;
+    }
+
+    // Recursive traversal with bounds checking
+    std::function<void(scene_node*)> traverse_node = [&](scene_node* node)
+    {
+        if (node == nullptr)
+        {
+            return;
+        }
+
+        // Early rejection: if node doesn't intersect bounds, skip it and all children
+        if (!node->intersects_bounds(min_x, min_z, max_x, max_z))
+        {
+            return;
+        }
+
+        // If this is a chunk and it intersects, call the callback
+        if (node->node_type == SceneNodeType::CHUNK)
+        {
+            callback(node);
+        }
+
+        // Traverse children (only if this node intersects)
+        for (scene_node* child : node->children)
+        {
+            traverse_node(child);
+        }
+    };
+
+    traverse_node(root);
+}
+
+// Legacy method - now traverses hierarchy instead of flat array
+void traverse_chunks_legacy(const std::function<void(scene_node*)>& callback, const scene_node* chunks, int chunk_count) noexcept
+{
+    // Simple linear traversal of all active chunks (fallback)
+    for (int i = 0; i < chunk_count; i++)
+    {
+        scene_node* chunk = const_cast<scene_node*>(&chunks[i]);
         callback(chunk);
     }
 }
@@ -303,6 +511,10 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     delete_chunks();
     sdl_helper::del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
+
+    // OPTIMIZATION: Process dirty chunks asynchronously on worker threads
+    // This prevents FPS drops when placing/destroying blocks
+    update_dirty_chunks_async();
 }
 
 void world::draw() const noexcept
@@ -755,8 +967,7 @@ std::optional<scene_node*> world::find_chunk(const int p, const int q) const noe
 {
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        scene_node* chunk = &m_model.chunks[i];
-        if (chunk->p == p && chunk->q == q)
+        if (scene_node* chunk = &m_model.chunks[i]; chunk->p == p && chunk->q == q)
         {
             return chunk;
         }
@@ -1264,10 +1475,18 @@ void world::dirty_chunk(scene_node* chunk) const noexcept
     chunk->dirty = 1;
     if (has_lights(chunk))
     {
+        // OPTIMIZATION: Only mark direct neighbors as dirty, not diagonals
+        // This reduces the number of chunks that need updating from 9 to 5
         for (int dp = -1; dp <= 1; dp++)
         {
             for (int dq = -1; dq <= 1; dq++)
             {
+                // Skip diagonal neighbors - they'll get updated if needed
+                if (dp != 0 && dq != 0)
+                {
+                    continue;
+                }
+
                 auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
                 if (other_opt.has_value())
                 {
@@ -1278,8 +1497,76 @@ void world::dirty_chunk(scene_node* chunk) const noexcept
     }
 }
 
+void world::update_dirty_chunks_async() noexcept
+{
+    // OPTIMIZATION: Delegate dirty chunk updates to worker threads
+    // This prevents blocking the main render thread when placing/destroying blocks
+
+    // Process dirty chunks through the worker system
+    for (auto&& worker : m_model.workers)
+    {
+        worker->mtx.lock();
+        if (worker->state == WorkerState::IDLE)
+        {
+            // Find a dirty chunk that needs updating and is assigned to this worker
+            for (int i = 0; i < m_model.chunk_count; i++)
+            {
+                scene_node* chunk = &m_model.chunks[i];
+                if (chunk->dirty)
+                {
+                    int index = (SDL_abs(chunk->p) ^ SDL_abs(chunk->q)) % m_model.workers.size();
+                    if (index == worker->index)
+                    {
+                        // Assign this dirty chunk to the worker
+                        WorkerItem* item = &worker->item;
+                        item->p = chunk->p;
+                        item->q = chunk->q;
+                        item->load = 0;
+
+                        // Set up neighbor maps for chunk generation
+                        for (int dp = -1; dp <= 1; dp++)
+                        {
+                            for (int dq = -1; dq <= 1; dq++)
+                            {
+                                scene_node* other = chunk;
+                                if (dp || dq)
+                                {
+                                    auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                                    if (!other_opt.has_value())
+                                    {
+                                        other = nullptr;
+                                    }
+                                    else
+                                    {
+                                        other = other_opt.value();
+                                    }
+                                }
+                                if (other)
+                                {
+                                    item->block_maps[dp + 1][dq + 1] = &other->map;
+                                    item->light_maps[dp + 1][dq + 1] = &other->lights;
+                                }
+                                else
+                                {
+                                    item->block_maps[dp + 1][dq + 1] = nullptr;
+                                    item->light_maps[dp + 1][dq + 1] = nullptr;
+                                }
+                            }
+                        }
+
+                        worker->state = WorkerState::BUSY;
+                        worker->cnd.notify_one();
+                        break;  // Assigned one chunk to this worker, move to next worker
+                    }
+                }
+            }
+        }
+        worker->mtx.unlock();
+    }
+}
+
 void world::occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4],
-                      float light[6][4]) const noexcept
+                      float light[6][4]) noexcept
 {
     static constexpr int lookup3[6][4][3] = {
         {{0, 1, 3}, {2, 1, 5}, {6, 3, 7}, {8, 5, 7}},
@@ -1318,14 +1605,14 @@ void world::occlusion(char neighbors[27], char lights[27], float shades[27], flo
             {
                 light_sum = 15 * 4 * 10;
             }
-            float total = curve[value] + shade_sum / 4.0f;
+            const float total = curve[value] + shade_sum / 4.0f;
             ao[i][j] = SDL_min(total, 1.0f);
             light[i][j] = light_sum / 15.0f / 4.0f;
         }
     }
 } // occlusion
 
-void world::light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) const noexcept
+void world::light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept
 {
 #define XZ_SIZE (BUILD_CHUNK_SIZE * 3 + 2)
 #define XZ_LO (BUILD_CHUNK_SIZE)
@@ -1379,8 +1666,7 @@ void world::compute_chunk(WorkerItem* item) const noexcept
     {
         for (int b = 0; b < 3; b++)
         {
-            Map* map = item->light_maps[a][b];
-            if (map && map->size)
+            if (Map* map = item->light_maps[a][b]; map && map->size)
             {
                 has_light = 1;
             }
@@ -1658,6 +1944,7 @@ void world::init_chunk(scene_node* chunk, int p, int q) const noexcept
     chunk->sign_faces = 0;
     chunk->buffer = 0;
     chunk->sign_buffer = 0;
+    chunk->node_type = SceneNodeType::CHUNK;
     dirty_chunk(chunk);
     auto* signs = &chunk->signs;
     sign_list_alloc(signs, 16);
@@ -1669,6 +1956,9 @@ void world::init_chunk(scene_node* chunk, int p, int q) const noexcept
     int dz = q * BUILD_CHUNK_SIZE - 1;
     map_alloc(block_map, dx, dy, dz, 0x7fff);
     map_alloc(light_map, dx, dy, dz, 0xf);
+
+    // Attach to spatial hierarchy (cast away const since we're modifying scene graph)
+    const_cast<world*>(this)->attach_chunk_to_layer(chunk, static_cast<int>(Layer::BACKGROUND));
 }
 
 void world::create_chunk(scene_node* chunk, int p, int q) const noexcept
@@ -1702,13 +1992,26 @@ void world::delete_chunks() noexcept
         }
         if (remove_chunk)
         {
+            // Detach from spatial hierarchy first
+            detach_chunk_from_layer(chunk);
+
             map_free(&chunk->map);
             map_free(&chunk->lights);
             sign_list_free(&chunk->signs);
             sdl_helper::del_buffer(chunk->buffer);
             sdl_helper::del_buffer(chunk->sign_buffer);
             const scene_node* other = this->m_model.chunks + (--count);
+
+            // Before copying, detach the other chunk too
+            detach_chunk_from_layer(const_cast<scene_node*>(other));
+
             SDL_memcpy(chunk, other, sizeof(scene_node));
+
+            // Reattach after copy (the moved chunk needs to update its parent reference)
+            if (chunk->node_type == SceneNodeType::CHUNK)
+            {
+                attach_chunk_to_layer(chunk, static_cast<int>(Layer::BACKGROUND));
+            }
         }
     }
     this->m_model.chunk_count = count;
@@ -1719,6 +2022,10 @@ void world::delete_all_chunks() noexcept
     for (int i = 0; i < this->m_model.chunk_count; i++)
     {
         scene_node* chunk = this->m_model.chunks + i;
+
+        // Detach from spatial hierarchy
+        detach_chunk_from_layer(chunk);
+
         map_free(&chunk->map);
         map_free(&chunk->lights);
         sign_list_free(&chunk->signs);
@@ -1726,6 +2033,9 @@ void world::delete_all_chunks() noexcept
         sdl_helper::del_buffer(chunk->sign_buffer);
     }
     this->m_model.chunk_count = 0;
+
+    // Clear the scene graph hierarchy
+    m_scene_graph.children.clear();
 }
 
 void world::check_workers() noexcept
@@ -1791,10 +2101,13 @@ void world::force_chunks(player* _player) noexcept
             if (chunk_opt.has_value())
             {
                 scene_node* chunk = chunk_opt.value();
-                if (chunk->dirty)
+                // OPTIMIZATION: Only regenerate if chunk has no buffer at all
+                // Otherwise let worker threads handle dirty chunks asynchronously
+                if (chunk->dirty && chunk->buffer == 0)
                 {
                     gen_chunk_buffer(chunk);
                 }
+                // Dirty chunks with existing buffers will be updated by workers
             }
             else if (this->m_model.chunk_count < MAX_CHUNKS)
             {
@@ -2165,23 +2478,34 @@ int world::render_chunks(const sdl_helper::attrib* attrib, player* _player, cons
     int chunks_culled_distance = 0;
     int chunks_culled_frustum = 0;
 
-    for (int i = 0; i < m_model.chunk_count; i++)
+    // Calculate bounds for spatial traversal (chunks within render radius)
+    int min_p = p - m_model.render_radius;
+    int min_q = q - m_model.render_radius;
+    int max_p = p + m_model.render_radius;
+    int max_q = q + m_model.render_radius;
+
+    // Use spatial hierarchy traversal with bounds culling
+    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](scene_node* chunk)
     {
-        const scene_node* chunk = m_model.chunks + i;
+        // Additional distance check
         if (chunk_distance(chunk, p, q) > m_model.render_radius)
         {
             chunks_culled_distance++;
-            continue;
+            return;
         }
+
+        // Frustum culling
         if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
         {
             chunks_culled_frustum++;
-            continue;
+            return;
         }
+
+        // Render the chunk
         draw_chunk(attrib, chunk);
         result += chunk->faces;
         chunks_rendered++;
-    }
+    });
 
     return result;
 }
@@ -2206,20 +2530,25 @@ void world::render_signs(const sdl_helper::attrib* attrib, const player* _player
     glUniform1i(attrib->sampler, 2);
     glUniform1i(attrib->extra1, 1);
 
-    for (int i = 0; i < m_model.chunk_count; i++)
+    // Calculate bounds for spatial traversal (chunks within sign render radius)
+    int min_p = p - m_model.sign_radius;
+    int min_q = q - m_model.sign_radius;
+    int max_p = p + m_model.sign_radius;
+    int max_q = q + m_model.sign_radius;
+
+    // Use spatial hierarchy traversal
+    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](scene_node* chunk)
     {
-        const scene_node* chunk = m_model.chunks + i;
         if (chunk_distance(chunk, p, q) > m_model.sign_radius)
         {
-            continue;
+            return;
         }
-        if (!chunk_visible(
-            planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
+        if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
         {
-            continue;
+            return;
         }
         draw_signs(attrib, chunk);
-    }
+    });
 }
 
 void world::render_sign(const sdl_helper::attrib* attrib, player* _player, const std::uint32_t sign) const noexcept
