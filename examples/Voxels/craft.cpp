@@ -83,8 +83,8 @@ struct craft::craft_impl
         struct context
         {
             explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
-                             , texture_manager& textures, player& p)
-                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}
+                             , texture_manager& textures, player& p, sdl_helper& sdl)
+                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}, m_sdl{&sdl}
             {
             }
 
@@ -93,6 +93,7 @@ struct craft::craft_impl
             shader_manager* m_shaders;
             texture_manager* m_textures;
             player* m_player;
+            sdl_helper* m_sdl;
         };
 
         explicit state(state_stack& stack, const context& _context) : m_stack{&stack}, m_context{_context}
@@ -345,7 +346,8 @@ struct craft::craft_impl
                     if (loading->is_finished())
                     {
                         m_world.emplace(get_context().m_window, *get_context().m_fonts,
-                                        &m_player, *get_context().m_shaders, *get_context().m_textures);
+                                        &m_player, *get_context().m_shaders, *get_context().m_textures,
+                                        get_context().m_sdl);
 
                         m_world.value().init();
 
@@ -360,7 +362,8 @@ struct craft::craft_impl
                 {
                     m_world.emplace(get_context().m_window,
                                     *get_context().m_fonts, &m_player,
-                                    *get_context().m_shaders, *get_context().m_textures);
+                                    *get_context().m_shaders, *get_context().m_textures,
+                                    get_context().m_sdl);
 
                     // Enable mouse capture for editor
                     SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
@@ -738,7 +741,8 @@ struct craft::craft_impl
             std::ref(m_fonts),
             std::ref(m_shaders),
             std::ref(m_textures),
-            std::ref(m_player)
+            std::ref(m_player),
+            std::ref(m_sdl)
         });
 
         register_states();

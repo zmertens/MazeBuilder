@@ -36,7 +36,7 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 class attrib;
 class command_queue;
 class player;
-struct SDL_Window;
+class sdl_helper;
 
 namespace mazes {
     class randomizer;
@@ -49,7 +49,7 @@ public:
         player* p,
         shader_manager& shaders,
         texture_manager& textures,
-        const std::function<std::uint32_t()>& compute_scale_factor);
+        const sdl_helper* sdl);
 
     ~world();
 
@@ -77,6 +77,12 @@ public:
 private:
     // Build the scene (initialize scene graph and layers)
     void build_scene();
+
+    // Scene graph helper methods
+    void attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept;
+    void traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept;
+    void draw_chunk(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
+    void draw_signs(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept;
 
 #define MAX_SIGN_LENGTH 16
 
@@ -115,7 +121,7 @@ private:
 #define MAX_CHUNKS 8192
     typedef struct {
         std::vector<std::unique_ptr<Worker>> workers;
-        // scene_node chunks[MAX_CHUNKS];
+        scene_node* chunks;  // Dynamically allocated chunk array
         int chunk_count;
         int create_radius;
         int render_radius;
@@ -234,7 +240,7 @@ private:
 
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
-    SDL_Window* m_window;
+    const sdl_helper* m_sdl;
 
     font_manager& m_fonts;
     shader_manager& m_shaders;
@@ -247,8 +253,6 @@ private:
     player* m_player;
 
     Model m_model;
-
-    std::function<std::uint32_t()> m_compute_window_scale_factor;
 };
 
 #endif // WORLD_H

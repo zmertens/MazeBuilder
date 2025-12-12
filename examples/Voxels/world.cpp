@@ -76,8 +76,8 @@ world::world(SDL_Window* window, font_manager& fonts,
         player* p,
         shader_manager& shaders,
         texture_manager& textures,
-        const std::function<std::uint32_t()>& compute_scale_factor)
-    : m_window{window}
+        const sdl_helper* sdl)
+    : m_sdl{sdl}
       , m_fonts{fonts}
       , m_shaders{shaders}
       , m_textures{textures}
@@ -86,7 +86,6 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_command_queue{}
       , m_player{p}
       , m_model{}
-        , m_compute_window_scale_factor{compute_scale_factor}
 {
     // Set bidirectional reference between player and world
     if (m_player)
@@ -98,6 +97,84 @@ world::world(SDL_Window* window, font_manager& fonts,
 world::~world()
 {
     destroy_world();
+}
+
+void world::build_scene()
+{
+    // Initialize scene layers as child nodes of the scene graph
+    // Layer 0 = BACKGROUND (terrain/chunks)
+    // Layer 1 = FOREGROUND (UI elements, if needed later)
+    m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)] = &m_scene_graph;
+    m_scene_layers[static_cast<std::size_t>(Layer::FOREGROUND)] = &m_scene_graph;
+
+    // Allocate chunks array dynamically
+    m_model.chunks = static_cast<scene_node*>(SDL_calloc(MAX_CHUNKS, sizeof(scene_node)));
+
+    if (m_model.chunks == nullptr)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate chunks array");
+        return;
+    }
+
+    // Initialize all chunks to have null/zero state
+    for (int i = 0; i < MAX_CHUNKS; i++)
+    {
+        scene_node* chunk = &m_model.chunks[i];
+        chunk->map.data = nullptr;
+        chunk->map.size = 0;
+        chunk->lights.data = nullptr;
+        chunk->lights.size = 0;
+        chunk->signs.data = nullptr;
+        chunk->signs.size = 0;
+        chunk->signs.capacity = 0;
+        chunk->buffer = 0;
+        chunk->sign_buffer = 0;
+        chunk->p = 0;
+        chunk->q = 0;
+        chunk->faces = 0;
+        chunk->sign_faces = 0;
+        chunk->dirty = 0;
+        chunk->miny = 0;
+        chunk->maxy = 0;
+    }
+}
+
+void world::attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept
+{
+    // For now, just ensure the chunk is properly initialized
+    // In the future, this could manage a more complex hierarchy
+    if (layer_index >= static_cast<int>(Layer::LAYER_COUNT))
+    {
+        return;
+    }
+
+    // Chunks are stored in the flat array for now, but attached to the BACKGROUND layer conceptually
+    // Future enhancement: create a spatial hierarchy (quadtree/octree)
+}
+
+void world::traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept
+{
+    // Simple linear traversal of all active chunks
+    for (int i = 0; i < m_model.chunk_count; i++)
+    {
+        scene_node* chunk = &m_model.chunks[i];
+        callback(chunk);
+    }
+}
+
+void world::draw_chunk(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept
+{
+    sdl_helper::draw_triangles_3d_ao(attrib, chunk->buffer, chunk->faces * 6);
+}
+
+void world::draw_signs(const sdl_helper::attrib* attrib, const scene_node* chunk) const noexcept
+{
+    if (chunk->sign_faces)
+    {
+        glDisable(GL_CULL_FACE);
+        sdl_helper::draw_triangles_3d_text(attrib, chunk->sign_buffer, chunk->sign_faces * 6);
+        glEnable(GL_CULL_FACE);
+    }
 }
 
 void world::init() noexcept
@@ -115,7 +192,7 @@ void world::init() noexcept
     m_model.day_length = DAY_LENGTH;
 
     // Initialize window dimensions
-    SDL_GetWindowSizeInPixels(m_window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
+    SDL_GetWindowSizeInPixels(m_sdl->window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
 
     // Set up OpenGL state (critical for rendering)
     glEnable(GL_CULL_FACE);
@@ -127,19 +204,8 @@ void world::init() noexcept
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    // Initialize all chunks to have null/zero state
-    for (auto& chunk : m_model.chunks)
-    {
-        chunk.map.data = nullptr;
-        chunk.map.size = 0;
-        chunk.lights.data = nullptr;
-        chunk.lights.size = 0;
-        chunk.signs.data = nullptr;
-        chunk.signs.size = 0;
-        chunk.signs.capacity = 0;
-        chunk.buffer = 0;
-        chunk.sign_buffer = 0;
-    }
+    // Build scene graph and initialize chunks
+    build_scene();
 
     init_worker_threads();
 
@@ -176,10 +242,10 @@ void world::init() noexcept
 
 void world::update(float delta_time, mazes::randomizer& rng) noexcept
 {
-    m_model.scale = m_compute_window_scale_factor();
+    m_model.scale = m_sdl->get_scale_factor();
 
     // Update window dimensions to ensure accurate viewport and projection matrix
-    SDL_GetWindowSizeInPixels(m_window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
+    SDL_GetWindowSizeInPixels(m_sdl->window, &m_model.voxel_scene_w, &m_model.voxel_scene_h);
 
     // Process all commands in the queue
     static int update_frame = 0;
@@ -245,7 +311,7 @@ void world::draw() const noexcept
 
     // Set viewport to match window dimensions
     int viewport_width, viewport_height;
-    SDL_GetWindowSizeInPixels(m_window, &viewport_width, &viewport_height);
+    SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
     glViewport(0, 0, viewport_width, viewport_height);
 
     // Verify OpenGL state
@@ -307,6 +373,13 @@ void world::destroy_world()
     cleanup_worker_threads();
     delete_all_chunks();
     delete_all_players();
+
+    // Free the dynamically allocated chunks array
+    if (m_model.chunks != nullptr)
+    {
+        SDL_free(m_model.chunks);
+        m_model.chunks = nullptr;
+    }
 }
 
 void world::handle_event(const SDL_Event& event) noexcept
@@ -678,11 +751,11 @@ void world::delete_all_players() noexcept
     m_model.player_count = 0;
 }
 
-std::optional<world::scene_node*> world::find_chunk(const int p, const int q) const noexcept
+std::optional<scene_node*> world::find_chunk(const int p, const int q) const noexcept
 {
     for (int i = 0; i < m_model.chunk_count; i++)
     {
-        scene_node* chunk = const_cast<scene_node*>(m_model.chunks + i);
+        scene_node* chunk = &m_model.chunks[i];
         if (chunk->p == p && chunk->q == q)
         {
             return chunk;
@@ -2176,7 +2249,7 @@ void world::render_sign(const sdl_helper::attrib* attrib, player* _player, const
     const int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
                                   text);
     const GLuint buffer = sdl_helper::gen_faces(5, length, data);
-    draw_sign(attrib, buffer, length);
+    m_sdl->draw_sign(attrib, buffer, length);
     sdl_helper::del_buffer(buffer);
 }
 
@@ -2196,7 +2269,7 @@ void world::render_players(const sdl_helper::attrib* attrib, player* _player) co
     for (int i = 0; i < m_model.player_count; i++)
     {
         const player* other = m_player;
-        draw_player(attrib, other);
+        m_sdl->draw_player(attrib, other);
     }
 }
 
@@ -2216,7 +2289,7 @@ void world::render_wireframe(const sdl_helper::attrib* attrib, const player* _pl
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         const GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
                                                        static_cast<float>(hz), 0.53f);
-        draw_lines(attrib, wireframe_buffer, 3, 24);
+        m_sdl->draw_lines(attrib, wireframe_buffer, 3, 24);
         sdl_helper::del_buffer(wireframe_buffer);
     }
 }
@@ -2229,7 +2302,7 @@ void world::render_crosshairs(const sdl_helper::attrib* attrib) const noexcept
     glLineWidth(static_cast<GLfloat>(4 * m_model.scale));
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     const GLuint crosshair_buffer = gen_crosshair_buffer();
-    draw_lines(attrib, crosshair_buffer, 2, 4);
+    m_sdl->draw_lines(attrib, crosshair_buffer, 2, 4);
     sdl_helper::del_buffer(crosshair_buffer);
 }
 
@@ -2247,13 +2320,13 @@ void world::render_item(const sdl_helper::attrib* attrib, const std::uint32_t te
     if (const int w = items[m_model.item_index]; is_plant(w))
     {
         const GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
-        draw_plant(attrib, buffer);
+        m_sdl->draw_plant(attrib, buffer);
         sdl_helper::del_buffer(buffer);
     }
     else
     {
         const GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
-        draw_cube(attrib, buffer);
+        m_sdl->draw_cube(attrib, buffer);
         sdl_helper::del_buffer(buffer);
     }
 }
@@ -2272,7 +2345,7 @@ void world::render_text(const sdl_helper::attrib* attrib, const std::uint32_t fo
     const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = gen_text_buffer(x, y, n, text);
-    draw_text(attrib, buffer, length);
+    m_sdl->draw_text(attrib, buffer, length);
     sdl_helper::del_buffer(buffer);
 }
 
