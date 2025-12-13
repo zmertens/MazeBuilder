@@ -77,8 +77,6 @@ private:
     void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
     struct model {
-        int sign_radius;
-        int scale;
         bool is_ortho;
         float fov;
         int day_length;
@@ -96,13 +94,6 @@ private:
     [[nodiscard]] float time_of_day() const noexcept;
     [[nodiscard]] float get_daylight() const noexcept;
 
-    [[nodiscard]] std::uint32_t gen_crosshair_buffer() const noexcept;
-    [[nodiscard]] std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) const noexcept;
-    [[nodiscard]] std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) const noexcept;
-    [[nodiscard]] std::uint32_t gen_plant_buffer(float x, float y, float z, float n, int w) const noexcept;
-    [[nodiscard]] std::uint32_t gen_player_buffer(float x, float y, float z, float rx, float ry) const noexcept;
-    [[nodiscard]] std::uint32_t gen_text_buffer(float x, float y, float n, std::string_view text) const noexcept;
-
     [[nodiscard]] std::optional<scene_node*> find_chunk(int p, int q) const noexcept;
     static int chunk_distance(const scene_node* chunk, int p, int q) noexcept;
     int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) const noexcept;
@@ -111,23 +102,23 @@ private:
     static int _hit_test(const Map* map, float max_distance, int previous,
         float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept;
     int hit_test(int previous, float x, float y, float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept;
-    int hit_test_face(player* _player, int* x, int* y, int* z, int* face) const noexcept;
+    int hit_test_face(int* x, int* y, int* z, int* face) const noexcept;
     int collide(int height, float* x, float* y, float* z) const noexcept;
-    [[nodiscard]] int player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const noexcept;
+    [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) noexcept;
 
-    int _gen_sign_buffer(float* data, float x, float y, float z, int face, std::string_view text) const noexcept;
-    void gen_sign_buffer(scene_node* chunk) const noexcept;
+    static int _gen_sign_buffer(float* data, float x, float y, float z, int face, std::string_view text) noexcept;
+    static void gen_sign_buffer(scene_node* chunk) noexcept;
 
-    int has_lights(scene_node* chunk) const noexcept;
+    bool has_lights(const scene_node* chunk) const noexcept;
 
     void dirty_chunk(scene_node* chunk) const noexcept;
     // Process dirty chunks on worker threads
-    void update_dirty_chunks_async() noexcept;
+    void update_dirty_chunks_async() const noexcept;
 
     static void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) noexcept;
     static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
 
-    void compute_chunk(worker_item* item) const noexcept;
+    static void compute_chunk(worker_item* item) noexcept;
 
     void generate_chunk(scene_node* chunk, worker_item* item) const noexcept;
     void gen_chunk_buffer(scene_node* chunk) const noexcept;
@@ -155,7 +146,7 @@ private:
     void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept;
     void set_block(int x, int y, int z, int w) const noexcept;
     static void record_block(int x, int y, int z, int w) noexcept;
-    int get_block(int x, int y, int z) const noexcept;
+    [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
     void builder_block(int x, int y, int z, int w) const noexcept;
 
     int render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, uint32_t texture) const noexcept;

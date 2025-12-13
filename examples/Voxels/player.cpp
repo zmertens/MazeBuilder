@@ -17,6 +17,7 @@ player::player()
       , m_is_active{true}
       , m_on_ground{false}
       , m_is_flying{false}
+      , m_is_ctrl_held{false}
       , m_name{"zm"}
       , m_buffer{}
       , m_item_index{0}
@@ -45,8 +46,6 @@ player::player()
 
 void player::handle_event(const SDL_Event& event, command_queue& commands) noexcept
 {
-    position* player_pos = &this->pos;
-
     if (event.type == SDL_EVENT_QUIT)
     {
         m_is_active = false;
@@ -80,6 +79,12 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
+        // Track Left Control modifier key
+        if (event.key.scancode == SDL_SCANCODE_LCTRL)
+        {
+            m_is_ctrl_held = true;
+        }
+
         if (const auto found = m_key_binding.find(event.key.scancode);
             found != m_key_binding.cend() && !is_realtime_action(found->second))
         {
@@ -95,11 +100,27 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
             commands.push(m_action_binding[found->second]);
         }
     }
+    if (event.type == SDL_EVENT_KEY_UP)
+    {
+        // Track Left Control modifier key release
+        if (event.key.scancode == SDL_SCANCODE_LCTRL)
+        {
+            m_is_ctrl_held = false;
+        }
+    }
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
         if (event.button.button == SDL_BUTTON_LEFT)
         {
-            commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
+            // Check if LCTRL is held for light placement
+            if (m_is_ctrl_held)
+            {
+                commands.push(m_action_binding[PlayerAction::PLACE_LIGHT]);
+            }
+            else
+            {
+                commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
+            }
         }
         else if (event.button.button == SDL_BUTTON_RIGHT)
         {
@@ -113,7 +134,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
         constexpr float mouse_sensitivity = 0.0025f;
-
+        position* player_pos = &this->pos;
         player_pos->rx += event.motion.xrel * mouse_sensitivity;
         static constexpr auto INVERT_MOUSE = false;
         if (INVERT_MOUSE)
@@ -263,7 +284,7 @@ void player::initialize_actions()
     constexpr float acceleration = 0.2f;
 
     m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
-        [max_move_speed, acceleration](player& p, const float dt)
+        [](player& p, const float dt)
         {
             const float target_vx = -SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_cosf(p.pos.rx) * max_move_speed;
@@ -277,7 +298,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
-        [max_move_speed, acceleration](player& p, const float dt)
+        [](player& p, const float dt)
         {
             const float target_vx = SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_cosf(p.pos.rx) * max_move_speed;
@@ -291,7 +312,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
-        [max_move_speed, acceleration](player& p, const float dt)
+        [](player& p, const float dt)
         {
             const float target_vx = -SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_sinf(p.pos.rx) * max_move_speed;
@@ -305,7 +326,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
-        [max_move_speed, acceleration](player& p, const float dt)
+        [](player& p, const float dt)
         {
             const float target_vx = SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_sinf(p.pos.rx) * max_move_speed;
@@ -370,7 +391,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
-        [this](player& p, float dt)
+        [this](const player& p, float dt)
         {
             if (p.m_world)
             {
@@ -379,11 +400,20 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
-        [this](player& p, float dt)
+        [this](const player& p, float dt)
         {
             if (p.m_world)
             {
                 on_left_click();
+            }
+        });
+
+    m_action_binding[PlayerAction::PLACE_LIGHT].action = derived_action<player>(
+        [this](const player& p, float dt)
+        {
+            if (p.m_world)
+            {
+                on_light();
             }
         });
 }
@@ -439,7 +469,7 @@ void player::on_right_click() const noexcept
     const position* s = &this->pos;
     int hx, hy, hz;
     if (const int hw = m_world->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        hy > 0 && hy < 256 && item::is_obstacle(hw))
+        hy > 0 && hy < item::TOTAL_BLOCKS && item::is_obstacle(hw))
     {
         if (!m_world->player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
         {

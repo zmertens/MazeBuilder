@@ -8,6 +8,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "cube.h"
 #include "player.h"
 #include "scene_node.h"
 #include "shader.h"
@@ -201,7 +202,7 @@ void sdl_gl_helper::print_opengl_info() noexcept
     SDL_Log("-------------------------------------------------------------\n");
 }
 
-void sdl_gl_helper::set_window_icon(std::string_view icon_path) noexcept
+void sdl_gl_helper::set_window_icon(std::string_view icon_path) const noexcept
 {
     SDL_Surface* icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path.data(), "rb"), true);
     if (icon_surface)
@@ -242,6 +243,73 @@ std::uint32_t sdl_gl_helper::gen_faces(const std::size_t components, const std::
     return buffer;
 }
 
+std::uint32_t sdl_gl_helper::gen_crosshair_buffer() const noexcept
+{
+    auto [width, height] = get_window_size();
+    const float x = static_cast<float>(width) / 2.0f;
+    const float y = static_cast<float>(height) / 2.0f;
+    const float p = 10.f * static_cast<float>(get_scale_factor());
+    const float data[] = {
+        x, y - p, x, y + p,
+        x - p, y, x + p, y
+    };
+    return gen_buffer(sizeof(data), data);
+}
+
+std::uint32_t sdl_gl_helper::gen_wireframe_buffer(const float x, const float y, const float z, const float n) noexcept
+{
+    float data[72];
+    // cube.h -> make_cube_wireframe
+    make_cube_wireframe(data, x, y, z, n);
+    return gen_buffer(sizeof(data), data);
+}
+
+std::uint32_t sdl_gl_helper::gen_cube_buffer(const float x, const float y, const float z, const float n, const int w) noexcept
+{
+    GLfloat* data = malloc_faces(10, 6);
+    float ao[6][4] = {0};
+    float light[6][4] = {
+        {0.5, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5},
+        {0.5, 0.5, 0.5, 0.5}
+    };
+    make_cube(data, ao, light, 1, 1, 1, 1, 1, 1, x, y, z, n, w);
+    return gen_faces(10, 6, data);
+}
+
+std::uint32_t sdl_gl_helper::gen_plant_buffer(const float x, const float y, const float z, const float n,
+                                      const int w) noexcept
+{
+    GLfloat* data = malloc_faces(10, 4);
+    float ao = 0;
+    float light = 1;
+    make_plant(data, ao, light, x, y, z, n, w, 45);
+    return gen_faces(10, 4, data);
+}
+
+std::uint32_t sdl_gl_helper::gen_player_buffer(const float x, const float y, const float z, const float rx,
+                                       const float ry) noexcept
+{
+    GLfloat* data = sdl_gl_helper::malloc_faces(10, 6);
+    make_player(data, x, y, z, rx, ry);
+    return sdl_gl_helper::gen_faces(10, 6, data);
+}
+
+std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float n, const std::string_view text) noexcept
+{
+    const auto length = static_cast<GLsizei>(text.size());
+    GLfloat* data = malloc_faces(4, length);
+    for (int i = 0; i < length; i++)
+    {
+        make_character(data + i * 24, x, y, n / 2, n, text[i]);
+        x += n;
+    }
+    return gen_faces(4, length, data);
+}
+
 void sdl_gl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
@@ -276,7 +344,7 @@ void sdl_gl_helper::draw_triangles_3d_text(const attrib* a, const std::uint32_t 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void sdl_gl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffer, const int count) const noexcept
+void sdl_gl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
@@ -300,7 +368,7 @@ void sdl_gl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffe
 }
 
 void sdl_gl_helper::draw_triangles_2d(const attrib* a, const std::uint32_t buffer,
-                                      const std::size_t count) const noexcept
+                                      const std::size_t count) noexcept
 {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
@@ -316,7 +384,7 @@ void sdl_gl_helper::draw_triangles_2d(const attrib* a, const std::uint32_t buffe
 }
 
 void sdl_gl_helper::draw_lines(const attrib* a, const std::uint32_t buffer, const int components,
-                               const int count) const noexcept
+                               const int count) noexcept
 {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
@@ -327,17 +395,17 @@ void sdl_gl_helper::draw_lines(const attrib* a, const std::uint32_t buffer, cons
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-void sdl_gl_helper::draw_chunk(const attrib* a, const scene_node* chunk) const noexcept
+void sdl_gl_helper::draw_chunk(const attrib* a, const scene_node* chunk) noexcept
 {
     draw_triangles_3d_ao(a, chunk->buffer, chunk->faces * 6);
 }
 
-void sdl_gl_helper::draw_item(const attrib* a, const GLuint buffer, const int count) const noexcept
+void sdl_gl_helper::draw_item(const attrib* a, const GLuint buffer, const int count) noexcept
 {
     draw_triangles_3d_ao(a, buffer, count);
 }
 
-void sdl_gl_helper::draw_text(const attrib* a, const std::uint32_t buffer, const std::size_t length) const noexcept
+void sdl_gl_helper::draw_text(const attrib* a, const std::uint32_t buffer, const std::size_t length) noexcept
 {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -345,7 +413,7 @@ void sdl_gl_helper::draw_text(const attrib* a, const std::uint32_t buffer, const
     glDisable(GL_BLEND);
 }
 
-void sdl_gl_helper::draw_signs(const attrib* a, const scene_node* chunk) const noexcept
+void sdl_gl_helper::draw_signs(const attrib* a, const scene_node* chunk) noexcept
 {
     glDisable(GL_CULL_FACE);
     glEnable(GL_POLYGON_OFFSET_FILL);
@@ -355,7 +423,7 @@ void sdl_gl_helper::draw_signs(const attrib* a, const scene_node* chunk) const n
     glEnable(GL_CULL_FACE);
 }
 
-void sdl_gl_helper::draw_sign(const attrib* a, const std::uint32_t buffer, const int length) const noexcept
+void sdl_gl_helper::draw_sign(const attrib* a, const std::uint32_t buffer, const int length) noexcept
 {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(-8, -1024);
@@ -363,17 +431,17 @@ void sdl_gl_helper::draw_sign(const attrib* a, const std::uint32_t buffer, const
     glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
-void sdl_gl_helper::draw_cube(const attrib* a, const std::uint32_t buffer) const noexcept
+void sdl_gl_helper::draw_cube(const attrib* a, const std::uint32_t buffer) noexcept
 {
     draw_item(a, buffer, 36);
 }
 
-void sdl_gl_helper::draw_plant(const attrib* a, const std::uint32_t buffer) const noexcept
+void sdl_gl_helper::draw_plant(const attrib* a, const std::uint32_t buffer) noexcept
 {
     draw_item(a, buffer, 24);
 }
 
-void sdl_gl_helper::draw_player(const attrib* a, const player* _player) const noexcept
+void sdl_gl_helper::draw_player(const attrib* a, const player* _player) noexcept
 {
     draw_cube(a, _player->get_buffer());
 }

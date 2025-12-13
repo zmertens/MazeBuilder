@@ -45,9 +45,64 @@ public:
 
     virtual ~scene_node() = default;
 
-    scene_node(const scene_node&) = delete;
-    scene_node& operator=(const scene_node&) = delete;
+    // Copy constructor: properly handles all members
+    scene_node(const scene_node& other)
+        : map(other.map)
+        , lights(other.lights)
+        , signs(other.signs)
+        , p(other.p)
+        , q(other.q)
+        , faces(other.faces)
+        , sign_faces(other.sign_faces)
+        , dirty(other.dirty)
+        , miny(other.miny)
+        , maxy(other.maxy)
+        , buffer(other.buffer)
+        , sign_buffer(other.sign_buffer)
+        , parent(nullptr)
+        , children()
+        , bounds_min_x(other.bounds_min_x)
+        , bounds_min_z(other.bounds_min_z)
+        , bounds_max_x(other.bounds_max_x)
+        , bounds_max_z(other.bounds_max_z)
+        , m_category(other.m_category)
+    {
+    }
 
+    // Copy assignment operator: properly handles all members
+    scene_node& operator=(const scene_node& other) {
+        if (this != &other) {
+            // Copy chunk-specific data
+            map = other.map;
+            lights = other.lights;
+            signs = other.signs;
+            p = other.p;
+            q = other.q;
+            faces = other.faces;
+            sign_faces = other.sign_faces;
+            dirty = other.dirty;
+            miny = other.miny;
+            maxy = other.maxy;
+            buffer = other.buffer;
+            sign_buffer = other.sign_buffer;
+
+            // Copy spatial bounds
+            bounds_min_x = other.bounds_min_x;
+            bounds_min_z = other.bounds_min_z;
+            bounds_max_x = other.bounds_max_x;
+            bounds_max_z = other.bounds_max_z;
+
+            // Copy category
+            m_category = other.m_category;
+
+            // Note: parent and children pointers are NOT copied
+            // They need to be managed separately by the scene graph
+            // parent remains as-is, children remains as-is
+        }
+        return *this;
+    }
+
+    // Move constructor and assignment: defaulted
     scene_node(scene_node&&) noexcept = default;
     scene_node& operator=(scene_node&&) noexcept = default;
 
@@ -62,7 +117,8 @@ public:
     }
 
     // Check if this node or its children intersect with a 2D bounds (for frustum culling)
-    [[nodiscard]] bool intersects_bounds(int min_x, int min_z, int max_x, int max_z) const noexcept
+    [[nodiscard]] bool intersects_bounds(const int min_x, const int min_z,
+        const int max_x, const int max_z) const noexcept
     {
         return !(bounds_max_x < min_x || bounds_min_x > max_x ||
                  bounds_max_z < min_z || bounds_min_z > max_z);

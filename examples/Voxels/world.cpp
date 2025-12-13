@@ -311,7 +311,6 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
 
 void world::init() noexcept
 {
-    m_model.sign_radius = RENDER_SIGN_RADIUS;
     m_model.is_ortho = false;
     m_model.fov = 65.0f;
     m_model.day_length = DAY_LENGTH;
@@ -364,8 +363,6 @@ void world::init() noexcept
 
 void world::update(float delta_time, mazes::randomizer& rng) noexcept
 {
-    m_model.scale = m_sdl->get_scale_factor();
-
     // Process all commands in the queue
     static int update_frame = 0;
     int commands_processed = 0;
@@ -718,73 +715,6 @@ float world::get_daylight() const noexcept
     }
 }
 
-std::uint32_t world::gen_crosshair_buffer() const noexcept
-{
-    auto [width, height] = m_sdl->get_window_size();
-    const float x = static_cast<float>(width) / 2.0f;
-    const float y = static_cast<float>(height) / 2.0f;
-    const float p = 10.f * static_cast<float>(m_model.scale);
-    const float data[] = {
-        x, y - p, x, y + p,
-        x - p, y, x + p, y
-    };
-    return sdl_gl_helper::gen_buffer(sizeof(data), data);
-}
-
-std::uint32_t world::gen_wireframe_buffer(float x, float y, float z, float n) const noexcept
-{
-    float data[72];
-    // cube.h -> make_cube_wireframe
-    make_cube_wireframe(data, x, y, z, n);
-    return sdl_gl_helper::gen_buffer(sizeof(data), data);
-}
-
-std::uint32_t world::gen_cube_buffer(const float x, float y, float z, float n, int w) const noexcept
-{
-    GLfloat* data = sdl_gl_helper::malloc_faces(10, 6);
-    float ao[6][4] = {0};
-    float light[6][4] = {
-        {0.5, 0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5, 0.5},
-        {0.5, 0.5, 0.5, 0.5}
-    };
-    make_cube(data, ao, light, 1, 1, 1, 1, 1, 1, x, y, z, n, w);
-    return sdl_gl_helper::gen_faces(10, 6, data);
-}
-
-std::uint32_t world::gen_plant_buffer(const float x, const float y, const float z, const float n,
-                                      const int w) const noexcept
-{
-    GLfloat* data = sdl_gl_helper::malloc_faces(10, 4);
-    float ao = 0;
-    float light = 1;
-    make_plant(data, ao, light, x, y, z, n, w, 45);
-    return sdl_gl_helper::gen_faces(10, 4, data);
-}
-
-std::uint32_t world::gen_player_buffer(const float x, const float y, const float z, const float rx,
-                                       const float ry) const noexcept
-{
-    GLfloat* data = sdl_gl_helper::malloc_faces(10, 6);
-    make_player(data, x, y, z, rx, ry);
-    return sdl_gl_helper::gen_faces(10, 6, data);
-}
-
-std::uint32_t world::gen_text_buffer(float x, const float y, const float n, const std::string_view text) const noexcept
-{
-    const auto length = static_cast<GLsizei>(text.size());
-    GLfloat* data = sdl_gl_helper::malloc_faces(4, length);
-    for (int i = 0; i < length; i++)
-    {
-        make_character(data + i * 24, x, y, n / 2, n, text[i]);
-        x += n;
-    }
-    return sdl_gl_helper::gen_faces(4, length, data);
-}
-
 std::optional<scene_node*> world::find_chunk(const int p, const int q) const noexcept
 {
     // Iterate through all active chunks in the BACKGROUND layer
@@ -809,14 +739,14 @@ int world::chunk_distance(const scene_node* chunk, const int p, const int q) noe
     return SDL_max(dp, dq);
 }
 
-int world::chunk_visible(float planes[6][4], int p, int q, const int miny, const int maxy) const noexcept
+int world::chunk_visible(float planes[6][4], const int p, const int q, const int miny, const int maxy) const noexcept
 {
-    auto miny_f = static_cast<float>(miny);
-    auto maxy_f = static_cast<float>(maxy);
-    auto x = static_cast<float>(p * BUILD_CHUNK_SIZE - 1);
-    float z = static_cast<float>(q * BUILD_CHUNK_SIZE - 1);
-    float d = static_cast<float>(BUILD_CHUNK_SIZE + 1);
-    float points[8][3] = {
+    const auto miny_f = static_cast<float>(miny);
+    const auto maxy_f = static_cast<float>(maxy);
+    const auto x = static_cast<float>(p * BUILD_CHUNK_SIZE - 1);
+    const float z = static_cast<float>(q * BUILD_CHUNK_SIZE - 1);
+    const float d = static_cast<float>(BUILD_CHUNK_SIZE + 1);
+    const float points[8][3] = {
         {x + 0.f, miny_f, z + 0.f},
         {x + d, miny_f, z + 0.f},
         {x + 0.f, miny_f, z + d},
@@ -826,19 +756,19 @@ int world::chunk_visible(float planes[6][4], int p, int q, const int miny, const
         {x + 0.f, maxy_f, z + d},
         {x + d, maxy_f, z + d}
     };
-    int n = this->m_model.is_ortho ? 4 : 6;
+    const int n = this->m_model.is_ortho ? 4 : 6;
     for (int i = 0; i < n; i++)
     {
         int in = 0;
         int out = 0;
         for (int j = 0; j < 8; j++)
         {
-            float d =
+            const float d1 =
                 planes[i][0] * points[j][0] +
                 planes[i][1] * points[j][1] +
                 planes[i][2] * points[j][2] +
                 planes[i][3];
-            if (d < 0)
+            if (d1 < 0)
             {
                 out++;
             }
@@ -862,12 +792,11 @@ int world::chunk_visible(float planes[6][4], int p, int q, const int miny, const
 int world::highest_block(const float x, const float z) const noexcept
 {
     int result = -1;
-    int nx = static_cast<int>(SDL_roundf(x));
-    int nz = static_cast<int>(SDL_roundf(z));
-    int p = chunked(x);
-    int q = chunked(z);
-    auto chunk = find_chunk(p, q);
-    if (chunk.has_value())
+    const int nx = static_cast<int>(SDL_roundf(x));
+    const int nz = static_cast<int>(SDL_roundf(z));
+    const int p = chunked(x);
+    const int q = chunked(z);
+    if (const auto chunk = find_chunk(p, q); chunk.has_value())
     {
         const Map* map = &chunk.value()->map;
         MAP_FOR_EACH(map, ex, ey, ez, ew)
@@ -892,13 +821,11 @@ int world::_hit_test(const Map* map, const float max_distance, const int previou
     int pz = 0;
     for (int i = 0; i < max_distance * m; i++)
     {
-        int nx = SDL_lroundf(x);
-        int ny = SDL_lroundf(y);
-        int nz = SDL_lroundf(z);
-        if (nx != px || ny != py || nz != pz)
+        const int nx = SDL_lroundf(x);
+        const int ny = SDL_lroundf(y);
+        if (const int nz = SDL_lroundf(z); nx != px || ny != py || nz != pz)
         {
-            int hw = map_get(map, nx, ny, nz);
-            if (hw > 0)
+            if (const int hw = map_get(map, nx, ny, nz); hw > 0)
             {
                 if (previous)
                 {
@@ -926,7 +853,8 @@ int world::_hit_test(const Map* map, const float max_distance, const int previou
 } // _hit_test
 
 int world::hit_test(const int previous, const float x, const float y,
-                    float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept
+                    const float z, const float rx, const float ry,
+                    int* bx, int* by, int* bz) const noexcept
 {
     int result = 0;
     float best = 0;
@@ -950,8 +878,10 @@ int world::hit_test(const int previous, const float x, const float y,
                                  x, y, z, vx, vy, vz, &hx, &hy, &hz);
         if (hw > 0)
         {
-            if (float d = SDL_sqrtf(SDL_powf(hx - x, 2) + SDL_powf(hy - y, 2) + SDL_powf(hz - z, 2)); best == 0 || d <
-                best)
+            if (const auto d = SDL_sqrtf(SDL_powf(static_cast<float>(hx) - x, 2)
+                + SDL_powf(static_cast<float>(hy) - y, 2)
+                + SDL_powf(static_cast<float>(hz) - z, 2));
+                best == 0 || d < best)
             {
                 best = d;
                 *bx = hx;
@@ -964,9 +894,9 @@ int world::hit_test(const int previous, const float x, const float y,
     return result;
 } // hit_test
 
-int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) const noexcept
+int world::hit_test_face(int* x, int* y, int* z, int* face) const noexcept
 {
-    const player::position* s = &_player->pos;
+    const player::position* s = &m_player->pos;
     // item.h -> is_obstacle
     if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
         item::is_obstacle(w))
@@ -1005,7 +935,7 @@ int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) con
             {
                 degrees += 360.f;
             }
-            int top = static_cast<int>(((degrees + 45.f) / 90.f)) % 4;
+            const int top = static_cast<int>(((degrees + 45.f) / 90.f)) % 4;
             *face = 4 + top;
             return 1;
         }
@@ -1013,12 +943,12 @@ int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) con
     return 0;
 }
 
-int world::collide(int height, float* x, float* y, float* z) const noexcept
+int world::collide(const int height, float* x, float* y, float* z) const noexcept
 {
     int result = 0;
-    int p = this->chunked(*x);
-    int q = this->chunked(*z);
-    auto chunk_opt = find_chunk(p, q);
+    const int p = this->chunked(*x);
+    const int q = this->chunked(*z);
+    const auto chunk_opt = find_chunk(p, q);
     if (!chunk_opt.has_value())
     {
         SDL_Log("Could find chunk: %d %d", p, q);
@@ -1026,15 +956,15 @@ int world::collide(int height, float* x, float* y, float* z) const noexcept
     }
     const scene_node* chunk = chunk_opt.value();
     const Map* map = &chunk->map;
-    int nx = static_cast<int>(SDL_roundf(*x));
-    int ny = static_cast<int>(SDL_roundf(*y));
-    int nz = static_cast<int>(SDL_roundf(*z));
-    float px = *x - nx;
-    float py = *y - ny;
-    float pz = *z - nz;
-    float pad = 0.25;
+    const int nx = static_cast<int>(SDL_roundf(*x));
+    const int ny = static_cast<int>(SDL_roundf(*y));
+    const int nz = static_cast<int>(SDL_roundf(*z));
+    const float px = *x - nx;
+    const float py = *y - ny;
+    const float pz = *z - nz;
     for (int dy = 0; dy < height; dy++)
     {
+        constexpr float pad = 0.25f;
         // item.h -> is_obstacle
         if (px < -pad && item::is_obstacle(map_get(map, nx - 1, ny - dy, nz)))
         {
@@ -1066,26 +996,27 @@ int world::collide(int height, float* x, float* y, float* z) const noexcept
     return result;
 }
 
-int world::player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) const noexcept
+bool world::player_intersects_block(const int height, const float x, const float y, const float z,
+    const int hx, const int hy, const int hz) noexcept
 {
-    int nx = static_cast<int>(SDL_roundf(x));
-    int ny = static_cast<int>(SDL_roundf(y));
-    int nz = static_cast<int>(SDL_roundf(z));
+    const auto nx = static_cast<int>(SDL_roundf(x));
+    const auto ny = static_cast<int>(SDL_roundf(y));
+    const auto nz = static_cast<int>(SDL_roundf(z));
     for (int i = 0; i < height; i++)
     {
         if (nx == hx && ny - i == hy && nz == hz)
         {
-            return 1;
+            return true;
         }
     }
-    return 0;
+    return false;
 }
 
-int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, std::string_view text) const noexcept
+int world::_gen_sign_buffer(float* data, const float x, const float y, const float z,
+    const int face, const std::string_view text) noexcept
 {
     auto tokenize = [](char* str, const char* delim, char** key)-> char*
     {
-        char* result;
         if (str == nullptr)
         {
             str = *key;
@@ -1095,7 +1026,7 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
         {
             return nullptr;
         }
-        result = str;
+        char* result = str;
         str += strcspn(str, delim);
         if (*str)
         {
@@ -1131,12 +1062,12 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
         return result;
     };
 
-    auto wrap = [=](const char* input, int max_width, char* output, int max_length)
+    auto wrap = [=](const char* input, const int max_width, char* output, const int max_length)
     {
         *output = '\0';
         auto* str = static_cast<char*>(SDL_malloc(sizeof(char) * (strlen(input) + 1)));
         SDL_strlcpy(str, input, SDL_strlen(input) + 1);
-        int space_width = char_width(' ');
+        const int space_width = char_width(' ');
         int line_number = 0;
         char *key1, *key2;
         char* line = tokenize(str, "\r\n", &key1);
@@ -1153,20 +1084,20 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
                     {
                         line_width = 0;
                         line_number++;
-                        strncat(output, "\n", max_length - strlen(output) - 1);
+                        SDL_strlcat(output, "\n", max_length - strlen(output) - 1);
                     }
                     else
                     {
-                        strncat(output, " ", max_length - strlen(output) - 1);
+                        SDL_strlcat(output, " ", max_length - strlen(output) - 1);
                     }
                 }
-                strncat(output, token, max_length - strlen(output) - 1);
+                SDL_strlcat(output, token, max_length - strlen(output) - 1);
                 line_width += token_width + space_width;
-                token = tokenize(NULL, " ", &key2);
+                token = tokenize(nullptr, " ", &key2);
             }
             line_number++;
-            strncat(output, "\n", max_length - strlen(output) - 1);
-            line = tokenize(NULL, "\r\n", &key1);
+            SDL_strlcat(output, "\n", max_length - strlen(output) - 1);
+            line = tokenize(nullptr, "\r\n", &key1);
         }
         SDL_free(str);
         return line_number;
@@ -1182,34 +1113,33 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
         return 0;
     }
     int count = 0;
-    float max_width = 64.f;
-    float line_height = 1.25f;
+    constexpr float max_width = 64.f;
+    constexpr float line_height = 1.25f;
     char lines[1024];
     int rows = wrap(text.data(), static_cast<int>(max_width), lines, 1024);
     rows = SDL_min(rows, 5);
-    int dx = glyph_dx[face];
-    int dz = glyph_dz[face];
-    int ldx = line_dx[face];
-    int ldy = line_dy[face];
-    int ldz = line_dz[face];
-    float n = 1.0f / (max_width / 10.f);
+    const int dx = glyph_dx[face];
+    const int dz = glyph_dz[face];
+    const int ldx = line_dx[face];
+    const int ldy = line_dy[face];
+    const int ldz = line_dz[face];
+    constexpr float n = 1.0f / (max_width / 10.f);
     float sx = x - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldx;
     float sy = y - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldy;
     float sz = z - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldz;
     char* key;
-    // util.h -> tokenize
-    char* line = tokenize(lines, "\n", &key);
+    const char* line = tokenize(lines, "\n", &key);
     while (line)
     {
-        size_t length = SDL_strlen(line);
+        const size_t length = SDL_strlen(line);
         int line_width = string_width(line);
         line_width = static_cast<int>(SDL_min(line_width, max_width));
         float rx = sx - dx * line_width / max_width / 2;
-        float ry = sy;
+        const float ry = sy;
         float rz = sz - dz * line_width / max_width / 2;
         for (int i = 0; i < length; i++)
         {
-            int width = char_width(line[i]);
+            const int width = char_width(line[i]);
             line_width -= width;
             if (line_width < 0)
             {
@@ -1239,7 +1169,7 @@ int world::_gen_sign_buffer(float* data, float x, float y, float z, int face, st
     return count;
 }
 
-void world::gen_sign_buffer(scene_node* chunk) const noexcept
+void world::gen_sign_buffer(scene_node* chunk) noexcept
 {
     const SignList* signs = &chunk->signs;
 
@@ -1247,7 +1177,7 @@ void world::gen_sign_buffer(scene_node* chunk) const noexcept
     std::size_t max_faces = 0;
     for (int i = 0; i < signs->size; i++)
     {
-        Sign* e = signs->data + i;
+        const Sign* e = signs->data + i;
         max_faces += SDL_strlen(e->text);
     }
 
@@ -1256,7 +1186,7 @@ void world::gen_sign_buffer(scene_node* chunk) const noexcept
     std::size_t faces = 0;
     for (int i = 0; i < signs->size; i++)
     {
-        Sign* e = signs->data + i;
+        const Sign* e = signs->data + i;
         faces += static_cast<std::size_t>(_gen_sign_buffer(data + static_cast<int>(faces) * 30,
                                                            static_cast<float>(e->x),
                                                            static_cast<float>(e->y),
@@ -1268,17 +1198,17 @@ void world::gen_sign_buffer(scene_node* chunk) const noexcept
     chunk->sign_faces = static_cast<int>(faces);
 }
 
-int world::has_lights(scene_node* chunk) const noexcept
+bool world::has_lights(const scene_node* chunk) const noexcept
 {
     for (int dp = -1; dp <= 1; dp++)
     {
         for (int dq = -1; dq <= 1; dq++)
         {
-            scene_node* other = chunk;
+            const scene_node* other = chunk;
             if (dp || dq)
             {
-                auto other_opt = this->find_chunk(chunk->p + dp, chunk->q + dq);
-                if (!other_opt.has_value())
+                if (auto other_opt = this->find_chunk(chunk->p + dp, chunk->q + dq);
+                    !other_opt.has_value())
                 {
                     other = nullptr;
                 }
@@ -1291,13 +1221,13 @@ int world::has_lights(scene_node* chunk) const noexcept
             {
                 continue;
             }
-            if (Map* map = &other->lights; map->size)
+            if (const Map* map = &other->lights; map->size)
             {
-                return 1;
+                return true;
             }
         }
     }
-    return 0;
+    return false;
 }
 
 void world::dirty_chunk(scene_node* chunk) const noexcept
@@ -1317,8 +1247,8 @@ void world::dirty_chunk(scene_node* chunk) const noexcept
                     continue;
                 }
 
-                auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
-                if (other_opt.has_value())
+                if (auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                    other_opt.has_value())
                 {
                     other_opt.value()->dirty = 1;
                 }
@@ -1327,12 +1257,8 @@ void world::dirty_chunk(scene_node* chunk) const noexcept
     }
 }
 
-void world::update_dirty_chunks_async() noexcept
+void world::update_dirty_chunks_async() const noexcept
 {
-    // OPTIMIZATION: Delegate dirty chunk updates to worker threads
-    // This prevents blocking the main render thread when placing/destroying blocks
-
-    // Process dirty chunks through the worker system
     for (auto&& worker : m_workers)
     {
         worker->mtx.lock();
@@ -1363,8 +1289,8 @@ void world::update_dirty_chunks_async() noexcept
                                 scene_node* other = chunk;
                                 if (dp || dq)
                                 {
-                                    auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
-                                    if (!other_opt.has_value())
+                                    if (auto other_opt = find_chunk(chunk->p + dp, chunk->q + dq);
+                                        !other_opt.has_value())
                                     {
                                         other = nullptr;
                                     }
@@ -1421,13 +1347,13 @@ void world::occlusion(char neighbors[27], char lights[27], float shades[27], flo
     {
         for (int j = 0; j < 4; j++)
         {
-            int corner = neighbors[lookup3[i][j][0]];
-            int side1 = neighbors[lookup3[i][j][1]];
-            int side2 = neighbors[lookup3[i][j][2]];
-            int value = side1 && side2 ? 3 : corner + side1 + side2;
+            const int corner = neighbors[lookup3[i][j][0]];
+            const int side1 = neighbors[lookup3[i][j][1]];
+            const int side2 = neighbors[lookup3[i][j][2]];
+            const int value = side1 && side2 ? 3 : corner + side1 + side2;
             float shade_sum = 0;
             float light_sum = 0;
-            int is_light = lights[13] == 15;
+            const int is_light = lights[13] == 15;
             for (int k = 0; k < 4; k++)
             {
                 shade_sum += shades[lookup4[i][j][k]];
@@ -1444,7 +1370,8 @@ void world::occlusion(char neighbors[27], char lights[27], float shades[27], flo
     }
 } // occlusion
 
-void world::light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept
+void world::light_fill(char* opaque, char* light, const int x, const int y, const int z,
+    int w, const int force) noexcept
 {
 #define XZ_SIZE (BUILD_CHUNK_SIZE * 3 + 2)
 #define XZ_LO (BUILD_CHUNK_SIZE)
@@ -1482,11 +1409,11 @@ void world::light_fill(char* opaque, char* light, int x, int y, int z, int w, in
 }
 
 // Handles terrain generation in a multithreaded environment
-void world::compute_chunk(worker_item* item) const noexcept
+void world::compute_chunk(worker_item* item) noexcept
 {
-    char* opaque = (char*)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-    char* light = (char*)SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char));
-    char* highest = (char*)SDL_calloc(XZ_SIZE * XZ_SIZE, sizeof(char));
+    auto* opaque = static_cast<char*>(SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char)));
+    auto* light = static_cast<char*>(SDL_calloc(XZ_SIZE * XZ_SIZE * Y_SIZE, sizeof(char)));
+    auto* highest = static_cast<char*>(SDL_calloc(XZ_SIZE * XZ_SIZE, sizeof(char)));
 
     int ox = item->p * BUILD_CHUNK_SIZE - BUILD_CHUNK_SIZE - 1;
     int oy = -1;
@@ -1639,14 +1566,14 @@ void world::compute_chunk(worker_item* item) const noexcept
                         neighbors[index] = opaque[XYZ(x + dx, y + dy, z + dz)];
                         lights[index] = light[XYZ(x + dx, y + dy, z + dz)];
                         shades[index] = 0;
-                        int highest_index = XZ(x + dx, z + dz);
-                        if (highest_index < XZ_SIZE * XZ_SIZE && y + dy <= highest[highest_index])
+                        if (int highest_index = XZ(x + dx, z + dz);
+                            highest_index < XZ_SIZE * XZ_SIZE && y + dy <= highest[highest_index])
                         {
-                            for (int oy = 0; oy < 8; oy++)
+                            for (int oy1 = 0; oy1 < 8; oy1++)
                             {
-                                if (opaque[XYZ(x + dx, y + dy + oy, z + dz)])
+                                if (opaque[XYZ(x + dx, y + dy + oy1, z + dz)])
                                 {
-                                    shades[index] = 1.0f - oy * 0.125f;
+                                    shades[index] = 1.0f - oy1 * 0.125f;
                                     break;
                                 }
                             }
@@ -1656,8 +1583,8 @@ void world::compute_chunk(worker_item* item) const noexcept
                 }
             }
             float ao[6][4];
-            float light[6][4];
-            occlusion(neighbors, lights, shades, ao, light);
+            float light2[6][4];
+            occlusion(neighbors, lights, shades, ao, light2);
             if (item::is_plant(ew))
             {
                 total = 4;
@@ -1668,7 +1595,7 @@ void world::compute_chunk(worker_item* item) const noexcept
                     for (int b = 0; b < 4; b++)
                     {
                         min_ao = SDL_min(min_ao, ao[a][b]);
-                        max_light = SDL_max(max_light, light[a][b]);
+                        max_light = SDL_max(max_light, light2[a][b]);
                     }
                 }
                 float rotation = simplex2(static_cast<float>(ex), static_cast<float>(ez), 4, 0.5f, 2.f) * 360.f;
@@ -1680,7 +1607,7 @@ void world::compute_chunk(worker_item* item) const noexcept
             else
             {
                 make_cube(
-                    data + offset, ao, light,
+                    data + offset, ao, light2,
                     f1, f2, f3, f4, f5, f6,
                     static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez), 0.5f, ew);
             }
@@ -1840,13 +1767,13 @@ void world::delete_chunks() noexcept
 
             // Move the last chunk to this position
             --count;
-            const scene_node* other = background_layer[count];
 
             // Before copying, detach the other chunk too
-            if (other != nullptr)
+            if (const scene_node* other = background_layer[count]; other != nullptr)
             {
                 detach_chunk_from_layer(const_cast<scene_node*>(other));
-                SDL_memcpy(chunk, other, sizeof(scene_node));
+
+                *chunk = *other;
 
                 // Reattach after copy (the moved chunk needs to update its parent reference)
                 if (chunk->get_category() == Entity::CHUNK)
@@ -2366,7 +2293,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, c
         }
 
         // Render the chunk
-        m_sdl->draw_chunk(attrib, chunk);
+        sdl_gl_helper::draw_chunk(attrib, chunk);
         result += chunk->faces;
         chunks_rendered++;
     });
@@ -2396,15 +2323,15 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const player* _pla
     glUniform1i(attrib->extra1, 1);
 
     // Calculate bounds for spatial traversal (chunks within sign render radius)
-    int min_p = p - m_model.sign_radius;
-    int min_q = q - m_model.sign_radius;
-    int max_p = p + m_model.sign_radius;
-    int max_q = q + m_model.sign_radius;
+    int min_p = p - RENDER_SIGN_RADIUS;
+    int min_q = q - RENDER_SIGN_RADIUS;
+    int max_p = p + RENDER_SIGN_RADIUS;
+    int max_q = q + RENDER_SIGN_RADIUS;
 
     // Use spatial hierarchy traversal
     traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](scene_node* chunk)
     {
-        if (chunk_distance(chunk, p, q) > m_model.sign_radius)
+        if (chunk_distance(chunk, p, q) > RENDER_SIGN_RADIUS)
         {
             return;
         }
@@ -2412,14 +2339,14 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const player* _pla
         {
             return;
         }
-        m_sdl->draw_signs(attrib, chunk);
+        sdl_gl_helper::draw_signs(attrib, chunk);
     });
 }
 
 void world::render_sign(const sdl_gl_helper::attrib* attrib, player* _player, const std::uint32_t sign) const noexcept
 {
     int x, y, z, face;
-    if (!hit_test_face(_player, &x, &y, &z, &face))
+    if (!hit_test_face(&x, &y, &z, &face))
     {
         return;
     }
@@ -2444,7 +2371,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, player* _player, co
     const int length = _gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
                                   text);
     const GLuint buffer = sdl_gl_helper::gen_faces(5, length, data);
-    m_sdl->draw_sign(attrib, buffer, length);
+    sdl_gl_helper::draw_sign(attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }
 
@@ -2463,7 +2390,7 @@ void world::render_players(const sdl_gl_helper::attrib* attrib, player* _player)
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
 
-    m_sdl->draw_player(attrib, m_player);
+    sdl_gl_helper::draw_player(attrib, m_player);
 }
 
 void world::render_wireframe(const sdl_gl_helper::attrib* attrib, const player* _player) const noexcept
@@ -2482,9 +2409,9 @@ void world::render_wireframe(const sdl_gl_helper::attrib* attrib, const player* 
         glUseProgram(attrib->program);
         glLineWidth(1);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        const GLuint wireframe_buffer = gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
+        const GLuint wireframe_buffer = sdl_gl_helper::gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
                                                        static_cast<float>(hz), 0.53f);
-        m_sdl->draw_lines(attrib, wireframe_buffer, 3, 24);
+        sdl_gl_helper::draw_lines(attrib, wireframe_buffer, 3, 24);
         sdl_gl_helper::del_buffer(wireframe_buffer);
     }
 }
@@ -2495,10 +2422,10 @@ void world::render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcep
     float matrix[16];
     set_matrix_2d(matrix, width, height);
     glUseProgram(attrib->program);
-    glLineWidth(static_cast<GLfloat>(4 * m_model.scale));
+    glLineWidth(static_cast<GLfloat>(4 * m_sdl->get_scale_factor()));
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    const GLuint crosshair_buffer = gen_crosshair_buffer();
-    m_sdl->draw_lines(attrib, crosshair_buffer, 2, 4);
+    const GLuint crosshair_buffer = m_sdl->gen_crosshair_buffer();
+    sdl_gl_helper::draw_lines(attrib, crosshair_buffer, 2, 4);
     sdl_gl_helper::del_buffer(crosshair_buffer);
 }
 
@@ -2516,14 +2443,14 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     glUniform1f(attrib->timer, time_of_day());
     if (const int w = m_player->get_item(); item::is_plant(w))
     {
-        const GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
-        m_sdl->draw_plant(attrib, buffer);
+        const GLuint buffer = sdl_gl_helper::gen_plant_buffer(0, 0, 0, 0.5, w);
+        sdl_gl_helper::draw_plant(attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
     else
     {
-        const GLuint buffer = gen_cube_buffer(0, 0, 0, 0.5, w);
-        m_sdl->draw_cube(attrib, buffer);
+        const GLuint buffer = sdl_gl_helper::gen_cube_buffer(0, 0, 0, 0.5, w);
+        sdl_gl_helper::draw_cube(attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
 }
@@ -2542,7 +2469,7 @@ void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     glBindTexture(GL_TEXTURE_2D, font);
     const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;
-    const GLuint buffer = gen_text_buffer(x, y, n, text);
-    m_sdl->draw_text(attrib, buffer, length);
+    const GLuint buffer = sdl_gl_helper::gen_text_buffer(x, y, n, text);
+    sdl_gl_helper::draw_text(attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }

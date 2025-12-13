@@ -37,7 +37,7 @@ public:
 
     void destroy_and_quit() noexcept;
 
-    void set_window_icon(std::string_view icon_path) noexcept;
+    void set_window_icon(std::string_view icon_path) const noexcept;
 
     [[nodiscard]] std::int32_t get_scale_factor() const noexcept;
     std::pair<std::int32_t, std::int32_t> get_window_size() const noexcept;
@@ -48,26 +48,30 @@ public:
     static void print_opengl_info() noexcept;
 
     static void del_buffer(std::uint32_t buffer) noexcept;
-
     static std::uint32_t gen_buffer(std::size_t size, const float* data) noexcept;
-
     static float* malloc_faces(std::size_t components, std::size_t faces) noexcept;
-
     static std::uint32_t gen_faces(std::size_t components, std::size_t faces, const float* data) noexcept;
+
+    [[nodiscard]] std::uint32_t gen_crosshair_buffer() const noexcept;
+    [[nodiscard]] static std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) noexcept;
+    [[nodiscard]] static std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) noexcept;
+    [[nodiscard]] static std::uint32_t gen_plant_buffer(float x, float y, float z, float n, int w) noexcept;
+    [[nodiscard]] static std::uint32_t gen_player_buffer(float x, float y, float z, float rx, float ry) noexcept;
+    [[nodiscard]] static std::uint32_t gen_text_buffer(float x, float y, float n, std::string_view text) noexcept;
 
     static void draw_triangles_3d_ao(const attrib* a, std::uint32_t buffer, int count) noexcept;
     static void draw_triangles_3d_text(const attrib* a, std::uint32_t buffer, int count) noexcept;
-    void draw_triangles_3d(const attrib* a, std::uint32_t buffer, int count) const noexcept;
-    void draw_triangles_2d(const attrib* a, std::uint32_t buffer, std::size_t count) const noexcept;
-    void draw_lines(const attrib* a, std::uint32_t buffer, int components, int count) const noexcept;
-    void draw_chunk(const attrib* a, const scene_node* chunk) const noexcept;
-    void draw_item(const attrib* a, std::uint32_t buffer, int count) const noexcept;
-    void draw_text(const attrib* a, std::uint32_t buffer, std::size_t length) const noexcept;
-    void draw_signs(const attrib* a, const scene_node* chunk) const noexcept;
-    void draw_sign(const attrib* a, std::uint32_t buffer, int length) const noexcept;
-    void draw_cube(const attrib* a, std::uint32_t buffer) const noexcept;
-    void draw_plant(const attrib* a, std::uint32_t buffer) const noexcept;
-    void draw_player(const attrib* a, const player* _player) const noexcept;
+    static void draw_triangles_3d(const attrib* a, std::uint32_t buffer, int count) noexcept;
+    static void draw_triangles_2d(const attrib* a, std::uint32_t buffer, std::size_t count) noexcept;
+    static void draw_lines(const attrib* a, std::uint32_t buffer, int components, int count) noexcept;
+    static void draw_chunk(const attrib* a, const scene_node* chunk) noexcept;
+    static void draw_item(const attrib* a, std::uint32_t buffer, int count) noexcept;
+    static void draw_text(const attrib* a, std::uint32_t buffer, std::size_t length) noexcept;
+    static void draw_signs(const attrib* a, const scene_node* chunk) noexcept;
+    static void draw_sign(const attrib* a, std::uint32_t buffer, int length) noexcept;
+    static void draw_cube(const attrib* a, std::uint32_t buffer) noexcept;
+    static void draw_plant(const attrib* a, std::uint32_t buffer) noexcept;
+    static void draw_player(const attrib* a, const player* _player) noexcept;
 
 private:
     std::once_flag m_initialized_flag;

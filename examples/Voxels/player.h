@@ -19,6 +19,7 @@ enum class PlayerAction
     FLY,
     BUILD_BLOCK,
     DESTROY_BLOCK,
+    PLACE_LIGHT,
     DONE,
     COUNT
 };
@@ -92,6 +93,7 @@ private:
     bool m_is_active;
     bool m_on_ground;
     bool m_is_flying;
+    bool m_is_ctrl_held;
 
     std::string m_name;
     std::uint32_t m_buffer;
