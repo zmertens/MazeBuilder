@@ -32,7 +32,6 @@
 #include <thread>
 
 // World configs
-#define SCROLL_THRESHOLD 0.1
 #define DAY_LENGTH 600
 #define MAX_TEXT_LENGTH 256
 #define CREATE_CHUNK_RADIUS 10

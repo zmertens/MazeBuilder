@@ -10,15 +10,17 @@
 
 #include <SDL3/SDL.h>
 
+#define SCROLL_THRESHOLD 0.1
+
 player::player()
     : scene_node{}
-    , m_is_active{true}
-    , m_on_ground{false}
-    , m_is_flying{false}
-    , m_buffer{}
-    , m_name{"zm"}
-    , m_item_index{0}
-    , m_world{nullptr}
+      , m_is_active{true}
+      , m_on_ground{false}
+      , m_is_flying{false}
+      , m_name{"zm"}
+      , m_buffer{}
+      , m_item_index{0}
+      , m_world{nullptr}
 {
     set_category(Entity::PLAYER);
 
@@ -41,13 +43,40 @@ player::player()
     }
 }
 
-void player::handle_event(const SDL_Event &event, command_queue &commands) noexcept
+void player::handle_event(const SDL_Event& event, command_queue& commands) noexcept
 {
     position* player_pos = &this->pos;
 
     if (event.type == SDL_EVENT_QUIT)
     {
         m_is_active = false;
+    }
+    if (event.type == SDL_EVENT_MOUSE_WHEEL)
+    {
+        if (event.wheel.y > SCROLL_THRESHOLD)
+        {
+            // Scroll up
+            if (m_item_index > 0)
+            {
+                m_item_index--;
+            }
+            else
+            {
+                m_item_index = item::items.size() - 1;
+            }
+        }
+        else if (event.wheel.y < -SCROLL_THRESHOLD)
+        {
+            // Scroll down
+            if (m_item_index + 1 < item::items.size())
+            {
+                m_item_index++;
+            }
+            else
+            {
+                m_item_index = 0;
+            }
+        }
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
@@ -70,17 +99,14 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     {
         if (event.button.button == SDL_BUTTON_LEFT)
         {
-            // Left click - destroy block
             commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
         }
         else if (event.button.button == SDL_BUTTON_RIGHT)
         {
-            // Right click - build block
             commands.push(m_action_binding[PlayerAction::BUILD_BLOCK]);
         }
         else if (event.button.button == SDL_BUTTON_MIDDLE)
         {
-            // Middle click - copy block (execute immediately, not queued)
             on_middle_click();
         }
     }
@@ -90,23 +116,27 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
 
         player_pos->rx += event.motion.xrel * mouse_sensitivity;
         static constexpr auto INVERT_MOUSE = false;
-        if (INVERT_MOUSE) {
+        if (INVERT_MOUSE)
+        {
             player_pos->ry += event.motion.yrel * mouse_sensitivity;
         }
         player_pos->ry -= event.motion.yrel * mouse_sensitivity;
 
         // Keep rotation within bounds
-        if (player_pos->rx < 0) {
+        if (player_pos->rx < 0)
+        {
             player_pos->rx += RADIANS(360.0);
         }
-        if (player_pos->rx >= RADIANS(360.0)) {
+        if (player_pos->rx >= RADIANS(360.0))
+        {
             player_pos->rx -= RADIANS(360.0);
         }
         player_pos->ry = SDL_max(player_pos->ry, -RADIANS(90.0));
         player_pos->ry = SDL_min(player_pos->ry, RADIANS(90.0));
     }
 }
-void player::handle_realtime_input(command_queue &commands)
+
+void player::handle_realtime_input(command_queue& commands)
 {
     static int frame_counter = 0;
     bool any_key_pressed = false;
@@ -118,7 +148,7 @@ void player::handle_realtime_input(command_queue &commands)
         {
             int numKeys = 0;
 
-            if (const auto *keyState = SDL_GetKeyboardState(&numKeys);
+            if (const auto* keyState = SDL_GetKeyboardState(&numKeys);
                 keyState && id < static_cast<std::uint32_t>(numKeys) && keyState[id])
             {
                 commands.push(m_action_binding[action]);
@@ -167,6 +197,7 @@ bool player::is_active() const noexcept
 {
     return m_is_active;
 }
+
 void player::set_active(const bool active) noexcept
 {
     m_is_active = active;
@@ -317,26 +348,26 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_UP].action = derived_action<player>(
-    [](player& p, float dt)
-    {
-        if (p.m_is_flying)
+        [](player& p, float dt)
         {
-            // In flying mode, move down
-            constexpr float flySpeed = 4.85f;
-            p.vel.vy = flySpeed;
-        }
-    });
+            if (p.m_is_flying)
+            {
+                // In flying mode, move down
+                constexpr float flySpeed = 4.85f;
+                p.vel.vy = flySpeed;
+            }
+        });
 
     m_action_binding[PlayerAction::FLY].action = derived_action<player>(
-    [](player& p, float dt)
-    {
-        p.m_is_flying = !p.m_is_flying;
-
-        if (p.m_is_flying)
+        [](player& p, float dt)
         {
-            p.vel.vy = 0.0f;
-        }
-    });
+            p.m_is_flying = !p.m_is_flying;
+
+            if (p.m_is_flying)
+            {
+                p.vel.vy = 0.0f;
+            }
+        });
 
     m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
         [this](player& p, float dt)
@@ -413,7 +444,7 @@ void player::on_right_click() const noexcept
         if (!m_world->player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
         {
             m_world->set_block(hx, hy, hz, get_item());
-            m_world->record_block(hx, hy, hz, get_item());
+            world::record_block(hx, hy, hz, get_item());
 #if defined(MAZE_DEBUG)
             SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw,
                     get_item());
