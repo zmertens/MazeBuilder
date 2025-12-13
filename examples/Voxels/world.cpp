@@ -393,6 +393,12 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
         m_player->vel.vy *= 0.85f;
     }
 
+    // Apply damping to horizontal velocity when not actively moving
+    // This prevents velocity from persisting after keys are released
+    constexpr float horizontal_damping = 0.80f;
+    m_player->vel.vx *= horizontal_damping;
+    m_player->vel.vz *= horizontal_damping;
+
     // Apply velocity to position
     m_player->pos.y += m_player->vel.vy * dt_seconds;
 

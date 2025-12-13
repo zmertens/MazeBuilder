@@ -228,75 +228,63 @@ void player::set_world(world* w) noexcept
 void player::initialize_actions()
 {
     // Movement parameters for smooth interpolation
-    constexpr float max_move_speed = 5.0f;      // Units per second
-    constexpr float acceleration = 0.2f;         // Interpolation factor (0-1)
+    constexpr float max_move_speed = 5.0f;
+    constexpr float acceleration = 0.2f;
 
     m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
         [max_move_speed, acceleration](player& p, const float dt)
         {
-            // Static variables INSIDE lambda - each direction has its own
-            static float current_vx = 0.0f;
-            static float current_vz = 0.0f;
-
             const float target_vx = -SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_cosf(p.pos.rx) * max_move_speed;
 
-            current_vx = std::lerp(current_vx, target_vx, acceleration);
-            current_vz = std::lerp(current_vz, target_vz, acceleration);
+            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
 
-            p.pos.x += current_vx * dt;
-            p.pos.z += current_vz * dt;
+            const float dt_seconds = dt / 1000.0f;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
     m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
         [max_move_speed, acceleration](player& p, const float dt)
         {
-            // Static variables INSIDE lambda - each direction has its own
-            static float current_vx = 0.0f;
-            static float current_vz = 0.0f;
-
             const float target_vx = SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_cosf(p.pos.rx) * max_move_speed;
 
-            current_vx = std::lerp(current_vx, target_vx, acceleration);
-            current_vz = std::lerp(current_vz, target_vz, acceleration);
+            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
 
-            p.pos.x += current_vx * dt;
-            p.pos.z += current_vz * dt;
+            const float dt_seconds = dt / 1000.0f;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
     m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
         [max_move_speed, acceleration](player& p, const float dt)
         {
-            // Static variables INSIDE lambda - each direction has its own
-            static float current_vx = 0.0f;
-            static float current_vz = 0.0f;
-
             const float target_vx = -SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_sinf(p.pos.rx) * max_move_speed;
 
-            current_vx = std::lerp(current_vx, target_vx, acceleration);
-            current_vz = std::lerp(current_vz, target_vz, acceleration);
+            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
 
-            p.pos.x += current_vx * dt;
-            p.pos.z += current_vz * dt;
+            const float dt_seconds = dt / 1000.0f;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
     m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
         [max_move_speed, acceleration](player& p, const float dt)
         {
-            // Static variables INSIDE lambda - each direction has its own
-            static float current_vx = 0.0f;
-            static float current_vz = 0.0f;
-
             const float target_vx = SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_sinf(p.pos.rx) * max_move_speed;
 
-            current_vx = std::lerp(current_vx, target_vx, acceleration);
-            current_vz = std::lerp(current_vz, target_vz, acceleration);
+            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
 
-            p.pos.x += current_vx * dt;
-            p.pos.z += current_vz * dt;
+            const float dt_seconds = dt / 1000.0f;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
     m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
