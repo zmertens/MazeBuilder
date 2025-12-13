@@ -26,19 +26,10 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <condition_variable>
+#include <mutex>
 #include <ranges>
-
-#define KEY_FORWARD SDL_SCANCODE_W
-#define KEY_BACKWARD SDL_SCANCODE_S
-#define KEY_LEFT SDL_SCANCODE_A
-#define KEY_RIGHT SDL_SCANCODE_D
-#define KEY_JUMP SDL_SCANCODE_SPACE
-#define KEY_FLY SDL_SCANCODE_TAB
-#define KEY_ITEM_NEXT SDL_SCANCODE_E
-#define KEY_ITEM_PREV SDL_SCANCODE_R
-#define KEY_ZOOM SDL_SCANCODE_LSHIFT
-#define KEY_ORTHO SDL_SCANCODE_F
-#define KEY_TAG SDL_SCANCODE_T
+#include <thread>
 
 // World configs
 #define SCROLL_THRESHOLD 0.1
@@ -49,8 +40,43 @@
 #define BUILD_CHUNK_SIZE 32
 #define RENDER_SIGN_RADIUS 4
 #define DELETE_CHUNK_RADIUS 14
-#define MAX_PLAYERS 1
 #define NUM_WORKERS 4
+
+struct block {
+    int x;
+    int y;
+    int z;
+    int w;
+} block0, block1;
+
+struct worker_item {
+    int p{};
+    int q{};
+    int load{};
+    Map* block_maps[3][3]{};
+    Map* light_maps[3][3]{};
+    int miny{};
+    int maxy{};
+    int faces{};
+    float* data{};
+};
+
+enum class WorkerState : int
+{
+    IDLE = 0,
+    BUSY = 1,
+    DONE = 2
+};
+
+struct worker {
+    int index;
+    WorkerState state;
+    std::thread thrd;
+    std::mutex mtx;
+    std::condition_variable cnd;
+    worker_item item;
+    bool should_stop;
+};
 
 static sdl_gl_helper::attrib s_block_attrib, s_line_attrib, s_text_attrib, s_sky_attrib;
 
@@ -286,8 +312,6 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
 void world::init() noexcept
 {
     m_model.sign_radius = RENDER_SIGN_RADIUS;
-    m_model.flying = false;
-    m_model.item_index = 0;
     m_model.is_ortho = false;
     m_model.fov = 65.0f;
     m_model.day_length = DAY_LENGTH;
@@ -311,7 +335,7 @@ void world::init() noexcept
     force_chunks(m_player);
 
     // Set player Y position to proper height above terrain
-    m_player->s1.y = static_cast<float>(highest_block(m_player->s1.x, m_player->s1.z) + 2);
+    m_player->pos.y = static_cast<float>(highest_block(m_player->pos.x, m_player->pos.z) + 2);
 
     s_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     s_block_attrib.position = 0;
@@ -348,8 +372,8 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
 
     while (!m_command_queue.is_empty())
     {
-        command cmd = m_command_queue.pop();
-        cmd.action(*m_player, delta_time);
+        auto [action, _] = m_command_queue.pop();
+        action(*m_player, delta_time);
         commands_processed++;
     }
 
@@ -359,7 +383,7 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     const float dt_seconds = delta_time / 1000.0f;
 
     // Only apply gravity when not flying
-    if (!m_player->m_is_flying)
+    if (!m_player->is_flying())
     {
         m_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
     }
@@ -370,29 +394,28 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     }
 
     // Apply velocity to position
-    m_player->s1.y += m_player->vel.vy * dt_seconds;
+    m_player->pos.y += m_player->vel.vy * dt_seconds;
 
     // Apply collision detection (height = 2 blocks for player)
     // Skip collision when flying (allows clipping through blocks)
-    if (!m_player->m_is_flying)
+    if (!m_player->is_flying())
     {
-        const int collision_result = collide(2, &m_player->s1.x, &m_player->s1.y, &m_player->s1.z);
-
         // Update ground state based on collision via helper (world is friend of player)
-        if (collision_result == 1)
+        if (const int collision_result = collide(2, &m_player->pos.x, &m_player->pos.y, &m_player->pos.z);
+            collision_result == 1)
         {
-            m_player->vel.vy = 0.0f;  // Stop vertical velocity on collision
-            m_player->m_on_ground = true;
+            m_player->vel.vy = 0.0f;
+            m_player->set_on_ground(true);
         }
         else
         {
-            m_player->m_on_ground = false;
+            m_player->set_on_ground(false);
         }
     }
     else
     {
         // When flying, not on ground
-        m_player->m_on_ground = false;
+        m_player->set_on_ground(false);
     }
 
     delete_chunks();
@@ -440,15 +463,15 @@ void world::draw() const noexcept
         texture_logged = true;
     }
 
-    auto triangle_faces = render_chunks(&s_block_attrib, m_player, atlas_texture);
+    const auto triangle_faces = render_chunks(&s_block_attrib, m_player, atlas_texture);
 
     // Debug logging (can be commented out after testing)
     static int frame_count = 0;
     if (frame_count++ % 60 == 0) {
         SDL_Log("Frame %d: Rendered %d triangle faces, player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f)",
                 frame_count, triangle_faces,
-                m_player->s1.x, m_player->s1.y, m_player->s1.z,
-                m_player->s1.rx, m_player->s1.ry);
+                m_player->pos.x, m_player->pos.y, m_player->pos.z,
+                m_player->pos.rx, m_player->pos.ry);
     }
 
     render_item(&s_block_attrib, atlas_texture);
@@ -479,24 +502,6 @@ void world::handle_event(const SDL_Event& event) noexcept
     if (event.type == SDL_EVENT_QUIT)
     {
         // Handle quit event if needed
-    }
-    else if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
-    {
-        if (event.button.button == SDL_BUTTON_LEFT)
-        {
-            // Left click - destroy block
-            on_left_click();
-        }
-        else if (event.button.button == SDL_BUTTON_RIGHT)
-        {
-            // Right click - build block
-            on_right_click();
-        }
-        else if (event.button.button == SDL_BUTTON_MIDDLE)
-        {
-            // Middle click - copy block
-            on_middle_click();
-        }
     }
 }
 
@@ -864,7 +869,7 @@ int world::highest_block(const float x, const float z) const noexcept
         MAP_FOR_EACH(map, ex, ey, ez, ew)
             {
                 // item.h -> is_obstacle
-                if (is_obstacle(ew) && ex == nx && ez == nz)
+                if (item::is_obstacle(ew) && ex == nx && ez == nz)
                 {
                     result = SDL_max(result, ey);
                 }
@@ -957,9 +962,10 @@ int world::hit_test(const int previous, const float x, const float y,
 
 int world::hit_test_face(player* _player, int* x, int* y, int* z, int* face) const noexcept
 {
-    const player::state* s = &_player->s1;
+    const player::position* s = &_player->pos;
     // item.h -> is_obstacle
-    if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z); is_obstacle(w))
+    if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
+        item::is_obstacle(w))
     {
         int hx, hy, hz;
 
@@ -1026,29 +1032,29 @@ int world::collide(int height, float* x, float* y, float* z) const noexcept
     for (int dy = 0; dy < height; dy++)
     {
         // item.h -> is_obstacle
-        if (px < -pad && is_obstacle(map_get(map, nx - 1, ny - dy, nz)))
+        if (px < -pad && item::is_obstacle(map_get(map, nx - 1, ny - dy, nz)))
         {
             *x = nx - pad;
         }
-        if (px > pad && is_obstacle(map_get(map, nx + 1, ny - dy, nz)))
+        if (px > pad && item::is_obstacle(map_get(map, nx + 1, ny - dy, nz)))
         {
             *x = nx + pad;
         }
-        if (py < -pad && is_obstacle(map_get(map, nx, ny - dy - 1, nz)))
+        if (py < -pad && item::is_obstacle(map_get(map, nx, ny - dy - 1, nz)))
         {
             *y = ny - pad;
             result = 1;
         }
-        if (py > pad && is_obstacle(map_get(map, nx, ny - dy + 1, nz)))
+        if (py > pad && item::is_obstacle(map_get(map, nx, ny - dy + 1, nz)))
         {
             *y = ny + pad;
             result = 1;
         }
-        if (pz < -pad && is_obstacle(map_get(map, nx, ny - dy, nz - 1)))
+        if (pz < -pad && item::is_obstacle(map_get(map, nx, ny - dy, nz - 1)))
         {
             *z = nz - pad;
         }
-        if (pz > pad && is_obstacle(map_get(map, nx, ny - dy, nz + 1)))
+        if (pz > pad && item::is_obstacle(map_get(map, nx, ny - dy, nz + 1)))
         {
             *z = nz + pad;
         }
@@ -1521,7 +1527,7 @@ void world::compute_chunk(worker_item* item) const noexcept
                         continue;
                     }
                     // END TODO
-                    opaque[XYZ(x, y, z)] = !is_transparent(w);
+                    opaque[XYZ(x, y, z)] = !item::is_transparent(w);
                     if (opaque[XYZ(x, y, z)])
                     {
                         highest[XZ(x, z)] = SDL_max(highest[XZ(x, z)], y);
@@ -1581,7 +1587,7 @@ void world::compute_chunk(worker_item* item) const noexcept
             {
                 continue;
             }
-            if (is_plant(ew))
+            if (item::is_plant(ew))
             {
                 total = 4;
             }
@@ -1648,7 +1654,7 @@ void world::compute_chunk(worker_item* item) const noexcept
             float ao[6][4];
             float light[6][4];
             occlusion(neighbors, lights, shades, ao, light);
-            if (is_plant(ew))
+            if (item::is_plant(ew))
             {
                 total = 4;
                 float min_ao = 1;
@@ -1800,7 +1806,7 @@ void world::create_chunk(scene_node* chunk, int p, int q) const noexcept
 void world::delete_chunks() noexcept
 {
     std::size_t count = this->m_next_chunk_slot;
-    const player::state* s1 = &m_player->s1;
+    const player::position* s1 = &m_player->pos;
     auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
     // NOTE: Start at index 1 because index 0 is the root layer node
@@ -1932,7 +1938,7 @@ void world::check_workers() noexcept
 // Used to init the terrain (chunks) around the player
 void world::force_chunks(player* _player) noexcept
 {
-    player::state* s = &_player->s1;
+    player::position* s = &_player->pos;
     int p = chunked(s->x);
     int q = chunked(s->z);
 
@@ -1971,7 +1977,7 @@ void world::force_chunks(player* _player) noexcept
 void world::ensure_chunks_worker(player* _player, worker* w) noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    player::state* s = &_player->s1;
+    player::position* s = &_player->pos;
     float matrix[16];
     set_matrix_3d(matrix, width, height,
                   s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
@@ -2260,16 +2266,16 @@ void world::set_block(int x, int y, int z, int w) const noexcept
     }
 }
 
-void world::record_block(int x, int y, int z, int w) noexcept
+void world::record_block(const int x, const int y, const int z, const int w) noexcept
 {
-    SDL_memcpy(&this->m_model.block1, &this->m_model.block0, sizeof(Block));
-    this->m_model.block0.x = x;
-    this->m_model.block0.y = y;
-    this->m_model.block0.z = z;
-    this->m_model.block0.w = w;
+    SDL_memcpy(&block1, &block0, sizeof(block));
+    block0.x = x;
+    block0.y = y;
+    block0.z = z;
+    block0.w = w;
 }
 
-int world::get_block(int x, int y, int z) noexcept
+int world::get_block(int x, int y, int z) const noexcept
 {
     int p = chunked(static_cast<float>(x));
     int q = chunked(static_cast<float>(z));
@@ -2283,13 +2289,13 @@ int world::get_block(int x, int y, int z) noexcept
     return 0;
 }
 
-void world::builder_block(int x, int y, int z, int w) noexcept
+void world::builder_block(const int x, const int y, const int z, const int w) const noexcept
 {
     if (y <= 0 || y >= 256)
     {
         return;
     }
-    if (is_destructable(get_block(x, y, z)))
+    if (item::is_destructable(get_block(x, y, z)))
     {
         set_block(x, y, z, 0);
     }
@@ -2303,7 +2309,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, c
 {
     auto [width, height] = m_sdl->get_window_size();
     int result = 0;
-    const player::state* s = &_player->s1;
+    const player::position* s = &_player->pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     const float light = get_daylight();
@@ -2367,7 +2373,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, c
 void world::render_signs(const sdl_gl_helper::attrib* attrib, const player* _player, const std::uint32_t sign) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    const player::state* s = &_player->s1;
+    const player::position* s = &_player->pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     float matrix[16];
@@ -2415,7 +2421,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, player* _player, co
     }
 
     auto [width, height] = m_sdl->get_window_size();
-    const player::state* s = &_player->s1;
+    const player::position* s = &_player->pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
@@ -2441,7 +2447,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, player* _player, co
 void world::render_players(const sdl_gl_helper::attrib* attrib, player* _player) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    player::state* s = &_player->s1;
+    player::position* s = &_player->pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
@@ -2459,14 +2465,15 @@ void world::render_players(const sdl_gl_helper::attrib* attrib, player* _player)
 void world::render_wireframe(const sdl_gl_helper::attrib* attrib, const player* _player) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    const player::state* s = &_player->s1;
+    const player::position* s = &_player->pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
         s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
         RENDER_CHUNK_RADIUS);
     int hx, hy, hz;
-    if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz); is_obstacle(hw))
+    if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        item::is_obstacle(hw))
     {
         glUseProgram(attrib->program);
         glLineWidth(1);
@@ -2503,7 +2510,7 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     glUniform3f(attrib->camera, 0, 0, 5);
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
-    if (const int w = items[m_model.item_index]; is_plant(w))
+    if (const int w = m_player->get_item(); item::is_plant(w))
     {
         const GLuint buffer = gen_plant_buffer(0, 0, 0, 0.5, w);
         m_sdl->draw_plant(attrib, buffer);
@@ -2535,71 +2542,3 @@ void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     m_sdl->draw_text(attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }
-
-void world::on_light() const noexcept
-{
-    const player::state* s = &m_player->s1;
-    int hx, hy, hz;
-    if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        hy > 0 && hy < 256 && is_destructable(hw))
-    {
-        toggle_light(hx, hy, hz);
-    }
-}
-
-void world::on_left_click() noexcept
-{
-    const player::state* s = &m_player->s1;
-    int hx, hy, hz;
-    if (const auto hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        hy > 0 && hy < 256 && is_destructable(hw))
-    {
-        set_block(hx, hy, hz, 0);
-        record_block(hx, hy, hz, 0);
-#if defined(MAZE_DEBUG)
-        SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, items[m_model.item_index]);
-#endif
-        if (is_plant(get_block(hx, hy + 1, hz)))
-        {
-            set_block(hx, hy + 1, hz, 0);
-        }
-    }
-}
-
-void world::on_right_click() noexcept
-{
-    const player::state* s = &m_player->s1;
-    int hx, hy, hz;
-    if (const int hw = hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-        hy > 0 && hy < 256 && is_obstacle(hw))
-    {
-        if (!player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
-        {
-            set_block(hx, hy, hz, items[m_model.item_index]);
-            record_block(hx, hy, hz, items[m_model.item_index]);
-#if defined(MAZE_DEBUG)
-            SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw,
-                    items[m_model.item_index]);
-#endif
-        }
-    }
-}
-
-void world::on_middle_click() noexcept
-{
-    const player::state* s = &m_player->s1;
-    int hx, hy, hz;
-    const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    for (int i = 0; i < item_count; i++)
-    {
-        if (items[i] == hw)
-        {
-            m_model.item_index = i;
-#if defined(MAZE_DEBUG)
-            SDL_Log("Copying item index: %d\n", i);
-#endif
-            break;
-        }
-    }
-}
-

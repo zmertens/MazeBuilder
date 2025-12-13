@@ -4,6 +4,7 @@
 
 #include "command_queue.h"
 #include "entity.h"
+#include "item.h"
 #include "matrix.h"
 #include "world.h"
 
@@ -13,8 +14,10 @@ player::player()
     : scene_node{}
     , m_is_active{true}
     , m_on_ground{false}
-, m_is_flying{false}
+    , m_is_flying{false}
     , m_buffer{}
+    , m_name{"zm"}
+    , m_item_index{0}
     , m_world{nullptr}
 {
     set_category(Entity::PLAYER);
@@ -24,12 +27,14 @@ player::player()
     m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
     m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
     m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
-    m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;  // Also used for UP in flying mode
-    m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;  // Down in flying mode
+    m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
+    m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;
+    m_key_binding[SDL_SCANCODE_RSHIFT] = PlayerAction::MOVE_UP;
     m_key_binding[SDL_SCANCODE_TAB] = PlayerAction::FLY;
 
     initialize_actions();
 
+    // Set category for all player actions
     for (auto& [_, category] : m_action_binding | std::views::values)
     {
         category = Entity::PLAYER;
@@ -38,7 +43,7 @@ player::player()
 
 void player::handle_event(const SDL_Event &event, command_queue &commands) noexcept
 {
-    state* s = &this->s1;
+    position* player_pos = &this->pos;
 
     if (event.type == SDL_EVENT_QUIT)
     {
@@ -61,26 +66,44 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
             commands.push(m_action_binding[found->second]);
         }
     }
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+    {
+        if (event.button.button == SDL_BUTTON_LEFT)
+        {
+            // Left click - destroy block
+            commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
+        }
+        else if (event.button.button == SDL_BUTTON_RIGHT)
+        {
+            // Right click - build block
+            commands.push(m_action_binding[PlayerAction::BUILD_BLOCK]);
+        }
+        else if (event.button.button == SDL_BUTTON_MIDDLE)
+        {
+            // Middle click - copy block (execute immediately, not queued)
+            on_middle_click();
+        }
+    }
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
         constexpr float mouse_sensitivity = 0.0025f;
 
-        s->rx += event.motion.xrel * mouse_sensitivity;
+        player_pos->rx += event.motion.xrel * mouse_sensitivity;
         static constexpr auto INVERT_MOUSE = false;
         if (INVERT_MOUSE) {
-            s->ry += event.motion.yrel * mouse_sensitivity;
+            player_pos->ry += event.motion.yrel * mouse_sensitivity;
         }
-        s->ry -= event.motion.yrel * mouse_sensitivity;
+        player_pos->ry -= event.motion.yrel * mouse_sensitivity;
 
         // Keep rotation within bounds
-        if (s->rx < 0) {
-            s->rx += RADIANS(360);
+        if (player_pos->rx < 0) {
+            player_pos->rx += RADIANS(360.0);
         }
-        if (s->rx >= RADIANS(360)) {
-            s->rx -= RADIANS(360);
+        if (player_pos->rx >= RADIANS(360.0)) {
+            player_pos->rx -= RADIANS(360.0);
         }
-        s->ry = SDL_max(s->ry, -RADIANS(90));
-        s->ry = SDL_min(s->ry, RADIANS(90));
+        player_pos->ry = SDL_max(player_pos->ry, -RADIANS(90.0));
+        player_pos->ry = SDL_min(player_pos->ry, RADIANS(90.0));
     }
 }
 void player::handle_realtime_input(command_queue &commands)
@@ -88,17 +111,17 @@ void player::handle_realtime_input(command_queue &commands)
     static int frame_counter = 0;
     bool any_key_pressed = false;
 
-    for (auto & [fst, snd] : m_key_binding)
+    for (auto& [id, action] : m_key_binding)
     {
         // Regular realtime actions OR JUMP when flying
-        if (is_realtime_action(snd) || (snd == PlayerAction::JUMP && m_is_flying))
+        if (is_realtime_action(action) || (action == PlayerAction::JUMP && m_is_flying))
         {
             int numKeys = 0;
 
             if (const auto *keyState = SDL_GetKeyboardState(&numKeys);
-                keyState && fst < static_cast<std::uint32_t>(numKeys) && keyState[fst])
+                keyState && id < static_cast<std::uint32_t>(numKeys) && keyState[id])
             {
-                commands.push(m_action_binding[snd]);
+                commands.push(m_action_binding[action]);
                 any_key_pressed = true;
             }
         }
@@ -116,18 +139,22 @@ void player::assign_key(const PlayerAction action, const std::uint32_t key)
     for (auto it = m_key_binding.begin(); it != m_key_binding.end();)
     {
         if (it->second == action)
+        {
             it = m_key_binding.erase(it);
+        }
         else
+        {
             ++it;
+        }
     }
 
     // Insert new binding
-    m_key_binding[key] = action;
+    m_key_binding.insert_or_assign(key, action);
 }
 
 [[nodiscard]] std::uint32_t player::get_assigned_key(const PlayerAction action) const
 {
-    for (const auto & [f, s] : m_key_binding)
+    for (const auto& [f, s] : m_key_binding)
     {
         if (s == action)
             return f;
@@ -145,6 +172,26 @@ void player::set_active(const bool active) noexcept
     m_is_active = active;
 }
 
+bool player::is_flying() const noexcept
+{
+    return m_is_flying;
+}
+
+void player::set_flying(const bool flying) noexcept
+{
+    this->m_is_flying = flying;
+}
+
+bool player::is_on_ground() const noexcept
+{
+    return m_on_ground;
+}
+
+void player::set_on_ground(const bool grounded) noexcept
+{
+    this->m_on_ground = grounded;
+}
+
 std::uint32_t player::get_buffer() const noexcept
 {
     return this->m_buffer;
@@ -155,78 +202,101 @@ void player::set_buffer(const std::uint32_t value) noexcept
     this->m_buffer = value;
 }
 
+std::uint32_t player::get_item() const noexcept
+{
+    if (this->m_item_index < item::items.size())
+    {
+        return item::items.at(this->m_item_index);
+    }
+    return -1;
+}
+
+void player::set_item(const std::uint32_t value) noexcept
+{
+    // Validate the value is within bounds before setting
+    if (value < item::items.size())
+    {
+        this->m_item_index = value;
+    }
+}
+
 void player::set_world(world* w) noexcept
 {
     m_world = w;
 }
 
-bool player::is_on_ground() const noexcept
-{
-    return m_on_ground;
-}
-
 void player::initialize_actions()
 {
+    // Movement parameters for smooth interpolation
+    constexpr float max_move_speed = 5.0f;      // Units per second
+    constexpr float acceleration = 0.2f;         // Interpolation factor (0-1)
+
     m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
-        [](player& p, float dt)
+        [max_move_speed, acceleration](player& p, const float dt)
         {
-            if (!p.m_world) {
-                SDL_Log("MOVE_FORWARD: No world reference!");
-                return;
-            }
+            // Static variables INSIDE lambda - each direction has its own
+            static float current_vx = 0.0f;
+            static float current_vz = 0.0f;
 
-            constexpr float moveSpeed = 0.1f;
-            float old_x = p.s1.x;
-            float old_z = p.s1.z;
-            float dx = -SDL_sinf(p.s1.rx) * moveSpeed;
-            float dz = SDL_cosf(p.s1.rx) * moveSpeed;
+            const float target_vx = -SDL_sinf(p.pos.rx) * max_move_speed;
+            const float target_vz = SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.s1.x += dx;
-            p.s1.z += dz;
+            current_vx = std::lerp(current_vx, target_vx, acceleration);
+            current_vz = std::lerp(current_vz, target_vz, acceleration);
 
-            static int move_count = 0;
-            if (move_count++ % 60 == 0) {
-                SDL_Log("MOVE_FORWARD executed: (%.2f, %.2f) -> (%.2f, %.2f)", old_x, old_z, p.s1.x, p.s1.z);
-            }
+            p.pos.x += current_vx * dt;
+            p.pos.z += current_vz * dt;
         });
 
     m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
-        [](player& p, float dt)
+        [max_move_speed, acceleration](player& p, const float dt)
         {
-            if (!p.m_world) return;
+            // Static variables INSIDE lambda - each direction has its own
+            static float current_vx = 0.0f;
+            static float current_vz = 0.0f;
 
-            constexpr float moveSpeed = 0.1f;
-            const float dx = SDL_sinf(p.s1.rx) * moveSpeed;
-            const float dz = -SDL_cosf(p.s1.rx) * moveSpeed;
+            const float target_vx = SDL_sinf(p.pos.rx) * max_move_speed;
+            const float target_vz = -SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.s1.x += dx;
-            p.s1.z += dz;
+            current_vx = std::lerp(current_vx, target_vx, acceleration);
+            current_vz = std::lerp(current_vz, target_vz, acceleration);
+
+            p.pos.x += current_vx * dt;
+            p.pos.z += current_vz * dt;
         });
 
     m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
-        [](player& p, float dt)
+        [max_move_speed, acceleration](player& p, const float dt)
         {
-            if (!p.m_world) return;
+            // Static variables INSIDE lambda - each direction has its own
+            static float current_vx = 0.0f;
+            static float current_vz = 0.0f;
 
-            constexpr float moveSpeed = 0.1f;
-            const float dx = -SDL_cosf(p.s1.rx) * moveSpeed;
-            const float dz = -SDL_sinf(p.s1.rx) * moveSpeed;
+            const float target_vx = -SDL_cosf(p.pos.rx) * max_move_speed;
+            const float target_vz = -SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.s1.x += dx;
-            p.s1.z += dz;
+            current_vx = std::lerp(current_vx, target_vx, acceleration);
+            current_vz = std::lerp(current_vz, target_vz, acceleration);
+
+            p.pos.x += current_vx * dt;
+            p.pos.z += current_vz * dt;
         });
 
     m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
-        [](player& p, float dt)
+        [max_move_speed, acceleration](player& p, const float dt)
         {
-            if (!p.m_world) return;
+            // Static variables INSIDE lambda - each direction has its own
+            static float current_vx = 0.0f;
+            static float current_vz = 0.0f;
 
-            constexpr float moveSpeed = 0.1f;
-            float dx = SDL_cosf(p.s1.rx) * moveSpeed;
-            float dz = SDL_sinf(p.s1.rx) * moveSpeed;
+            const float target_vx = SDL_cosf(p.pos.rx) * max_move_speed;
+            const float target_vz = SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.s1.x += dx;
-            p.s1.z += dz;
+            current_vx = std::lerp(current_vx, target_vx, acceleration);
+            current_vz = std::lerp(current_vz, target_vz, acceleration);
+
+            p.pos.x += current_vx * dt;
+            p.pos.z += current_vz * dt;
         });
 
     m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
@@ -247,17 +317,27 @@ void player::initialize_actions()
             }
         });
 
-    // MOVE_DOWN action for flying mode (Left Shift)
     m_action_binding[PlayerAction::MOVE_DOWN].action = derived_action<player>(
         [](player& p, float dt)
         {
             if (p.m_is_flying)
             {
                 // In flying mode, move down
-                constexpr float flySpeed = 0.15f;
+                constexpr float flySpeed = 4.85f;
                 p.vel.vy = -flySpeed;
             }
         });
+
+    m_action_binding[PlayerAction::MOVE_UP].action = derived_action<player>(
+    [](player& p, float dt)
+    {
+        if (p.m_is_flying)
+        {
+            // In flying mode, move down
+            constexpr float flySpeed = 4.85f;
+            p.vel.vy = flySpeed;
+        }
+    });
 
     m_action_binding[PlayerAction::FLY].action = derived_action<player>(
     [](player& p, float dt)
@@ -266,31 +346,25 @@ void player::initialize_actions()
 
         if (p.m_is_flying)
         {
-            // When entering flying mode, zero out vertical velocity
             p.vel.vy = 0.0f;
-            SDL_Log("Flying mode: ENABLED");
-        }
-        else
-        {
-            SDL_Log("Flying mode: DISABLED");
         }
     });
 
     m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
-        [](player& p, float dt)
+        [this](player& p, float dt)
         {
             if (p.m_world)
             {
-                p.m_world->on_right_click();
+                on_right_click();
             }
         });
 
     m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
-        [](player& p, float dt)
+        [this](player& p, float dt)
         {
             if (p.m_world)
             {
-                p.m_world->on_left_click();
+                on_left_click();
             }
         });
 }
@@ -303,9 +377,78 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
     case PlayerAction::MOVE_RIGHT:
     case PlayerAction::MOVE_FORWARD:
     case PlayerAction::MOVE_BACKWARD:
-    case PlayerAction::MOVE_DOWN:  // Hold Shift to descend in flying mode
+    case PlayerAction::MOVE_DOWN:
+    case PlayerAction::MOVE_UP:
         return true;
     default:
         return false;
     }
 }
+
+void player::on_light() const noexcept
+{
+    const position* s = &this->pos;
+    int hx, hy, hz;
+    if (const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && item::is_destructable(hw))
+    {
+        m_world->toggle_light(hx, hy, hz);
+    }
+}
+
+void player::on_left_click() const noexcept
+{
+    const position* s = &this->pos;
+    int hx, hy, hz;
+    if (const auto hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && item::is_destructable(hw))
+    {
+        m_world->set_block(hx, hy, hz, 0);
+        m_world->record_block(hx, hy, hz, 0);
+#if defined(MAZE_DEBUG)
+        SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, get_item());
+#endif
+        if (item::is_plant(m_world->get_block(hx, hy + 1, hz)))
+        {
+            m_world->set_block(hx, hy + 1, hz, 0);
+        }
+    }
+}
+
+void player::on_right_click() const noexcept
+{
+    const position* s = &this->pos;
+    int hx, hy, hz;
+    if (const int hw = m_world->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && item::is_obstacle(hw))
+    {
+        if (!m_world->player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
+        {
+            m_world->set_block(hx, hy, hz, get_item());
+            m_world->record_block(hx, hy, hz, get_item());
+#if defined(MAZE_DEBUG)
+            SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw,
+                    get_item());
+#endif
+        }
+    }
+}
+
+void player::on_middle_click() noexcept
+{
+    const position* s = &this->pos;
+    int hx, hy, hz;
+    const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    for (int i = 0; i < item::items.size(); i++)
+    {
+        if (item::items.at(i) == hw)
+        {
+            this->m_item_index = i;
+#if defined(MAZE_DEBUG)
+            SDL_Log("Copying item index: %d\n", i);
+#endif
+            break;
+        }
+    }
+}
+

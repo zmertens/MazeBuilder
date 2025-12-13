@@ -13,8 +13,8 @@ enum class PlayerAction
     MOVE_RIGHT,
     MOVE_FORWARD,
     MOVE_BACKWARD,
-    MOVE_UP,      // For flying mode - ascend
-    MOVE_DOWN,    // For flying mode - descend
+    MOVE_UP,
+    MOVE_DOWN,
     JUMP,
     FLY,
     BUILD_BLOCK,
@@ -29,13 +29,11 @@ class world;
 
 class player : public scene_node
 {
-    // Access to world private methods
-    friend class world;
 public:
-    struct state
+    struct position
     {
         float x, y, z, rx, ry, t;
-    } s1{};
+    } pos{};
 
     struct velocity
     {
@@ -49,31 +47,43 @@ public:
     player(const player&) = delete;
     player& operator=(const player&) = delete;
 
-    player(player&&)  noexcept = default;
+    player(player&&) noexcept = default;
     player& operator=(player&&) = default;
 
-    void handle_event(const SDL_Event &event, command_queue &commands) noexcept;
+    void handle_event(const SDL_Event& event, command_queue& commands) noexcept;
 
-    void handle_realtime_input(command_queue &commands);
+    void handle_realtime_input(command_queue& commands);
 
     void assign_key(PlayerAction action, std::uint32_t key);
 
     [[nodiscard]] std::uint32_t get_assigned_key(PlayerAction action) const;
 
     [[nodiscard]] bool is_active() const noexcept;
-
     void set_active(bool active) noexcept;
+
+    [[nodiscard]] bool is_flying() const noexcept;
+    void set_flying(bool flying) noexcept;
+
+    [[nodiscard]] bool is_on_ground() const noexcept;
+    void set_on_ground(bool grounded) noexcept;
 
     [[nodiscard]] std::uint32_t get_buffer() const noexcept;
     void set_buffer(std::uint32_t value) noexcept;
 
+    [[nodiscard]] std::uint32_t get_item() const noexcept;
+    void set_item(std::uint32_t value) noexcept;
+
     void set_world(world* w) noexcept;
-    [[nodiscard]] bool is_on_ground() const noexcept;
 
 private:
     void initialize_actions();
 
     static bool is_realtime_action(PlayerAction action) noexcept;
+
+    void on_light() const noexcept;
+    void on_left_click() const noexcept;
+    void on_right_click() const noexcept;
+    void on_middle_click() noexcept;
 
     std::map<std::uint32_t, PlayerAction> m_key_binding;
 
@@ -85,6 +95,8 @@ private:
 
     std::string m_name;
     std::uint32_t m_buffer;
+
+    std::uint32_t m_item_index;
 
     world* m_world;
 };

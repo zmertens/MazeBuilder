@@ -1,6 +1,8 @@
 #ifndef ITEM_H
 #define ITEM_H
 
+#include <array>
+
 #define EMPTY 0
 #define GRASS 1
 #define SAND 2
@@ -60,14 +62,22 @@
 #define COLOR_30 62
 #define COLOR_31 63
 
-extern const int items[];
-extern const int item_count;
-extern const int blocks[256][6];
-extern const int plants[256];
+class item
+{
+public:
+    static constexpr auto TOTAL_BLOCKS = 256;
+    static constexpr auto BLOCK_FACE_COUNT = 6;
+    static constexpr auto TOTAL_ITEMS = 64;
+    static constexpr auto TOTAL_PLANTS = 256;
 
-int is_plant(int w);
-int is_obstacle(int w);
-int is_transparent(int w);
-int is_destructable(int w);
+    static bool is_plant(int w) noexcept;
+    static bool is_obstacle(int w) noexcept;
+    static bool is_transparent(int w) noexcept;
+    static bool is_destructable(int w) noexcept;
+
+    static std::array<std::array<int, BLOCK_FACE_COUNT>, TOTAL_BLOCKS> blocks;
+    static std::array<int, TOTAL_ITEMS> items;
+    static std::array<int, TOTAL_PLANTS> plants;
+};
 
 #endif // ITEM_H

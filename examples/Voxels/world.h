@@ -2,13 +2,10 @@
 #define WORLD_H
 
 #include <array>
-#include <condition_variable>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <vector>
 
 #include "command_queue.h"
@@ -18,13 +15,8 @@
 #include "sdl_gl_helper.h"
 #include "sign.h"
 
-enum class WorkerState : int
-{
-    IDLE = 0,
-    BUSY = 1,
-    DONE = 2
-};
-
+struct worker;
+struct worker_item;
 union SDL_Event;
 
 std::string gl_error_checker(const char* file, int line) noexcept;
@@ -35,7 +27,6 @@ using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class attrib;
 class command_queue;
-class player;
 class sdl_gl_helper;
 
 namespace mazes {
@@ -43,6 +34,7 @@ namespace mazes {
 }
 
 class world final {
+    friend class player;
 public:
     explicit world(SDL_Window* window,
         font_manager& fonts,
@@ -68,11 +60,8 @@ public:
 
     static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
 
-    // Block manipulation methods (public for player actions)
+    // Light manipulation (public for player actions)
     void on_light() const noexcept;
-    void on_left_click() noexcept;
-    void on_right_click() noexcept;
-    void on_middle_click() noexcept;
 
 private:
     // Build the scene (initialize scene graph and layers)
@@ -87,49 +76,14 @@ private:
     void insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept;
     void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
-    struct worker_item {
-        int p{};
-        int q{};
-        int load{};
-        Map* block_maps[3][3]{};
-        Map* light_maps[3][3]{};
-        int miny{};
-        int maxy{};
-        int faces{};
-        float* data{};
-    };
-
-    struct worker {
-        int index;
-        WorkerState state;
-        std::thread thrd;
-        std::mutex mtx;
-        std::condition_variable cnd;
-        worker_item item;
-        bool should_stop;
-    };
-
-    typedef struct {
-        int x;
-        int y;
-        int z;
-        int w;
-    } Block;
-
     struct model {
         int sign_radius;
-        bool flying;
-        int item_index;
         int scale;
         bool is_ortho;
         float fov;
         int day_length;
         int start_time;
         int start_ticks;
-        Block block0;
-        Block block1;
-        Block copy0;
-        Block copy1;
     };
 
     bool worker_run(worker* w) const noexcept;
@@ -200,9 +154,9 @@ private:
 
     void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept;
     void set_block(int x, int y, int z, int w) const noexcept;
-    void record_block(int x, int y, int z, int w) noexcept;
-    int get_block(int x, int y, int z) noexcept;
-    void builder_block(int x, int y, int z, int w) noexcept;
+    static void record_block(int x, int y, int z, int w) noexcept;
+    int get_block(int x, int y, int z) const noexcept;
+    void builder_block(int x, int y, int z, int w) const noexcept;
 
     int render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, uint32_t texture) const noexcept;
     void render_signs(const sdl_gl_helper::attrib* attrib, const player* _player, std::uint32_t sign) const noexcept;

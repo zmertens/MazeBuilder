@@ -48,8 +48,10 @@ bool sdl_gl_helper::initialize(std::string_view title, int width, int height) no
         SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
         SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
 
-        constexpr auto window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIGH_PIXEL_DENSITY | SDL_WINDOW_RESIZABLE |
-            SDL_WINDOW_INPUT_FOCUS;
+        constexpr auto window_flags = SDL_WINDOW_OPENGL
+            | SDL_WINDOW_HIGH_PIXEL_DENSITY
+            | SDL_WINDOW_RESIZABLE
+            | SDL_WINDOW_INPUT_FOCUS;
 
         this->window = SDL_CreateWindow(title.data(), width, height, window_flags);
 
