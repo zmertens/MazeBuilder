@@ -58,7 +58,7 @@ public:
 
     void handle_event(const SDL_Event& event) noexcept;
 
-    static void create_world(int p, int q, world_func func, Map *m, int chunk_size) noexcept;
+    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
 
     // Light manipulation (public for player actions)
     void on_light() const noexcept;

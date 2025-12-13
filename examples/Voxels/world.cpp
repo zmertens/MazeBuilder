@@ -39,6 +39,7 @@
 #define RENDER_CHUNK_RADIUS 20
 #define BUILD_CHUNK_SIZE 32
 #define RENDER_SIGN_RADIUS 4
+#define SHOW_CLOUDS true
 #define DELETE_CHUNK_RADIUS 14
 #define NUM_WORKERS 4
 
@@ -511,13 +512,10 @@ void world::handle_event(const SDL_Event& event) noexcept
     }
 }
 
-void set_player(player* player)
+void world::create_world(const int p, const int q,
+    const world_func& func, Map* m, const int chunk_size) noexcept
 {
-}
-
-void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) noexcept
-{
-    int pad = 1;
+    constexpr int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++)
     {
         for (int dz = -pad; dz < chunk_size + pad; dz++)
@@ -527,33 +525,22 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
             {
                 flag = -1;
             }
-            int x = p * chunk_size + dx;
-            int z = q * chunk_size + dz;
+            const int x = p * chunk_size + dx;
+            const int z = q * chunk_size + dz;
 
             // Build the environment
-            float f = simplex2(static_cast<float>(x) * 0.01, static_cast<float>(z) * 0.01, 4, 0.5, 2);
-            float g = simplex2(static_cast<float>(-x) * 0.01, static_cast<float>(-z) * 0.01, 2, 0.9, 2);
-            int mh = g * 32 + 16;
-            int h = f * mh;
+            const float f = simplex2(static_cast<float>(x) * 0.01f, static_cast<float>(z) * 0.01f,
+                4, 0.5f, 2.f);
+            const float g = simplex2(static_cast<float>(-x) * 0.01f, static_cast<float>(-z) * 0.01f,
+                2, 0.9f, 2.f);
+            const int mh = g * 32 + 16;
+            auto h = static_cast<int>(f * static_cast<float>(mh));
             int w = 1;
-            int t = 12;
-            if (h <= t)
+            if (constexpr int t = 12; h <= t)
             {
                 h = t;
                 w = 2;
             }
-
-            static constexpr auto PLANT_HEIGHT_MAX = 2;
-
-            // Maze
-            //const auto& block = mazes.find(x, z);
-            //if (block.has_value()) {
-            //    const auto& [rows, cols, levels, t] = block.value();
-            //    for (auto y = 0; y < levels + PLANT_HEIGHT_MAX + 1; y++) {
-            //        func(rows, y, cols, t * flag, m);
-            //    }
-            //    continue;
-            //}
 
             // sand and grass terrain
             for (int y = 0; y < h; y++)
@@ -561,57 +548,69 @@ void world::create_world(int p, int q, world_func func, Map* m, int chunk_size) 
                 func(x, y, z, w * flag, m);
             }
 
-            if (w == 1)
-            {
-                // grass
-                if (simplex2(-x * 0.1, z * 0.1, 4, 0.8, 2) > 0.6)
-                {
-                    func(x, PLANT_HEIGHT_MAX, z, 17 * flag, m);
-                }
-                // flowers
-                if (simplex2(x * 0.05, -z * 0.05, 4, 0.8, 2) > 0.7)
-                {
-                    int w = 18 + simplex2(x * 0.1, z * 0.1, 4, 0.8, 2) * 7;
-                    func(x, PLANT_HEIGHT_MAX, z, w * flag, m);
-                }
+            if (w == 1) {
+
+                    // grass
+                    if (simplex2(static_cast<float>(-x) * 0.1f,
+                        static_cast<float>(z) * 0.1f,
+                        4,
+                        0.8f, 2.0f) > 0.6f) {
+
+                        func(x, h, z, 17 * flag, m);
+                    }
+                    // flowers
+                    if (simplex2(static_cast<float>(x) * 0.05f,
+                        static_cast<float>(-z) * 0.05f,
+                        4,
+                        0.8f,
+                        2.0f) > 0.7f) {
+
+                        const auto w1 = 18.f + simplex2(static_cast<float>(x) * 0.1f,
+                            static_cast<float>(z) * 0.1f,
+                            4,
+                            0.8f,
+                            2.0f) * 7.f;
+
+                        func(x, h, z, w1 * static_cast<float>(flag), m);
+                    }
+
                 // trees
-                // Check that the tree fits in the chunk
-                bool ok = true;
-                if (dx - 3 < 0 || dz - 3 < 0 || dx + 4 > chunk_size || dz + 4 > chunk_size)
+                int ok = 1;
+                if (dx - 4 < 0 || dz - 4 < 0 ||
+                    dx + 4 >= BUILD_CHUNK_SIZE || dz + 4 >= BUILD_CHUNK_SIZE)
                 {
-                    ok = false;
+                    ok = 0;
                 }
-                if (ok && simplex2(x, z, 6, 0.5, 2) > 0.84)
-                {
-                    // Generate canopy for tree (leaves)
-                    for (int y = PLANT_HEIGHT_MAX + 3; y < PLANT_HEIGHT_MAX + 8; y++)
-                    {
-                        for (int ox = -3; ox <= 3; ox++)
-                        {
-                            for (int oz = -3; oz <= 3; oz++)
-                            {
-                                int d = (ox * ox) + (oz * oz) + (y - (PLANT_HEIGHT_MAX + 4)) * (y - (PLANT_HEIGHT_MAX +
-                                    4));
-                                if (d < 11)
-                                {
+                if (ok && simplex2(static_cast<float>(x), static_cast<float>(z), 6, 0.5f, 2.0f) > 0.84f) {
+                    for (int y = h + 3; y < h + 8; y++) {
+                        for (int ox = -3; ox <= 3; ox++) {
+                            for (int oz = -3; oz <= 3; oz++) {
+                                const int d = (ox * ox) + (oz * oz) +
+                                    (y - (h + 4)) * (y - (h + 4));
+                                if (d < 11) {
                                     func(x + ox, y, z + oz, 15, m);
                                 }
                             }
                         }
                     }
-                    // Generate the tree trunk
-                    for (int y = PLANT_HEIGHT_MAX; y < PLANT_HEIGHT_MAX + 7; y++)
-                    {
+                    for (int y = h; y < h + 7; y++) {
                         func(x, y, z, 5, m);
                     }
                 }
             }
             // clouds
-            for (int y = 64; y < 72; y++)
-            {
-                if (simplex3(x * 0.01, y * 0.1, z * 0.01, 8, 0.5, 2) > 0.75)
-                {
-                    func(x, y, z, 16 * flag, m);
+            if (SHOW_CLOUDS) {
+                for (int y = 64; y < 72; y++) {
+                    if (simplex3(
+                        static_cast<float>(x) * 0.01f,
+                        static_cast<float>(y) * 0.1f,
+                        static_cast<float>(z) * 0.01f,
+                        8,
+                        0.5f,
+                        2.0f) > 0.75f)
+                    {
+                        func(x, y, z, 16 * flag, m);
+                    }
                 }
             }
         }
