@@ -9,6 +9,7 @@ in vec2 fragment_uv;
 
 void main()
 {
-    vec2 uv = vec2(timer, fragment_uv.t);
-    FragColor = texture(sampler, uv);
+    // Original code used timer for animated sky:
+     vec2 uv = vec2(timer, fragment_uv.t);
+     FragColor = texture(sampler, uv);
 }

@@ -40,8 +40,8 @@ void main() {
     vec3 ambient = vec3(value * 0.3 + 0.2);
     vec3 light = ambient + light_color * df;
     color *= light * ao;
-    // Apply fog with a proper fog color (light gray/white based on daylight)
-    vec3 fog_color = vec3(daylight * 0.5 + 0.5);
+    // Apply fog with sky blue color that matches the background
+    vec3 fog_color = vec3(0.53, 0.81, 0.92) * (daylight * 0.4 + 0.6);
     color = mix(color, fog_color, fog_factor);
     fragColor = vec4(color, 1.0);
 

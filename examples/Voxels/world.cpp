@@ -2198,10 +2198,10 @@ void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t 
         matrix, width, height,
         0, 0, 0, s->rx, s->ry, m_model.fov, 0, RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
-    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SKY));
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sky);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SKY));
+    glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
     sdl_gl_helper::draw_triangles_3d(attrib, buffer, 512 * 3);
 }
