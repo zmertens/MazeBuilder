@@ -5,6 +5,7 @@
 
 #include "craft.h"
 
+#include <algorithm>
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
@@ -82,7 +83,8 @@ struct craft::craft_impl
         {
             explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
                              , texture_manager& textures, player& p, sdl_gl_helper& sdl)
-                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p}, m_sdl{&sdl}
+                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p},
+                  m_sdl{&sdl}
             {
             }
 
@@ -448,11 +450,11 @@ struct craft::craft_impl
                     "shaders/line_vertex.glsl",
                     "shaders/line_fragment.glsl"
                 },
-{
-    ShaderIdentifier::SKY_SHADER,
-    "shaders/sky_vertex.glsl",
-    "shaders/sky_fragment.glsl"
-},
+                {
+                    ShaderIdentifier::SKY_SHADER,
+                    "shaders/sky_vertex.glsl",
+                    "shaders/sky_fragment.glsl"
+                },
                 {
                     ShaderIdentifier::TEXT_SHADER,
                     "shaders/text_vertex.glsl",
@@ -470,6 +472,11 @@ struct craft::craft_impl
                     ShaderIdentifier::LINE_SHADER,
                     "shaders/es/line_vertex.es.glsl",
                     "shaders/es/line_fragment.es.glsl"
+                },
+                {
+                    ShaderIdentifier::SKY_SHADER,
+                    "shaders/es/sky_vertex.es.glsl",
+                    "shaders/es/sky_fragment.es.glsl"
                 },
                 {
                     ShaderIdentifier::TEXT_SHADER,
@@ -505,17 +512,24 @@ struct craft::craft_impl
             textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
             textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
-                static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
+                           static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
 
+            const std::vector<std::string_view> font_names = {
+                "Cousine Regular",
+                "Limelight Regular",
+                "Nunito Sans"
+            };
 
 #if defined(MAZE_DEBUG)
 
-            SDL_Log("Loaded fonts\nCousine Regular\nLimelight Regular\nNunito Sans\n");
+            std::ranges::for_each(font_names, [](const auto& name)
+            {
+                SDL_Log("Loaded font: %s\n", name.data());
+            });
 
-            SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n", atlas_path.data(),
-                    bitmap_font_path.data(), window_icon_path.data(), signs_path.data());
-            // TODO: print shaders
+            SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n%s\n", atlas_path.data(),
+                    bitmap_font_path.data(), window_icon_path.data(), signs_path.data(), sky_path.data());
 #endif
         } // load_resources
 
@@ -689,7 +703,7 @@ struct craft::craft_impl
         {
             if (m_should_close)
             {
-                SDL_Log("Menu: Quit button clicked - clearing stack\n");
+                SDL_Log("Menu: Close button clicked - popping menu state\n");
                 request_stack_pop();
             }
 
@@ -700,7 +714,7 @@ struct craft::craft_impl
         {
             if (SDL_EVENT_QUIT == event.type)
             {
-                SDL_Log("Menu: Received SDL_QUIT event - popping menu state\n");
+                SDL_Log("Menu: Received SDL_QUIT event - clearing states\n");
                 get_context().m_player->set_active(false);
                 request_stack_clear();
                 return false;
@@ -1016,7 +1030,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 
 std::string craft::artifacts() const noexcept
 {
-    return "";
+    return "hello world";
 }
 
 void craft::show_download_button(bool show) const noexcept

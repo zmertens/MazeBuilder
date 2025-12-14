@@ -93,9 +93,6 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
         return false;
     }
 
-    SDL_Log("Loaded texture %s: %dx%d, %d channels (forced to RGBA)",
-            filepath.data(), width, height, n);
-
     glGenTextures(1, &m_texture);
     glActiveTexture(GL_TEXTURE0 + channel_offset);
     glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -127,7 +124,6 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
 
     stbi_image_free(data);
 
-    SDL_Log("Successfully created OpenGL texture %u for %s", m_texture, filepath.data());
     return true;
 }
 
@@ -156,7 +152,6 @@ bool texture::load_target(const int w, const int h) noexcept
         return false;
     }
 
-    SDL_Log("Created render target texture %u: %dx%d", m_texture, w, h);
     return true;
 }
 

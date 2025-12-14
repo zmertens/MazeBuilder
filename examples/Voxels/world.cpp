@@ -314,6 +314,8 @@ void world::init() noexcept
     m_model.is_ortho = false;
     m_model.fov = 65.0f;
     m_model.day_length = DAY_LENGTH;
+    m_model.start_time = DAY_LENGTH / 2 * 1000; // Start at midday (multiply by 1000 for milliseconds)
+    m_model.start_ticks = SDL_GetTicks();
 
     // Set up OpenGL state (critical for rendering)
     glEnable(GL_CULL_FACE);

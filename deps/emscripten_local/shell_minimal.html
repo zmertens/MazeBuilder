@@ -111,9 +111,9 @@
         <div class="emscripten" id="status">Downloading...</div>
 
         <span id='controls'>
-            <span><input type="checkbox" id="resize">Resize canvas</span>
+            <span><input type="checkbox" id="resize" checked>Resize canvas</span>
             <span><input type="checkbox" id="pointerLock" checked>Lock/hide mouse pointer &nbsp;&nbsp;&nbsp;</span>
-            <span><input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked, 
+            <span><input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked,
                                                                                       document.getElementById('resize').checked)">
             </span>
         </span>
@@ -148,7 +148,7 @@
                 e.preventDefault();
             }, false);
 
-            var Module = {
+            const Module = {
                 print(...args) {
                     console.log(...args);
                     // These replacements are necessary if you render to raw HTML
@@ -166,17 +166,19 @@
                 requestFullscreen(lockPointer, resizeCanvas) {
                     // Browser compatibility for requestFullscreen
                     var canvas = Module.canvas;
+
                     function fullscreenChange() {
                         if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
-                            canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock || canvas.msRequestPointerLock || function(){};
+                            canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock || canvas.msRequestPointerLock || function () {
+                            };
                             if (lockPointer) canvas.requestPointerLock();
                         }
                     }
-                    
+
                     document.addEventListener('fullscreenchange', fullscreenChange, false);
                     document.addEventListener('webkitfullscreenchange', fullscreenChange, false);
                     document.addEventListener('mozfullscreenchange', fullscreenChange, false);
-                    
+
                     if (canvas.requestFullscreen) {
                         canvas.requestFullscreen();
                     } else if (canvas.webkitRequestFullscreen) {
@@ -188,7 +190,7 @@
                     }
                 },
                 setStatus(text) {
-                    if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+                    if (!Module.setStatus.last) Module.setStatus.last = {time: Date.now(), text: ''};
                     if (text === Module.setStatus.last.text) return;
                     var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
                     var now = Date.now();
@@ -198,8 +200,8 @@
                     Module.setStatus.last.text = text;
                     if (m) {
                         text = m[1];
-                        progressElement.value = parseInt(m[2])*100;
-                        progressElement.max = parseInt(m[4])*100;
+                        progressElement.value = parseInt(m[2]) * 100;
+                        progressElement.max = parseInt(m[4]) * 100;
                         progressElement.hidden = false;
                         spinnerElement.hidden = false;
                     } else {
@@ -213,7 +215,30 @@
                 totalDependencies: 0,
                 monitorRunDependencies(left) {
                     this.totalDependencies = Math.max(this.totalDependencies, left);
-                    Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies-left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+                    Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+                },
+                onRuntimeInitialized() {
+                    // Force a resize event to ensure canvas sizes correctly on initial load
+                    window.dispatchEvent(new Event('resize'));
+
+                    // Call the exported C++ functions via Embind
+                    // Note: Module.get() returns an instance, then we can call artifacts() on it
+                    try {
+                        console.log('Calling Module.get()...');
+                        const inst = Module.get();
+                        console.log('Instance retrieved:', inst);
+
+                        console.log('Calling artifacts()...');
+                        const result = inst.artifacts();
+                        console.log('Artifacts result:', result);
+
+                        // Print the string result to the output textarea
+                        Module.print('=== Artifacts Result ===');
+                        Module.print(result);
+                    } catch (e) {
+                        console.error('Error calling Module methods:', e);
+                        Module.print('Error: ' + e.message);
+                    }
                 }
             };
             Module.setStatus('Downloading...');
