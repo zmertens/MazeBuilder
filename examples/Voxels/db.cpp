@@ -6,6 +6,8 @@
 
 #include <sqlite/sqlite3.h>
 
+#include <SDL3/SDL.h>
+
 #include <condition_variable>
 #include <mutex>
 #include <string>
@@ -251,7 +253,7 @@ void db_insert_blocks(const std::vector<std::tuple<int, int, int, int, int, int>
     }
     mtx.lock();
     int* blocks_array = new int[blocks.size() * 6];
-    memcpy(blocks_array, blocks.data(), blocks.size() * 6 * sizeof(int));
+    SDL_memcpy(blocks_array, blocks.data(), blocks.size() * 6 * sizeof(int));
     ring_put_blocks(&ring, blocks_array);
     cnd.notify_one();
     mtx.unlock();
@@ -482,5 +484,5 @@ int db_worker_run(void *arg) {
                 break;
         }
     }
-    return 0;
+    return running;
 }
