@@ -1,6 +1,7 @@
 #ifndef TEXTURE_H
 #define TEXTURE_H
 
+#include <cstdint>
 #include <string_view>
 
 struct SDL_Window;
