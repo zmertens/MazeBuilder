@@ -25,7 +25,11 @@ shader &shader::operator=(shader &&other) noexcept
 
 shader::~shader() noexcept
 {
-
+    if (m_program)
+    {
+        glDeleteProgram(m_program);
+        m_program = 0;
+    }
 }
 
 std::uint32_t shader::make_shader(const std::string_view sources, std::string_view path)
