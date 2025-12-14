@@ -106,9 +106,6 @@ private:
     int collide(int height, float* x, float* y, float* z) const noexcept;
     [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) noexcept;
 
-    static int _gen_sign_buffer(float* data, float x, float y, float z, int face, std::string_view text) noexcept;
-    static void gen_sign_buffer(scene_node* chunk) noexcept;
-
     bool has_lights(const scene_node* chunk) const noexcept;
 
     void dirty_chunk(scene_node* chunk) const noexcept;
@@ -120,14 +117,14 @@ private:
 
     static void compute_chunk(worker_item* item) noexcept;
 
-    void generate_chunk(scene_node* chunk, worker_item* item) const noexcept;
+    static void generate_chunk(scene_node* chunk, const worker_item* item) noexcept;
     void gen_chunk_buffer(scene_node* chunk) const noexcept;
 
     static void map_set_func(int x, int y, int z, int w, Map* m) noexcept;
 
-    void load_chunk(worker_item* item) const noexcept;
-    void init_chunk(scene_node* chunk, int p, int q) const noexcept;
-    void create_chunk(scene_node* chunk, int p, int q) const noexcept;
+    static void load_chunk(const worker_item* item) noexcept;
+    void init_chunk(scene_node* chunk, int p, int q) noexcept;
+    void create_chunk(scene_node* chunk, int p, int q) noexcept;
     void delete_chunks() noexcept;
     void delete_all_chunks() noexcept;
     void force_chunks(player* player) noexcept;
@@ -149,11 +146,11 @@ private:
     [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
     void builder_block(int x, int y, int z, int w) const noexcept;
 
-    int render_chunks(const sdl_gl_helper::attrib* attrib, player* _player, uint32_t texture) const noexcept;
-    void render_signs(const sdl_gl_helper::attrib* attrib, const player* _player, std::uint32_t sign) const noexcept;
-    void render_sign(const sdl_gl_helper::attrib* attrib, player* _player, std::uint32_t sign) const noexcept;
-    void render_players(const sdl_gl_helper::attrib* attrib, player* _player) const noexcept;
-    void render_wireframe(const sdl_gl_helper::attrib* attrib, const player* _player) const noexcept;
+    int render_chunks(const sdl_gl_helper::attrib* attrib, uint32_t texture) const noexcept;
+    void render_signs(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
+    void render_sign(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
+    void render_players(const sdl_gl_helper::attrib* attrib) const noexcept;
+    void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;

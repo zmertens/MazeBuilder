@@ -17,6 +17,7 @@ enum class PlayerAction
     MOVE_DOWN,
     JUMP,
     FLY,
+    TAG_SIGN,
     BUILD_BLOCK,
     DESTROY_BLOCK,
     PLACE_LIGHT,
@@ -85,6 +86,7 @@ private:
     void on_left_click() const noexcept;
     void on_right_click() const noexcept;
     void on_middle_click() noexcept;
+    void on_tag_sign() const noexcept;
 
     std::map<std::uint32_t, PlayerAction> m_key_binding;
 

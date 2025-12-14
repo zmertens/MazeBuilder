@@ -30,6 +30,7 @@ player::player()
     m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
     m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
     m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
+    m_key_binding[SDL_SCANCODE_T] = PlayerAction::TAG_SIGN;
     m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
     m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;
     m_key_binding[SDL_SCANCODE_RSHIFT] = PlayerAction::MOVE_UP;
@@ -357,6 +358,15 @@ void player::initialize_actions()
             }
         });
 
+    m_action_binding[PlayerAction::TAG_SIGN].action = derived_action<player>(
+        [this](player& p, float dt)
+        {
+            if (m_world)
+            {
+                on_tag_sign();
+            }
+        });
+
     m_action_binding[PlayerAction::MOVE_DOWN].action = derived_action<player>(
         [](player& p, float dt)
         {
@@ -500,4 +510,14 @@ void player::on_middle_click() noexcept
         }
     }
 }
+
+void player::on_tag_sign() const noexcept
+{
+    int hx, hy, hz, face;
+    if (auto result = m_world->hit_test_face(&hx, &hy, &hz, &face))
+    {
+        m_world->set_sign(hx, hy, hz, face, "words");
+    }
+}
+
 

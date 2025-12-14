@@ -12,6 +12,7 @@
 #include "player.h"
 #include "scene_node.h"
 #include "shader.h"
+#include "sign.h"
 
 bool sdl_gl_helper::initialize(std::string_view title, int width, int height) noexcept
 {
@@ -293,9 +294,9 @@ std::uint32_t sdl_gl_helper::gen_plant_buffer(const float x, const float y, cons
 std::uint32_t sdl_gl_helper::gen_player_buffer(const float x, const float y, const float z, const float rx,
                                        const float ry) noexcept
 {
-    GLfloat* data = sdl_gl_helper::malloc_faces(10, 6);
+    GLfloat* data = malloc_faces(10, 6);
     make_player(data, x, y, z, rx, ry);
-    return sdl_gl_helper::gen_faces(10, 6, data);
+    return gen_faces(10, 6, data);
 }
 
 std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float n, const std::string_view text) noexcept
@@ -308,6 +309,192 @@ std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float
         x += n;
     }
     return gen_faces(4, length, data);
+}
+
+int sdl_gl_helper::_gen_sign_buffer(float* data, const float x, const float y, const float z,
+    const int face, const std::string_view text) noexcept
+{
+    auto tokenize = [](char* str, const char* delim, char** key)-> char*
+    {
+        if (str == nullptr)
+        {
+            str = *key;
+        }
+        str += strspn(str, delim);
+        if (*str == '\0')
+        {
+            return nullptr;
+        }
+        char* result = str;
+        str += strcspn(str, delim);
+        if (*str)
+        {
+            *str++ = '\0';
+        }
+        *key = str;
+        return result;
+    };
+
+    auto char_width = [](const char input)
+    {
+        static const int lookup[128] = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            4, 2, 4, 7, 6, 9, 7, 2, 3, 3, 4, 6, 3, 5, 2, 7,
+            6, 3, 6, 6, 6, 6, 6, 6, 6, 6, 2, 3, 5, 6, 5, 7,
+            8, 6, 6, 6, 6, 6, 6, 6, 6, 4, 6, 6, 5, 8, 8, 6,
+            6, 7, 6, 6, 6, 6, 8, 10, 8, 6, 6, 3, 6, 3, 6, 6,
+            4, 7, 6, 6, 6, 6, 5, 6, 6, 2, 5, 5, 2, 9, 6, 6,
+            6, 6, 6, 6, 5, 6, 6, 6, 6, 6, 6, 4, 2, 5, 7, 0
+        };
+        return lookup[input];
+    };
+
+    auto string_width = [=](const char* input)
+    {
+        int result = 0;
+        const std::size_t length = SDL_strlen(input);
+        for (int i = 0; i < length; i++)
+        {
+            result += char_width(input[i]);
+        }
+        return result;
+    };
+
+    auto wrap = [=](const char* input, const int max_width, char* output, const int max_length)
+    {
+        *output = '\0';
+        auto* str = static_cast<char*>(SDL_malloc(sizeof(char) * (strlen(input) + 1)));
+        SDL_strlcpy(str, input, SDL_strlen(input) + 1);
+        const int space_width = char_width(' ');
+        int line_number = 0;
+        char *key1, *key2;
+        char* line = tokenize(str, "\r\n", &key1);
+        while (line)
+        {
+            int line_width = 0;
+            const char* token = tokenize(line, " ", &key2);
+            while (token)
+            {
+                int token_width = string_width(token);
+                if (line_width)
+                {
+                    if (line_width + token_width > max_width)
+                    {
+                        line_width = 0;
+                        line_number++;
+                        SDL_strlcat(output, "\n", max_length - strlen(output) - 1);
+                    }
+                    else
+                    {
+                        SDL_strlcat(output, " ", max_length - strlen(output) - 1);
+                    }
+                }
+                SDL_strlcat(output, token, max_length - strlen(output) - 1);
+                line_width += token_width + space_width;
+                token = tokenize(nullptr, " ", &key2);
+            }
+            line_number++;
+            SDL_strlcat(output, "\n", max_length - strlen(output) - 1);
+            line = tokenize(nullptr, "\r\n", &key1);
+        }
+        SDL_free(str);
+        return line_number;
+    };
+
+    static constexpr int glyph_dx[8] = {0, 0, -1, 1, 1, 0, -1, 0};
+    static constexpr int glyph_dz[8] = {1, -1, 0, 0, 0, -1, 0, 1};
+    static constexpr int line_dx[8] = {0, 0, 0, 0, 0, 1, 0, -1};
+    static constexpr int line_dy[8] = {-1, -1, -1, -1, 0, 0, 0, 0};
+    static constexpr int line_dz[8] = {0, 0, 0, 0, 1, 0, -1, 0};
+    if (face < 0 || face >= 8)
+    {
+        return 0;
+    }
+    int count = 0;
+    constexpr float max_width = 64.f;
+    constexpr float line_height = 1.25f;
+    char lines[1024];
+    int rows = wrap(text.data(), static_cast<int>(max_width), lines, 1024);
+    rows = SDL_min(rows, 5);
+    const int dx = glyph_dx[face];
+    const int dz = glyph_dz[face];
+    const int ldx = line_dx[face];
+    const int ldy = line_dy[face];
+    const int ldz = line_dz[face];
+    constexpr float n = 1.0f / (max_width / 10.f);
+    float sx = x - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldx;
+    float sy = y - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldy;
+    float sz = z - n * static_cast<float>(rows - 1) * (line_height / 2.f) * ldz;
+    char* key;
+    const char* line = tokenize(lines, "\n", &key);
+    while (line)
+    {
+        const size_t length = SDL_strlen(line);
+        int line_width = string_width(line);
+        line_width = static_cast<int>(SDL_min(line_width, max_width));
+        float rx = sx - dx * line_width / max_width / 2;
+        const float ry = sy;
+        float rz = sz - dz * line_width / max_width / 2;
+        for (int i = 0; i < length; i++)
+        {
+            const int width = char_width(line[i]);
+            line_width -= width;
+            if (line_width < 0)
+            {
+                break;
+            }
+            rx += dx * width / max_width / 2;
+            rz += dz * width / max_width / 2;
+            if (line[i] != ' ')
+            {
+                make_character_3d(
+                    data + count * 30, rx, ry, rz, n / 2, face, line[i]);
+                count++;
+            }
+            rx += dx * width / max_width / 2;
+            rz += dz * width / max_width / 2;
+        }
+        sx += n * line_height * ldx;
+        sy += n * line_height * ldy;
+        sz += n * line_height * ldz;
+        line = tokenize(nullptr, "\n", &key);
+        rows--;
+        if (rows <= 0)
+        {
+            break;
+        }
+    }
+    return count;
+}
+
+void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
+{
+    const SignList* signs = &chunk->signs;
+
+    // first pass - count characters
+    std::size_t max_faces = 0;
+    for (int i = 0; i < signs->size; i++)
+    {
+        const Sign* e = signs->data + i;
+        max_faces += SDL_strlen(e->text);
+    }
+
+    // second pass - generate geometry
+    GLfloat* data = malloc_faces(5, max_faces);
+    std::size_t faces = 0;
+    for (int i = 0; i < signs->size; i++)
+    {
+        const Sign* e = signs->data + i;
+        faces += static_cast<std::size_t>(_gen_sign_buffer(data + static_cast<int>(faces) * 30,
+                                                           static_cast<float>(e->x),
+                                                           static_cast<float>(e->y),
+                                                           static_cast<float>(e->z), e->face, e->text));
+    }
+
+    del_buffer(chunk->sign_buffer);
+    chunk->sign_buffer = gen_faces(5, static_cast<GLsizei>(faces), data);
+    chunk->sign_faces = static_cast<int>(faces);
 }
 
 void sdl_gl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t buffer, const int count) noexcept
