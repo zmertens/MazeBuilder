@@ -313,8 +313,8 @@ void player::initialize_actions()
             const float target_vx = -SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
-            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
             p.pos.x += p.vel.vx * dt_seconds;
@@ -327,8 +327,8 @@ void player::initialize_actions()
             const float target_vx = SDL_sinf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
-            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
             p.pos.x += p.vel.vx * dt_seconds;
@@ -341,8 +341,8 @@ void player::initialize_actions()
             const float target_vx = -SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = -SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
-            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
             p.pos.x += p.vel.vx * dt_seconds;
@@ -355,8 +355,8 @@ void player::initialize_actions()
             const float target_vx = SDL_cosf(p.pos.rx) * max_move_speed;
             const float target_vz = SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.vel.vx = std::lerp(p.vel.vx, target_vx, acceleration);
-            p.vel.vz = std::lerp(p.vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
             p.pos.x += p.vel.vx * dt_seconds;
@@ -543,4 +543,7 @@ void player::on_tag_sign() const noexcept
     }
 }
 
-
+float player::lerp(float a, float b, float t) noexcept
+{
+    return a + t * (b - a);
+}

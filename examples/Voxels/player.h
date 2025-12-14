@@ -81,7 +81,6 @@ public:
 
 private:
     void initialize_actions();
-
     static bool is_realtime_action(PlayerAction action) noexcept;
 
     void on_light() const noexcept;
@@ -89,6 +88,8 @@ private:
     void on_right_click() const noexcept;
     void on_middle_click() noexcept;
     void on_tag_sign() const noexcept;
+
+    static float lerp(float a, float b, float t) noexcept;
 
     std::map<std::uint32_t, PlayerAction> m_key_binding;
 
