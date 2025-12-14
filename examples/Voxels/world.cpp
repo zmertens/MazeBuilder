@@ -69,13 +69,13 @@ enum class WorkerState : int
 };
 
 struct worker {
-    int index;
+    int index{};
     WorkerState state;
     std::thread thrd;
     std::mutex mtx;
     std::condition_variable cnd;
     worker_item item;
-    bool should_stop;
+    bool should_stop{};
 };
 
 static sdl_gl_helper::attrib s_block_attrib, s_line_attrib, s_text_attrib, s_sky_attrib;
@@ -318,10 +318,8 @@ void world::init() noexcept
     // Set up OpenGL state (critical for rendering)
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
-#if !defined(__EMSCRIPTEN__)
-
-    glLogicOp(GL_INVERT);
-#endif
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
@@ -359,9 +357,19 @@ void world::init() noexcept
     s_text_attrib.matrix = glGetUniformLocation(s_text_attrib.program, "matrix");
     s_text_attrib.sampler = glGetUniformLocation(s_text_attrib.program, "sampler");
     s_text_attrib.extra1 = glGetUniformLocation(s_text_attrib.program, "is_sign");
+
+    s_sky_attrib.program = m_shaders.get(ShaderIdentifier::SKY_SHADER).get();
+    s_sky_attrib.position = 0;
+    s_sky_attrib.normal = 1;
+    s_sky_attrib.uv = 2;
+    s_sky_attrib.matrix = glGetUniformLocation(s_sky_attrib.program, "matrix");
+    s_sky_attrib.sampler = glGetUniformLocation(s_sky_attrib.program, "sampler");
+    s_sky_attrib.timer = glGetUniformLocation(s_sky_attrib.program, "timer");
+
+    m_sky_buffer = sdl_gl_helper::gen_sky_buffer();
 }
 
-void world::update(float delta_time, mazes::randomizer& rng) noexcept
+void world::update(float delta_time, [[maybe_unused]] mazes::randomizer& rng) noexcept
 {
     // Process all commands in the queue
     static int update_frame = 0;
@@ -449,22 +457,16 @@ void world::draw() const noexcept
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Get texture IDs from texture manager
-    auto atlas_texture = m_textures.get(TextureIdentifier::ATLAS).get();
-    auto signs_texture = m_textures.get(TextureIdentifier::SIGNS).get();
+    const auto atlas_texture = m_textures.get(TextureIdentifier::ATLAS).get();
+    const auto signs_texture = m_textures.get(TextureIdentifier::SIGNS).get();
+    const auto sky_texture = m_textures.get(TextureIdentifier::SKY).get();
 
-    // Debug: Verify textures are loaded
-    static bool texture_logged = false;
-    if (!texture_logged) {
-        SDL_Log("Atlas texture ID: %u", atlas_texture);
-        SDL_Log("Signs texture ID: %u", signs_texture);
-        if (atlas_texture == 0) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Atlas texture not loaded!");
-        }
-        if (signs_texture == 0) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "ERROR: Signs texture not loaded!");
-        }
-        texture_logged = true;
-    }
+    // Disable culling and depth writes for sky sphere (camera is inside the sphere)
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    render_sky(&s_sky_attrib, m_sky_buffer, sky_texture);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
 
     const auto triangle_faces = render_chunks(&s_block_attrib, atlas_texture);
 
@@ -1921,8 +1923,8 @@ void world::_set_sign(const int p, const int q, const int x, const int y, const 
 
 void world::set_sign(const int x, const int y, const int z, const int face, const std::string_view text) const noexcept
 {
-    int p = chunked(static_cast<float>(x));
-    int q = chunked(static_cast<float>(z));
+    const int p = chunked(static_cast<float>(x));
+    const int q = chunked(static_cast<float>(z));
     _set_sign(p, q, x, y, z, face, text, 1);
 }
 
@@ -1943,12 +1945,10 @@ void world::toggle_light(int x, int y, int z) const noexcept
 
 void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept
 {
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
-        Map* map = &chunk->lights;
-        if (map_set(map, x, y, z, w))
+        if (Map* map = &chunk->lights; map_set(map, x, y, z, w))
         {
             dirty_chunk(chunk);
             db_insert_light(p, q, x, y, z, w);
@@ -1960,10 +1960,9 @@ void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept
     }
 }
 
-void world::_set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept
+void world::_set_block(int p, int q, int x, int y, int z, const int w, const int dirty) const noexcept
 {
-    auto chunk_opt = find_chunk(p, q);
-    if (chunk_opt.has_value())
+    if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
         Map* map = &chunk->map;
@@ -2070,7 +2069,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     // matrix.cpp -> frustum_planes
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
     glUseProgram(attrib->program);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniform3f(attrib->camera, s->x, s->y, s->z);
     glUniform1i(attrib->sampler, 0);
@@ -2091,7 +2090,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     int max_q = q + RENDER_CHUNK_RADIUS;
 
     // Use spatial hierarchy traversal with bounds culling
-    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](scene_node* chunk)
+    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](const scene_node* chunk)
     {
         // Additional distance check
         if (chunk_distance(chunk, p, q) > RENDER_CHUNK_RADIUS)
@@ -2131,10 +2130,10 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
 
     glUseProgram(attrib->program);
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glBindTexture(GL_TEXTURE_2D, sign);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, 2);
+    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glUniform1i(attrib->extra1, 1);
 
     // Calculate bounds for spatial traversal (chunks within sign render radius)
@@ -2174,10 +2173,10 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
         s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
         RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
-    glActiveTexture(GL_TEXTURE2);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glBindTexture(GL_TEXTURE_2D, sign);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, 2);
+    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glUniform1i(attrib->extra1, 1);
     char text[MAX_SIGN_LENGTH];
     SDL_strlcpy(text, "put maze here", MAX_SIGN_LENGTH);
@@ -2188,6 +2187,23 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     const GLuint buffer = sdl_gl_helper::gen_faces(5, length, data);
     sdl_gl_helper::draw_sign(attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
+}
+
+void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t buffer,
+    const std::uint32_t sky) const noexcept {
+    auto [width, height] = m_sdl->get_window_size();
+    const auto* s = &this->m_player->pos;
+    float matrix[16];
+    set_matrix_3d(
+        matrix, width, height,
+        0, 0, 0, s->rx, s->ry, m_model.fov, 0, RENDER_CHUNK_RADIUS);
+    glUseProgram(attrib->program);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SKY));
+    glBindTexture(GL_TEXTURE_2D, sky);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SKY));
+    glUniform1f(attrib->timer, time_of_day());
+    sdl_gl_helper::draw_triangles_3d(attrib, buffer, 512 * 3);
 }
 
 void world::render_players(const sdl_gl_helper::attrib* attrib) const noexcept
@@ -2250,7 +2266,7 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     float matrix[16];
     set_matrix_item(matrix, width, height, m_sdl->get_scale_factor());
     glUseProgram(attrib->program);
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     glUniform3f(attrib->camera, 0, 0, 5);
@@ -2280,7 +2296,7 @@ void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     glUniform1i(attrib->sampler, 3);
     glUniform1i(attrib->extra1, 0);
-    glActiveTexture(GL_TEXTURE3);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
     glBindTexture(GL_TEXTURE_2D, font);
     const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;

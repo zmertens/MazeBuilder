@@ -18,8 +18,12 @@ layout (location = 1) out vec4 brightColor;
 const float pi = 3.14159265;
 
 void main() {
-    vec3 color = texture(sampler, fragment_uv).rgb;
-    if (color == vec3(1.0, 0.0, 1.0)) {
+    vec4 texColor = texture(sampler, fragment_uv);
+    vec3 color = texColor.rgb;
+
+    // Discard transparent pixels (alpha < 0.5) or magenta color key (with tolerance for mipmap filtering)
+    bool is_magenta = (color.r > 0.8 && color.g < 0.2 && color.b > 0.8);
+    if (texColor.a < 0.5 || is_magenta) {
         discard;
     }
     bool cloud = color == vec3(1.0, 1.0, 1.0);
@@ -36,10 +40,11 @@ void main() {
     vec3 ambient = vec3(value * 0.3 + 0.2);
     vec3 light = ambient + light_color * df;
     color *= light * ao;
-    vec3 fog_mix = vec3(timer, fog_height, 0.0);
-    color = mix(color, vec3(0.0), fog_mix.y * fog_factor);
+    // Apply fog with a proper fog color (light gray/white based on daylight)
+    vec3 fog_color = vec3(daylight * 0.5 + 0.5);
+    color = mix(color, fog_color, fog_factor);
     fragColor = vec4(color, 1.0);
-    
+
     float brightness = dot(fragColor.rgb, vec3(0.2126, 0.7152, 0.0722));
     if (brightness > 1.0) {
         brightColor = vec4(fragColor.rgb, 1.0);

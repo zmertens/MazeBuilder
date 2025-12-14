@@ -103,7 +103,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_UP)
     {
-        // Track Left Control modifier key release
         if (event.key.scancode == SDL_SCANCODE_LCTRL)
         {
             m_is_ctrl_held = false;
@@ -113,7 +112,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     {
         if (event.button.button == SDL_BUTTON_LEFT)
         {
-            // Check if LCTRL is held for light placement
             if (m_is_ctrl_held)
             {
                 commands.push(m_action_binding[PlayerAction::PLACE_LIGHT]);
@@ -255,19 +253,18 @@ void player::set_buffer(const std::uint32_t value) noexcept
     this->m_buffer = value;
 }
 
-std::uint32_t player::get_item() const noexcept
+std::int32_t player::get_item() const noexcept
 {
-    if (this->m_item_index < item::items.size())
+    if (this->m_item_index >= 0 && this->m_item_index < item::items.size())
     {
         return item::items.at(this->m_item_index);
     }
     return -1;
 }
 
-void player::set_item(const std::uint32_t value) noexcept
+void player::set_item(const std::int32_t value) noexcept
 {
-    // Validate the value is within bounds before setting
-    if (value < item::items.size())
+    if (value >= 0 && value < item::items.size())
     {
         this->m_item_index = value;
     }

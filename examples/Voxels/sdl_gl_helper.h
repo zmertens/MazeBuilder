@@ -60,6 +60,7 @@ public:
     [[nodiscard]] static std::uint32_t gen_text_buffer(float x, float y, float n, std::string_view text) noexcept;
     static int _gen_sign_buffer(float* data, float x, float y, float z, int face, std::string_view text) noexcept;
     static void gen_sign_buffer(scene_node* chunk) noexcept;
+    static std::uint32_t gen_sky_buffer() noexcept;
 
     static void draw_triangles_3d_ao(const attrib* a, std::uint32_t buffer, int count) noexcept;
     static void draw_triangles_3d_text(const attrib* a, std::uint32_t buffer, int count) noexcept;

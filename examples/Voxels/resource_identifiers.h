@@ -5,17 +5,18 @@ enum class ShaderIdentifier : unsigned int
 {
     BLOCK_SHADER = 0,
     LINE_SHADER = 1,
-    TEXT_SHADER = 2,
-    TOTAL = 3
+    SKY_SHADER = 2,
+    TEXT_SHADER = 3,
+    TOTAL = 4
 };
 
 enum class TextureIdentifier : unsigned int
 {
     ATLAS = 0,
-    CHARACTER = 1,
-    BITMAP_FONT = 2,
-    WINDOW_ICON = 3,
-    SIGNS = 4,
+    SIGNS = 1,
+    SKY = 2,
+    BITMAP_FONT = 3,
+    WINDOW_ICON = 4,
     TOTAL = 5
 };
 

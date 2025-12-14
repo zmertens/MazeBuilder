@@ -448,6 +448,11 @@ struct craft::craft_impl
                     "shaders/line_vertex.glsl",
                     "shaders/line_fragment.glsl"
                 },
+{
+    ShaderIdentifier::SKY_SHADER,
+    "shaders/sky_vertex.glsl",
+    "shaders/sky_fragment.glsl"
+},
                 {
                     ShaderIdentifier::TEXT_SHADER,
                     "shaders/text_vertex.glsl",
@@ -487,19 +492,22 @@ struct craft::craft_impl
 #endif
             }
 
-
             // textures
             constexpr std::string_view atlas_path = "textures/atlas.png";
             constexpr std::string_view bitmap_font_path = "textures/bitmap_font.png";
             constexpr std::string_view window_icon_path = "textures/icon.bmp";
             constexpr std::string_view signs_path = "textures/signs.png";
+            constexpr std::string_view sky_path = "textures/sky.png";
 
             auto&& textures = get_context().m_textures;
 
-            textures->load(TextureIdentifier::ATLAS, atlas_path, 0);
-            textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path, 1);
+            textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
+            textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
+            textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
+            textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
+                static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
-            textures->load(TextureIdentifier::SIGNS, signs_path, 2);
+
 
 #if defined(MAZE_DEBUG)
 
@@ -912,8 +920,14 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     if constexpr (USE_DATABASE)
     {
         db_enable();
+        std::string db_file;
+#if defined(__EMSCRIPTEN__)
+        db_file = ":memory:";
+#else
+        db_file = "craft.db";
+#endif
 
-        if (const auto DB_FILE = "craft.db"; db_init(DB_FILE) != 0)
+        if (db_init(db_file.data()) != 0)
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Database initialization failed\n");
             return false;
@@ -971,16 +985,12 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     emscripten_cancel_main_loop();
 #endif
 
-    SDL_Log("Main loop ended, beginning cleanup...\n");
+    SDL_Log("Run loop ended, beginning cleanup...\n");
 
-    // Clear all states first to ensure proper destruction order
-    // This ensures world and other state resources are cleaned up before ImGui/SDL
     SDL_Log("Clearing state stack...\n");
     if (!this->m_impl->m_crafting_states->is_empty())
     {
         this->m_impl->m_crafting_states->clear_states();
-        // CRITICAL: Apply the pending CLEAR action to actually destroy states
-        // This calls editor_state destructor which properly destroys the world
         this->m_impl->m_crafting_states->apply_pending_changes();
     }
 

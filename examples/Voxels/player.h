@@ -72,8 +72,8 @@ public:
     [[nodiscard]] std::uint32_t get_buffer() const noexcept;
     void set_buffer(std::uint32_t value) noexcept;
 
-    [[nodiscard]] std::uint32_t get_item() const noexcept;
-    void set_item(std::uint32_t value) noexcept;
+    [[nodiscard]] std::int32_t get_item() const noexcept;
+    void set_item(std::int32_t value) noexcept;
 
     void set_world(world* w) noexcept;
 
@@ -100,7 +100,7 @@ private:
     std::string m_name;
     std::uint32_t m_buffer;
 
-    std::uint32_t m_item_index;
+    std::int32_t m_item_index;
 
     world* m_world;
 };

@@ -115,12 +115,7 @@ int db_init(const char *path) {
     static auto set_key_query =
         "insert or replace into key (p, q, key) "
         "values (?, ?, ?);";
-    int rc;
-#if defined(__EMSCRIPTEN__)
-    rc = sqlite3_open(":memory:", &db);
-#else
-    rc = sqlite3_open(path, &db);
-#endif
+    int rc = sqlite3_open(path, &db);
     if (rc) return rc;
     rc = sqlite3_exec(db, create_query, nullptr, nullptr, nullptr);
     if (rc) return rc;

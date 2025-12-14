@@ -20,9 +20,9 @@ public:
     shader(shader&& other) noexcept;
     shader& operator=(shader&& other) noexcept;
 
-    std::uint32_t make_shader(std::string_view sources, std::string_view path);
-    std::uint32_t load_shader(std::string_view path);
-    std::uint32_t make_program(std::uint32_t shader1, std::uint32_t shader2);
+    static std::uint32_t make_shader(std::string_view sources, std::string_view path);
+    static std::uint32_t load_shader(std::string_view path);
+    static std::uint32_t make_program(std::uint32_t shader1, std::uint32_t shader2);
     std::uint32_t load_program(std::string_view vertex_shader_path, std::string_view fragment_shader_path);
 
     [[nodiscard]] std::uint32_t get() const noexcept;

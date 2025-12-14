@@ -10,9 +10,8 @@
 
 #include <SDL3/SDL.h>
 
-shader::shader(shader &&other) noexcept
+shader::shader(shader &&other) noexcept : m_program(0)
 {
-
 }
 
 shader &shader::operator=(shader &&other) noexcept
@@ -29,7 +28,7 @@ shader::~shader() noexcept
 
 }
 
-std::uint32_t shader::make_shader(std::string_view sources, std::string_view path)
+std::uint32_t shader::make_shader(const std::string_view sources, std::string_view path)
 {
     auto convert_id_to_gl_enum = [&path]() -> GLenum
     {
@@ -109,7 +108,7 @@ std::uint32_t shader::load_shader(std::string_view path)
     return result;
 }
 
-std::uint32_t shader::make_program(std::uint32_t shader1, std::uint32_t shader2)
+std::uint32_t shader::make_program(const std::uint32_t shader1, const std::uint32_t shader2)
 {
     GLuint program = glCreateProgram();
     glAttachShader(program, shader1);
@@ -120,8 +119,8 @@ std::uint32_t shader::make_program(std::uint32_t shader1, std::uint32_t shader2)
     if (status == GL_FALSE) {
         GLint length;
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-        GLchar *info = (GLchar*) calloc(length, sizeof(GLchar));
-        glGetProgramInfoLog(program, length, NULL, info);
+        const auto info = static_cast<GLchar*>(calloc(length, sizeof(GLchar)));
+        glGetProgramInfoLog(program, length, nullptr, info);
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "glLinkProgram failed: %s\n", info);
         SDL_free(info);
     }
@@ -135,8 +134,8 @@ std::uint32_t shader::make_program(std::uint32_t shader1, std::uint32_t shader2)
 std::uint32_t shader::load_program(std::string_view vertex_shader_path, std::string_view fragment_shader_path)
 {
     const GLuint shader1 = load_shader(vertex_shader_path);
-    GLuint shader2 = load_shader(fragment_shader_path);
-    GLuint program = make_program(shader1, shader2);
+    const GLuint shader2 = load_shader(fragment_shader_path);
+    const GLuint program = make_program(shader1, shader2);
     this->m_program = program;
 
     return program;

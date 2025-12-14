@@ -497,6 +497,12 @@ void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
     chunk->sign_faces = static_cast<int>(faces);
 }
 
+std::uint32_t sdl_gl_helper::gen_sky_buffer() noexcept {
+    float data[12288];
+    make_sphere(data, 1, 3);
+    return gen_buffer(sizeof(data), data);
+}
+
 void sdl_gl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
     glBindBuffer(GL_ARRAY_BUFFER, buffer);

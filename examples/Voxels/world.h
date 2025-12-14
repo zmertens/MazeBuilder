@@ -149,6 +149,8 @@ private:
     int render_chunks(const sdl_gl_helper::attrib* attrib, uint32_t texture) const noexcept;
     void render_signs(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
     void render_sign(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
+    void render_sky(const sdl_gl_helper::attrib* attrib, std::uint32_t buffer,
+        std::uint32_t sign) const noexcept;
     void render_players(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
@@ -181,6 +183,8 @@ private:
     model m_model;
 
     std::vector<std::unique_ptr<worker>> m_workers;
+
+    std::uint32_t m_sky_buffer;
 };
 
 #endif // WORLD_H
