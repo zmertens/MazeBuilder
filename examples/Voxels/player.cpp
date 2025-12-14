@@ -10,6 +10,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <MazeBuilder/string_utils.h>
+
 #define SCROLL_THRESHOLD 0.1
 
 player::player()
@@ -274,6 +276,30 @@ void player::set_world(world* w) noexcept
 {
     m_world = w;
 }
+
+std::string_view player::get_local_time() const noexcept
+{
+    if (!m_world)
+    {
+        return "00:00";
+    }
+
+    // time_of_day() returns 0.0-1.0 representing position in the day cycle
+    const float time_fraction = m_world->time_of_day();
+    const float total_hours = time_fraction * 24.0f;
+
+    // Extract hours and minutes
+    int hour = static_cast<int>(total_hours);
+    int minute = static_cast<int>((total_hours - hour) * 60.0f);
+
+    // Convert to 12-hour format
+    const std::string_view am_pm = hour < 12 ? "am" : "pm";
+    hour = hour % 12;
+    hour = hour ? hour : 12; // Convert 0 to 12 for midnight/noon
+
+    return mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm);
+}
+
 
 void player::initialize_actions()
 {

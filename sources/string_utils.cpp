@@ -229,3 +229,11 @@ std::string string_utils::format<long long>(std::string_view format_str, const l
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
 
+template <>
+std::string string_utils::format<int, int, std::string_view>(const std::string_view format_str,
+    const int& arg1, const int& arg2,
+    const std::string_view& arg3) noexcept
+{
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2, arg3));
+}
+

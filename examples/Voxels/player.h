@@ -77,6 +77,8 @@ public:
 
     void set_world(world* w) noexcept;
 
+    std::string_view get_local_time() const noexcept;
+
 private:
     void initialize_actions();
 

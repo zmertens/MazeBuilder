@@ -486,10 +486,12 @@ void world::draw() const noexcept
     // Debug logging (can be commented out after testing)
     static int frame_count = 0;
     if (frame_count++ % 60 == 0) {
-        SDL_Log("Frame %d: Rendered %d triangle faces, player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f)",
+        SDL_Log("Frame %d: Rendered %d triangle faces, "
+                "player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f), "
+                "chunk count: %zu",
                 frame_count, triangle_faces,
                 m_player->pos.x, m_player->pos.y, m_player->pos.z,
-                m_player->pos.rx, m_player->pos.ry);
+                m_player->pos.rx, m_player->pos.ry, get_chunk_count());
     }
 #endif
 }
@@ -2051,6 +2053,12 @@ void world::builder_block(const int x, const int y, const int z, const int w) co
         set_block(x, y, z, w);
     }
 }
+
+std::size_t world::get_chunk_count() const noexcept
+{
+    return this->m_next_chunk_slot - 1;
+}
+
 
 int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
 {

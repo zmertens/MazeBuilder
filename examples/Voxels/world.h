@@ -146,6 +146,8 @@ private:
     [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
     void builder_block(int x, int y, int z, int w) const noexcept;
 
+    std::size_t get_chunk_count() const noexcept;
+
     int render_chunks(const sdl_gl_helper::attrib* attrib, uint32_t texture) const noexcept;
     void render_signs(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
     void render_sign(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;

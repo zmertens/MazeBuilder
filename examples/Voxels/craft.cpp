@@ -845,6 +845,7 @@ struct craft::craft_impl
         {
             ImGui::Text("FPS: %d", smoothed_fps);
             ImGui::Text("Frame Time: %.2f ms", smoothed_frame_time);
+            ImGui::Text("local time: %s\n", this->m_player.get_local_time().data());
             ImGui::End();
         }
     }
