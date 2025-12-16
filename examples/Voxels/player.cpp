@@ -277,7 +277,7 @@ void player::set_world(world* w) noexcept
     m_world = w;
 }
 
-std::string_view player::get_local_time() const noexcept
+std::string player::get_local_time() const noexcept
 {
     if (!m_world)
     {
@@ -297,7 +297,7 @@ std::string_view player::get_local_time() const noexcept
     hour = hour % 12;
     hour = hour ? hour : 12; // Convert 0 to 12 for midnight/noon
 
-    return mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm);
+    return std::string{ mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm) };
 }
 
 

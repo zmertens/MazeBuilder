@@ -8,8 +8,6 @@
 
 #include <SDL3/SDL.h>
 
-#include <MazeBuilder/enums.h>
-
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 

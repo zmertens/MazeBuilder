@@ -27,7 +27,7 @@ void map_alloc(Map *map, const int dx, const int dy, const int dz, const int mas
     map->dz = dz;
     map->mask = mask;
     map->size = 0;
-    map->data = static_cast<MapEntry*>(calloc(map->mask + 1, sizeof(MapEntry)));
+    map->data = static_cast<MapEntry*>(SDL_calloc(map->mask + 1, sizeof(MapEntry)));
 }
 
 void map_free(Map *map) {

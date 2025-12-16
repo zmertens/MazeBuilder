@@ -306,34 +306,7 @@ struct craft::craft_impl
             if (m_world.has_value())
             {
                 m_world->draw();
-
-                return;
             }
-
-            const auto center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
-            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(350, 150), ImGuiCond_Always);
-
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-
-            if (ImGui::Begin("Initializing", nullptr,
-                             ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
-            {
-                ImGui::Spacing();
-                const auto init_text = "Initializing World...";
-                const float text_width = ImGui::CalcTextSize(init_text).x;
-                ImGui::SetCursorPosX((ImGui::GetWindowSize().x - text_width) * 0.5f);
-                ImGui::Text("%s", init_text);
-
-                ImGui::Spacing();
-                ImGui::ProgressBar(-1.0f * static_cast<float>(ImGui::GetTime()), ImVec2(-1, 0), "");
-            }
-            ImGui::End();
-
-            ImGui::PopStyleColor(4);
         }
 
         bool update(const float delta_time, mazes::randomizer& rng) noexcept override
@@ -429,6 +402,12 @@ struct craft::craft_impl
             // fonts
             static constexpr auto FONT_PIXEL_SIZE = 28.f;
 
+            const std::vector<std::string_view> font_names = {
+                "Cousine Regular",
+                "Limelight Regular",
+                "Nunito Sans"
+            };
+
             auto&& fonts = get_context().m_fonts;
 
             fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data,
@@ -514,12 +493,6 @@ struct craft::craft_impl
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
                            static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
-
-            const std::vector<std::string_view> font_names = {
-                "Cousine Regular",
-                "Limelight Regular",
-                "Nunito Sans"
-            };
 
 #if defined(MAZE_DEBUG)
 
