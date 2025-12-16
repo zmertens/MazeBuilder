@@ -42,6 +42,16 @@ public:
         float vx, vy, vz;
     } vel{};
 
+    struct configs
+    {
+        bool fullscreen;
+        bool is_ortho;
+        float fov;
+        int day_length;
+        int start_time;
+        int start_ticks;
+    } m_configs{};
+
     explicit player();
 
     ~player() override = default;

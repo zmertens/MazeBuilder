@@ -11,7 +11,7 @@ enum class Entity : unsigned int
     PICKUP = 1 << 4,
     CHUNK = 1 << 5,
     SPATIAL = 1 << 6,
-    ALL = 1 << 6
+    ALL = 1 << 7
 };
 
 #endif // ENTITY_H

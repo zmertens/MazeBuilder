@@ -19,10 +19,6 @@ struct worker;
 struct worker_item;
 union SDL_Event;
 
-std::string gl_error_checker(const char* file, int line) noexcept;
-
-#define CHECK_GL_ERR() gl_error_checker(__FILE__, __LINE__)
-
 using world_func = std::function<void(int, int, int, int, Map*)>;
 
 class attrib;
@@ -75,14 +71,6 @@ private:
                                      const std::function<void(scene_node*)>& callback) const noexcept;
     void insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept;
     void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
-
-    struct model {
-        bool is_ortho;
-        float fov;
-        int day_length;
-        int start_time;
-        int start_ticks;
-    };
 
     bool worker_run(worker* w) const noexcept;
     void init_worker_threads() noexcept;
@@ -181,8 +169,6 @@ private:
 
     command_queue m_command_queue;
     player* m_player;
-
-    model m_model;
 
     std::vector<std::unique_ptr<worker>> m_workers;
 

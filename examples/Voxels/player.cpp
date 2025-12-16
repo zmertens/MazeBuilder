@@ -12,7 +12,7 @@
 
 #include <MazeBuilder/string_utils.h>
 
-#define SCROLL_THRESHOLD 0.1
+constexpr auto SCROLL_THRESHOLD = 0.1f;
 
 player::player()
     : scene_node{}

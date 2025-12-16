@@ -88,18 +88,20 @@ std::string gl_error_checker(const char* file, const int line) noexcept
     {
         switch (error_code)
         {
-        case GL_INVALID_ENUM: error_str += "INVALID_ENUM";
-        case GL_INVALID_VALUE: error_str += "INVALID_VALUE";
-        case GL_INVALID_OPERATION: error_str += "INVALID_OPERATION";
-        case GL_OUT_OF_MEMORY: error_str += "OUT_OF_MEMORY";
-        case GL_INVALID_FRAMEBUFFER_OPERATION: error_str += "INVALID_FRAMEBUFFER_OPERATION";
-        default: ;
+        case GL_INVALID_ENUM: { error_str += "INVALID_ENUM"; break; }
+        case GL_INVALID_VALUE: { error_str += "INVALID_VALUE"; break; }
+        case GL_INVALID_OPERATION: { error_str += "INVALID_OPERATION"; break; }
+        case GL_OUT_OF_MEMORY: { error_str += "OUT_OF_MEMORY"; break; }
+        case GL_INVALID_FRAMEBUFFER_OPERATION: { error_str += "INVALID_FRAMEBUFFER_OPERATION"; break; }
+        default: break;
         }
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
                      "OpenGL ERROR: %s\n\t\tFILE: %s, LINE: %d\n", error_str.c_str(), file, line);
     }
     return error_code == GL_NO_ERROR ? "" : error_str;
 }
+
+#define CHECK_GL_ERR() gl_error_checker(__FILE__, __LINE__)
 
 world::world(SDL_Window* window, font_manager& fonts,
         player* p,
@@ -111,10 +113,10 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_shaders{shaders}
       , m_textures{textures}
       , m_scene_layers{}
-      , m_next_chunk_slot{1}  // Start at 1 since index 0 is reserved for root layer node
+      , m_next_chunk_slot{1}
       , m_command_queue{}
       , m_player{p}
-      , m_model{}
+      , m_sky_buffer{ 0 }
 {
     // Set bidirectional reference between player and world
     if (m_player)
@@ -125,6 +127,10 @@ world::world(SDL_Window* window, font_manager& fonts,
 
 world::~world()
 {
+    if (m_player)
+    {
+        m_player->set_world(nullptr);
+    }
     destroy_world();
 }
 
@@ -223,9 +229,7 @@ void world::remove_chunk_from_spatial_tree(scene_node* chunk) noexcept
         return;
     }
 
-    // Remove from parent's children list
-    auto& siblings = chunk->parent->children;
-    siblings.erase(std::remove(siblings.begin(), siblings.end(), chunk), siblings.end());
+    std::erase(chunk->parent->children, chunk);
 
     chunk->parent = nullptr;
 }
@@ -248,7 +252,8 @@ void world::traverse_chunks(const std::function<void(scene_node*)>& callback) co
         }
 
         // If this is a chunk, call the callback
-        if (node->get_category() == Entity::CHUNK)
+        if ((static_cast<int>(node->get_category())
+            & static_cast<int>(Entity::CHUNK)) != 0)
         {
             callback(node);
         }
@@ -294,7 +299,8 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
         }
 
         // If this is a chunk and it intersects, call the callback
-        if (node->get_category() == Entity::CHUNK)
+        if ((static_cast<int>(node->get_category())
+            & static_cast<int>(Entity::CHUNK)) != 0)
         {
             callback(node);
         }
@@ -311,13 +317,12 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
 
 void world::init() noexcept
 {
-    m_model.is_ortho = false;
-    m_model.fov = 65.0f;
-    m_model.day_length = DAY_LENGTH;
-    m_model.start_time = DAY_LENGTH / 2 * 1000; // Start at midday (multiply by 1000 for milliseconds)
-    m_model.start_ticks = SDL_GetTicks();
-
-    // Set up OpenGL state (critical for rendering)
+    m_player->m_configs.is_ortho = false;
+    m_player->m_configs.fov = 65.0f;
+    m_player->m_configs.day_length = DAY_LENGTH;
+    m_player->m_configs.start_time = DAY_LENGTH / 2 * 1000;
+    m_player->m_configs.start_ticks = SDL_GetTicks();
+    
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -325,7 +330,6 @@ void world::init() noexcept
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
-    // Build scene graph and initialize chunks
     build_scene();
 
     init_worker_threads();
@@ -333,7 +337,6 @@ void world::init() noexcept
     // Force create initial chunks around player
     force_chunks(m_player);
 
-    // Set player Y position to proper height above terrain
     m_player->pos.y = static_cast<float>(highest_block(m_player->pos.x, m_player->pos.z) + 2);
 
     s_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
@@ -694,18 +697,17 @@ int world::chunked(const float x) noexcept
 
 double world::get_time() const noexcept
 {
-    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(m_model.start_time) - static_cast<double>(m_model.
-        start_ticks)) / 1000.0;
+    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(m_player->m_configs.start_time) - static_cast<double>(m_player->m_configs.start_ticks)) / 1000.0;
 }
 
 float world::time_of_day() const noexcept
 {
-    if (m_model.day_length <= 0)
+    if (m_player->m_configs.day_length <= 0)
     {
         return 0.5f;
     }
     auto t = static_cast<float>(get_time());
-    t /= static_cast<float>(m_model.day_length);
+    t /= static_cast<float>(m_player->m_configs.day_length);
     t -= static_cast<float>(static_cast<int>(t));
     return t;
 }
@@ -765,7 +767,7 @@ int world::chunk_visible(float planes[6][4], const int p, const int q, const int
         {x + 0.f, maxy_f, z + d},
         {x + d, maxy_f, z + d}
     };
-    const int n = this->m_model.is_ortho ? 4 : 6;
+    const int n = m_player->m_configs.is_ortho ? 4 : 6;
     for (int i = 0; i < n; i++)
     {
         int in = 0;
@@ -1733,7 +1735,9 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
     player::position* s = &_player->pos;
     float matrix[16];
     set_matrix_3d(matrix, width, height,
-                  s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+                  s->x, s->y, s->z, s->rx, s->ry,
+                  m_player->m_configs.fov,
+                  m_player->m_configs.is_ortho,
                   RENDER_CHUNK_RADIUS);
     float planes[6][4];
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
@@ -2040,7 +2044,7 @@ int world::get_block(const int x, const int y, const int z) const noexcept
 
 void world::builder_block(const int x, const int y, const int z, const int w) const noexcept
 {
-    if (y <= 0 || y >= 256)
+    if (y <= 0 || y >= item::TOTAL_BLOCKS)
     {
         return;
     }
@@ -2072,7 +2076,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     // matrix.cpp -> set_matrix_3d
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
         RENDER_CHUNK_RADIUS);
 
     float planes[6][4];
@@ -2085,7 +2089,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->extra2, light);
     glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
-    glUniform1i(attrib->extra4, static_cast<int>(m_model.is_ortho));
+    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.is_ortho));
     glUniform1f(attrib->timer, time_of_day());
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
 
@@ -2134,7 +2138,7 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
         RENDER_CHUNK_RADIUS);
     float planes[6][4];
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
@@ -2180,7 +2184,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
         RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
@@ -2206,7 +2210,7 @@ void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t 
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        0, 0, 0, s->rx, s->ry, m_model.fov, 0, RENDER_CHUNK_RADIUS);
+        0, 0, 0, s->rx, s->ry, m_player->m_configs.fov, 0, RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, sky);
@@ -2223,7 +2227,7 @@ void world::render_players(const sdl_gl_helper::attrib* attrib) const noexcept
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
         RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
@@ -2241,7 +2245,7 @@ void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_model.fov, m_model.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
         RENDER_CHUNK_RADIUS);
     int hx, hy, hz;
     if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
