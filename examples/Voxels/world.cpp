@@ -2347,17 +2347,11 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Get world coordinates (center of the block)
-    float world_x = static_cast<float>(plane.target_x);
-    float world_y = static_cast<float>(plane.target_y);
-    float world_z = static_cast<float>(plane.target_z);
-    int face = plane.target_face;
-
-    // Clamp face index to 0-5 range (top face can be 4-7, map all to 4)
-    if (face > 5)
-    {
-        face = 4;  // Map all top face rotations to index 4
-    }
+    // Get world coordinates of the targeted block's corner (not center)
+    // We'll always render on the TOP face regardless of which face was hit
+    const float world_x = static_cast<float>(plane.target_x);
+    const float world_y = static_cast<float>(plane.target_y);
+    const float world_z = static_cast<float>(plane.target_z);
 
     // Get maze texture dimensions from player
     const float tex_width = static_cast<float>(m_player->m_configs.maze_texture_width);
@@ -2368,99 +2362,60 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     constexpr float pixel_to_block_scale = 1.0f / 32.0f;
     const float plane_width = tex_width * pixel_to_block_scale;
     const float plane_height = tex_height * pixel_to_block_scale;
-    const float half_width = plane_width * 0.5f;
-    const float half_height = plane_height * 0.5f;
 
-    // Offset from block face - float the plane slightly in front (0.1 blocks)
-    constexpr float offset_distance = 0.1f;
-
-    // Face normals - used for offsetting the plane away from the face
-    static const float face_normals[6][3] = {
-        {-1, 0, 0}, {+1, 0, 0}, {0, 0, -1}, {0, 0, +1}, {0, +1, 0}, {0, -1, 0}
-    };
+    // Offset from block top face - float the plane slightly above (0.05 blocks)
+    constexpr float offset_distance = 0.05f;
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, plane.texture_id);
     glUniform1i(attrib->sampler, 0);
 
-    // Debug: Log plane details (only once per face change to avoid spam)
-    static int last_logged_face = -1;
+    // Debug: Log plane details (only once per position change to avoid spam)
     static int last_logged_x = -9999;
     static int last_logged_z = -9999;
     bool position_changed = (plane.target_x != last_logged_x || plane.target_z != last_logged_z);
 
-    if (face != last_logged_face || position_changed)
+    if (position_changed)
     {
-        SDL_Log("Floating plane: face=%d, block=(%d,%d,%d), tex=%dx%d, plane_size=%.2fx%.2f blocks",
-                face, plane.target_x, plane.target_y, plane.target_z,
+        SDL_Log("Maze plane on TOP of block (%d,%d,%d), tex=%dx%d, plane_size=%.2fx%.2f blocks",
+                plane.target_x, plane.target_y, plane.target_z,
                 m_player->m_configs.maze_texture_width, m_player->m_configs.maze_texture_height,
                 plane_width, plane_height);
-        last_logged_face = face;
         last_logged_x = plane.target_x;
         last_logged_z = plane.target_z;
     }
 
-    // Build floating plane geometry based on face orientation
+    // Build floating plane geometry - ALWAYS on top face, corner-aligned
     float quad_data[6 * 10];  // 6 vertices * 10 floats per vertex
     float* d = quad_data;
 
-    // Calculate the center position of the plane (offset from block center)
-    float center_x = world_x + face_normals[face][0] * offset_distance;
-    float center_y = world_y + face_normals[face][1] * offset_distance;
-    float center_z = world_z + face_normals[face][2] * offset_distance;
+    // Position plane on TOP of the block (+Y face), corner-aligned
+    // Block extends from (x, y, z) to (x+1, y+1, z+1)
+    // Top face is at y+1, we offset slightly above it
+    const float base_x = world_x;
+    const float base_y = world_y + 1.0f + offset_distance;
+    const float base_z = world_z;
 
-    // Define plane vertices based on face orientation
-    // We'll create a plane that's properly oriented to face the camera
+    // Define plane vertices for top face (parallel to XZ plane)
+    // Corner-aligned: plane starts at block corner and extends by plane_width/plane_height
+    // Note: plane_height is used for Z dimension since texture height maps to depth
     float vertices[4][3];
+    vertices[0][0] = 0.0f;         vertices[0][1] = 0.0f; vertices[0][2] = 0.0f;           // Near-left corner (block corner)
+    vertices[1][0] = plane_width;  vertices[1][1] = 0.0f; vertices[1][2] = 0.0f;           // Near-right
+    vertices[2][0] = plane_width;  vertices[2][1] = 0.0f; vertices[2][2] = plane_height;   // Far-right
+    vertices[3][0] = 0.0f;         vertices[3][1] = 0.0f; vertices[3][2] = plane_height;   // Far-left
 
-    switch (face)
-    {
-        case 0: // Left (-X) - plane parallel to YZ
-            vertices[0][0] = 0; vertices[0][1] = -half_height; vertices[0][2] = -half_width;  // BL
-            vertices[1][0] = 0; vertices[1][1] = -half_height; vertices[1][2] = +half_width;  // BR
-            vertices[2][0] = 0; vertices[2][1] = +half_height; vertices[2][2] = +half_width;  // TR
-            vertices[3][0] = 0; vertices[3][1] = +half_height; vertices[3][2] = -half_width;  // TL
-            break;
-        case 1: // Right (+X) - plane parallel to YZ
-            vertices[0][0] = 0; vertices[0][1] = -half_height; vertices[0][2] = +half_width;  // BL
-            vertices[1][0] = 0; vertices[1][1] = -half_height; vertices[1][2] = -half_width;  // BR
-            vertices[2][0] = 0; vertices[2][1] = +half_height; vertices[2][2] = -half_width;  // TR
-            vertices[3][0] = 0; vertices[3][1] = +half_height; vertices[3][2] = +half_width;  // TL
-            break;
-        case 2: // Front (-Z) - plane parallel to XY
-            vertices[0][0] = -half_width;  vertices[0][1] = -half_height; vertices[0][2] = 0;  // BL
-            vertices[1][0] = +half_width;  vertices[1][1] = -half_height; vertices[1][2] = 0;  // BR
-            vertices[2][0] = +half_width;  vertices[2][1] = +half_height; vertices[2][2] = 0;  // TR
-            vertices[3][0] = -half_width;  vertices[3][1] = +half_height; vertices[3][2] = 0;  // TL
-            break;
-        case 3: // Back (+Z) - plane parallel to XY
-            vertices[0][0] = +half_width;  vertices[0][1] = -half_height; vertices[0][2] = 0;  // BL
-            vertices[1][0] = -half_width;  vertices[1][1] = -half_height; vertices[1][2] = 0;  // BR
-            vertices[2][0] = -half_width;  vertices[2][1] = +half_height; vertices[2][2] = 0;  // TR
-            vertices[3][0] = +half_width;  vertices[3][1] = +half_height; vertices[3][2] = 0;  // TL
-            break;
-        case 4: // Top (+Y) - plane parallel to XZ
-            vertices[0][0] = -half_width;  vertices[0][1] = 0; vertices[0][2] = -half_height;  // BL
-            vertices[1][0] = +half_width;  vertices[1][1] = 0; vertices[1][2] = -half_height;  // BR
-            vertices[2][0] = +half_width;  vertices[2][1] = 0; vertices[2][2] = +half_height;  // TR
-            vertices[3][0] = -half_width;  vertices[3][1] = 0; vertices[3][2] = +half_height;  // TL
-            break;
-        case 5: // Bottom (-Y) - plane parallel to XZ
-            vertices[0][0] = -half_width;  vertices[0][1] = 0; vertices[0][2] = +half_height;  // BL
-            vertices[1][0] = +half_width;  vertices[1][1] = 0; vertices[1][2] = +half_height;  // BR
-            vertices[2][0] = +half_width;  vertices[2][1] = 0; vertices[2][2] = -half_height;  // TR
-            vertices[3][0] = -half_width;  vertices[3][1] = 0; vertices[3][2] = -half_height;  // TL
-            break;
-    }
-
-    // Standard UV coordinates (same for all faces now since plane is oriented correctly)
+    // UV coordinates for top face (V flipped for OpenGL texture coordinate system)
     static const float uvs[4][2] = {
-        {0.0f, 1.0f},  // BL (V flipped for OpenGL)
-        {1.0f, 1.0f},  // BR
-        {1.0f, 0.0f},  // TR
-        {0.0f, 0.0f}   // TL
+        {0.0f, 1.0f},  // Near-left (V flipped)
+        {1.0f, 1.0f},  // Near-right
+        {1.0f, 0.0f},  // Far-right
+        {0.0f, 0.0f}   // Far-left
     };
+
+    // Top face normal (points up in +Y direction)
+    static const float top_normal[3] = {0.0f, 1.0f, 0.0f};
 
     // Triangle indices: 0,1,2 and 0,2,3 form the quad
     static const int indices[6] = {0, 1, 2, 0, 2, 3};
@@ -2469,15 +2424,15 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     {
         int vert_idx = indices[i];
 
-        // Position - world space position of the floating plane
-        *(d++) = center_x + vertices[vert_idx][0];
-        *(d++) = center_y + vertices[vert_idx][1];
-        *(d++) = center_z + vertices[vert_idx][2];
+        // Position - world space position from block corner
+        *(d++) = base_x + vertices[vert_idx][0];
+        *(d++) = base_y + vertices[vert_idx][1];
+        *(d++) = base_z + vertices[vert_idx][2];
 
-        // Normal (points outward from face)
-        *(d++) = face_normals[face][0];
-        *(d++) = face_normals[face][1];
-        *(d++) = face_normals[face][2];
+        // Normal (points upward)
+        *(d++) = top_normal[0];
+        *(d++) = top_normal[1];
+        *(d++) = top_normal[2];
 
         // UV coordinates
         *(d++) = uvs[vert_idx][0];  // U
