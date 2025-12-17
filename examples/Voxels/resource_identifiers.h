@@ -24,7 +24,8 @@ enum class FontIdentifier : unsigned int
 {
     COUSINE_REGULAR = 0,
     LIMELIGHT = 1,
-    NUNITO_SANS = 2
+    NUNITO_SANS = 2,
+    TOTAL = 3
 };
 
 class font;

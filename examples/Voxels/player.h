@@ -5,6 +5,8 @@
 #include <map>
 #include <string>
 
+#include <MazeBuilder/configurator.h>
+
 #include "command.h"
 
 enum class PlayerAction
@@ -44,12 +46,19 @@ public:
 
     struct configs
     {
-        bool fullscreen;
-        bool is_ortho;
-        float fov;
-        int day_length;
-        int start_time;
-        int start_ticks;
+        bool fullscreen{ false };
+        bool invert_mouse{ false };
+        bool show_stats_window{ true };
+        bool use_bloom_effect{ false };
+        bool is_zoom{ false };
+        bool vsync{ true };
+        float fov{ };
+        int day_length{ };
+        int ortho{ 0 };
+        int start_time{ };
+        int start_ticks{ };
+        mazes::configurator maze{ };
+        std::string tag;
     } m_configs{};
 
     explicit player();

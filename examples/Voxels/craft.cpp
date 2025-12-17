@@ -5,7 +5,6 @@
 
 #include "craft.h"
 
-#include <algorithm>
 #include <dearimgui/imgui.h>
 #include <dearimgui/backends/imgui_impl_sdl3.h>
 #include <dearimgui/backends/imgui_impl_opengl3.h>
@@ -34,10 +33,14 @@
 #include "texture.h"
 #include "world.h"
 
+#include <MazeBuilder/randomizer.h>
+
+#include <algorithm>
 #include <array>
 #include <functional>
-#include <memory>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <ranges>
 
@@ -397,6 +400,9 @@ struct craft::craft_impl
 
     class loading_state final : public state
     {
+        // Static once_flag to ensure load_resources is called only once across all instances
+        static std::once_flag s_load_resources_flag;
+
         void load_resources() const noexcept
         {
             // fonts
@@ -561,9 +567,15 @@ struct craft::craft_impl
         {
             if (!m_has_finished)
             {
-                load_resources();
-                m_has_finished = true;
+                // Use std::call_once to ensure load_resources is called exactly once
+                // across all instances of loading_state
+                std::call_once(s_load_resources_flag, [this]()
+                {
+                    load_resources();
+                    SDL_Log("Resources loaded (via std::call_once)\n");
+                });
 
+                m_has_finished = true;
                 request_stack_pop();
             }
 
@@ -586,15 +598,28 @@ struct craft::craft_impl
     {
         mutable bool m_should_close{false};
 
+        std::vector<FontIdentifier> m_selectable_fonts;
+
+        std::size_t m_selected_font_index{ 0 };
+
     public:
         explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
         {
+            m_selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
+            std::ranges::all_of(
+                std::views::iota(0, static_cast<int>(FontIdentifier::TOTAL)),
+                [this](const int id)
+                {
+                    m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
+                    return true;
+                });
+
         }
 
         void draw() const noexcept override
         {
-            ImGui::PushFont(get_context().m_fonts->get(FontIdentifier::LIMELIGHT).get());
+            ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(m_selected_font_index)).get());
 
             // Apply color schema
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
@@ -608,67 +633,48 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
-            ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
+            // Open the popup modal (should be called every frame when you want it visible)
+            ImGui::OpenPopup("Main Menu");
+
+            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), 
+                                    ImGuiCond_Always, ImVec2(0.5f, 0.5f));
             ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
 
-            if (ImGui::Begin("Main Menu", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_Modal))
+            if (ImGui::BeginPopupModal("Main Menu", nullptr,
+                                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_Modal | ImGuiWindowFlags_AlwaysAutoResize))
             {
-                ImGui::Text("Welcome to Maze Builder");
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                // Navigation options
-                ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
-                ImGui::Spacing();
-
-                // Resume button - return to game
-                if (ImGui::Button("Resume", ImVec2(200, 40)))
+                if (ImGui::BeginTabBar("MenuTabs"))
                 {
-                    request_stack_pop();
+                    if (ImGui::BeginTabItem("Main Menu"))
+                    {
+                        ImGui::Text("Welcome to Maze Builder");
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        // Navigation options
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
+                        ImGui::Spacing();
+                        if (ImGui::Button("Resume", ImVec2(200, 40)))
+                        {
+                            request_stack_pop();
+                        }
+                        ImGui::Spacing();
+                        if (ImGui::Button("New Editor", ImVec2(200, 40)))
+                        {
+                            request_stack_clear();
+                            request_stack_push(StateIdentifier::EDITOR);
+                            request_stack_push(StateIdentifier::LOADING);
+                        }
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        
+                        ImGui::EndTabItem();
+                    }
+                    ImGui::EndTabBar();
                 }
-                ImGui::Spacing();
-
-                // New Game button - placeholder for now
-                if (ImGui::Button("New Game", ImVec2(200, 40)))
-                {
-                    // TODO: Implement new game functionality
-                    SDL_Log("New Game - Not yet implemented\n");
-                }
-                ImGui::Spacing();
-
-                // Settings button - placeholder for now
-                if (ImGui::Button("Settings", ImVec2(200, 40)))
-                {
-                    // TODO: Implement settings functionality
-                    SDL_Log("Settings - Not yet implemented\n");
-                }
-                ImGui::Spacing();
-
-                // Close button - exit application
-                if (ImGui::Button("Close", ImVec2(200, 40)))
-                {
-                    m_should_close = true;
-                }
-
-                ImGui::Separator();
-                ImGui::Spacing();
-
-                // Display controls help
-                ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "Press ESC to return to game");
-                ImGui::Spacing();
-                ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Controls:");
-                ImGui::BulletText("WASD - Move");
-                ImGui::BulletText("Space - Jump");
-                ImGui::BulletText("Tab - Toggle Fly Mode");
-                ImGui::BulletText("E/R - Cycle Blocks");
-                ImGui::BulletText("Left Click - Break Block");
-                ImGui::BulletText("Right Click - Place Block");
+                ImGui::EndPopup();
             }
 
-            ImGui::End();
-
             ImGui::PopStyleColor(10);
-
             ImGui::PopFont();
         }
 
@@ -814,7 +820,7 @@ struct craft::craft_impl
             ImGuiWindowFlags_NoNav |
             ImGuiWindowFlags_NoMove;
 
-        if (ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        if (this->m_player.m_configs.show_stats_window && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
             ImGui::Text("FPS: %d", smoothed_fps);
             ImGui::Text("Frame Time: %.2f ms", smoothed_frame_time);
@@ -885,6 +891,9 @@ struct craft::craft_impl
         SDL_GL_SwapWindow(this->m_sdl.window);
     }
 }; // craft_impl
+
+// Define the static once_flag for loading_state
+std::once_flag craft::craft_impl::loading_state::s_load_resources_flag;
 
 craft::craft(const std::string& title, const int w, const int h)
     : m_impl{std::make_unique<craft_impl>(cref(title), w, h)}

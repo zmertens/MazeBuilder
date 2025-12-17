@@ -12,7 +12,12 @@
 
 #include <MazeBuilder/string_utils.h>
 
+constexpr auto DAY_LENGTH = 600;
+constexpr auto DEFAULT_FOV = 65.0f;
+constexpr auto DEFAULT_ORTHO = 0u;
+constexpr auto ORTHO_ENABLED_VAL = 64;
 constexpr auto SCROLL_THRESHOLD = 0.1f;
+constexpr auto ZOOM_FOV = 15.f;
 
 player::player()
     : scene_node{}
@@ -37,6 +42,11 @@ player::player()
     m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;
     m_key_binding[SDL_SCANCODE_RSHIFT] = PlayerAction::MOVE_UP;
     m_key_binding[SDL_SCANCODE_TAB] = PlayerAction::FLY;
+
+    m_configs.day_length = DAY_LENGTH;
+    m_configs.start_time = DAY_LENGTH / 2 * 1000;
+    m_configs.start_ticks = SDL_GetTicks();
+    m_configs.fov = DEFAULT_FOV;
 
     initialize_actions();
 

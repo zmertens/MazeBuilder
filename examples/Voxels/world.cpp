@@ -316,13 +316,7 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
 }
 
 void world::init() noexcept
-{
-    m_player->m_configs.is_ortho = false;
-    m_player->m_configs.fov = 65.0f;
-    m_player->m_configs.day_length = DAY_LENGTH;
-    m_player->m_configs.start_time = DAY_LENGTH / 2 * 1000;
-    m_player->m_configs.start_ticks = SDL_GetTicks();
-    
+{    
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -767,7 +761,7 @@ int world::chunk_visible(float planes[6][4], const int p, const int q, const int
         {x + 0.f, maxy_f, z + d},
         {x + d, maxy_f, z + d}
     };
-    const int n = m_player->m_configs.is_ortho ? 4 : 6;
+    const int n = m_player->m_configs.ortho ? 4 : 6;
     for (int i = 0; i < n; i++)
     {
         int in = 0;
@@ -1737,7 +1731,7 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
     set_matrix_3d(matrix, width, height,
                   s->x, s->y, s->z, s->rx, s->ry,
                   m_player->m_configs.fov,
-                  m_player->m_configs.is_ortho,
+                  m_player->m_configs.ortho,
                   RENDER_CHUNK_RADIUS);
     float planes[6][4];
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
@@ -2076,7 +2070,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     // matrix.cpp -> set_matrix_3d
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
 
     float planes[6][4];
@@ -2089,7 +2083,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->extra2, light);
     glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
-    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.is_ortho));
+    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
     glUniform1f(attrib->timer, time_of_day());
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
 
@@ -2138,7 +2132,7 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
     float planes[6][4];
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
@@ -2184,7 +2178,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
@@ -2227,7 +2221,7 @@ void world::render_players(const sdl_gl_helper::attrib* attrib) const noexcept
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
@@ -2245,7 +2239,7 @@ void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.is_ortho,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
     int hx, hy, hz;
     if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
