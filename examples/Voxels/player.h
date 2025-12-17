@@ -67,6 +67,10 @@ public:
         int start_ticks{ };
         mazes::configurator maze{ };
         std::string tag;
+        std::uint32_t maze_texture_id{ 0 };
+        int maze_texture_width{ 0 };
+        int maze_texture_height{ 0 };
+        bool maze_ready{ false };
     } m_configs{};
 
     explicit player();
@@ -107,6 +111,8 @@ public:
     [[nodiscard]] std::string get_local_time() const noexcept;
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
+
+    bool generate_maze_texture(mazes::randomizer& rng) noexcept;
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;

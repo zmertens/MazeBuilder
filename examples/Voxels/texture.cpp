@@ -153,6 +153,48 @@ bool texture::load_target(const int w, const int h) noexcept
     return true;
 }
 
+bool texture::load_from_memory(const std::uint8_t* data, const int width, const int height, const std::uint32_t channel_offset) noexcept
+{
+    if (data == nullptr || width <= 0 || height <= 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid parameters for load_from_memory\n");
+        return false;
+    }
+
+    this->free();
+
+    glGenTextures(1, &m_texture);
+    glActiveTexture(GL_TEXTURE0 + channel_offset);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Upload texture data - RGBA format
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                 GL_UNSIGNED_BYTE, data);
+
+    // Generate mipmaps
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    // Check for OpenGL errors
+    if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error after loading from memory: 0x%x\n", error);
+        return false;
+    }
+
+    m_width = width;
+    m_height = height;
+
+    SDL_Log("Texture loaded from memory: %dx%d\n", width, height);
+
+    return true;
+}
+
 bool texture::load_bmp_icon(SDL_Window *window, std::string_view filepath) noexcept
 {
     if (SDL_Surface *bmp_surface = SDL_LoadBMP(filepath.data()))

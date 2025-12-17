@@ -10,9 +10,18 @@
 
 #include <SDL3/SDL.h>
 
+#if defined(__EMSCRIPTEN__)
+#include <GLES3/gl3.h>
+#else
+#include <glad/glad.h>
+#endif
+
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/pixels.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
 
 constexpr auto DAY_LENGTH = 600;
@@ -486,8 +495,22 @@ void player::initialize_actions()
     {
         if (p.m_world)
         {
-            SDL_Log("Projecting and building maze");
-            // @TODO: implement run method in world to build maze geometry
+            SDL_Log("Generating maze texture with current configuration...");
+
+            // Create a randomizer with the configured seed
+            mazes::randomizer rng;
+            rng.seed(p.m_configs.maze.seed());
+
+            // Generate the maze texture
+            if (p.generate_maze_texture(rng))
+            {
+                SDL_Log("Maze texture generated successfully! Texture ID: %u", p.m_configs.maze_texture_id);
+                SDL_Log("Press middle mouse button on a block face to project the maze texture");
+            }
+            else
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze texture");
+            }
         }
     });
 }
@@ -588,3 +611,121 @@ float player::lerp(float a, float b, float t) noexcept
 {
     return a + t * (b - a);
 }
+
+bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
+{
+    try
+    {
+        SDL_Log("Generating maze texture: %dx%d, seed=%u\n",
+                m_configs.maze.rows(), m_configs.maze.columns(), m_configs.maze.seed());
+
+        // Create a grid with current configuration
+        auto grid = std::make_unique<mazes::grid>(
+            m_configs.maze.rows(),
+            m_configs.maze.columns(),
+            m_configs.maze.levels()
+        );
+
+        if (!grid)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze grid\n");
+            return false;
+        }
+
+        // Generate the maze using the configured algorithm
+        if (auto algo = mazes::configurator::make_algo_from_config(m_configs.maze))
+        {
+            if (!algo.value()->run(grid.get(), rng))
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to run maze algorithm\n");
+                return false;
+            }
+        }
+        else
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze algorithm\n");
+            return false;
+        }
+
+        // Convert to pixel representation
+        mazes::pixels pixel_converter;
+        if (!pixel_converter.run(grid.get(), rng))
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to convert maze to pixels\n");
+            return false;
+        }
+
+        // Get the pixel data
+        auto pixel_data = grid->operations().get_pixels();
+        if (pixel_data.empty())
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Pixel data is empty\n");
+            return false;
+        }
+
+        // Calculate dimensions (pixels uses a scale factor)
+        auto [rows, columns, levels] = grid->operations().get_dimensions();
+
+        // The pixels algorithm scales the ASCII representation
+        // ASCII is (rows*2+1) x (columns*2+1)
+        const auto ascii_height = rows * 2 + 1;
+        const auto ascii_width = columns * 2 + 1;
+
+        // Calculate scale (same as in pixels.cpp)
+        constexpr unsigned int MIN_SCALE = 1;
+        constexpr unsigned int MAX_SCALE = 10;
+        auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
+        auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+        const int width = static_cast<int>(ascii_width * scale);
+        const int height = static_cast<int>(ascii_height * scale);
+
+        SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
+
+        // Delete old texture if it exists
+        if (m_configs.maze_texture_id != 0)
+        {
+            glDeleteTextures(1, &m_configs.maze_texture_id);
+            m_configs.maze_texture_id = 0;
+        }
+
+        // Create OpenGL texture
+        glGenTextures(1, &m_configs.maze_texture_id);
+        glBindTexture(GL_TEXTURE_2D, m_configs.maze_texture_id);
+
+        // Set texture parameters
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        // Upload texture data
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                     GL_UNSIGNED_BYTE, pixel_data.data());
+
+        // Generate mipmaps
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        // Check for errors
+        if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error creating maze texture: 0x%x\n", error);
+            return false;
+        }
+
+        m_configs.maze_texture_width = width;
+        m_configs.maze_texture_height = height;
+        m_configs.maze_ready = true;
+
+        SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
+                m_configs.maze_texture_id, width, height);
+
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Exception in generate_maze_texture: %s\n", e.what());
+        return false;
+    }
+}
+

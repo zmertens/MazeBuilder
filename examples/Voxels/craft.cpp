@@ -683,31 +683,45 @@ struct craft::craft_impl
                     }
                     if (ImGui::BeginTabItem("Builder"))
                     {
-                        unsigned int rows;
-                        ImGui::SliderInt("Rows", reinterpret_cast<int*>(&rows), 0,
-                            mazes::configurator::MAX_ROWS);
+                        ImGui::Text("Maze Configuration");
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        unsigned int columns;
-                        ImGui::SliderInt("Columns", reinterpret_cast<int*>(&columns), 0,
-                            mazes::configurator::MAX_COLUMNS);
+                        auto&& maze_config = get_context().m_player->m_configs.maze;
+
+                        static int rows = static_cast<int>(maze_config.rows());
+                        static int columns = static_cast<int>(maze_config.columns());
+                        static int seed = static_cast<int>(maze_config.seed());
+
+                        ImGui::SliderInt("Rows", &rows, 2, static_cast<int>(mazes::configurator::MAX_ROWS));
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        unsigned int seed{};
-                        ImGui::SliderInt("Seed", reinterpret_cast<int*>(&seed), 0, 1000000);
+                        ImGui::SliderInt("Columns", &columns, 2, static_cast<int>(mazes::configurator::MAX_COLUMNS));
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        mazes::randomizer rng{};
-                        rng.seed(seed);
+                        ImGui::SliderInt("Seed", &seed, 0, 1000000);
+                        ImGui::Separator();
+                        ImGui::Spacing();
 
-                        std::optional<std::unique_ptr<mazes::grid_interface>> grid_ptr =
-                            m_impl->m_grid_factory.create(m_impl->INIT_WINDOW_TITLE,
-                                mazes::configurator().rows(rows).columns(columns).seed(seed));
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
+                        ImGui::Text("1. Configure maze parameters above");
+                        ImGui::Text("2. Press 'E' key in the editor to generate");
+                        ImGui::Text("3. The maze will be projected on the selected block face");
+                        ImGui::Separator();
+                        ImGui::Spacing();
 
-                        m_player.run(grid_ptr.value().get(), std::ref(rng));
+                        if (ImGui::Button("Apply Configuration", ImVec2(200, 40)))
+                        {
+                            get_context().m_player->m_configs.maze
+                                .rows(static_cast<unsigned int>(rows))
+                                .columns(static_cast<unsigned int>(columns))
+                                .seed(static_cast<unsigned int>(seed));
+
+                            SDL_Log("Maze configuration updated: %dx%d, seed=%d\n", rows, columns, seed);
+                        }
+
 
                         ImGui::EndTabItem();
                     }
@@ -1160,7 +1174,6 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 
 std::string craft::artifacts() const noexcept
 {
-    this->m_impl->m_pl
     return "hello world";
 }
 

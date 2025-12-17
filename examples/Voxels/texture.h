@@ -34,6 +34,8 @@ public:
 
     bool load_from_file(std::string_view filepath, std::uint32_t channel_offset = 0) noexcept;
 
+    bool load_from_memory(const std::uint8_t* data, int width, int height, std::uint32_t channel_offset = 0) noexcept;
+
     static bool load_bmp_icon(SDL_Window* window,std::string_view filepath) noexcept;
 
 private:
