@@ -726,7 +726,7 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
         // Calculate scale (same as in pixels.cpp)
         constexpr unsigned int MIN_SCALE = 1;
         constexpr unsigned int MAX_SCALE = 10;
-        const auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
+        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
         const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
 
         // Height is predictable: (rows*2+1) * scale
