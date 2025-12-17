@@ -64,6 +64,18 @@ int main(const int argc, char* argv[])
                 std::ref(user_options));
                 !str.empty())
             {
+                if (user_options.help())
+                {
+                    std::cout << my_cli->help() << std::endl;
+                    return EXIT_SUCCESS;
+                }
+
+                if (user_options.version())
+                {
+                    std::cout << my_cli->version() << std::endl;
+                    return EXIT_SUCCESS;
+                }
+
                 std::stringstream stream;
                 bool write_success{false};
                 constexpr mazes::io_utils writer{};
@@ -135,7 +147,7 @@ int main(const int argc, char* argv[])
         }
         else
         {
-            throw std::runtime_error(my_cli->help());
+            throw std::runtime_error("Failed to create CLI instance");
         }
     }
     catch (const std::exception& ex)

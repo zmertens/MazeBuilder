@@ -67,6 +67,14 @@ namespace mazes
         static constexpr const auto DISTANCES_START_STR = "distances_start";
         static constexpr const auto DISTANCES_END_STR = "distances_end";
 
+        // Image dimension related constants
+        static constexpr const auto IMAGE_WIDTH_WORD_STR = "image_width";
+        static constexpr const auto IMAGE_HEIGHT_WORD_STR = "image_height";
+        static constexpr const auto IMAGE_WIDTH_OPTION_STR = "--image-width";
+        static constexpr const auto IMAGE_HEIGHT_OPTION_STR = "--image-height";
+        static constexpr const auto IMAGE_WIDTH_FLAG_STR = "-W";
+        static constexpr const auto IMAGE_HEIGHT_FLAG_STR = "-H";
+
         // Help related constants
         static constexpr const auto HELP_FLAG_STR = "-h";
         static constexpr const auto HELP_OPTION_STR = "--help";

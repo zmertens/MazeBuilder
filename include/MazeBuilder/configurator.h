@@ -157,6 +157,24 @@ namespace mazes
             return *this;
         }
 
+        /// @brief Set the help flag
+        /// @param help 
+        /// @return 
+        configurator &help(bool help) noexcept
+        {
+            m_help = help;
+            return *this;
+        };
+
+        /// @brief Set the version flag
+        /// @param version 
+        /// @return 
+        configurator &version(bool version) noexcept
+        {
+            m_version = version;
+            return *this;
+        };
+
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
         [[nodiscard]] unsigned int rows() const noexcept { return m_rows.value_or(DEFAULT_ROWS); }
@@ -220,6 +238,9 @@ namespace mazes
 
         /// @brief Get the computed image height (in pixels) for exported images
         [[nodiscard]] unsigned int image_height() const noexcept { return m_image_height.value_or(0u); }
+
+        [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
+        [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
@@ -303,6 +324,10 @@ namespace mazes
         std::optional<unsigned int> m_image_width;
 
         std::optional<unsigned int> m_image_height;
+
+        std::optional<bool> m_help;
+
+        std::optional<bool> m_version;
     };
 
 } // namespace

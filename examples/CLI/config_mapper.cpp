@@ -53,40 +53,28 @@ bool config_mapper::map_args_to_config(std::vector<std::string> const& args, maz
 
                 throw std::runtime_error("Output file name cannot be empty.");
             }
+            
+            // Store the full filename
+            config.output_format_filename(value);
+            
+            auto extension = string_utils::get_file_extension(value);
 
-            // Detect if the value looks like a filename or format
-            // If it contains a file extension or path separator, treat as filename
-            // Otherwise, treat as format
-            if (value.find('.') != std::string::npos || value.find('/') != std::string::npos ||
-                value.find('\\') != std::string::npos || value == "stdout") {
-                // This looks like a filename or special output (stdout)
-                config.output_format_filename(value);
-
-                // Try to infer format from filename extension
-                if (value == "stdout") {
-                    config.output_format_id(output_format::STDOUT);
-                } else {
-                    size_t dot_pos = value.find_last_of('.');
-                    if (dot_pos != std::string::npos) {
-                        std::string extension = value.substr(dot_pos + 1);
-                        try {
-                            config.output_format_id(to_output_format_from_sv(extension));
-                        } catch (const std::invalid_argument&) {
-                            // If extension isn't recognized, default to plain text
-                            config.output_format_id(output_format::PLAIN_TEXT);
-                        }
-                    } else {
-                        // No extension, default to plain text
-                        config.output_format_id(output_format::PLAIN_TEXT);
-                    }
-                }
-            } else {
-                // This looks like a format specifier
-                config.output_format_id(to_output_format_from_sv(value));
+            try {
+                // Don't add the dot - to_output_format_from_sv expects extensions without dots
+                config.output_format_id(to_output_format_from_sv(extension));
+            } catch (const std::invalid_argument&) {
+                // If extension isn't recognized, default to plain text
+                config.output_format_id(output_format::STDOUT);
             }
         } else if (key == args::OUTPUT_FILENAME_WORD_STR) {
 
             config.output_format_filename(value);
+        } else if (key == args::HELP_WORD_STR) {
+
+            config.help(true);
+        } else if (key == args::VERSION_WORD_STR) {
+
+            config.version(true);
         }
         else {
 
@@ -137,12 +125,7 @@ bool config_mapper::map_args_to_config(std::vector<std::string> const& args, maz
 
     } catch (const std::exception& ex) {
 
-#if defined(MAZE_DEBUG)
-
-        std::cerr << "Parser Error: " << ex.what() << std::endl;
-#endif
-
-        return false;
+        throw std::runtime_error(std::string("config_mapper::map_args_to_config - ") + ex.what());
     }
 
     return true;

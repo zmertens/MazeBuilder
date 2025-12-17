@@ -42,6 +42,8 @@ public:
     std::vector<std::string> output_files;
     std::vector<int> rows_values;
     std::vector<int> seed_values;
+    std::vector<int> image_width_values;
+    std::vector<int> image_height_values;
 
     // Flag tracking
     bool help_flag = false;
@@ -84,6 +86,11 @@ public:
             current_map[args::LEVEL_FLAG_STR] = value;
             current_map[args::LEVEL_OPTION_STR] = value;
             current_map[args::LEVEL_WORD_STR] = value;
+        } else if (key == args::ALGO_ID_WORD_STR) {
+
+            current_map[args::ALGO_ID_FLAG_STR] = value;
+            current_map[args::ALGO_ID_OPTION_STR] = value;
+            current_map[args::ALGO_ID_WORD_STR] = value;
         } else if (key == args::SEED_WORD_STR) {
 
             current_map[args::SEED_FLAG_STR] = value;
@@ -104,16 +111,16 @@ public:
             current_map[args::DISTANCES_FLAG_STR] = value;
             current_map[args::DISTANCES_OPTION_STR] = value;
             current_map[args::DISTANCES_WORD_STR] = value;
-        } else if (key == args::ALGO_ID_WORD_STR) {
+        } else if (key == args::IMAGE_WIDTH_WORD_STR) {
 
-            current_map[args::ALGO_ID_FLAG_STR] = value;
-            current_map[args::ALGO_ID_OPTION_STR] = value;
-            current_map[args::ALGO_ID_WORD_STR] = value;
-        } else if (key == args::HELP_WORD_STR) {
+            current_map[args::IMAGE_WIDTH_FLAG_STR] = value;
+            current_map[args::IMAGE_WIDTH_OPTION_STR] = value;
+            current_map[args::IMAGE_WIDTH_WORD_STR] = value;
+        } else if (key == args::IMAGE_HEIGHT_WORD_STR) {
 
-            current_map[args::HELP_FLAG_STR] = value;
-            current_map[args::HELP_OPTION_STR] = value;
-            current_map[args::HELP_WORD_STR] = value;
+            current_map[args::IMAGE_HEIGHT_FLAG_STR] = value;
+            current_map[args::IMAGE_HEIGHT_OPTION_STR] = value;
+            current_map[args::IMAGE_HEIGHT_WORD_STR] = value;
         } else if (key == args::VERSION_WORD_STR) {
 
             current_map[args::VERSION_FLAG_STR] = value;
@@ -244,6 +251,8 @@ public:
                     arg == args::JSON_FLAG_STR || arg == args::JSON_OPTION_STR ||
                     arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR ||
                     arg == args::HELP_FLAG_STR || arg == args::HELP_OPTION_STR ||
+                    arg == args::IMAGE_WIDTH_FLAG_STR || arg == args::IMAGE_WIDTH_OPTION_STR ||
+                    arg == args::IMAGE_HEIGHT_FLAG_STR || arg == args::IMAGE_HEIGHT_OPTION_STR ||
                     arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR) {
 
                     continue;
@@ -255,6 +264,7 @@ public:
                         option_part == args::LEVEL_OPTION_STR || option_part == args::SEED_OPTION_STR ||
                         option_part == args::ALGO_ID_OPTION_STR || option_part == args::OUTPUT_ID_OPTION_STR ||
                         option_part == args::JSON_OPTION_STR || option_part == args::DISTANCES_OPTION_STR ||
+                        option_part == args::IMAGE_WIDTH_OPTION_STR || option_part == args::IMAGE_HEIGHT_OPTION_STR ||
                         option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR) {
 
                         // Validate the value part for slice syntax if it's distances
@@ -283,6 +293,8 @@ public:
                         || short_opt == args::OUTPUT_ID_FLAG_STR[1]
                         || short_opt == args::ROW_FLAG_STR[1]
                         || short_opt == args::SEED_FLAG_STR[1]
+                        || short_opt == args::IMAGE_WIDTH_FLAG_STR[1]
+                        || short_opt == args::IMAGE_HEIGHT_FLAG_STR[1]
                         || short_opt == args::VERSION_FLAG_STR[1]) {
 
                         continue;
@@ -302,6 +314,7 @@ public:
                         prev_arg == args::LEVEL_FLAG_STR || prev_arg == args::SEED_FLAG_STR ||
                         prev_arg == args::ALGO_ID_FLAG_STR || prev_arg == args::OUTPUT_ID_FLAG_STR ||
                         prev_arg == args::JSON_FLAG_STR || prev_arg == args::DISTANCES_FLAG_STR ||
+                        prev_arg == args::IMAGE_WIDTH_FLAG_STR || prev_arg == args::IMAGE_HEIGHT_FLAG_STR ||
                         prev_arg == args::HELP_FLAG_STR || prev_arg == args::VERSION_FLAG_STR) {
 
                             continue;
@@ -368,6 +381,14 @@ private:
 
         const auto SEED_OPTIONS = string_utils::format("{},{}", args::SEED_FLAG_STR, args::SEED_OPTION_STR);
         cli_app.add_option(SEED_OPTIONS, seed_values, "Random seed for maze generation")
+            ->capture_default_str();
+
+        const auto IMAGE_WIDTH_OPTIONS = string_utils::format("{},{}", args::IMAGE_WIDTH_FLAG_STR, args::IMAGE_WIDTH_OPTION_STR);
+        cli_app.add_option(IMAGE_WIDTH_OPTIONS, image_width_values, "Width of the output image")
+            ->capture_default_str();
+
+        const auto IMAGE_HEIGHT_OPTIONS = string_utils::format("{},{}", args::IMAGE_HEIGHT_FLAG_STR, args::IMAGE_HEIGHT_OPTION_STR);
+        cli_app.add_option(IMAGE_HEIGHT_OPTIONS, image_height_values, "Height of the output image")
             ->capture_default_str();
 
         // Add flags manually to avoid automatic exit behavior
@@ -599,6 +620,10 @@ public:
             } else if (key == args::OUTPUT_ID_WORD_STR) {
 
                 add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
+            } else if (key == args::IMAGE_HEIGHT_FLAG_STR || key == args::IMAGE_HEIGHT_OPTION_STR || key == args::IMAGE_HEIGHT_WORD_STR) {
+                add_argument_variants(args::IMAGE_HEIGHT_WORD_STR, value);
+            } else if (key == args::IMAGE_WIDTH_FLAG_STR || key == args::IMAGE_WIDTH_OPTION_STR || key == args::IMAGE_WIDTH_WORD_STR) {
+                add_argument_variants(args::IMAGE_WIDTH_WORD_STR, value);
             } else if (key == args::DISTANCES_WORD_STR) {
 
                 // Handle boolean distances field
@@ -796,6 +821,8 @@ args::args(const args& other) : pimpl{ std::make_unique<impl>() } {
         pimpl->levels_values = other.pimpl->levels_values;
         pimpl->output_files = other.pimpl->output_files;
         pimpl->rows_values = other.pimpl->rows_values;
+        pimpl->image_height_values = other.pimpl->image_height_values;
+        pimpl->image_width_values = other.pimpl->image_width_values;
         pimpl->seed_values = other.pimpl->seed_values;
         pimpl->version_flag = other.pimpl->version_flag;
     }
@@ -823,6 +850,8 @@ args& args::operator=(const args& other) {
         pimpl->levels_values = other.pimpl->levels_values;
         pimpl->output_files = other.pimpl->output_files;
         pimpl->rows_values = other.pimpl->rows_values;
+        pimpl->image_height_values = other.pimpl->image_height_values;
+        pimpl->image_width_values = other.pimpl->image_width_values;
         pimpl->seed_values = other.pimpl->seed_values;
         pimpl->version_flag = other.pimpl->version_flag;
     }
