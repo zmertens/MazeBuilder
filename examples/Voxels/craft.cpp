@@ -654,7 +654,28 @@ struct craft::craft_impl
                         }
                         ImGui::Separator();
                         ImGui::Spacing();
-                        
+
+                        ImGui::Text("Commands:");
+                        ImGui::Spacing();
+                        ImGui::Text("Left Mouse Click: Delete a block");
+                        ImGui::Text("Right Mouse Click: Build a block");
+                        ImGui::Text("Middle Mouse Click: Copy selected block type");
+                        ImGui::Text("Middle Mouse Scroll: Cycle block types");
+                        ImGui::Text("Spacebar: Jump");
+                        ImGui::Text("Tab: Fly");
+                        ImGui::Text("Left Shift: Hover up while flying");
+                        ImGui::Text("Right Shift: Hover down while flying");
+                        ImGui::Text("W: Forward Movement");
+                        ImGui::Text("A: Left Movement");
+                        ImGui::Text("S: Backward Movement");
+                        ImGui::Text("D: Right Movement");
+                        ImGui::Text("F: Toggle orthogonal projection");
+                        ImGui::Text("T: Tag a block");
+                        ImGui::Text("Control + Left Click: Place light");
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
                         ImGui::EndTabItem();
                     }
                     if (ImGui::BeginTabItem("Builder"))
@@ -696,6 +717,58 @@ struct craft::craft_impl
                                 }
                             }
                             ImGui::EndListBox();
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        auto&& current_configs = get_context().m_player->m_configs;
+
+                        auto last_vsync = current_configs.vsync;
+                        auto last_fullscreen = current_configs.fullscreen;
+
+                        ImGui::SliderFloat("FoV", &current_configs.fov, 30, 120, "%.3f degrees");
+                        ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
+                        ImGui::Checkbox("Enable VSync", &current_configs.vsync);
+                        ImGui::Checkbox("Enable fullscreen", &current_configs.fullscreen);
+                        ImGui::Checkbox("Invert Mouse Y-Axis", &current_configs.invert_mouse);
+                        ImGui::SliderInt("Orthographic scaling", &current_configs.ortho, 0, 64);
+                        ImGui::Checkbox("Apply Bloom Effect", &current_configs.use_bloom_effect);
+                        ImGui::SliderFloat("Exp", &current_configs.exposure_range, 0.1f, 1.0f, "%.2f");
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Player Tag:");
+                        ImGui::Spacing();
+
+                        static char tag_buffer[256] = "";
+
+                        // Copy current tag to buffer on first use or when changed externally
+                        static bool initialized = false;
+                        if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
+                        {
+                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
+                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
+                            initialized = true;
+                        }
+
+                        if (ImGui::InputText("##PlayerTag", tag_buffer, SDL_arraysize(tag_buffer)))
+                        {
+                            current_configs.tag = std::string(tag_buffer);
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        if (last_vsync != current_configs.vsync)
+                        {
+                            SDL_GL_SetSwapInterval(current_configs.vsync ? 1 : 0);
+                        }
+
+                        if (last_fullscreen != current_configs.fullscreen)
+                        {
+                            SDL_SetWindowFullscreen(get_context().m_window, current_configs.fullscreen);
                         }
 
                         ImGui::EndTabItem();

@@ -50,8 +50,8 @@ public:
         bool invert_mouse{ false };
         bool show_stats_window{ true };
         bool use_bloom_effect{ false };
-        bool is_zoom{ false };
         bool vsync{ true };
+        float exposure_range{ 0.5f };
         float fov{ };
         int day_length{ };
         int ortho{ 0 };

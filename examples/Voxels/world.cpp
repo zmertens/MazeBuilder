@@ -2187,7 +2187,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glUniform1i(attrib->extra1, 1);
     char text[MAX_SIGN_LENGTH];
-    SDL_strlcpy(text, "put maze here", MAX_SIGN_LENGTH);
+    SDL_strlcpy(text, m_player->m_configs.tag.c_str(), MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
     GLfloat* data = sdl_gl_helper::malloc_faces(5, SDL_strlen(text));
     const int length = sdl_gl_helper::_gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,

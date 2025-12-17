@@ -47,6 +47,9 @@ player::player()
     m_configs.start_time = DAY_LENGTH / 2 * 1000;
     m_configs.start_ticks = SDL_GetTicks();
     m_configs.fov = DEFAULT_FOV;
+    m_configs.ortho = DEFAULT_ORTHO;
+    m_configs.invert_mouse = false;
+    m_configs.tag = "put maze here";
 
     initialize_actions();
 
@@ -147,12 +150,15 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
         constexpr float mouse_sensitivity = 0.0025f;
         position* player_pos = &this->pos;
         player_pos->rx += event.motion.xrel * mouse_sensitivity;
-        static constexpr auto INVERT_MOUSE = false;
-        if (INVERT_MOUSE)
+
+        if (this->m_configs.invert_mouse)
         {
             player_pos->ry += event.motion.yrel * mouse_sensitivity;
         }
-        player_pos->ry -= event.motion.yrel * mouse_sensitivity;
+        else
+        {
+            player_pos->ry -= event.motion.yrel * mouse_sensitivity;
+        }
 
         // Keep rotation within bounds
         if (player_pos->rx < 0)
@@ -549,7 +555,7 @@ void player::on_tag_sign() const noexcept
     int hx, hy, hz, face;
     if (auto result = m_world->hit_test_face(&hx, &hy, &hz, &face))
     {
-        m_world->set_sign(hx, hy, hz, face, "words");
+        m_world->set_sign(hx, hy, hz, face, m_configs.tag);
     }
 }
 
