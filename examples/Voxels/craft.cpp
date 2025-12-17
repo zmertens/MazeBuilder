@@ -408,12 +408,6 @@ struct craft::craft_impl
             // fonts
             static constexpr auto FONT_PIXEL_SIZE = 28.f;
 
-            const std::vector<std::string_view> font_names = {
-                "Cousine Regular",
-                "Limelight Regular",
-                "Nunito Sans"
-            };
-
             auto&& fonts = get_context().m_fonts;
 
             fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data,
@@ -502,7 +496,7 @@ struct craft::craft_impl
 
 #if defined(MAZE_DEBUG)
 
-            std::ranges::for_each(font_names, [](const auto& name)
+            std::ranges::for_each(craft_impl::s_font_names, [](const auto& name)
             {
                 SDL_Log("Loaded font: %s\n", name.data());
             });
@@ -567,12 +561,9 @@ struct craft::craft_impl
         {
             if (!m_has_finished)
             {
-                // Use std::call_once to ensure load_resources is called exactly once
-                // across all instances of loading_state
                 std::call_once(s_load_resources_flag, [this]()
                 {
                     load_resources();
-                    SDL_Log("Resources loaded (via std::call_once)\n");
                 });
 
                 m_has_finished = true;
@@ -607,7 +598,7 @@ struct craft::craft_impl
             : state{stack, context}
         {
             m_selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
-            std::ranges::all_of(
+            std::ranges::for_each(
                 std::views::iota(0, static_cast<int>(FontIdentifier::TOTAL)),
                 [this](const int id)
                 {
@@ -619,7 +610,8 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
-            ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(m_selected_font_index)).get());
+            static auto selected_font_index{ 0 };
+            ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
             // Apply color schema
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
@@ -634,23 +626,17 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
             // Open the popup modal (should be called every frame when you want it visible)
-            ImGui::OpenPopup("Main Menu");
+            ImGui::OpenPopup("Mazes");
 
-            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f), 
-                                    ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-            ImGui::SetNextWindowSize(ImVec2(400, 500), ImGuiCond_FirstUseEver);
-
-            if (ImGui::BeginPopupModal("Main Menu", nullptr,
-                                     ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_Modal | ImGuiWindowFlags_AlwaysAutoResize))
+            if (ImGui::BeginPopupModal("Mazes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
             {
                 if (ImGui::BeginTabBar("MenuTabs"))
                 {
-                    if (ImGui::BeginTabItem("Main Menu"))
+                    if (ImGui::BeginTabItem("Main"))
                     {
                         ImGui::Text("Welcome to Maze Builder");
                         ImGui::Separator();
                         ImGui::Spacing();
-                        // Navigation options
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
                         ImGui::Spacing();
                         if (ImGui::Button("Resume", ImVec2(200, 40)))
@@ -660,6 +646,8 @@ struct craft::craft_impl
                         ImGui::Spacing();
                         if (ImGui::Button("New Editor", ImVec2(200, 40)))
                         {
+                            // Start a new editor session
+                            // @TODO : new DB
                             request_stack_clear();
                             request_stack_push(StateIdentifier::EDITOR);
                             request_stack_push(StateIdentifier::LOADING);
@@ -667,6 +655,49 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
                         
+                        ImGui::EndTabItem();
+                    }
+                    if (ImGui::BeginTabItem("Builder"))
+                    {
+                        ImGui::Text("Builder Options Coming Soon...");
+                        ImGui::EndTabItem();
+                    }
+                    if (ImGui::BeginTabItem("Settings"))
+                    {
+                        static bool toggle_color_mode = false;
+                        ImGui::Checkbox("Toggle Dark Mode", &toggle_color_mode);
+                        if (toggle_color_mode)
+                        {
+                            ImGui::StyleColorsLight();
+                        }
+                        else
+                        {
+                            ImGui::StyleColorsDark();
+                        }
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        ImGui::TextColored(ImVec4(0.745f, 0.863, 0.498f, 1.0f), "Font Selection:");
+                        ImGui::Spacing();
+                        if (ImGui::BeginListBox("##FontListBox", ImVec2(-100, 200)))
+                        {
+                            for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
+                            {
+                                const bool is_selected = (selected_font_index == i);
+                                const auto& font_name = craft_impl::s_font_names.at(static_cast<std::size_t>(m_selectable_fonts.at(i)));
+                                if (ImGui::Selectable(font_name.data(), is_selected))
+                                {
+                                    selected_font_index = i;
+                                }
+                                if (is_selected)
+                                {
+                                    ImGui::SetItemDefaultFocus();
+                                }
+                            }
+                            ImGui::EndListBox();
+                        }
+
                         ImGui::EndTabItem();
                     }
                     ImGui::EndTabBar();
@@ -715,6 +746,8 @@ struct craft::craft_impl
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     std::unique_ptr<state_stack> m_crafting_states;
+
+    static std::vector<std::string_view> s_font_names;
 
     font_manager m_fonts;
     shader_manager m_shaders;
@@ -892,8 +925,13 @@ struct craft::craft_impl
     }
 }; // craft_impl
 
-// Define the static once_flag for loading_state
+// Static member definitions
 std::once_flag craft::craft_impl::loading_state::s_load_resources_flag;
+std::vector<std::string_view> craft::craft_impl::s_font_names{
+    "Cousine Regular",
+    "Limelight Regular",
+    "Nunito Sans"
+};
 
 craft::craft(const std::string& title, const int w, const int h)
     : m_impl{std::make_unique<craft_impl>(cref(title), w, h)}
