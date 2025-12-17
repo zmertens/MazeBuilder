@@ -34,12 +34,6 @@ public:
     std::string help() noexcept;
 
     std::string version() noexcept;
-
-    // Helper: copy raw pixel bytes into a std::string for transport/storage
-    static std::string bytes_to_string(const std::vector<std::uint8_t>& bytes);
-
-    // Reverse helper: reconstruct a vector<uint8_t> from a raw bytes string
-    static std::vector<std::uint8_t> string_to_bytes(const std::string& s);
 private:
     static void apply(mazes::grid_interface* g,
                       mazes::randomizer& rng,

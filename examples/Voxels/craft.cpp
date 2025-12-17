@@ -12,6 +12,7 @@
 #include "fonts/Cousine_Regular.h"
 #include "fonts/nunito_sans.h"
 #include "fonts/Limelight_Regular.h"
+#include "MazeBuilder/string_utils.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
@@ -33,6 +34,8 @@
 #include "texture.h"
 #include "world.h"
 
+#include <MazeBuilder/grid.h>
+#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <algorithm>
@@ -680,7 +683,32 @@ struct craft::craft_impl
                     }
                     if (ImGui::BeginTabItem("Builder"))
                     {
-                        ImGui::Text("Builder Options Coming Soon...");
+                        unsigned int rows;
+                        ImGui::SliderInt("Rows", reinterpret_cast<int*>(&rows), 0,
+                            mazes::configurator::MAX_ROWS);
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        unsigned int columns;
+                        ImGui::SliderInt("Columns", reinterpret_cast<int*>(&columns), 0,
+                            mazes::configurator::MAX_COLUMNS);
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        unsigned int seed{};
+                        ImGui::SliderInt("Seed", reinterpret_cast<int*>(&seed), 0, 1000000);
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        mazes::randomizer rng{};
+                        rng.seed(seed);
+
+                        std::optional<std::unique_ptr<mazes::grid_interface>> grid_ptr =
+                            m_impl->m_grid_factory.create(m_impl->INIT_WINDOW_TITLE,
+                                mazes::configurator().rows(rows).columns(columns).seed(seed));
+
+                        m_player.run(grid_ptr.value().get(), std::ref(rng));
+
                         ImGui::EndTabItem();
                     }
                     if (ImGui::BeginTabItem("Settings"))
@@ -830,6 +858,8 @@ struct craft::craft_impl
 
     sdl_gl_helper m_sdl;
 
+    mazes::grid_factory m_grid_factory;
+
     mutable double fps_update_timer{0.0};
     mutable int smoothed_fps{0};
     mutable float smoothed_frame_time{0.0f};
@@ -840,6 +870,12 @@ struct craft::craft_impl
         start_SDL();
 
         setup_imgui();
+
+        m_grid_factory.register_creator(
+            title, [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface>
+            {
+                return std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
+            });
 
         m_crafting_states = std::make_unique<state_stack>(state::context{
             m_sdl.window,
@@ -1124,6 +1160,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 
 std::string craft::artifacts() const noexcept
 {
+    this->m_impl->m_pl
     return "hello world";
 }
 

@@ -5,6 +5,7 @@
 #include <map>
 #include <string>
 
+#include <MazeBuilder/algo_interface.h>
 #include <MazeBuilder/configurator.h>
 
 #include "command.h"
@@ -23,6 +24,7 @@ enum class PlayerAction
     BUILD_BLOCK,
     DESTROY_BLOCK,
     PLACE_LIGHT,
+    BUILD_MAZE,
     DONE,
     COUNT
 };
@@ -31,7 +33,13 @@ class command_queue;
 union SDL_Event;
 class world;
 
-class player : public scene_node
+namespace mazes
+{
+    class grid_interface;
+    class randomizer;
+}
+
+class player : public scene_node, mazes::algo_interface
 {
 public:
     struct position
@@ -96,8 +104,9 @@ public:
 
     void set_world(world* w) noexcept;
 
-    std::string get_local_time() const noexcept;
+    [[nodiscard]] std::string get_local_time() const noexcept;
 
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;

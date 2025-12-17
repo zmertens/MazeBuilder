@@ -10,6 +10,9 @@
 
 #include <SDL3/SDL.h>
 
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/pixels.h>
 #include <MazeBuilder/string_utils.h>
 
 constexpr auto DAY_LENGTH = 600;
@@ -34,6 +37,7 @@ player::player()
 
     // Movement key bindings
     m_key_binding[SDL_SCANCODE_A] = PlayerAction::MOVE_LEFT;
+    m_key_binding[SDL_SCANCODE_E] = PlayerAction::BUILD_MAZE;
     m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
     m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
     m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
@@ -316,6 +320,17 @@ std::string player::get_local_time() const noexcept
     return std::string{ mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm) };
 }
 
+bool player::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
+{
+    if (!g)
+    {
+        return false;
+    }
+
+    static mazes::pixels pixelizer{};
+
+    return pixelizer.run(g, std::ref(rng));
+}
 
 void player::initialize_actions()
 {
@@ -465,6 +480,16 @@ void player::initialize_actions()
                 on_light();
             }
         });
+
+    m_action_binding[PlayerAction::BUILD_MAZE].action = derived_action<player>(
+    [](player& p, const float dt)
+    {
+        if (p.m_world)
+        {
+            SDL_Log("Projecting and building maze");
+            // @TODO: implement run method in world to build maze geometry
+        }
+    });
 }
 
 bool player::is_realtime_action(const PlayerAction action) noexcept
