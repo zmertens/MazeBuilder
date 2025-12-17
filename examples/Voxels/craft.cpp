@@ -707,8 +707,10 @@ struct craft::craft_impl
 
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
                         ImGui::Text("1. Configure maze parameters above");
-                        ImGui::Text("2. Press 'E' key in the editor to generate");
-                        ImGui::Text("3. The maze will be projected on the selected block face");
+                        ImGui::Text("2. Press 'Apply Configuration' button");
+                        ImGui::Text("3. Press 'E' key in editor to generate texture");
+                        ImGui::Text("4. Aim at a block face");
+                        ImGui::Text("5. Press MIDDLE MOUSE to project maze");
                         ImGui::Separator();
                         ImGui::Spacing();
 

@@ -25,6 +25,7 @@ public:
     std::uint32_t buffer;
     std::uint32_t sign_buffer;
 
+
     scene_node* parent;
     std::vector<scene_node*> children;
 

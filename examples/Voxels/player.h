@@ -73,6 +73,17 @@ public:
         bool maze_ready{ false };
     } m_configs{};
 
+    struct projected_plane
+    {
+        bool visible{ false };
+        std::uint32_t texture_id{ 0 };
+        int target_x{ 0 };
+        int target_y{ 0 };
+        int target_z{ 0 };
+        int target_face{ 0 };
+        bool has_valid_target{ false };
+    } m_projected_plane{};
+
     explicit player();
 
     ~player() override = default;
@@ -84,6 +95,8 @@ public:
     player& operator=(player&&) = default;
 
     void handle_event(const SDL_Event& event, command_queue& commands) noexcept;
+
+    void draw() const noexcept;
 
     void handle_realtime_input(command_queue& commands);
 
@@ -109,6 +122,8 @@ public:
     void set_world(world* w) noexcept;
 
     [[nodiscard]] std::string get_local_time() const noexcept;
+
+    [[nodiscard]] const projected_plane& get_projected_plane() const noexcept;
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 

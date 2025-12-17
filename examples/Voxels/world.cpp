@@ -316,7 +316,7 @@ void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q
 }
 
 void world::init() noexcept
-{    
+{
     glEnable(GL_CULL_FACE);
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
@@ -473,6 +473,9 @@ void world::draw() const noexcept
 
     render_signs(&s_text_attrib, signs_texture);
     render_sign(&s_text_attrib, signs_texture);
+
+    // Render player's projected maze texture plane
+    render_player_projected_plane(&s_block_attrib);
 
     render_wireframe(&s_line_attrib);
 
@@ -2292,6 +2295,125 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
         sdl_gl_helper::draw_cube(attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
+}
+
+void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) const noexcept
+{
+    if (!attrib || !m_player)
+    {
+        return;
+    }
+
+    // Get the player's projected plane state
+    const auto& plane = m_player->get_projected_plane();
+
+    // Only render if plane is visible and has a valid target
+    if (!plane.visible || !plane.has_valid_target || plane.texture_id == 0)
+    {
+        return;
+    }
+
+    auto [width, height] = m_sdl->get_window_size();
+    const player::position* s = &m_player->pos;
+
+    float matrix[16];
+    set_matrix_3d(
+        matrix, width, height,
+        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
+        RENDER_CHUNK_RADIUS);
+
+    glUseProgram(attrib->program);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform3f(attrib->camera, s->x, s->y, s->z);
+    glUniform1f(attrib->extra2, get_daylight());
+    glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
+    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
+    glUniform1f(attrib->timer, time_of_day());
+
+    // Use polygon offset to render slightly in front of the block face
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glPolygonOffset(-1.0f, -1.0f);
+
+    // Face offset vectors - position plane slightly in front of block face
+    static const float face_offsets[6][3] = {
+        {-0.502f, 0.0f, 0.0f},  // Left (-X)
+        {+0.502f, 0.0f, 0.0f},  // Right (+X)
+        {0.0f, 0.0f, -0.502f},  // Front (-Z)
+        {0.0f, 0.0f, +0.502f},  // Back (+Z)
+        {0.0f, +0.502f, 0.0f},  // Top (+Y)
+        {0.0f, -0.502f, 0.0f}   // Bottom (-Y)
+    };
+
+    // Quad vertices for each face orientation (centered on block face)
+    static const float face_vertices[6][4][3] = {
+        // Left face (-X) - looking at -X face from outside
+        {{0, -0.5f, -0.5f}, {0, -0.5f, +0.5f}, {0, +0.5f, +0.5f}, {0, +0.5f, -0.5f}},
+        // Right face (+X) - looking at +X face from outside
+        {{0, -0.5f, +0.5f}, {0, -0.5f, -0.5f}, {0, +0.5f, -0.5f}, {0, +0.5f, +0.5f}},
+        // Front face (-Z) - looking at -Z face from outside
+        {{-0.5f, -0.5f, 0}, {+0.5f, -0.5f, 0}, {+0.5f, +0.5f, 0}, {-0.5f, +0.5f, 0}},
+        // Back face (+Z) - looking at +Z face from outside
+        {{+0.5f, -0.5f, 0}, {-0.5f, -0.5f, 0}, {-0.5f, +0.5f, 0}, {+0.5f, +0.5f, 0}},
+        // Top face (+Y) - looking down at +Y face
+        {{-0.5f, 0, -0.5f}, {+0.5f, 0, -0.5f}, {+0.5f, 0, +0.5f}, {-0.5f, 0, +0.5f}},
+        // Bottom face (-Y) - looking up at -Y face
+        {{-0.5f, 0, +0.5f}, {+0.5f, 0, +0.5f}, {+0.5f, 0, -0.5f}, {-0.5f, 0, -0.5f}}
+    };
+
+    static const float face_normals[6][3] = {
+        {-1, 0, 0}, {+1, 0, 0}, {0, 0, -1}, {0, 0, +1}, {0, +1, 0}, {0, -1, 0}
+    };
+
+    // Get world coordinates (center of the block)
+    float world_x = static_cast<float>(plane.target_x);
+    float world_y = static_cast<float>(plane.target_y);
+    float world_z = static_cast<float>(plane.target_z);
+    int face = plane.target_face;
+
+    // Bind the maze texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, plane.texture_id);
+    glUniform1i(attrib->sampler, 0);
+
+    // Build quad geometry (6 vertices = 2 triangles)
+    float quad_data[6 * 10];  // 6 vertices * 10 floats per vertex
+    float* d = quad_data;
+
+    // Triangle indices: 0,1,2 and 0,2,3 form the quad
+    static const int indices[6] = {0, 1, 2, 0, 2, 3};
+
+    for (int i = 0; i < 6; i++)
+    {
+        int vert_idx = indices[i];
+
+        // Position - offset from block center to face position
+        *(d++) = world_x + face_vertices[face][vert_idx][0] + face_offsets[face][0];
+        *(d++) = world_y + face_vertices[face][vert_idx][1] + face_offsets[face][1];
+        *(d++) = world_z + face_vertices[face][vert_idx][2] + face_offsets[face][2];
+
+        // Normal (points outward from face)
+        *(d++) = face_normals[face][0];
+        *(d++) = face_normals[face][1];
+        *(d++) = face_normals[face][2];
+
+        // UV coordinates - map full texture (0,0) to (1,1)
+        float u = (vert_idx == 1 || vert_idx == 2) ? 1.0f : 0.0f;
+        float v = (vert_idx == 2 || vert_idx == 3) ? 1.0f : 0.0f;
+        *(d++) = u;
+        *(d++) = v;
+
+        // AO and light - use full brightness for maze texture
+        *(d++) = 1.0f;  // AO (no darkening)
+        *(d++) = 1.0f;  // Light (full brightness)
+    }
+
+    // Create and render the quad
+    GLuint temp_buffer = sdl_gl_helper::gen_faces(10, 6, quad_data);
+    sdl_gl_helper::draw_triangles_3d_ao(attrib, temp_buffer, 6);
+    sdl_gl_helper::del_buffer(temp_buffer);
+
+    // Restore GL state
+    glDisable(GL_POLYGON_OFFSET_FILL);
 }
 
 void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font,

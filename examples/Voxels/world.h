@@ -128,6 +128,7 @@ private:
     void toggle_light(int x, int y, int z) const noexcept;
     void set_light(int p, int q, int x, int y, int z, int w) const noexcept;
 
+
     void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept;
     void set_block(int x, int y, int z, int w) const noexcept;
     static void record_block(int x, int y, int z, int w) noexcept;
@@ -146,6 +147,7 @@ private:
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify, float x, float y, float n, std::string_view text) const noexcept;
+    void render_player_projected_plane(const sdl_gl_helper::attrib* attrib) const noexcept;
 
     enum class Layer
     {

@@ -155,6 +155,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
         }
         else if (event.button.button == SDL_BUTTON_MIDDLE)
         {
+            // Keep existing behavior: copy block type
             on_middle_click();
         }
     }
@@ -187,6 +188,11 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
 }
 
+void player::draw() const noexcept
+{
+
+}
+
 void player::handle_realtime_input(command_queue& commands)
 {
     static int frame_counter = 0;
@@ -211,6 +217,35 @@ void player::handle_realtime_input(command_queue& commands)
     if (any_key_pressed)
     {
         frame_counter++;
+    }
+
+    // Update projected plane position every frame if maze is ready
+    if (m_world && m_configs.maze_ready)
+    {
+        int hx, hy, hz, face;
+        if (m_world->hit_test_face(&hx, &hy, &hz, &face))
+        {
+            // Valid target found - update plane state
+            m_projected_plane.visible = true;
+            m_projected_plane.texture_id = m_configs.maze_texture_id;
+            m_projected_plane.target_x = hx;
+            m_projected_plane.target_y = hy;
+            m_projected_plane.target_z = hz;
+            m_projected_plane.target_face = face;
+            m_projected_plane.has_valid_target = true;
+        }
+        else
+        {
+            // No valid target (looking at sky/void) - hide plane gracefully
+            m_projected_plane.has_valid_target = false;
+            m_projected_plane.visible = false;
+        }
+    }
+    else
+    {
+        // Maze not ready - ensure plane is hidden
+        m_projected_plane.visible = false;
+        m_projected_plane.has_valid_target = false;
     }
 }
 
@@ -327,6 +362,11 @@ std::string player::get_local_time() const noexcept
     hour = hour ? hour : 12; // Convert 0 to 12 for midnight/noon
 
     return std::string{ mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm) };
+}
+
+const player::projected_plane& player::get_projected_plane() const noexcept
+{
+    return m_projected_plane;
 }
 
 bool player::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
@@ -505,7 +545,7 @@ void player::initialize_actions()
             if (p.generate_maze_texture(rng))
             {
                 SDL_Log("Maze texture generated successfully! Texture ID: %u", p.m_configs.maze_texture_id);
-                SDL_Log("Press middle mouse button on a block face to project the maze texture");
+                SDL_Log("Maze preview will appear on block faces as you move your crosshair");
             }
             else
             {
