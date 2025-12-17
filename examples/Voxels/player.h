@@ -2,6 +2,8 @@
 #define PLAYER_H
 
 #include <cstdint>
+#include <functional>
+#include <future>
 #include <map>
 #include <string>
 
@@ -36,6 +38,7 @@ class world;
 namespace mazes
 {
     class grid_interface;
+    class grid_factory;
     class randomizer;
 }
 
@@ -71,6 +74,7 @@ public:
         int maze_texture_width{ 0 };
         int maze_texture_height{ 0 };
         bool maze_ready{ false };
+        bool preview_enabled{ true };
     } m_configs{};
 
     struct projected_plane
@@ -127,7 +131,12 @@ public:
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
+    std::unique_ptr<mazes::grid_interface> make_grid(const std::string& key,
+        const mazes::configurator& config) const noexcept;
+
     bool generate_maze_texture(mazes::randomizer& rng) noexcept;
+
+    std::string get_mazes_and_reset_future() noexcept;
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;
@@ -155,6 +164,13 @@ private:
     std::int32_t m_item_index;
 
     world* m_world;
+
+    std::function<std::string()> m_maze_task;
+    std::future<std::string> m_maze_future;
+
+    mazes::grid_interface* m_grid;
+
+    std::unique_ptr<mazes::grid_factory> m_grid_factory;;
 };
 
 #endif // PLAYER_H

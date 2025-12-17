@@ -1,5 +1,8 @@
 #include "world.h"
 
+#include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/wavefront_object_helper.h>
+
 #include <noise/noise.h>
 
 #include "command_queue.h"
@@ -368,7 +371,7 @@ void world::init() noexcept
     m_sky_buffer = sdl_gl_helper::gen_sky_buffer();
 }
 
-void world::update(float delta_time, [[maybe_unused]] mazes::randomizer& rng) noexcept
+void world::update(float delta_time, mazes::randomizer& rng) noexcept
 {
     // Process all commands in the queue
     static int update_frame = 0;
@@ -377,7 +380,7 @@ void world::update(float delta_time, [[maybe_unused]] mazes::randomizer& rng) no
     while (!m_command_queue.is_empty())
     {
         auto [action, _] = m_command_queue.pop();
-        action(*m_player, delta_time);
+        action(*m_player, delta_time, std::ref(rng));
         commands_processed++;
     }
 
@@ -515,6 +518,18 @@ void world::handle_event(const SDL_Event& event) noexcept
     {
         // Handle quit event if needed
     }
+}
+
+bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
+{
+    if (!g)
+    {
+        return false;
+    }
+
+    static mazes::wavefront_object_helper woh{};
+
+    return woh.run(g, std::ref(rng));
 }
 
 void world::create_world(const int p, const int q,
@@ -2305,7 +2320,7 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
 
 void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) const noexcept
 {
-    if (!attrib || !m_player)
+    if (!attrib || !m_player || !m_player->m_configs.preview_enabled)
     {
         return;
     }
@@ -2374,14 +2389,9 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     // Debug: Log plane details (only once per position change to avoid spam)
     static int last_logged_x = -9999;
     static int last_logged_z = -9999;
-    bool position_changed = (plane.target_x != last_logged_x || plane.target_z != last_logged_z);
 
-    if (position_changed)
+    if (bool position_changed = (plane.target_x != last_logged_x || plane.target_z != last_logged_z))
     {
-        SDL_Log("Maze plane on TOP of block (%d,%d,%d), tex=%dx%d, plane_size=%.2fx%.2f blocks",
-                plane.target_x, plane.target_y, plane.target_z,
-                m_player->m_configs.maze_texture_width, m_player->m_configs.maze_texture_height,
-                plane_width, plane_height);
         last_logged_x = plane.target_x;
         last_logged_z = plane.target_z;
     }

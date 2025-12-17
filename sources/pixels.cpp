@@ -45,7 +45,7 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
     }
 
     // Calculate scale based on grid dimensions
-    auto [rows, columns, levels] = grid_ops.get_dimensions();
+    auto [rows, columns, _] = grid_ops.get_dimensions();
 
     constexpr unsigned int MIN_SCALE = 1;
     constexpr unsigned int MAX_SCALE = 10;
@@ -75,49 +75,20 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
     // Find the maximum line length to handle lines with trimmed trailing spaces
     size_t ascii_width = 0;
     size_t min_line_length = SIZE_MAX;
-    for (size_t i = 0; i < lines.size(); ++i)
+    for (const auto & l : lines)
     {
-        const auto& l = lines[i];
         ascii_width = std::max(ascii_width, l.length());
         min_line_length = std::min(min_line_length, l.length());
-
-        // Log first few line lengths for debugging
-        if (i < 5)
-        {
-            // Using fprintf to stderr for immediate output
-            fprintf(stderr, "[pixels] Line %zu length: %zu (first 10 chars: '", i, l.length());
-            for (size_t j = 0; j < std::min(l.length(), size_t(10)); ++j)
-            {
-                fprintf(stderr, "%c", l[j]);
-            }
-            fprintf(stderr, "')\n");
-        }
     }
 
-    fprintf(stderr, "[pixels] ASCII dimensions: %zux%zu (min_len=%zu, max_len=%zu), scale=%u\n",
-            ascii_width, ascii_height, min_line_length, ascii_width, scale);
-
-    const unsigned int pixel_width = static_cast<unsigned int>(ascii_width * scale);
-    const unsigned int pixel_height = static_cast<unsigned int>(ascii_height * scale);
-
-    fprintf(stderr, "[pixels] Pixel dimensions: %ux%u\n", pixel_width, pixel_height);
+    const auto pixel_width = static_cast<unsigned int>(ascii_width * scale);
+    const auto pixel_height = static_cast<unsigned int>(ascii_height * scale);
 
     // RGBA format - 4 bytes per pixel
     constexpr unsigned int STRIDE = 4;
     const size_t pixel_data_size = static_cast<size_t>(pixel_width) * pixel_height * STRIDE;
 
     std::vector<std::uint8_t> pixel_data(pixel_data_size);
-
-    // Define colors (RGBA format)
-    constexpr std::uint8_t BLACK_R = 0x00;
-    constexpr std::uint8_t BLACK_G = 0x00;
-    constexpr std::uint8_t BLACK_B = 0x00;
-    constexpr std::uint8_t BLACK_A = 0xFF;
-
-    constexpr std::uint8_t WHITE_R = 0xFF;
-    constexpr std::uint8_t WHITE_G = 0xFF;
-    constexpr std::uint8_t WHITE_B = 0xFF;
-    constexpr std::uint8_t WHITE_A = 0xFF;
 
     // Convert ASCII to pixels
     for (size_t ascii_y = 0; ascii_y < ascii_height; ++ascii_y)
@@ -126,11 +97,23 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
 
         for (size_t ascii_x = 0; ascii_x < ascii_width; ++ascii_x)
         {
+            // Define colors (RGBA format)
+            constexpr std::uint8_t BLACK_R = 0x00;
+            constexpr std::uint8_t BLACK_G = 0x00;
+            constexpr std::uint8_t BLACK_B = 0x00;
+            constexpr std::uint8_t BLACK_A = 0xFF;
+
+            constexpr std::uint8_t WHITE_R = 0xFF;
+            constexpr std::uint8_t WHITE_G = 0xFF;
+            constexpr std::uint8_t WHITE_B = 0xFF;
+            constexpr std::uint8_t WHITE_A = 0xFF;
             // Get character at position, treating missing/beyond-length as space (passage)
             const char ch = (ascii_x < current_line.length()) ? current_line[ascii_x] : ' ';
 
             // Determine if this is a wall or passage
-            const bool is_wall = (ch == '+' || ch == '-' || ch == '|');
+            const bool is_wall = ch == static_cast<unsigned char>(barriers::CORNER) ||
+                ch == static_cast<unsigned char>(barriers::HORIZONTAL) ||
+                ch == static_cast<unsigned char>(barriers::VERTICAL);
 
             const std::uint8_t red = is_wall ? BLACK_R : WHITE_R;
             const std::uint8_t green = is_wall ? BLACK_G : WHITE_G;
@@ -143,13 +126,11 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
                 for (unsigned int sx = 0; sx < scale; ++sx)
                 {
                     const size_t pixel_y = ascii_y * scale + sy;
-                    const size_t pixel_x = ascii_x * scale + sx;
 
-                    if (pixel_y < pixel_height && pixel_x < pixel_width)
+                    if (const size_t pixel_x = ascii_x * scale + sx; pixel_y < pixel_height && pixel_x < pixel_width)
                     {
-                        const size_t pixel_index = (pixel_y * pixel_width + pixel_x) * STRIDE;
-
-                        if (pixel_index + 3 < pixel_data_size)
+                        if (const size_t pixel_index = (pixel_y * pixel_width + pixel_x) * STRIDE;
+                            pixel_index + 3 < pixel_data_size)
                         {
                             pixel_data[pixel_index + 0] = red;
                             pixel_data[pixel_index + 1] = green;

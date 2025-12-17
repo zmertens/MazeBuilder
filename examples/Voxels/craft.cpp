@@ -590,8 +590,6 @@ struct craft::craft_impl
     // Handles GUI options
     class menu_state final : public state
     {
-        mutable bool m_should_close{false};
-
         std::vector<FontIdentifier> m_selectable_fonts;
 
         std::size_t m_selected_font_index{ 0 };
@@ -640,7 +638,8 @@ struct craft::craft_impl
                         ImGui::Text("Welcome to Maze Builder");
                         ImGui::Separator();
                         ImGui::Spacing();
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Navigation Options:");
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f),
+                            "Navigation Options:");
                         ImGui::Spacing();
                         if (ImGui::Button("Resume", ImVec2(200, 40)))
                         {
@@ -654,6 +653,11 @@ struct craft::craft_impl
                             request_stack_clear();
                             request_stack_push(StateIdentifier::EDITOR);
                             request_stack_push(StateIdentifier::LOADING);
+                        }
+                        ImGui::Spacing();
+                        if (ImGui::Button("Close Application", ImVec2(200, 40)))
+                        {
+                            request_stack_clear();
                         }
                         ImGui::Separator();
                         ImGui::Spacing();
@@ -693,11 +697,11 @@ struct craft::craft_impl
                         static int columns = static_cast<int>(maze_config.columns());
                         static int seed = static_cast<int>(maze_config.seed());
 
-                        ImGui::SliderInt("Rows", &rows, 2, static_cast<int>(mazes::configurator::MAX_ROWS));
+                        ImGui::SliderInt("Rows", &rows, 2, mazes::configurator::MAX_ROWS);
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::SliderInt("Columns", &columns, 2, static_cast<int>(mazes::configurator::MAX_COLUMNS));
+                        ImGui::SliderInt("Columns", &columns, 2, mazes::configurator::MAX_COLUMNS);
                         ImGui::Separator();
                         ImGui::Spacing();
 
@@ -707,14 +711,17 @@ struct craft::craft_impl
 
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
                         ImGui::Text("1. Configure maze parameters above");
-                        ImGui::Text("2. Press 'Apply Configuration' button");
+                        ImGui::Text("2. Press 'Apply Configs' button");
                         ImGui::Text("3. Press 'E' key in editor to generate texture");
                         ImGui::Text("4. Aim at a block face");
-                        ImGui::Text("5. Press MIDDLE MOUSE to project maze");
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        if (ImGui::Button("Apply Configuration", ImVec2(200, 40)))
+                        ImGui::Checkbox("Preview Enabled", &get_context().m_player->m_configs.preview_enabled);
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        if (ImGui::Button("Apply Configs", ImVec2(200, 40)))
                         {
                             get_context().m_player->m_configs.maze
                                 .rows(static_cast<unsigned int>(rows))
@@ -768,8 +775,8 @@ struct craft::craft_impl
 
                         auto&& current_configs = get_context().m_player->m_configs;
 
-                        auto last_vsync = current_configs.vsync;
-                        auto last_fullscreen = current_configs.fullscreen;
+                        const auto last_vsync = current_configs.vsync;
+                        const auto last_fullscreen = current_configs.fullscreen;
 
                         ImGui::SliderFloat("FoV", &current_configs.fov, 30, 120, "%.3f degrees");
                         ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
@@ -792,12 +799,12 @@ struct craft::craft_impl
                         static bool initialized = false;
                         if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
                         {
-                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
-                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
+                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), std::size(tag_buffer));
+                            tag_buffer[std::size(tag_buffer) - 1] = '\0';
                             initialized = true;
                         }
 
-                        if (ImGui::InputText("##PlayerTag", tag_buffer, SDL_arraysize(tag_buffer)))
+                        if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
                         {
                             current_configs.tag = std::string(tag_buffer);
                         }
@@ -828,11 +835,9 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            if (m_should_close)
-            {
-                SDL_Log("Menu: Close button clicked - popping menu state\n");
-                request_stack_pop();
-            }
+            auto success = get_context().m_player->run(
+            get_context().m_player->make_grid("", get_context().m_player->m_configs.maze).get(),
+    std::ref(rng));
 
             return false;
         }
@@ -844,7 +849,6 @@ struct craft::craft_impl
                 SDL_Log("Menu: Received SDL_QUIT event - clearing states\n");
                 get_context().m_player->set_active(false);
                 request_stack_clear();
-                return false;
             }
 
             // Handle ESCAPE to return to game
@@ -852,7 +856,6 @@ struct craft::craft_impl
             {
                 SDL_Log("Menu: ESCAPE pressed - returning to editor\n");
                 request_stack_pop();
-                return false;
             }
 
             return false;
@@ -861,6 +864,8 @@ struct craft::craft_impl
 
     const std::string& INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
+
+    bool m_show_download_button{false};
 
     std::unique_ptr<state_stack> m_crafting_states;
 
@@ -876,9 +881,9 @@ struct craft::craft_impl
 
     mazes::grid_factory m_grid_factory;
 
-    mutable double fps_update_timer{0.0};
-    mutable int smoothed_fps{0};
-    mutable float smoothed_frame_time{0.0f};
+    mutable double m_fps_update_timer{0.0};
+    mutable int m_smoothed_fps{0};
+    mutable float m_smoothed_frame_time{0.0f};
 
     craft_impl(const std::string& title, const int w, const int h)
         : INIT_WINDOW_TITLE(title), INIT_WINDOW_WIDTH(w), INIT_WINDOW_HEIGHT(h)
@@ -929,7 +934,7 @@ struct craft::craft_impl
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+        // ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
         ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
         ImGui::GetIO().IniFilename = nullptr;
 
@@ -954,12 +959,12 @@ struct craft::craft_impl
         const auto frame_time = static_cast<float>(elapsed);
 
         // Update smoothed values periodically for display
-        fps_update_timer += elapsed;
-        if (constexpr double FPS_UPDATE_INTERVAL = 250.0; fps_update_timer >= FPS_UPDATE_INTERVAL)
+        m_fps_update_timer += elapsed;
+        if (constexpr double FPS_UPDATE_INTERVAL = 250.0; m_fps_update_timer >= FPS_UPDATE_INTERVAL)
         {
-            smoothed_fps = fps;
-            smoothed_frame_time = frame_time;
-            fps_update_timer = 0.0;
+            m_smoothed_fps = fps;
+            m_smoothed_frame_time = frame_time;
+            m_fps_update_timer = 0.0;
         }
 
         // Create ImGui overlay window
@@ -978,10 +983,11 @@ struct craft::craft_impl
             ImGuiWindowFlags_NoNav |
             ImGuiWindowFlags_NoMove;
 
-        if (this->m_player.m_configs.show_stats_window && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        if (this->m_player.m_configs.show_stats_window
+            && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
-            ImGui::Text("FPS: %d", smoothed_fps);
-            ImGui::Text("Frame Time: %.2f ms", smoothed_frame_time);
+            ImGui::Text("FPS: %d", m_smoothed_fps);
+            ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
             ImGui::Text("local time: %s\n", this->m_player.get_local_time().data());
             ImGui::End();
         }
@@ -1101,7 +1107,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
     double time_step = 0.0;
     double accumulator = 0.0;
 
-    this->m_impl->m_crafting_states->update(0.0f, rng);
+    this->m_impl->m_crafting_states->update(0.0f, std::ref(rng));
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
@@ -1132,7 +1138,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
             time_step += FIXED_TIME_STEP;
             accumulator -= FIXED_TIME_STEP;
 
-            this->m_impl->update(FIXED_TIME_STEP, rng);
+            this->m_impl->update(FIXED_TIME_STEP, std::ref(rng));
         }
 
         this->m_impl->render(elapsed);
@@ -1176,9 +1182,10 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 
 std::string craft::artifacts() const noexcept
 {
-    return "hello world";
+    return this->m_impl->m_player.get_mazes_and_reset_future();
 }
 
-void craft::show_download_button(bool show) const noexcept
+void craft::show_download_button(const bool show) const noexcept
 {
+    this->m_impl->m_show_download_button = show;
 }

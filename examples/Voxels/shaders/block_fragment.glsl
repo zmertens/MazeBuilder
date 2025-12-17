@@ -21,18 +21,20 @@ void main() {
     vec4 texColor = texture(sampler, fragment_uv);
     vec3 color = texColor.rgb;
 
+    // Detect maze texture FIRST: fragment_light == 1.0 AND fragment_ao == 1.0 (from uv.z=0.0)
+    // This must come before cloud check since white passages are (1,1,1)
+    // Render it without any lighting, AO, or fog effects
+    if (fragment_light >= 0.99 && fragment_ao >= 0.99) {
+        // Maze texture detected - render at full brightness without lighting/fog
+        fragColor = vec4(color, 1.0);
+        brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
     // Discard transparent pixels (alpha < 0.5) or magenta color key (with tolerance for mipmap filtering)
     bool is_magenta = (color.r > 0.8 && color.g < 0.2 && color.b > 0.8);
     if (texColor.a < 0.5 || is_magenta) {
         discard;
-    }
-
-    // Detect maze texture: fragment_light == 1.0 means full brightness (maze projection)
-    // Render it without any lighting, AO, or fog effects
-    if (fragment_light >= 0.99 && fragment_ao < 0.01) {
-        fragColor = vec4(color, 1.0);
-        brightColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
     }
 
     bool cloud = color == vec3(1.0, 1.0, 1.0);

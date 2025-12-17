@@ -13,7 +13,8 @@
 #include "map.h"
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
-#include "sign.h"
+
+#include <MazeBuilder/algo_interface.h>
 
 struct worker;
 struct worker_item;
@@ -26,10 +27,11 @@ class command_queue;
 class sdl_gl_helper;
 
 namespace mazes {
+    class grid_interface;
     class randomizer;
 }
 
-class world final {
+class world final : public mazes::algo_interface {
     friend class player;
 public:
     explicit world(SDL_Window* window,
@@ -39,7 +41,7 @@ public:
         texture_manager& textures,
         const sdl_gl_helper* sdl);
 
-    ~world();
+    ~world() override;
 
     void init() noexcept;
 
@@ -54,14 +56,12 @@ public:
 
     void handle_event(const SDL_Event& event) noexcept;
 
-    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
-
-    // Light manipulation (public for player actions)
-    void on_light() const noexcept;
-
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 private:
     // Build the scene (initialize scene graph and layers)
     void build_scene();
+
+    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
 
     // Scene graph helper methods
     void attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept;
@@ -135,7 +135,7 @@ private:
     [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
     void builder_block(int x, int y, int z, int w) const noexcept;
 
-    std::size_t get_chunk_count() const noexcept;
+    [[nodiscard]] std::size_t get_chunk_count() const noexcept;
 
     int render_chunks(const sdl_gl_helper::attrib* attrib, uint32_t texture) const noexcept;
     void render_signs(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;

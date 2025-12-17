@@ -52,16 +52,14 @@ bool wavefront_object_helper::run(grid_interface *g, [[maybe_unused]] randomizer
     for (const auto &face : faces)
     {
         result << "f";
-        for (auto index : face)
+        for (const auto index : face)
         {
             result << " " << index;
         }
         result << "\n";
     }
 
-    // Convert to string and set (only one string allocation here)
-    string final_result = result.str();
-    g_ops.set_str(final_result);
+    g_ops.set_str(result.str());
 
     return !g_ops.get_str().empty();
 } // run
