@@ -1,6 +1,8 @@
 #include "player.h"
 
+#include <fstream>
 #include <ranges>
+#include <sstream>
 
 #include "command_queue.h"
 #include "entity.h"
@@ -718,13 +720,9 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
             return false;
         }
 
-        // Calculate dimensions (pixels uses a scale factor)
+        // Calculate dimensions from actual pixel data
+        // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
         auto [rows, columns, levels] = grid->operations().get_dimensions();
-
-        // The pixels algorithm scales the ASCII representation
-        // ASCII is (rows*2+1) x (columns*2+1)
-        const auto ascii_height = rows * 2 + 1;
-        const auto ascii_width = columns * 2 + 1;
 
         // Calculate scale (same as in pixels.cpp)
         constexpr unsigned int MIN_SCALE = 1;
@@ -732,10 +730,134 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
         auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
         auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
 
-        const int width = static_cast<int>(ascii_width * scale);
+        // Height is predictable: (rows*2+1) * scale
+        const auto ascii_height = rows * 2 + 1;
         const int height = static_cast<int>(ascii_height * scale);
 
+        // Width must be calculated from pixel data size since ASCII lines may have varying lengths
+        // pixel_data.size() = width * height * 4 (RGBA)
+        const int width = static_cast<int>(pixel_data.size() / (height * 4));
+
         SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
+
+        // Debug: Log the ASCII representation to see what the maze looks like
+        std::string maze_ascii = grid->operations().get_str();
+        if (!maze_ascii.empty())
+        {
+            SDL_Log("Maze ASCII (first 10 lines):");
+            std::istringstream iss(maze_ascii);
+            std::string line;
+            int line_count = 0;
+            while (std::getline(iss, line) && line_count < 10)
+            {
+                SDL_Log("  %s", line.c_str());
+
+                // DIAGNOSTIC: Check specific characters that should be passages
+                if (line_count == 1 && line.length() > 5)
+                {
+                    SDL_Log("  Line 1 character analysis:");
+                    SDL_Log("    Char[0]='%c' (should be |)", line[0]);
+                    SDL_Log("    Char[1]='%c' (should be space)", line[1]);
+                    SDL_Log("    Char[2]='%c' (should be space)", line[2]);
+                    SDL_Log("    Char[5]='%c' (should be space)", line[5]);
+                }
+
+                line_count++;
+            }
+        }
+
+        // Debug: Log sample pixels from multiple rows to verify the maze data
+        if (pixel_data.size() >= static_cast<size_t>(width * height) * 4)
+        {
+            SDL_Log("Pixel samples - Row 0 (top border - should be all black):");
+            const int samples = std::min(10, width);
+            for (int i = 0; i < samples; i++)
+            {
+                const size_t idx = i * 4;
+                SDL_Log("  Pixel[%d]: %d,%d,%d,%d %s", i,
+                        pixel_data[idx + 0], pixel_data[idx + 1],
+                        pixel_data[idx + 2], pixel_data[idx + 3],
+                        (pixel_data[idx] == 0) ? "(wall)" : "(passage)");
+            }
+
+            // Sample from the CENTER of the texture where passages should definitely exist
+            const int center_y = height / 2;
+            const int center_x_start = width / 2 - 5;
+            SDL_Log("Pixel samples - Center of texture (y=%d, x=%d+) (MUST have passages):", center_y, center_x_start);
+            for (int i = 0; i < samples; i++)
+            {
+                const size_t idx = (center_y * width + center_x_start + i) * 4;
+                if (idx + 3 < pixel_data.size())
+                {
+                    SDL_Log("  Pixel[%d]: %d,%d,%d,%d %s", i,
+                            pixel_data[idx + 0], pixel_data[idx + 1],
+                            pixel_data[idx + 2], pixel_data[idx + 3],
+                            (pixel_data[idx] == 0) ? "(wall)" : "(passage)");
+                }
+            }
+
+            // Find and log the first passage pixel
+            bool found_passage = false;
+            for (size_t i = 0; i < pixel_data.size() && !found_passage; i += 4)
+            {
+                if (pixel_data[i] == 255)  // White pixel (passage)
+                {
+                    const int px = (i / 4) % width;
+                    const int py = (i / 4) / width;
+                    SDL_Log("First passage pixel found at: (%d, %d)", px, py);
+                    found_passage = true;
+                }
+            }
+
+            // DIAGNOSTIC: Sample multiple columns to understand the pattern
+            const int test_columns[] = {10, 30, 60, 100, 15};
+            for (int col : test_columns)
+            {
+                SDL_Log("Checking column X=%d (first 20 rows):", col);
+                bool has_variation = false;
+                bool last_was_wall = (pixel_data[(0 * width + col) * 4] == 0);
+
+                for (int y = 0; y < std::min(20, height); y++)
+                {
+                    const size_t idx = (y * width + col) * 4;
+                    const bool is_wall = (pixel_data[idx] == 0);
+
+                    if (y > 0 && is_wall != last_was_wall)
+                    {
+                        has_variation = true;
+                    }
+                    last_was_wall = is_wall;
+
+                    if (y < 5) // Only log first 5 to reduce spam
+                    {
+                        SDL_Log("  Y=%d: %s", y, is_wall ? "WALL" : "passage");
+                    }
+                }
+                SDL_Log("  Column X=%d has %s", col, has_variation ? "VERTICAL VARIATION (good)" : "NO VARIATION (all same - BAD!)");
+            }
+
+            // Count wall vs passage pixels
+            int wall_count = 0;
+            int passage_count = 0;
+            for (size_t i = 0; i < pixel_data.size(); i += 4)
+            {
+                if (pixel_data[i] == 0)
+                    wall_count++;
+                else
+                    passage_count++;
+            }
+            SDL_Log("Pixel statistics: %d walls (%.1f%%), %d passages (%.1f%%)",
+                    wall_count, 100.0f * wall_count / (wall_count + passage_count),
+                    passage_count, 100.0f * passage_count / (wall_count + passage_count));
+
+            // Write texture to file for visual inspection
+            SDL_Log("Writing maze texture to 'maze_debug.data' for inspection...");
+            if (std::ofstream out("maze_debug.data", std::ios::binary); out)
+            {
+                out.write(reinterpret_cast<const char*>(pixel_data.data()), pixel_data.size());
+                SDL_Log("Maze texture written successfully (use image viewer to open as raw RGBA %dx%d)", width, height);
+            }
+        }
 
         // Delete old texture if it exists
         if (m_configs.maze_texture_id != 0)

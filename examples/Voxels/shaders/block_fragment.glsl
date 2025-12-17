@@ -26,6 +26,15 @@ void main() {
     if (texColor.a < 0.5 || is_magenta) {
         discard;
     }
+
+    // Detect maze texture: fragment_light == 1.0 means full brightness (maze projection)
+    // Render it without any lighting, AO, or fog effects
+    if (fragment_light >= 0.99 && fragment_ao < 0.01) {
+        fragColor = vec4(color, 1.0);
+        brightColor = vec4(0.0, 0.0, 0.0, 1.0);
+        return;
+    }
+
     bool cloud = color == vec3(1.0, 1.0, 1.0);
     if (cloud && is_ortho) {
         discard;

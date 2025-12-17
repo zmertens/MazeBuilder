@@ -2336,40 +2336,16 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
     glUniform1f(attrib->timer, time_of_day());
 
-    // Use polygon offset to render slightly in front of the block face
+    // Use polygon offset to render in front of blocks
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(-1.0f, -1.0f);
 
-    // Face offset vectors - position plane slightly in front of block face
-    static const float face_offsets[6][3] = {
-        {-0.502f, 0.0f, 0.0f},  // Left (-X)
-        {+0.502f, 0.0f, 0.0f},  // Right (+X)
-        {0.0f, 0.0f, -0.502f},  // Front (-Z)
-        {0.0f, 0.0f, +0.502f},  // Back (+Z)
-        {0.0f, +0.502f, 0.0f},  // Top (+Y)
-        {0.0f, -0.502f, 0.0f}   // Bottom (-Y)
-    };
+    // Disable face culling so plane is visible from both sides
+    glDisable(GL_CULL_FACE);
 
-    // Quad vertices for each face orientation (centered on block face)
-    // All vertices are wound counter-clockwise when viewed from outside the cube
-    static const float face_vertices[6][4][3] = {
-        // Left face (-X) - looking at it from negative X direction
-        {{0, -0.5f, +0.5f}, {0, -0.5f, -0.5f}, {0, +0.5f, -0.5f}, {0, +0.5f, +0.5f}},
-        // Right face (+X) - looking at it from positive X direction
-        {{0, -0.5f, -0.5f}, {0, -0.5f, +0.5f}, {0, +0.5f, +0.5f}, {0, +0.5f, -0.5f}},
-        // Front face (-Z) - looking at it from negative Z direction
-        {{+0.5f, -0.5f, 0}, {-0.5f, -0.5f, 0}, {-0.5f, +0.5f, 0}, {+0.5f, +0.5f, 0}},
-        // Back face (+Z) - looking at it from positive Z direction
-        {{-0.5f, -0.5f, 0}, {+0.5f, -0.5f, 0}, {+0.5f, +0.5f, 0}, {-0.5f, +0.5f, 0}},
-        // Top face (+Y) - looking down at it from positive Y direction
-        {{-0.5f, 0, +0.5f}, {+0.5f, 0, +0.5f}, {+0.5f, 0, -0.5f}, {-0.5f, 0, -0.5f}},
-        // Bottom face (-Y) - looking up at it from negative Y direction
-        {{-0.5f, 0, -0.5f}, {+0.5f, 0, -0.5f}, {+0.5f, 0, +0.5f}, {-0.5f, 0, +0.5f}}
-    };
-
-    static const float face_normals[6][3] = {
-        {-1, 0, 0}, {+1, 0, 0}, {0, 0, -1}, {0, 0, +1}, {0, +1, 0}, {0, -1, 0}
-    };
+    // Enable blending for semi-transparency (optional)
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     // Get world coordinates (center of the block)
     float world_x = static_cast<float>(plane.target_x);
@@ -2383,14 +2359,108 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
         face = 4;  // Map all top face rotations to index 4
     }
 
+    // Get maze texture dimensions from player
+    const float tex_width = static_cast<float>(m_player->m_configs.maze_texture_width);
+    const float tex_height = static_cast<float>(m_player->m_configs.maze_texture_height);
+
+    // Scale the plane to match texture aspect ratio
+    // Each pixel in the texture represents approximately 1/32 of a block (adjustable)
+    constexpr float pixel_to_block_scale = 1.0f / 32.0f;
+    const float plane_width = tex_width * pixel_to_block_scale;
+    const float plane_height = tex_height * pixel_to_block_scale;
+    const float half_width = plane_width * 0.5f;
+    const float half_height = plane_height * 0.5f;
+
+    // Offset from block face - float the plane slightly in front (0.1 blocks)
+    constexpr float offset_distance = 0.1f;
+
+    // Face normals - used for offsetting the plane away from the face
+    static const float face_normals[6][3] = {
+        {-1, 0, 0}, {+1, 0, 0}, {0, 0, -1}, {0, 0, +1}, {0, +1, 0}, {0, -1, 0}
+    };
+
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, plane.texture_id);
     glUniform1i(attrib->sampler, 0);
 
-    // Build quad geometry (6 vertices = 2 triangles)
+    // Debug: Log plane details (only once per face change to avoid spam)
+    static int last_logged_face = -1;
+    static int last_logged_x = -9999;
+    static int last_logged_z = -9999;
+    bool position_changed = (plane.target_x != last_logged_x || plane.target_z != last_logged_z);
+
+    if (face != last_logged_face || position_changed)
+    {
+        SDL_Log("Floating plane: face=%d, block=(%d,%d,%d), tex=%dx%d, plane_size=%.2fx%.2f blocks",
+                face, plane.target_x, plane.target_y, plane.target_z,
+                m_player->m_configs.maze_texture_width, m_player->m_configs.maze_texture_height,
+                plane_width, plane_height);
+        last_logged_face = face;
+        last_logged_x = plane.target_x;
+        last_logged_z = plane.target_z;
+    }
+
+    // Build floating plane geometry based on face orientation
     float quad_data[6 * 10];  // 6 vertices * 10 floats per vertex
     float* d = quad_data;
+
+    // Calculate the center position of the plane (offset from block center)
+    float center_x = world_x + face_normals[face][0] * offset_distance;
+    float center_y = world_y + face_normals[face][1] * offset_distance;
+    float center_z = world_z + face_normals[face][2] * offset_distance;
+
+    // Define plane vertices based on face orientation
+    // We'll create a plane that's properly oriented to face the camera
+    float vertices[4][3];
+
+    switch (face)
+    {
+        case 0: // Left (-X) - plane parallel to YZ
+            vertices[0][0] = 0; vertices[0][1] = -half_height; vertices[0][2] = -half_width;  // BL
+            vertices[1][0] = 0; vertices[1][1] = -half_height; vertices[1][2] = +half_width;  // BR
+            vertices[2][0] = 0; vertices[2][1] = +half_height; vertices[2][2] = +half_width;  // TR
+            vertices[3][0] = 0; vertices[3][1] = +half_height; vertices[3][2] = -half_width;  // TL
+            break;
+        case 1: // Right (+X) - plane parallel to YZ
+            vertices[0][0] = 0; vertices[0][1] = -half_height; vertices[0][2] = +half_width;  // BL
+            vertices[1][0] = 0; vertices[1][1] = -half_height; vertices[1][2] = -half_width;  // BR
+            vertices[2][0] = 0; vertices[2][1] = +half_height; vertices[2][2] = -half_width;  // TR
+            vertices[3][0] = 0; vertices[3][1] = +half_height; vertices[3][2] = +half_width;  // TL
+            break;
+        case 2: // Front (-Z) - plane parallel to XY
+            vertices[0][0] = -half_width;  vertices[0][1] = -half_height; vertices[0][2] = 0;  // BL
+            vertices[1][0] = +half_width;  vertices[1][1] = -half_height; vertices[1][2] = 0;  // BR
+            vertices[2][0] = +half_width;  vertices[2][1] = +half_height; vertices[2][2] = 0;  // TR
+            vertices[3][0] = -half_width;  vertices[3][1] = +half_height; vertices[3][2] = 0;  // TL
+            break;
+        case 3: // Back (+Z) - plane parallel to XY
+            vertices[0][0] = +half_width;  vertices[0][1] = -half_height; vertices[0][2] = 0;  // BL
+            vertices[1][0] = -half_width;  vertices[1][1] = -half_height; vertices[1][2] = 0;  // BR
+            vertices[2][0] = -half_width;  vertices[2][1] = +half_height; vertices[2][2] = 0;  // TR
+            vertices[3][0] = +half_width;  vertices[3][1] = +half_height; vertices[3][2] = 0;  // TL
+            break;
+        case 4: // Top (+Y) - plane parallel to XZ
+            vertices[0][0] = -half_width;  vertices[0][1] = 0; vertices[0][2] = -half_height;  // BL
+            vertices[1][0] = +half_width;  vertices[1][1] = 0; vertices[1][2] = -half_height;  // BR
+            vertices[2][0] = +half_width;  vertices[2][1] = 0; vertices[2][2] = +half_height;  // TR
+            vertices[3][0] = -half_width;  vertices[3][1] = 0; vertices[3][2] = +half_height;  // TL
+            break;
+        case 5: // Bottom (-Y) - plane parallel to XZ
+            vertices[0][0] = -half_width;  vertices[0][1] = 0; vertices[0][2] = +half_height;  // BL
+            vertices[1][0] = +half_width;  vertices[1][1] = 0; vertices[1][2] = +half_height;  // BR
+            vertices[2][0] = +half_width;  vertices[2][1] = 0; vertices[2][2] = -half_height;  // TR
+            vertices[3][0] = -half_width;  vertices[3][1] = 0; vertices[3][2] = -half_height;  // TL
+            break;
+    }
+
+    // Standard UV coordinates (same for all faces now since plane is oriented correctly)
+    static const float uvs[4][2] = {
+        {0.0f, 1.0f},  // BL (V flipped for OpenGL)
+        {1.0f, 1.0f},  // BR
+        {1.0f, 0.0f},  // TR
+        {0.0f, 0.0f}   // TL
+    };
 
     // Triangle indices: 0,1,2 and 0,2,3 form the quad
     static const int indices[6] = {0, 1, 2, 0, 2, 3};
@@ -2399,24 +2469,22 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     {
         int vert_idx = indices[i];
 
-        // Position - offset from block center to face position
-        *(d++) = world_x + face_vertices[face][vert_idx][0] + face_offsets[face][0];
-        *(d++) = world_y + face_vertices[face][vert_idx][1] + face_offsets[face][1];
-        *(d++) = world_z + face_vertices[face][vert_idx][2] + face_offsets[face][2];
+        // Position - world space position of the floating plane
+        *(d++) = center_x + vertices[vert_idx][0];
+        *(d++) = center_y + vertices[vert_idx][1];
+        *(d++) = center_z + vertices[vert_idx][2];
 
         // Normal (points outward from face)
         *(d++) = face_normals[face][0];
         *(d++) = face_normals[face][1];
         *(d++) = face_normals[face][2];
 
-        // UV coordinates - map full texture (0,0) to (1,1)
-        float u = (vert_idx == 1 || vert_idx == 2) ? 1.0f : 0.0f;
-        float v = (vert_idx == 2 || vert_idx == 3) ? 1.0f : 0.0f;
-        *(d++) = u;
-        *(d++) = v;
+        // UV coordinates
+        *(d++) = uvs[vert_idx][0];  // U
+        *(d++) = uvs[vert_idx][1];  // V
 
         // AO and light - use full brightness for maze texture
-        *(d++) = 1.0f;  // AO (no darkening)
+        *(d++) = 0.0f;  // AO (0.0 = no darkening, see vertex shader)
         *(d++) = 1.0f;  // Light (full brightness)
     }
 
@@ -2427,6 +2495,8 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
 
     // Restore GL state
     glDisable(GL_POLYGON_OFFSET_FILL);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
 }
 
 void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font,

@@ -71,10 +71,36 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
 
     // Calculate pixel dimensions
     const size_t ascii_height = lines.size();
-    const size_t ascii_width = lines[0].length();
+
+    // Find the maximum line length to handle lines with trimmed trailing spaces
+    size_t ascii_width = 0;
+    size_t min_line_length = SIZE_MAX;
+    for (size_t i = 0; i < lines.size(); ++i)
+    {
+        const auto& l = lines[i];
+        ascii_width = std::max(ascii_width, l.length());
+        min_line_length = std::min(min_line_length, l.length());
+
+        // Log first few line lengths for debugging
+        if (i < 5)
+        {
+            // Using fprintf to stderr for immediate output
+            fprintf(stderr, "[pixels] Line %zu length: %zu (first 10 chars: '", i, l.length());
+            for (size_t j = 0; j < std::min(l.length(), size_t(10)); ++j)
+            {
+                fprintf(stderr, "%c", l[j]);
+            }
+            fprintf(stderr, "')\n");
+        }
+    }
+
+    fprintf(stderr, "[pixels] ASCII dimensions: %zux%zu (min_len=%zu, max_len=%zu), scale=%u\n",
+            ascii_width, ascii_height, min_line_length, ascii_width, scale);
 
     const unsigned int pixel_width = static_cast<unsigned int>(ascii_width * scale);
     const unsigned int pixel_height = static_cast<unsigned int>(ascii_height * scale);
+
+    fprintf(stderr, "[pixels] Pixel dimensions: %ux%u\n", pixel_width, pixel_height);
 
     // RGBA format - 4 bytes per pixel
     constexpr unsigned int STRIDE = 4;
@@ -98,9 +124,10 @@ bool pixels::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noex
     {
         const std::string &current_line = lines[ascii_y];
 
-        for (size_t ascii_x = 0; ascii_x < ascii_width && ascii_x < current_line.length(); ++ascii_x)
+        for (size_t ascii_x = 0; ascii_x < ascii_width; ++ascii_x)
         {
-            const char ch = current_line[ascii_x];
+            // Get character at position, treating missing/beyond-length as space (passage)
+            const char ch = (ascii_x < current_line.length()) ? current_line[ascii_x] : ' ';
 
             // Determine if this is a wall or passage
             const bool is_wall = (ch == '+' || ch == '-' || ch == '|');
