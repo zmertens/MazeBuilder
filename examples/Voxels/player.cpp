@@ -226,6 +226,8 @@ void player::handle_realtime_input(command_queue& commands)
         if (m_world->hit_test_face(&hx, &hy, &hz, &face))
         {
             // Valid target found - update plane state
+            bool face_changed = (m_projected_plane.target_face != face) || !m_projected_plane.visible;
+
             m_projected_plane.visible = true;
             m_projected_plane.texture_id = m_configs.maze_texture_id;
             m_projected_plane.target_x = hx;
@@ -233,6 +235,19 @@ void player::handle_realtime_input(command_queue& commands)
             m_projected_plane.target_z = hz;
             m_projected_plane.target_face = face;
             m_projected_plane.has_valid_target = true;
+
+#if defined(MAZE_DEBUG)
+            // Log when face changes (for debugging)
+            if (face_changed)
+            {
+                static const char* face_names[] = {
+                    "Left(-X)", "Right(+X)", "Front(-Z)", "Back(+Z)", "Top(+Y)", "Bottom(-Y)", "Top-rot6", "Top-rot7"
+                };
+                const char* face_name = (face < 8) ? face_names[face] : "Unknown";
+                SDL_Log("Projected plane on face %d [%s] at block (%d, %d, %d)",
+                        face, face_name, hx, hy, hz);
+            }
+#endif
         }
         else
         {

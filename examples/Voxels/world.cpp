@@ -947,6 +947,12 @@ int world::hit_test_face(int* x, int* y, int* z, int* face) const noexcept
             *face = 4 + top;
             return 1;
         }
+        if (dx == 0 && dy == -1 && dz == 0)
+        {
+            // Bottom face - use simple face index 5
+            *face = 5;
+            return 1;
+        }
     }
     return 0;
 }
@@ -2345,19 +2351,20 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     };
 
     // Quad vertices for each face orientation (centered on block face)
+    // All vertices are wound counter-clockwise when viewed from outside the cube
     static const float face_vertices[6][4][3] = {
-        // Left face (-X) - looking at -X face from outside
-        {{0, -0.5f, -0.5f}, {0, -0.5f, +0.5f}, {0, +0.5f, +0.5f}, {0, +0.5f, -0.5f}},
-        // Right face (+X) - looking at +X face from outside
+        // Left face (-X) - looking at it from negative X direction
         {{0, -0.5f, +0.5f}, {0, -0.5f, -0.5f}, {0, +0.5f, -0.5f}, {0, +0.5f, +0.5f}},
-        // Front face (-Z) - looking at -Z face from outside
-        {{-0.5f, -0.5f, 0}, {+0.5f, -0.5f, 0}, {+0.5f, +0.5f, 0}, {-0.5f, +0.5f, 0}},
-        // Back face (+Z) - looking at +Z face from outside
+        // Right face (+X) - looking at it from positive X direction
+        {{0, -0.5f, -0.5f}, {0, -0.5f, +0.5f}, {0, +0.5f, +0.5f}, {0, +0.5f, -0.5f}},
+        // Front face (-Z) - looking at it from negative Z direction
         {{+0.5f, -0.5f, 0}, {-0.5f, -0.5f, 0}, {-0.5f, +0.5f, 0}, {+0.5f, +0.5f, 0}},
-        // Top face (+Y) - looking down at +Y face
-        {{-0.5f, 0, -0.5f}, {+0.5f, 0, -0.5f}, {+0.5f, 0, +0.5f}, {-0.5f, 0, +0.5f}},
-        // Bottom face (-Y) - looking up at -Y face
-        {{-0.5f, 0, +0.5f}, {+0.5f, 0, +0.5f}, {+0.5f, 0, -0.5f}, {-0.5f, 0, -0.5f}}
+        // Back face (+Z) - looking at it from positive Z direction
+        {{-0.5f, -0.5f, 0}, {+0.5f, -0.5f, 0}, {+0.5f, +0.5f, 0}, {-0.5f, +0.5f, 0}},
+        // Top face (+Y) - looking down at it from positive Y direction
+        {{-0.5f, 0, +0.5f}, {+0.5f, 0, +0.5f}, {+0.5f, 0, -0.5f}, {-0.5f, 0, -0.5f}},
+        // Bottom face (-Y) - looking up at it from negative Y direction
+        {{-0.5f, 0, -0.5f}, {+0.5f, 0, -0.5f}, {+0.5f, 0, +0.5f}, {-0.5f, 0, +0.5f}}
     };
 
     static const float face_normals[6][3] = {
@@ -2369,6 +2376,12 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     float world_y = static_cast<float>(plane.target_y);
     float world_z = static_cast<float>(plane.target_z);
     int face = plane.target_face;
+
+    // Clamp face index to 0-5 range (top face can be 4-7, map all to 4)
+    if (face > 5)
+    {
+        face = 4;  // Map all top face rotations to index 4
+    }
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0);
