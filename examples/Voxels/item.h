@@ -29,6 +29,8 @@
 #define BLUE_FLOWER 23
 #define SDL_LOGO 24
 #define SFML_LOGO 25
+#define CACTUS_1 26
+#define CACTUS_2 27
 #define COLOR_00 32
 #define COLOR_01 33
 #define COLOR_02 34

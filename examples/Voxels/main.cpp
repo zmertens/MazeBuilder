@@ -30,7 +30,8 @@ EMSCRIPTEN_BINDINGS (craft_module)
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
         .constructor<const std::string&, int, int>()
         .function("artifacts", &craft::artifacts)
-        .function("show_download_button", &craft::show_download_button);
+        .function("is_download_ready", &craft::is_download_ready)
+        .function("set_download_ready", &craft::set_download_ready);
 }
 #endif
 

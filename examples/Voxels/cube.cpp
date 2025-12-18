@@ -128,8 +128,8 @@ void make_plant(
     };
     float *d = data;
     float s = 0.0625;
-    float a = 0;
-    float b = s;
+    float a = 0 + 1 / 2048.0;
+    float b = s - 1 / 2048.0;
     float du = (item::plants[w] % 16) * s;
     float dv = (item::plants[w] / 16) * s;
     for (int i = 0; i < 4; i++) {

@@ -128,7 +128,6 @@ private:
     void set_block(int x, int y, int z, int w) const noexcept;
     static void record_block(int x, int y, int z, int w) noexcept;
     [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
-    void builder_block(int x, int y, int z, int w) const noexcept;
 
     [[nodiscard]] std::size_t get_chunk_count() const noexcept;
 

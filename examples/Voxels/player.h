@@ -11,7 +11,6 @@
 #include <MazeBuilder/configurator.h>
 
 #include "command.h"
-#include "MazeBuilder/factory_interface.h"
 
 enum class PlayerAction
 {
@@ -28,6 +27,7 @@ enum class PlayerAction
     DESTROY_BLOCK,
     PLACE_LIGHT,
     BUILD_MAZE,
+    PREVIEW_MAZE,
     DONE,
     COUNT
 };
@@ -77,6 +77,7 @@ public:
         int maze_texture_height{ 0 };
         bool maze_ready{ false };
         bool preview_enabled{ true };
+        bool download_ready{ false };
     } m_configs{};
 
     struct projected_plane

@@ -193,8 +193,8 @@
                 setStatus(text) {
                     if (!Module.setStatus.last) Module.setStatus.last = {time: Date.now(), text: ''};
                     if (text === Module.setStatus.last.text) return;
-                    var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-                    var now = Date.now();
+                    const m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
+                    const now = Date.now();
                     // if this is a progress update, skip it if too soon
                     if (m && now - Module.setStatus.last.time < 30) return;
                     Module.setStatus.last.time = now;
@@ -222,24 +222,74 @@
                     // Force a resize event to ensure canvas sizes correctly on initial load
                     window.dispatchEvent(new Event('resize'));
 
-                    // Call the exported C++ functions via Embind
-                    // Note: Module.get() returns an instance, then we can call artifacts() on it
+                    // Get the instance once
+                    let inst = null;
                     try {
                         console.log('Calling Module.get()...');
-                        const inst = Module.get();
+                        inst = Module.get();
                         console.log('Instance retrieved:', inst);
-
-                        console.log('Calling artifacts()...');
-                        const result = inst.artifacts();
-                        console.log('Artifacts result:', result);
-
-                        // Print the string result to the output textarea
-                        Module.print('=== Artifacts Result ===');
-                        Module.print(result);
                     } catch (e) {
-                        console.error('Error calling Module methods:', e);
+                        console.error('Error calling Module.get():', e);
                         Module.print('Error: ' + e.message);
+                        return;
                     }
+
+                    // Poll is_download_ready() every 3-5ms (using 4ms as middle ground)
+                    let pollCount = 0;
+                    const pollInterval = setInterval(() => {
+                        pollCount++;
+                        try {
+                            const isReady = inst.is_download_ready();
+
+                            // Log every ~1 second
+                            if (pollCount % 250 === 0) {
+                                console.log(`Polling is_download_ready() [${pollCount}]: ${isReady}`);
+                            }
+
+                            if (isReady) {
+                                clearInterval(pollInterval);
+                                console.log('Download ready! Calling artifacts()...');
+                                Module.print('Download ready! Retrieving artifacts...');
+
+                                // Get the artifacts
+                                const result = inst.artifacts();
+                                console.log('Artifacts retrieved, length:', result.length);
+
+                                // Check if artifacts are not empty
+                                if (!result || result.length === 0) {
+                                    console.warn('Artifacts are empty!');
+                                    Module.print('Warning: Artifacts are empty, nothing to download.');
+                                    return;
+                                }
+
+                                Module.print(`Artifacts retrieved: ${result.length} characters`);
+
+                                // Create a blob from the artifacts string
+                                const blob = new Blob([result], { type: 'text/plain' });
+
+                                // Create a download link and trigger download
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = 'artifacts_' + new Date().toISOString().replace(/[:.]/g, '-') + '.obj';
+                                document.body.appendChild(a);
+                                a.click();
+
+                                // Cleanup
+                                setTimeout(() => {
+                                    inst.set_download_ready(false);
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                    Module.print('Artifacts downloaded successfully!');
+                                    console.log('Download triggered, cleanup complete');
+                                }, 100);
+                            }
+                        } catch (e) {
+                            clearInterval(pollInterval);
+                            console.error('Error during polling or artifact retrieval:', e);
+                            Module.print('Error: ' + e.message);
+                        }
+                    }, 3000);
                 }
             };
             Module.setStatus('Downloading...');

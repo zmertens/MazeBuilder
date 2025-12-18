@@ -1972,13 +1972,12 @@ void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept
     }
 }
 
-void world::_set_block(int p, int q, int x, int y, int z, const int w, const int dirty) const noexcept
+void world::_set_block(const int p, int q, int x, int y, int z, const int w, const int dirty) const noexcept
 {
-    if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
+    if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
-        Map* map = &chunk->map;
-        if (map_set(map, x, y, z, w))
+        if (Map* map = &chunk->map; map_set(map, x, y, z, w))
         {
             if (dirty)
             {
@@ -1998,10 +1997,10 @@ void world::_set_block(int p, int q, int x, int y, int z, const int w, const int
     }
 }
 
-void world::set_block(int x, int y, int z, int w) const noexcept
+void world::set_block(const int x, const int y, const int z, const int w) const noexcept
 {
-    int p = chunked(static_cast<float>(x));
-    int q = chunked(static_cast<float>(z));
+    const int p = chunked(static_cast<float>(x));
+    const int q = chunked(static_cast<float>(z));
     _set_block(p, q, x, y, z, w, 1);
     for (int dx = -1; dx <= 1; dx++)
     {
@@ -2046,27 +2045,10 @@ int world::get_block(const int x, const int y, const int z) const noexcept
     return 0;
 }
 
-void world::builder_block(const int x, const int y, const int z, const int w) const noexcept
-{
-    if (y <= 0 || y >= item::TOTAL_BLOCKS)
-    {
-        return;
-    }
-    if (item::is_destructable(get_block(x, y, z)))
-    {
-        set_block(x, y, z, 0);
-    }
-    if (w)
-    {
-        set_block(x, y, z, w);
-    }
-}
-
 std::size_t world::get_chunk_count() const noexcept
 {
     return this->m_next_chunk_slot - 1;
 }
-
 
 int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
 {

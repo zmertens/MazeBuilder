@@ -11,8 +11,6 @@
 
 #include <SDL3/SDL.h>
 
-#include <MazeBuilder/objectify.h>
-
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
 #else
@@ -20,11 +18,12 @@
 #endif
 
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/dfs.h>
+#include <MazeBuilder/enums.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/objectify.h>
 #include <MazeBuilder/pixels.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/stringify.h>
@@ -48,43 +47,40 @@ player::player()
       , m_buffer{}
       , m_item_index{0}
       , m_world{nullptr}
-      , m_maze_task{[this](const mazes::configurator& config)->std::unique_ptr<mazes::grid_interface>
-      {
-          const auto a = mazes::configurator::make_algo_from_config(this->m_configs.maze);
-          auto g = std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
-          if (!a.has_value())
+      , m_maze_task{
+          [this](const mazes::configurator& config)-> std::unique_ptr<mazes::grid_interface>
           {
-              return g;
+              const auto a = mazes::configurator::make_algo_from_config(this->m_configs.maze);
+              auto g = std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
+              if (!a.has_value())
+              {
+                  return g;
+              }
+              thread_local mazes::randomizer rng{};
+              rng.seed(config.seed());
+              if (!a.value()->run(g.get(), std::ref(rng)))
+              {
+                  return nullptr;
+              }
+
+              if (thread_local mazes::stringify stringifier{}; !stringifier.run(g.get(), std::ref(rng)))
+              {
+                  return nullptr;
+              }
+
+              if (thread_local mazes::objectify obj_tool{}; !obj_tool.run(g.get(), std::ref(rng)))
+              {
+                  return nullptr;
+              }
+
+              if (thread_local mazes::wavefront_object_helper woh{}; !woh.run(g.get(), std::ref(rng)))
+              {
+                  return nullptr;
+              }
+
+              return std::move(g);
           }
-          thread_local mazes::randomizer rng{};
-          rng.seed(config.seed());
-          if (!a.value()->run(g.get(), std::ref(rng)))
-          {
-              return nullptr;
-          }
-
-          thread_local mazes::stringify stringifier{};
-          if (!stringifier.run(g.get(), std::ref(rng)))
-          {
-              return nullptr;
-          }
-
-          thread_local mazes::objectify obj_tool{};
-
-          if (!obj_tool.run(g.get(), std::ref(rng)))
-          {
-                return nullptr;
-          }
-
-          thread_local mazes::wavefront_object_helper woh{};
-
-          if (!woh.run(g.get(), std::ref(rng)))
-          {
-              return nullptr;
-          }
-
-          return std::move(g);
-      }}
+      }
       , m_maze_future{}
       , m_grid_factory{std::make_unique<mazes::grid_factory>()}
 {
@@ -94,11 +90,12 @@ player::player()
 
     // Movement key bindings
     m_key_binding[SDL_SCANCODE_A] = PlayerAction::MOVE_LEFT;
-    m_key_binding[SDL_SCANCODE_E] = PlayerAction::BUILD_MAZE;
+    m_key_binding[SDL_SCANCODE_E] = PlayerAction::PREVIEW_MAZE;
     m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
-    m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
+    m_key_binding[SDL_SCANCODE_F] = PlayerAction::BUILD_MAZE;
     m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
     m_key_binding[SDL_SCANCODE_T] = PlayerAction::TAG_SIGN;
+    m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
     m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
     m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;
     m_key_binding[SDL_SCANCODE_RSHIFT] = PlayerAction::MOVE_UP;
@@ -238,7 +235,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
 
 void player::draw() const noexcept
 {
-
 }
 
 void player::handle_realtime_input(command_queue& commands)
@@ -422,7 +418,7 @@ std::string player::get_local_time() const noexcept
     // Convert 0 to 12 for midnight/noon
     hour = hour ? hour : 12;
 
-    return std::string{ mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm) };
+    return std::string{mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm)};
 }
 
 const player::projected_plane& player::get_projected_plane() const noexcept
@@ -602,23 +598,31 @@ void player::initialize_actions()
             }
         });
 
-    m_action_binding[PlayerAction::BUILD_MAZE].action = derived_action<player>(
-    [](player& p, const float dt, mazes::randomizer& rng)
-    {
-        if (p.m_configs.preview_enabled && p.m_world)
+    m_action_binding[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
+        [](player& p, const float dt, mazes::randomizer& rng)
         {
-            // Generate the maze texture
-            if (p.generate_maze_texture(rng))
+            if (p.m_configs.preview_enabled && p.m_world)
             {
-                SDL_Log("Maze texture generated successfully! Texture ID: %u", p.m_configs.maze_texture_id);
-                SDL_Log("Maze preview will appear on block faces as you move your crosshair");
+                // Generate the maze texture
+                if (p.generate_maze_texture(rng))
+                {
+                    SDL_Log("Maze texture generated successfully! Texture ID: %u", p.m_configs.maze_texture_id);
+                    SDL_Log("Maze preview will appear on block faces as you move your crosshair");
+                }
+                else
+                {
+                    SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze texture");
+                }
             }
-            else
+        });
+
+    m_action_binding[PlayerAction::BUILD_MAZE].action = derived_action<player>(
+        [](player& p, const float dt, mazes::randomizer& rng)
+        {
+            if (p.m_configs.preview_enabled && p.m_world)
             {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze texture");
             }
-        }
-    });
+        });
 }
 
 bool player::is_realtime_action(const PlayerAction action) noexcept
@@ -725,92 +729,147 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
         if (const auto& g = m_grid_factory->create(m_name, m_configs.maze);
             g.has_value())
         {
-
             auto&& val = g.value();
 
-        val->operations().set_str("");
-        // Convert to pixel representation
-        if (const mazes::pixels pixel_converter; !pixel_converter.run(val.get(), rng))
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to convert maze to pixels\n");
-            return false;
-        }
+            val->operations().set_str("");
+            // Convert to pixel representation
+            if (const mazes::pixels pixel_converter; !pixel_converter.run(val.get(), rng))
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to convert maze to pixels\n");
+                return false;
+            }
 
-        // Get the pixel data
-        const auto pixel_data = val->operations().get_pixels();
-        if (pixel_data.empty())
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Pixel data is empty\n");
-            return false;
-        }
+            // Get the pixel data
+            const auto pixel_data = val->operations().get_pixels();
+            if (pixel_data.empty())
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Pixel data is empty\n");
+                return false;
+            }
 
-        // Calculate dimensions from actual pixel data
-        // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
-        auto [rows, columns, _] = val->operations().get_dimensions();
+            // Calculate dimensions from actual pixel data
+            // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
+            auto [rows, columns, _] = val->operations().get_dimensions();
 
-        // Calculate scale (same as in pixels.cpp)
-        constexpr unsigned int MIN_SCALE = 1;
-        constexpr unsigned int MAX_SCALE = 10;
-        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
-        const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+            // Calculate scale (same as in pixels.cpp)
+            constexpr unsigned int MIN_SCALE = 1;
+            constexpr unsigned int MAX_SCALE = 10;
+            const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
+            const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
 
-        // Height is predictable: (rows*2+1) * scale
-        const auto ascii_height = rows * 2 + 1;
-        const int height = static_cast<int>(ascii_height * scale);
+            // Height is predictable: (rows*2+1) * scale
+            const auto ascii_height = rows * 2 + 1;
+            const int height = static_cast<int>(ascii_height * scale);
 
-        // Width must be calculated from pixel data size since ASCII lines may have varying lengths
-        // pixel_data.size() = width * height * 4 (RGBA)
-        const int width = static_cast<int>(pixel_data.size() / (height * 4));
+            // Width must be calculated from pixel data size since ASCII lines may have varying lengths
+            // pixel_data.size() = width * height * 4 (RGBA)
+            const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
-        SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
+            SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
 
-        // Delete old texture if it exists
-        if (m_configs.maze_texture_id != 0)
-        {
-            glDeleteTextures(1, &m_configs.maze_texture_id);
-            m_configs.maze_texture_id = 0;
-        }
+            // Delete old texture if it exists
+            if (m_configs.maze_texture_id != 0)
+            {
+                glDeleteTextures(1, &m_configs.maze_texture_id);
+                m_configs.maze_texture_id = 0;
+            }
 
-        // Create OpenGL texture
-        glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-        glGenTextures(1, &m_configs.maze_texture_id);
-        glBindTexture(GL_TEXTURE_2D, m_configs.maze_texture_id);
+            // Create OpenGL texture
+            glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
+            glGenTextures(1, &m_configs.maze_texture_id);
+            glBindTexture(GL_TEXTURE_2D, m_configs.maze_texture_id);
 
-        // Set texture parameters
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            // Set texture parameters
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-        // Upload texture data
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, pixel_data.data());
+            // Upload texture data
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, pixel_data.data());
 
-        // Generate mipmaps
-        glGenerateMipmap(GL_TEXTURE_2D);
+            // Generate mipmaps
+            glGenerateMipmap(GL_TEXTURE_2D);
 
-        // Check for errors
-        if (const GLenum error = glGetError(); error != GL_NO_ERROR)
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error creating maze texture: 0x%x\n", error);
-            return false;
-        }
+            // Check for errors
+            if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+            {
+                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error creating maze texture: 0x%x\n", error);
+                return false;
+            }
 
-        m_configs.maze_texture_width = width;
-        m_configs.maze_texture_height = height;
-        m_configs.maze_ready = true;
+            m_configs.maze_texture_width = width;
+            m_configs.maze_texture_height = height;
+            m_configs.maze_ready = true;
 
-        // Store the grid for artifact generation and launch async task
-        m_maze_future = std::async(std::launch::async, m_maze_task, m_configs.maze);
+            // Store the grid for artifact generation and launch async task
+            m_maze_future = std::async(std::launch::async, m_maze_task, m_configs.maze);
 
-        // Enable the download button now that maze data is available
-        m_configs.show_download_button = true;
+            // Enable the download button now that maze data is available
+            m_configs.show_download_button = true;
 
-        SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
-                m_configs.maze_texture_id, width, height);
-        SDL_Log("Async task launched for artifact generation\n");
+            SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
+                    m_configs.maze_texture_id, width, height);
+            SDL_Log("Async task launched for artifact generation\n");
 
-        return true;
+            // Place maze blocks in the world for visual rendering
+            // Parse pixel_data: black pixels (walls) become stone blocks
+
+            // Get player position to place maze at player's feet
+            const int base_x = static_cast<int>(pos.x);
+            const int base_y = static_cast<int>(pos.y) - 1; // At feet, not above head
+            const int base_z = static_cast<int>(pos.z);
+
+            SDL_Log("Placing maze in world: %dx%d pixels at offset (%d, %d, %d)\n",
+                    width, height, base_x, base_y, base_z);
+
+            int blocks_placed = 0;
+            constexpr int wall_height = 3; // Walls are 3 blocks tall
+
+            // Iterate through pixel data (RGBA format: 4 bytes per pixel)
+            // Y-axis in pixels maps to Z-axis in world (row)
+            // X-axis in pixels maps to X-axis in world (column)
+            for (int pix_y = 0; pix_y < height; ++pix_y)
+            {
+                for (int pix_x = 0; pix_x < width; ++pix_x)
+                {
+                    // Calculate pixel index in the RGBA array
+                    const int pixel_index = (pix_y * width + pix_x) * 4;
+
+                    // Read RGBA values
+                    const uint8_t r = pixel_data[pixel_index + 0];
+                    const uint8_t g = pixel_data[pixel_index + 1];
+                    const uint8_t b = pixel_data[pixel_index + 2];
+                    // Alpha is pixel_data[pixel_index + 3] but we don't need it
+
+                    // Check if pixel is black (wall) - threshold for near-black
+                    const bool is_wall = (r < 50 && g < 50 && b < 50);
+
+                    if (is_wall)
+                    {
+                        // Place a vertical column of blocks for this wall
+                        for (int y = 0; y < wall_height; ++y)
+                        {
+                            const int world_x = base_x + pix_x;
+                            const int world_y = base_y + y;
+                            const int world_z = base_z + pix_y;
+
+                            m_world->set_block(world_x, world_y, world_z, 1); // Stone
+                            world::record_block(world_x, world_y, world_z, 1);
+                            blocks_placed++;
+                        }
+                    }
+                }
+            }
+
+            SDL_Log("Maze blocks placed successfully! %d blocks placed\n", blocks_placed);
+            SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
+                   base_x, base_x + width - 1,
+                   base_y, base_y + wall_height - 1,
+                   base_z, base_z + height - 1);
+
+            return true;
         }
 
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create grid\n");

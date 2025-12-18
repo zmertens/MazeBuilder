@@ -592,7 +592,7 @@ struct craft::craft_impl
     {
         std::vector<FontIdentifier> m_selectable_fonts;
         std::size_t m_selected_font_index{0};
-        mutable bool m_write_file{false};
+
     public:
         explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
@@ -749,7 +749,7 @@ struct craft::craft_impl
                             {
                                 if (ImGui::Button("Download Maze Data", ImVec2(180, 40)))
                                 {
-                                    m_write_file = true;
+                                    p->m_configs.download_ready = p->m_configs.maze_ready;
                                 }
                             }
                             ImGui::End();
@@ -859,27 +859,32 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            if (m_write_file)
+            auto&& p = get_context().m_player;
+            if (p->m_configs.download_ready)
             {
-                auto&& p = get_context().m_player;
+#if !defined(__EMSCRIPTEN__)
                 const auto artifacts = p->artifacts();
 
                 if (artifacts.empty())
                 {
                     SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
-                    m_write_file = false;
+                    p->m_configs.download_ready = false;
                     return false;
                 }
 
                 constexpr mazes::io_utils io_things{};
                 const auto filename = p->get_name() + ".obj";
                 const auto success = io_things.write_file(filename, artifacts);
+                p->m_configs.download_ready = !success;
                 SDL_Log("Write file '%s': %s (%zu bytes)\n",
                         filename.c_str(),
                         success ? "SUCCESS" : "FAILED",
                         artifacts.size());
+#else
+
+                SDL_Log("Web detected: download via calling for artifacts");
                 p->m_configs.show_download_button = false;
-                m_write_file = false;
+#endif
             }
 
             return false;
@@ -1228,7 +1233,12 @@ std::string craft::artifacts() const noexcept
     return this->m_impl->m_player.artifacts();
 }
 
-void craft::show_download_button(const bool show) const noexcept
+bool craft::is_download_ready() const noexcept
 {
-    this->m_impl->m_player.m_configs.show_download_button = show;
+    return this->m_impl->m_player.m_configs.download_ready;
+}
+
+void craft::set_download_ready(const bool ready) const noexcept
+{
+    this->m_impl->m_player.m_configs.download_ready = ready;
 }
