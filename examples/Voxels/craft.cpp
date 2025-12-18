@@ -41,6 +41,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <list>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -592,6 +593,7 @@ struct craft::craft_impl
     {
         std::vector<FontIdentifier> m_selectable_fonts;
         std::size_t m_selected_font_index{0};
+        std::list<std::string> algo_list;
 
     public:
         explicit menu_state(state_stack& stack, const context& context)
@@ -605,6 +607,9 @@ struct craft::craft_impl
                     m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
                     return true;
                 });
+            for (auto i{ static_cast<int>(mazes::algo::BINARY_TREE) }; i < static_cast<int>(mazes::algo::TOTAL); ++i) {
+                algo_list.emplace_back(mazes::to_sv_from_algo(static_cast<mazes::algo>(i)));
+            }
         }
 
         void draw() const noexcept override
@@ -691,17 +696,47 @@ struct craft::craft_impl
 
                         auto&& maze_config = get_context().m_player->m_configs.maze;
 
+                        static auto selected_algo = mazes::to_sv_from_algo(maze_config.algo_id());
                         static int rows = static_cast<int>(maze_config.rows());
                         static int columns = static_cast<int>(maze_config.columns());
+                        static int levels = static_cast<int>(maze_config.levels());
                         static int seed = static_cast<int>(maze_config.seed());
 
-                        ImGui::SliderInt("Rows", &rows, 2, mazes::configurator::MAX_ROWS);
+                        ImGui::SliderInt("Rows", &rows, 2, mazes::configurator::MAX_ROWS / 2);
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::SliderInt("Columns", &columns, 2, mazes::configurator::MAX_COLUMNS);
+                        ImGui::SliderInt("Columns", &columns, 2, mazes::configurator::MAX_COLUMNS / 2);
                         ImGui::Separator();
                         ImGui::Spacing();
+
+                        ImGui::SliderInt("Levels", &levels, 1, mazes::configurator::MAX_LEVELS / 2);
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        if (ImGui::TreeNode("Algo")) {
+                            auto preview{ selected_algo };
+                            ImGui::NewLine();
+                            if (constexpr ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft |
+                                ImGuiComboFlags_WidthFitPreview;
+                                ImGui::BeginCombo("algorithm", preview.data(), combo_flags)) {
+                                for (const auto& itr : algo_list) {
+                                    const bool is_selected = (mazes::to_algo_from_sv(itr) == maze_config.algo_id());
+                                    if (ImGui::Selectable(std::string{itr}.c_str(), is_selected)) {
+                                        maze_config.algo_id(mazes::to_algo_from_sv(itr));
+                                        selected_algo = itr;
+                                    }
+                                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
+                                    if (is_selected)
+                                    {
+                                        ImGui::SetItemDefaultFocus();
+                                    }
+                                }
+                                ImGui::EndCombo();
+                            }
+                            ImGui::NewLine();
+                            ImGui::TreePop();
+                        }
 
                         ImGui::SliderInt("Seed", &seed, 0, 1000000);
                         ImGui::Separator();
@@ -722,11 +757,11 @@ struct craft::craft_impl
                         if (ImGui::Button("Apply Configs", ImVec2(200, 40)))
                         {
                             get_context().m_player->m_configs.maze
+                                         .algo_id(mazes::to_algo_from_sv(selected_algo))
                                          .rows(static_cast<unsigned int>(rows))
                                          .columns(static_cast<unsigned int>(columns))
+                                         .levels(static_cast<unsigned int>(levels))
                                          .seed(static_cast<unsigned int>(seed));
-
-                            SDL_Log("Maze configuration updated: %dx%d, seed=%d\n", rows, columns, seed);
                         }
                         ImGui::Separator();
                         ImGui::Spacing();

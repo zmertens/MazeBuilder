@@ -603,11 +603,27 @@ void player::initialize_actions()
         {
             if (p.m_configs.preview_enabled && p.m_world)
             {
+                // Check cooldown before generating
+                if (!p.is_maze_generation_ready())
+                {
+                    const auto remaining_ms = p.get_maze_cooldown_remaining_ms();
+                    const auto remaining_seconds = (remaining_ms + 999) / 1000; // Round up
+                    SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                               "Maze generation on cooldown. Please wait %.1f seconds",
+                               static_cast<float>(remaining_ms) / 1000.0f);
+                    return;
+                }
+
                 // Generate the maze texture
                 if (p.generate_maze_texture(rng))
                 {
+                    // Update cooldown timestamp on successful generation
+                    p.m_last_maze_generation_time = SDL_GetTicks();
+
                     SDL_Log("Maze texture generated successfully! Texture ID: %u", p.m_configs.maze_texture_id);
                     SDL_Log("Maze preview will appear on block faces as you move your crosshair");
+                    SDL_Log("Next generation available in %llu seconds",
+                           player::MAZE_GENERATION_COOLDOWN_MS / 1000);
                 }
                 else
                 {
@@ -804,7 +820,7 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
             m_configs.maze_ready = true;
 
             // Store the grid for artifact generation and launch async task
-            m_maze_future = std::async(std::launch::async, m_maze_task, m_configs.maze);
+            m_maze_future = std::exchange(m_maze_future, std::async(std::launch::async, m_maze_task, m_configs.maze));
 
             // Enable the download button now that maze data is available
             m_configs.show_download_button = true;
@@ -815,25 +831,33 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
 
             // Place maze blocks in the world for visual rendering
             // Parse pixel_data: black pixels (walls) become stone blocks
+            // Sample every 'scale' pixels to match logical maze structure
 
             // Get player position to place maze at player's feet
             const int base_x = static_cast<int>(pos.x);
-            const int base_y = static_cast<int>(pos.y) - 1; // At feet, not above head
+            const int base_y = static_cast<int>(pos.y);
             const int base_z = static_cast<int>(pos.z);
 
-            SDL_Log("Placing maze in world: %dx%d pixels at offset (%d, %d, %d)\n",
-                    width, height, base_x, base_y, base_z);
+            // Calculate logical maze dimensions (before scaling)
+            const int logical_width = width / scale;
+            const int logical_height = height / scale;
+
+            SDL_Log("Placing maze in world: %dx%d logical cells (from %dx%d pixels, scale=%u) at offset (%d, %d, %d)\n",
+                    logical_width, logical_height, width, height, scale, base_x, base_y, base_z);
 
             int blocks_placed = 0;
-            constexpr int wall_height = 3; // Walls are 3 blocks tall
+            const auto wall_height = m_configs.maze.levels();
 
-            // Iterate through pixel data (RGBA format: 4 bytes per pixel)
-            // Y-axis in pixels maps to Z-axis in world (row)
-            // X-axis in pixels maps to X-axis in world (column)
-            for (int pix_y = 0; pix_y < height; ++pix_y)
+            // Iterate through logical maze cells by sampling every 'scale' pixels
+            // This creates geometry that matches the maze structure, not the upscaled texture
+            for (int cell_y = 0; cell_y < logical_height; ++cell_y)
             {
-                for (int pix_x = 0; pix_x < width; ++pix_x)
+                for (int cell_x = 0; cell_x < logical_width; ++cell_x)
                 {
+                    // Sample the center of each scaled cell region
+                    const int pix_x = cell_x * scale + scale / 2;
+                    const int pix_y = cell_y * scale + scale / 2;
+
                     // Calculate pixel index in the RGBA array
                     const int pixel_index = (pix_y * width + pix_x) * 4;
 
@@ -851,12 +875,12 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
                         // Place a vertical column of blocks for this wall
                         for (int y = 0; y < wall_height; ++y)
                         {
-                            const int world_x = base_x + pix_x;
+                            const int world_x = base_x + cell_x;
                             const int world_y = base_y + y;
-                            const int world_z = base_z + pix_y;
+                            const int world_z = base_z + cell_y;
 
-                            m_world->set_block(world_x, world_y, world_z, 1); // Stone
-                            world::record_block(world_x, world_y, world_z, 1);
+                            m_world->set_block(world_x, world_y, world_z, get_item());
+                            world::record_block(world_x, world_y, world_z, get_item());
                             blocks_placed++;
                         }
                     }
@@ -865,9 +889,9 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
 
             SDL_Log("Maze blocks placed successfully! %d blocks placed\n", blocks_placed);
             SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
-                   base_x, base_x + width - 1,
+                   base_x, base_x + logical_width - 1,
                    base_y, base_y + wall_height - 1,
-                   base_z, base_z + height - 1);
+                   base_z, base_z + logical_height - 1);
 
             return true;
         }
@@ -916,5 +940,29 @@ std::string player::artifacts() const noexcept
     }
 
     return "";
+}
+
+/// Check if maze generation cooldown has elapsed (non-blocking)
+/// @return true if cooldown has elapsed and generation is allowed
+bool player::is_maze_generation_ready() const noexcept
+{
+    const std::uint64_t current_time = SDL_GetTicks();
+    const std::uint64_t elapsed = current_time - m_last_maze_generation_time;
+    return elapsed >= MAZE_GENERATION_COOLDOWN_MS;
+}
+
+/// Get remaining cooldown time in milliseconds
+/// @return milliseconds remaining until next generation is allowed (0 if ready)
+std::uint64_t player::get_maze_cooldown_remaining_ms() const noexcept
+{
+    const std::uint64_t current_time = SDL_GetTicks();
+    const std::uint64_t elapsed = current_time - m_last_maze_generation_time;
+
+    if (elapsed >= MAZE_GENERATION_COOLDOWN_MS)
+    {
+        return 0;
+    }
+
+    return MAZE_GENERATION_COOLDOWN_MS - elapsed;
 }
 
