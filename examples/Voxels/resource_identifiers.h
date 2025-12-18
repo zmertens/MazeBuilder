@@ -17,7 +17,8 @@ enum class TextureIdentifier : unsigned int
     SKY = 2,
     BITMAP_FONT = 3,
     WINDOW_ICON = 4,
-    TOTAL = 5
+    MAZE = 5,
+    TOTAL = 6
 };
 
 enum class FontIdentifier : unsigned int

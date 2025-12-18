@@ -14,8 +14,6 @@
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
 
-#include <MazeBuilder/algo_interface.h>
-
 struct worker;
 struct worker_item;
 union SDL_Event;
@@ -27,11 +25,10 @@ class command_queue;
 class sdl_gl_helper;
 
 namespace mazes {
-    class grid_interface;
     class randomizer;
 }
 
-class world final : public mazes::algo_interface {
+class world final {
     friend class player;
 public:
     explicit world(SDL_Window* window,
@@ -41,9 +38,11 @@ public:
         texture_manager& textures,
         const sdl_gl_helper* sdl);
 
-    ~world() override;
+    ~world();
 
     void init() noexcept;
+
+    void handle_event(const SDL_Event& event) noexcept;
 
     void update(float dt, mazes::randomizer& rng) noexcept;
 
@@ -51,14 +50,8 @@ public:
 
     command_queue& get_command_queue() noexcept;
 
-    // Destroy the world
     void destroy_world();
-
-    void handle_event(const SDL_Event& event) noexcept;
-
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 private:
-    // Build the scene (initialize scene graph and layers)
     void build_scene();
 
     static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
@@ -84,7 +77,7 @@ private:
 
     [[nodiscard]] std::optional<scene_node*> find_chunk(int p, int q) const noexcept;
     static int chunk_distance(const scene_node* chunk, int p, int q) noexcept;
-    int chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) const noexcept;
+    bool chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) const noexcept;
 
     [[nodiscard]] int highest_block(float x, float z) const noexcept;
     static int _hit_test(const Map* map, float max_distance, int previous,
@@ -92,7 +85,8 @@ private:
     int hit_test(int previous, float x, float y, float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept;
     int hit_test_face(int* x, int* y, int* z, int* face) const noexcept;
     int collide(int height, float* x, float* y, float* z) const noexcept;
-    [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z, int hx, int hy, int hz) noexcept;
+    [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z,
+        int hx, int hy, int hz) noexcept;
 
     bool has_lights(const scene_node* chunk) const noexcept;
 
@@ -100,7 +94,8 @@ private:
     // Process dirty chunks on worker threads
     void update_dirty_chunks_async() const noexcept;
 
-    static void occlusion(char neighbors[27], char lights[27], float shades[27], float ao[6][4], float light[6][4]) noexcept;
+    static void occlusion(char neighbors[27], char lights[27], float shades[27],
+        float ao[6][4], float light[6][4]) noexcept;
     static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
 
     static void compute_chunk(worker_item* item) noexcept;
@@ -142,7 +137,6 @@ private:
     void render_sign(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
     void render_sky(const sdl_gl_helper::attrib* attrib, std::uint32_t buffer,
         std::uint32_t sign) const noexcept;
-    void render_players(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;

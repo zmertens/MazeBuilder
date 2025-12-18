@@ -157,9 +157,6 @@ std::string cli::convert_with_options(std::vector<std::string> const& args_vec, 
             }
 
             // Convert to Wavefront OBJ format
-            auto vertices = product.value()->operations().get_vertices();
-            auto faces = product.value()->operations().get_faces();
-
             if (const mazes::wavefront_object_helper w; !w.run(product.value().get(), std::ref(rng)))
             {
                 return "Failed to generate Wavefront OBJ data.";

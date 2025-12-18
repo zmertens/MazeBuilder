@@ -36,10 +36,10 @@
 
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_factory.h>
+#include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <algorithm>
-#include <array>
 #include <functional>
 #include <map>
 #include <memory>
@@ -499,7 +499,7 @@ struct craft::craft_impl
 
 #if defined(MAZE_DEBUG)
 
-            std::ranges::for_each(craft_impl::s_font_names, [](const auto& name)
+            std::ranges::for_each(s_font_names, [](const auto& name)
             {
                 SDL_Log("Loaded font: %s\n", name.data());
             });
@@ -591,9 +591,8 @@ struct craft::craft_impl
     class menu_state final : public state
     {
         std::vector<FontIdentifier> m_selectable_fonts;
-
-        std::size_t m_selected_font_index{ 0 };
-
+        std::size_t m_selected_font_index{0};
+        mutable bool m_write_file{false};
     public:
         explicit menu_state(state_stack& stack, const context& context)
             : state{stack, context}
@@ -606,12 +605,11 @@ struct craft::craft_impl
                     m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
                     return true;
                 });
-
         }
 
         void draw() const noexcept override
         {
-            static auto selected_font_index{ 0 };
+            static auto selected_font_index{0};
             ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
             // Apply color schema
@@ -639,7 +637,7 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f),
-                            "Navigation Options:");
+                                           "Navigation Options:");
                         ImGui::Spacing();
                         if (ImGui::Button("Resume", ImVec2(200, 40)))
                         {
@@ -724,13 +722,38 @@ struct craft::craft_impl
                         if (ImGui::Button("Apply Configs", ImVec2(200, 40)))
                         {
                             get_context().m_player->m_configs.maze
-                                .rows(static_cast<unsigned int>(rows))
-                                .columns(static_cast<unsigned int>(columns))
-                                .seed(static_cast<unsigned int>(seed));
+                                         .rows(static_cast<unsigned int>(rows))
+                                         .columns(static_cast<unsigned int>(columns))
+                                         .seed(static_cast<unsigned int>(seed));
 
                             SDL_Log("Maze configuration updated: %dx%d, seed=%d\n", rows, columns, seed);
                         }
+                        ImGui::Separator();
+                        ImGui::Spacing();
 
+                        auto&& p = get_context().m_player;
+                        if (p->m_configs.show_download_button)
+                        {
+                            ImGui::SetNextWindowPos(ImVec2(10.0f, ImGui::GetIO().DisplaySize.y - 60.0f), ImGuiCond_Always,
+                                                    ImVec2(0.0f, 1.0f));
+                            ImGui::SetNextWindowBgAlpha(0.65f);
+
+                            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+                                ImGuiWindowFlags_AlwaysAutoResize |
+                                ImGuiWindowFlags_NoSavedSettings |
+                                ImGuiWindowFlags_NoFocusOnAppearing |
+                                ImGuiWindowFlags_NoNav |
+                                ImGuiWindowFlags_NoMove;
+
+                            if (ImGui::Begin("Download Maze", nullptr, windowFlags))
+                            {
+                                if (ImGui::Button("Download Maze Data", ImVec2(180, 40)))
+                                {
+                                    m_write_file = true;
+                                }
+                            }
+                            ImGui::End();
+                        }
 
                         ImGui::EndTabItem();
                     }
@@ -757,7 +780,8 @@ struct craft::craft_impl
                             for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
                             {
                                 const bool is_selected = (selected_font_index == i);
-                                const auto& font_name = craft_impl::s_font_names.at(static_cast<std::size_t>(m_selectable_fonts.at(i)));
+                                const auto& font_name = craft_impl::s_font_names.at(
+                                    static_cast<std::size_t>(m_selectable_fonts.at(i)));
                                 if (ImGui::Selectable(font_name.data(), is_selected))
                                 {
                                     selected_font_index = i;
@@ -835,9 +859,28 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            auto success = get_context().m_player->run(
-            get_context().m_player->make_grid("", get_context().m_player->m_configs.maze).get(),
-    std::ref(rng));
+            if (m_write_file)
+            {
+                auto&& p = get_context().m_player;
+                const auto artifacts = p->artifacts();
+
+                if (artifacts.empty())
+                {
+                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
+                    m_write_file = false;
+                    return false;
+                }
+
+                constexpr mazes::io_utils io_things{};
+                const auto filename = p->get_name() + ".obj";
+                const auto success = io_things.write_file(filename, artifacts);
+                SDL_Log("Write file '%s': %s (%zu bytes)\n",
+                        filename.c_str(),
+                        success ? "SUCCESS" : "FAILED",
+                        artifacts.size());
+                p->m_configs.show_download_button = false;
+                m_write_file = false;
+            }
 
             return false;
         }
@@ -1182,10 +1225,10 @@ bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rn
 
 std::string craft::artifacts() const noexcept
 {
-    return this->m_impl->m_player.get_mazes_and_reset_future();
+    return this->m_impl->m_player.artifacts();
 }
 
 void craft::show_download_button(const bool show) const noexcept
 {
-    this->m_impl->m_show_download_button = show;
+    this->m_impl->m_player.m_configs.show_download_button = show;
 }

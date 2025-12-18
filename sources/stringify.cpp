@@ -14,10 +14,8 @@ using namespace mazes;
 /// @return
 bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
 {
-
     if (!g)
     {
-
         return false;
     }
 
@@ -30,9 +28,7 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
 
     static constexpr auto MAX_REASONABLE_CELLS = configurator::MAX_COLUMNS * configurator::MAX_ROWS * configurator::MAX_LEVELS + 1u;
 
-    const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels);
-
-    if (total_cells > MAX_REASONABLE_CELLS)
+    if (const size_t total_cells = static_cast<size_t>(rows) * static_cast<size_t>(columns) * static_cast<size_t>(levels); total_cells > MAX_REASONABLE_CELLS)
     {
         ops.set_str("Grid too large to stringify reasonably.");
 
@@ -70,7 +66,7 @@ bool stringify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
                         str = " " + str;
                     }
                 };
-                
+
                 pad_content(content);
 
                 top_line = string_utils::concat(top_line, content);

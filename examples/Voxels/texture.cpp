@@ -153,7 +153,13 @@ bool texture::load_target(const int w, const int h) noexcept
     return true;
 }
 
-bool texture::load_from_memory(const std::uint8_t* data, const int width, const int height, const std::uint32_t channel_offset) noexcept
+/// Load texture from raw RGBA memory data
+/// @param data
+/// @param width
+/// @param height
+/// @param channel_offset 0
+bool texture::load_from_memory(const std::uint8_t* data, const int width, const int height,
+    const std::uint32_t channel_offset) noexcept
 {
     if (data == nullptr || width <= 0 || height <= 0)
     {
@@ -174,8 +180,8 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     // Upload texture data - RGBA format
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA,
-                 GL_UNSIGNED_BYTE, data);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
+        GL_RGBA,GL_UNSIGNED_BYTE, data);
 
     // Generate mipmaps
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -190,12 +196,10 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     m_width = width;
     m_height = height;
 
-    SDL_Log("Texture loaded from memory: %dx%d\n", width, height);
-
     return true;
 }
 
-bool texture::load_bmp_icon(SDL_Window *window, std::string_view filepath) noexcept
+bool texture::load_bmp_icon(SDL_Window *window, const std::string_view filepath) noexcept
 {
     if (SDL_Surface *bmp_surface = SDL_LoadBMP(filepath.data()))
     {

@@ -28,7 +28,7 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
     }
 
     // Get the grid operations to access dimensions and other methods
-    const auto &grid_ops = g->operations();
+    auto&& grid_ops = g->operations();
     const auto dimensions = grid_ops.get_dimensions();
     if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0)
     {
@@ -112,11 +112,8 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
         col_z++;
     }
 
-    // Store the generated vertices and faces in the grid operations
-    // Need to cast to non-const to call the setter methods
-    auto &mutable_grid_ops = const_cast<grid_operations &>(grid_ops);
-    mutable_grid_ops.set_vertices(vertices);
-    mutable_grid_ops.set_faces(faces);
+    grid_ops.set_vertices(vertices);
+    grid_ops.set_faces(faces);
 
     return true;
 } // run

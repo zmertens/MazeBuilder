@@ -11,6 +11,7 @@
 #include <MazeBuilder/configurator.h>
 
 #include "command.h"
+#include "MazeBuilder/factory_interface.h"
 
 enum class PlayerAction
 {
@@ -60,6 +61,7 @@ public:
         bool fullscreen{ false };
         bool invert_mouse{ false };
         bool show_stats_window{ true };
+        bool show_download_button{ false };
         bool use_bloom_effect{ false };
         bool vsync{ true };
         float exposure_range{ 0.5f };
@@ -123,6 +125,9 @@ public:
     [[nodiscard]] std::int32_t get_item() const noexcept;
     void set_item(std::int32_t value) noexcept;
 
+    [[nodiscard]] std::string get_name() const noexcept;
+    void set_name(const std::string& name) noexcept;
+
     void set_world(world* w) noexcept;
 
     [[nodiscard]] std::string get_local_time() const noexcept;
@@ -131,12 +136,9 @@ public:
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 
-    std::unique_ptr<mazes::grid_interface> make_grid(const std::string& key,
-        const mazes::configurator& config) const noexcept;
-
     bool generate_maze_texture(mazes::randomizer& rng) noexcept;
 
-    std::string get_mazes_and_reset_future() noexcept;
+    std::string artifacts() const noexcept;
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;
@@ -165,10 +167,8 @@ private:
 
     world* m_world;
 
-    std::function<std::string()> m_maze_task;
-    std::future<std::string> m_maze_future;
-
-    mazes::grid_interface* m_grid;
+    std::function<std::unique_ptr<mazes::grid_interface>(const mazes::configurator&)> m_maze_task;
+    mutable std::future<std::unique_ptr<mazes::grid_interface>> m_maze_future;
 
     std::unique_ptr<mazes::grid_factory> m_grid_factory;;
 };

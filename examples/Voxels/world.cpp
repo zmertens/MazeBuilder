@@ -1,7 +1,6 @@
 #include "world.h"
 
 #include <MazeBuilder/randomizer.h>
-#include <MazeBuilder/wavefront_object_helper.h>
 
 #include <noise/noise.h>
 
@@ -520,18 +519,6 @@ void world::handle_event(const SDL_Event& event) noexcept
     }
 }
 
-bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
-{
-    if (!g)
-    {
-        return false;
-    }
-
-    static mazes::wavefront_object_helper woh{};
-
-    return woh.run(g, std::ref(rng));
-}
-
 void world::create_world(const int p, const int q,
     const world_func& func, Map* m, const int chunk_size) noexcept
 {
@@ -762,7 +749,7 @@ int world::chunk_distance(const scene_node* chunk, const int p, const int q) noe
     return SDL_max(dp, dq);
 }
 
-int world::chunk_visible(float planes[6][4], const int p, const int q, const int miny, const int maxy) const noexcept
+bool world::chunk_visible(float planes[6][4], const int p, const int q, const int miny, const int maxy) const noexcept
 {
     const auto miny_f = static_cast<float>(miny);
     const auto maxy_f = static_cast<float>(maxy);
@@ -806,10 +793,10 @@ int world::chunk_visible(float planes[6][4], const int p, const int q, const int
         }
         if (in == 0)
         {
-            return 0;
+            return false;
         }
     }
-    return 1;
+    return true;
 } // chunk_visible
 
 int world::highest_block(const float x, const float z) const noexcept
@@ -1783,7 +1770,7 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
                 continue;
             }
             int distance = SDL_max(SDL_abs(dp), SDL_abs(dq));
-            int invisible = ~chunk_visible(planes, a, b, 0, 256);
+            const auto invisible = ~static_cast<int>(chunk_visible(planes, a, b, 0, item::TOTAL_BLOCKS));
             int priority = 0;
             if (chunk_opt.has_value())
             {
@@ -1791,8 +1778,7 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
                 priority = chunk->buffer & chunk->dirty;
             }
             // Check for chunk to update based on lowest score
-            int score = (invisible << 24) | (priority << 16) | distance;
-            if (score < best_score)
+            if (const int score = (invisible << 24) | (priority << 16) | distance; score < best_score)
             {
                 best_score = score;
                 best_a = a;
@@ -2238,24 +2224,6 @@ void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t 
     sdl_gl_helper::draw_triangles_3d(attrib, buffer, 512 * 3);
 }
 
-void world::render_players(const sdl_gl_helper::attrib* attrib) const noexcept
-{
-    auto [width, height] = m_sdl->get_window_size();
-    player::position* s = &this->m_player->pos;
-    float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
-    glUseProgram(attrib->program);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform3f(attrib->camera, s->x, s->y, s->z);
-    glUniform1i(attrib->sampler, 0);
-    glUniform1f(attrib->timer, time_of_day());
-
-    sdl_gl_helper::draw_player(attrib, m_player);
-}
-
 void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
@@ -2337,15 +2305,17 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     auto [width, height] = m_sdl->get_window_size();
     const player::position* s = &m_player->pos;
 
+    constexpr auto PROJECTED_PLANE_HEIGHT_OFFSET = 0.5f;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
+        s->x, s->y + PROJECTED_PLANE_HEIGHT_OFFSET, s->z,
+        s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
 
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform3f(attrib->camera, s->x, s->y, s->z);
+    glUniform3f(attrib->camera, s->x, s->y + PROJECTED_PLANE_HEIGHT_OFFSET, s->z);
     glUniform1f(attrib->extra2, get_daylight());
     glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
     glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
@@ -2382,19 +2352,9 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     constexpr float offset_distance = 0.05f;
 
     // Bind the maze texture
-    glActiveTexture(GL_TEXTURE0);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
     glBindTexture(GL_TEXTURE_2D, plane.texture_id);
-    glUniform1i(attrib->sampler, 0);
-
-    // Debug: Log plane details (only once per position change to avoid spam)
-    static int last_logged_x = -9999;
-    static int last_logged_z = -9999;
-
-    if (bool position_changed = (plane.target_x != last_logged_x || plane.target_z != last_logged_z))
-    {
-        last_logged_x = plane.target_x;
-        last_logged_z = plane.target_z;
-    }
+    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
     // Build floating plane geometry - ALWAYS on top face, corner-aligned
     float quad_data[6 * 10];  // 6 vertices * 10 floats per vertex
@@ -2411,28 +2371,36 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     // Corner-aligned: plane starts at block corner and extends by plane_width/plane_height
     // Note: plane_height is used for Z dimension since texture height maps to depth
     float vertices[4][3];
-    vertices[0][0] = 0.0f;         vertices[0][1] = 0.0f; vertices[0][2] = 0.0f;           // Near-left corner (block corner)
-    vertices[1][0] = plane_width;  vertices[1][1] = 0.0f; vertices[1][2] = 0.0f;           // Near-right
-    vertices[2][0] = plane_width;  vertices[2][1] = 0.0f; vertices[2][2] = plane_height;   // Far-right
-    vertices[3][0] = 0.0f;         vertices[3][1] = 0.0f; vertices[3][2] = plane_height;   // Far-left
+    vertices[0][0] = 0.0f;
+    vertices[0][1] = 0.0f;
+    vertices[0][2] = 0.0f;
+    vertices[1][0] = plane_width;
+    vertices[1][1] = 0.0f;
+    vertices[1][2] = 0.0f;
+    vertices[2][0] = plane_width;
+    vertices[2][1] = 0.0f;
+    vertices[2][2] = plane_height;
+    vertices[3][0] = 0.0f;
+    vertices[3][1] = 0.0f;
+    vertices[3][2] = plane_height;
 
     // UV coordinates for top face (V flipped for OpenGL texture coordinate system)
-    static const float uvs[4][2] = {
-        {0.0f, 1.0f},  // Near-left (V flipped)
-        {1.0f, 1.0f},  // Near-right
-        {1.0f, 0.0f},  // Far-right
-        {0.0f, 0.0f}   // Far-left
+    static constexpr float uvs[4][2] = {
+        {0.0f, 1.0f},
+        {1.0f, 1.0f},
+        {1.0f, 0.0f},
+        {0.0f, 0.0f}
     };
 
     // Top face normal (points up in +Y direction)
-    static const float top_normal[3] = {0.0f, 1.0f, 0.0f};
+    static constexpr float top_normal[3] = {0.0f, 1.0f, 0.0f};
 
     // Triangle indices: 0,1,2 and 0,2,3 form the quad
     static const int indices[6] = {0, 1, 2, 0, 2, 3};
 
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < SDL_arraysize(indices); i++)
     {
-        int vert_idx = indices[i];
+        const int vert_idx = indices[i];
 
         // Position - world space position from block corner
         *(d++) = base_x + vertices[vert_idx][0];
@@ -2449,12 +2417,14 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
         *(d++) = uvs[vert_idx][1];  // V
 
         // AO and light - use full brightness for maze texture
-        *(d++) = 0.0f;  // AO (0.0 = no darkening, see vertex shader)
-        *(d++) = 1.0f;  // Light (full brightness)
+        // AO (0.0 = no darkening, see vertex shader)
+        *(d++) = 0.0f;
+        // Light (full brightness)
+        *(d++) = 1.0f;
     }
 
     // Create and render the quad
-    GLuint temp_buffer = sdl_gl_helper::gen_faces(10, 6, quad_data);
+    const GLuint temp_buffer = sdl_gl_helper::gen_faces(10, 6, quad_data);
     sdl_gl_helper::draw_triangles_3d_ao(attrib, temp_buffer, 6);
     sdl_gl_helper::del_buffer(temp_buffer);
 

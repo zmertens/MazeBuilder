@@ -11,6 +11,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <MazeBuilder/objectify.h>
+
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
 #else
@@ -18,13 +20,16 @@
 #endif
 
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/dfs.h>
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/pixels.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/stringify.h>
 #include <MazeBuilder/string_utils.h>
+#include <MazeBuilder/wavefront_object_helper.h>
 
 constexpr auto DAY_LENGTH = 600;
 constexpr auto DEFAULT_FOV = 65.0f;
@@ -43,23 +48,47 @@ player::player()
       , m_buffer{}
       , m_item_index{0}
       , m_world{nullptr}
-      , m_maze_task{[this]()->std::string
+      , m_maze_task{[this](const mazes::configurator& config)->std::unique_ptr<mazes::grid_interface>
       {
-          if (!this->m_grid)
+          const auto a = mazes::configurator::make_algo_from_config(this->m_configs.maze);
+          auto g = std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
+          if (!a.has_value())
           {
-              return "";
+              return g;
           }
-          return this->m_grid->operations().get_str();
+          thread_local mazes::randomizer rng{};
+          rng.seed(config.seed());
+          if (!a.value()->run(g.get(), std::ref(rng)))
+          {
+              return nullptr;
+          }
+
+          thread_local mazes::stringify stringifier{};
+          if (!stringifier.run(g.get(), std::ref(rng)))
+          {
+              return nullptr;
+          }
+
+          thread_local mazes::objectify obj_tool{};
+
+          if (!obj_tool.run(g.get(), std::ref(rng)))
+          {
+                return nullptr;
+          }
+
+          thread_local mazes::wavefront_object_helper woh{};
+
+          if (!woh.run(g.get(), std::ref(rng)))
+          {
+              return nullptr;
+          }
+
+          return std::move(g);
       }}
       , m_maze_future{}
-      , m_grid{nullptr}
       , m_grid_factory{std::make_unique<mazes::grid_factory>()}
 {
-    m_grid_factory->register_creator(m_name,
-        [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface>
-    {
-        return std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
-    });
+    m_grid_factory->register_creator(m_name, m_maze_task);
 
     set_category(Entity::PLAYER);
 
@@ -357,6 +386,16 @@ void player::set_item(const std::int32_t value) noexcept
     }
 }
 
+std::string player::get_name() const noexcept
+{
+    return m_name;
+}
+
+void player::set_name(const std::string& name) noexcept
+{
+    m_name = name;
+}
+
 void player::set_world(world* w) noexcept
 {
     m_world = w;
@@ -393,18 +432,25 @@ const player::projected_plane& player::get_projected_plane() const noexcept
 
 bool player::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
-    if (!m_world)
+    if (!g)
     {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "player::run - grid is nullptr\n");
         return false;
     }
 
-    return this->m_world->run(g, std::ref(rng));
-}
+    // Use m_maze_task which already generates and processes the maze
+    auto result_grid = m_maze_task(m_configs.maze);
 
-std::unique_ptr<mazes::grid_interface> player::make_grid(const std::string& key,
-    const mazes::configurator& config) const noexcept
-{
-    return this->m_grid_factory->create(key, config).value_or(nullptr);
+    if (!result_grid)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "player::run - maze task failed\n");
+        return false;
+    }
+
+    // Copy the generated maze data to the provided grid
+    *g = *result_grid;
+
+    return true;
 }
 
 void player::initialize_actions()
@@ -676,43 +722,22 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
 {
     try
     {
-        // Create a grid with current configuration
-        const auto grid = std::make_unique<mazes::grid>(
-            m_configs.maze.rows(),
-            m_configs.maze.columns(),
-            m_configs.maze.levels()
-        );
-
-        if (!grid)
+        if (const auto& g = m_grid_factory->create(m_name, m_configs.maze);
+            g.has_value())
         {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze grid\n");
-            return false;
-        }
 
-        // Generate the maze using the configured algorithm
-        if (const auto algo = mazes::configurator::make_algo_from_config(m_configs.maze))
-        {
-            if (!algo.value()->run(grid.get(), rng))
-            {
-                SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to run maze algorithm\n");
-                return false;
-            }
-        }
-        else
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create maze algorithm\n");
-            return false;
-        }
+            auto&& val = g.value();
 
+        val->operations().set_str("");
         // Convert to pixel representation
-        if (mazes::pixels pixel_converter; !pixel_converter.run(grid.get(), rng))
+        if (const mazes::pixels pixel_converter; !pixel_converter.run(val.get(), rng))
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to convert maze to pixels\n");
             return false;
         }
 
         // Get the pixel data
-        const auto pixel_data = grid->operations().get_pixels();
+        const auto pixel_data = val->operations().get_pixels();
         if (pixel_data.empty())
         {
             SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Pixel data is empty\n");
@@ -721,7 +746,7 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
 
         // Calculate dimensions from actual pixel data
         // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
-        auto [rows, columns, _] = grid->operations().get_dimensions();
+        auto [rows, columns, _] = val->operations().get_dimensions();
 
         // Calculate scale (same as in pixels.cpp)
         constexpr unsigned int MIN_SCALE = 1;
@@ -747,6 +772,7 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
         }
 
         // Create OpenGL texture
+        glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
         glGenTextures(1, &m_configs.maze_texture_id);
         glBindTexture(GL_TEXTURE_2D, m_configs.maze_texture_id);
 
@@ -774,10 +800,21 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
         m_configs.maze_texture_height = height;
         m_configs.maze_ready = true;
 
+        // Store the grid for artifact generation and launch async task
+        m_maze_future = std::async(std::launch::async, m_maze_task, m_configs.maze);
+
+        // Enable the download button now that maze data is available
+        m_configs.show_download_button = true;
+
         SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
                 m_configs.maze_texture_id, width, height);
+        SDL_Log("Async task launched for artifact generation\n");
 
         return true;
+        }
+
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create grid\n");
+        return false;
     }
     catch (const std::exception& e)
     {
@@ -786,18 +823,37 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
     }
 }
 
-std::string player::get_mazes_and_reset_future() noexcept
+/// Gather player's generated maze artifacts from the async task
+/// @return Wavefront .obj data as a string, or empty if not ready
+std::string player::artifacts() const noexcept
 {
-    const auto valid_future = m_maze_future.valid() &&
-        m_maze_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
-
-    if (valid_future)
+    if (!m_maze_future.valid())
     {
-        const auto& s = m_maze_future.get();
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Future is not valid. Generate a maze first.\n");
+        return "";
+    }
 
-        m_maze_future = std::async(std::launch::async, m_maze_task);
+    if (const auto status = m_maze_future.wait_for(std::chrono::seconds(0));
+        status == std::future_status::ready)
+    {
+        const auto g = m_maze_future.get();
+        if (!g)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Grid is null\n");
+            return "";
+        }
 
-        return s;
+        const auto result = g->operations().get_str();
+        SDL_Log("artifacts(): Retrieved %zu bytes from future\n", result.size());
+        return result;
+    }
+    else if (status == std::future_status::timeout)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Maze generation still in progress. Please wait.\n");
+    }
+    else
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Future status deferred.\n");
     }
 
     return "";
