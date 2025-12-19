@@ -360,6 +360,7 @@ struct craft::craft_impl
                     SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
                 }
 
+                m_player.update(delta_time, std::ref(rng));
                 m_world->update(delta_time, std::ref(rng));
 
                 auto& commands = m_world->get_command_queue();
@@ -629,6 +630,53 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
+             // Set button position to bottom-right corner
+            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f,
+                                           ImGui::GetIO().DisplaySize.y - 10.0f),
+                                    ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+
+            // Set window background to be semi-transparent
+            ImGui::SetNextWindowBgAlpha(0.65f);
+
+            // Create window with no title bar, no resize, no move, auto-resize
+            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_NoMove;
+
+            if (ImGui::Begin("Download Window", nullptr, windowFlags))
+            {
+                if (ImGui::Button("Download mazes", ImVec2(150, 40)))
+                {
+#if !defined(__EMSCRIPTEN__)
+                    const auto artifacts = get_context().m_player->artifacts();
+
+                    if (artifacts.empty())
+                    {
+                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
+                        get_context().m_player->m_configs.download_ready = false;
+                        return ;
+                    }
+
+                    constexpr mazes::io_utils io_things{};
+                    const auto filename = get_context().m_player->get_name() + ".obj";
+                    const auto success = io_things.write_file(filename, artifacts);
+                    get_context().m_player->m_configs.download_ready = !success;
+                    SDL_Log("Write file '%s': %s (%zu bytes)\n",
+                            filename.c_str(),
+                            success ? "SUCCESS" : "FAILED",
+                            artifacts.size());
+#else
+
+                    SDL_Log("Web detected: download via calling for artifacts");
+                    p->m_configs.show_download_button = false;
+#endif
+                }
+                ImGui::End();
+            }
+
             // Open the popup modal (should be called every frame when you want it visible)
             ImGui::OpenPopup("Mazes");
 
@@ -766,30 +814,6 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        auto&& p = get_context().m_player;
-                        if (p->m_configs.show_download_button)
-                        {
-                            ImGui::SetNextWindowPos(ImVec2(10.0f, ImGui::GetIO().DisplaySize.y - 60.0f), ImGuiCond_Always,
-                                                    ImVec2(0.0f, 1.0f));
-                            ImGui::SetNextWindowBgAlpha(0.65f);
-
-                            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
-                                ImGuiWindowFlags_AlwaysAutoResize |
-                                ImGuiWindowFlags_NoSavedSettings |
-                                ImGuiWindowFlags_NoFocusOnAppearing |
-                                ImGuiWindowFlags_NoNav |
-                                ImGuiWindowFlags_NoMove;
-
-                            if (ImGui::Begin("Download Maze", nullptr, windowFlags))
-                            {
-                                if (ImGui::Button("Download Maze Data", ImVec2(180, 40)))
-                                {
-                                    p->m_configs.download_ready = p->m_configs.maze_ready;
-                                }
-                            }
-                            ImGui::End();
-                        }
-
                         ImGui::EndTabItem();
                     }
                     if (ImGui::BeginTabItem("Settings"))
@@ -894,34 +918,6 @@ struct craft::craft_impl
 
         bool update(float delta_time, mazes::randomizer& rng) noexcept override
         {
-            auto&& p = get_context().m_player;
-            if (p->m_configs.download_ready)
-            {
-#if !defined(__EMSCRIPTEN__)
-                const auto artifacts = p->artifacts();
-
-                if (artifacts.empty())
-                {
-                    SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
-                    p->m_configs.download_ready = false;
-                    return false;
-                }
-
-                constexpr mazes::io_utils io_things{};
-                const auto filename = p->get_name() + ".obj";
-                const auto success = io_things.write_file(filename, artifacts);
-                p->m_configs.download_ready = !success;
-                SDL_Log("Write file '%s': %s (%zu bytes)\n",
-                        filename.c_str(),
-                        success ? "SUCCESS" : "FAILED",
-                        artifacts.size());
-#else
-
-                SDL_Log("Web detected: download via calling for artifacts");
-                p->m_configs.show_download_button = false;
-#endif
-            }
-
             return false;
         }
 
@@ -1035,7 +1031,7 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
-    void handle_FPS(const double elapsed) const noexcept
+    void render_FPS(const double elapsed) const noexcept
     {
         // Calculate instantaneous FPS and frame time
         const auto fps = static_cast<int>(1000.0 / elapsed);
@@ -1073,6 +1069,39 @@ struct craft::craft_impl
             ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
             ImGui::Text("local time: %s\n", this->m_player.get_local_time().data());
             ImGui::End();
+        }
+    }
+
+    void render_download_button(const double elapsed) const noexcept
+    {
+        auto&& p = const_cast<player*>(&this->m_player);
+        if (p->m_configs.show_download_button && p->m_configs.download_ready)
+        {
+            // Set button position to bottom-right corner
+            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f,
+                                           ImGui::GetIO().DisplaySize.y - 10.0f),
+                                    ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+
+            // Set window background to be semi-transparent
+            ImGui::SetNextWindowBgAlpha(0.65f);
+
+            // Create window with no title bar, no resize, no move, auto-resize
+            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_AlwaysAutoResize |
+                ImGuiWindowFlags_NoSavedSettings |
+                ImGuiWindowFlags_NoFocusOnAppearing |
+                ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_NoMove;
+
+            if (ImGui::Begin("Download Window", nullptr, windowFlags))
+            {
+                if (ImGui::Button("Download mazes", ImVec2(150, 40)))
+                {
+                    // Just show the button
+                }
+
+                ImGui::End();
+            }
         }
     }
 
@@ -1130,7 +1159,9 @@ struct craft::craft_impl
 
         m_crafting_states->draw();
 
-        handle_FPS(elapsed);
+        render_FPS(elapsed);
+
+        render_download_button(elapsed);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

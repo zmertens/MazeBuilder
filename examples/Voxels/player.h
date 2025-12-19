@@ -14,6 +14,7 @@
 
 enum class PlayerAction
 {
+    MOVE_AUTO,
     MOVE_LEFT,
     MOVE_RIGHT,
     MOVE_FORWARD,
@@ -24,6 +25,7 @@ enum class PlayerAction
     FLY,
     TAG_SIGN,
     BUILD_BLOCK,
+    COPY_BLOCK,
     DESTROY_BLOCK,
     PLACE_LIGHT,
     BUILD_MAZE,
@@ -103,6 +105,8 @@ public:
 
     void handle_event(const SDL_Event& event, command_queue& commands) noexcept;
 
+    void update(float delta_time, mazes::randomizer& rng) noexcept;
+
     void draw() const noexcept;
 
     void handle_realtime_input(command_queue& commands);
@@ -162,7 +166,7 @@ private:
     bool m_is_active;
     bool m_on_ground;
     bool m_is_flying;
-    bool m_is_ctrl_held;
+    bool m_is_on_auto_run;
 
     std::string m_name;
     std::uint32_t m_buffer;

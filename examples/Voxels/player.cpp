@@ -42,7 +42,7 @@ player::player()
       , m_is_active{true}
       , m_on_ground{false}
       , m_is_flying{false}
-      , m_is_ctrl_held{false}
+      , m_is_on_auto_run{false}
       , m_name{"zm"}
       , m_buffer{}
       , m_item_index{0}
@@ -89,21 +89,23 @@ player::player()
     set_category(Entity::PLAYER);
 
     // Movement key bindings
-    m_key_binding[SDL_SCANCODE_A] = PlayerAction::MOVE_LEFT;
-    m_key_binding[SDL_SCANCODE_E] = PlayerAction::PREVIEW_MAZE;
-    m_key_binding[SDL_SCANCODE_D] = PlayerAction::MOVE_RIGHT;
-    m_key_binding[SDL_SCANCODE_F] = PlayerAction::BUILD_MAZE;
-    m_key_binding[SDL_SCANCODE_S] = PlayerAction::MOVE_BACKWARD;
-    m_key_binding[SDL_SCANCODE_T] = PlayerAction::TAG_SIGN;
-    m_key_binding[SDL_SCANCODE_W] = PlayerAction::MOVE_FORWARD;
-    m_key_binding[SDL_SCANCODE_SPACE] = PlayerAction::JUMP;
-    m_key_binding[SDL_SCANCODE_LSHIFT] = PlayerAction::MOVE_DOWN;
-    m_key_binding[SDL_SCANCODE_RSHIFT] = PlayerAction::MOVE_UP;
-    m_key_binding[SDL_SCANCODE_TAB] = PlayerAction::FLY;
+    assign_key(PlayerAction::MOVE_LEFT, SDL_SCANCODE_A);
+    assign_key(PlayerAction::MOVE_RIGHT, SDL_SCANCODE_D);
+    assign_key(PlayerAction::MOVE_FORWARD, SDL_SCANCODE_W);
+    assign_key(PlayerAction::MOVE_BACKWARD, SDL_SCANCODE_S);
+    assign_key(PlayerAction::MOVE_AUTO, SDL_SCANCODE_Q);
+    assign_key(PlayerAction::MOVE_UP, SDL_SCANCODE_RSHIFT);
+    assign_key(PlayerAction::MOVE_DOWN, SDL_SCANCODE_LSHIFT);
+    assign_key(PlayerAction::JUMP, SDL_SCANCODE_SPACE);
+    assign_key(PlayerAction::FLY, SDL_SCANCODE_TAB);
+    assign_key(PlayerAction::PLACE_LIGHT, SDL_SCANCODE_LCTRL);
+    assign_key(PlayerAction::TAG_SIGN, SDL_SCANCODE_T);
+    assign_key(PlayerAction::BUILD_MAZE, SDL_SCANCODE_B);
+    assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
 
     m_configs.day_length = DAY_LENGTH;
     m_configs.start_time = DAY_LENGTH / 2 * 1000;
-    m_configs.start_ticks = SDL_GetTicks();
+    m_configs.start_ticks = static_cast<int>(SDL_GetTicks());
     m_configs.fov = DEFAULT_FOV;
     m_configs.ortho = DEFAULT_ORTHO;
     m_configs.invert_mouse = false;
@@ -153,12 +155,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
-        // Track Left Control modifier key
-        if (event.key.scancode == SDL_SCANCODE_LCTRL)
-        {
-            m_is_ctrl_held = true;
-        }
-
         if (const auto found = m_key_binding.find(event.key.scancode);
             found != m_key_binding.cend() && !is_realtime_action(found->second))
         {
@@ -176,23 +172,13 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_UP)
     {
-        if (event.key.scancode == SDL_SCANCODE_LCTRL)
-        {
-            m_is_ctrl_held = false;
-        }
+
     }
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
         if (event.button.button == SDL_BUTTON_LEFT)
         {
-            if (m_is_ctrl_held)
-            {
-                commands.push(m_action_binding[PlayerAction::PLACE_LIGHT]);
-            }
-            else
-            {
-                commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
-            }
+            commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
         }
         else if (event.button.button == SDL_BUTTON_RIGHT)
         {
@@ -200,8 +186,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
         }
         else if (event.button.button == SDL_BUTTON_MIDDLE)
         {
-            // Keep existing behavior: copy block type
-            on_middle_click();
+            commands.push(m_action_binding[PlayerAction::COPY_BLOCK]);
         }
     }
     if (event.type == SDL_EVENT_MOUSE_MOTION)
@@ -233,6 +218,11 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
 }
 
+void player::update(float delta_time, mazes::randomizer& rng) noexcept
+{
+
+}
+
 void player::draw() const noexcept
 {
 }
@@ -242,18 +232,48 @@ void player::handle_realtime_input(command_queue& commands)
     static int frame_counter = 0;
     bool any_key_pressed = false;
 
+    int numKeys = 0;
+    const auto* keyState = SDL_GetKeyboardState(&numKeys);
+
+    // If auto-run is enabled, automatically move forward
+    if (m_is_on_auto_run)
+    {
+        commands.push(m_action_binding[PlayerAction::MOVE_FORWARD]);
+        any_key_pressed = true;
+    }
+
+    // Process all realtime action keys
     for (auto& [id, action] : m_key_binding)
     {
-        // Regular realtime actions OR JUMP when flying
-        if (is_realtime_action(action) || (action == PlayerAction::JUMP && m_is_flying))
+        if (is_realtime_action(action))
         {
-            int numKeys = 0;
+            // Skip JUMP if not flying
+            if (action == PlayerAction::JUMP && !m_is_flying)
+            {
+                continue;
+            }
 
-            if (const auto* keyState = SDL_GetKeyboardState(&numKeys);
-                keyState && id < static_cast<std::uint32_t>(numKeys) && keyState[id])
+            // Skip MOVE_FORWARD if auto-run is active and the key is not pressed
+            // (to avoid double movement, but still allow manual override)
+            if (action == PlayerAction::MOVE_FORWARD && m_is_on_auto_run)
+            {
+                continue;
+            }
+
+            // Check if the key is currently pressed
+            if (keyState && id < static_cast<std::uint32_t>(numKeys) && keyState[id])
             {
                 commands.push(m_action_binding[action]);
                 any_key_pressed = true;
+
+                // If any manual movement key is pressed (except MOVE_FORWARD), disable auto-run
+                if (m_is_on_auto_run &&
+                    (action == PlayerAction::MOVE_LEFT ||
+                     action == PlayerAction::MOVE_RIGHT ||
+                     action == PlayerAction::MOVE_BACKWARD))
+                {
+                    m_is_on_auto_run = false;
+                }
             }
         }
     }
@@ -511,6 +531,12 @@ void player::initialize_actions()
             p.pos.z += p.vel.vz * dt_seconds;
         });
 
+    m_action_binding[PlayerAction::MOVE_AUTO].action = derived_action<player>(
+        [](player& p, const float dt, mazes::randomizer& rng)
+        {
+            p.m_is_on_auto_run = !p.m_is_on_auto_run;
+        });
+
     m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
         [](player& p, float dt, mazes::randomizer& rng)
         {
@@ -579,6 +605,16 @@ void player::initialize_actions()
                 on_right_click();
             }
         });
+
+    m_action_binding[PlayerAction::COPY_BLOCK].action = derived_action<player>(
+    [this](const player& p, float dt, mazes::randomizer& rng)
+    {
+        if (p.m_world)
+        {
+            on_middle_click();
+        }
+    });
+
 
     m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
         [this](const player& p, float dt, mazes::randomizer& rng)
@@ -676,10 +712,11 @@ void player::on_left_click() const noexcept
         hy > 0 && hy < 256 && item::is_destructable(hw))
     {
         m_world->set_block(hx, hy, hz, 0);
-        world::record_block(hx, hy, hz, 0);
+
 #if defined(MAZE_DEBUG)
         SDL_Log("on_left_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw, get_item());
 #endif
+
         if (item::is_plant(m_world->get_block(hx, hy + 1, hz)))
         {
             m_world->set_block(hx, hy + 1, hz, 0);
@@ -697,7 +734,6 @@ void player::on_right_click() const noexcept
         if (!world::player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
         {
             m_world->set_block(hx, hy, hz, get_item());
-            world::record_block(hx, hy, hz, get_item());
 #if defined(MAZE_DEBUG)
             SDL_Log("on_right_click(%d, %d, %d, %d, block_type: %d): ", hx, hy, hz, hw,
                     get_item());
@@ -820,7 +856,8 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
             m_configs.maze_ready = true;
 
             // Store the grid for artifact generation and launch async task
-            m_maze_future = std::exchange(m_maze_future, std::async(std::launch::async, m_maze_task, m_configs.maze));
+            m_maze_future = std::exchange(m_maze_future,
+                std::async(std::launch::async, m_maze_task, m_configs.maze));
 
             // Enable the download button now that maze data is available
             m_configs.show_download_button = true;
@@ -880,7 +917,6 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
                             const int world_z = base_z + cell_y;
 
                             m_world->set_block(world_x, world_y, world_z, get_item());
-                            world::record_block(world_x, world_y, world_z, get_item());
                             blocks_placed++;
                         }
                     }
@@ -892,6 +928,8 @@ bool player::generate_maze_texture(mazes::randomizer& rng) noexcept
                    base_x, base_x + logical_width - 1,
                    base_y, base_y + wall_height - 1,
                    base_z, base_z + logical_height - 1);
+
+            this->m_configs.download_ready = true;
 
             return true;
         }

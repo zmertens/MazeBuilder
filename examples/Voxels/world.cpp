@@ -44,13 +44,6 @@
 #define DELETE_CHUNK_RADIUS 14
 #define NUM_WORKERS 4
 
-struct block {
-    int x;
-    int y;
-    int z;
-    int w;
-} block0, block1;
-
 struct worker_item {
     int p{};
     int q{};
@@ -478,6 +471,9 @@ void world::draw() const noexcept
 
     // Render player's projected maze texture plane
     render_player_projected_plane(&s_block_attrib);
+
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+        10.0f, 10.0f, 12.0f, m_player->get_name());
 
     render_wireframe(&s_line_attrib);
 
@@ -2023,15 +2019,6 @@ void world::set_block(const int x, const int y, const int z, const int w) const 
     }
 }
 
-void world::record_block(const int x, const int y, const int z, const int w) noexcept
-{
-    SDL_memcpy(&block1, &block0, sizeof(block));
-    block0.x = x;
-    block0.y = y;
-    block0.z = z;
-    block0.w = w;
-}
-
 int world::get_block(const int x, const int y, const int z) const noexcept
 {
     const int p = chunked(static_cast<float>(x));
@@ -2310,7 +2297,6 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     // Disable face culling so plane is visible from both sides
     glDisable(GL_CULL_FACE);
 
-    // Enable blending for semi-transparency (optional)
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -2325,12 +2311,11 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     const float tex_height = static_cast<float>(m_player->m_configs.maze_texture_height);
 
     // Scale the plane to match texture aspect ratio
-    // Each pixel in the texture represents approximately 1/32 of a block (adjustable)
     constexpr float pixel_to_block_scale = 1.0f / 32.0f;
     const float plane_width = tex_width * pixel_to_block_scale;
     const float plane_height = tex_height * pixel_to_block_scale;
 
-    // Offset from block top face - float the plane slightly above (0.05 blocks)
+    // Offset from block top face - plane hovers on z-axis
     constexpr float offset_distance = 0.05f;
 
     // Bind the maze texture
@@ -2338,20 +2323,14 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     glBindTexture(GL_TEXTURE_2D, plane.texture_id);
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
-    // Build floating plane geometry - ALWAYS on top face, corner-aligned
-    float quad_data[6 * 10];  // 6 vertices * 10 floats per vertex
+    // Build floating plane geometry
+    float quad_data[6 * 10];
     float* d = quad_data;
 
-    // Position plane on TOP of the block (+Y face), corner-aligned
-    // Block extends from (x, y, z) to (x+1, y+1, z+1)
-    // Top face is at y+1, we offset slightly above it
     const float base_x = world_x;
     const float base_y = world_y + 1.0f + offset_distance;
     const float base_z = world_z;
 
-    // Define plane vertices for top face (parallel to XZ plane)
-    // Corner-aligned: plane starts at block corner and extends by plane_width/plane_height
-    // Note: plane_height is used for Z dimension since texture height maps to depth
     float vertices[4][3];
     vertices[0][0] = 0.0f;
     vertices[0][1] = 0.0f;
@@ -2416,18 +2395,19 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     glDisable(GL_BLEND);
 }
 
-void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font,
-                        const int justify, float x, const float y, const float n, const std::string_view text) const noexcept
+void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font, const int justify,
+    float x, const float y, const float n, const std::string_view text) const noexcept
 {
     auto [w, h] = m_sdl->get_window_size();
     float matrix[16];
     set_matrix_2d(matrix, w, h);
     glUseProgram(attrib->program);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, 3);
+    glUniform1i(attrib->sampler, static_cast<int>(TextureIdentifier::BITMAP_FONT));
     glUniform1i(attrib->extra1, 0);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
     glBindTexture(GL_TEXTURE_2D, font);
+
     const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = sdl_gl_helper::gen_text_buffer(x, y, n, text);
