@@ -196,7 +196,7 @@ void world::insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept
     }
 
     // Get the layer root (background layer)
-    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)].at(0);
+    scene_node* root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -232,7 +232,7 @@ void world::remove_chunk_from_spatial_tree(scene_node* chunk) noexcept
 void world::traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept
 {
     // Traverse the spatial hierarchy
-    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)].at(0);
+    scene_node* root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -263,17 +263,17 @@ void world::traverse_chunks(const std::function<void(scene_node*)>& callback) co
     traverse_node(root);
 }
 
-void world::traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
+void world::traverse_chunks_in_bounds(const int min_p, const int min_q, const int max_p, const int max_q,
                                        const std::function<void(scene_node*)>& callback) const noexcept
 {
     // Convert chunk coordinates to world coordinates
-    constexpr int CHUNK_SIZE = 32;
-    int min_x = min_p * CHUNK_SIZE;
-    int min_z = min_q * CHUNK_SIZE;
-    int max_x = (max_p + 1) * CHUNK_SIZE - 1;
-    int max_z = (max_q + 1) * CHUNK_SIZE - 1;
+    constexpr int CHUNK_SIZE = BUILD_CHUNK_SIZE;
+    const int min_x = min_p * CHUNK_SIZE;
+    const int min_z = min_q * CHUNK_SIZE;
+    const int max_x = (max_p + 1) * CHUNK_SIZE - 1;
+    const int max_z = (max_q + 1) * CHUNK_SIZE - 1;
 
-    scene_node* root = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)].at(0);
+    scene_node* root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -326,7 +326,7 @@ void world::init() noexcept
     // Force create initial chunks around player
     force_chunks(m_player);
 
-    m_player->pos.y = static_cast<float>(highest_block(m_player->pos.x, m_player->pos.z) + 2);
+    m_player->m_pos.y = static_cast<float>(highest_block(m_player->m_pos.x, m_player->m_pos.z) + 2);
 
     s_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     s_block_attrib.position = 0;
@@ -363,20 +363,13 @@ void world::init() noexcept
     m_sky_buffer = sdl_gl_helper::gen_sky_buffer();
 }
 
-void world::update(float delta_time, mazes::randomizer& rng) noexcept
+void world::update(const float delta_time, mazes::randomizer& rng) noexcept
 {
-    // Process all commands in the queue
-    static int update_frame = 0;
-    int commands_processed = 0;
-
     while (!m_command_queue.is_empty())
     {
         auto [action, _] = m_command_queue.pop();
         action(*m_player, delta_time, std::ref(rng));
-        commands_processed++;
     }
-
-    update_frame++;
 
     // Apply gravity as continuous force (convert delta_time from ms to seconds)
     const float dt_seconds = delta_time / 1000.0f;
@@ -384,32 +377,60 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     // Only apply gravity when not flying
     if (!m_player->is_flying())
     {
-        m_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
+        m_player->m_vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
     }
     else
     {
         // In flying mode, apply damping to vertical velocity to stop floating
-        m_player->vel.vy *= 0.85f;
+        m_player->m_vel.vy *= 0.85f;
     }
 
     // Apply damping to horizontal velocity when not actively moving
     // This prevents velocity from persisting after keys are released
     constexpr float horizontal_damping = 0.80f;
-    m_player->vel.vx *= horizontal_damping;
-    m_player->vel.vz *= horizontal_damping;
+    m_player->m_vel.vx *= horizontal_damping;
+    m_player->m_vel.vz *= horizontal_damping;
 
     // Apply velocity to position
-    m_player->pos.y += m_player->vel.vy * dt_seconds;
+    m_player->m_pos.y += m_player->m_vel.vy * dt_seconds;
+
+    // Update projected plane position every frame if maze is ready
+    if (m_player->m_configs.maze_texture != nullptr)
+    {
+        int hx, hy, hz, face;
+        if (hit_test_face(&hx, &hy, &hz, &face))
+        {
+            m_projected_plane.visible = true;
+            m_projected_plane.texture_id = m_player->m_configs.maze_texture->get();
+            m_projected_plane.target_x = hx;
+            m_projected_plane.target_y = hy;
+            m_projected_plane.target_z = hz;
+            m_projected_plane.target_face = face;
+            m_projected_plane.has_valid_target = true;
+        }
+        else
+        {
+            // No valid target (looking at sky/void) - hide plane gracefully
+            m_projected_plane.has_valid_target = false;
+            m_projected_plane.visible = false;
+        }
+    }
+    else
+    {
+        // Maze not ready - ensure plane is hidden
+        m_projected_plane.visible = false;
+        m_projected_plane.has_valid_target = false;
+    }
 
     // Apply collision detection (height = 2 blocks for player)
     // Skip collision when flying (allows clipping through blocks)
     if (!m_player->is_flying())
     {
         // Update ground state based on collision via helper (world is friend of player)
-        if (const int collision_result = collide(2, &m_player->pos.x, &m_player->pos.y, &m_player->pos.z);
+        if (const int collision_result = collide(2, &m_player->m_pos.x, &m_player->m_pos.y, &m_player->m_pos.z);
             collision_result == 1)
         {
-            m_player->vel.vy = 0.0f;
+            m_player->m_vel.vy = 0.0f;
             m_player->set_on_ground(true);
         }
         else
@@ -426,9 +447,6 @@ void world::update(float delta_time, mazes::randomizer& rng) noexcept
     delete_chunks();
     sdl_gl_helper::del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
-
-    // OPTIMIZATION: Process dirty chunks asynchronously on worker threads
-    // This prevents FPS drops when placing/destroying blocks
     update_dirty_chunks_async();
 }
 
@@ -488,8 +506,8 @@ void world::draw() const noexcept
                 "player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f), "
                 "chunk count: %zu",
                 frame_count, triangle_faces,
-                m_player->pos.x, m_player->pos.y, m_player->pos.z,
-                m_player->pos.rx, m_player->pos.ry, get_chunk_count());
+                m_player->m_pos.x, m_player->m_pos.y, m_player->m_pos.z,
+                m_player->m_pos.rx, m_player->m_pos.ry, get_chunk_count());
     }
 #endif
 }
@@ -902,7 +920,7 @@ int world::hit_test(const int previous, const float x, const float y,
 
 int world::hit_test_face(int* x, int* y, int* z, int* face) const noexcept
 {
-    const player::position* s = &m_player->pos;
+    const player::position* s = &m_player->m_pos;
     // item.h -> is_obstacle
     if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
         item::is_obstacle(w))
@@ -1562,7 +1580,7 @@ void world::create_chunk(scene_node* chunk, const int p, const int q) noexcept
 void world::delete_chunks() noexcept
 {
     std::size_t count = this->m_next_chunk_slot;
-    const player::position* s1 = &m_player->pos;
+    const player::position* s1 = &m_player->m_pos;
     auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
     // NOTE: Start at index 1 because index 0 is the root layer node
@@ -1694,7 +1712,7 @@ void world::check_workers() noexcept
 // Used to init the terrain (chunks) around the player
 void world::force_chunks(player* _player) noexcept
 {
-    player::position* s = &_player->pos;
+    player::position* s = &_player->m_pos;
     int p = chunked(s->x);
     int q = chunked(s->z);
 
@@ -1733,7 +1751,7 @@ void world::force_chunks(player* _player) noexcept
 void world::ensure_chunks_worker(player* _player, worker* w) noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    player::position* s = &_player->pos;
+    player::position* s = &_player->m_pos;
     float matrix[16];
     set_matrix_3d(matrix, width, height,
                   s->x, s->y, s->z, s->rx, s->ry,
@@ -2041,7 +2059,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
 {
     auto [width, height] = m_sdl->get_window_size();
     int result = 0;
-    const player::position* s = &this->m_player->pos;
+    const player::position* s = &this->m_player->m_pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     const float light = get_daylight();
@@ -2105,7 +2123,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
 void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_t sign) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &this->m_player->pos;
+    const player::position* s = &this->m_player->m_pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     float matrix[16];
@@ -2153,7 +2171,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     }
 
     auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &this->m_player->pos;
+    const player::position* s = &this->m_player->m_pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
@@ -2179,7 +2197,7 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
 void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t buffer,
     const std::uint32_t sky) const noexcept {
     auto [width, height] = m_sdl->get_window_size();
-    const auto* s = &this->m_player->pos;
+    const auto* s = &this->m_player->m_pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
@@ -2196,7 +2214,7 @@ void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t 
 void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
 {
     auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &this->m_player->pos;
+    const player::position* s = &this->m_player->m_pos;
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
@@ -2263,7 +2281,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     }
 
     // Get the player's projected plane state
-    const auto& plane = m_player->get_projected_plane();
+    const auto& plane = m_projected_plane;
 
     // Only render if plane is visible and has a valid target
     if (!plane.visible || !plane.has_valid_target || plane.texture_id == 0)
@@ -2272,7 +2290,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     }
 
     auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &m_player->pos;
+    const player::position* s = &m_player->m_pos;
 
     constexpr auto PROJECTED_PLANE_HEIGHT_OFFSET = 0.5f;
     float matrix[16];
@@ -2307,8 +2325,8 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     const float world_z = static_cast<float>(plane.target_z);
 
     // Get maze texture dimensions from player
-    const float tex_width = static_cast<float>(m_player->m_configs.maze_texture_width);
-    const float tex_height = static_cast<float>(m_player->m_configs.maze_texture_height);
+    const float tex_width = static_cast<float>(m_player->m_configs.maze_texture->get_width());
+    const float tex_height = static_cast<float>(m_player->m_configs.maze_texture->get_height());
 
     // Scale the plane to match texture aspect ratio
     constexpr float pixel_to_block_scale = 1.0f / 32.0f;
@@ -2320,7 +2338,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glBindTexture(GL_TEXTURE_2D, plane.texture_id);
+    glBindTexture(GL_TEXTURE_2D, m_player->m_configs.maze_texture->get());
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
     // Build floating plane geometry

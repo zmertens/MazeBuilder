@@ -3,6 +3,7 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/stringify.h>
 #include <MazeBuilder/enums.h>
 
 #include <tuple>
@@ -16,31 +17,33 @@ using namespace mazes;
 /// @param g The grid interface
 /// @param rng Random number generator (unused but required by interface)
 /// @return True if successful, false otherwise
-bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+bool objectify::run(grid_interface *g, randomizer &rng) const noexcept
 {
-
     using namespace std;
 
     if (!g)
     {
-        // Handle null grid
         return false;
     }
 
     // Get the grid operations to access dimensions and other methods
-    auto&& grid_ops = g->operations();
-    const auto dimensions = grid_ops.get_dimensions();
-    if (get<0>(dimensions) == 0 || get<1>(dimensions) == 0 || get<2>(dimensions) == 0)
-    {
-        // Handle invalid dimensions
-        return false;
-    }
+    auto &grid_ops = g->operations();
 
-    // Get the string representation of the maze
-    const std::string str = grid_ops.get_str();
-    if (str.empty())
+    // Ensure we have a string representation first
+    std::string maze_str = grid_ops.get_str();
+    if (maze_str.empty())
     {
-        return false;
+        // Run stringify if not already done
+        if (const stringify stringifier; !stringifier.run(g, std::ref(rng)))
+        {
+            return false;
+        }
+        maze_str = grid_ops.get_str();
+
+        if (maze_str.empty())
+        {
+            return false;
+        }
     }
 
     // Prepare data structures for vertices and faces
@@ -88,7 +91,7 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
     int row_x = 0;
     int col_z = 0;
 
-    std::string_view sv(str);
+    std::string_view sv(maze_str);
     for (size_t i = 0; i < sv.size(); ++i)
     {
         if (sv[i] == '\n')
@@ -104,7 +107,7 @@ bool objectify::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const n
             sv[i] == static_cast<char>(barriers::VERTICAL))
         {
             static constexpr auto block_size = 1;
-            for (auto h = 0; h < static_cast<int>(std::get<2>(dimensions)); ++h)
+            for (auto h = 0; h < static_cast<int>(std::get<2>(grid_ops.get_dimensions())); ++h)
             {
                 add_block(row_x, col_z, h, 0, block_size); // w=0 for now, could use block_id from config
             }

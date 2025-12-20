@@ -9,7 +9,7 @@
 #include "craft.h"
 
 // Run the SDL app
-static constexpr auto window_w = 1080, window_h = 720;
+static constexpr auto window_w = 1200, window_h = 800;
 
 const auto title{"Maze Builder 🔧 " + mazes::VERSION};
 

@@ -5,12 +5,14 @@
 #include <functional>
 #include <future>
 #include <map>
+#include <memory>
 #include <string>
 
-#include <MazeBuilder/algo_interface.h>
 #include <MazeBuilder/configurator.h>
 
 #include "command.h"
+
+class texture;
 
 enum class PlayerAction
 {
@@ -45,18 +47,18 @@ namespace mazes
     class randomizer;
 }
 
-class player : public scene_node, mazes::algo_interface
+class player : public scene_node
 {
 public:
     struct position
     {
         float x, y, z, rx, ry, t;
-    } pos{};
+    } m_pos{};
 
     struct velocity
     {
         float vx, vy, vz;
-    } vel{};
+    } m_vel{};
 
     struct configs
     {
@@ -70,28 +72,14 @@ public:
         float fov{ };
         int day_length{ };
         int ortho{ 0 };
-        int start_time{ };
-        int start_ticks{ };
+        std::uint64_t start_time{ };
+        std::uint64_t start_ticks{ };
         mazes::configurator maze{ };
         std::string tag;
-        std::uint32_t maze_texture_id{ 0 };
-        int maze_texture_width{ 0 };
-        int maze_texture_height{ 0 };
-        bool maze_ready{ false };
+        std::unique_ptr<texture> maze_texture;
         bool preview_enabled{ true };
         bool download_ready{ false };
     } m_configs{};
-
-    struct projected_plane
-    {
-        bool visible{ false };
-        std::uint32_t texture_id{ 0 };
-        int target_x{ 0 };
-        int target_y{ 0 };
-        int target_z{ 0 };
-        int target_face{ 0 };
-        bool has_valid_target{ false };
-    } m_projected_plane{};
 
     explicit player();
 
@@ -137,11 +125,7 @@ public:
 
     [[nodiscard]] std::string get_local_time() const noexcept;
 
-    [[nodiscard]] const projected_plane& get_projected_plane() const noexcept;
-
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
-
-    bool generate_maze_texture(mazes::randomizer& rng) noexcept;
+    bool generate_maze_texture(mazes::grid_interface* g, mazes::randomizer& rng) noexcept;
 
     std::string artifacts() const noexcept;
 
@@ -176,13 +160,11 @@ private:
     world* m_world;
 
     std::function<std::unique_ptr<mazes::grid_interface>(const mazes::configurator&)> m_maze_task;
-    mutable std::future<std::unique_ptr<mazes::grid_interface>> m_maze_future;
 
     std::unique_ptr<mazes::grid_factory> m_grid_factory;
 
-    // Cooldown management (timestamp-based, non-blocking)
     std::uint64_t m_last_maze_generation_time{ 0 };
-    static constexpr std::uint64_t MAZE_GENERATION_COOLDOWN_MS{ 10000 }; // 10 seconds
+    static constexpr std::uint64_t MAZE_GENERATION_COOLDOWN_MS{ 10000 };
 };
 
 #endif // PLAYER_H

@@ -615,6 +615,8 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
+            auto&& current_configs = get_context().m_player->m_configs;
+            auto* p = get_context().m_player;
             static auto selected_font_index{0};
             ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
@@ -628,76 +630,50 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
-             // Set button position to bottom-right corner
-            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f,
-                                           ImGui::GetIO().DisplaySize.y - 10.0f),
-                                    ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+            // Center the modal window
+            const ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
+            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
 
-            // Set window background to be semi-transparent
-            ImGui::SetNextWindowBgAlpha(0.65f);
+            ImGui::SetNextWindowBgAlpha(0.95f);
 
-            // Create window with no title bar, no resize, no move, auto-resize
-            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
+            constexpr ImGuiWindowFlags window_flags =
                 ImGuiWindowFlags_AlwaysAutoResize |
-                ImGuiWindowFlags_NoSavedSettings |
-                ImGuiWindowFlags_NoFocusOnAppearing |
-                ImGuiWindowFlags_NoNav |
-                ImGuiWindowFlags_NoMove;
+                ImGuiWindowFlags_NoSavedSettings;
 
-            if (ImGui::Begin("Download Window", nullptr, windowFlags))
-            {
-                if (ImGui::Button("Download mazes", ImVec2(150, 40)))
-                {
-#if !defined(__EMSCRIPTEN__)
-                    const auto artifacts = get_context().m_player->artifacts();
-
-                    if (artifacts.empty())
-                    {
-                        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
-                        get_context().m_player->m_configs.download_ready = false;
-                        return ;
-                    }
-
-                    constexpr mazes::io_utils io_things{};
-                    const auto filename = get_context().m_player->get_name() + ".obj";
-                    const auto success = io_things.write_file(filename, artifacts);
-                    get_context().m_player->m_configs.download_ready = !success;
-                    SDL_Log("Write file '%s': %s (%zu bytes)\n",
-                            filename.c_str(),
-                            success ? "SUCCESS" : "FAILED",
-                            artifacts.size());
-#else
-
-                    SDL_Log("Web detected: download via calling for artifacts");
-                    p->m_configs.show_download_button = false;
-#endif
-                }
-                ImGui::End();
-            }
-
-            // Open the popup modal (should be called every frame when you want it visible)
             ImGui::OpenPopup("Mazes");
 
-            if (ImGui::BeginPopupModal("Mazes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+            if (ImGui::BeginPopupModal("Mazes", nullptr, window_flags))
             {
                 if (ImGui::BeginTabBar("MenuTabs"))
                 {
                     if (ImGui::BeginTabItem("Main"))
                     {
-                        ImGui::Text("Welcome to Maze Builder");
+                        if (current_configs.download_ready && ImGui::Button("Download mazes",
+                            ImVec2(220, 40)))
+                        {
+                            handle_artifacts(p);
+                        }
                         ImGui::Separator();
                         ImGui::Spacing();
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f),
                                            "Navigation Options:");
                         ImGui::Spacing();
-                        if (ImGui::Button("Resume", ImVec2(200, 40)))
+                        if (ImGui::Button("Resume", ImVec2(220, 40)))
                         {
                             request_stack_pop();
                         }
+                        ImGui::Separator();
                         ImGui::Spacing();
-                        if (ImGui::Button("New Editor", ImVec2(200, 40)))
+                        if (ImGui::Button("New Editor", ImVec2(220, 40)))
                         {
                             // Start a new editor session
                             // @TODO : new DB
@@ -705,8 +681,9 @@ struct craft::craft_impl
                             request_stack_push(StateIdentifier::EDITOR);
                             request_stack_push(StateIdentifier::LOADING);
                         }
+                        ImGui::Separator();
                         ImGui::Spacing();
-                        if (ImGui::Button("Close Application", ImVec2(200, 40)))
+                        if (ImGui::Button("Close Application", ImVec2(270, 40)))
                         {
                             request_stack_clear();
                         }
@@ -722,14 +699,16 @@ struct craft::craft_impl
                         ImGui::Text("Spacebar: Jump");
                         ImGui::Text("Tab: Fly");
                         ImGui::Text("Left Shift: Hover up while flying");
-                        ImGui::Text("Right Shift: Hover down while flying");
+                        ImGui::Text("F: Hover down while flying");
+                        ImGui::Text("Q: Auto run Movement");
                         ImGui::Text("W: Forward Movement");
                         ImGui::Text("A: Left Movement");
                         ImGui::Text("S: Backward Movement");
                         ImGui::Text("D: Right Movement");
-                        ImGui::Text("F: Toggle orthogonal projection");
+                        ImGui::Text("B: Build maze at cursor");
+                        ImGui::Text("E: Preview maze at cursor");
                         ImGui::Text("T: Tag a block");
-                        ImGui::Text("Control + Left Click: Place light");
+                        ImGui::Text("Left Control: Place light");
 
                         ImGui::Separator();
                         ImGui::Spacing();
@@ -750,15 +729,15 @@ struct craft::craft_impl
                         static int levels = static_cast<int>(maze_config.levels());
                         static int seed = static_cast<int>(maze_config.seed());
 
-                        ImGui::SliderInt("Rows", &rows, 2, mazes::configurator::MAX_ROWS / 2);
+                        ImGui::SliderInt("Rows", &rows, 2, 10);
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::SliderInt("Columns", &columns, 2, mazes::configurator::MAX_COLUMNS / 2);
+                        ImGui::SliderInt("Columns", &columns, 2, 10);
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::SliderInt("Levels", &levels, 1, mazes::configurator::MAX_LEVELS / 2);
+                        ImGui::SliderInt("Levels", &levels, 1, 5);
                         ImGui::Separator();
                         ImGui::Spacing();
 
@@ -774,7 +753,6 @@ struct craft::craft_impl
                                         maze_config.algo_id(mazes::to_algo_from_sv(itr));
                                         selected_algo = itr;
                                     }
-                                    // Set the initial focus when opening the combo (scrolling + keyboard navigation focus)
                                     if (is_selected)
                                     {
                                         ImGui::SetItemDefaultFocus();
@@ -912,7 +890,7 @@ struct craft::craft_impl
                 ImGui::EndPopup();
             }
 
-            ImGui::PopStyleColor(10);
+            ImGui::PopStyleColor(17);
             ImGui::PopFont();
         }
 
@@ -1031,6 +1009,32 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
+    static void handle_artifacts(player* p) noexcept
+    {
+#if !defined(__EMSCRIPTEN__)
+        const auto artifacts = p->artifacts();
+
+        if (artifacts.empty())
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
+            p->m_configs.download_ready = false;
+            return ;
+        }
+
+        constexpr mazes::io_utils io_things{};
+        const auto filename = p->get_name() + ".obj";
+        const auto success = io_things.write_file(filename, artifacts);
+        p->m_configs.download_ready = !success;
+        SDL_Log("Write file '%s': %s (%zu bytes)\n",
+                filename.c_str(),
+                success ? "SUCCESS" : "FAILED",
+                artifacts.size());
+#else
+        SDL_Log("Web detected: download via calling for artifacts");
+        p->m_configs.show_download_button = false;
+#endif
+    }
+
     void render_FPS(const double elapsed) const noexcept
     {
         // Calculate instantaneous FPS and frame time
@@ -1069,39 +1073,6 @@ struct craft::craft_impl
             ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
             ImGui::Text("local time: %s\n", this->m_player.get_local_time().data());
             ImGui::End();
-        }
-    }
-
-    void render_download_button(const double elapsed) const noexcept
-    {
-        auto&& p = const_cast<player*>(&this->m_player);
-        if (p->m_configs.show_download_button && p->m_configs.download_ready)
-        {
-            // Set button position to bottom-right corner
-            ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f,
-                                           ImGui::GetIO().DisplaySize.y - 10.0f),
-                                    ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-
-            // Set window background to be semi-transparent
-            ImGui::SetNextWindowBgAlpha(0.65f);
-
-            // Create window with no title bar, no resize, no move, auto-resize
-            constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
-                ImGuiWindowFlags_AlwaysAutoResize |
-                ImGuiWindowFlags_NoSavedSettings |
-                ImGuiWindowFlags_NoFocusOnAppearing |
-                ImGuiWindowFlags_NoNav |
-                ImGuiWindowFlags_NoMove;
-
-            if (ImGui::Begin("Download Window", nullptr, windowFlags))
-            {
-                if (ImGui::Button("Download mazes", ImVec2(150, 40)))
-                {
-                    // Just show the button
-                }
-
-                ImGui::End();
-            }
         }
     }
 
@@ -1160,8 +1131,6 @@ struct craft::craft_impl
         m_crafting_states->draw();
 
         render_FPS(elapsed);
-
-        render_download_button(elapsed);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

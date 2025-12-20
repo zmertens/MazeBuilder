@@ -3,6 +3,7 @@
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/objectify.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
 
@@ -14,7 +15,7 @@
 
 using namespace mazes;
 
-bool wavefront_object_helper::run(grid_interface *g, [[maybe_unused]] randomizer &rng) const noexcept
+bool wavefront_object_helper::run(grid_interface *g, randomizer &rng) const noexcept
 {
     using namespace std;
 
@@ -22,6 +23,18 @@ bool wavefront_object_helper::run(grid_interface *g, [[maybe_unused]] randomizer
 
     const auto &vertices = g_ops.get_vertices();
     const auto &faces = g_ops.get_faces();
+
+    if (vertices.empty() || faces.empty())
+    {
+        if (mazes::objectify obj_tool{}; !obj_tool.run(g, std::ref(rng)))
+        {
+            return false;
+        }
+        if (g_ops.get_vertices().empty() || g_ops.get_faces().empty())
+        {
+            return false;
+        }
+    }
 
     // Pre-calculate approximate output size to minimize reallocations
     // Header: ~100 chars, each vertex: ~30 chars, each face: ~20 chars + face indices

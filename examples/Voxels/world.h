@@ -44,7 +44,7 @@ public:
 
     void handle_event(const SDL_Event& event) noexcept;
 
-    void update(float dt, mazes::randomizer& rng) noexcept;
+    void update(float delta_time, mazes::randomizer& rng) noexcept;
 
     void draw() const noexcept;
 
@@ -52,6 +52,17 @@ public:
 
     void destroy_world();
 private:
+    struct projected_plane
+    {
+        bool visible{ false };
+        std::uint32_t texture_id{ 0 };
+        int target_x{ 0 };
+        int target_y{ 0 };
+        int target_z{ 0 };
+        int target_face{ 0 };
+        bool has_valid_target{ false };
+    } m_projected_plane{};
+
     void build_scene();
 
     static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
@@ -63,7 +74,7 @@ private:
     void traverse_chunks_in_bounds(int min_p, int min_q, int max_p, int max_q,
                                      const std::function<void(scene_node*)>& callback) const noexcept;
     void insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept;
-    void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
+    static void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
     bool worker_run(worker* w) const noexcept;
     void init_worker_threads() noexcept;
@@ -123,10 +134,8 @@ private:
     void toggle_light(int x, int y, int z) const noexcept;
     void set_light(int p, int q, int x, int y, int z, int w) const noexcept;
 
-
     void _set_block(int p, int q, int x, int y, int z, int w, int dirty) const noexcept;
     void set_block(int x, int y, int z, int w) const noexcept;
-    static void record_block(int x, int y, int z, int w) noexcept;
     [[nodiscard]] int get_block(int x, int y, int z) const noexcept;
 
     [[nodiscard]] std::size_t get_chunk_count() const noexcept;

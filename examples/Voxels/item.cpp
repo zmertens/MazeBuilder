@@ -94,7 +94,7 @@ std::array<std::array<int, item::BLOCK_FACE_COUNT>, item::TOTAL_BLOCKS> item::bl
     55, 55, 55, 55, 55, 55, // 24
     56, 56, 56, 56, 56, 56, // 25
     57, 57, 57, 57, 57, 57, // 26
-    57, 57, 57, 57, 57, 57, // 27
+    58, 58, 58, 58, 58, 58, // 27
     0, 0, 0, 0, 0, 0, // 28
     0, 0, 0, 0, 0, 0, // 29
     0, 0, 0, 0, 0, 0, // 30
@@ -143,8 +143,8 @@ std::array<int, item::TOTAL_PLANTS> item::plants = {
     52, // 21 - sun flower
     53, // 22 - white flower
     54, // 23 - blue flower
-    0,  // 24 - SDL_LOGO (not a plant, placeholder)
-    0,  // 25 - SFML_LOGO (not a plant, placeholder)
+    0,  // 24 - SDL_LOGO
+    0,  // 25 - SFML_LOGO
     57, // 26 - cactus 1
     58, // 27 - cactus 2
 };
