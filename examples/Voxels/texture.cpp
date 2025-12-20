@@ -8,6 +8,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "sdl_gl_helper.h"
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
@@ -91,8 +93,15 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
     // n stores number of components (channels)
     int n;
 
+    auto buffer = sdl_gl_helper::load_file_binary(filepath);
+    if (buffer.empty())
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load file %s into memory\n", filepath.data());
+        return false;
+    }
+
     // Force RGBA (4 components) for consistency
-    auto *data = stbi_load(filepath.data(), &width, &height, &n, 4);
+    auto *data = stbi_load_from_memory(buffer.data(), static_cast<int>(buffer.size()), &width, &height, &n, 4);
 
     if (data == nullptr)
     {
@@ -129,7 +138,7 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
 
     m_width = width;
     m_height = height;
-
+    m_pixel_data = data;
     stbi_image_free(data);
 
     return true;

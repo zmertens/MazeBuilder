@@ -10,6 +10,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "sdl_gl_helper.h"
+
 shader::shader(shader &&other) noexcept : m_program(0)
 {
 }
@@ -66,48 +68,7 @@ std::uint32_t shader::make_shader(const std::string_view sources, std::string_vi
 
 std::uint32_t shader::load_shader(std::string_view path)
 {
-
-    auto sdl_file_io = [&path]()->std::string
-    {
-        // Open binary file
-        SDL_IOStream* io = SDL_IOFromFile(path.data(), "r");
-        if (io == nullptr) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_IOFromFile failed: %s", SDL_GetError());
-            return "";
-        }
-        const auto data_size = SDL_GetIOSize(io);
-        // Allocate memory for the file content + null terminator
-        const auto data = static_cast<char*>(SDL_malloc(data_size + 1));
-
-        if (data == nullptr) {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_malloc failed: %s", SDL_GetError());
-            SDL_CloseIO(io);
-            return "";
-        }
-
-        // Read file into memory
-        // SDL_ReadIO returns the number of bytes read, or 0 on error or end of file
-        int nb_read_total = 0, nb_read_size = 1;
-        auto buf = data;
-        while (nb_read_total < data_size && nb_read_size != 0) {
-            nb_read_size = SDL_ReadIO(io, buf, (data_size - nb_read_total));
-            nb_read_total += nb_read_size;
-            buf += nb_read_size;
-        }
-
-        SDL_CloseIO(io);
-        if (nb_read_total != data_size) {
-            SDL_free(data);
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to read complete file: %s", SDL_GetError());
-            return "";
-        }
-        data[nb_read_total] = '\0';
-        std::string string_data(data, nb_read_total);
-        SDL_free(data);
-        return string_data;
-    };
-
-    auto data = sdl_file_io();
+    auto data = sdl_gl_helper::load_file_to_string(path);
     const GLuint result = make_shader(data, path);
     return result;
 }

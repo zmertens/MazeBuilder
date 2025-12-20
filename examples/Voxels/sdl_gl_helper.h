@@ -1,9 +1,11 @@
 #ifndef SDL_HELPER_H
 #define SDL_HELPER_H
 
+#include <cstdint>
 #include <mutex>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include <SDL3/SDL.h>
 
@@ -44,8 +46,10 @@ public:
     std::pair<std::int32_t, std::int32_t> get_window_size_in_pixels() const noexcept;
 
     static void print_display_modes() noexcept;
-
     static void print_opengl_info() noexcept;
+
+    static std::string load_file_to_string(std::string_view path) noexcept;
+    static std::vector<std::uint8_t> load_file_binary(std::string_view path) noexcept;
 
     static void del_buffer(std::uint32_t buffer) noexcept;
     static std::uint32_t gen_buffer(std::size_t size, const float* data) noexcept;

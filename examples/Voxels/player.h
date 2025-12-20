@@ -87,8 +87,8 @@ public:
     player(const player&) = delete;
     player& operator=(const player&) = delete;
 
-    player(player&&) noexcept = default;
-    player& operator=(player&&) = default;
+    player(player&&) noexcept = delete;
+    player& operator=(player&&) = delete;
 
     void handle_event(const SDL_Event& event, command_queue& commands) noexcept;
 

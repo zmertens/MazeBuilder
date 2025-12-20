@@ -203,6 +203,62 @@ void sdl_gl_helper::print_opengl_info() noexcept
     SDL_Log("-------------------------------------------------------------\n");
 }
 
+std::string sdl_gl_helper::load_file_to_string(std::string_view path) noexcept
+{
+    
+    // Open binary file
+    SDL_IOStream* io = SDL_IOFromFile(path.data(), "r");
+    if (io == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_IOFromFile failed: %s", SDL_GetError());
+        return "";
+    }
+    const auto data_size = SDL_GetIOSize(io);
+    // Allocate memory for the file content + null terminator
+    const auto data = static_cast<char*>(SDL_malloc(data_size + 1));
+
+    if (data == nullptr) {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_malloc failed: %s", SDL_GetError());
+        SDL_CloseIO(io);
+        return "";
+    }
+
+    // Read file into memory
+    // SDL_ReadIO returns the number of bytes read, or 0 on error or end of file
+    int nb_read_total = 0, nb_read_size = 1;
+    auto buf = data;
+    while (nb_read_total < data_size && nb_read_size != 0) {
+        nb_read_size = SDL_ReadIO(io, buf, (data_size - nb_read_total));
+        nb_read_total += nb_read_size;
+        buf += nb_read_size;
+    }
+
+    SDL_CloseIO(io);
+    if (nb_read_total != data_size) {
+        SDL_free(data);
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to read complete file: %s", SDL_GetError());
+        return "";
+    }
+    data[nb_read_total] = '\0';
+    std::string string_data(data, nb_read_total);
+    SDL_free(data);
+    return string_data;
+}
+
+std::vector<std::uint8_t> sdl_gl_helper::load_file_binary(std::string_view path) noexcept
+{
+    SDL_IOStream* io = SDL_IOFromFile(path.data(), "rb");
+    if (!io)
+    {
+        return {};
+    }
+
+    auto size = SDL_GetIOSize(io);
+    std::vector<std::uint8_t> buffer(size);
+    SDL_ReadIO(io, buffer.data(), size);
+    SDL_CloseIO(io);
+    return buffer;
+}
+
 void sdl_gl_helper::set_window_icon(std::string_view icon_path) const noexcept
 {
     SDL_Surface* icon_surface = SDL_LoadBMP_IO(SDL_IOFromFile(icon_path.data(), "rb"), true);
