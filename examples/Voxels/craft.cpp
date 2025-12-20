@@ -729,7 +729,8 @@ struct craft::craft_impl
 
                         auto&& maze_config = get_context().m_player->m_configs.maze;
 
-                        static auto selected_algo = mazes::to_sv_from_algo(maze_config.algo_id());
+                        static std::string selected_algo = "";
+                        selected_algo = mazes::to_sv_from_algo(maze_config.algo_id());
                         static int rows = static_cast<int>(maze_config.rows());
                         static int columns = static_cast<int>(maze_config.columns());
                         static int levels = static_cast<int>(maze_config.levels());

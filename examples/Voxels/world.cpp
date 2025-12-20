@@ -30,6 +30,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <chrono>
 #include <condition_variable>
 #include <mutex>
 #include <ranges>
@@ -116,7 +117,6 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_sky_buffer{ 0 }
       , m_projected_plane{}
 {
-    // Reference the cached MAZE texture instead of creating new instance
     m_projected_plane.projected_texture = &m_textures.get(TextureIdentifier::MAZE);
 
     // Set bidirectional reference between player and world
@@ -443,6 +443,9 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     sdl_gl_helper::del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
     update_dirty_chunks_async();
+
+    // Process async maze build queue
+    process_maze_build_queue();
 }
 
 void world::draw() const noexcept
@@ -623,12 +626,18 @@ void world::create_world(const int p, const int q,
 
 bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 {
+    // This method now ONLY generates the texture for preview
+    // Block placement is handled separately via place_maze_blocks_async
+    return const_cast<world*>(this)->generate_maze_texture(g);
+}
+
+bool world::generate_maze_texture(mazes::grid_interface* g) noexcept
+{
     // Calculate dimensions from actual pixel data
-    // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
     auto [rows, columns, _] = g->operations().get_dimensions();
     auto pixel_data = g->operations().get_pixels();
 
-    // Calculate scale (same as in pixels.cpp)
+    // Calculate scale
     constexpr unsigned int MIN_SCALE = 1;
     constexpr unsigned int MAX_SCALE = 10;
     const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
@@ -638,12 +647,12 @@ bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
     const auto ascii_height = rows * 2 + 1;
     const int height = static_cast<int>(ascii_height * scale);
 
-    // Width must be calculated from pixel data size since ASCII lines may have varying lengths
-    // pixel_data.size() = width * height * 4 (RGBA)
+    // Width must be calculated from pixel data size
     const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
-    SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
+    SDL_Log("Maze texture generation: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
 
+    // Update the texture on the main thread (required for OpenGL/SDL)
     if (!m_projected_plane.projected_texture->update_from_memory(
         pixel_data.data(),
         width,
@@ -654,126 +663,109 @@ bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
         return false;
     }
 
-    // Enable the download button now that maze data is available
-    m_player->m_configs.show_download_button = true;
+    SDL_Log("Maze texture updated successfully: %dx%d\n", width, height);
+    return true;
+}
 
-    SDL_Log("Maze texture updated successfully: ID=%u, %dx%d\n",
-            m_projected_plane.projected_texture->get(), width, height);
-    SDL_Log("Async task launched for artifact generation\n");
+void world::place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
+                                     int width, int height, int scale,
+                                     int target_x, int target_y, int target_z, int target_face,
+                                     int wall_height, int item_type) noexcept
+{
+    SDL_Log("Queuing async maze block placement: %dx%d, wall_height=%d\n", width, height, wall_height);
 
-    // Place maze blocks in the world for visual rendering
-    // Parse pixel_data: black pixels (walls) become stone blocks
-    // Sample every 'scale' pixels to match logical maze structure
+    // Calculate base position from target face
+    int base_x = target_x;
+    int base_y = target_y;
+    int base_z = target_z;
 
-    // Use the targeted block face position from the crosshair instead of player position
-    // This allows precise placement where the player is looking
-    int base_x, base_y, base_z;
-
-    if (m_projected_plane.has_valid_target)
+    // Adjust position based on which face was targeted
+    switch (target_face)
     {
-        // Use the block face that player is targeting
-        base_x = m_projected_plane.target_x;
-        base_y = m_projected_plane.target_y;
-        base_z = m_projected_plane.target_z;
-
-        // Adjust position based on which face was targeted
-        // Place maze on the adjacent empty space (where you would place a block)
-        switch (m_projected_plane.target_face)
-        {
-            case 0: // Left face (-X)
-                base_x -= 1;
-                break;
-            case 1: // Right face (+X)
-                base_x += 1;
-                break;
-            case 2: // Front face (-Z)
-                base_z -= 1;
-                break;
-            case 3: // Back face (+Z)
-                base_z += 1;
-                break;
-            case 4: case 5: case 6: case 7: // Top faces (various orientations)
-                base_y += 1; // Place on top of the block
-                break;
-            case 8: // Bottom face
-                base_y -= 1; // Place below the block
-                break;
-            default:
-                // Fallback to top face if unknown
-                base_y += 1;
-                break;
-        }
-
-        SDL_Log("Using crosshair target block at (%d, %d, %d) face %d for maze placement\n",
-                m_projected_plane.target_x, m_projected_plane.target_y,
-                m_projected_plane.target_z, m_projected_plane.target_face);
-    }
-    else
-    {
-        // Fallback: if no valid target, place at player's feet (old behavior)
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No valid crosshair target, placing maze at player position\n");
-        base_x = static_cast<int>(m_player->m_pos.x);
-        base_y = static_cast<int>(m_player->m_pos.y);
-        base_z = static_cast<int>(m_player->m_pos.z);
+        case 0: base_x -= 1; break; // Left face (-X)
+        case 1: base_x += 1; break; // Right face (+X)
+        case 2: base_z -= 1; break; // Front face (-Z)
+        case 3: base_z += 1; break; // Back face (+Z)
+        case 4: case 5: case 6: case 7: base_y += 1; break; // Top faces
+        case 8: base_y -= 1; break; // Bottom face
+        default: base_y += 1; break; // Fallback to top
     }
 
-    // Calculate logical maze dimensions (before scaling)
-    const int logical_width = width / scale;
-    const int logical_height = height / scale;
+    SDL_Log("Maze placement base position: (%d, %d, %d) from face %d\n",
+            base_x, base_y, base_z, target_face);
 
-    SDL_Log("Placing maze in world: %dx%d logical cells (from %dx%d pixels, scale=%u) at offset (%d, %d, %d)\n",
-            logical_width, logical_height, width, height, scale, base_x, base_y, base_z);
-
-    int blocks_placed = 0;
-    const auto wall_height = m_player->m_configs.maze.levels();
-
-    // Iterate through logical maze cells by sampling every 'scale' pixels
-    // This creates geometry that matches the maze structure, not the upscaled texture
-    for (int cell_y = 0; cell_y < logical_height; ++cell_y)
+    // Create a future for async block placement
+    auto future = std::async(std::launch::async, [this, pixel_data, width, height, scale,
+                                                   base_x, base_y, base_z, wall_height, item_type]()
     {
-        for (int cell_x = 0; cell_x < logical_width; ++cell_x)
+        // Calculate logical maze dimensions
+        const int logical_width = width / scale;
+        const int logical_height = height / scale;
+
+        int blocks_placed = 0;
+
+        // Iterate through logical maze cells
+        for (int cell_y = 0; cell_y < logical_height; ++cell_y)
         {
-            // Sample the center of each scaled cell region
-            const int pix_x = cell_x * scale + scale / 2;
-            const int pix_y = cell_y * scale + scale / 2;
-
-            // Calculate pixel index in the RGBA array
-            const int pixel_index = (pix_y * width + pix_x) * 4;
-
-            // Read RGBA values
-            const uint8_t r = pixel_data[pixel_index + 0];
-            const uint8_t g = pixel_data[pixel_index + 1];
-            const uint8_t b = pixel_data[pixel_index + 2];
-            // Alpha is pixel_data[pixel_index + 3] but we don't need it
-
-            // Check if pixel is black (wall) - threshold for near-black
-            const bool is_wall = (r < 50 && g < 50 && b < 50);
-
-            if (is_wall)
+            for (int cell_x = 0; cell_x < logical_width; ++cell_x)
             {
-                // Place a vertical column of blocks for this wall
-                for (int y = 0; y < wall_height; ++y)
-                {
-                    const int world_x = base_x + cell_x;
-                    const int world_y = base_y + y;
-                    const int world_z = base_z + cell_y;
+                // Sample the center of each scaled cell region
+                const int pix_x = cell_x * scale + scale / 2;
+                const int pix_y = cell_y * scale + scale / 2;
+                const int pixel_index = (pix_y * width + pix_x) * 4;
 
-                    set_block(world_x, world_y, world_z, m_player->get_item());
-                    blocks_placed++;
+                // Read RGB values
+                const uint8_t r = pixel_data[pixel_index + 0];
+                const uint8_t g = pixel_data[pixel_index + 1];
+                const uint8_t b = pixel_data[pixel_index + 2];
+
+                // Check if pixel is black (wall)
+                const bool is_wall = (r < 50 && g < 50 && b < 50);
+
+                if (is_wall)
+                {
+                    // Place a vertical column of blocks for this wall
+                    for (int y = 0; y < wall_height; ++y)
+                    {
+                        const int world_x = base_x + cell_x;
+                        const int world_y = base_y + y;
+                        const int world_z = base_z + cell_y;
+
+                        // set_block is thread-safe with mutex protection
+                        set_block(world_x, world_y, world_z, item_type);
+                        blocks_placed++;
+                    }
                 }
             }
         }
-    }
 
-    SDL_Log("Maze blocks placed successfully! %d blocks placed\n", blocks_placed);
-    SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
-           base_x, base_x + logical_width - 1,
-           base_y, base_y + wall_height - 1,
-           base_z, base_z + logical_height - 1);
+        SDL_Log("Async maze block placement complete: %d blocks placed\n", blocks_placed);
+        SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
+               base_x, base_x + logical_width - 1,
+               base_y, base_y + wall_height - 1,
+               base_z, base_z + logical_height - 1);
+    });
 
-    m_player->m_configs.download_ready = true;
+    // Add future to queue
+    std::lock_guard<std::mutex> lock(m_maze_build_mutex);
+    m_maze_build_futures.push_back(std::move(future));
+}
 
-    return true;
+void world::process_maze_build_queue() noexcept
+{
+    std::lock_guard<std::mutex> lock(m_maze_build_mutex);
+
+    // Remove completed futures
+    m_maze_build_futures.erase(
+        std::remove_if(m_maze_build_futures.begin(), m_maze_build_futures.end(),
+            [](std::future<void>& f) {
+                if (!f.valid()) return true;
+
+                // Check if ready without blocking
+                return f.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+            }),
+        m_maze_build_futures.end()
+    );
 }
 
 bool world::worker_run(worker* w) const noexcept

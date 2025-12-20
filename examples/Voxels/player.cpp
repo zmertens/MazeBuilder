@@ -560,25 +560,34 @@ void player::initialize_actions()
     m_action_binding[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
         [](player& p, const float dt, mazes::randomizer& rng)
         {
-            constexpr auto PREVIEW_COOLDOWN_MS = 500;
+            constexpr auto PREVIEW_COOLDOWN_MS = 250;  // Faster cooldown for preview
             static auto last_preview_time = SDL_GetTicks();
             const auto current_time = SDL_GetTicks();
 
             if (const auto time_since_last_preview = current_time - last_preview_time;
                 time_since_last_preview > PREVIEW_COOLDOWN_MS && p.m_configs.preview_enabled && p.m_world)
             {
-                if (auto g = p.m_grid_factory->create(p.get_name(),
-                    std::cref(p.m_configs.maze));
+                last_preview_time = current_time;
+
+                // Generate maze grid
+                if (auto g = p.m_grid_factory->create(p.get_name(), std::cref(p.m_configs.maze));
                     g.has_value())
                 {
-                    // Generate the maze texture
-                    if (p.m_world->run(g.value().get(), rng))
+                    // Move grid ownership
+                    auto grid_ptr = std::move(g.value());
+
+                    // ONLY generate texture (main thread, no block placement)
+                    if (p.m_world->generate_maze_texture(grid_ptr.get()))
                     {
+                        // Store for artifacts and building
+                        p.store_maze_for_artifacts(std::move(grid_ptr));
+                        p.m_configs.show_download_button = true;
                         p.m_last_maze_generation_time = SDL_GetTicks();
+                        SDL_Log("Preview generated successfully\n");
                     }
                     else
                     {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate maze texture");
+                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate preview texture\n");
                     }
                 }
             }
@@ -587,9 +596,57 @@ void player::initialize_actions()
     m_action_binding[PlayerAction::BUILD_MAZE].action = derived_action<player>(
         [](player& p, const float dt, mazes::randomizer& rng)
         {
-            if (p.m_configs.preview_enabled && p.m_world)
+            if (!p.m_world)
             {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No world available for maze building\n");
+                return;
             }
+
+            // Check if we have a valid crosshair target
+            if (!p.m_world->m_projected_plane.has_valid_target)
+            {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No valid target block. Aim at a block face first.\n");
+                return;
+            }
+
+            // Get the last generated maze data
+            auto maze_ptr = p.get_last_generated_maze();
+            if (!maze_ptr)
+            {
+                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No maze preview available. Press E to generate preview first.\n");
+                return;
+            }
+
+            // Get pixel data from the generated maze
+            auto pixel_data = maze_ptr->operations().get_pixels();
+            auto [rows, columns, _] = maze_ptr->operations().get_dimensions();
+
+            // Calculate scale
+            constexpr unsigned int MIN_SCALE = 1;
+            constexpr unsigned int MAX_SCALE = 10;
+            const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
+            const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+            const auto ascii_height = rows * 2 + 1;
+            const int height = static_cast<int>(ascii_height * scale);
+            const int width = static_cast<int>(pixel_data.size() / (height * 4));
+
+            // Queue async block placement
+            p.m_world->place_maze_blocks_async(
+                pixel_data,
+                width,
+                height,
+                scale,
+                p.m_world->m_projected_plane.target_x,
+                p.m_world->m_projected_plane.target_y,
+                p.m_world->m_projected_plane.target_z,
+                p.m_world->m_projected_plane.target_face,
+                p.m_configs.maze.levels(),
+                p.get_item()
+            );
+
+            p.m_configs.download_ready = true;
+            SDL_Log("Maze build queued asynchronously\n");
         });
 }
 
@@ -713,5 +770,17 @@ std::string player::artifacts() const noexcept
     // }
 
     return "";
+}
+
+void player::store_maze_for_artifacts(std::unique_ptr<mazes::grid_interface> maze) noexcept
+{
+    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
+    m_last_maze_for_artifacts = std::move(maze);
+}
+
+mazes::grid_interface* player::get_last_generated_maze() const noexcept
+{
+    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
+    return m_last_maze_for_artifacts.get();
 }
 

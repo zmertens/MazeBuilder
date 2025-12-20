@@ -16,10 +16,12 @@ texture::texture(texture &&other) noexcept
     m_texture = other.m_texture;
     m_width = other.m_width;
     m_height = other.m_height;
+    m_pixel_data = other.m_pixel_data;
 
     other.m_texture = 0;
     other.m_width = 0;
     other.m_height = 0;
+    other.m_pixel_data = nullptr;
 }
 
 texture &texture::operator=(texture &&other) noexcept
@@ -31,10 +33,12 @@ texture &texture::operator=(texture &&other) noexcept
         m_texture = other.m_texture;
         m_width = other.m_width;
         m_height = other.m_height;
+        m_pixel_data = other.m_pixel_data;
 
         other.m_texture = 0;
         other.m_width = 0;
         other.m_height = 0;
+        other.m_pixel_data = nullptr;
     }
     return *this;
 }
@@ -52,6 +56,7 @@ void texture::free() noexcept
         m_texture = 0;
         m_width = 0;
         m_height = 0;
+        m_pixel_data = nullptr;
     }
 }
 
@@ -68,6 +73,11 @@ int texture::get_width() const noexcept
 int texture::get_height() const noexcept
 {
     return this->m_height;
+}
+
+std::uint8_t* texture::get_pixel_data() const noexcept
+{
+    return this->m_pixel_data;
 }
 
 // Load an image file using stb_image and create an SDL texture
@@ -169,6 +179,8 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
 
     this->free();
 
+    this->m_pixel_data = const_cast<std::uint8_t*>(data);
+
     glGenTextures(1, &m_texture);
     glActiveTexture(GL_TEXTURE0 + channel_offset);
     glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -222,6 +234,8 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
             width, height, MAX_TEXTURE_WIDTH, MAX_TEXTURE_HEIGHT);
         return false;
     }
+
+    m_pixel_data = const_cast<std::uint8_t*>(data);
 
     // If texture doesn't exist or dimensions changed, reallocate
     if (m_texture == 0 || m_width != width || m_height != height)

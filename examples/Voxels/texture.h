@@ -30,6 +30,8 @@ public:
 
     [[nodiscard]] int get_height() const noexcept;
 
+    std::uint8_t* get_pixel_data() const noexcept;
+
     bool load_target(int w, int h) noexcept;
 
     bool load_from_file(std::string_view filepath, std::uint32_t channel_offset = 0) noexcept;
@@ -47,6 +49,7 @@ private:
     std::uint32_t m_texture;
     int m_width;
     int m_height;
+    std::uint8_t* m_pixel_data;
 }; // texture class
 
 #endif // TEXTURE_H

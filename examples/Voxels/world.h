@@ -3,6 +3,7 @@
 
 #include <array>
 #include <functional>
+#include <future>
 #include <memory>
 #include <optional>
 #include <string>
@@ -55,6 +56,15 @@ public:
     void destroy_world();
 
     bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
+
+    // Separated maze operations for better decoupling
+    bool generate_maze_texture(mazes::grid_interface* g) noexcept;
+    void place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
+                                  int width, int height, int scale,
+                                  int target_x, int target_y, int target_z, int target_face,
+                                  int wall_height, int item_type) noexcept;
+    void process_maze_build_queue() noexcept;
+
 private:
     struct projected_plane
     {
@@ -182,6 +192,10 @@ private:
     std::vector<std::unique_ptr<worker>> m_workers;
 
     std::uint32_t m_sky_buffer;
+
+    // Maze build queue for async block placement
+    std::vector<std::future<void>> m_maze_build_futures;
+    mutable std::mutex m_maze_build_mutex;
 };
 
 #endif // WORLD_H

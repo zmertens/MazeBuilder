@@ -130,6 +130,11 @@ public:
 
     [[nodiscard]] bool is_maze_generation_ready() const noexcept;
     [[nodiscard]] std::uint64_t get_maze_cooldown_remaining_ms() const noexcept;
+
+    // Maze storage for artifacts and building
+    void store_maze_for_artifacts(std::unique_ptr<mazes::grid_interface> maze) noexcept;
+    mazes::grid_interface* get_last_generated_maze() const noexcept;
+
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;
@@ -164,6 +169,10 @@ private:
 
     std::uint64_t m_last_maze_generation_time{ 0 };
     static constexpr std::uint64_t MAZE_GENERATION_COOLDOWN_MS{ 10000 };
+
+    // Store maze data for artifacts generation
+    mutable std::unique_ptr<mazes::grid_interface> m_last_maze_for_artifacts;
+    mutable std::mutex m_maze_artifacts_mutex;
 };
 
 #endif // PLAYER_H
