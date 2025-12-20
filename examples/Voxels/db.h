@@ -13,6 +13,7 @@ int get_db_enabled();
 int db_init(const char* path);
 void db_close();
 void db_commit();
+void db_flush();
 void db_save_state(float x, float y, float z, float rx, float ry);
 int db_load_state(float* x, float* y, float* z, float* rx, float* ry);
 void db_insert_block(int p, int q, int x, int y, int z, int w);

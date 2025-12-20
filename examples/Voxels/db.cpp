@@ -186,6 +186,32 @@ void _db_commit() {
     sqlite3_exec(db, "commit; begin;", nullptr, nullptr, nullptr);
 }
 
+void db_flush() {
+    if (!db_enabled) {
+        return;
+    }
+
+    SDL_Log("Flushing database - clearing all world data\n");
+
+    // Execute DELETE statements to clear all tables
+    const char* flush_query =
+        "delete from state;"
+        "delete from block;"
+        "delete from light;"
+        "delete from key;"
+        "delete from sign;";
+
+    int rc = sqlite3_exec(db, flush_query, nullptr, nullptr, nullptr);
+    if (rc != SQLITE_OK) {
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Failed to flush database: %s\n", sqlite3_errmsg(db));
+    } else {
+        SDL_Log("Database flushed successfully\n");
+        // Commit the deletions
+        _db_commit();
+    }
+}
+
 
 void db_save_state(float x, float y, float z, float rx, float ry) {
     if (!db_enabled) {

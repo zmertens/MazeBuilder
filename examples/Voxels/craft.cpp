@@ -672,7 +672,7 @@ struct craft::craft_impl
                         if (ImGui::Button("New Editor", ImVec2(220, 40)))
                         {
                             // Start a new editor session
-                            // @TODO : new DB
+                            db_flush();
                             request_stack_clear();
                             request_stack_push(StateIdentifier::EDITOR);
                             request_stack_push(StateIdentifier::LOADING);
