@@ -12,7 +12,6 @@
 #include "fonts/Cousine_Regular.h"
 #include "fonts/nunito_sans.h"
 #include "fonts/Limelight_Regular.h"
-#include "MazeBuilder/string_utils.h"
 
 #if defined(__EMSCRIPTEN__)
 #include <GLES3/gl3.h>
@@ -38,6 +37,7 @@
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <functional>
@@ -50,15 +50,6 @@
 
 namespace
 {
-    enum class MenuItem : unsigned int
-    {
-        CONTINUE = 0,
-        NEW_EDITOR = 1,
-        SETTINGS = 2,
-        CLOSE = 3,
-        COUNT = 4
-    };
-
     enum class StackAction : unsigned int
     {
         PUSH = 0,
@@ -292,7 +283,6 @@ struct craft::craft_impl
     {
         player& m_player;
         std::optional<world> m_world;
-        float m_mouse_movement{};
 
     public:
         explicit editor_state(state_stack& stack, const context& _context)
@@ -497,7 +487,7 @@ struct craft::craft_impl
                 static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
 
             // Initialize MAZE texture with 1x1 white pixel placeholder
-            const std::uint8_t white_pixel[4] = { 255, 255, 255, 255 };
+            constexpr std::uint8_t white_pixel[4] = { 255, 255, 255, 255 };
             textures->load(TextureIdentifier::MAZE, 1, 1, white_pixel,
                 static_cast<unsigned int>(TextureIdentifier::MAZE));
 
@@ -536,7 +526,7 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
             ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
             if (ImGui::Begin("Loading", nullptr,
                              ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
@@ -775,15 +765,15 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
-                        ImGui::Text("1. Configure maze parameters above");
-                        ImGui::Text("2. Press 'Apply Configs' button");
-                        ImGui::Text("3. Press 'E' key in editor to generate texture");
-                        ImGui::Text("4. Aim at a block face");
+                        ImGui::Checkbox("Preview Enabled", &get_context().m_player->m_configs.preview_enabled);
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::Checkbox("Preview Enabled", &get_context().m_player->m_configs.preview_enabled);
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
+                        ImGui::Text("1. Configure maze parameters above");
+                        ImGui::Text("2. Press 'Apply Configs' button");
+                        ImGui::Text("3. Press 'E' key in editor to generate preview");
+                        ImGui::Text("4. Aim at a block face");
                         ImGui::Separator();
                         ImGui::Spacing();
 
@@ -852,13 +842,13 @@ struct craft::craft_impl
                         ImGui::Checkbox("Enable fullscreen", &current_configs.fullscreen);
                         ImGui::Checkbox("Invert Mouse Y-Axis", &current_configs.invert_mouse);
                         ImGui::SliderInt("Orthographic scaling", &current_configs.ortho, 0, 64);
-                        ImGui::Checkbox("Apply Bloom Effect", &current_configs.use_bloom_effect);
-                        ImGui::SliderFloat("Exp", &current_configs.exposure_range, 0.1f, 1.0f, "%.2f");
+                        // ImGui::Checkbox("Apply Bloom Effect", &current_configs.use_bloom_effect);
+                        // ImGui::SliderFloat("Exp", &current_configs.exposure_range, 0.1f, 1.0f, "%.2f");
 
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Player Tag:");
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
                         ImGui::Spacing();
 
                         static char tag_buffer[256] = "";
@@ -867,8 +857,8 @@ struct craft::craft_impl
                         static bool initialized = false;
                         if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
                         {
-                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), std::size(tag_buffer));
-                            tag_buffer[std::size(tag_buffer) - 1] = '\0';
+                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
+                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
                             initialized = true;
                         }
 
@@ -1002,7 +992,6 @@ struct craft::craft_impl
         ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
         ImGui::GetIO().IniFilename = nullptr;
 
-        // Setup ImGui Platform/Renderer backends
         ImGui_ImplSDL3_InitForOpenGL(m_sdl.window, m_sdl.gl_context);
 
         std::string glsl_version;
@@ -1016,6 +1005,25 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
+    static std::string make_filename(const player* p) noexcept
+    {
+        std::vector<std::string> timestamp_parts;
+        const auto& itr = mazes::string_utils::split(p->get_local_time().begin(),
+            p->get_local_time().end(), timestamp_parts, ':');
+        const auto timestamp = mazes::string_utils::format("{}_{}",
+            timestamp_parts.at(0), timestamp_parts.at(2));
+        const auto rows = std::to_string(p->m_configs.maze.rows());
+        const auto columns = std::to_string(p->m_configs.maze.columns());
+        const auto levels = std::to_string(p->m_configs.maze.levels());
+
+        std::string filename;
+        filename.reserve(128);
+        filename = rows + "x" + columns + "x" + levels + "_" +
+                   p->get_name() + "_" + std::string(timestamp) + ".obj";
+
+        return filename;
+    }
+
     static void handle_artifacts(player* p) noexcept
     {
 #if !defined(__EMSCRIPTEN__)
@@ -1023,19 +1031,21 @@ struct craft::craft_impl
 
         if (artifacts.empty())
         {
-            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Menu: Failed to generate maze for export\n");
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                "Failed to generate artifacts.\n");
             p->m_configs.download_ready = false;
             return ;
         }
 
         constexpr mazes::io_utils io_things{};
-        const auto filename = p->get_name() + ".obj";
+        const auto filename = make_filename(p);
         const auto success = io_things.write_file(filename, artifacts);
         p->m_configs.download_ready = !success;
         SDL_Log("Write file '%s': %s (%zu bytes)\n",
                 filename.c_str(),
                 success ? "SUCCESS" : "FAILED",
                 artifacts.size());
+
 #else
         SDL_Log("Web detected: download via calling for artifacts");
         p->m_configs.show_download_button = false;
@@ -1057,15 +1067,11 @@ struct craft::craft_impl
             m_fps_update_timer = 0.0;
         }
 
-        // Create ImGui overlay window
-        // Set window position to top-right corner
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always,
                                 ImVec2(1.0f, 0.0f));
 
-        // Set window background to be semi-transparent
         ImGui::SetNextWindowBgAlpha(0.65f);
 
-        // Create window with no title bar, no resize, no move, auto-resize
         constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
             ImGuiWindowFlags_AlwaysAutoResize |
             ImGuiWindowFlags_NoSavedSettings |
@@ -1127,7 +1133,6 @@ struct craft::craft_impl
 
     void render(const double elapsed) const noexcept
     {
-        // Clear the screen before drawing
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 

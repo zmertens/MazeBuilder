@@ -121,6 +121,10 @@ namespace mazes
 
         virtual std::string get_str() const noexcept override;
 
+        virtual void set_file(std::string const &f) noexcept override;
+
+        virtual std::string get_file() const noexcept override;
+
         /// @brief Get the vertices for wavefront object file generation
         /// @return A vector of vertices as tuples (x, y, z, w)
         virtual std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept override;
@@ -155,6 +159,8 @@ namespace mazes
         mutable std::mutex m_topology_mutex;
         std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
 
+        // Arbitrary data
+        std::string m_file;
         std::string m_str;
 
         // 3D data

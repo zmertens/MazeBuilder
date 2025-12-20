@@ -156,6 +156,16 @@ std::string grid::get_str() const noexcept
     return this->m_str;
 }
 
+void grid::set_file(std::string const &f) noexcept
+{
+    this->m_file = f;
+}
+
+std::string grid::get_file() const noexcept
+{
+    return this->m_file;
+}
+
 std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, Direction dir) const noexcept
 {
     if (!c)

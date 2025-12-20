@@ -444,8 +444,7 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     ensure_chunks(m_player);
     update_dirty_chunks_async();
 
-    // Process async maze build queue
-    process_maze_build_queue();
+    process_build_queue();
 }
 
 void world::draw() const noexcept
@@ -485,7 +484,7 @@ void world::draw() const noexcept
     render_signs(&s_text_attrib, signs_texture);
     render_sign(&s_text_attrib, signs_texture);
 
-    render_player_projected_plane(&s_block_attrib);
+    render_plane(&s_block_attrib);
 
     std::array<char, 256> buffer{};
     SDL_snprintf(buffer.data(), buffer.size(),"Rendered %d triangle faces | chunk count: %zu",
@@ -624,18 +623,11 @@ void world::create_world(const int p, const int q,
     }
 } // create_world
 
-bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
-{
-    // This method now ONLY generates the texture for preview
-    // Block placement is handled separately via place_maze_blocks_async
-    return const_cast<world*>(this)->generate_maze_texture(g);
-}
-
-bool world::generate_maze_texture(mazes::grid_interface* g) noexcept
+bool world::update_preview(mazes::grid_interface* g) const noexcept
 {
     // Calculate dimensions from actual pixel data
     auto [rows, columns, _] = g->operations().get_dimensions();
-    auto pixel_data = g->operations().get_pixels();
+    const auto pixel_data = g->operations().get_pixels();
 
     // Calculate scale
     constexpr unsigned int MIN_SCALE = 1;
@@ -650,9 +642,6 @@ bool world::generate_maze_texture(mazes::grid_interface* g) noexcept
     // Width must be calculated from pixel data size
     const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
-    SDL_Log("Maze texture generation: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
-
-    // Update the texture on the main thread (required for OpenGL/SDL)
     if (!m_projected_plane.projected_texture->update_from_memory(
         pixel_data.data(),
         width,
@@ -663,17 +652,15 @@ bool world::generate_maze_texture(mazes::grid_interface* g) noexcept
         return false;
     }
 
-    SDL_Log("Maze texture updated successfully: %dx%d\n", width, height);
     return true;
 }
 
-void world::place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
+void world::finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data,
                                      int width, int height, int scale,
-                                     int target_x, int target_y, int target_z, int target_face,
+                                     const int target_x, const int target_y, const int target_z,
+                                     const int target_face,
                                      int wall_height, int item_type) noexcept
 {
-    SDL_Log("Queuing async maze block placement: %dx%d, wall_height=%d\n", width, height, wall_height);
-
     // Calculate base position from target face
     int base_x = target_x;
     int base_y = target_y;
@@ -691,11 +678,8 @@ void world::place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
         default: base_y += 1; break; // Fallback to top
     }
 
-    SDL_Log("Maze placement base position: (%d, %d, %d) from face %d\n",
-            base_x, base_y, base_z, target_face);
-
     // Create a future for async block placement
-    auto future = std::async(std::launch::async, [this, pixel_data, width, height, scale,
+    auto future_build = std::async(std::launch::async, [this, pixel_data, width, height, scale,
                                                    base_x, base_y, base_z, wall_height, item_type]()
     {
         // Calculate logical maze dimensions
@@ -739,8 +723,8 @@ void world::place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
             }
         }
 
-        SDL_Log("Async maze block placement complete: %d blocks placed\n", blocks_placed);
-        SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
+        SDL_Log("Async building placement complete: %d blocks placed\n", blocks_placed);
+        SDL_Log("  Build covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
                base_x, base_x + logical_width - 1,
                base_y, base_y + wall_height - 1,
                base_z, base_z + logical_height - 1);
@@ -748,22 +732,24 @@ void world::place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
 
     // Add future to queue
     std::lock_guard<std::mutex> lock(m_maze_build_mutex);
-    m_maze_build_futures.push_back(std::move(future));
+    m_maze_build_futures.push_back(std::move(future_build));
 }
 
-void world::process_maze_build_queue() noexcept
+void world::process_build_queue() noexcept
 {
     std::lock_guard<std::mutex> lock(m_maze_build_mutex);
 
     // Remove completed futures
     m_maze_build_futures.erase(
-        std::remove_if(m_maze_build_futures.begin(), m_maze_build_futures.end(),
-            [](std::future<void>& f) {
-                if (!f.valid()) return true;
+        std::ranges::remove_if(m_maze_build_futures,
+                               [](std::future<void>& f) {
+                                   if (!f.valid())
+                                   {
+                                       return true;
+                                   }
 
-                // Check if ready without blocking
-                return f.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
-            }),
+                                   return f.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+                               }).begin(),
         m_maze_build_futures.end()
     );
 }
@@ -2403,7 +2389,7 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     }
 }
 
-void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) const noexcept
+void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
 {
     if (!attrib || !m_player || !m_player->m_configs.preview_enabled)
     {

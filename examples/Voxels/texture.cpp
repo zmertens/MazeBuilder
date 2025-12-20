@@ -247,7 +247,8 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     // Efficient update using glTexSubImage2D (reuses existing texture)
     glActiveTexture(GL_TEXTURE0 + channel_offset);
     glBindTexture(GL_TEXTURE_2D, m_texture);
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
+        GL_UNSIGNED_BYTE, data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     if (const GLenum error = glGetError(); error != GL_NO_ERROR)

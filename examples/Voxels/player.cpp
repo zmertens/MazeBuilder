@@ -71,7 +71,6 @@ player::player()
                   return nullptr;
               }
 
-              g->operations().set_str("");
               // Set bytes
               if (thread_local mazes::pixels pixel_converter; !pixel_converter.run(g.get(), std::ref(rng)))
               {
@@ -575,9 +574,7 @@ void player::initialize_actions()
                 {
                     // Move grid ownership
                     auto grid_ptr = std::move(g.value());
-
-                    // ONLY generate texture (main thread, no block placement)
-                    if (p.m_world->generate_maze_texture(grid_ptr.get()))
+                    if (p.m_world->update_preview(grid_ptr.get()))
                     {
                         // Store for artifacts and building
                         p.store_maze_for_artifacts(std::move(grid_ptr));
@@ -610,7 +607,7 @@ void player::initialize_actions()
             }
 
             // Get the last generated maze data
-            auto maze_ptr = p.get_last_generated_maze();
+            const auto maze_ptr = p.get_last_generated_maze();
             if (!maze_ptr)
             {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No maze preview available. Press E to generate preview first.\n");
@@ -618,7 +615,7 @@ void player::initialize_actions()
             }
 
             // Get pixel data from the generated maze
-            auto pixel_data = maze_ptr->operations().get_pixels();
+            const auto pixel_data = maze_ptr->operations().get_pixels();
             auto [rows, columns, _] = maze_ptr->operations().get_dimensions();
 
             // Calculate scale
@@ -632,7 +629,7 @@ void player::initialize_actions()
             const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
             // Queue async block placement
-            p.m_world->place_maze_blocks_async(
+            p.m_world->finalize_and_build_async(
                 pixel_data,
                 width,
                 height,
@@ -646,7 +643,7 @@ void player::initialize_actions()
             );
 
             p.m_configs.download_ready = true;
-            SDL_Log("Maze build queued asynchronously\n");
+            SDL_Log("Build queued asynchronously\n");
         });
 }
 
@@ -740,35 +737,11 @@ float player::lerp(float a, float b, float t) noexcept
 /// @return Wavefront .obj data as a string, or empty if not ready
 std::string player::artifacts() const noexcept
 {
-    // if (!m_maze_future.valid())
-    // {
-    //     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Future is not valid. Generate a maze first.\n");
-    //     return "";
-    // }
-    //
-    // if (const auto status = m_maze_future.wait_for(std::chrono::seconds(0));
-    //     status == std::future_status::ready)
-    // {
-    //     const auto g = m_maze_future.get();
-    //     if (!g)
-    //     {
-    //         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Grid is null\n");
-    //         return "";
-    //     }
-    //
-    //     const auto result = g->operations().get_str();
-    //     SDL_Log("artifacts(): Retrieved %zu bytes from future\n", result.size());
-    //     return result;
-    // }
-    // else if (status == std::future_status::timeout)
-    // {
-    //     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Maze generation still in progress. Please wait.\n");
-    // }
-    // else
-    // {
-    //     SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "artifacts(): Future status deferred.\n");
-    // }
-
+    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
+    if (m_last_maze_for_artifacts)
+    {
+        return m_last_maze_for_artifacts->operations().get_file();
+    }
     return "";
 }
 

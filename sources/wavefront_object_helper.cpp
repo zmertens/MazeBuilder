@@ -19,14 +19,11 @@ bool wavefront_object_helper::run(grid_interface *g, randomizer &rng) const noex
 {
     using namespace std;
 
-    auto &&g_ops = g->operations();
+    auto&& g_ops = g->operations();
 
-    const auto &vertices = g_ops.get_vertices();
-    const auto &faces = g_ops.get_faces();
-
-    if (vertices.empty() || faces.empty())
+    if (g_ops.get_vertices().empty() || g_ops.get_faces().empty())
     {
-        if (mazes::objectify obj_tool{}; !obj_tool.run(g, std::ref(rng)))
+        if (const mazes::objectify obj_tool{}; !obj_tool.run(g, std::ref(rng)))
         {
             return false;
         }
@@ -36,23 +33,13 @@ bool wavefront_object_helper::run(grid_interface *g, randomizer &rng) const noex
         }
     }
 
-    // Pre-calculate approximate output size to minimize reallocations
-    // Header: ~100 chars, each vertex: ~30 chars, each face: ~20 chars + face indices
-    size_t estimated_size = 100 + (vertices.size() * 30);
-    for (const auto &face : faces)
-    {
-        estimated_size += 20 + (face.size() * 8); // "f " + indices + spaces + "\n"
-    }
-
-    // Use ostringstream with pre-allocated buffer for efficient string building
     ostringstream result;
-    //result.reserve(estimated_size);
 
     // Write header
     result << "# mazebuilder v" << buildinfo::Version << "-" << buildinfo::CommitSHA << "\n";
 
     // Write vertices - use direct stream output to avoid string conversions
-    for (const auto &vertex : vertices)
+    for (const auto &vertex : g_ops.get_vertices())
     {
         float x = static_cast<float>(get<0>(vertex));
         float y = static_cast<float>(get<1>(vertex));
@@ -61,7 +48,7 @@ bool wavefront_object_helper::run(grid_interface *g, randomizer &rng) const noex
     }
 
     // Write faces - minimize string operations
-    for (const auto &face : faces)
+    for (const auto &face : g_ops.get_faces())
     {
         result << "f";
         for (const auto index : face)
@@ -71,7 +58,7 @@ bool wavefront_object_helper::run(grid_interface *g, randomizer &rng) const noex
         result << "\n";
     }
 
-    g_ops.set_str(result.str());
+    g_ops.set_file(result.str());
 
-    return !g_ops.get_str().empty();
+    return !g_ops.get_file().empty();
 } // run

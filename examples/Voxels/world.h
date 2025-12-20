@@ -15,8 +15,6 @@
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
 
-#include <MazeBuilder/algo_interface.h>
-
 struct worker;
 struct worker_item;
 union SDL_Event;
@@ -28,10 +26,11 @@ class command_queue;
 class sdl_gl_helper;
 
 namespace mazes {
+    class grid_interface;
     class randomizer;
 }
 
-class world final : public mazes::algo_interface {
+class world final {
     friend class player;
 public:
     explicit world(SDL_Window* window,
@@ -55,21 +54,18 @@ public:
 
     void destroy_world();
 
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
-
-    // Separated maze operations for better decoupling
-    bool generate_maze_texture(mazes::grid_interface* g) noexcept;
-    void place_maze_blocks_async(const std::vector<std::uint8_t>& pixel_data,
+    bool update_preview(mazes::grid_interface* g) const noexcept;
+    void finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data,
                                   int width, int height, int scale,
                                   int target_x, int target_y, int target_z, int target_face,
                                   int wall_height, int item_type) noexcept;
-    void process_maze_build_queue() noexcept;
+    void process_build_queue() noexcept;
 
 private:
     struct projected_plane
     {
         bool visible{ false };
-        texture* projected_texture{ nullptr };  // Non-owning pointer to cached texture
+        texture* projected_texture{ nullptr };
         int target_x{ 0 };
         int target_y{ 0 };
         int target_z{ 0 };
@@ -90,12 +86,14 @@ private:
     void insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept;
     static void remove_chunk_from_spatial_tree(scene_node* chunk) noexcept;
 
+    // Worker functions
     bool worker_run(worker* w) const noexcept;
     void init_worker_threads() noexcept;
     void cleanup_worker_threads() noexcept;
 
     [[nodiscard]] static int chunked(float x) noexcept;
 
+    // Time functions
     [[nodiscard]] double get_time() const noexcept;
     [[nodiscard]] float time_of_day() const noexcept;
     [[nodiscard]] float get_daylight() const noexcept;
@@ -107,7 +105,8 @@ private:
     [[nodiscard]] int highest_block(float x, float z) const noexcept;
     static int _hit_test(const Map* map, float max_distance, int previous,
         float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept;
-    int hit_test(int previous, float x, float y, float z, float rx, float ry, int* bx, int* by, int* bz) const noexcept;
+    int hit_test(int previous, float x, float y, float z,
+        float rx, float ry, int* bx, int* by, int* bz) const noexcept;
     int hit_test_face(int* x, int* y, int* z, int* face) const noexcept;
     int collide(int height, float* x, float* y, float* z) const noexcept;
     [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z,
@@ -164,7 +163,7 @@ private:
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify,
         float x, float y, float n, std::string_view text) const noexcept;
-    void render_player_projected_plane(const sdl_gl_helper::attrib* attrib) const noexcept;
+    void render_plane(const sdl_gl_helper::attrib* attrib) const noexcept;
 
     enum class Layer
     {
@@ -193,7 +192,6 @@ private:
 
     std::uint32_t m_sky_buffer;
 
-    // Maze build queue for async block placement
     std::vector<std::future<void>> m_maze_build_futures;
     mutable std::mutex m_maze_build_mutex;
 };

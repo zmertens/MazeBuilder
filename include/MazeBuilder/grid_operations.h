@@ -65,6 +65,10 @@ namespace mazes
 
         virtual std::string get_str() const noexcept = 0;
 
+        virtual void set_file(std::string const &f) noexcept = 0;
+
+        virtual std::string get_file() const noexcept = 0;
+
         /// @brief Get the vertices for wavefront object file generation
         /// @return A vector of vertices as tuples (x, y, z, w)
         virtual std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept = 0;
