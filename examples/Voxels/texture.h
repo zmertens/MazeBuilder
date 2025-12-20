@@ -36,7 +36,12 @@ public:
 
     bool load_from_memory(const std::uint8_t* data, int width, int height, std::uint32_t channel_offset = 0) noexcept;
 
+    bool update_from_memory(const std::uint8_t* data, int width, int height, std::uint32_t channel_offset = 0) noexcept;
+
     static bool load_bmp_icon(SDL_Window* window,std::string_view filepath) noexcept;
+
+    static constexpr int MAX_TEXTURE_WIDTH = 1980;
+    static constexpr int MAX_TEXTURE_HEIGHT = 1020;
 
 private:
     std::uint32_t m_texture;

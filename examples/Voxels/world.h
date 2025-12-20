@@ -59,7 +59,7 @@ private:
     struct projected_plane
     {
         bool visible{ false };
-        std::unique_ptr<texture> projected_texture{ nullptr };
+        texture* projected_texture{ nullptr };  // Non-owning pointer to cached texture
         int target_x{ 0 };
         int target_y{ 0 };
         int target_z{ 0 };

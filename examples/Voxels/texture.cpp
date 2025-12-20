@@ -199,6 +199,52 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     return true;
 }
 
+/// Update texture from raw RGBA memory data efficiently
+/// Uses glTexSubImage2D when dimensions match, otherwise reallocates
+/// @param data RGBA pixel data
+/// @param width new width
+/// @param height new height
+/// @param channel_offset texture unit offset
+bool texture::update_from_memory(const std::uint8_t* data, const int width, const int height,
+    const std::uint32_t channel_offset) noexcept
+{
+    if (data == nullptr || width <= 0 || height <= 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid parameters for update_from_memory\n");
+        return false;
+    }
+
+    // Enforce size constraints
+    if (width > MAX_TEXTURE_WIDTH || height > MAX_TEXTURE_HEIGHT)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+            "Texture dimensions %dx%d exceed maximum %dx%d\n",
+            width, height, MAX_TEXTURE_WIDTH, MAX_TEXTURE_HEIGHT);
+        return false;
+    }
+
+    // If texture doesn't exist or dimensions changed, reallocate
+    if (m_texture == 0 || m_width != width || m_height != height)
+    {
+        SDL_Log("Reallocating texture: %dx%d -> %dx%d\n", m_width, m_height, width, height);
+        return load_from_memory(data, width, height, channel_offset);
+    }
+
+    // Efficient update using glTexSubImage2D (reuses existing texture)
+    glActiveTexture(GL_TEXTURE0 + channel_offset);
+    glBindTexture(GL_TEXTURE_2D, m_texture);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, data);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "OpenGL error in update_from_memory: 0x%x\n", error);
+        return false;
+    }
+
+    return true;
+}
+
 bool texture::load_bmp_icon(SDL_Window *window, const std::string_view filepath) noexcept
 {
     if (SDL_Surface *bmp_surface = SDL_LoadBMP(filepath.data()))

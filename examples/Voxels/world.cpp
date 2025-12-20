@@ -116,11 +116,8 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_sky_buffer{ 0 }
       , m_projected_plane{}
 {
-    // Create or recreate the texture using the texture class
-    if (!m_projected_plane.projected_texture)
-    {
-        m_projected_plane.projected_texture = std::make_unique<texture>();
-    }
+    // Reference the cached MAZE texture instead of creating new instance
+    m_projected_plane.projected_texture = &m_textures.get(TextureIdentifier::MAZE);
 
     // Set bidirectional reference between player and world
     if (m_player)
@@ -485,7 +482,6 @@ void world::draw() const noexcept
     render_signs(&s_text_attrib, signs_texture);
     render_sign(&s_text_attrib, signs_texture);
 
-    // Render player's projected maze texture plane
     render_player_projected_plane(&s_block_attrib);
 
     std::array<char, 256> buffer{};
@@ -648,20 +644,20 @@ bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
 
     SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
 
-    if (!m_projected_plane.projected_texture->load_from_memory(
+    if (!m_projected_plane.projected_texture->update_from_memory(
         pixel_data.data(),
         width,
         height,
         static_cast<std::uint32_t>(TextureIdentifier::MAZE)))
     {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load maze texture from memory\n");
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to update maze texture from memory\n");
         return false;
     }
 
     // Enable the download button now that maze data is available
     m_player->m_configs.show_download_button = true;
 
-    SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
+    SDL_Log("Maze texture updated successfully: ID=%u, %dx%d\n",
             m_projected_plane.projected_texture->get(), width, height);
     SDL_Log("Async task launched for artifact generation\n");
 
@@ -2433,7 +2429,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glBindTexture(GL_TEXTURE_2D, m_projected_plane.projected_texture->get());
+    glBindTexture(GL_TEXTURE_2D,     m_textures.get(TextureIdentifier::MAZE).get());
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
     // Build floating plane geometry

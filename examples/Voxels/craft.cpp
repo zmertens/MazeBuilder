@@ -495,8 +495,12 @@ struct craft::craft_impl
             textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
                 static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
-            // textures->load(TextureIdentifier::MAZE, 256, 256, nullptr,
-                // static_cast<unsigned int>(TextureIdentifier::MAZE));
+
+            // Initialize MAZE texture with 1x1 white pixel placeholder
+            const std::uint8_t white_pixel[4] = { 255, 255, 255, 255 };
+            textures->load(TextureIdentifier::MAZE, 1, 1, white_pixel,
+                static_cast<unsigned int>(TextureIdentifier::MAZE));
+
             textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
             textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
@@ -812,7 +816,7 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::TextColored(ImVec4(0.745f, 0.863, 0.498f, 1.0f), "Font Selection:");
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Font Selection:");
                         ImGui::Spacing();
                         if (ImGui::BeginListBox("##FontListBox", ImVec2(-100, 200)))
                         {
