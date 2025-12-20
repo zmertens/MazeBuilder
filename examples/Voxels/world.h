@@ -14,6 +14,8 @@
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
 
+#include <MazeBuilder/algo_interface.h>
+
 struct worker;
 struct worker_item;
 union SDL_Event;
@@ -28,7 +30,7 @@ namespace mazes {
     class randomizer;
 }
 
-class world final {
+class world final : public mazes::algo_interface {
     friend class player;
 public:
     explicit world(SDL_Window* window,
@@ -51,11 +53,13 @@ public:
     command_queue& get_command_queue() noexcept;
 
     void destroy_world();
+
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
 private:
     struct projected_plane
     {
         bool visible{ false };
-        std::uint32_t texture_id{ 0 };
+        std::unique_ptr<texture> projected_texture{ nullptr };
         int target_x{ 0 };
         int target_y{ 0 };
         int target_z{ 0 };

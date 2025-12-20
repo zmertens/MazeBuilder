@@ -572,7 +572,7 @@ void player::initialize_actions()
                     g.has_value())
                 {
                     // Generate the maze texture
-                    if (p.generate_maze_texture(g.value().get(), rng))
+                    if (p.m_world->run(g.value().get(), rng))
                     {
                         p.m_last_maze_generation_time = SDL_GetTicks();
                     }
@@ -677,120 +677,6 @@ void player::on_tag_sign() const noexcept
 float player::lerp(float a, float b, float t) noexcept
 {
     return a + t * (b - a);
-}
-
-bool player::generate_maze_texture(mazes::grid_interface* g, mazes::randomizer& rng) noexcept
-{
-    // Calculate dimensions from actual pixel data
-    // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
-    auto [rows, columns, _] = g->operations().get_dimensions();
-    auto pixel_data = g->operations().get_pixels();
-
-    // Calculate scale (same as in pixels.cpp)
-    constexpr unsigned int MIN_SCALE = 1;
-    constexpr unsigned int MAX_SCALE = 10;
-    const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
-    const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
-
-    // Height is predictable: (rows*2+1) * scale
-    const auto ascii_height = rows * 2 + 1;
-    const int height = static_cast<int>(ascii_height * scale);
-
-    // Width must be calculated from pixel data size since ASCII lines may have varying lengths
-    // pixel_data.size() = width * height * 4 (RGBA)
-    const int width = static_cast<int>(pixel_data.size() / (height * 4));
-
-    SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
-
-    // Create or recreate the texture using the texture class
-    if (!m_configs.maze_texture)
-    {
-        m_configs.maze_texture = std::make_unique<texture>();
-    }
-
-    if (!m_configs.maze_texture->load_from_memory(
-        pixel_data.data(),
-        width,
-        height,
-        static_cast<std::uint32_t>(TextureIdentifier::MAZE)))
-    {
-        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load maze texture from memory\n");
-        return false;
-    }
-
-    // Enable the download button now that maze data is available
-    m_configs.show_download_button = true;
-
-    SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
-            m_configs.maze_texture->get(), width, height);
-    SDL_Log("Async task launched for artifact generation\n");
-
-    // Place maze blocks in the world for visual rendering
-    // Parse pixel_data: black pixels (walls) become stone blocks
-    // Sample every 'scale' pixels to match logical maze structure
-
-    // Get player position to place maze at player's feet
-    const int base_x = static_cast<int>(m_pos.x);
-    const int base_y = static_cast<int>(m_pos.y);
-    const int base_z = static_cast<int>(m_pos.z);
-
-    // Calculate logical maze dimensions (before scaling)
-    const int logical_width = width / scale;
-    const int logical_height = height / scale;
-
-    SDL_Log("Placing maze in world: %dx%d logical cells (from %dx%d pixels, scale=%u) at offset (%d, %d, %d)\n",
-            logical_width, logical_height, width, height, scale, base_x, base_y, base_z);
-
-    int blocks_placed = 0;
-    const auto wall_height = m_configs.maze.levels();
-
-    // Iterate through logical maze cells by sampling every 'scale' pixels
-    // This creates geometry that matches the maze structure, not the upscaled texture
-    for (int cell_y = 0; cell_y < logical_height; ++cell_y)
-    {
-        for (int cell_x = 0; cell_x < logical_width; ++cell_x)
-        {
-            // Sample the center of each scaled cell region
-            const int pix_x = cell_x * scale + scale / 2;
-            const int pix_y = cell_y * scale + scale / 2;
-
-            // Calculate pixel index in the RGBA array
-            const int pixel_index = (pix_y * width + pix_x) * 4;
-
-            // Read RGBA values
-            const uint8_t r = pixel_data[pixel_index + 0];
-            const uint8_t g = pixel_data[pixel_index + 1];
-            const uint8_t b = pixel_data[pixel_index + 2];
-            // Alpha is pixel_data[pixel_index + 3] but we don't need it
-
-            // Check if pixel is black (wall) - threshold for near-black
-            const bool is_wall = (r < 50 && g < 50 && b < 50);
-
-            if (is_wall)
-            {
-                // Place a vertical column of blocks for this wall
-                for (int y = 0; y < wall_height; ++y)
-                {
-                    const int world_x = base_x + cell_x;
-                    const int world_y = base_y + y;
-                    const int world_z = base_z + cell_y;
-
-                    m_world->set_block(world_x, world_y, world_z, get_item());
-                    blocks_placed++;
-                }
-            }
-        }
-    }
-
-    SDL_Log("Maze blocks placed successfully! %d blocks placed\n", blocks_placed);
-    SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
-           base_x, base_x + logical_width - 1,
-           base_y, base_y + wall_height - 1,
-           base_z, base_z + logical_height - 1);
-
-    this->m_configs.download_ready = true;
-
-    return true;
 }
 
 /// Gather player's generated maze artifacts from the async task

@@ -1,5 +1,7 @@
 #include "world.h"
 
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <noise/noise.h>
@@ -112,7 +114,14 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_command_queue{}
       , m_player{p}
       , m_sky_buffer{ 0 }
+      , m_projected_plane{}
 {
+    // Create or recreate the texture using the texture class
+    if (!m_projected_plane.projected_texture)
+    {
+        m_projected_plane.projected_texture = std::make_unique<texture>();
+    }
+
     // Set bidirectional reference between player and world
     if (m_player)
     {
@@ -394,32 +403,21 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     // Apply velocity to position
     m_player->m_pos.y += m_player->m_vel.vy * dt_seconds;
 
-    // Update projected plane position every frame if maze is ready
-    if (m_player->m_configs.maze_texture != nullptr)
+    int hx, hy, hz, face;
+    if (hit_test_face(&hx, &hy, &hz, &face))
     {
-        int hx, hy, hz, face;
-        if (hit_test_face(&hx, &hy, &hz, &face))
-        {
-            m_projected_plane.visible = true;
-            m_projected_plane.texture_id = m_player->m_configs.maze_texture->get();
-            m_projected_plane.target_x = hx;
-            m_projected_plane.target_y = hy;
-            m_projected_plane.target_z = hz;
-            m_projected_plane.target_face = face;
-            m_projected_plane.has_valid_target = true;
-        }
-        else
-        {
-            // No valid target (looking at sky/void) - hide plane gracefully
-            m_projected_plane.has_valid_target = false;
-            m_projected_plane.visible = false;
-        }
+        m_projected_plane.visible = true;
+        m_projected_plane.target_x = hx;
+        m_projected_plane.target_y = hy;
+        m_projected_plane.target_z = hz;
+        m_projected_plane.target_face = face;
+        m_projected_plane.has_valid_target = true;
     }
     else
     {
-        // Maze not ready - ensure plane is hidden
-        m_projected_plane.visible = false;
+        // No valid target (looking at sky/void) - hide plane gracefully
         m_projected_plane.has_valid_target = false;
+        m_projected_plane.visible = false;
     }
 
     // Apply collision detection (height = 2 blocks for player)
@@ -490,26 +488,15 @@ void world::draw() const noexcept
     // Render player's projected maze texture plane
     render_player_projected_plane(&s_block_attrib);
 
+    std::array<char, 256> buffer{};
+    SDL_snprintf(buffer.data(), buffer.size(),"Rendered %d triangle faces | chunk count: %zu",
+            triangle_faces, get_chunk_count());
     render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
-        10.0f, 10.0f, 12.0f, m_player->get_name());
+        10, viewport_height - 10, 12.0f, buffer.data());
 
     render_wireframe(&s_line_attrib);
 
     render_crosshairs(&s_line_attrib);
-
-#if defined(MAZE_DEBUG)
-
-    // Debug logging (can be commented out after testing)
-    static int frame_count = 0;
-    if (frame_count++ % 60 == 0) {
-        SDL_Log("Frame %d: Rendered %d triangle faces, "
-                "player at (%.2f, %.2f, %.2f), rot (%.2f, %.2f), "
-                "chunk count: %zu",
-                frame_count, triangle_faces,
-                m_player->m_pos.x, m_player->m_pos.y, m_player->m_pos.z,
-                m_player->m_pos.rx, m_player->m_pos.ry, get_chunk_count());
-    }
-#endif
 }
 
 command_queue& world::get_command_queue() noexcept
@@ -637,6 +624,114 @@ void world::create_world(const int p, const int q,
         }
     }
 } // create_world
+
+bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
+{
+    // Calculate dimensions from actual pixel data
+    // pixels.cpp creates RGBA data (4 bytes per pixel) with dimensions based on actual ASCII string lengths
+    auto [rows, columns, _] = g->operations().get_dimensions();
+    auto pixel_data = g->operations().get_pixels();
+
+    // Calculate scale (same as in pixels.cpp)
+    constexpr unsigned int MIN_SCALE = 1;
+    constexpr unsigned int MAX_SCALE = 10;
+    const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
+    const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+    // Height is predictable: (rows*2+1) * scale
+    const auto ascii_height = rows * 2 + 1;
+    const int height = static_cast<int>(ascii_height * scale);
+
+    // Width must be calculated from pixel data size since ASCII lines may have varying lengths
+    // pixel_data.size() = width * height * 4 (RGBA)
+    const int width = static_cast<int>(pixel_data.size() / (height * 4));
+
+    SDL_Log("Maze pixel data: %dx%d (%zu bytes)\n", width, height, pixel_data.size());
+
+    if (!m_projected_plane.projected_texture->load_from_memory(
+        pixel_data.data(),
+        width,
+        height,
+        static_cast<std::uint32_t>(TextureIdentifier::MAZE)))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to load maze texture from memory\n");
+        return false;
+    }
+
+    // Enable the download button now that maze data is available
+    m_player->m_configs.show_download_button = true;
+
+    SDL_Log("Maze texture created successfully: ID=%u, %dx%d\n",
+            m_projected_plane.projected_texture->get(), width, height);
+    SDL_Log("Async task launched for artifact generation\n");
+
+    // Place maze blocks in the world for visual rendering
+    // Parse pixel_data: black pixels (walls) become stone blocks
+    // Sample every 'scale' pixels to match logical maze structure
+
+    // Get player position to place maze at player's feet
+    const int base_x = static_cast<int>(m_player->m_pos.x);
+    const int base_y = static_cast<int>(m_player->m_pos.y);
+    const int base_z = static_cast<int>(m_player->m_pos.z);
+
+    // Calculate logical maze dimensions (before scaling)
+    const int logical_width = width / scale;
+    const int logical_height = height / scale;
+
+    SDL_Log("Placing maze in world: %dx%d logical cells (from %dx%d pixels, scale=%u) at offset (%d, %d, %d)\n",
+            logical_width, logical_height, width, height, scale, base_x, base_y, base_z);
+
+    int blocks_placed = 0;
+    const auto wall_height = m_player->m_configs.maze.levels();
+
+    // Iterate through logical maze cells by sampling every 'scale' pixels
+    // This creates geometry that matches the maze structure, not the upscaled texture
+    for (int cell_y = 0; cell_y < logical_height; ++cell_y)
+    {
+        for (int cell_x = 0; cell_x < logical_width; ++cell_x)
+        {
+            // Sample the center of each scaled cell region
+            const int pix_x = cell_x * scale + scale / 2;
+            const int pix_y = cell_y * scale + scale / 2;
+
+            // Calculate pixel index in the RGBA array
+            const int pixel_index = (pix_y * width + pix_x) * 4;
+
+            // Read RGBA values
+            const uint8_t r = pixel_data[pixel_index + 0];
+            const uint8_t g = pixel_data[pixel_index + 1];
+            const uint8_t b = pixel_data[pixel_index + 2];
+            // Alpha is pixel_data[pixel_index + 3] but we don't need it
+
+            // Check if pixel is black (wall) - threshold for near-black
+            const bool is_wall = (r < 50 && g < 50 && b < 50);
+
+            if (is_wall)
+            {
+                // Place a vertical column of blocks for this wall
+                for (int y = 0; y < wall_height; ++y)
+                {
+                    const int world_x = base_x + cell_x;
+                    const int world_y = base_y + y;
+                    const int world_z = base_z + cell_y;
+
+                    set_block(world_x, world_y, world_z, m_player->get_item());
+                    blocks_placed++;
+                }
+            }
+        }
+    }
+
+    SDL_Log("Maze blocks placed successfully! %d blocks placed\n", blocks_placed);
+    SDL_Log("  Maze covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
+           base_x, base_x + logical_width - 1,
+           base_y, base_y + wall_height - 1,
+           base_z, base_z + logical_height - 1);
+
+    m_player->m_configs.download_ready = true;
+
+    return true;
+}
 
 bool world::worker_run(worker* w) const noexcept
 {
@@ -2284,7 +2379,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     const auto& plane = m_projected_plane;
 
     // Only render if plane is visible and has a valid target
-    if (!plane.visible || !plane.has_valid_target || plane.texture_id == 0)
+    if (!plane.visible || !plane.has_valid_target)
     {
         return;
     }
@@ -2325,8 +2420,8 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
     const float world_z = static_cast<float>(plane.target_z);
 
     // Get maze texture dimensions from player
-    const float tex_width = static_cast<float>(m_player->m_configs.maze_texture->get_width());
-    const float tex_height = static_cast<float>(m_player->m_configs.maze_texture->get_height());
+    const float tex_width = static_cast<float>(m_projected_plane.projected_texture->get_width());
+    const float tex_height = static_cast<float>(m_projected_plane.projected_texture->get_height());
 
     // Scale the plane to match texture aspect ratio
     constexpr float pixel_to_block_scale = 1.0f / 32.0f;
@@ -2338,7 +2433,7 @@ void world::render_player_projected_plane(const sdl_gl_helper::attrib* attrib) c
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glBindTexture(GL_TEXTURE_2D, m_player->m_configs.maze_texture->get());
+    glBindTexture(GL_TEXTURE_2D, m_projected_plane.projected_texture->get());
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
     // Build floating plane geometry

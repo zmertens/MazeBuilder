@@ -2,6 +2,7 @@
 #define RESOURCE_MANAGER_HPP
 
 #include <cassert>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -18,6 +19,9 @@ class resource_manager
 {
 public:
     void load(SDL_Window* window, Identifier id, std::string_view filename);
+
+    // Load resource from raw memory data
+    void load(Identifier id, unsigned int w, unsigned int h, const std::uint8_t* data, std::uint32_t channel_offset = 0);
 
     void load(Identifier id, std::string_view filename, std::uint32_t channel_offset = 0);
 
@@ -50,6 +54,22 @@ void resource_manager<Resource, Identifier>::load(SDL_Window* window, Identifier
     if (!resource->load_bmp_icon(window, filename))
     {
         throw std::runtime_error("resource_manager::load - Failed to load " + std::string(filename));
+    }
+
+    // If loading successful, insert resource to map
+    insert_resource(id, std::move(resource));
+}
+
+template <typename Resource, typename Identifier>
+void resource_manager<Resource, Identifier>::load(Identifier id, unsigned int w, unsigned int h,
+    const std::uint8_t* data, std::uint32_t channel_offset)
+{
+    // Create and load resource
+    auto resource = std::make_unique<Resource>();
+
+    if (!resource->load_from_memory(data, w, h, channel_offset))
+    {
+        throw std::runtime_error("resource_manager::load - Failed to load data to memory");
     }
 
     // If loading successful, insert resource to map

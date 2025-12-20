@@ -76,7 +76,6 @@ public:
         std::uint64_t start_ticks{ };
         mazes::configurator maze{ };
         std::string tag;
-        std::unique_ptr<texture> maze_texture;
         bool preview_enabled{ true };
         bool download_ready{ false };
     } m_configs{};

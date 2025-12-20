@@ -493,10 +493,12 @@ struct craft::craft_impl
             auto&& textures = get_context().m_textures;
 
             textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
+            textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
+                static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
+            // textures->load(TextureIdentifier::MAZE, 256, 256, nullptr,
+                // static_cast<unsigned int>(TextureIdentifier::MAZE));
             textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
             textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
-            textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
-                           static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
             textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
 
 #if defined(MAZE_DEBUG)
