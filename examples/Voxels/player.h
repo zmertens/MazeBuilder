@@ -30,7 +30,7 @@ enum class PlayerAction
     COPY_BLOCK,
     DESTROY_BLOCK,
     PLACE_LIGHT,
-    BUILD_MAZE,
+    DOWNLOAD_MAZE,
     PREVIEW_MAZE,
     DONE,
     COUNT
@@ -130,10 +130,6 @@ public:
 
     [[nodiscard]] bool is_maze_generation_ready() const noexcept;
     [[nodiscard]] std::uint64_t get_maze_cooldown_remaining_ms() const noexcept;
-
-    // Maze storage for artifacts and building
-    void store_maze_for_artifacts(std::unique_ptr<mazes::grid_interface> maze) noexcept;
-    mazes::grid_interface* get_last_generated_maze() const noexcept;
 
 private:
     void initialize_actions();

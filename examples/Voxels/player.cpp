@@ -1,9 +1,12 @@
 #include "player.h"
 
 #include <chrono>
+#include <cmath>
 #include <ranges>
+#include <sstream>
 
 #include "command_queue.h"
+#include "db.h"
 #include "entity.h"
 #include "item.h"
 #include "matrix.h"
@@ -30,6 +33,88 @@
 #include <MazeBuilder/stringify.h>
 #include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/wavefront_object_helper.h>
+
+namespace {
+    // Helper to compute chunk coordinates from world position
+    int chunked(float x) noexcept {
+        constexpr int CHUNK_SIZE = 32;  // BUILD_CHUNK_SIZE from world.cpp
+        return static_cast<int>(std::floor(std::round(x) / static_cast<float>(CHUNK_SIZE)));
+    }
+
+    // Helper to convert block/voxel data to Wavefront OBJ format
+    std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>>& blocks) noexcept {
+        if (blocks.empty()) {
+            return "";
+        }
+
+        std::ostringstream result;
+
+        // Write header
+        result << "# Voxel World Export\n";
+        result << "# Generated from database\n";
+        result << "# Block count: " << blocks.size() << "\n\n";
+
+        // Cube vertex offsets (8 vertices per cube)
+        static constexpr float cube_vertices[8][3] = {
+            {-0.5f, -0.5f, -0.5f},  // 0
+            { 0.5f, -0.5f, -0.5f},  // 1
+            { 0.5f,  0.5f, -0.5f},  // 2
+            {-0.5f,  0.5f, -0.5f},  // 3
+            {-0.5f, -0.5f,  0.5f},  // 4
+            { 0.5f, -0.5f,  0.5f},  // 5
+            { 0.5f,  0.5f,  0.5f},  // 6
+            {-0.5f,  0.5f,  0.5f}   // 7
+        };
+
+        // Cube face indices (6 faces, 2 triangles each = 6 vertices per face)
+        // Faces: front, back, top, bottom, right, left
+        static constexpr int cube_faces[6][6] = {
+            {4, 5, 6, 4, 6, 7},  // front  (+Z)
+            {1, 0, 3, 1, 3, 2},  // back   (-Z)
+            {3, 7, 6, 3, 6, 2},  // top    (+Y)
+            {0, 1, 5, 0, 5, 4},  // bottom (-Y)
+            {1, 2, 6, 1, 6, 5},  // right  (+X)
+            {0, 4, 7, 0, 7, 3}   // left   (-X)
+        };
+
+        int vertex_count = 0;
+
+        // Generate vertices and faces for each block
+        for (const auto& [x, y, z, w] : blocks) {
+            // Skip air blocks (w == 0)
+            if (w == 0) {
+                continue;
+            }
+
+            // Write vertices for this cube
+            for (int v = 0; v < 8; ++v) {
+                float vx = static_cast<float>(x) + cube_vertices[v][0];
+                float vy = static_cast<float>(y) + cube_vertices[v][1];
+                float vz = static_cast<float>(z) + cube_vertices[v][2];
+                result << "v " << vx << " " << vy << " " << vz << "\n";
+            }
+
+            // Write faces for this cube (all 6 faces)
+            for (int face = 0; face < 6; ++face) {
+                result << "f";
+                for (int i = 0; i < 3; ++i) {
+                    result << " " << (vertex_count + cube_faces[face][i] + 1);
+                }
+                result << "\n";
+
+                result << "f";
+                for (int i = 3; i < 6; ++i) {
+                    result << " " << (vertex_count + cube_faces[face][i] + 1);
+                }
+                result << "\n";
+            }
+
+            vertex_count += 8;
+        }
+
+        return result.str();
+    }
+}
 
 constexpr auto DAY_LENGTH = 600;
 constexpr auto DEFAULT_FOV = 65.0f;
@@ -98,7 +183,7 @@ player::player()
     assign_key(PlayerAction::FLY, SDL_SCANCODE_TAB);
     assign_key(PlayerAction::PLACE_LIGHT, SDL_SCANCODE_LCTRL);
     assign_key(PlayerAction::TAG_SIGN, SDL_SCANCODE_T);
-    assign_key(PlayerAction::BUILD_MAZE, SDL_SCANCODE_B);
+    assign_key(PlayerAction::DOWNLOAD_MAZE, SDL_SCANCODE_B);
     assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
 
     m_configs.day_length = DAY_LENGTH;
@@ -576,11 +661,36 @@ void player::initialize_actions()
                     auto grid_ptr = std::move(g.value());
                     if (p.m_world->update_preview(grid_ptr.get()))
                     {
-                        // Store for artifacts and building
-                        p.store_maze_for_artifacts(std::move(grid_ptr));
+                        // Get pixel data from the generated maze
+                        const auto pixel_data = grid_ptr->operations().get_pixels();
+                        auto [rows, columns, _] = grid_ptr->operations().get_dimensions();
+
+                        // Calculate scale
+                        constexpr unsigned int MIN_SCALE = 1;
+                        constexpr unsigned int MAX_SCALE = 10;
+                        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
+                        const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+
+                        const auto ascii_height = rows * 2 + 1;
+                        const int height = static_cast<int>(ascii_height * scale);
+                        const int width = static_cast<int>(pixel_data.size() / (height * 4));
+
+                        // Queue async block placement
+                        p.m_world->finalize_and_build_async(
+                            pixel_data,
+                            width,
+                            height,
+                            scale,
+                            p.m_world->m_projected_plane.target_x,
+                            p.m_world->m_projected_plane.target_y,
+                            p.m_world->m_projected_plane.target_z,
+                            p.m_world->m_projected_plane.target_face,
+                            p.m_configs.maze.levels(),
+                            p.get_item()
+                        );
+
                         p.m_configs.show_download_button = true;
                         p.m_last_maze_generation_time = SDL_GetTicks();
-                        SDL_Log("Preview generated successfully\n");
                     }
                     else
                     {
@@ -590,7 +700,7 @@ void player::initialize_actions()
             }
         });
 
-    m_action_binding[PlayerAction::BUILD_MAZE].action = derived_action<player>(
+    m_action_binding[PlayerAction::DOWNLOAD_MAZE].action = derived_action<player>(
         [](player& p, const float dt, mazes::randomizer& rng)
         {
             if (!p.m_world)
@@ -606,42 +716,7 @@ void player::initialize_actions()
                 return;
             }
 
-            // Get the last generated maze data
-            const auto maze_ptr = p.get_last_generated_maze();
-            if (!maze_ptr)
-            {
-                SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No maze preview available. Press E to generate preview first.\n");
-                return;
-            }
-
-            // Get pixel data from the generated maze
-            const auto pixel_data = maze_ptr->operations().get_pixels();
-            auto [rows, columns, _] = maze_ptr->operations().get_dimensions();
-
-            // Calculate scale
-            constexpr unsigned int MIN_SCALE = 1;
-            constexpr unsigned int MAX_SCALE = 10;
-            const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
-            const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
-
-            const auto ascii_height = rows * 2 + 1;
-            const int height = static_cast<int>(ascii_height * scale);
-            const int width = static_cast<int>(pixel_data.size() / (height * 4));
-
-            // Queue async block placement
-            p.m_world->finalize_and_build_async(
-                pixel_data,
-                width,
-                height,
-                scale,
-                p.m_world->m_projected_plane.target_x,
-                p.m_world->m_projected_plane.target_y,
-                p.m_world->m_projected_plane.target_z,
-                p.m_world->m_projected_plane.target_face,
-                p.m_configs.maze.levels(),
-                p.get_item()
-            );
-
+            // Note: process_build_queue() is now called automatically in world::update()
             p.m_configs.download_ready = true;
             SDL_Log("Build queued asynchronously\n");
         });
@@ -733,27 +808,25 @@ float player::lerp(float a, float b, float t) noexcept
     return a + t * (b - a);
 }
 
-/// Gather player's generated maze artifacts from the async task
+/// Gather player's voxel world artifacts from the database
 /// @return Wavefront .obj data as a string, or empty if not ready
 std::string player::artifacts() const noexcept
 {
-    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
-    if (m_last_maze_for_artifacts)
-    {
-        return m_last_maze_for_artifacts->operations().get_file();
+    // Check if database is enabled
+    if (!get_db_enabled()) {
+
+        return "";
     }
-    return "";
-}
 
-void player::store_maze_for_artifacts(std::unique_ptr<mazes::grid_interface> maze) noexcept
-{
-    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
-    m_last_maze_for_artifacts = std::move(maze);
-}
+    // Calculate player's chunk coordinates
+    const int player_chunk_p = chunked(m_pos.x);
+    const int player_chunk_q = chunked(m_pos.z);
 
-mazes::grid_interface* player::get_last_generated_maze() const noexcept
-{
-    std::lock_guard<std::mutex> lock(m_maze_artifacts_mutex);
-    return m_last_maze_for_artifacts.get();
+    // Query blocks from nearby chunks (radius of 2 chunks = 5x5 chunk area)
+    constexpr int chunk_radius = 2;
+    const auto blocks = db_query_blocks_near_chunks(player_chunk_p, player_chunk_q, chunk_radius);
+
+    // Convert blocks to Wavefront OBJ format
+    return blocks_to_wavefront_obj(blocks);
 }
 

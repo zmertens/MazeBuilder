@@ -451,6 +451,41 @@ void _db_set_key(const int p, const int q, const int key) {
     sqlite3_step(set_key_stmt);
 }
 
+std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int center_p, int center_q, int radius) {
+    std::vector<std::tuple<int, int, int, int>> blocks;
+
+    if (!db_enabled) {
+        return blocks;
+    }
+
+    load_mtx.lock();
+
+    // Query blocks from chunks within radius of center chunk
+    const char* query = "select x, y, z, w from block where p >= ? and p <= ? and q >= ? and q <= ? limit 10000;";
+    sqlite3_stmt* stmt;
+
+    if (sqlite3_prepare_v2(db, query, -1, &stmt, nullptr) == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, center_p - radius);
+        sqlite3_bind_int(stmt, 2, center_p + radius);
+        sqlite3_bind_int(stmt, 3, center_q - radius);
+        sqlite3_bind_int(stmt, 4, center_q + radius);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int x = sqlite3_column_int(stmt, 0);
+            int y = sqlite3_column_int(stmt, 1);
+            int z = sqlite3_column_int(stmt, 2);
+            int w = sqlite3_column_int(stmt, 3);
+            blocks.emplace_back(x, y, z, w);
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+    load_mtx.unlock();
+
+    return blocks;
+}
+
 void db_worker_start(const char *path) {
     if (!db_enabled) {
         return;

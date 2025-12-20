@@ -377,6 +377,9 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
         action(*m_player, delta_time, std::ref(rng));
     }
 
+    // Process async maze build queue (clean up completed futures)
+    process_build_queue();
+
     // Apply gravity as continuous force (convert delta_time from ms to seconds)
     const float dt_seconds = delta_time / 1000.0f;
 
@@ -443,8 +446,6 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     sdl_gl_helper::del_buffer(m_player->get_buffer());
     ensure_chunks(m_player);
     update_dirty_chunks_async();
-
-    process_build_queue();
 }
 
 void world::draw() const noexcept
@@ -679,7 +680,13 @@ void world::finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data
     }
 
     // Create a future for async block placement
+    // For web builds, use deferred execution to avoid blocking the main thread
+    // For native builds, use true async execution
+#if defined(__EMSCRIPTEN__)
+    auto future_build = std::async(std::launch::deferred, [this, pixel_data, width, height, scale,
+#else
     auto future_build = std::async(std::launch::async, [this, pixel_data, width, height, scale,
+#endif
                                                    base_x, base_y, base_z, wall_height, item_type]()
     {
         // Calculate logical maze dimensions
@@ -748,10 +755,38 @@ void world::process_build_queue() noexcept
                                        return true;
                                    }
 
-                                   return f.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready;
+                                   // Non-blocking check if future is ready
+                                   const auto status = f.wait_for(std::chrono::milliseconds(0));
+
+                                   // If ready, clean it up
+                                   if (status == std::future_status::ready)
+                                   {
+                                       // Call get() to retrieve any exceptions and clean up
+                                       try {
+                                           f.get();
+                                       } catch (const std::exception& e) {
+                                           SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                                               "Error in maze build future: %s\n", e.what());
+                                       }
+                                       return true;
+                                   }
+
+                                   return false;
                                }).begin(),
         m_maze_build_futures.end()
     );
+
+#if defined(__EMSCRIPTEN__)
+    // For web builds with deferred execution, we need to explicitly trigger execution
+    // Process one deferred task per frame to avoid blocking
+    if (!m_maze_build_futures.empty())
+    {
+        // The deferred future will execute when we check its status
+        // This allows incremental execution without blocking the main thread
+        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
+            "Processing deferred maze builds: %zu remaining\n", m_maze_build_futures.size());
+    }
+#endif
 }
 
 bool world::worker_run(worker* w) const noexcept
@@ -2465,26 +2500,32 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
     const float base_y = world_y + 1.0f + offset_distance;
     const float base_z = world_z;
 
+    // Rotate vertices 180 degrees (flipped from original orientation)
+    // Original quad was: (0,0), (width,0), (width,height), (0,height)
+    // After -180° it was: (width,height), (0,height), (0,0), (width,0)
+    // Now rotating +180° from that (or -180° from original flipped):
+    // Final result: Original texture is flipped 180°
     float vertices[4][3];
-    vertices[0][0] = 0.0f;
+    vertices[0][0] = 0.0f;          // bottom-left flipped
     vertices[0][1] = 0.0f;
     vertices[0][2] = 0.0f;
-    vertices[1][0] = plane_width;
+    vertices[1][0] = plane_width;   // bottom-right flipped
     vertices[1][1] = 0.0f;
     vertices[1][2] = 0.0f;
-    vertices[2][0] = plane_width;
+    vertices[2][0] = plane_width;   // top-right flipped
     vertices[2][1] = 0.0f;
     vertices[2][2] = plane_height;
-    vertices[3][0] = 0.0f;
+    vertices[3][0] = 0.0f;          // top-left flipped
     vertices[3][1] = 0.0f;
     vertices[3][2] = plane_height;
 
-    // UV coordinates for top face (V flipped for OpenGL texture coordinate system)
+    // UV coordinates rotated 180 degrees (both U and V inverted)
+    // This rotates the texture image 180 degrees on the plane
     static constexpr float uvs[4][2] = {
-        {0.0f, 1.0f},
-        {1.0f, 1.0f},
-        {1.0f, 0.0f},
-        {0.0f, 0.0f}
+        {1.0f, 0.0f},  // was {0.0f, 1.0f}
+        {0.0f, 0.0f},  // was {1.0f, 1.0f}
+        {0.0f, 1.0f},  // was {1.0f, 0.0f}
+        {1.0f, 1.0f}   // was {0.0f, 0.0f}
     };
 
     // Top face normal (points up in +Y direction)
