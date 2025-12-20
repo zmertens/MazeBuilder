@@ -665,10 +665,57 @@ bool world::run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
     // Parse pixel_data: black pixels (walls) become stone blocks
     // Sample every 'scale' pixels to match logical maze structure
 
-    // Get player position to place maze at player's feet
-    const int base_x = static_cast<int>(m_player->m_pos.x);
-    const int base_y = static_cast<int>(m_player->m_pos.y);
-    const int base_z = static_cast<int>(m_player->m_pos.z);
+    // Use the targeted block face position from the crosshair instead of player position
+    // This allows precise placement where the player is looking
+    int base_x, base_y, base_z;
+
+    if (m_projected_plane.has_valid_target)
+    {
+        // Use the block face that player is targeting
+        base_x = m_projected_plane.target_x;
+        base_y = m_projected_plane.target_y;
+        base_z = m_projected_plane.target_z;
+
+        // Adjust position based on which face was targeted
+        // Place maze on the adjacent empty space (where you would place a block)
+        switch (m_projected_plane.target_face)
+        {
+            case 0: // Left face (-X)
+                base_x -= 1;
+                break;
+            case 1: // Right face (+X)
+                base_x += 1;
+                break;
+            case 2: // Front face (-Z)
+                base_z -= 1;
+                break;
+            case 3: // Back face (+Z)
+                base_z += 1;
+                break;
+            case 4: case 5: case 6: case 7: // Top faces (various orientations)
+                base_y += 1; // Place on top of the block
+                break;
+            case 8: // Bottom face
+                base_y -= 1; // Place below the block
+                break;
+            default:
+                // Fallback to top face if unknown
+                base_y += 1;
+                break;
+        }
+
+        SDL_Log("Using crosshair target block at (%d, %d, %d) face %d for maze placement\n",
+                m_projected_plane.target_x, m_projected_plane.target_y,
+                m_projected_plane.target_z, m_projected_plane.target_face);
+    }
+    else
+    {
+        // Fallback: if no valid target, place at player's feet (old behavior)
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No valid crosshair target, placing maze at player position\n");
+        base_x = static_cast<int>(m_player->m_pos.x);
+        base_y = static_cast<int>(m_player->m_pos.y);
+        base_z = static_cast<int>(m_player->m_pos.z);
+    }
 
     // Calculate logical maze dimensions (before scaling)
     const int logical_width = width / scale;
