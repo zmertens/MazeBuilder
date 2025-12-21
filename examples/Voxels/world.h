@@ -52,30 +52,19 @@ public:
     command_queue& get_command_queue() noexcept;
 
     void destroy_world();
+private:
+    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
 
+    // Building helper methods
     bool update_preview(mazes::grid_interface* g) const noexcept;
     void finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                                   int width, int height, int scale,
                                   int wall_height, int item_type) noexcept;
+    void commit_preview_to_world() noexcept;
     void process_build_queue() noexcept;
 
-private:
-    struct projected_plane
-    {
-        bool visible{ false };
-        texture* projected_texture{ nullptr };
-        int target_x{ 0 };
-        int target_y{ 0 };
-        int target_z{ 0 };
-        int target_face{ 0 };
-        bool has_valid_target{ false };
-    } m_projected_plane{};
-
+    // Scene graph methods
     void build_scene();
-
-    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
-
-    // Scene graph helper methods
     void attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept;
     void detach_chunk_from_layer(scene_node* chunk) noexcept;
     void traverse_chunks(const std::function<void(scene_node*)>& callback) const noexcept;
@@ -88,8 +77,6 @@ private:
     bool worker_run(worker* w) const noexcept;
     void init_worker_threads() noexcept;
     void cleanup_worker_threads() noexcept;
-
-    [[nodiscard]] static int chunked(float x) noexcept;
 
     // Time functions
     [[nodiscard]] double get_time() const noexcept;
@@ -110,16 +97,15 @@ private:
     [[nodiscard]] static bool player_intersects_block(int height, float x, float y, float z,
         int hx, int hy, int hz) noexcept;
 
-    bool has_lights(const scene_node* chunk) const noexcept;
-
     void dirty_chunk(scene_node* chunk) const noexcept;
-    // Process dirty chunks on worker threads
     void update_dirty_chunks_async() const noexcept;
 
     static void occlusion(char neighbors[27], char lights[27], float shades[27],
         float ao[6][4], float light[6][4]) noexcept;
     static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
+    bool has_lights(const scene_node* chunk) const noexcept;
 
+    [[nodiscard]] static int chunked(float x) noexcept;
     static void compute_chunk(worker_item* item) noexcept;
 
     static void generate_chunk(scene_node* chunk, const worker_item* item) noexcept;
@@ -170,6 +156,17 @@ private:
         LAYER_COUNT = 2
     };
 
+    struct projected_plane
+    {
+        bool visible{ false };
+        texture* projected_texture{ nullptr };
+        int target_x{ 0 };
+        int target_y{ 0 };
+        int target_z{ 0 };
+        int target_face{ 0 };
+        bool has_valid_target{ false };
+    } m_projected_plane{};
+
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
     const sdl_gl_helper* m_sdl;
@@ -191,7 +188,10 @@ private:
     std::uint32_t m_sky_buffer;
 
     std::vector<std::function<void()>> m_building_processes;
-    mutable std::mutex m_maze_build_mutex;
+    mutable std::mutex m_building_mutex;
+
+    // Preview tracking - increments with each preview, committed with 'B' key
+    int m_current_preview_id = 0;
 };
 
 #endif // WORLD_H

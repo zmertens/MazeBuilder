@@ -27,6 +27,13 @@ static sqlite3_stmt *load_signs_stmt;
 static sqlite3_stmt *get_key_stmt;
 static sqlite3_stmt *set_key_stmt;
 
+// Preview blocks database - for temporary maze previews
+static sqlite3_stmt *insert_preview_block_stmt;
+static sqlite3_stmt *load_preview_blocks_stmt;
+static sqlite3_stmt *delete_all_preview_blocks_stmt;
+static sqlite3_stmt *move_latest_preview_to_main_stmt;
+static sqlite3_stmt *get_latest_preview_id_stmt;
+
 static Ring ring;
 
 static std::thread db_thread;
@@ -66,6 +73,16 @@ int db_init(const char *path) {
         "    z int not null,"
         "    w int not null"
         ");"
+        "create table if not exists preview_blocks ("
+        "    preview_id int not null,"
+        "    p int not null,"
+        "    q int not null,"
+        "    x int not null,"
+        "    y int not null,"
+        "    z int not null,"
+        "    w int not null,"
+        "    timestamp datetime default current_timestamp"
+        ");"
         "create table if not exists light ("
         "    p int not null,"
         "    q int not null,"
@@ -89,6 +106,8 @@ int db_init(const char *path) {
         "    text text not null"
         ");"
         "create unique index if not exists block_pqxyz_idx on block (p, q, x, y, z);"
+        "create index if not exists preview_blocks_id_idx on preview_blocks (preview_id);"
+        "create index if not exists preview_blocks_pqxyz_idx on preview_blocks (p, q, x, y, z);"
         "create unique index if not exists light_pqxyz_idx on light (p, q, x, y, z);"
         "create unique index if not exists key_pq_idx on key (p, q);"
         "create unique index if not exists sign_xyzface_idx on sign (x, y, z, face);"
@@ -117,6 +136,18 @@ int db_init(const char *path) {
     static auto set_key_query =
         "insert or replace into key (p, q, key) "
         "values (?, ?, ?);";
+
+    // Preview blocks queries
+    static auto insert_preview_block_query =
+        "insert into preview_blocks (preview_id, p, q, x, y, z, w) "
+        "values (?, ?, ?, ?, ?, ?, ?);";
+    static auto load_preview_blocks_query =
+        "select x, y, z, w from preview_blocks where p = ? and q = ? and preview_id = ?;";
+    static auto delete_all_preview_blocks_query =
+        "delete from preview_blocks;";
+    static auto get_latest_preview_id_query =
+        "select max(preview_id) from preview_blocks;";
+
     int rc = sqlite3_open(path, &db);
     if (rc) return rc;
     rc = sqlite3_exec(db, create_query, nullptr, nullptr, nullptr);
@@ -146,6 +177,16 @@ int db_init(const char *path) {
     if (rc) return rc;
     rc = sqlite3_prepare_v2(db, set_key_query, -1, &set_key_stmt, nullptr);
     if (rc) return rc;
+
+    // Prepare preview blocks statements
+    rc = sqlite3_prepare_v2(db, insert_preview_block_query, -1, &insert_preview_block_stmt, nullptr);
+    if (rc) return rc;
+    rc = sqlite3_prepare_v2(db, load_preview_blocks_query, -1, &load_preview_blocks_stmt, nullptr);
+    if (rc) return rc;
+    rc = sqlite3_prepare_v2(db, delete_all_preview_blocks_query, -1, &delete_all_preview_blocks_stmt, nullptr);
+    if (rc) return rc;
+    rc = sqlite3_prepare_v2(db, get_latest_preview_id_query, -1, &get_latest_preview_id_stmt, nullptr);
+    if (rc) return rc;
     sqlite3_exec(db, "begin;", nullptr, nullptr, nullptr);
     static constexpr auto p = "";
     db_worker_start(p);
@@ -168,6 +209,13 @@ void db_close() {
     sqlite3_finalize(load_signs_stmt);
     sqlite3_finalize(get_key_stmt);
     sqlite3_finalize(set_key_stmt);
+
+    // Finalize preview blocks statements
+    sqlite3_finalize(insert_preview_block_stmt);
+    sqlite3_finalize(load_preview_blocks_stmt);
+    sqlite3_finalize(delete_all_preview_blocks_stmt);
+    sqlite3_finalize(get_latest_preview_id_stmt);
+
     sqlite3_close(db);
 }
 
@@ -547,3 +595,164 @@ int db_worker_run(void *arg) {
     }
     return running;
 }
+
+// ============================================================================
+// PREVIEW BLOCKS FUNCTIONS
+// ============================================================================
+
+// Insert multiple preview blocks at once
+void db_insert_preview_blocks(int preview_id, const std::vector<std::tuple<int, int, int, int, int, int>>& blocks) {
+    if (!db_enabled || blocks.empty()) {
+        return;
+    }
+
+    load_mtx.lock();
+    sqlite3_exec(db, "begin;", nullptr, nullptr, nullptr);
+
+    for (const auto& [p, q, x, y, z, w] : blocks) {
+        sqlite3_reset(insert_preview_block_stmt);
+        sqlite3_bind_int(insert_preview_block_stmt, 1, preview_id);
+        sqlite3_bind_int(insert_preview_block_stmt, 2, p);
+        sqlite3_bind_int(insert_preview_block_stmt, 3, q);
+        sqlite3_bind_int(insert_preview_block_stmt, 4, x);
+        sqlite3_bind_int(insert_preview_block_stmt, 5, y);
+        sqlite3_bind_int(insert_preview_block_stmt, 6, z);
+        sqlite3_bind_int(insert_preview_block_stmt, 7, w);
+        sqlite3_step(insert_preview_block_stmt);
+    }
+
+    sqlite3_exec(db, "commit;", nullptr, nullptr, nullptr);
+    load_mtx.unlock();
+
+    SDL_Log("Inserted %zu preview blocks with preview_id %d\n", blocks.size(), preview_id);
+}
+
+// Load preview blocks for a specific chunk and preview_id
+void db_load_preview_blocks(Map* map, const int p, const int q, const int preview_id) {
+    if (!db_enabled) {
+        return;
+    }
+    load_mtx.lock();
+    sqlite3_reset(load_preview_blocks_stmt);
+    sqlite3_bind_int(load_preview_blocks_stmt, 1, p);
+    sqlite3_bind_int(load_preview_blocks_stmt, 2, q);
+    sqlite3_bind_int(load_preview_blocks_stmt, 3, preview_id);
+    while (sqlite3_step(load_preview_blocks_stmt) == SQLITE_ROW) {
+        const int x = sqlite3_column_int(load_preview_blocks_stmt, 0);
+        const int y = sqlite3_column_int(load_preview_blocks_stmt, 1);
+        const int z = sqlite3_column_int(load_preview_blocks_stmt, 2);
+        const int w = sqlite3_column_int(load_preview_blocks_stmt, 3);
+        map_set(map, x, y, z, w);
+    }
+    load_mtx.unlock();
+}
+
+// Get the latest preview_id
+int db_get_latest_preview_id() {
+    if (!db_enabled) {
+        return 0;
+    }
+
+    load_mtx.lock();
+    sqlite3_reset(get_latest_preview_id_stmt);
+    int latest_id = 0;
+    if (sqlite3_step(get_latest_preview_id_stmt) == SQLITE_ROW) {
+        latest_id = sqlite3_column_int(get_latest_preview_id_stmt, 0);
+    }
+    load_mtx.unlock();
+
+    return latest_id;
+}
+
+// Commit the latest preview to the main block table and clear all previews
+void db_commit_latest_preview_to_main() {
+    if (!db_enabled) {
+        return;
+    }
+
+    const int latest_preview_id = db_get_latest_preview_id();
+    if (latest_preview_id <= 0) {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No preview blocks to commit\n");
+        return;
+    }
+
+    load_mtx.lock();
+
+    // Move latest preview blocks to main block table
+    const char* move_query =
+        "insert or replace into block (p, q, x, y, z, w) "
+        "select p, q, x, y, z, w from preview_blocks where preview_id = ?;";
+
+    sqlite3_stmt* move_stmt = nullptr;
+    int rc = sqlite3_prepare_v2(db, move_query, -1, &move_stmt, nullptr);
+    if (rc == SQLITE_OK) {
+        sqlite3_bind_int(move_stmt, 1, latest_preview_id);
+        sqlite3_step(move_stmt);
+        sqlite3_finalize(move_stmt);
+
+        const int moved_count = sqlite3_changes(db);
+        SDL_Log("Committed %d preview blocks (preview_id %d) to main block table\n",
+                moved_count, latest_preview_id);
+    }
+
+    // Clear all preview blocks after committing
+    sqlite3_reset(delete_all_preview_blocks_stmt);
+    sqlite3_step(delete_all_preview_blocks_stmt);
+
+    // Commit the transaction
+    sqlite3_exec(db, "commit;", nullptr, nullptr, nullptr);
+    sqlite3_exec(db, "begin;", nullptr, nullptr, nullptr);
+
+    load_mtx.unlock();
+}
+
+// Flush all preview blocks without committing to main
+void db_flush_all_preview_blocks() {
+    if (!db_enabled) {
+        return;
+    }
+
+    load_mtx.lock();
+    sqlite3_reset(delete_all_preview_blocks_stmt);
+    sqlite3_step(delete_all_preview_blocks_stmt);
+    load_mtx.unlock();
+
+    SDL_Log("Flushed all preview blocks\n");
+}
+
+// Get all blocks for a specific preview_id (for building)
+std::vector<std::tuple<int, int, int, int, int, int>> db_get_all_preview_blocks(int preview_id) {
+    std::vector<std::tuple<int, int, int, int, int, int>> blocks;
+
+    if (!db_enabled) {
+        return blocks;
+    }
+
+    load_mtx.lock();
+
+    const char* query = "SELECT p, q, x, y, z, w FROM preview_blocks WHERE preview_id = ?;";
+    sqlite3_stmt* stmt = nullptr;
+
+    int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
+    if (rc == SQLITE_OK) {
+        sqlite3_bind_int(stmt, 1, preview_id);
+
+        while (sqlite3_step(stmt) == SQLITE_ROW) {
+            int p = sqlite3_column_int(stmt, 0);
+            int q = sqlite3_column_int(stmt, 1);
+            int x = sqlite3_column_int(stmt, 2);
+            int y = sqlite3_column_int(stmt, 3);
+            int z = sqlite3_column_int(stmt, 4);
+            int w = sqlite3_column_int(stmt, 5);
+
+            blocks.emplace_back(p, q, x, y, z, w);
+        }
+
+        sqlite3_finalize(stmt);
+    }
+
+    load_mtx.unlock();
+
+    return blocks;
+}
+

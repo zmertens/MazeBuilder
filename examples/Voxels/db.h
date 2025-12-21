@@ -33,5 +33,13 @@ void db_worker_start(const char* path);
 void db_worker_stop();
 int db_worker_run(void* arg);
 
+// Preview blocks functions - for temporary maze preview before committing
+void db_insert_preview_blocks(int preview_id, const std::vector<std::tuple<int, int, int, int, int, int>>& blocks);
+void db_load_preview_blocks(Map* map, int p, int q, int preview_id);
+int db_get_latest_preview_id();
+void db_commit_latest_preview_to_main();
+void db_flush_all_preview_blocks();
+std::vector<std::tuple<int, int, int, int, int, int>> db_get_all_preview_blocks(int preview_id);
+
 
 #endif // DB_H

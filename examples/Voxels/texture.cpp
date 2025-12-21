@@ -13,6 +13,38 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb/stb_image.h>
 
+#include <vector>
+#include <algorithm>
+
+namespace {
+
+    /// Create a rotated copy of RGBA texture data (180 degrees)
+    std::vector<std::uint8_t> create_rotated_180(const std::uint8_t* data, int width, int height) noexcept
+    {
+        if (data == nullptr || width <= 0 || height <= 0) {
+            return {};
+        }
+
+        const size_t total_bytes = width * height * 4;
+        std::vector<std::uint8_t> rotated(total_bytes);
+
+        const int total_pixels = width * height;
+
+        // Copy pixels in reverse order
+        for (int i = 0; i < total_pixels; ++i) {
+            const int src_idx = i * 4;
+            const int dst_idx = (total_pixels - 1 - i) * 4;
+
+            rotated[dst_idx + 0] = data[src_idx + 0]; // R
+            rotated[dst_idx + 1] = data[src_idx + 1]; // G
+            rotated[dst_idx + 2] = data[src_idx + 2]; // B
+            rotated[dst_idx + 3] = data[src_idx + 3]; // A
+        }
+
+        return rotated;
+    }
+} // anonymous namespace
+
 texture::texture(texture &&other) noexcept
 {
     m_texture = other.m_texture;
@@ -101,7 +133,8 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
     }
 
     // Force RGBA (4 components) for consistency
-    auto *data = stbi_load_from_memory(buffer.data(), static_cast<int>(buffer.size()), &width, &height, &n, 4);
+    auto *data = stbi_load_from_memory(buffer.data(), static_cast<int>(buffer.size()),
+        &width, &height, &n, 4);
 
     if (data == nullptr)
     {
@@ -173,12 +206,13 @@ bool texture::load_target(const int w, const int h) noexcept
 }
 
 /// Load texture from raw RGBA memory data
-/// @param data
-/// @param width
-/// @param height
-/// @param channel_offset 0
+/// @param data RGBA pixel data
+/// @param width texture width
+/// @param height texture height
+/// @param channel_offset texture unit offset (default 0)
+/// @param rotate_180 if true, rotate texture 180 degrees (default false)
 bool texture::load_from_memory(const std::uint8_t* data, const int width, const int height,
-    const std::uint32_t channel_offset) noexcept
+    const std::uint32_t channel_offset, const bool rotate_180) noexcept
 {
     if (data == nullptr || width <= 0 || height <= 0)
     {
@@ -187,6 +221,21 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     }
 
     this->free();
+
+    // If rotation requested, create rotated copy
+    const std::uint8_t* upload_data = data;
+    std::vector<std::uint8_t> rotated_buffer;
+
+    if (rotate_180)
+    {
+        rotated_buffer = create_rotated_180(data, width, height);
+        if (rotated_buffer.empty())
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create rotated texture copy\n");
+            return false;
+        }
+        upload_data = rotated_buffer.data();
+    }
 
     this->m_pixel_data = const_cast<std::uint8_t*>(data);
 
@@ -200,9 +249,9 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    // Upload texture data - RGBA format
+    // Upload texture data - RGBA format (potentially rotated)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-        GL_RGBA,GL_UNSIGNED_BYTE, data);
+        GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
 
     // Generate mipmaps
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -226,8 +275,9 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
 /// @param width new width
 /// @param height new height
 /// @param channel_offset texture unit offset
+/// @param rotate_180 if true, rotate texture 180 degrees (default false)
 bool texture::update_from_memory(const std::uint8_t* data, const int width, const int height,
-    const std::uint32_t channel_offset) noexcept
+    const std::uint32_t channel_offset, const bool rotate_180) noexcept
 {
     if (data == nullptr || width <= 0 || height <= 0)
     {
@@ -250,14 +300,29 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     if (m_texture == 0 || m_width != width || m_height != height)
     {
         SDL_Log("Reallocating texture: %dx%d -> %dx%d\n", m_width, m_height, width, height);
-        return load_from_memory(data, width, height, channel_offset);
+        return load_from_memory(data, width, height, channel_offset, rotate_180);
+    }
+
+    // If rotation requested, create rotated copy
+    const std::uint8_t* upload_data = data;
+    std::vector<std::uint8_t> rotated_buffer;
+
+    if (rotate_180)
+    {
+        rotated_buffer = create_rotated_180(data, width, height);
+        if (rotated_buffer.empty())
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to create rotated texture copy\n");
+            return false;
+        }
+        upload_data = rotated_buffer.data();
     }
 
     // Efficient update using glTexSubImage2D (reuses existing texture)
     glActiveTexture(GL_TEXTURE0 + channel_offset);
     glBindTexture(GL_TEXTURE_2D, m_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
-        GL_UNSIGNED_BYTE, data);
+        GL_UNSIGNED_BYTE, upload_data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     if (const GLenum error = glGetError(); error != GL_NO_ERROR)

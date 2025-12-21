@@ -47,7 +47,8 @@
 #define DELETE_CHUNK_RADIUS 14
 #define NUM_WORKERS 4
 
-struct worker_item {
+struct worker_item
+{
     int p{};
     int q{};
     int load{};
@@ -66,7 +67,8 @@ enum class WorkerState : int
     DONE = 2
 };
 
-struct worker {
+struct worker
+{
     int index{};
     WorkerState state{WorkerState::IDLE};
     std::thread thrd;
@@ -86,11 +88,31 @@ std::string gl_error_checker(const char* file, const int line) noexcept
     {
         switch (error_code)
         {
-        case GL_INVALID_ENUM: { error_str += "INVALID_ENUM"; break; }
-        case GL_INVALID_VALUE: { error_str += "INVALID_VALUE"; break; }
-        case GL_INVALID_OPERATION: { error_str += "INVALID_OPERATION"; break; }
-        case GL_OUT_OF_MEMORY: { error_str += "OUT_OF_MEMORY"; break; }
-        case GL_INVALID_FRAMEBUFFER_OPERATION: { error_str += "INVALID_FRAMEBUFFER_OPERATION"; break; }
+        case GL_INVALID_ENUM:
+            {
+                error_str += "INVALID_ENUM";
+                break;
+            }
+        case GL_INVALID_VALUE:
+            {
+                error_str += "INVALID_VALUE";
+                break;
+            }
+        case GL_INVALID_OPERATION:
+            {
+                error_str += "INVALID_OPERATION";
+                break;
+            }
+        case GL_OUT_OF_MEMORY:
+            {
+                error_str += "OUT_OF_MEMORY";
+                break;
+            }
+        case GL_INVALID_FRAMEBUFFER_OPERATION:
+            {
+                error_str += "INVALID_FRAMEBUFFER_OPERATION";
+                break;
+            }
         default: break;
         }
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
@@ -102,10 +124,10 @@ std::string gl_error_checker(const char* file, const int line) noexcept
 #define CHECK_GL_ERR() gl_error_checker(__FILE__, __LINE__)
 
 world::world(SDL_Window* window, font_manager& fonts,
-        player* p,
-        shader_manager& shaders,
-        texture_manager& textures,
-        const sdl_gl_helper* sdl)
+             player* p,
+             shader_manager& shaders,
+             texture_manager& textures,
+             const sdl_gl_helper* sdl)
     : m_sdl{sdl}
       , m_fonts{fonts}
       , m_shaders{shaders}
@@ -114,7 +136,7 @@ world::world(SDL_Window* window, font_manager& fonts,
       , m_next_chunk_slot{1}
       , m_command_queue{}
       , m_player{p}
-      , m_sky_buffer{ 0 }
+      , m_sky_buffer{0}
       , m_projected_plane{}
 {
     m_projected_plane.projected_texture = &m_textures.get(TextureIdentifier::MAZE);
@@ -215,7 +237,8 @@ void world::insert_chunk_into_spatial_tree(scene_node* chunk) const noexcept
     {
         chunk->parent = spatial_parent;
 
-        if (const bool is_attached = std::ranges::find(spatial_parent->children, chunk) != spatial_parent->children.cend();
+        if (const bool is_attached = std::ranges::find(spatial_parent->children, chunk) != spatial_parent->children.
+                cend();
             !is_attached)
         {
             spatial_parent->children.push_back(chunk);
@@ -270,7 +293,7 @@ void world::traverse_chunks(const std::function<void(scene_node*)>& callback) co
 }
 
 void world::traverse_chunks_in_bounds(const int min_p, const int min_q, const int max_p, const int max_q,
-                                       const std::function<void(scene_node*)>& callback) const noexcept
+                                      const std::function<void(scene_node*)>& callback) const noexcept
 {
     // Convert chunk coordinates to world coordinates
     constexpr int CHUNK_SIZE = BUILD_CHUNK_SIZE;
@@ -487,10 +510,10 @@ void world::draw() const noexcept
     render_plane(&s_block_attrib);
 
     std::array<char, 256> buffer{};
-    SDL_snprintf(buffer.data(), buffer.size(),"Rendered %d triangle faces | chunk count: %zu",
-            triangle_faces, get_chunk_count());
+    SDL_snprintf(buffer.data(), buffer.size(), "[%d triangle faces, %zu chunks]",
+                 triangle_faces, get_chunk_count());
     render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
-        10, viewport_height - 10, 12.0f, buffer.data());
+                10, viewport_height - 10, 12.0f, buffer.data());
 
     render_wireframe(&s_line_attrib);
 
@@ -519,7 +542,7 @@ void world::handle_event(const SDL_Event& event) noexcept
 }
 
 void world::create_world(const int p, const int q,
-    const world_func& func, Map* m, const int chunk_size) noexcept
+                         const world_func& func, Map* m, const int chunk_size) noexcept
 {
     constexpr int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++)
@@ -536,9 +559,9 @@ void world::create_world(const int p, const int q,
 
             // Build the environment
             const float f = simplex2(static_cast<float>(x) * 0.01f, static_cast<float>(z) * 0.01f,
-                4, 0.5f, 2.f);
+                                     4, 0.5f, 2.f);
             const float g = simplex2(static_cast<float>(-x) * 0.01f, static_cast<float>(-z) * 0.01f,
-                2, 0.9f, 2.f);
+                                     2, 0.9f, 2.f);
             const int mh = g * 32 + 16;
             auto h = static_cast<int>(f * static_cast<float>(mh));
             int w = 1;
@@ -554,31 +577,31 @@ void world::create_world(const int p, const int q,
                 func(x, y, z, w * flag, m);
             }
 
-            if (w == 1) {
+            if (w == 1)
+            {
+                // grass
+                if (simplex2(static_cast<float>(-x) * 0.1f,
+                             static_cast<float>(z) * 0.1f,
+                             4,
+                             0.8f, 2.0f) > 0.6f)
+                {
+                    func(x, h, z, 17 * flag, m);
+                }
+                // flowers
+                if (simplex2(static_cast<float>(x) * 0.05f,
+                             static_cast<float>(-z) * 0.05f,
+                             4,
+                             0.8f,
+                             2.0f) > 0.7f)
+                {
+                    const auto w1 = 18.f + simplex2(static_cast<float>(x) * 0.1f,
+                                                    static_cast<float>(z) * 0.1f,
+                                                    4,
+                                                    0.8f,
+                                                    2.0f) * 7.f;
 
-                    // grass
-                    if (simplex2(static_cast<float>(-x) * 0.1f,
-                        static_cast<float>(z) * 0.1f,
-                        4,
-                        0.8f, 2.0f) > 0.6f) {
-
-                        func(x, h, z, 17 * flag, m);
-                    }
-                    // flowers
-                    if (simplex2(static_cast<float>(x) * 0.05f,
-                        static_cast<float>(-z) * 0.05f,
-                        4,
-                        0.8f,
-                        2.0f) > 0.7f) {
-
-                        const auto w1 = 18.f + simplex2(static_cast<float>(x) * 0.1f,
-                            static_cast<float>(z) * 0.1f,
-                            4,
-                            0.8f,
-                            2.0f) * 7.f;
-
-                        func(x, h, z, w1 * static_cast<float>(flag), m);
-                    }
+                    func(x, h, z, w1 * static_cast<float>(flag), m);
+                }
 
                 // trees
                 int ok = 1;
@@ -587,26 +610,34 @@ void world::create_world(const int p, const int q,
                 {
                     ok = 0;
                 }
-                if (ok && simplex2(static_cast<float>(x), static_cast<float>(z), 6, 0.5f, 2.0f) > 0.84f) {
-                    for (int y = h + 3; y < h + 8; y++) {
-                        for (int ox = -3; ox <= 3; ox++) {
-                            for (int oz = -3; oz <= 3; oz++) {
+                if (ok && simplex2(static_cast<float>(x), static_cast<float>(z), 6, 0.5f, 2.0f) > 0.84f)
+                {
+                    for (int y = h + 3; y < h + 8; y++)
+                    {
+                        for (int ox = -3; ox <= 3; ox++)
+                        {
+                            for (int oz = -3; oz <= 3; oz++)
+                            {
                                 const int d = (ox * ox) + (oz * oz) +
                                     (y - (h + 4)) * (y - (h + 4));
-                                if (d < 11) {
+                                if (d < 11)
+                                {
                                     func(x + ox, y, z + oz, 15, m);
                                 }
                             }
                         }
                     }
-                    for (int y = h; y < h + 7; y++) {
+                    for (int y = h; y < h + 7; y++)
+                    {
                         func(x, y, z, 5, m);
                     }
                 }
             }
             // clouds
-            if (SHOW_CLOUDS) {
-                for (int y = 64; y < 72; y++) {
+            if (SHOW_CLOUDS)
+            {
+                for (int y = 64; y < 72; y++)
+                {
                     if (simplex3(
                         static_cast<float>(x) * 0.01f,
                         static_cast<float>(y) * 0.1f,
@@ -632,7 +663,7 @@ bool world::update_preview(mazes::grid_interface* g) const noexcept
     // Calculate scale
     constexpr unsigned int MIN_SCALE = 1;
     constexpr unsigned int MAX_SCALE = 10;
-    const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
+    const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(static_cast<float>(rows * columns)));
     const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
 
     // Height is predictable: (rows*2+1) * scale
@@ -656,9 +687,11 @@ bool world::update_preview(mazes::grid_interface* g) const noexcept
 }
 
 void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
-                                     int width, int height, int scale,
-                                     int wall_height, int item_type) noexcept
+                               int width, int height, int scale,
+                               int wall_height, int item_type) noexcept
 {
+    m_current_preview_id++;
+
     // Calculate base position from target face
     int base_x = m_projected_plane.target_x;
     int base_y = m_projected_plane.target_y;
@@ -667,24 +700,43 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
     // Adjust position based on which face was targeted
     switch (m_projected_plane.target_face)
     {
-        case 0: base_x -= 1; break; // Left face (-X)
-        case 1: base_x += 1; break; // Right face (+X)
-        case 2: base_z -= 1; break; // Front face (-Z)
-        case 3: base_z += 1; break; // Back face (+Z)
-        case 4: case 5: case 6: case 7: base_y += 1; break; // Top faces
-        case 8: base_y -= 1; break; // Bottom face
-        default: base_y += 1; break; // Fallback to top
+    // Left face (-X)
+    case 0: base_x -= 1;
+        break;
+    // Right face (+X)
+    case 1: base_x += 1;
+        break;
+    // Front face (-Z)
+    case 2: base_z -= 1;
+        break;
+    // Back face (+Z)
+    case 3: base_z += 1;
+        break;
+    // Top faces
+    case 4:
+    case 5:
+    case 6:
+    case 7: base_y += 1;
+        break;
+    // Bottom face
+    case 8: base_y -= 1;
+        break;
+    // Fallback to top
+    default: base_y += 1;
+        break;
     }
 
-   auto build_func = [this, pixel_data, width, height, scale, base_x, base_y, base_z, wall_height, item_type]()
+    auto build_func = [pixel_data, width, height, scale, base_x, base_y, base_z, wall_height, item_type,
+            preview_id = m_current_preview_id]()
     {
         // Calculate logical maze dimensions
         const int logical_width = width / scale;
         const int logical_height = height / scale;
 
-        int blocks_placed = 0;
+        // Collect all preview blocks first
+        std::vector<std::tuple<int, int, int, int, int, int>> preview_blocks;
+        preview_blocks.reserve(logical_width * logical_height * wall_height);
 
-        // Iterate through logical maze cells
         for (int cell_y = 0; cell_y < logical_height; ++cell_y)
         {
             for (int cell_x = 0; cell_x < logical_width; ++cell_x)
@@ -700,9 +752,8 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                 const uint8_t b = pixel_data[pixel_index + 2];
 
                 // Check if pixel is black (wall)
-                const bool is_wall = (r < 50 && g < 50 && b < 50);
 
-                if (is_wall)
+                if (r < 50 && g < 50 && b < 50)
                 {
                     // Place a vertical column of blocks for this wall
                     for (int y = 0; y < wall_height; ++y)
@@ -711,28 +762,93 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                         const int world_y = base_y + y;
                         const int world_z = base_z + cell_y;
 
-                        // set_block is thread-safe with mutex protection
-                        set_block(world_x, world_y, world_z, item_type);
-                        blocks_placed++;
+                        // Calculate chunk coordinates
+                        const int p = chunked(static_cast<float>(world_x));
+                        const int q = chunked(static_cast<float>(world_z));
+
+                        preview_blocks.emplace_back(p, q, world_x, world_y, world_z, item_type);
                     }
                 }
             }
         }
+
+        if (!preview_blocks.empty())
+        {
+            db_insert_preview_blocks(preview_id, preview_blocks);
+
+        }
     };
 
     // Add future to queue
-    std::lock_guard<std::mutex> lock(m_maze_build_mutex);
+    std::lock_guard<std::mutex> lock(m_building_mutex);
     m_building_processes.emplace_back(build_func);
+}
+
+// Commit the latest preview to the main world database
+// Called when user presses 'B' (BUILD/PLACE_MAZE action)
+// This reads blocks from preview_blocks DB, places them in the world, and commits to main block table
+void world::commit_preview_to_world() noexcept
+{
+    if (!get_db_enabled())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "Database not enabled - cannot commit preview\n");
+        return;
+    }
+
+    const int latest_preview_id = db_get_latest_preview_id();
+
+    if (latest_preview_id <= 0)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "No preview to build - press 'E' first to generate a preview\n");
+        return;
+    }
+
+    SDL_Log("Building preview_id %d: Reading blocks from preview_blocks DB...\n", latest_preview_id);
+
+    // Get all preview blocks from the database
+    auto blocks_to_build = db_get_all_preview_blocks(latest_preview_id);
+
+    if (blocks_to_build.empty())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "No blocks found for preview_id %d\n", latest_preview_id);
+        return;
+    }
+
+    // Now actually place the blocks in the world
+    int blocks_placed = 0;
+    for (const auto& [p, q, x, y, z, w] : blocks_to_build)
+    {
+        set_block(x, y, z, w);
+        blocks_placed++;
+    }
+
+    SDL_Log("Built %d blocks in the world!\n", blocks_placed);
+
+    // Commit latest preview to main block table and clear all previews
+    db_commit_latest_preview_to_main();
+
+    // Force database commit
+    db_commit();
+
+    SDL_Log("Preview committed successfully! Maze is now permanent in the world.\n");
+    SDL_Log("All preview_blocks have been cleared from preview_blocks table.\n");
 }
 
 void world::process_build_queue() noexcept
 {
-    std::lock_guard<std::mutex> lock(m_maze_build_mutex);
+    std::lock_guard<std::mutex> lock(m_building_mutex);
 
     // Remove completed futures
     m_building_processes.erase(
         std::ranges::remove_if(m_building_processes,
-            [](std::function<void()>& f) { f(); return true; }).begin(), m_building_processes.end());
+                               [](std::function<void()>& f)
+                               {
+                                   f();
+                                   return true;
+                               }).begin(), m_building_processes.end());
 }
 
 bool world::worker_run(worker* w) const noexcept
@@ -807,7 +923,8 @@ int world::chunked(const float x) noexcept
 
 double world::get_time() const noexcept
 {
-    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(m_player->m_configs.start_time) - static_cast<double>(m_player->m_configs.start_ticks)) / 1000.0;
+    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(m_player->m_configs.start_time) - static_cast<
+        double>(m_player->m_configs.start_ticks)) / 1000.0;
 }
 
 float world::time_of_day() const noexcept
@@ -1000,8 +1117,8 @@ int world::hit_test(const int previous, const float x, const float y,
         if (hw > 0)
         {
             if (const auto d = SDL_sqrtf(SDL_powf(static_cast<float>(hx) - x, 2)
-                + SDL_powf(static_cast<float>(hy) - y, 2)
-                + SDL_powf(static_cast<float>(hz) - z, 2));
+                    + SDL_powf(static_cast<float>(hy) - y, 2)
+                    + SDL_powf(static_cast<float>(hz) - z, 2));
                 best == 0 || d < best)
             {
                 best = d;
@@ -1124,7 +1241,7 @@ int world::collide(const int height, float* x, float* y, float* z) const noexcep
 }
 
 bool world::player_intersects_block(const int height, const float x, const float y, const float z,
-    const int hx, const int hy, const int hz) noexcept
+                                    const int hx, const int hy, const int hz) noexcept
 {
     const auto nx = static_cast<int>(SDL_roundf(x));
     const auto ny = static_cast<int>(SDL_roundf(y));
@@ -1255,7 +1372,7 @@ void world::update_dirty_chunks_async() const noexcept
 
                         worker->state = WorkerState::BUSY;
                         worker->cnd.notify_one();
-                        break;  // Assigned one chunk to this worker, move to next worker
+                        break; // Assigned one chunk to this worker, move to next worker
                     }
                 }
             }
@@ -1312,7 +1429,7 @@ void world::occlusion(char neighbors[27], char lights[27], float shades[27], flo
 } // occlusion
 
 void world::light_fill(char* opaque, char* light, const int x, const int y, const int z,
-    int w, const int force) noexcept
+                       int w, const int force) noexcept
 {
 #define XZ_SIZE (BUILD_CHUNK_SIZE * 3 + 2)
 #define XZ_LO (BUILD_CHUNK_SIZE)
@@ -1837,7 +1954,7 @@ void world::force_chunks(player* _player) noexcept
                 auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
                 scene_node* chunk = new scene_node{};
                 background_layer[this->m_next_chunk_slot] = chunk;
-                ++this->m_next_chunk_slot;  // Move to next available slot
+                ++this->m_next_chunk_slot; // Move to next available slot
                 create_chunk(chunk, a, b);
                 gen_chunk_buffer(chunk);
             }
@@ -1915,7 +2032,7 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
             auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
             chunk = new scene_node{};
             background_layer[this->m_next_chunk_slot] = chunk;
-            ++this->m_next_chunk_slot;  // Move to next available slot
+            ++this->m_next_chunk_slot; // Move to next available slot
             init_chunk(chunk, a, b);
         }
         else
@@ -2024,7 +2141,7 @@ void world::unset_sign_face(const int x, const int y, const int z, const int fac
 }
 
 void world::_set_sign(const int p, const int q, const int x, const int y, const int z,
-    const int face, const std::string_view text, const int dirty) const noexcept
+                      const int face, const std::string_view text, const int dirty) const noexcept
 {
     if (text.empty())
     {
@@ -2284,15 +2401,17 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     SDL_strlcpy(text, m_player->m_configs.tag.c_str(), MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
     GLfloat* data = sdl_gl_helper::malloc_faces(5, SDL_strlen(text));
-    const int length = sdl_gl_helper::_gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y), static_cast<float>(z), face,
-                                  text);
+    const int length = sdl_gl_helper::_gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y),
+                                                       static_cast<float>(z), face,
+                                                       text);
     const GLuint buffer = sdl_gl_helper::gen_faces(5, length, data);
     sdl_gl_helper::draw_sign(attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }
 
 void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t buffer,
-    const std::uint32_t sky) const noexcept {
+                       const std::uint32_t sky) const noexcept
+{
     auto [width, height] = m_sdl->get_window_size();
     const auto* s = &this->m_player->m_pos;
     float matrix[16];
@@ -2324,8 +2443,9 @@ void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
         glUseProgram(attrib->program);
         glLineWidth(1);
         glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-        const GLuint wireframe_buffer = sdl_gl_helper::gen_wireframe_buffer(static_cast<float>(hx), static_cast<float>(hy),
-                                                       static_cast<float>(hz), 0.53f);
+        const GLuint wireframe_buffer = sdl_gl_helper::gen_wireframe_buffer(
+            static_cast<float>(hx), static_cast<float>(hy),
+            static_cast<float>(hz), 0.53f);
         sdl_gl_helper::draw_lines(attrib, wireframe_buffer, 3, 24);
         sdl_gl_helper::del_buffer(wireframe_buffer);
     }
@@ -2435,7 +2555,7 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glBindTexture(GL_TEXTURE_2D,     m_textures.get(TextureIdentifier::MAZE).get());
+    glBindTexture(GL_TEXTURE_2D, m_textures.get(TextureIdentifier::MAZE).get());
     glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
     // Build floating plane geometry
@@ -2452,26 +2572,26 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
     // Now rotating +180° from that (or -180° from original flipped):
     // Final result: Original texture is flipped 180°
     float vertices[4][3];
-    vertices[0][0] = 0.0f;          // bottom-left flipped
+    vertices[0][0] = 0.0f; // bottom-left flipped
     vertices[0][1] = 0.0f;
     vertices[0][2] = 0.0f;
-    vertices[1][0] = plane_width;   // bottom-right flipped
+    vertices[1][0] = plane_width; // bottom-right flipped
     vertices[1][1] = 0.0f;
     vertices[1][2] = 0.0f;
-    vertices[2][0] = plane_width;   // top-right flipped
+    vertices[2][0] = plane_width; // top-right flipped
     vertices[2][1] = 0.0f;
     vertices[2][2] = plane_height;
-    vertices[3][0] = 0.0f;          // top-left flipped
+    vertices[3][0] = 0.0f; // top-left flipped
     vertices[3][1] = 0.0f;
     vertices[3][2] = plane_height;
 
     // UV coordinates rotated 180 degrees (both U and V inverted)
     // This rotates the texture image 180 degrees on the plane
     static constexpr float uvs[4][2] = {
-        {1.0f, 0.0f},  // was {0.0f, 1.0f}
-        {0.0f, 0.0f},  // was {1.0f, 1.0f}
-        {0.0f, 1.0f},  // was {1.0f, 0.0f}
-        {1.0f, 1.0f}   // was {0.0f, 0.0f}
+        {1.0f, 0.0f}, // was {0.0f, 1.0f}
+        {0.0f, 0.0f}, // was {1.0f, 1.0f}
+        {0.0f, 1.0f}, // was {1.0f, 0.0f}
+        {1.0f, 1.0f} // was {0.0f, 0.0f}
     };
 
     // Top face normal (points up in +Y direction)
@@ -2495,8 +2615,8 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
         *(d++) = top_normal[2];
 
         // UV coordinates
-        *(d++) = uvs[vert_idx][0];  // U
-        *(d++) = uvs[vert_idx][1];  // V
+        *(d++) = uvs[vert_idx][0]; // U
+        *(d++) = uvs[vert_idx][1]; // V
 
         // AO and light - use full brightness for maze texture
         // AO (0.0 = no darkening, see vertex shader)
@@ -2517,7 +2637,7 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
 }
 
 void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font, const int justify,
-    float x, const float y, const float n, const std::string_view text) const noexcept
+                        float x, const float y, const float n, const std::string_view text) const noexcept
 {
     auto [w, h] = m_sdl->get_window_size();
     float matrix[16];

@@ -644,7 +644,7 @@ void player::initialize_actions()
     m_action_binding[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
         [](player& p, const float dt, mazes::randomizer& rng)
         {
-            constexpr auto PREVIEW_COOLDOWN_MS = 250;  // Faster cooldown for preview
+            constexpr auto PREVIEW_COOLDOWN_MS = 250;
             static auto last_preview_time = SDL_GetTicks();
             const auto current_time = SDL_GetTicks();
 
@@ -712,9 +712,12 @@ void player::initialize_actions()
                 return;
             }
 
-            // Note: process_build_queue() is now called automatically in world::update()
+            // Commit the latest preview to the main world database
+            // This moves blocks from preview_blocks table to the main block table
+            p.m_world->commit_preview_to_world();
+
             p.m_configs.download_ready = true;
-            SDL_Log("Build queued asynchronously\n");
+            SDL_Log("Maze committed to world - press 'E' to generate a new preview\n");
         });
 }
 
