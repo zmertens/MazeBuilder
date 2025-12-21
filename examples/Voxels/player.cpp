@@ -34,16 +34,20 @@
 #include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/wavefront_object_helper.h>
 
-namespace {
+namespace
+{
     // Helper to compute chunk coordinates from world position
-    int chunked(float x) noexcept {
-        constexpr int CHUNK_SIZE = 32;  // BUILD_CHUNK_SIZE from world.cpp
+    int chunked(float x) noexcept
+    {
+        constexpr int CHUNK_SIZE = 32; // BUILD_CHUNK_SIZE from world.cpp
         return static_cast<int>(std::floor(std::round(x) / static_cast<float>(CHUNK_SIZE)));
     }
 
     // Helper to convert block/voxel data to Wavefront OBJ format
-    std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>>& blocks) noexcept {
-        if (blocks.empty()) {
+    std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>>& blocks) noexcept
+    {
+        if (blocks.empty())
+        {
             return "";
         }
 
@@ -56,38 +60,41 @@ namespace {
 
         // Cube vertex offsets (8 vertices per cube)
         static constexpr float cube_vertices[8][3] = {
-            {-0.5f, -0.5f, -0.5f},  // 0
-            { 0.5f, -0.5f, -0.5f},  // 1
-            { 0.5f,  0.5f, -0.5f},  // 2
-            {-0.5f,  0.5f, -0.5f},  // 3
-            {-0.5f, -0.5f,  0.5f},  // 4
-            { 0.5f, -0.5f,  0.5f},  // 5
-            { 0.5f,  0.5f,  0.5f},  // 6
-            {-0.5f,  0.5f,  0.5f}   // 7
+            {-0.5f, -0.5f, -0.5f}, // 0
+            {0.5f, -0.5f, -0.5f}, // 1
+            {0.5f, 0.5f, -0.5f}, // 2
+            {-0.5f, 0.5f, -0.5f}, // 3
+            {-0.5f, -0.5f, 0.5f}, // 4
+            {0.5f, -0.5f, 0.5f}, // 5
+            {0.5f, 0.5f, 0.5f}, // 6
+            {-0.5f, 0.5f, 0.5f} // 7
         };
 
         // Cube face indices (6 faces, 2 triangles each = 6 vertices per face)
         // Faces: front, back, top, bottom, right, left
         static constexpr int cube_faces[6][6] = {
-            {4, 5, 6, 4, 6, 7},  // front  (+Z)
-            {1, 0, 3, 1, 3, 2},  // back   (-Z)
-            {3, 7, 6, 3, 6, 2},  // top    (+Y)
-            {0, 1, 5, 0, 5, 4},  // bottom (-Y)
-            {1, 2, 6, 1, 6, 5},  // right  (+X)
-            {0, 4, 7, 0, 7, 3}   // left   (-X)
+            {4, 5, 6, 4, 6, 7}, // front  (+Z)
+            {1, 0, 3, 1, 3, 2}, // back   (-Z)
+            {3, 7, 6, 3, 6, 2}, // top    (+Y)
+            {0, 1, 5, 0, 5, 4}, // bottom (-Y)
+            {1, 2, 6, 1, 6, 5}, // right  (+X)
+            {0, 4, 7, 0, 7, 3} // left   (-X)
         };
 
         int vertex_count = 0;
 
         // Generate vertices and faces for each block
-        for (const auto& [x, y, z, w] : blocks) {
+        for (const auto& [x, y, z, w] : blocks)
+        {
             // Skip air blocks (w == 0)
-            if (w == 0) {
+            if (w == 0)
+            {
                 continue;
             }
 
             // Write vertices for this cube
-            for (int v = 0; v < 8; ++v) {
+            for (int v = 0; v < 8; ++v)
+            {
                 float vx = static_cast<float>(x) + cube_vertices[v][0];
                 float vy = static_cast<float>(y) + cube_vertices[v][1];
                 float vz = static_cast<float>(z) + cube_vertices[v][2];
@@ -95,15 +102,18 @@ namespace {
             }
 
             // Write faces for this cube (all 6 faces)
-            for (int face = 0; face < 6; ++face) {
+            for (int face = 0; face < 6; ++face)
+            {
                 result << "f";
-                for (int i = 0; i < 3; ++i) {
+                for (int i = 0; i < 3; ++i)
+                {
                     result << " " << (vertex_count + cube_faces[face][i] + 1);
                 }
                 result << "\n";
 
                 result << "f";
-                for (int i = 3; i < 6; ++i) {
+                for (int i = 3; i < 6; ++i)
+                {
                     result << " " << (vertex_count + cube_faces[face][i] + 1);
                 }
                 result << "\n";
@@ -255,7 +265,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_UP)
     {
-
     }
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
@@ -303,7 +312,6 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
 
 void player::update(float delta_time, mazes::randomizer& rng) noexcept
 {
-
 }
 
 void player::draw() const noexcept
@@ -343,8 +351,8 @@ void player::handle_realtime_input(command_queue& commands)
                 // Check for disablement
                 if (m_is_on_auto_run &&
                     (action == PlayerAction::MOVE_LEFT ||
-                     action == PlayerAction::MOVE_RIGHT ||
-                     action == PlayerAction::MOVE_BACKWARD))
+                        action == PlayerAction::MOVE_RIGHT ||
+                        action == PlayerAction::MOVE_BACKWARD))
                 {
                     m_is_on_auto_run = false;
                 }
@@ -614,13 +622,13 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::COPY_BLOCK].action = derived_action<player>(
-    [this](const player& p, float dt, mazes::randomizer& rng)
-    {
-        if (p.m_world)
+        [this](const player& p, float dt, mazes::randomizer& rng)
         {
-            on_middle_click();
-        }
-    });
+            if (p.m_world)
+            {
+                on_middle_click();
+            }
+        });
 
 
     m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
@@ -812,8 +820,8 @@ float player::lerp(float a, float b, float t) noexcept
 std::string player::artifacts() const noexcept
 {
     // Check if database is enabled
-    if (!get_db_enabled()) {
-
+    if (!get_db_enabled())
+    {
         return "";
     }
 

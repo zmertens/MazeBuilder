@@ -16,12 +16,13 @@
 #include <vector>
 #include <algorithm>
 
-namespace {
-
+namespace
+{
     /// Create a rotated copy of RGBA texture data (180 degrees)
     std::vector<std::uint8_t> create_rotated_180(const std::uint8_t* data, int width, int height) noexcept
     {
-        if (data == nullptr || width <= 0 || height <= 0) {
+        if (data == nullptr || width <= 0 || height <= 0)
+        {
             return {};
         }
 
@@ -31,7 +32,8 @@ namespace {
         const int total_pixels = width * height;
 
         // Copy pixels in reverse order
-        for (int i = 0; i < total_pixels; ++i) {
+        for (int i = 0; i < total_pixels; ++i)
+        {
             const int src_idx = i * 4;
             const int dst_idx = (total_pixels - 1 - i) * 4;
 
@@ -45,7 +47,7 @@ namespace {
     }
 } // anonymous namespace
 
-texture::texture(texture &&other) noexcept
+texture::texture(texture&& other) noexcept
 {
     m_texture = other.m_texture;
     m_width = other.m_width;
@@ -58,7 +60,7 @@ texture::texture(texture &&other) noexcept
     other.m_pixel_data = nullptr;
 }
 
-texture &texture::operator=(texture &&other) noexcept
+texture& texture::operator=(texture&& other) noexcept
 {
     if (this != &other)
     {
@@ -133,8 +135,8 @@ bool texture::load_from_file(const std::string_view filepath, const std::uint32_
     }
 
     // Force RGBA (4 components) for consistency
-    auto *data = stbi_load_from_memory(buffer.data(), static_cast<int>(buffer.size()),
-        &width, &height, &n, 4);
+    auto* data = stbi_load_from_memory(buffer.data(), static_cast<int>(buffer.size()),
+                                       &width, &height, &n, 4);
 
     if (data == nullptr)
     {
@@ -194,7 +196,7 @@ bool texture::load_target(const int w, const int h) noexcept
 
     // Create empty texture for render target
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
-        w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+                 w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
 
     if (const GLenum error = glGetError(); error != GL_NO_ERROR)
     {
@@ -212,7 +214,7 @@ bool texture::load_target(const int w, const int h) noexcept
 /// @param channel_offset texture unit offset (default 0)
 /// @param rotate_180 if true, rotate texture 180 degrees (default false)
 bool texture::load_from_memory(const std::uint8_t* data, const int width, const int height,
-    const std::uint32_t channel_offset, const bool rotate_180) noexcept
+                               const std::uint32_t channel_offset, const bool rotate_180) noexcept
 {
     if (data == nullptr || width <= 0 || height <= 0)
     {
@@ -251,7 +253,7 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
 
     // Upload texture data - RGBA format (potentially rotated)
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0,
-        GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
+                 GL_RGBA, GL_UNSIGNED_BYTE, upload_data);
 
     // Generate mipmaps
     glGenerateMipmap(GL_TEXTURE_2D);
@@ -277,7 +279,7 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
 /// @param channel_offset texture unit offset
 /// @param rotate_180 if true, rotate texture 180 degrees (default false)
 bool texture::update_from_memory(const std::uint8_t* data, const int width, const int height,
-    const std::uint32_t channel_offset, const bool rotate_180) noexcept
+                                 const std::uint32_t channel_offset, const bool rotate_180) noexcept
 {
     if (data == nullptr || width <= 0 || height <= 0)
     {
@@ -289,8 +291,8 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     if (width > MAX_TEXTURE_WIDTH || height > MAX_TEXTURE_HEIGHT)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-            "Texture dimensions %dx%d exceed maximum %dx%d\n",
-            width, height, MAX_TEXTURE_WIDTH, MAX_TEXTURE_HEIGHT);
+                     "Texture dimensions %dx%d exceed maximum %dx%d\n",
+                     width, height, MAX_TEXTURE_WIDTH, MAX_TEXTURE_HEIGHT);
         return false;
     }
 
@@ -322,7 +324,7 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     glActiveTexture(GL_TEXTURE0 + channel_offset);
     glBindTexture(GL_TEXTURE_2D, m_texture);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
-        GL_UNSIGNED_BYTE, upload_data);
+                    GL_UNSIGNED_BYTE, upload_data);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     if (const GLenum error = glGetError(); error != GL_NO_ERROR)
@@ -334,9 +336,9 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     return true;
 }
 
-bool texture::load_bmp_icon(SDL_Window *window, const std::string_view filepath) noexcept
+bool texture::load_bmp_icon(SDL_Window* window, const std::string_view filepath) noexcept
 {
-    if (SDL_Surface *bmp_surface = SDL_LoadBMP(filepath.data()))
+    if (SDL_Surface* bmp_surface = SDL_LoadBMP(filepath.data()))
     {
         SDL_SetWindowIcon(window, bmp_surface);
         SDL_DestroySurface(bmp_surface);

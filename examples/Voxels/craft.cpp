@@ -484,12 +484,12 @@ struct craft::craft_impl
 
             textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
-                static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
+                           static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
 
             // Initialize MAZE texture with 1x1 white pixel placeholder
-            constexpr std::uint8_t white_pixel[4] = { 255, 255, 255, 255 };
+            constexpr std::uint8_t white_pixel[4] = {255, 255, 255, 255};
             textures->load(TextureIdentifier::MAZE, 1, 1, white_pixel,
-                static_cast<unsigned int>(TextureIdentifier::MAZE));
+                           static_cast<unsigned int>(TextureIdentifier::MAZE));
 
             textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
             textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
@@ -604,7 +604,8 @@ struct craft::craft_impl
                     m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
                     return true;
                 });
-            for (auto i{ static_cast<int>(mazes::algo::BINARY_TREE) }; i < static_cast<int>(mazes::algo::TOTAL); ++i) {
+            for (auto i{static_cast<int>(mazes::algo::BINARY_TREE)}; i < static_cast<int>(mazes::algo::TOTAL); ++i)
+            {
                 algo_list.emplace_back(mazes::to_sv_from_algo(static_cast<mazes::algo>(i)));
             }
         }
@@ -654,7 +655,7 @@ struct craft::craft_impl
                     if (ImGui::BeginTabItem("Main"))
                     {
                         if (current_configs.download_ready && ImGui::Button("Download mazes",
-                            ImVec2(220, 40)))
+                                                                            ImVec2(220, 40)))
                         {
                             handle_artifacts(p);
                         }
@@ -738,15 +739,19 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        if (ImGui::TreeNode("Algo")) {
-                            auto preview{ selected_algo };
+                        if (ImGui::TreeNode("Algo"))
+                        {
+                            auto preview{selected_algo};
                             ImGui::NewLine();
                             if (constexpr ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft |
-                                ImGuiComboFlags_WidthFitPreview;
-                                ImGui::BeginCombo("algorithm", preview.data(), combo_flags)) {
-                                for (const auto& itr : algo_list) {
+                                    ImGuiComboFlags_WidthFitPreview;
+                                ImGui::BeginCombo("algorithm", preview.data(), combo_flags))
+                            {
+                                for (const auto& itr : algo_list)
+                                {
                                     const bool is_selected = (mazes::to_algo_from_sv(itr) == maze_config.algo_id());
-                                    if (ImGui::Selectable(std::string{itr}.c_str(), is_selected)) {
+                                    if (ImGui::Selectable(std::string{itr}.c_str(), is_selected))
+                                    {
                                         maze_config.algo_id(mazes::to_algo_from_sv(itr));
                                         selected_algo = itr;
                                     }
@@ -1009,9 +1014,9 @@ struct craft::craft_impl
     {
         std::vector<std::string> timestamp_parts;
         const auto& itr = mazes::string_utils::split(p->get_local_time().begin(),
-            p->get_local_time().end(), timestamp_parts, ':');
+                                                     p->get_local_time().end(), timestamp_parts, ':');
         const auto timestamp = mazes::string_utils::format("{}_{}",
-            timestamp_parts.at(0), timestamp_parts.at(2));
+                                                           timestamp_parts.at(0), timestamp_parts.at(2));
         const auto rows = std::to_string(p->m_configs.maze.rows());
         const auto columns = std::to_string(p->m_configs.maze.columns());
         const auto levels = std::to_string(p->m_configs.maze.levels());
@@ -1019,7 +1024,7 @@ struct craft::craft_impl
         std::string filename;
         filename.reserve(128);
         filename = rows + "x" + columns + "x" + levels + "_" +
-                   p->get_name() + "_" + std::string(timestamp) + ".obj";
+            p->get_name() + "_" + std::string(timestamp) + ".obj";
 
         return filename;
     }
@@ -1032,9 +1037,9 @@ struct craft::craft_impl
         if (artifacts.empty())
         {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                "Failed to generate artifacts.\n");
+                         "Failed to generate artifacts.\n");
             p->m_configs.download_ready = false;
-            return ;
+            return;
         }
 
         constexpr mazes::io_utils io_things{};

@@ -205,10 +205,10 @@ void sdl_gl_helper::print_opengl_info() noexcept
 
 std::string sdl_gl_helper::load_file_to_string(std::string_view path) noexcept
 {
-    
     // Open binary file
     SDL_IOStream* io = SDL_IOFromFile(path.data(), "r");
-    if (io == nullptr) {
+    if (io == nullptr)
+    {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_IOFromFile failed: %s", SDL_GetError());
         return "";
     }
@@ -216,7 +216,8 @@ std::string sdl_gl_helper::load_file_to_string(std::string_view path) noexcept
     // Allocate memory for the file content + null terminator
     const auto data = static_cast<char*>(SDL_malloc(data_size + 1));
 
-    if (data == nullptr) {
+    if (data == nullptr)
+    {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL_malloc failed: %s", SDL_GetError());
         SDL_CloseIO(io);
         return "";
@@ -226,14 +227,16 @@ std::string sdl_gl_helper::load_file_to_string(std::string_view path) noexcept
     // SDL_ReadIO returns the number of bytes read, or 0 on error or end of file
     int nb_read_total = 0, nb_read_size = 1;
     auto buf = data;
-    while (nb_read_total < data_size && nb_read_size != 0) {
+    while (nb_read_total < data_size && nb_read_size != 0)
+    {
         nb_read_size = SDL_ReadIO(io, buf, (data_size - nb_read_total));
         nb_read_total += nb_read_size;
         buf += nb_read_size;
     }
 
     SDL_CloseIO(io);
-    if (nb_read_total != data_size) {
+    if (nb_read_total != data_size)
+    {
         SDL_free(data);
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to read complete file: %s", SDL_GetError());
         return "";
@@ -321,7 +324,8 @@ std::uint32_t sdl_gl_helper::gen_wireframe_buffer(const float x, const float y, 
     return gen_buffer(sizeof(data), data);
 }
 
-std::uint32_t sdl_gl_helper::gen_cube_buffer(const float x, const float y, const float z, const float n, const int w) noexcept
+std::uint32_t sdl_gl_helper::gen_cube_buffer(const float x, const float y, const float z, const float n,
+                                             const int w) noexcept
 {
     GLfloat* data = malloc_faces(10, 6);
     float ao[6][4] = {0};
@@ -338,7 +342,7 @@ std::uint32_t sdl_gl_helper::gen_cube_buffer(const float x, const float y, const
 }
 
 std::uint32_t sdl_gl_helper::gen_plant_buffer(const float x, const float y, const float z, const float n,
-                                      const int w) noexcept
+                                              const int w) noexcept
 {
     GLfloat* data = malloc_faces(10, 4);
     float ao = 0;
@@ -348,14 +352,15 @@ std::uint32_t sdl_gl_helper::gen_plant_buffer(const float x, const float y, cons
 }
 
 std::uint32_t sdl_gl_helper::gen_player_buffer(const float x, const float y, const float z, const float rx,
-                                       const float ry) noexcept
+                                               const float ry) noexcept
 {
     GLfloat* data = malloc_faces(10, 6);
     make_player(data, x, y, z, rx, ry);
     return gen_faces(10, 6, data);
 }
 
-std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float n, const std::string_view text) noexcept
+std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float n,
+                                             const std::string_view text) noexcept
 {
     const auto length = static_cast<GLsizei>(text.size());
     GLfloat* data = malloc_faces(4, length);
@@ -368,7 +373,7 @@ std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float
 }
 
 int sdl_gl_helper::_gen_sign_buffer(float* data, const float x, const float y, const float z,
-    const int face, const std::string_view text) noexcept
+                                    const int face, const std::string_view text) noexcept
 {
     auto tokenize = [](char* str, const char* delim, char** key)-> char*
     {
@@ -553,7 +558,8 @@ void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
     chunk->sign_faces = static_cast<int>(faces);
 }
 
-std::uint32_t sdl_gl_helper::gen_sky_buffer() noexcept {
+std::uint32_t sdl_gl_helper::gen_sky_buffer() noexcept
+{
     float data[12288];
     make_sphere(data, 1, 3);
     return gen_buffer(sizeof(data), data);

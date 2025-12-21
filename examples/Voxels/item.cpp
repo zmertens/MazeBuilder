@@ -143,67 +143,78 @@ std::array<int, item::TOTAL_PLANTS> item::plants = {
     52, // 21 - sun flower
     53, // 22 - white flower
     54, // 23 - blue flower
-    0,  // 24 - SDL_LOGO
-    0,  // 25 - SFML_LOGO
+    0, // 24 - SDL_LOGO
+    0, // 25 - SFML_LOGO
     57, // 26 - cactus 1
     58, // 27 - cactus 2
 };
 
-bool item::is_plant(const int w) noexcept {
-    switch (w) {
-        case TALL_GRASS:
-        case YELLOW_FLOWER:
-        case RED_FLOWER:
-        case PURPLE_FLOWER:
-        case SUN_FLOWER:
-        case WHITE_FLOWER:
-        case BLUE_FLOWER:
-        case CACTUS_1:
-        case CACTUS_2:
-            return true;
-        default:
-            return false;
-    }
-}
-
-bool item::is_obstacle(int w) noexcept {
-    w = SDL_abs(w);
-    if (is_plant(w)) {
+bool item::is_plant(const int w) noexcept
+{
+    switch (w)
+    {
+    case TALL_GRASS:
+    case YELLOW_FLOWER:
+    case RED_FLOWER:
+    case PURPLE_FLOWER:
+    case SUN_FLOWER:
+    case WHITE_FLOWER:
+    case BLUE_FLOWER:
+    case CACTUS_1:
+    case CACTUS_2:
+        return true;
+    default:
         return false;
     }
-    switch (w) {
-        case EMPTY:
-        case CLOUD:
-            return false;
-        default:
-            return true;
+}
+
+bool item::is_obstacle(int w) noexcept
+{
+    w = SDL_abs(w);
+    if (is_plant(w))
+    {
+        return false;
+    }
+    switch (w)
+    {
+    case EMPTY:
+    case CLOUD:
+        return false;
+    default:
+        return true;
     }
 }
 
-bool item::is_transparent(int w) noexcept {
-    if (w == EMPTY) {
+bool item::is_transparent(int w) noexcept
+{
+    if (w == EMPTY)
+    {
         return true;
     }
     w = SDL_abs(w);
-    if (is_plant(w)) {
+    if (is_plant(w))
+    {
         return true;
     }
-    switch (w) {
-        case EMPTY:
-        case GLASS:
-        case LEAVES:
-            return true;
-        default:
-            return false;
+    switch (w)
+    {
+    case EMPTY:
+    case GLASS:
+    case LEAVES:
+        return true;
+    default:
+        return false;
     }
 }
 
-bool item::is_destructable(const int w) noexcept {
-    switch (w) {
-        case EMPTY:
-        case CLOUD:
-            return false;
-        default:
-            return true;
+bool item::is_destructable(const int w) noexcept
+{
+    switch (w)
+    {
+    case EMPTY:
+    case CLOUD:
+        return false;
+    default:
+        return true;
     }
 }

@@ -775,7 +775,6 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
         if (!preview_blocks.empty())
         {
             db_insert_preview_blocks(preview_id, preview_blocks);
-
         }
     };
 
