@@ -3,7 +3,6 @@
 
 #include <array>
 #include <functional>
-#include <future>
 #include <memory>
 #include <optional>
 #include <string>
@@ -55,9 +54,8 @@ public:
     void destroy_world();
 
     bool update_preview(mazes::grid_interface* g) const noexcept;
-    void finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data,
+    void finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                                   int width, int height, int scale,
-                                  int target_x, int target_y, int target_z, int target_face,
                                   int wall_height, int item_type) noexcept;
     void process_build_queue() noexcept;
 
@@ -192,7 +190,7 @@ private:
 
     std::uint32_t m_sky_buffer;
 
-    std::vector<std::future<void>> m_maze_build_futures;
+    std::vector<std::function<void()>> m_building_processes;
     mutable std::mutex m_maze_build_mutex;
 };
 

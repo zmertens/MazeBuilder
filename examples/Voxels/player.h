@@ -30,7 +30,7 @@ enum class PlayerAction
     COPY_BLOCK,
     DESTROY_BLOCK,
     PLACE_LIGHT,
-    DOWNLOAD_MAZE,
+    PLACE_MAZE,
     PREVIEW_MAZE,
     DONE,
     COUNT

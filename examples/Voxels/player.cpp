@@ -183,7 +183,7 @@ player::player()
     assign_key(PlayerAction::FLY, SDL_SCANCODE_TAB);
     assign_key(PlayerAction::PLACE_LIGHT, SDL_SCANCODE_LCTRL);
     assign_key(PlayerAction::TAG_SIGN, SDL_SCANCODE_T);
-    assign_key(PlayerAction::DOWNLOAD_MAZE, SDL_SCANCODE_B);
+    assign_key(PlayerAction::PLACE_MAZE, SDL_SCANCODE_B);
     assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
 
     m_configs.day_length = DAY_LENGTH;
@@ -676,15 +676,11 @@ void player::initialize_actions()
                         const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
                         // Queue async block placement
-                        p.m_world->finalize_and_build_async(
+                        p.m_world->finalize_buildings(
                             pixel_data,
                             width,
                             height,
                             scale,
-                            p.m_world->m_projected_plane.target_x,
-                            p.m_world->m_projected_plane.target_y,
-                            p.m_world->m_projected_plane.target_z,
-                            p.m_world->m_projected_plane.target_face,
                             p.m_configs.maze.levels(),
                             p.get_item()
                         );
@@ -700,7 +696,7 @@ void player::initialize_actions()
             }
         });
 
-    m_action_binding[PlayerAction::DOWNLOAD_MAZE].action = derived_action<player>(
+    m_action_binding[PlayerAction::PLACE_MAZE].action = derived_action<player>(
         [](player& p, const float dt, mazes::randomizer& rng)
         {
             if (!p.m_world)

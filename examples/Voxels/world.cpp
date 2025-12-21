@@ -68,7 +68,7 @@ enum class WorkerState : int
 
 struct worker {
     int index{};
-    WorkerState state;
+    WorkerState state{WorkerState::IDLE};
     std::thread thrd;
     std::mutex mtx;
     std::condition_variable cnd;
@@ -377,7 +377,6 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
         action(*m_player, delta_time, std::ref(rng));
     }
 
-    // Process async maze build queue (clean up completed futures)
     process_build_queue();
 
     // Apply gravity as continuous force (convert delta_time from ms to seconds)
@@ -656,19 +655,17 @@ bool world::update_preview(mazes::grid_interface* g) const noexcept
     return true;
 }
 
-void world::finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data,
+void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                                      int width, int height, int scale,
-                                     const int target_x, const int target_y, const int target_z,
-                                     const int target_face,
                                      int wall_height, int item_type) noexcept
 {
     // Calculate base position from target face
-    int base_x = target_x;
-    int base_y = target_y;
-    int base_z = target_z;
+    int base_x = m_projected_plane.target_x;
+    int base_y = m_projected_plane.target_y;
+    int base_z = m_projected_plane.target_z;
 
     // Adjust position based on which face was targeted
-    switch (target_face)
+    switch (m_projected_plane.target_face)
     {
         case 0: base_x -= 1; break; // Left face (-X)
         case 1: base_x += 1; break; // Right face (+X)
@@ -679,15 +676,7 @@ void world::finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data
         default: base_y += 1; break; // Fallback to top
     }
 
-    // Create a future for async block placement
-    // For web builds, use deferred execution to avoid blocking the main thread
-    // For native builds, use true async execution
-#if defined(__EMSCRIPTEN__)
-    auto future_build = std::async(std::launch::deferred, [this, pixel_data, width, height, scale,
-#else
-    auto future_build = std::async(std::launch::async, [this, pixel_data, width, height, scale,
-#endif
-                                                   base_x, base_y, base_z, wall_height, item_type]()
+   auto build_func = [this, pixel_data, width, height, scale, base_x, base_y, base_z, wall_height, item_type]()
     {
         // Calculate logical maze dimensions
         const int logical_width = width / scale;
@@ -729,17 +718,11 @@ void world::finalize_and_build_async(const std::vector<std::uint8_t>& pixel_data
                 }
             }
         }
-
-        SDL_Log("Async building placement complete: %d blocks placed\n", blocks_placed);
-        SDL_Log("  Build covers: X[%d..%d] Y[%d..%d] Z[%d..%d]\n",
-               base_x, base_x + logical_width - 1,
-               base_y, base_y + wall_height - 1,
-               base_z, base_z + logical_height - 1);
-    });
+    };
 
     // Add future to queue
     std::lock_guard<std::mutex> lock(m_maze_build_mutex);
-    m_maze_build_futures.push_back(std::move(future_build));
+    m_building_processes.emplace_back(build_func);
 }
 
 void world::process_build_queue() noexcept
@@ -747,46 +730,9 @@ void world::process_build_queue() noexcept
     std::lock_guard<std::mutex> lock(m_maze_build_mutex);
 
     // Remove completed futures
-    m_maze_build_futures.erase(
-        std::ranges::remove_if(m_maze_build_futures,
-                               [](std::future<void>& f) {
-                                   if (!f.valid())
-                                   {
-                                       return true;
-                                   }
-
-                                   // Non-blocking check if future is ready
-                                   const auto status = f.wait_for(std::chrono::milliseconds(0));
-
-                                   // If ready, clean it up
-                                   if (status == std::future_status::ready)
-                                   {
-                                       // Call get() to retrieve any exceptions and clean up
-                                       try {
-                                           f.get();
-                                       } catch (const std::exception& e) {
-                                           SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
-                                               "Error in maze build future: %s\n", e.what());
-                                       }
-                                       return true;
-                                   }
-
-                                   return false;
-                               }).begin(),
-        m_maze_build_futures.end()
-    );
-
-#if defined(__EMSCRIPTEN__)
-    // For web builds with deferred execution, we need to explicitly trigger execution
-    // Process one deferred task per frame to avoid blocking
-    if (!m_maze_build_futures.empty())
-    {
-        // The deferred future will execute when we check its status
-        // This allows incremental execution without blocking the main thread
-        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION,
-            "Processing deferred maze builds: %zu remaining\n", m_maze_build_futures.size());
-    }
-#endif
+    m_building_processes.erase(
+        std::ranges::remove_if(m_building_processes,
+            [](std::function<void()>& f) { f(); return true; }).begin(), m_building_processes.end());
 }
 
 bool world::worker_run(worker* w) const noexcept
