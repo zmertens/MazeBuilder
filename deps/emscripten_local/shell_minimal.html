@@ -111,14 +111,6 @@
         <div class="spinner" id='spinner'></div>
         <div class="emscripten" id="status">Downloading...</div>
 
-        <span id='controls'>
-            <span><input type="checkbox" id="resize" checked>Resize canvas</span>
-            <span><input type="checkbox" id="pointerLock" checked>Lock/hide mouse pointer &nbsp;&nbsp;&nbsp;</span>
-            <span><input type="button" value="Fullscreen" onclick="Module.requestFullscreen(document.getElementById('pointerLock').checked,
-                                                                                      document.getElementById('resize').checked)">
-            </span>
-        </span>
-
         <div class="emscripten">
             <progress value="0" max="100" id="progress" hidden=1></progress>
         </div>
@@ -164,32 +156,6 @@
                     }
                 },
                 canvas: canvasElement,
-                requestFullscreen(lockPointer, resizeCanvas) {
-                    // Browser compatibility for requestFullscreen
-                    var canvas = Module.canvas;
-
-                    function fullscreenChange() {
-                        if (document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement) {
-                            canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock || canvas.webkitRequestPointerLock || canvas.msRequestPointerLock || function () {
-                            };
-                            if (lockPointer) canvas.requestPointerLock();
-                        }
-                    }
-
-                    document.addEventListener('fullscreenchange', fullscreenChange, false);
-                    document.addEventListener('webkitfullscreenchange', fullscreenChange, false);
-                    document.addEventListener('mozfullscreenchange', fullscreenChange, false);
-
-                    if (canvas.requestFullscreen) {
-                        canvas.requestFullscreen();
-                    } else if (canvas.webkitRequestFullscreen) {
-                        canvas.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
-                    } else if (canvas.mozRequestFullScreen) {
-                        canvas.mozRequestFullScreen();
-                    } else if (canvas.msRequestFullscreen) {
-                        canvas.msRequestFullscreen();
-                    }
-                },
                 setStatus(text) {
                     if (!Module.setStatus.last) Module.setStatus.last = {time: Date.now(), text: ''};
                     if (text === Module.setStatus.last.text) return;

@@ -188,7 +188,6 @@ private:
     std::uint32_t m_sky_buffer;
 
     std::vector<std::function<void()>> m_building_processes;
-    mutable std::mutex m_building_mutex;
 
     // Preview tracking - increments with each preview, committed with 'B' key
     int m_current_preview_id = 0;

@@ -36,13 +36,6 @@
 
 namespace
 {
-    // Helper to compute chunk coordinates from world position
-    int chunked(float x) noexcept
-    {
-        constexpr int CHUNK_SIZE = 32; // BUILD_CHUNK_SIZE from world.cpp
-        return static_cast<int>(std::floor(std::round(x) / static_cast<float>(CHUNK_SIZE)));
-    }
-
     // Helper to convert block/voxel data to Wavefront OBJ format
     std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>>& blocks) noexcept
     {
@@ -693,7 +686,7 @@ void player::initialize_actions()
                             p.get_item()
                         );
 
-                        p.m_configs.show_download_button = true;
+                        p.m_configs.download_ready = true;
                         p.m_last_maze_generation_time = SDL_GetTicks();
                     }
                     else
@@ -822,16 +815,23 @@ std::string player::artifacts() const noexcept
     // Check if database is enabled
     if (!get_db_enabled())
     {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Database not enabled for artifacts export\n");
         return "";
     }
 
     // Calculate player's chunk coordinates
-    const int player_chunk_p = chunked(m_pos.x);
-    const int player_chunk_q = chunked(m_pos.z);
-
-    // Query blocks from nearby chunks (radius of 2 chunks = 5x5 chunk area)
-    constexpr int chunk_radius = 2;
+    const int player_chunk_p = m_world->chunked(m_pos.x);
+    const int player_chunk_q = m_world->chunked(m_pos.z);
+    // Query blocks from nearby chunks - increased radius for better coverage
+    // Radius of 4 chunks = 9x9 chunk area (~2304 blocks if fully populated)
+    constexpr int chunk_radius = 4;
     const auto blocks = db_query_blocks_near_chunks(player_chunk_p, player_chunk_q, chunk_radius);
+
+    if (blocks.empty())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No blocks found in database for export\n");
+        return "";
+    }
 
     // Convert blocks to Wavefront OBJ format
     return blocks_to_wavefront_obj(blocks);

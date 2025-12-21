@@ -778,8 +778,6 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
         }
     };
 
-    // Add future to queue
-    std::lock_guard<std::mutex> lock(m_building_mutex);
     m_building_processes.emplace_back(build_func);
 }
 
@@ -804,8 +802,6 @@ void world::commit_preview_to_world() noexcept
         return;
     }
 
-    SDL_Log("Building preview_id %d: Reading blocks from preview_blocks DB...\n", latest_preview_id);
-
     // Get all preview blocks from the database
     auto blocks_to_build = db_get_all_preview_blocks(latest_preview_id);
 
@@ -824,22 +820,15 @@ void world::commit_preview_to_world() noexcept
         blocks_placed++;
     }
 
-    SDL_Log("Built %d blocks in the world!\n", blocks_placed);
-
     // Commit latest preview to main block table and clear all previews
     db_commit_latest_preview_to_main();
 
     // Force database commit
     db_commit();
-
-    SDL_Log("Preview committed successfully! Maze is now permanent in the world.\n");
-    SDL_Log("All preview_blocks have been cleared from preview_blocks table.\n");
 }
 
 void world::process_build_queue() noexcept
 {
-    std::lock_guard<std::mutex> lock(m_building_mutex);
-
     // Remove completed futures
     m_building_processes.erase(
         std::ranges::remove_if(m_building_processes,
@@ -1194,7 +1183,6 @@ int world::collide(const int height, float* x, float* y, float* z) const noexcep
     const auto chunk_opt = find_chunk(p, q);
     if (!chunk_opt.has_value())
     {
-        SDL_Log("Could find chunk: %d %d", p, q);
         return result;
     }
     const scene_node* chunk = chunk_opt.value();

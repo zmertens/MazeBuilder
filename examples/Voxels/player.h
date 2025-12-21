@@ -65,7 +65,6 @@ public:
         bool fullscreen{ false };
         bool invert_mouse{ false };
         bool show_stats_window{ true };
-        bool show_download_button{ false };
         bool use_bloom_effect{ false };
         bool vsync{ true };
         float exposure_range{ 0.5f };

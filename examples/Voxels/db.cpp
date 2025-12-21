@@ -251,8 +251,6 @@ void db_flush()
         return;
     }
 
-    SDL_Log("Flushing database - clearing all world data\n");
-
     // Execute DELETE statements to clear all tables
     const char* flush_query =
         "delete from state;"
@@ -557,34 +555,56 @@ std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int cent
 
     if (!db_enabled)
     {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Database not enabled, cannot query blocks\n");
         return blocks;
     }
 
     load_mtx.lock();
 
     // Query blocks from chunks within radius of center chunk
-    const char* query = "select x, y, z, w from block where p >= ? and p <= ? and q >= ? and q <= ? limit 10000;";
-    sqlite3_stmt* stmt;
+    // The 'block' table has columns: p, q, x, y, z, w
+    // p, q are chunk coordinates
+    // x, y, z are world block coordinates
+    // w is the block type/ID
+    const char* query =
+        "SELECT x, y, z, w FROM block "
+        "WHERE p >= ? AND p <= ? AND q >= ? AND q <= ? "
+        "AND w > 0 "  // Only non-air blocks
+        "ORDER BY p, q, x, y, z "
+        "LIMIT 50000;";  // Increased limit for larger exports
 
-    if (sqlite3_prepare_v2(db, query, -1, &stmt, nullptr) == SQLITE_OK)
+    sqlite3_stmt* stmt = nullptr;
+
+    int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
+    if (rc != SQLITE_OK)
     {
-        sqlite3_bind_int(stmt, 1, center_p - radius);
-        sqlite3_bind_int(stmt, 2, center_p + radius);
-        sqlite3_bind_int(stmt, 3, center_q - radius);
-        sqlite3_bind_int(stmt, 4, center_q + radius);
-
-        while (sqlite3_step(stmt) == SQLITE_ROW)
-        {
-            int x = sqlite3_column_int(stmt, 0);
-            int y = sqlite3_column_int(stmt, 1);
-            int z = sqlite3_column_int(stmt, 2);
-            int w = sqlite3_column_int(stmt, 3);
-            blocks.emplace_back(x, y, z, w);
-        }
-
-        sqlite3_finalize(stmt);
+        SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                     "Failed to prepare block query: %s\n",
+                     sqlite3_errmsg(db));
+        load_mtx.unlock();
+        return blocks;
     }
 
+    // Bind parameters
+    sqlite3_bind_int(stmt, 1, center_p - radius);
+    sqlite3_bind_int(stmt, 2, center_p + radius);
+    sqlite3_bind_int(stmt, 3, center_q - radius);
+    sqlite3_bind_int(stmt, 4, center_q + radius);
+
+    // Execute query and collect results
+    int row_count = 0;
+    while (sqlite3_step(stmt) == SQLITE_ROW)
+    {
+        int x = sqlite3_column_int(stmt, 0);
+        int y = sqlite3_column_int(stmt, 1);
+        int z = sqlite3_column_int(stmt, 2);
+        int w = sqlite3_column_int(stmt, 3);
+
+        blocks.emplace_back(x, y, z, w);
+        row_count++;
+    }
+
+    sqlite3_finalize(stmt);
     load_mtx.unlock();
 
     return blocks;
@@ -691,8 +711,6 @@ void db_insert_preview_blocks(int preview_id, const std::vector<std::tuple<int, 
 
     sqlite3_exec(db, "commit;", nullptr, nullptr, nullptr);
     load_mtx.unlock();
-
-    SDL_Log("Inserted %zu preview blocks with preview_id %d\n", blocks.size(), preview_id);
 }
 
 // Load preview blocks for a specific chunk and preview_id
@@ -769,8 +787,6 @@ void db_commit_latest_preview_to_main()
         sqlite3_finalize(move_stmt);
 
         const int moved_count = sqlite3_changes(db);
-        SDL_Log("Committed %d preview blocks (preview_id %d) to main block table\n",
-                moved_count, latest_preview_id);
     }
 
     // Clear all preview blocks after committing

@@ -44,7 +44,6 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <ranges>
 
@@ -924,8 +923,6 @@ struct craft::craft_impl
     const std::string& INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
-    bool m_show_download_button{false};
-
     std::unique_ptr<state_stack> m_crafting_states;
 
     static std::vector<std::string_view> s_font_names;
@@ -1012,11 +1009,6 @@ struct craft::craft_impl
 
     static std::string make_filename(const player* p) noexcept
     {
-        std::vector<std::string> timestamp_parts;
-        const auto& itr = mazes::string_utils::split(p->get_local_time().begin(),
-                                                     p->get_local_time().end(), timestamp_parts, ':');
-        const auto timestamp = mazes::string_utils::format("{}_{}",
-                                                           timestamp_parts.at(0), timestamp_parts.at(2));
         const auto rows = std::to_string(p->m_configs.maze.rows());
         const auto columns = std::to_string(p->m_configs.maze.columns());
         const auto levels = std::to_string(p->m_configs.maze.levels());
@@ -1024,7 +1016,7 @@ struct craft::craft_impl
         std::string filename;
         filename.reserve(128);
         filename = rows + "x" + columns + "x" + levels + "_" +
-            p->get_name() + "_" + std::string(timestamp) + ".obj";
+            p->get_name() + ".obj";
 
         return filename;
     }
@@ -1053,7 +1045,7 @@ struct craft::craft_impl
 
 #else
         SDL_Log("Web detected: download via calling for artifacts");
-        p->m_configs.show_download_button = false;
+        p->m_configs.download_ready = true;
 #endif
     }
 
