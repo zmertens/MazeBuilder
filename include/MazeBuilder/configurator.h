@@ -1,6 +1,7 @@
 #ifndef CONFIGURATOR_H
 #define CONFIGURATOR_H
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <optional>
@@ -13,8 +14,6 @@
 
 namespace mazes
 {
-    class algo_interface;
-
     /// @file configurator.h
     /// @class configurator
     /// @brief Configuration class for arguments
@@ -58,8 +57,7 @@ namespace mazes
         configurator &rows(unsigned int rows) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
-            m_rows = (rows == 0) ? 1 : (rows > MAX_ROWS) ? MAX_ROWS
-                                                         : rows;
+            m_rows = std::clamp(rows, 1u, MAX_ROWS);
             return *this;
         }
 
@@ -70,8 +68,7 @@ namespace mazes
         configurator &columns(unsigned int columns) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
-            m_columns = (columns == 0) ? 1 : (columns > MAX_COLUMNS) ? MAX_COLUMNS
-                                                                     : columns;
+            m_columns = std::clamp(columns, 1u, MAX_COLUMNS);
             return *this;
         }
 
@@ -84,8 +81,7 @@ namespace mazes
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             // Levels are more memory-intensive than rows/columns, so lower limit
-            m_levels = (levels == 0) ? 1 : (levels > MAX_LEVELS) ? MAX_LEVELS
-                                                                 : levels;
+            m_levels = std::clamp(levels, 1u, MAX_LEVELS);
             return *this;
         }
 
@@ -157,58 +153,99 @@ namespace mazes
         /// @return A reference to this configurator
         configurator &output_format_filename(std::string filename) noexcept
         {
-            m_output_format_filename = std::move(filename);
+            m_output_filename = std::move(filename);
             return *this;
         }
 
+        /// @brief Set the help flag
+        /// @param help 
+        /// @return 
+        configurator &help(bool help) noexcept
+        {
+            m_help = help;
+            return *this;
+        };
+
+        /// @brief Set the version flag
+        /// @param version 
+        /// @return 
+        configurator &version(bool version) noexcept
+        {
+            m_version = version;
+            return *this;
+        };
+
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
-        unsigned int rows() const noexcept { return m_rows.value_or(DEFAULT_ROWS); }
+        [[nodiscard]] unsigned int rows() const noexcept { return m_rows.value_or(DEFAULT_ROWS); }
 
         /// @brief Get the number of columns
         /// @return The number of columns (guaranteed to be > 0)
-        unsigned int columns() const noexcept { return m_columns.value_or(DEFAULT_COLUMNS); }
+        [[nodiscard]] unsigned int columns() const noexcept { return m_columns.value_or(DEFAULT_COLUMNS); }
 
         /// @brief Get the number of levels
         /// @return The number of levels (guaranteed to be > 0)
-        unsigned int levels() const noexcept { return m_levels.value_or(DEFAULT_LEVELS); }
+        [[nodiscard]] unsigned int levels() const noexcept { return m_levels.value_or(DEFAULT_LEVELS); }
 
         /// @brief Get the maze generation algorithm
         /// @return The algorithm used for maze generation
-        algo algo_id() const noexcept { return m_algo_id.value_or(DEFAULT_ALGO_ID); }
+        [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(DEFAULT_ALGO_ID); }
 
         /// @brief Get the block ID
         /// @return The block ID
-        int block_id() const noexcept { return m_block_id.value_or(DEFAULT_BLOCK_ID); }
+        [[nodiscard]] int block_id() const noexcept { return m_block_id.value_or(DEFAULT_BLOCK_ID); }
 
         /// @brief Get the random seed
         /// @return The random seed
-        unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED); }
+        [[nodiscard]] unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED); }
 
         /// @brief Check if distances are calculated
         /// @return True if distances are calculated, false otherwise
-        bool distances() const noexcept { return m_distances.value_or(DEFAULT_DISTANCES); }
+        [[nodiscard]] bool distances() const noexcept { return m_distances.value_or(DEFAULT_DISTANCES); }
 
         /// @brief Get the distance start index
         /// @return The starting cell index for distance calculation
-        int distances_start() const noexcept { return m_distances_start.value_or(DEFAULT_DISTANCES_START); }
+        [[nodiscard]] int distances_start() const noexcept { return m_distances_start.value_or(DEFAULT_DISTANCES_START); }
 
         /// @brief Get the distance end index
         /// @return The ending cell index for distance calculation
-        int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
+        [[nodiscard]] int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
 
         /// @brief Get the output_format ID
         /// @return The output_format ID
-        output_format output_format_id() const noexcept { return m_output_format_id.value_or(DEFAULT_OUTPUT_ID); }
+        [[nodiscard]] output_format output_format_id() const noexcept { return m_output_format_id.value_or(DEFAULT_OUTPUT_ID); }
 
         /// @brief Get the output_format filename
         /// @return The output_format filename
-        std::string output_format_filename() const noexcept { return m_output_format_filename.value_or(std::string{ DEFAULT_FILENAME }); }
+        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{ DEFAULT_FILENAME }); }
+
+        /// @brief Set the computed image width (in pixels) for exported images
+        configurator &image_width(unsigned int width) noexcept
+        {
+            m_image_width = width;
+            return *this;
+        }
+
+        /// @brief Set the computed image height (in pixels) for exported images
+        configurator &image_height(unsigned int height) noexcept
+        {
+            m_image_height = height;
+            return *this;
+        }
+
+        /// @brief Get the computed image width (in pixels) for exported images
+        [[nodiscard]] unsigned int image_width() const noexcept { return m_image_width.value_or(0u); }
+
+        /// @brief Get the computed image height (in pixels) for exported images
+        [[nodiscard]] unsigned int image_height() const noexcept { return m_image_height.value_or(0u); }
+
+        [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
+        [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
         /// @details Checks for potential infinite loop conditions and memory issues
-        bool is_valid() const noexcept
+        [[nodiscard]] bool is_valid() const noexcept
         {
 
             // Check for zero dimensions (would cause infinite loops or divisions by zero)
@@ -226,9 +263,8 @@ namespace mazes
             }
 
             // Check for potential overflow in total cell calculation
-            constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void *);
-
-            if (static_cast<size_t>(m_rows.value()) * m_columns.value() * m_levels.value() > max_cells)
+            if (constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void *);
+                static_cast<size_t>(m_rows.value()) * m_columns.value() * m_levels.value() > max_cells)
             {
                 // Potential overflow detected
                 return false;
@@ -247,12 +283,12 @@ namespace mazes
 
                 return std::make_optional(std::make_unique<dfs>());
             }
-            else if (config.algo_id() == algo::BINARY_TREE)
+            if (config.algo_id() == algo::BINARY_TREE)
             {
 
                 return std::make_optional(std::make_unique<binary_tree>());
             }
-            else if (config.algo_id() == algo::SIDEWINDER)
+            if (config.algo_id() == algo::SIDEWINDER)
             {
 
                 return std::make_optional(std::make_unique<sidewinder>());
@@ -282,7 +318,16 @@ namespace mazes
 
         std::optional<output_format> m_output_format_id;
 
-        std::optional<std::string> m_output_format_filename;
+        std::optional<std::string> m_output_filename;
+
+        // Computed image dimensions for raster exports (PNG/JPEG)
+        std::optional<unsigned int> m_image_width;
+
+        std::optional<unsigned int> m_image_height;
+
+        std::optional<bool> m_help;
+
+        std::optional<bool> m_version;
     };
 
 } // namespace

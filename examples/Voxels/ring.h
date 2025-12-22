@@ -1,7 +1,7 @@
-#ifndef _ring_h_
-#define _ring_h_
+#ifndef RING_H
+#define RING_H
 
-typedef enum {
+enum class RingEntryType {
     BLOCK,
     // Part of a vector
     BLOCKS,
@@ -9,9 +9,9 @@ typedef enum {
     KEY,
     COMMIT,
     EXIT
-} RingEntryType;
+};
 
-typedef struct {
+struct RingEntry {
     RingEntryType type;
     int p;
     int q;
@@ -21,22 +21,22 @@ typedef struct {
     int w;
     int *blocks;
     int key;
-} RingEntry;
+};
 
-typedef struct {
+struct Ring {
     unsigned int capacity;
     unsigned int start;
     unsigned int end;
     RingEntry *data;
-} Ring;
+};
 
 void ring_alloc(Ring *ring, int capacity);
-void ring_free(Ring *ring);
-int ring_empty(Ring *ring);
-int ring_full(Ring *ring);
-int ring_size(Ring *ring);
+void ring_free(const Ring *ring);
+int ring_empty(const Ring *ring);
+int ring_full(const Ring *ring);
+int ring_size(const Ring *ring);
 void ring_grow(Ring *ring);
-void ring_put(Ring *ring, RingEntry *entry);
+void ring_put(Ring *ring, const RingEntry *entry);
 void ring_put_block(Ring *ring, int p, int q, int x, int y, int z, int w);
 void ring_put_blocks(Ring* ring, int* blocks);
 void ring_put_light(Ring *ring, int p, int q, int x, int y, int z, int w);
@@ -45,4 +45,4 @@ void ring_put_commit(Ring *ring);
 void ring_put_exit(Ring *ring);
 int ring_get(Ring *ring, RingEntry *entry);
 
-#endif
+#endif // RING_H

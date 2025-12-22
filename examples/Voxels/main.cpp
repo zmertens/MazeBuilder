@@ -1,47 +1,55 @@
-#include <random>
-#include <stdexcept>
+// Main file for the Maze Builder voxel editor application.
+
 #include <iostream>
-#include <algorithm>
+#include <stdexcept>
 #include <string>
 
 #include <MazeBuilder/maze_builder.h>
 
 #include "craft.h"
 
+// Run the SDL app
+static constexpr auto window_w = 1200, window_h = 800;
+
+const auto title{"Maze Builder 🔧 " + mazes::VERSION};
+
+// Setup for Emscripten/WebAssembly
+// Bind a getter method from C++ so that it can be accessed in the frontend with JS
 #if defined(__EMSCRIPTEN__)
 #include <emscripten/bind.h>
 
-// bind a getter method from C++ so that it can be accessed in the frontend with JS
-EMSCRIPTEN_BINDINGS(maze_builder_module) {
+std::shared_ptr<craft> get()
+{
+    return mazes::singleton_base<craft>::instance(title, window_w, window_h);
+}
+
+EMSCRIPTEN_BINDINGS (craft_module)
+{
+    emscripten::function("get", &get, emscripten::allow_raw_pointers());
     emscripten::class_<craft>("craft")
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
-        .constructor<const std::string&, const std::string&, int, int>()
-        .function("mazes", &craft::mazes)
-        .function("toggle_mouse", &craft::toggle_mouse)
-        .class_function("get_instance", &craft::get_instance, emscripten::allow_raw_pointers());
+        .constructor<const std::string&, int, int>()
+        .function("artifacts", &craft::artifacts)
+        .function("is_download_ready", &craft::is_download_ready)
+        .function("set_download_ready", &craft::set_download_ready);
 }
 #endif
 
-int main(int argc, char* argv[]) {
+int main()
+{
+    try
+    {
+        mazes::randomizer rng;
 
-    using namespace std;
-
-    mazes::randomizer rng;
-
-    try {
-
-        bool success = false;
-        // Run the SDL app
-        static constexpr int window_w = 800, window_h = 600;
-        string my_title { "Maze Builder 🔧" };
-        auto&& voxel_engine = craft::get_instance(cref(my_title), mazes::VERSION, window_w, window_h);
-        success = voxel_engine->run(std::ref(rng));
-        if (!success) {
-            std::cerr << "ERROR: Running SDL app failed." << std::endl;
+        if (const auto voxel_engine = mazes::singleton_base<craft>::instance(title, window_w, window_h);
+            !voxel_engine->run(nullptr, std::ref(rng)))
+        {
+            throw std::runtime_error("ERROR: Running SDL app failed.");
         }
-
-    } catch (std::exception& ex) {
-        std::cerr << ex.what() << std::endl; 
+    }
+    catch (std::exception& ex)
+    {
+        std::cerr << ex.what() << std::endl;
     }
 
     return EXIT_SUCCESS;

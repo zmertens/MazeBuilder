@@ -112,91 +112,103 @@ std::string string_utils::format<int, int>(std::string_view format_str, const in
 }
 
 template <>
-std::string string_utils::format<int, float>(std::string_view format_str, const int &arg1, const float &arg2) noexcept
+std::string string_utils::format<int, float>(const std::string_view format_str, const int &arg1,
+    const float &arg2) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
 }
 
 template <>
-std::string string_utils::format<int, int, int>(std::string_view format_str, const int &arg, const int &arg2, const int& arg3) noexcept
+std::string string_utils::format<int, int, int>(const std::string_view format_str, const int &arg, const int &arg2,
+    const int& arg3) noexcept
 {
-
     return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
 }
 
 template <>
-std::string string_utils::format<unsigned int, int, int>(std::string_view format_str, const unsigned int &arg, const int &arg2, const int& arg3) noexcept
+std::string string_utils::format<unsigned int, int, int>(const std::string_view format_str, const unsigned int &arg,
+    const int &arg2, const int& arg3) noexcept
 {
-
     return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
 }
 
 template <>
-std::string string_utils::format<int, int, int, int>(std::string_view format_str, const int &arg, const int &arg2, const int& arg3, const int& arg4) noexcept
+std::string string_utils::format<int, int, int, int>(const std::string_view format_str, const int &arg, const int &arg2,
+    const int& arg3, const int& arg4) noexcept
 {
-
     return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3, arg4));
 }
 
 template <>
-std::string string_utils::format<int, size_t, size_t, size_t>(std::string_view format_str, const int &arg, const size_t &arg2, const size_t &arg3, const size_t &arg4) noexcept
+std::string string_utils::format<int, size_t, size_t, size_t>(const std::string_view format_str, const int &arg,
+    const size_t &arg2, const size_t &arg3, const size_t &arg4) noexcept
 {
-
     return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3, arg4));
 }
 
 template <>
-std::string string_utils::format<int, int, float>(std::string_view format_str, const int &arg, const int &arg2, const float &arg3) noexcept
+std::string string_utils::format<int, int, float>(const std::string_view format_str, const int &arg, const int &arg2,
+    const float &arg3) noexcept
 {
-
     return fmt::vformat(format_str, fmt::make_format_args(arg, arg2, arg3));
 }
 
 template <>
-std::string string_utils::format<float>(std::string_view format_str, const float &arg) noexcept
+std::string string_utils::format<float>(const std::string_view format_str, const float &arg) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
 
 template <>
-std::string string_utils::format<float, float>(std::string_view format_str, const float &arg1, const float &arg2) noexcept
+std::string string_utils::format<float, float>(const std::string_view format_str, const float &arg1, const float &arg2) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
 }
 
 template <>
-std::string string_utils::format<const char *>(std::string_view format_str, const char *const &arg) noexcept
+std::string string_utils::format<const char *>(const std::string_view format_str, const char *const &arg) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
 
 template <>
-std::string string_utils::format<std::string>(std::string_view format_str, const std::string &arg) noexcept
+std::string string_utils::format<std::string>(const std::string_view format_str, const std::string &arg) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
 
 template <>
-std::string string_utils::format<std::string_view>(std::string_view format_str, const std::string_view &arg) noexcept
+std::string string_utils::format<std::string_view>(const std::string_view format_str,
+    const std::string_view &arg) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg));
 }
 
 template <>
-std::string string_utils::format<std::string_view>(std::string_view format_str, const std::string_view &arg1, const std::string_view &arg2) noexcept
+std::string string_utils::format<std::string_view>(const std::string_view format_str, const std::string_view &arg1,
+    const std::string_view &arg2) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
 }
 
 template <>
-std::string string_utils::format<const char *, const char *>(std::string_view format_str, const char *const &arg1, const char *const &arg2) noexcept
+std::string string_utils::format<std::string_view>(const std::string_view format_str, const std::string_view &arg1,
+    const std::string_view &arg2, const std::string_view &arg3, const std::string_view &arg4,
+    const std::string_view &arg5) noexcept
+{
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2, arg3, arg4, arg5));
+}
+
+template <>
+std::string string_utils::format<const char *, const char *>(std::string_view format_str, const char *const &arg1,
+    const char *const &arg2) noexcept
 {
 
     return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2));
@@ -227,5 +239,13 @@ template <>
 std::string string_utils::format<long long>(std::string_view format_str, const long long &arg) noexcept
 {
     return fmt::vformat(format_str, fmt::make_format_args(arg));
+}
+
+template <>
+std::string string_utils::format<int, int, std::string_view>(const std::string_view format_str,
+    const int& arg1, const int& arg2,
+    const std::string_view& arg3) noexcept
+{
+    return fmt::vformat(format_str, fmt::make_format_args(arg1, arg2, arg3));
 }
 

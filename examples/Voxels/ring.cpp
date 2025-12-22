@@ -1,33 +1,34 @@
-#include <stdlib.h>
-#include <string.h>
 #include "ring.h"
 
-void ring_alloc(Ring *ring, int capacity) {
+#include <string>
+
+#include <SDL3/SDL.h>
+
+
+void ring_alloc(Ring *ring, const int capacity) {
     ring->capacity = capacity;
     ring->start = 0;
     ring->end = 0;
-    ring->data = (RingEntry *)calloc(capacity, sizeof(RingEntry));
+    ring->data = static_cast<RingEntry*>(SDL_calloc(capacity, sizeof(RingEntry)));
 }
 
-void ring_free(Ring *ring) {
-    free(ring->data);
+void ring_free(const Ring *ring) {
+    SDL_free(ring->data);
 }
 
-int ring_empty(Ring *ring) {
+int ring_empty(const Ring *ring) {
     return ring->start == ring->end;
 }
 
-int ring_full(Ring *ring) {
+int ring_full(const Ring *ring) {
     return ring->start == (ring->end + 1) % ring->capacity;
 }
 
-int ring_size(Ring *ring) {
+int ring_size(const Ring *ring) {
     if (ring->end >= ring->start) {
         return ring->end - ring->start;
     }
-    else {
-        return ring->capacity - (ring->start - ring->end);
-    }
+    return ring->capacity - (ring->start - ring->end);
 }
 
 void ring_grow(Ring *ring) {
@@ -37,25 +38,25 @@ void ring_grow(Ring *ring) {
     while (ring_get(ring, &entry)) {
         ring_put(&new_ring, &entry);
     }
-    free(ring->data);
+    SDL_free(ring->data);
     ring->capacity = new_ring.capacity;
     ring->start = new_ring.start;
     ring->end = new_ring.end;
     ring->data = new_ring.data;
 }
 
-void ring_put(Ring *ring, RingEntry *entry) {
+void ring_put(Ring *ring, const RingEntry *entry) {
     if (ring_full(ring)) {
         ring_grow(ring);
     }
     RingEntry *e = ring->data + ring->end;
-    memcpy(e, entry, sizeof(RingEntry));
+    SDL_memcpy(e, entry, sizeof(RingEntry));
     ring->end = (ring->end + 1) % ring->capacity;
 }
 
-void ring_put_block(Ring *ring, int p, int q, int x, int y, int z, int w) {
+void ring_put_block(Ring *ring, const int p, const int q, const int x, const int y, const int z, const int w) {
     RingEntry entry;
-    entry.type = BLOCK;
+    entry.type = RingEntryType::BLOCK;
     entry.p = p;
     entry.q = q;
     entry.x = x;
@@ -68,7 +69,7 @@ void ring_put_block(Ring *ring, int p, int q, int x, int y, int z, int w) {
 
 void ring_put_blocks(Ring* ring, int *blocks) {
     RingEntry entry;
-    entry.type = BLOCKS;
+    entry.type = RingEntryType::BLOCKS;
     entry.p = 0;
     entry.q = 0;
     entry.x = 0;
@@ -79,9 +80,9 @@ void ring_put_blocks(Ring* ring, int *blocks) {
     ring_put(ring, &entry);
 }
 
-void ring_put_light(Ring *ring, int p, int q, int x, int y, int z, int w) {
+void ring_put_light(Ring *ring, const int p, const int q, const int x, const int y, const int z, const int w) {
     RingEntry entry;
-    entry.type = LIGHT;
+    entry.type = RingEntryType::LIGHT;
     entry.p = p;
     entry.q = q;
     entry.x = x;
@@ -91,9 +92,9 @@ void ring_put_light(Ring *ring, int p, int q, int x, int y, int z, int w) {
     ring_put(ring, &entry);
 }
 
-void ring_put_key(Ring *ring, int p, int q, int key) {
+void ring_put_key(Ring *ring, const int p, const int q, const int key) {
     RingEntry entry;
-    entry.type = KEY;
+    entry.type = RingEntryType::KEY;
     entry.p = p;
     entry.q = q;
     entry.key = key;
@@ -102,13 +103,13 @@ void ring_put_key(Ring *ring, int p, int q, int key) {
 
 void ring_put_commit(Ring *ring) {
     RingEntry entry;
-    entry.type = COMMIT;
+    entry.type = RingEntryType::COMMIT;
     ring_put(ring, &entry);
 }
 
 void ring_put_exit(Ring *ring) {
     RingEntry entry;
-    entry.type = EXIT;
+    entry.type = RingEntryType::EXIT;
     ring_put(ring, &entry);
 }
 
@@ -116,8 +117,8 @@ int ring_get(Ring *ring, RingEntry *entry) {
     if (ring_empty(ring)) {
         return 0;
     }
-    RingEntry *e = ring->data + ring->start;
-    memcpy(entry, e, sizeof(RingEntry));
+    const RingEntry *e = ring->data + ring->start;
+    SDL_memcpy(entry, e, sizeof(RingEntry));
     ring->start = (ring->start + 1) % ring->capacity;
     return 1;
 }

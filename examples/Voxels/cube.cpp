@@ -1,8 +1,9 @@
 #include "cube.h"
 
+#include <cmath>
+
 #include "item.h"
 #include "matrix.h"
-#include "craft_utils.h"
 
 void make_cube_faces(
     float *data, float ao[6][4], float light[6][4],
@@ -84,12 +85,12 @@ void make_cube(
     int left, int right, int top, int bottom, int front, int back,
     float x, float y, float z, float n, int w)
 {
-    int wleft = blocks[w][0];
-    int wright = blocks[w][1];
-    int wtop = blocks[w][2];
-    int wbottom = blocks[w][3];
-    int wfront = blocks[w][4];
-    int wback = blocks[w][5];
+    int wleft = item::blocks[w][0];
+    int wright = item::blocks[w][1];
+    int wtop = item::blocks[w][2];
+    int wbottom = item::blocks[w][3];
+    int wfront = item::blocks[w][4];
+    int wback = item::blocks[w][5];
     make_cube_faces(
         data, ao, light,
         left, right, top, bottom, front, back,
@@ -127,10 +128,10 @@ void make_plant(
     };
     float *d = data;
     float s = 0.0625;
-    float a = 0;
-    float b = s;
-    float du = (plants[w] % 16) * s;
-    float dv = (plants[w] / 16) * s;
+    float a = 0 + 1 / 2048.0;
+    float b = s - 1 / 2048.0;
+    float du = (item::plants[w] % 16) * s;
+    float dv = (item::plants[w] / 16) * s;
     for (int i = 0; i < 4; i++) {
         for (int v = 0; v < 6; v++) {
             int j = indices[i][v];
@@ -159,9 +160,9 @@ void make_plant(
 
 void make_player(
     float *data,
-    float x, float y, float z, float rx, float ry)
+    const float x, const float y, const float z, const float rx, const float ry)
 {
-    float ao[6][4] = {0};
+    float ao[6][4]{};
     float light[6][4] = {
         {0.8, 0.8, 0.8, 0.8},
         {0.8, 0.8, 0.8, 0.8},
@@ -188,7 +189,7 @@ void make_player(
     mat_apply(data, ma, 36, 0, 10);
 }
 
-void make_cube_wireframe(float *data, float x, float y, float z, float n) {
+void make_cube_wireframe(float *data, const float x, const float y, const float z, const float n) {
     static const float positions[8][3] = {
         {-1, -1, -1},
         {-1, -1, +1},
@@ -215,15 +216,15 @@ void make_cube_wireframe(float *data, float x, float y, float z, float n) {
 
 void make_character(
     float *data,
-    float x, float y, float n, float m, char c)
+    const float x, const float y, const float n, const float m, const char c)
 {
     float *d = data;
-    float s = 0.0625;
-    float a = s;
-    float b = s * 2;
-    int w = c - 32;
-    float du = (w % 16) * a;
-    float dv = 1 - (w / 16) * b - b;
+    constexpr float s = 0.0625;
+    constexpr float a = s;
+    constexpr float b = s * 2;
+    const int w = c - 32;
+    const float du = (w % 16) * a;
+    const float dv = 1 - (w / 16) * b - b;
     *(d++) = x - n; *(d++) = y - m;
     *(d++) = du + 0; *(d++) = dv;
     *(d++) = x + n; *(d++) = y - m;

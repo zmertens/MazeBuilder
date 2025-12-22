@@ -9,6 +9,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <ranges>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
@@ -27,7 +28,7 @@ bool grid_factory::register_creator(const std::string &key, factory_creator_t cr
     std::lock_guard<std::mutex> lock(m_creators_mutex);
 
     // Check if key already exists
-    if (m_creators.find(key) != m_creators.end())
+    if (m_creators.contains(key))
     {
 
         return false;
@@ -40,12 +41,10 @@ bool grid_factory::register_creator(const std::string &key, factory_creator_t cr
 
 bool grid_factory::unregister_creator(const std::string &key) noexcept
 {
-
     std::lock_guard<std::mutex> lock(m_creators_mutex);
 
-    if (auto it{m_creators.find(key)}; it != m_creators.cend())
+    if (const auto it{m_creators.find(key)}; it != m_creators.cend())
     {
-
         m_creators.erase(it);
 
         return true;
@@ -56,18 +55,16 @@ bool grid_factory::unregister_creator(const std::string &key) noexcept
 
 bool grid_factory::is_registered(const std::string &key) const
 {
-
     std::lock_guard<std::mutex> lock(m_creators_mutex);
 
-    return m_creators.find(key) != m_creators.end();
+    return m_creators.contains(key);
 }
 
 std::optional<std::unique_ptr<grid_interface>> grid_factory::create(const std::string &key, const configurator &config) const noexcept
 {
-
     std::lock_guard<std::mutex> lock(m_creators_mutex);
 
-    if (auto it = m_creators.find(key); it != m_creators.cend())
+    if (const auto it = m_creators.find(key); it != m_creators.cend())
     {
         try
         {
@@ -104,10 +101,10 @@ std::vector<std::string> grid_factory::get_registered_keys() const
 
     keys.reserve(m_creators.size());
 
-    for (const auto &pair : m_creators)
+    for (const auto& key : m_creators | std::views::keys)
     {
 
-        keys.push_back(pair.first);
+        keys.push_back(key);
     }
 
     return keys;

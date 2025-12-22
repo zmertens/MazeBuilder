@@ -3,72 +3,72 @@ set(NOISE_SOURCES ${CMAKE_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
 set(CRAFT_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/bloom_effects.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/chunk_manager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/craft_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/event_handler.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/font.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/map.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/sdl_gl_helper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/world_manager.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
 
 set(VOXELS_EXE "mazebuildervoxels")
 
-if(EMSCRIPTEN)
+add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
+target_compile_definitions(${VOXELS_EXE} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
+target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_20)
+target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps/glad/include>)
+target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps/dearimgui>)
+target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/deps>)
+target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>)
+target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
+
+if (EMSCRIPTEN)
     message(INFO ": Building ${VOXELS_EXE} examples for the Web!")
 
-    add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
-
-    target_compile_definitions(${VOXELS_EXE} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
-    target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_20)
     target_compile_options(${VOXELS_EXE} PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
-    target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/glad/include>)
-    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
-    target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
-        target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps/emscripten_local> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/emscripten_local>)
-    target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
+
+    set(EMSCRIPTEN_DEP_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../deps/emscripten_local)
+    target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps/emscripten_local> $<BUILD_INTERFACE:${EMSCRIPTEN_DEP_PATH}>)
+
     target_link_options(${VOXELS_EXE} PRIVATE
-    	"SHELL:-s PTHREAD_POOL_SIZE=5 -s WASM=1 -s USE_PTHREADS -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
-        "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1"
-        "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
-        "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
+            "SHELL:-s PTHREAD_POOL_SIZE=6 -s USE_PTHREADS -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
+            "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s WASM=1"
+            "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
+            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
+            "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/textures@/textures")
     target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map --profile>")
     target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
     set_target_properties(${VOXELS_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 
-else()
+else ()
 
     message(INFO ": Building ${VOXELS_EXE} examples for the Desktop!")
 
-    add_executable(${VOXELS_EXE} ${GLAD_SOURCES} ${NOISE_SOURCES} ${SQLITE3_SOURCES} ${DEAR_IMGUI_SOURCES} ${CRAFT_SOURCES})
-    target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
-    target_compile_features(${VOXELS_EXE} PRIVATE cxx_std_20)
-    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
-    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/dearimgui> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/dearimgui>)
-    target_include_directories(${VOXELS_EXE} PUBLIC $<INSTALL_INTERFACE:deps/glad/include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/glad/include>)
-    target_compile_definitions(${VOXELS_EXE} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
-
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
     file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 
     # Copy shared/dlls on Windows only
-	if(WIN32)
-		add_custom_command(
-			TARGET ${VOXELS_EXE} POST_BUILD
-			COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:${VOXELS_EXE}>
-			VERBATIM
-		)
-	endif()
+    if (WIN32)
+        # If the SDL3 imported target exists, copy its DLL into the target directory.
+        if (TARGET SDL3::SDL3-shared)
+            add_custom_command(TARGET ${VOXELS_EXE} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:${VOXELS_EXE}>"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:SDL3::SDL3-shared>"
+                    "$<TARGET_FILE_DIR:${VOXELS_EXE}>/$<TARGET_FILE_NAME:SDL3::SDL3-shared>"
+                VERBATIM)
+        else()
+            message(WARNING "SDL3::SDL3-shared target not available and fallback DLL not found.")
+        endif()
+    endif ()
 
-endif(EMSCRIPTEN)
+endif (EMSCRIPTEN)

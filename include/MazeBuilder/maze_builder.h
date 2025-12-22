@@ -6,7 +6,7 @@
 
 #include <MazeBuilder/algo_interface.h>
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/base64_helper.h>
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/binary_tree.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/cell.h>

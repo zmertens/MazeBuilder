@@ -1,6 +1,8 @@
-#include <stdlib.h>
-#include <string.h>
 #include "map.h"
+
+#include <string>
+
+#include <SDL3/SDL.h>
 
 int hash_int(int key) {
     key = ~key + (key << 15);
@@ -19,27 +21,27 @@ int hash(int x, int y, int z) {
     return x ^ y ^ z;
 }
 
-void map_alloc(Map *map, int dx, int dy, int dz, int mask) {
+void map_alloc(Map *map, const int dx, const int dy, const int dz, const int mask) {
     map->dx = dx;
     map->dy = dy;
     map->dz = dz;
     map->mask = mask;
     map->size = 0;
-    map->data = (MapEntry *)calloc(map->mask + 1, sizeof(MapEntry));
+    map->data = static_cast<MapEntry*>(SDL_calloc(map->mask + 1, sizeof(MapEntry)));
 }
 
 void map_free(Map *map) {
-    free(map->data);
+    SDL_free(map->data);
 }
 
-void map_copy(Map *dst, Map *src) {
+void map_copy(Map *dst, const Map *src) {
     dst->dx = src->dx;
     dst->dy = src->dy;
     dst->dz = src->dz;
     dst->mask = src->mask;
     dst->size = src->size;
-    dst->data = (MapEntry *)calloc(dst->mask + 1, sizeof(MapEntry));
-    memcpy(dst->data, src->data, (dst->mask + 1) * sizeof(MapEntry));
+    dst->data = static_cast<MapEntry*>(SDL_calloc(dst->mask + 1, sizeof(MapEntry)));
+    SDL_memcpy(dst->data, src->data, (dst->mask + 1) * sizeof(MapEntry));
 }
 
 int map_set(Map *map, int x, int y, int z, int w) {
@@ -77,7 +79,7 @@ int map_set(Map *map, int x, int y, int z, int w) {
     return 0;
 }
 
-int map_get(Map *map, int x, int y, int z) {
+int map_get(const Map *map, int x, int y, int z) {
     unsigned int index = hash(x, y, z) & map->mask;
     x -= map->dx;
     y -= map->dy;
@@ -103,11 +105,11 @@ void map_grow(Map *map) {
     new_map.dz = map->dz;
     new_map.mask = (map->mask << 1) | 1;
     new_map.size = 0;
-    new_map.data = (MapEntry *)calloc(new_map.mask + 1, sizeof(MapEntry));
+    new_map.data = static_cast<MapEntry*>(SDL_calloc(new_map.mask + 1, sizeof(MapEntry)));
     MAP_FOR_EACH(map, ex, ey, ez, ew) {
         map_set(&new_map, ex, ey, ez, ew);
     } END_MAP_FOR_EACH;
-    free(map->data);
+    SDL_free(map->data);
     map->mask = new_map.mask;
     map->size = new_map.size;
     map->data = new_map.data;

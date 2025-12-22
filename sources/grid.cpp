@@ -40,7 +40,7 @@ grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
 
 // Copy constructor
 grid::grid(const grid &other)
-    : m_dimensions(other.m_dimensions)
+    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
 {
 
 }
@@ -55,12 +55,14 @@ grid &grid::operator=(const grid &other)
 
     m_dimensions = other.m_dimensions;
 
+    m_cells = other.m_cells;
+
     return *this;
 }
 
 // Move constructor
 grid::grid(grid &&other) noexcept
-    : m_dimensions(other.m_dimensions)
+    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
 {
 
 }
@@ -75,6 +77,8 @@ grid &grid::operator=(grid &&other) noexcept
 
     m_dimensions = other.m_dimensions;
 
+    m_cells = other.m_cells;
+
     return *this;
 }
 
@@ -83,7 +87,7 @@ grid::~grid()
 {
 
     // First clean up cell references
-    clear_cells();
+    grid::clear_cells();
 }
 
 void grid::clear_cells() noexcept
@@ -150,6 +154,16 @@ void grid::set_str(std::string const &str) noexcept
 std::string grid::get_str() const noexcept
 {
     return this->m_str;
+}
+
+void grid::set_file(std::string const &f) noexcept
+{
+    this->m_file = f;
+}
+
+std::string grid::get_file() const noexcept
+{
+    return this->m_file;
 }
 
 std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, Direction dir) const noexcept
@@ -305,3 +319,18 @@ void grid::set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexc
 {
     m_faces = faces;
 }
+
+/// @brief Get the pixel data for image generation
+/// @return A vector of RGBA pixel data
+std::vector<std::uint8_t> grid::get_pixels() const noexcept
+{
+    return m_pixels;
+}
+
+/// @brief Set the pixel data for image generation
+/// @param pixels A vector of RGBA pixel data
+void grid::set_pixels(const std::vector<std::uint8_t> &pixels) noexcept
+{
+    m_pixels = pixels;
+}
+

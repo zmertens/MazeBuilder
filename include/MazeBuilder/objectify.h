@@ -9,7 +9,7 @@ namespace mazes
     class objectify : public algo_interface
     {
     public:
-        virtual bool run(grid_interface *g, randomizer &rng) const noexcept override;
+        bool run(grid_interface *g, randomizer &rng) const noexcept override;
     };
 }
 

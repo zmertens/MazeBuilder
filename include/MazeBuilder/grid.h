@@ -121,6 +121,10 @@ namespace mazes
 
         virtual std::string get_str() const noexcept override;
 
+        virtual void set_file(std::string const &f) noexcept override;
+
+        virtual std::string get_file() const noexcept override;
+
         /// @brief Get the vertices for wavefront object file generation
         /// @return A vector of vertices as tuples (x, y, z, w)
         virtual std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept override;
@@ -137,6 +141,14 @@ namespace mazes
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept override;
 
+        /// @brief Get the pixel data for image generation
+        /// @return A vector of RGBA pixel data
+        virtual std::vector<std::uint8_t> get_pixels() const noexcept override;
+
+        /// @brief Set the pixel data for image generation
+        /// @param pixels A vector of RGBA pixel data
+        virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept override;
+
     private:
         std::unordered_map<int, std::shared_ptr<cell>> m_cells;
 
@@ -147,11 +159,16 @@ namespace mazes
         mutable std::mutex m_topology_mutex;
         std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
 
+        // Arbitrary data
+        std::string m_file;
         std::string m_str;
 
         // 3D data
         std::vector<std::tuple<int, int, int, int>> m_vertices;
         std::vector<std::vector<std::uint32_t>> m_faces;
+
+        // Image data
+        std::vector<std::uint8_t> m_pixels;
     };
 
 } // namespace mazes

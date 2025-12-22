@@ -24,7 +24,13 @@ file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
 
 # These tests can use the Catch2-provided main
 add_executable(${MAZE_BUILDER_TESTS_EXE} ${TEST_FILES})
-add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_EXE})
+add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_EXE}
+        ${MAZE_BUILDER_TESTS_EXE}
+        --reporter console
+        --reporter xml:${CMAKE_BINARY_DIR}/test-results.xml
+        --durations yes
+        --order lex
+        -s)
 target_compile_features(${MAZE_BUILDER_TESTS_EXE} PRIVATE cxx_std_20)
 target_compile_definitions(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:RelWithDebInfo>:MAZE_BENCHMARK>")
 target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static Catch2::Catch2WithMain)
@@ -42,6 +48,6 @@ if(MAZE_BUILDER_MEMCHECK)
 	include(Memcheck)
 	AddMemcheck(${MAZE_BUILDER_TESTS_EXE})
 
-        target_link_options(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:Debug>:-g>")
+    target_link_options(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:Debug>:-g>")
 endif()
 

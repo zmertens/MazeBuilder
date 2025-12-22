@@ -65,6 +65,10 @@ namespace mazes
 
         virtual std::string get_str() const noexcept = 0;
 
+        virtual void set_file(std::string const &f) noexcept = 0;
+
+        virtual std::string get_file() const noexcept = 0;
+
         /// @brief Get the vertices for wavefront object file generation
         /// @return A vector of vertices as tuples (x, y, z, w)
         virtual std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept = 0;
@@ -80,6 +84,14 @@ namespace mazes
         /// @brief Set the faces for wavefront object file generation
         /// @param faces A vector of faces, where each face is a vector of vertex indices
         virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept = 0;
+
+        /// @brief Get the pixel data for image generation
+        /// @return A vector of RGBA pixel data
+        virtual std::vector<std::uint8_t> get_pixels() const noexcept = 0;
+
+        /// @brief Set the pixel data for image generation
+        /// @param pixels A vector of RGBA pixel data
+        virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept = 0;
     };
 
 } // namespace mazes
