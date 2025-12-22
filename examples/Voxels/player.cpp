@@ -188,10 +188,11 @@ player::player()
     assign_key(PlayerAction::TAG_SIGN, SDL_SCANCODE_T);
     assign_key(PlayerAction::PLACE_MAZE, SDL_SCANCODE_B);
     assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
+    assign_key(PlayerAction::COPY_BLOCK, SDL_SCANCODE_C);
 
     m_configs.day_length = DAY_LENGTH;
     m_configs.start_time = DAY_LENGTH / 2 * 1000;
-    m_configs.start_ticks = static_cast<int>(SDL_GetTicks());
+    m_configs.start_ticks = SDL_GetTicks();
     m_configs.fov = DEFAULT_FOV;
     m_configs.ortho = DEFAULT_ORTHO;
     m_configs.invert_mouse = false;
@@ -649,16 +650,17 @@ void player::initialize_actions()
         [](player& p, const float dt, mazes::randomizer& rng)
         {
             constexpr auto PREVIEW_COOLDOWN_MS = 250;
-            static Uint64 last_preview_time = 0; // Initialize to 0 so first press works immediately
+            static std::uint64_t last_preview_time = 0;
             const auto current_time = SDL_GetTicks();
 
             if (const auto time_since_last_preview = current_time - last_preview_time;
-                time_since_last_preview > PREVIEW_COOLDOWN_MS && p.m_configs.preview_enabled && p.m_world)
+                time_since_last_preview > PREVIEW_COOLDOWN_MS && p.m_world)
             {
                 last_preview_time = current_time;
 
                 // Generate maze grid
-                if (auto g = p.m_grid_factory->create(p.get_name(), std::cref(p.m_configs.maze));
+                if (auto g = p.m_grid_factory->create(p.get_name(),
+                    std::cref(p.m_configs.maze));
                     g.has_value())
                 {
                     // Move grid ownership
@@ -679,7 +681,6 @@ void player::initialize_actions()
                         const int height = static_cast<int>(ascii_height * scale);
                         const int width = static_cast<int>(pixel_data.size() / (height * 4));
 
-                        // Queue async block placement
                         p.m_world->finalize_buildings(
                             pixel_data,
                             width,
@@ -689,7 +690,6 @@ void player::initialize_actions()
                             p.get_item()
                         );
 
-                        p.m_configs.download_ready = true;
                         p.m_last_preview_generation_time = SDL_GetTicks();
                     }
                     else
@@ -716,11 +716,7 @@ void player::initialize_actions()
                 return;
             }
 
-            // Commit the latest preview to the main world database
-            // This moves blocks from preview_blocks table to the main block table
             p.m_world->commit_preview_to_world();
-
-            p.m_configs.download_ready = true;
         });
 }
 
@@ -822,8 +818,8 @@ std::string player::artifacts() const noexcept
     }
 
     // Calculate player's chunk coordinates
-    const int player_chunk_p = m_world->chunked(m_pos.x);
-    const int player_chunk_q = m_world->chunked(m_pos.z);
+    const int player_chunk_p = world::chunked(m_pos.x);
+    const int player_chunk_q = world::chunked(m_pos.z);
     // Query blocks from nearby chunks - increased radius for better coverage
     // Radius of 4 chunks = 9x9 chunk area (~2304 blocks if fully populated)
     constexpr int chunk_radius = 4;
@@ -839,3 +835,7 @@ std::string player::artifacts() const noexcept
     return blocks_to_wavefront_obj(blocks);
 }
 
+bool player::is_download_ready() const noexcept
+{
+    return m_configs.artifacts_ready;
+}

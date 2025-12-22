@@ -512,7 +512,14 @@ void world::draw() const noexcept
     SDL_snprintf(buffer.data(), buffer.size(), "[%d triangle faces, %zu chunks]",
                  triangle_faces, get_chunk_count());
     render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
-                10, viewport_height - 10, 12.0f, buffer.data());
+                10, viewport_height - 15, 12.0f, buffer.data());
+
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+                10, viewport_height - 35, 12.0f, "Press E to preview");
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+                10, viewport_height - 55, 12.0f, "Press B to build");
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+                10, viewport_height - 75, 12.0f, "Press C to download");
 
     render_wireframe(&s_line_attrib);
 

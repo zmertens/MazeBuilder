@@ -75,7 +75,7 @@ public:
         mazes::configurator maze{ };
         std::string tag;
         bool preview_enabled{ true };
-        bool download_ready{ false };
+        bool artifacts_ready{ false };
     } m_configs{};
 
     explicit player();
@@ -122,7 +122,9 @@ public:
 
     [[nodiscard]] std::string get_local_time() const noexcept;
 
-    std::string artifacts() const noexcept;
+    [[nodiscard]] std::string artifacts() const noexcept;
+
+    [[nodiscard]] bool is_download_ready() const noexcept;
 
 private:
     void initialize_actions();

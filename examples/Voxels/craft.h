@@ -25,7 +25,7 @@ public:
     // Web interaction
     [[nodiscard]] std::string artifacts() const noexcept;
     [[nodiscard]] bool is_download_ready() const noexcept;
-    void set_download_ready(bool ready) const noexcept;
+    void reset_download_flag() const noexcept;
 
 private:
     struct craft_impl;

@@ -31,7 +31,7 @@ EMSCRIPTEN_BINDINGS (craft_module)
         .constructor<const std::string&, int, int>()
         .function("artifacts", &craft::artifacts)
         .function("is_download_ready", &craft::is_download_ready)
-        .function("set_download_ready", &craft::set_download_ready);
+        .function("reset_download_flag", &craft::reset_download_flag);
 }
 #endif
 
