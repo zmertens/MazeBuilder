@@ -214,28 +214,31 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
     {
+        // Note: items array has 58 valid items (0-57), though array size is 64
+        constexpr std::int32_t MAX_ITEM_INDEX = 57;
+
         if (event.wheel.y > SCROLL_THRESHOLD)
         {
-            // Scroll up
+            // Scroll up (backward through items)
             if (m_item_index > 0)
             {
                 m_item_index--;
             }
             else
             {
-                m_item_index = item::items.size() - 1;
+                m_item_index = MAX_ITEM_INDEX;  // Wrap to last valid item
             }
         }
         else if (event.wheel.y < -SCROLL_THRESHOLD)
         {
-            // Scroll down
-            if (m_item_index + 1 < item::items.size())
+            // Scroll down (forward through items)
+            if (m_item_index < MAX_ITEM_INDEX)
             {
                 m_item_index++;
             }
             else
             {
-                m_item_index = 0;
+                m_item_index = 0;  // Wrap to first item
             }
         }
     }

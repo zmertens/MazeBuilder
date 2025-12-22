@@ -676,7 +676,7 @@ bool world::update_preview(mazes::grid_interface* g) const noexcept
         pixel_data.data(),
         width,
         height,
-        static_cast<std::uint32_t>(TextureIdentifier::MAZE), true))
+        static_cast<std::uint32_t>(TextureIdentifier::MAZE), false))
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to update maze texture from memory\n");
         return false;
