@@ -167,6 +167,18 @@ private:
         bool has_valid_target{ false };
     } m_projected_plane{};
 
+    // Store current preview data for reusable building
+    struct preview_data
+    {
+        std::vector<std::uint8_t> pixel_data;
+        int width{ 0 };
+        int height{ 0 };
+        int scale{ 0 };
+        int wall_height{ 0 };
+        int item_type{ 0 };
+        bool has_data{ false };
+    } m_current_preview{};
+
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
     const sdl_gl_helper* m_sdl;

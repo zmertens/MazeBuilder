@@ -646,7 +646,7 @@ void player::initialize_actions()
         [](player& p, const float dt, mazes::randomizer& rng)
         {
             constexpr auto PREVIEW_COOLDOWN_MS = 250;
-            static auto last_preview_time = SDL_GetTicks();
+            static Uint64 last_preview_time = 0; // Initialize to 0 so first press works immediately
             const auto current_time = SDL_GetTicks();
 
             if (const auto time_since_last_preview = current_time - last_preview_time;
@@ -687,7 +687,7 @@ void player::initialize_actions()
                         );
 
                         p.m_configs.download_ready = true;
-                        p.m_last_maze_generation_time = SDL_GetTicks();
+                        p.m_last_preview_generation_time = SDL_GetTicks();
                     }
                     else
                     {
@@ -718,7 +718,6 @@ void player::initialize_actions()
             p.m_world->commit_preview_to_world();
 
             p.m_configs.download_ready = true;
-            SDL_Log("Maze committed to world - press 'E' to generate a new preview\n");
         });
 }
 

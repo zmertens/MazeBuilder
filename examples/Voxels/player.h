@@ -3,7 +3,6 @@
 
 #include <cstdint>
 #include <functional>
-#include <future>
 #include <map>
 #include <memory>
 #include <string>
@@ -123,12 +122,7 @@ public:
 
     [[nodiscard]] std::string get_local_time() const noexcept;
 
-    bool generate_maze_texture(mazes::grid_interface* g, mazes::randomizer& rng) noexcept;
-
     std::string artifacts() const noexcept;
-
-    [[nodiscard]] bool is_maze_generation_ready() const noexcept;
-    [[nodiscard]] std::uint64_t get_maze_cooldown_remaining_ms() const noexcept;
 
 private:
     void initialize_actions();
@@ -162,12 +156,7 @@ private:
 
     std::unique_ptr<mazes::grid_factory> m_grid_factory;
 
-    std::uint64_t m_last_maze_generation_time{ 0 };
-    static constexpr std::uint64_t MAZE_GENERATION_COOLDOWN_MS{ 10000 };
-
-    // Store maze data for artifacts generation
-    mutable std::unique_ptr<mazes::grid_interface> m_last_maze_for_artifacts;
-    mutable std::mutex m_maze_artifacts_mutex;
+    std::uint64_t m_last_preview_generation_time{ 0 };
 };
 
 #endif // PLAYER_H
