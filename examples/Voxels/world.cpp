@@ -518,8 +518,6 @@ void world::draw() const noexcept
                 10, viewport_height - 35, 12.0f, "Press E to preview");
     render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
                 10, viewport_height - 55, 12.0f, "Press B to build");
-    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
-                10, viewport_height - 75, 12.0f, "Press C to download");
 
     render_wireframe(&s_line_attrib);
 
@@ -704,8 +702,6 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
     m_current_preview.wall_height = wall_height;
     m_current_preview.item_type = item_type;
     m_current_preview.has_data = true;
-
-    SDL_Log("Preview data stored - press 'B' to build at targeted location\n");
 }
 
 // Build the current preview at the targeted location
@@ -791,9 +787,6 @@ void world::commit_preview_to_world() noexcept
             }
         }
     }
-
-    SDL_Log("Built maze with %d blocks at (%d, %d, %d) - press 'B' again to build elsewhere or 'E' for new preview\n",
-            blocks_placed, base_x, base_y, base_z);
 }
 
 void world::process_build_queue() noexcept

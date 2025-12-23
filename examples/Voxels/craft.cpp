@@ -884,8 +884,9 @@ struct craft::craft_impl
                     {
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Artifact Export:");
                         ImGui::Spacing();
-                        if (ImGui::Button("Generate Artifacts", ImVec2(250, 60)))
+                        if (ImGui::Button("Download Artifacts", ImVec2(250, 60)))
                         {
+                            current_configs.artifacts_ready = true;
                             handle_artifacts(p);
                         }
                         ImGui::TextWrapped("%s\n", p->artifacts().data());
@@ -1046,6 +1047,7 @@ struct craft::craft_impl
         // Desktop: Write to file system and reset flag
         constexpr mazes::io_utils io_things{};
         const auto success = io_things.write_file(filename, artifacts);
+        p->m_configs.artifacts_ready = false;
         SDL_Log("Write file '%s': %s (%zu bytes)\n",
                 filename.c_str(),
                 success ? "SUCCESS" : "FAILED",
