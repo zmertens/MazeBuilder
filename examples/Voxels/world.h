@@ -145,6 +145,7 @@ private:
     void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
+    void render_player(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify,
         float x, float y, float n, std::string_view text) const noexcept;
     void render_plane(const sdl_gl_helper::attrib* attrib) const noexcept;

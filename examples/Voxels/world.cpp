@@ -503,6 +503,8 @@ void world::draw() const noexcept
 
     render_item(&s_block_attrib, atlas_texture);
 
+    render_player(&s_block_attrib, atlas_texture);
+
     render_signs(&s_text_attrib, signs_texture);
     render_sign(&s_text_attrib, signs_texture);
 
@@ -2437,6 +2439,46 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
         sdl_gl_helper::draw_cube(attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
+}
+
+void world::render_player(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
+{
+    // Only render player model in 3rd person mode (ortho 1-64)
+    if (m_player->m_configs.ortho < 1 || m_player->m_configs.ortho > 64)
+    {
+        return;
+    }
+
+    auto [width, height] = m_sdl->get_window_size();
+    const player::position* s = &m_player->m_pos;
+
+    // Set up 3D projection matrix
+    float matrix[16];
+    set_matrix_3d(
+        matrix, width, height,
+        s->x, s->y, s->z, s->rx, s->ry,
+        m_player->m_configs.fov,
+        m_player->m_configs.ortho,
+        RENDER_CHUNK_RADIUS);
+
+    glUseProgram(attrib->program);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform3f(attrib->camera, s->x, s->y, s->z);
+    glUniform1i(attrib->sampler, 0);
+    glUniform1f(attrib->timer, time_of_day());
+
+    // Generate player buffer at current position
+    // Offset player slightly behind camera for better visibility in 3rd person
+    const float offset_distance = 3.0f;
+    const float px = s->x - offset_distance * SDL_sinf(s->rx);
+    const float py = s->y - 0.5f; // Slight downward offset
+    const float pz = s->z + offset_distance * SDL_cosf(s->rx);
+
+    const GLuint player_buffer = sdl_gl_helper::gen_player_buffer(px, py, pz, s->rx, s->ry);
+    sdl_gl_helper::draw_player(attrib, player_buffer);
+    sdl_gl_helper::del_buffer(player_buffer);
 }
 
 void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept

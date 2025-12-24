@@ -78,7 +78,7 @@ public:
     static void draw_sign(const attrib* a, std::uint32_t buffer, int length) noexcept;
     static void draw_cube(const attrib* a, std::uint32_t buffer) noexcept;
     static void draw_plant(const attrib* a, std::uint32_t buffer) noexcept;
-    static void draw_player(const attrib* a, const player* _player) noexcept;
+    static void draw_player(const attrib* a, std::uint32_t buffer) noexcept;
 
 private:
     std::once_flag m_initialized_flag;

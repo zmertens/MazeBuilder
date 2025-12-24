@@ -605,7 +605,8 @@ struct craft::craft_impl
                 });
             for (auto i{static_cast<int>(mazes::algo::BINARY_TREE)}; i < static_cast<int>(mazes::algo::TOTAL); ++i)
             {
-                algo_list.emplace_back(mazes::to_sv_from_algo(static_cast<mazes::algo>(i)));
+                // Need temporary string object to store the result from to_sv_from_algo
+                algo_list.emplace_back(std::string{mazes::to_sv_from_algo(static_cast<mazes::algo>(i))});
             }
         }
 
