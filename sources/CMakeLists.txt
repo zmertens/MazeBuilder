@@ -69,8 +69,8 @@ message(INFO ": Fetching fmt library...")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(FetchContent)
-# fmt version 11.2.0
-FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 40626af88bd7df9a5fb80be7b25ac85b122d6c21)
+# fmt version 12.1.0
+FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 407c905e45ad75fc29bf0f9bb7c5c2fd3475976f)
 # Configure fmt options before making it available
 set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
 set(FMT_TEST OFF CACHE BOOL "" FORCE)
