@@ -50,6 +50,7 @@ namespace mazes
         /// @brief Get a random available cell location
         /// @param rng Randomizer to use
         /// @return A pair (row, col) of a random available cell
+        /// @pre count() > 0 — callers must ensure at least one cell is available
         std::pair<unsigned int, unsigned int> random_location(randomizer &rng) const noexcept;
 
         /// @brief Get the number of rows
@@ -64,6 +65,7 @@ namespace mazes
         /// @param filename Path to the text file ('X' = blocked, other = available)
         /// @return A mask loaded from the file
         /// @throws std::runtime_error if the file cannot be opened or is empty
+        /// @note Lines of different lengths are supported; shorter rows default to available
         static mask from_txt(const std::string &filename);
 
     private:

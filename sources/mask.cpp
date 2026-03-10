@@ -70,8 +70,8 @@ mask mask::from_txt(const std::string &filename)
     std::string line;
     while (std::getline(file, line))
     {
-        // Strip trailing carriage return and whitespace
-        while (!line.empty() && (line.back() == '\r' || line.back() == '\n' || line.back() == ' '))
+        // Strip trailing carriage return and spaces (std::getline already strips \n)
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
         {
             line.pop_back();
         }
@@ -87,12 +87,20 @@ mask mask::from_txt(const std::string &filename)
     }
 
     const auto rows = static_cast<unsigned int>(lines.size());
-    const auto columns = static_cast<unsigned int>(lines[0].size());
 
+    // Use the maximum line length as the column count for potentially ragged input
+    std::size_t max_cols = 0;
+    for (const auto &l : lines)
+    {
+        if (l.size() > max_cols) max_cols = l.size();
+    }
+    const auto columns = static_cast<unsigned int>(max_cols);
+
+    // Cells in shorter rows that are missing default to available (true)
     mask m(rows, columns);
     for (unsigned int row = 0; row < rows; ++row)
     {
-        for (unsigned int col = 0; col < columns && col < static_cast<unsigned int>(lines[row].size()); ++col)
+        for (unsigned int col = 0; col < static_cast<unsigned int>(lines[row].size()); ++col)
         {
             m.set(row, col, lines[row][col] != 'X');
         }
