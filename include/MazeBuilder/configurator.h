@@ -157,6 +157,15 @@ namespace mazes
             return *this;
         }
 
+        /// @brief Set the mask filename
+        /// @param filename The mask file path (.txt)
+        /// @return A reference to this configurator
+        configurator &mask_filename(std::string filename) noexcept
+        {
+            m_mask_filename = std::move(filename);
+            return *this;
+        }
+
         /// @brief Set the help flag
         /// @param help 
         /// @return 
@@ -218,6 +227,10 @@ namespace mazes
         /// @brief Get the output_format filename
         /// @return The output_format filename
         [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{ DEFAULT_FILENAME }); }
+
+        /// @brief Get the mask filename
+        /// @return The mask file path, or empty string if not set
+        [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
 
         /// @brief Set the computed image width (in pixels) for exported images
         configurator &image_width(unsigned int width) noexcept
@@ -328,6 +341,8 @@ namespace mazes
         std::optional<bool> m_help;
 
         std::optional<bool> m_version;
+
+        std::optional<std::string> m_mask_filename;
     };
 
 } // namespace
