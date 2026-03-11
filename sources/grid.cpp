@@ -211,6 +211,8 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, Directi
             neighbor_index = level * (rows * columns) + row * columns + (col - 1);
         }
         break;
+    default:
+        break;
     }
 
     // Return the neighbor (will be created lazily if it doesn't exist)

@@ -49,6 +49,7 @@ public:
     bool help_flag = false;
     bool version_flag = false;
     bool distances_flag = false;
+    bool hexagonal_flag = false;
 
     // CLI11 app
     CLI::App cli_app;
@@ -126,6 +127,10 @@ public:
             current_map[args::VERSION_FLAG_STR] = value;
             current_map[args::VERSION_OPTION_STR] = value;
             current_map[args::VERSION_WORD_STR] = value;
+        } else if (key == args::HEXAGONAL_WORD_STR) {
+
+            current_map[args::HEXAGONAL_OPTION_STR] = value;
+            current_map[args::HEXAGONAL_WORD_STR] = value;
         } else {
 
             // For other keys, store as-is (like app name)
@@ -253,7 +258,8 @@ public:
                     arg == args::HELP_FLAG_STR || arg == args::HELP_OPTION_STR ||
                     arg == args::IMAGE_WIDTH_FLAG_STR || arg == args::IMAGE_WIDTH_OPTION_STR ||
                     arg == args::IMAGE_HEIGHT_FLAG_STR || arg == args::IMAGE_HEIGHT_OPTION_STR ||
-                    arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR) {
+                    arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR ||
+                    arg == args::HEXAGONAL_OPTION_STR) {
 
                     continue;
                 }
@@ -265,7 +271,8 @@ public:
                         option_part == args::ALGO_ID_OPTION_STR || option_part == args::OUTPUT_ID_OPTION_STR ||
                         option_part == args::JSON_OPTION_STR || option_part == args::DISTANCES_OPTION_STR ||
                         option_part == args::IMAGE_WIDTH_OPTION_STR || option_part == args::IMAGE_HEIGHT_OPTION_STR ||
-                        option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR) {
+                        option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR ||
+                        option_part == args::HEXAGONAL_OPTION_STR) {
 
                         // Validate the value part for slice syntax if it's distances
                         if (option_part == args::DISTANCES_OPTION_STR) {
@@ -397,6 +404,8 @@ private:
 
         const auto VERSION_OPTIONS = string_utils::format("{},{}", args::VERSION_FLAG_STR, args::VERSION_OPTION_STR);
         cli_app.add_flag(VERSION_OPTIONS, version_flag, "Show version information");
+
+        cli_app.add_flag(args::HEXAGONAL_OPTION_STR, hexagonal_flag, "Generate a hexagonal maze");
     }
 
 public:
@@ -592,6 +601,11 @@ public:
         if (version_flag) {
 
             add_argument_variants(args::VERSION_WORD_STR, args::TRUE_VALUE);
+        }
+
+        if (hexagonal_flag) {
+
+            add_argument_variants(args::HEXAGONAL_WORD_STR, args::TRUE_VALUE);
         }
     } // populate_args_map
 

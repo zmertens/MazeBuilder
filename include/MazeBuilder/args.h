@@ -85,6 +85,10 @@ namespace mazes
         static constexpr const auto VERSION_OPTION_STR = "--version";
         static constexpr const auto VERSION_WORD_STR = "version";
 
+        // Hexagonal grid related constants
+        static constexpr const auto HEXAGONAL_OPTION_STR = "--hexagonal";
+        static constexpr const auto HEXAGONAL_WORD_STR = "hexagonal";
+
         // Special values
         static constexpr const auto TRUE_VALUE = "true";
         static constexpr const auto FALSE_VALUE = "false";

@@ -70,6 +70,18 @@ Run the `dfs` algorithm with short arguments:
 mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o dfs.obj
 ```
 
+Generate a hexagonal maze using the `--hexagonal` flag:
+
+```sh
+mazebuildercli.exe --rows=10 --columns=10 --algo=dfs --hexagonal
+```
+
+Generate a hexagonal maze with a specific seed and output to a file:
+
+```sh
+mazebuildercli.exe -r 15 -c 15 -s 7 -a dfs --hexagonal -o hex_maze.txt
+```
+
 Get some help and print to standard output:
 ```sh
 mazebuildercli.exe --help
