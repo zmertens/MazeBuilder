@@ -453,7 +453,9 @@ struct pathtracer_app::pathtracer_impl
         SDL_GPUTextureCreateInfo tex_info{};
         tex_info.type                 = SDL_GPU_TEXTURETYPE_2D;
         tex_info.format               = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-        tex_info.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        tex_info.usage                = SDL_GPU_TEXTUREUSAGE_SAMPLER
+                                      | SDL_GPU_TEXTUREUSAGE_COPY_DST
+                                      | SDL_GPU_TEXTUREUSAGE_COPY_SRC;
         tex_info.width                = RENDER_W;
         tex_info.height               = RENDER_H;
         tex_info.layer_count_or_depth = 1;
