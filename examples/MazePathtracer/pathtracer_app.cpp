@@ -513,12 +513,17 @@ struct pathtracer_app::pathtracer_impl
         if (!transfer) return;
 
         void* mapped = SDL_MapGPUTransferBuffer(gpu_dev, transfer, false);
-        if (mapped)
+        if (!mapped)
         {
-            std::memcpy(mapped, pixels.data(), buf_size);
-            SDL_UnmapGPUTransferBuffer(gpu_dev, transfer);
+            SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
+                         "SDL_MapGPUTransferBuffer failed: %s",
+                         SDL_GetError());
+            SDL_ReleaseGPUTransferBuffer(gpu_dev, transfer);
+            return;
         }
 
+        std::memcpy(mapped, pixels.data(), buf_size);
+        SDL_UnmapGPUTransferBuffer(gpu_dev, transfer);
         SDL_GPUCommandBuffer* cmd = SDL_AcquireGPUCommandBuffer(gpu_dev);
         if (!cmd)
         {
