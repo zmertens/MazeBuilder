@@ -25,9 +25,8 @@ file(GLOB TEST_FILES ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
 # These tests can use the Catch2-provided main
 add_executable(${MAZE_BUILDER_TESTS_EXE} ${TEST_FILES})
 add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_EXE}
-        ${MAZE_BUILDER_TESTS_EXE}
         --reporter console
-        --reporter xml:${CMAKE_BINARY_DIR}/test-results.xml
+        --reporter XML::out=${CMAKE_BINARY_DIR}/test-results.xml
         --durations yes
         --order lex
         -s)
