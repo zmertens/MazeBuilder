@@ -61,12 +61,7 @@ static std::string get_cli_help_str()
         "\t-m, --mask         load mask from text file\n"
         "\t-s, --seed         seed for the number generator\n"
         "\t-r, --rows         rows [max: 100]\n"
-<<<<<<< HEAD
-        "\t-o, --output       output format\n"
-        "\t                     [json, obj, text, stdout]\n"
-=======
         "\t-o, --output       output format [json, obj, text, stdout]\n"
->>>>>>> masking2
         "\t-v, --version      display program version\n";
 }
 
