@@ -227,35 +227,11 @@ namespace mazes
         /// @brief Get the output_format filename
         /// @return The output_format filename
         [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{ DEFAULT_FILENAME }); }
-<<<<<<< HEAD
-        
-=======
 
         /// @brief Get the mask filename
         /// @return The mask file path, or empty string if not set
         [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
 
-        /// @brief Set the computed image width (in pixels) for exported images
-        configurator &image_width(unsigned int width) noexcept
-        {
-            m_image_width = width;
-            return *this;
-        }
-
-        /// @brief Set the computed image height (in pixels) for exported images
-        configurator &image_height(unsigned int height) noexcept
-        {
-            m_image_height = height;
-            return *this;
-        }
-
-        /// @brief Get the computed image width (in pixels) for exported images
-        [[nodiscard]] unsigned int image_width() const noexcept { return m_image_width.value_or(0u); }
-
-        /// @brief Get the computed image height (in pixels) for exported images
-        [[nodiscard]] unsigned int image_height() const noexcept { return m_image_height.value_or(0u); }
-
->>>>>>> masking2
         [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
         [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
 
