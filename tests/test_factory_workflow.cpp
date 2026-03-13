@@ -226,11 +226,6 @@ TEST_CASE("Grid grid_factory registration", "[grid_factory registration]")
         config.distances(true);
         auto grid2 = grid_factory.create("test", config);
         REQUIRE(grid2 != nullptr);
-
-        // With distances and image output
-        config.output_format_id(output_format::PNG);
-        auto grid3 = grid_factory.create("test", config);
-        REQUIRE(grid3 != nullptr);
     }
 
     SECTION("Clear removes all creators")

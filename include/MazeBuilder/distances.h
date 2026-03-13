@@ -2,9 +2,14 @@
 #define DISTANCES_H
 
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+
+#include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 
 namespace mazes
 {
@@ -41,12 +46,6 @@ namespace mazes
         /// @param index The index of the cell to check for containment.
         bool contains(int32_t index) const noexcept;
 
-        /// @brief Computes the shortest path to a goal cell index within a distances object.
-        /// @param goal_index The index of the goal cell.
-        /// @param grid A reference to the grid object for retrieving cell pointers.
-        /// @return A shared pointer to a distances object representing the path.
-        std::shared_ptr<distances> path_to(std::unique_ptr<grid_interface> const &g, int32_t goal_index) const noexcept;
-
         /// @brief Computes the maximum distance and cell index in a distances object.
         /// @return A pair containing the index of the cell with the maximum distance and the distance value.
         std::pair<int32_t, int> max() const noexcept;
@@ -54,6 +53,13 @@ namespace mazes
         /// @brief Collects all cell indices stored in the distances object.
         /// @param indices A reference to a vector to store the collected indices.
         void collect_keys(std::vector<int32_t> &indices) const noexcept;
+
+        /// @brief Computes the shortest path to a goal cell index within a distances object.
+        /// @param start_index The index of the starting cell.
+        /// @param goal_index The index of the goal cell.
+        /// @param grid A reference to the grid object for retrieving cell pointers.
+        /// @return A shared pointer to a distances object representing the path.
+        static std::shared_ptr<distances> path_to(grid_interface *g, int32_t start_index, int32_t goal_index) noexcept;
 
     private:
         std::unordered_map<int32_t, int> m_cells;
