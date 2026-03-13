@@ -5,12 +5,9 @@
 #include <MazeBuilder/grid.h>
 #include <MazeBuilder/grid_operations.h>
 
-#include <functional>
+#include <algorithm>
+#include <array>
 #include <string>
-
-#if defined(MAZE_DEBUG)
-#include <iostream>
-#endif
 
 using namespace mazes;
 
@@ -19,46 +16,9 @@ using namespace mazes;
 /// @param cols 1
 /// @param levels 1
 colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int levels)
-    : m_grid{std::make_unique<grid>(rows, cols, levels)}, m_distances{std::make_shared<distances>(rows * cols)}
+    : m_grid{std::make_unique<grid>(rows, cols, levels)}, m_distances{std::make_shared<distances>(0)}
 {
 }
-
-// void colored_grid::configure(const std::vector<int>& indices) noexcept {
-//
-//     using namespace std;
-
-//    grid::configure(cref(indices));
-//
-//    try {
-//
-//        auto [ROWS, COLUMNS, _] = this->get_dimensions();
-//
-//        auto found = search(ROWS * COLUMNS);
-//
-//        if (!found) {
-//
-//            throw std::runtime_error("Search returned a null cell.");
-//        }
-//
-//        m_distances = std::make_shared<distances>(found->get_index());
-//
-//        if (!m_distances) {
-//
-//            throw std::runtime_error("Failed to create distances object.");
-//        }
-//
-//        m_distances = m_distances->path_to(0, *this);
-//
-//        if (!m_distances) {
-//
-//            throw std::runtime_error("Failed to get path to goal.");
-//        }
-//    } catch (const std::exception& e) {
-// #if defined(MAZE_DEBUG)
-//        std::cerr << "Exception in distance_grid::start_configuration: " << e.what() << std::endl;
-// #endif
-//    }
-//}
 
 std::string colored_grid::contents_of(const std::shared_ptr<cell> &c) const noexcept
 {
@@ -76,33 +36,45 @@ std::string colored_grid::contents_of(const std::shared_ptr<cell> &c) const noex
     return m_grid->contents_of(c);
 }
 
+void colored_grid::initialize_distance_coloring(int start_index, int goal_index) noexcept
+{
+    m_distances = distances::path_to(m_grid.get(), start_index, goal_index);
+}
+
 std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell> &c) const noexcept
 {
-
     using namespace std;
 
     if (!c)
     {
-
         return m_grid->background_color_for(cref(c));
     }
 
-    const auto &d = this->m_distances->path_to(m_grid, c->get_index());
-
-    if (!d)
+    // Only path cells are colored; all others use the grid default.
+    if (!m_distances || !m_distances->contains(c->get_index()))
     {
-
         return m_grid->background_color_for(cref(c));
     }
 
-    auto max = d->max();
+    // 8-stop palette: deep blue (start) → red (goal)
+    static constexpr std::array<std::uint32_t, 8> kPalette = {
+        0x0015FFu, // deep blue
+        0x0084FFu, // sky blue
+        0x00E5FFu, // cyan
+        0x00FF9Eu, // aqua green
+        0x7DFF00u, // yellow-green
+        0xFFF000u, // yellow
+        0xFF9800u, // orange
+        0xFF1A00u  // red
+    };
 
-    int distance1 = d->operator[](max.first);
+    const int distance = (*m_distances)[c->get_index()];
+    const int max_dist = m_distances->max().second;
+    float normalized = max_dist > 0 ? static_cast<float>(distance) / static_cast<float>(max_dist) : 0.0f;
+    normalized = std::clamp(normalized, 0.0f, 1.0f);
 
-    float intensity = static_cast<float>(10 - distance1) / 10;
-    int dark = static_cast<int>(255 * intensity);
-    int bright = 128 + static_cast<int>(127 * intensity);
-    return (dark << 16) | (bright << 8) | dark;
+    const auto bucket = static_cast<std::size_t>(normalized * static_cast<float>(kPalette.size() - 1) + 0.5f);
+    return kPalette[std::min(bucket, kPalette.size() - 1)];
 }
 
 // Delegate to embedded grid

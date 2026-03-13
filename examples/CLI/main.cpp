@@ -30,7 +30,7 @@ std::shared_ptr<cli> get()
     return mazes::singleton_base<cli>::instance();
 }
 
-EMSCRIPTEN_BINDINGS (cli_module)
+EMSCRIPTEN_BINDINGS(cli_module)
 {
     emscripten::function("get", &get);
     emscripten::class_<cli>("cli")
@@ -45,7 +45,7 @@ EMSCRIPTEN_BINDINGS (cli_module)
 
 #endif // EMSCRIPTEN_BINDINGS
 
-int main(const int argc, char* argv[])
+int main(const int argc, char *argv[])
 {
 #if defined(__EMSCRIPTEN__)
 
@@ -61,7 +61,7 @@ int main(const int argc, char* argv[])
         {
             mazes::configurator user_options;
             if (const auto str = my_cli->convert_with_options(std::cref(args_vec),
-                std::ref(user_options));
+                                                              std::ref(user_options));
                 !str.empty())
             {
                 if (user_options.help())
@@ -79,55 +79,26 @@ int main(const int argc, char* argv[])
                 std::stringstream stream;
                 bool write_success{false};
                 constexpr mazes::io_utils writer{};
-
-                // PNG and JPEG formats handle their own file writing in create.h
-                if (const auto output_fmt = user_options.output_format_id();
-                    output_fmt == mazes::output_format::PNG || output_fmt == mazes::output_format::JPEG)
+                // Check if we have a specific output filename
+                if (const auto filename = user_options.output_filename(); !filename.empty())
                 {
-                    const auto filename = user_options.output_filename();
-                    if (user_options.output_format_id() == mazes::output_format::PNG)
+                    if (user_options.output_format_id() == mazes::output_format::STDOUT)
                     {
-                        write_success = writer.write_png(filename,
-                                                         mazes::bytes::string_to_bytes(str),
-                                                         user_options.image_width(),
-                                                         user_options.image_height(),
-                                                         4);
-                    }
-                    else if (user_options.output_format_id() == mazes::output_format::JPEG)
-                    {
-                        write_success = writer.write_jpeg(filename, mazes::bytes::string_to_bytes(str),
-                                                          user_options.image_width(),
-                                                          user_options.image_height(),
-                                                          4);
-                    }
-
-                    stream << "Wrote file: " << filename << std::endl;
-                    stream << "Image dimensions: " << user_options.image_width() << "x"
-                        << user_options.image_height() << std::endl;
-                }
-                else
-                {
-                    // Check if we have a specific output filename
-                    if (const auto filename = user_options.output_filename(); !filename.empty())
-                    {
-                        if (user_options.output_format_id() == mazes::output_format::STDOUT)
-                        {
-                            // Write to stdout
-                            write_success = writer.write(std::cout, str);
-                            stream << "Wrote to standard output." << std::endl;
-                        }
-                        else
-                        {
-                            // Write to file
-                            write_success = writer.write_file(user_options.output_filename(), str);
-                            stream << "Wrote file: " << filename << std::endl;
-                        }
-                    }
-                    else
-                    {
+                        // Write to stdout
                         write_success = writer.write(std::cout, str);
                         stream << "Wrote to standard output." << std::endl;
                     }
+                    else
+                    {
+                        // Write to file
+                        write_success = writer.write_file(user_options.output_filename(), str);
+                        stream << "Wrote file: " << filename << std::endl;
+                    }
+                }
+                else
+                {
+                    write_success = writer.write(std::cout, str);
+                    stream << "Wrote to standard output." << std::endl;
                 }
 
                 if (!write_success)
@@ -150,7 +121,7 @@ int main(const int argc, char* argv[])
             throw std::runtime_error("Failed to create CLI instance");
         }
     }
-    catch (const std::exception& ex)
+    catch (const std::exception &ex)
     {
         std::cerr << ex.what() << std::endl;
     }

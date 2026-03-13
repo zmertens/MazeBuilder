@@ -1,14 +1,7 @@
 #include <MazeBuilder/distances.h>
 
-#include <MazeBuilder/cell.h>
-#include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/grid_operations.h>
-
-#include <deque>
-
-#if defined(MAZE_DEBUG)
-#include <iostream>
-#endif
+#include <algorithm>
+#include <unordered_set>
 
 using namespace mazes;
 
@@ -38,117 +31,6 @@ bool distances::contains(int32_t index) const noexcept
     return m_cells.find(index) != m_cells.end();
 }
 
-/// @brief Implementation of breadth-first search
-/// @param goal_index
-/// @param g
-/// @return
-std::shared_ptr<distances> distances::path_to(std::unique_ptr<grid_interface> const &g, int32_t goal_index) const noexcept
-{
-    // Create a new distances object to store the path
-    auto path = std::make_shared<distances>(m_root_index);
-
-    // If the goal index is the same as the root index, return path with just the root
-    if (goal_index == m_root_index)
-    {
-        return path;
-    }
-
-    // Parent map to reconstruct the path
-    std::unordered_map<int32_t, int32_t> parent;
-    std::unordered_map<int32_t, bool> visited;
-
-    // BFS queue
-    std::deque<int32_t> q;
-    q.push_back(m_root_index);
-    visited[m_root_index] = true;
-    parent[m_root_index] = -1;
-
-    static constexpr auto MAX_ITERATIONS = 1000000;
-#if defined(MAZE_DEBUG)
-    auto current_iteration = 0;
-#endif
-
-    // Get the grid operations interface
-    auto &ops = g->operations();
-
-    while (!q.empty())
-    {
-#if defined(MAZE_DEBUG)
-        if (current_iteration++ > MAX_ITERATIONS)
-        {
-            std::cerr << "Error: path_to exceeded maximum iterations." << std::endl;
-            return path;
-        }
-#endif
-
-        int32_t current_index = q.front();
-        q.pop_front();
-
-        // If we reached the goal, reconstruct the path
-        if (current_index == goal_index)
-        {
-            // Reconstruct path from goal to root
-            std::vector<int32_t> path_indices;
-            int32_t step = goal_index;
-
-            while (step != -1)
-            {
-                path_indices.push_back(step);
-                step = parent[step];
-            }
-
-            // Set distances in the path (distance 0 for root, increasing towards goal)
-            for (size_t i = 0; i < path_indices.size(); ++i)
-            {
-                int distance = static_cast<int>(path_indices.size() - 1 - i);
-                path->set(path_indices[i], distance);
-            }
-
-            return path;
-        }
-
-        // Retrieve the current cell
-        auto current_cell = ops.search(current_index);
-        if (!current_cell)
-        {
-#if defined(MAZE_DEBUG)
-            std::cerr << "Error: grid::search returned nullptr for index " << current_index << std::endl;
-#endif
-            continue;
-        }
-
-        // Process each neighbor that has a passage (linked cells)
-        auto neighbors = ops.get_neighbors(current_cell);
-        for (const auto &neighbor : neighbors)
-        {
-            if (!neighbor)
-                continue;
-
-            int32_t neighbor_index = neighbor->get_index();
-
-            // Skip if already visited
-            if (visited.find(neighbor_index) != visited.end())
-            {
-                continue;
-            }
-
-            // Only follow passages that exist (cells that are linked)
-            if (!current_cell->is_linked(neighbor))
-            {
-                continue;
-            }
-
-            // Mark as visited and add to queue
-            visited[neighbor_index] = true;
-            parent[neighbor_index] = current_index;
-            q.push_back(neighbor_index);
-        }
-    }
-
-    // No path found, return empty path
-    return std::make_shared<distances>(m_root_index);
-}
-
 std::pair<int32_t, int> distances::max() const noexcept
 {
     int32_t max_index = m_root_index;
@@ -173,4 +55,93 @@ void distances::collect_keys(std::vector<int32_t> &indices) const noexcept
     {
         indices.push_back(index);
     }
+}
+
+std::shared_ptr<distances> distances::path_to(grid_interface *g, int32_t start_index, int32_t goal_index) noexcept
+{
+    auto path = std::make_shared<distances>(start_index);
+
+    if (!g)
+    {
+        return path;
+    }
+
+    auto &ops = g->operations();
+    const auto total_cells = static_cast<int32_t>(ops.num_cells());
+
+    if (start_index < 0 || goal_index < 0 || start_index >= total_cells || goal_index >= total_cells)
+    {
+        return path;
+    }
+
+    if (start_index == goal_index)
+    {
+        return path;
+    }
+
+    std::unordered_map<int32_t, int32_t> parent;
+    std::unordered_set<int32_t> visited;
+    std::deque<int32_t> queue;
+
+    queue.push_back(start_index);
+    visited.insert(start_index);
+    parent[start_index] = -1;
+
+    bool found = false;
+
+    while (!queue.empty())
+    {
+        const int32_t current_index = queue.front();
+        queue.pop_front();
+
+        if (current_index == goal_index)
+        {
+            found = true;
+            break;
+        }
+
+        const auto current_cell = ops.search(current_index);
+        if (!current_cell)
+        {
+            continue;
+        }
+
+        const auto neighbors = ops.get_neighbors(current_cell);
+        for (const auto &neighbor : neighbors)
+        {
+            if (!neighbor || !current_cell->is_linked(neighbor))
+            {
+                continue;
+            }
+
+            const int32_t neighbor_index = neighbor->get_index();
+            if (visited.find(neighbor_index) != visited.end())
+            {
+                continue;
+            }
+
+            visited.insert(neighbor_index);
+            parent[neighbor_index] = current_index;
+            queue.push_back(neighbor_index);
+        }
+    }
+
+    if (!found)
+    {
+        return path;
+    }
+
+    std::vector<int32_t> path_indices;
+    for (int32_t step = goal_index; step != -1; step = parent[step])
+    {
+        path_indices.push_back(step);
+    }
+    std::reverse(path_indices.begin(), path_indices.end());
+
+    for (size_t i = 0; i < path_indices.size(); ++i)
+    {
+        path->set(path_indices[i], static_cast<int>(i));
+    }
+
+    return path;
 }

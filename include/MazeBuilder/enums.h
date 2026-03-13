@@ -1,7 +1,6 @@
-#ifndef ENUMS
-#define ENUMS
+#ifndef ENUMS_H
+#define ENUMS_H
 
-#include <cstdint>
 #include <string>
 #include <string_view>
 #include <stdexcept>
@@ -35,13 +34,9 @@ namespace mazes
 
         WAVEFRONT_OBJECT_FILE = 2,
 
-        PNG = 3,
+        STDOUT = 3,
 
-        JPEG = 4,
-
-        STDOUT = 5,
-
-        TOTAL = 6
+        TOTAL = 4
     };
 
     /// @brief Convert an output_format enum to a string
@@ -62,12 +57,6 @@ namespace mazes
         case output_format::WAVEFRONT_OBJECT_FILE:
 
             return "obj";
-        case output_format::PNG:
-
-            return "png";
-        case output_format::JPEG:
-
-            return "jpeg";
         case output_format::STDOUT:
 
             return "stdout";
@@ -97,21 +86,6 @@ namespace mazes
         {
 
             return output_format::WAVEFRONT_OBJECT_FILE;
-        }
-        else if (sv.compare("png") == 0)
-        {
-
-            return output_format::PNG;
-        }
-        else if (sv.compare("jpeg") == 0)
-        {
-
-            return output_format::JPEG;
-        }
-        else if (sv.compare("jpg") == 0)
-        {
-
-            return output_format::JPEG;
         }
         else if (sv.compare("stdout") == 0)
         {
@@ -179,13 +153,12 @@ namespace mazes
     };
 
     /// @brief Directional neighbors for grid topology
-    enum class Direction : std::uint8_t
+    enum class Direction : int
     {
         NORTH = 0,
         SOUTH = 1,
         EAST = 2,
-        WEST = 3,
-        COUNT
+        WEST = 3
     };
 } // namespace
 

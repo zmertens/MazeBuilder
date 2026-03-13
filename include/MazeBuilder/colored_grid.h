@@ -38,6 +38,11 @@ namespace mazes
         /// @return An 32-bit unsigned integer containing the background color
         virtual std::uint32_t background_color_for(const std::shared_ptr<cell> &c) const noexcept override;
 
+        /// @brief Initialize distance coloring from a starting cell index.
+        /// @param start_index The index of the starting cell for distance calculation.
+        /// @param goal_index The index of the goal cell for distance calculation.
+        void initialize_distance_coloring(int start_index, int goal_index) noexcept;
+
         // Delegate to embedded grid
         grid_operations &operations() noexcept override;
 
