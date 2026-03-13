@@ -114,9 +114,9 @@ int main() {
 
 ## Voxels
 
-![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExbjlnbjl6NmZ3c3hmMW05MDV1YXg1NjFuOW5ydHRlYW5xdjVvY3BsMCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/iO02l5jhramJ43olgE/giphy.gif)
+![](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjEwNzU4aTBjamE0aDhtN281YW11N2QxYWhxM2F2eGU3a3RpdGg5NCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VOT4sVJVxgK2RXADkZ/giphy.gif)
 
-- The Voxels app is set in a 3D voxel world and enables interactive maze generation and downloading of Wavefront object files.
+  - Build in a 3D voxel world and download scenes as Wavefront object files.
 
 [Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
 

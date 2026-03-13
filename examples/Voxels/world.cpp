@@ -428,7 +428,7 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     int hx, hy, hz, face;
     if (hit_test_face(&hx, &hy, &hz, &face))
     {
-        m_projected_plane.visible = true;
+        // Track target for building purposes
         m_projected_plane.target_x = hx;
         m_projected_plane.target_y = hy;
         m_projected_plane.target_z = hz;
@@ -437,9 +437,8 @@ void world::update(const float delta_time, mazes::randomizer& rng) noexcept
     }
     else
     {
-        // No valid target (looking at sky/void) - hide plane gracefully
+        // No valid target (looking at sky/void) - can't build here, but preview stays visible
         m_projected_plane.has_valid_target = false;
-        m_projected_plane.visible = false;
     }
 
     // Apply collision detection (height = 2 blocks for player)
@@ -504,6 +503,8 @@ void world::draw() const noexcept
 
     render_item(&s_block_attrib, atlas_texture);
 
+    render_player(&s_block_attrib, atlas_texture);
+
     render_signs(&s_text_attrib, signs_texture);
     render_sign(&s_text_attrib, signs_texture);
 
@@ -513,7 +514,12 @@ void world::draw() const noexcept
     SDL_snprintf(buffer.data(), buffer.size(), "[%d triangle faces, %zu chunks]",
                  triangle_faces, get_chunk_count());
     render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
-                10, viewport_height - 10, 12.0f, buffer.data());
+                10, viewport_height - 15, 12.0f, buffer.data());
+
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+                10, viewport_height - 35, 12.0f, "Press E to preview");
+    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+                10, viewport_height - 55, 12.0f, "Press B to build");
 
     render_wireframe(&s_line_attrib);
 
@@ -677,7 +683,7 @@ bool world::update_preview(mazes::grid_interface* g) const noexcept
         pixel_data.data(),
         width,
         height,
-        static_cast<std::uint32_t>(TextureIdentifier::MAZE)))
+        static_cast<std::uint32_t>(TextureIdentifier::MAZE), false))
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to update maze texture from memory\n");
         return false;
@@ -690,14 +696,35 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                                int width, int height, int scale,
                                int wall_height, int item_type) noexcept
 {
-    m_current_preview_id++;
+    // Store preview data in memory for reusable building
+    m_current_preview.pixel_data = pixel_data;
+    m_current_preview.width = width;
+    m_current_preview.height = height;
+    m_current_preview.scale = scale;
+    m_current_preview.wall_height = wall_height;
+    m_current_preview.item_type = item_type;
+    m_current_preview.has_data = true;
+}
 
-    // Calculate base position from target face
+// Build the current preview at the targeted location
+// Called when user presses 'B' (BUILD/PLACE_MAZE action)
+// Uses stored preview data and builds at current crosshair target
+void world::commit_preview_to_world() noexcept
+{
+    // Check if we have preview data
+    if (!m_current_preview.has_data)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "No preview to build - press 'E' first to generate a preview\n");
+        return;
+    }
+
+    // Calculate base position from current target face
     int base_x = m_projected_plane.target_x;
     int base_y = m_projected_plane.target_y;
     int base_z = m_projected_plane.target_z;
 
-    // Adjust position based on which face was targeted
+    // Adjust position based on which face is targeted
     switch (m_projected_plane.target_face)
     {
     // Left face (-X)
@@ -726,105 +753,42 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
         break;
     }
 
-    auto build_func = [pixel_data, width, height, scale, base_x, base_y, base_z, wall_height, item_type,
-            preview_id = m_current_preview_id]()
+    // Calculate logical maze dimensions
+    const int logical_width = m_current_preview.width / m_current_preview.scale;
+    const int logical_height = m_current_preview.height / m_current_preview.scale;
+
+    // Build the maze at the current target location
+    int blocks_placed = 0;
+    for (int cell_y = 0; cell_y < logical_height; ++cell_y)
     {
-        // Calculate logical maze dimensions
-        const int logical_width = width / scale;
-        const int logical_height = height / scale;
-
-        // Collect all preview blocks first
-        std::vector<std::tuple<int, int, int, int, int, int>> preview_blocks;
-        preview_blocks.reserve(logical_width * logical_height * wall_height);
-
-        for (int cell_y = 0; cell_y < logical_height; ++cell_y)
+        for (int cell_x = 0; cell_x < logical_width; ++cell_x)
         {
-            for (int cell_x = 0; cell_x < logical_width; ++cell_x)
+            // Sample the center of each scaled cell region
+            const int pix_x = cell_x * m_current_preview.scale + m_current_preview.scale / 2;
+            const int pix_y = cell_y * m_current_preview.scale + m_current_preview.scale / 2;
+            const int pixel_index = (pix_y * m_current_preview.width + pix_x) * 4;
+
+            // Read RGB values
+            const uint8_t r = m_current_preview.pixel_data[pixel_index + 0];
+            const uint8_t g = m_current_preview.pixel_data[pixel_index + 1];
+            const uint8_t b = m_current_preview.pixel_data[pixel_index + 2];
+
+            // Check if pixel is black (wall)
+            if (r < 50 && g < 50 && b < 50)
             {
-                // Sample the center of each scaled cell region
-                const int pix_x = cell_x * scale + scale / 2;
-                const int pix_y = cell_y * scale + scale / 2;
-                const int pixel_index = (pix_y * width + pix_x) * 4;
-
-                // Read RGB values
-                const uint8_t r = pixel_data[pixel_index + 0];
-                const uint8_t g = pixel_data[pixel_index + 1];
-                const uint8_t b = pixel_data[pixel_index + 2];
-
-                // Check if pixel is black (wall)
-
-                if (r < 50 && g < 50 && b < 50)
+                // Place a vertical column of blocks for this wall
+                for (int y = 0; y < m_current_preview.wall_height; ++y)
                 {
-                    // Place a vertical column of blocks for this wall
-                    for (int y = 0; y < wall_height; ++y)
-                    {
-                        const int world_x = base_x + cell_x;
-                        const int world_y = base_y + y;
-                        const int world_z = base_z + cell_y;
+                    const int world_x = base_x + cell_x;
+                    const int world_y = base_y + y;
+                    const int world_z = base_z + cell_y;
 
-                        // Calculate chunk coordinates
-                        const int p = chunked(static_cast<float>(world_x));
-                        const int q = chunked(static_cast<float>(world_z));
-
-                        preview_blocks.emplace_back(p, q, world_x, world_y, world_z, item_type);
-                    }
+                    set_block(world_x, world_y, world_z, m_current_preview.item_type);
+                    blocks_placed++;
                 }
             }
         }
-
-        if (!preview_blocks.empty())
-        {
-            db_insert_preview_blocks(preview_id, preview_blocks);
-        }
-    };
-
-    m_building_processes.emplace_back(build_func);
-}
-
-// Commit the latest preview to the main world database
-// Called when user presses 'B' (BUILD/PLACE_MAZE action)
-// This reads blocks from preview_blocks DB, places them in the world, and commits to main block table
-void world::commit_preview_to_world() noexcept
-{
-    if (!get_db_enabled())
-    {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "Database not enabled - cannot commit preview\n");
-        return;
     }
-
-    const int latest_preview_id = db_get_latest_preview_id();
-
-    if (latest_preview_id <= 0)
-    {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "No preview to build - press 'E' first to generate a preview\n");
-        return;
-    }
-
-    // Get all preview blocks from the database
-    auto blocks_to_build = db_get_all_preview_blocks(latest_preview_id);
-
-    if (blocks_to_build.empty())
-    {
-        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
-                    "No blocks found for preview_id %d\n", latest_preview_id);
-        return;
-    }
-
-    // Now actually place the blocks in the world
-    int blocks_placed = 0;
-    for (const auto& [p, q, x, y, z, w] : blocks_to_build)
-    {
-        set_block(x, y, z, w);
-        blocks_placed++;
-    }
-
-    // Commit latest preview to main block table and clear all previews
-    db_commit_latest_preview_to_main();
-
-    // Force database commit
-    db_commit();
 }
 
 void world::process_build_queue() noexcept
@@ -2477,18 +2441,10 @@ void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t
     }
 }
 
-void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
+void world::render_player(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
 {
-    if (!attrib || !m_player || !m_player->m_configs.preview_enabled)
-    {
-        return;
-    }
-
-    // Get the player's projected plane state
-    const auto& plane = m_projected_plane;
-
-    // Only render if plane is visible and has a valid target
-    if (!plane.visible || !plane.has_valid_target)
+    // Only render player model in 3rd person mode (ortho 1-64)
+    if (m_player->m_configs.ortho < 1 || m_player->m_configs.ortho > 64)
     {
         return;
     }
@@ -2496,131 +2452,171 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
     auto [width, height] = m_sdl->get_window_size();
     const player::position* s = &m_player->m_pos;
 
-    constexpr auto PROJECTED_PLANE_HEIGHT_OFFSET = 0.5f;
+    // Set up 3D projection matrix
     float matrix[16];
     set_matrix_3d(
         matrix, width, height,
-        s->x, s->y + PROJECTED_PLANE_HEIGHT_OFFSET, s->z,
-        s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
+        s->x, s->y, s->z, s->rx, s->ry,
+        m_player->m_configs.fov,
+        m_player->m_configs.ortho,
         RENDER_CHUNK_RADIUS);
 
     glUseProgram(attrib->program);
+    glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
+    glBindTexture(GL_TEXTURE_2D, texture);
     glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform3f(attrib->camera, s->x, s->y + PROJECTED_PLANE_HEIGHT_OFFSET, s->z);
-    glUniform1f(attrib->extra2, get_daylight());
-    glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
-    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
+    glUniform3f(attrib->camera, s->x, s->y, s->z);
+    glUniform1i(attrib->sampler, 0);
     glUniform1f(attrib->timer, time_of_day());
 
-    // Use polygon offset to render in front of blocks
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glPolygonOffset(-1.0f, -1.0f);
+    // Generate player buffer at current position
+    // Offset player slightly behind camera for better visibility in 3rd person
+    const float offset_distance = 3.0f;
+    const float px = s->x - offset_distance * SDL_sinf(s->rx);
+    const float py = s->y - 0.5f; // Slight downward offset
+    const float pz = s->z + offset_distance * SDL_cosf(s->rx);
 
-    // Disable face culling so plane is visible from both sides
-    glDisable(GL_CULL_FACE);
+    const GLuint player_buffer = sdl_gl_helper::gen_player_buffer(px, py, pz, s->rx, s->ry);
+    sdl_gl_helper::draw_player(attrib, player_buffer);
+    sdl_gl_helper::del_buffer(player_buffer);
+}
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
+{
+    if (!attrib || !m_player || !m_player->m_configs.preview_enabled)
+    {
+        return;
+    }
 
-    // Get world coordinates of the targeted block's corner (not center)
-    // We'll always render on the TOP face regardless of which face was hit
-    const float world_x = static_cast<float>(plane.target_x);
-    const float world_y = static_cast<float>(plane.target_y);
-    const float world_z = static_cast<float>(plane.target_z);
+    // Check if we have a valid texture to display
+    // Note: We don't check visibility or target since this is now a persistent 2D overlay
+    // The target is still tracked for building purposes, but not required for display
+    if (!m_projected_plane.projected_texture)
+    {
+        return;
+    }
 
-    // Get maze texture dimensions from player
+    // Only render if a maze texture has been generated (width/height > 0)
     const float tex_width = static_cast<float>(m_projected_plane.projected_texture->get_width());
     const float tex_height = static_cast<float>(m_projected_plane.projected_texture->get_height());
 
-    // Scale the plane to match texture aspect ratio
-    constexpr float pixel_to_block_scale = 1.0f / 32.0f;
-    const float plane_width = tex_width * pixel_to_block_scale;
-    const float plane_height = tex_height * pixel_to_block_scale;
+    if (tex_width <= 0.0f || tex_height <= 0.0f)
+    {
+        return;
+    }
 
-    // Offset from block top face - plane hovers on z-axis
-    constexpr float offset_distance = 0.05f;
+    auto [width, height] = m_sdl->get_window_size();
+
+    // Set up 2D orthographic projection
+    float matrix[16];
+    set_matrix_2d(matrix, width, height);
+
+    glUseProgram(attrib->program);
+    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
+    glUniform1i(attrib->extra1, 0);
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
     glBindTexture(GL_TEXTURE_2D, m_textures.get(TextureIdentifier::MAZE).get());
-    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
 
-    // Build floating plane geometry
-    float quad_data[6 * 10];
-    float* d = quad_data;
+    // Enable blending for transparency
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    const float base_x = world_x;
-    const float base_y = world_y + 1.0f + offset_distance;
-    const float base_z = world_z;
+    // Disable depth testing for 2D overlay
+    glDisable(GL_DEPTH_TEST);
 
-    // Rotate vertices 180 degrees (flipped from original orientation)
-    // Original quad was: (0,0), (width,0), (width,height), (0,height)
-    // After -180° it was: (width,height), (0,height), (0,0), (width,0)
-    // Now rotating +180° from that (or -180° from original flipped):
-    // Final result: Original texture is flipped 180°
-    float vertices[4][3];
-    vertices[0][0] = 0.0f; // bottom-left flipped
-    vertices[0][1] = 0.0f;
-    vertices[0][2] = 0.0f;
-    vertices[1][0] = plane_width; // bottom-right flipped
-    vertices[1][1] = 0.0f;
-    vertices[1][2] = 0.0f;
-    vertices[2][0] = plane_width; // top-right flipped
-    vertices[2][1] = 0.0f;
-    vertices[2][2] = plane_height;
-    vertices[3][0] = 0.0f; // top-left flipped
-    vertices[3][1] = 0.0f;
-    vertices[3][2] = plane_height;
 
-    // UV coordinates rotated 180 degrees (both U and V inverted)
-    // This rotates the texture image 180 degrees on the plane
-    static constexpr float uvs[4][2] = {
-        {1.0f, 0.0f}, // was {0.0f, 1.0f}
-        {0.0f, 0.0f}, // was {1.0f, 1.0f}
-        {0.0f, 1.0f}, // was {1.0f, 0.0f}
-        {1.0f, 1.0f} // was {0.0f, 0.0f}
-    };
+    // Calculate preview size (5-10% of screen dimensions)
+    constexpr float PREVIEW_SIZE_FACTOR = 0.075f; // 7.5% of screen dimensions
+    const float preview_max_width = static_cast<float>(width) * PREVIEW_SIZE_FACTOR * 2.0f;
+    const float preview_max_height = static_cast<float>(height) * PREVIEW_SIZE_FACTOR * 2.0f;
 
-    // Top face normal (points up in +Y direction)
-    static constexpr float top_normal[3] = {0.0f, 1.0f, 0.0f};
+    // Calculate aspect ratio and fit preview within bounds
+    const float tex_aspect = tex_width / tex_height;
+    float preview_width, preview_height;
 
-    // Triangle indices: 0,1,2 and 0,2,3 form the quad
-    static const int indices[6] = {0, 1, 2, 0, 2, 3};
-
-    for (int i = 0; i < SDL_arraysize(indices); i++)
-    {
-        const int vert_idx = indices[i];
-
-        // Position - world space position from block corner
-        *(d++) = base_x + vertices[vert_idx][0];
-        *(d++) = base_y + vertices[vert_idx][1];
-        *(d++) = base_z + vertices[vert_idx][2];
-
-        // Normal (points upward)
-        *(d++) = top_normal[0];
-        *(d++) = top_normal[1];
-        *(d++) = top_normal[2];
-
-        // UV coordinates
-        *(d++) = uvs[vert_idx][0]; // U
-        *(d++) = uvs[vert_idx][1]; // V
-
-        // AO and light - use full brightness for maze texture
-        // AO (0.0 = no darkening, see vertex shader)
-        *(d++) = 0.0f;
-        // Light (full brightness)
-        *(d++) = 1.0f;
+    if (tex_aspect > 1.0f) {
+        // Wider than tall
+        preview_width = preview_max_width;
+        preview_height = preview_max_width / tex_aspect;
+        if (preview_height > preview_max_height) {
+            preview_height = preview_max_height;
+            preview_width = preview_max_height * tex_aspect;
+        }
+    } else {
+        // Taller than wide
+        preview_height = preview_max_height;
+        preview_width = preview_max_height * tex_aspect;
+        if (preview_width > preview_max_width) {
+            preview_width = preview_max_width;
+            preview_height = preview_max_width / tex_aspect;
+        }
     }
 
-    // Create and render the quad
-    const GLuint temp_buffer = sdl_gl_helper::gen_faces(10, 6, quad_data);
-    sdl_gl_helper::draw_triangles_3d_ao(attrib, temp_buffer, 6);
+    // Position in bottom right corner with some padding
+    constexpr float PADDING = 10.0f;
+    const float bottom_right_x = static_cast<float>(width) - preview_width - PADDING;
+    const float bottom_right_y = PADDING; // In 2D coords, 0 is at bottom
+
+    // Build 2D quad geometry (2 triangles)
+    // Vertex format: x, y, u, v (4 floats per vertex, 6 vertices for 2 triangles)
+    float quad_data[6 * 4];
+    float* d = quad_data;
+
+    // Define the quad corners (bottom-left origin)
+    const float x0 = bottom_right_x;
+    const float y0 = bottom_right_y;
+    const float x1 = bottom_right_x + preview_width;
+    const float y1 = bottom_right_y + preview_height;
+
+    // Triangle 1: bottom-left, bottom-right, top-right
+    // Vertex 0: bottom-left
+    *(d++) = x0;
+    *(d++) = y0;
+    *(d++) = 0.0f; // u
+    *(d++) = 0.0f; // v
+
+    // Vertex 1: bottom-right
+    *(d++) = x1;
+    *(d++) = y0;
+    *(d++) = 1.0f; // u
+    *(d++) = 0.0f; // v
+
+    // Vertex 2: top-right
+    *(d++) = x1;
+    *(d++) = y1;
+    *(d++) = 1.0f; // u
+    *(d++) = 1.0f; // v
+
+    // Triangle 2: bottom-left, top-right, top-left
+    // Vertex 3: bottom-left
+    *(d++) = x0;
+    *(d++) = y0;
+    *(d++) = 0.0f; // u
+    *(d++) = 0.0f; // v
+
+    // Vertex 4: top-right
+    *(d++) = x1;
+    *(d++) = y1;
+    *(d++) = 1.0f; // u
+    *(d++) = 1.0f; // v
+
+    // Vertex 5: top-left
+    *(d++) = x0;
+    *(d++) = y1;
+    *(d++) = 0.0f; // u
+    *(d++) = 1.0f; // v
+
+    // Create and render the quad using 2D drawing
+    const GLuint temp_buffer = sdl_gl_helper::gen_buffer(sizeof(quad_data), quad_data);
+    sdl_gl_helper::draw_triangles_2d(attrib, temp_buffer, 6);
     sdl_gl_helper::del_buffer(temp_buffer);
 
     // Restore GL state
-    glDisable(GL_POLYGON_OFFSET_FILL);
-    glEnable(GL_CULL_FACE);
     glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font, const int justify,

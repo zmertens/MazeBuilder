@@ -157,9 +157,18 @@ namespace mazes
             return *this;
         }
 
+        /// @brief Set the mask filename
+        /// @param filename The mask file path (.txt)
+        /// @return A reference to this configurator
+        configurator &mask_filename(std::string filename) noexcept
+        {
+            m_mask_filename = std::move(filename);
+            return *this;
+        }
+
         /// @brief Set the help flag
-        /// @param help 
-        /// @return 
+        /// @param help
+        /// @return
         configurator &help(bool help) noexcept
         {
             m_help = help;
@@ -167,8 +176,8 @@ namespace mazes
         };
 
         /// @brief Set the version flag
-        /// @param version 
-        /// @return 
+        /// @param version
+        /// @return
         configurator &version(bool version) noexcept
         {
             m_version = version;
@@ -217,27 +226,11 @@ namespace mazes
 
         /// @brief Get the output_format filename
         /// @return The output_format filename
-        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{ DEFAULT_FILENAME }); }
+        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{DEFAULT_FILENAME}); }
 
-        /// @brief Set the computed image width (in pixels) for exported images
-        configurator &image_width(unsigned int width) noexcept
-        {
-            m_image_width = width;
-            return *this;
-        }
-
-        /// @brief Set the computed image height (in pixels) for exported images
-        configurator &image_height(unsigned int height) noexcept
-        {
-            m_image_height = height;
-            return *this;
-        }
-
-        /// @brief Get the computed image width (in pixels) for exported images
-        [[nodiscard]] unsigned int image_width() const noexcept { return m_image_width.value_or(0u); }
-
-        /// @brief Get the computed image height (in pixels) for exported images
-        [[nodiscard]] unsigned int image_height() const noexcept { return m_image_height.value_or(0u); }
+        /// @brief Get the mask filename
+        /// @return The mask file path, or empty string if not set
+        [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
 
         [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
         [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
@@ -320,14 +313,11 @@ namespace mazes
 
         std::optional<std::string> m_output_filename;
 
-        // Computed image dimensions for raster exports (PNG/JPEG)
-        std::optional<unsigned int> m_image_width;
-
-        std::optional<unsigned int> m_image_height;
-
         std::optional<bool> m_help;
 
         std::optional<bool> m_version;
+
+        std::optional<std::string> m_mask_filename;
     };
 
 } // namespace

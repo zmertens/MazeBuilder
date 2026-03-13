@@ -145,6 +145,7 @@ private:
     void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
     void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
+    void render_player(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
     void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify,
         float x, float y, float n, std::string_view text) const noexcept;
     void render_plane(const sdl_gl_helper::attrib* attrib) const noexcept;
@@ -167,6 +168,18 @@ private:
         bool has_valid_target{ false };
     } m_projected_plane{};
 
+    // Store current preview data for reusable building
+    struct preview_data
+    {
+        std::vector<std::uint8_t> pixel_data;
+        int width{ 0 };
+        int height{ 0 };
+        int scale{ 0 };
+        int wall_height{ 0 };
+        int item_type{ 0 };
+        bool has_data{ false };
+    } m_current_preview{};
+
     static constexpr auto FORCE_DUE_TO_GRAVITY = -9.8f;
 
     const sdl_gl_helper* m_sdl;
@@ -188,9 +201,6 @@ private:
     std::uint32_t m_sky_buffer;
 
     std::vector<std::function<void()>> m_building_processes;
-
-    // Preview tracking - increments with each preview, committed with 'B' key
-    int m_current_preview_id = 0;
 };
 
 #endif // WORLD_H

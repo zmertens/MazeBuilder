@@ -696,7 +696,7 @@ void sdl_gl_helper::draw_plant(const attrib* a, const std::uint32_t buffer) noex
     draw_item(a, buffer, 24);
 }
 
-void sdl_gl_helper::draw_player(const attrib* a, const player* _player) noexcept
+void sdl_gl_helper::draw_player(const attrib* a, const std::uint32_t buffer) noexcept
 {
-    draw_cube(a, _player->get_buffer());
+    draw_item(a, buffer, 36);
 }

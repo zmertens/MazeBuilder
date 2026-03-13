@@ -42,8 +42,8 @@ public:
     void set_window_icon(std::string_view icon_path) const noexcept;
 
     [[nodiscard]] std::int32_t get_scale_factor() const noexcept;
-    std::pair<std::int32_t, std::int32_t> get_window_size() const noexcept;
-    std::pair<std::int32_t, std::int32_t> get_window_size_in_pixels() const noexcept;
+    [[nodiscard]] std::pair<std::int32_t, std::int32_t> get_window_size() const noexcept;
+    [[nodiscard]] std::pair<std::int32_t, std::int32_t> get_window_size_in_pixels() const noexcept;
 
     static void print_display_modes() noexcept;
     static void print_opengl_info() noexcept;
@@ -78,7 +78,7 @@ public:
     static void draw_sign(const attrib* a, std::uint32_t buffer, int length) noexcept;
     static void draw_cube(const attrib* a, std::uint32_t buffer) noexcept;
     static void draw_plant(const attrib* a, std::uint32_t buffer) noexcept;
-    static void draw_player(const attrib* a, const player* _player) noexcept;
+    static void draw_player(const attrib* a, std::uint32_t buffer) noexcept;
 
 private:
     std::once_flag m_initialized_flag;

@@ -605,7 +605,8 @@ struct craft::craft_impl
                 });
             for (auto i{static_cast<int>(mazes::algo::BINARY_TREE)}; i < static_cast<int>(mazes::algo::TOTAL); ++i)
             {
-                algo_list.emplace_back(mazes::to_sv_from_algo(static_cast<mazes::algo>(i)));
+                // Need temporary string object to store the result from to_sv_from_algo
+                algo_list.emplace_back(std::string{mazes::to_sv_from_algo(static_cast<mazes::algo>(i))});
             }
         }
 
@@ -633,6 +634,7 @@ struct craft::craft_impl
             ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
             // Center the modal window
@@ -653,13 +655,10 @@ struct craft::craft_impl
                 {
                     if (ImGui::BeginTabItem("Main"))
                     {
-                        if (current_configs.download_ready && ImGui::Button("Download mazes",
-                                                                            ImVec2(220, 40)))
-                        {
-                            handle_artifacts(p);
-                        }
+                        ImGui::Checkbox("Preview Enabled", &p->m_configs.preview_enabled);
                         ImGui::Separator();
                         ImGui::Spacing();
+
                         ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f),
                                            "Navigation Options:");
                         ImGui::Spacing();
@@ -719,8 +718,8 @@ struct craft::craft_impl
 
                         auto&& maze_config = get_context().m_player->m_configs.maze;
 
-                        static std::string selected_algo = "";
-                        selected_algo = mazes::to_sv_from_algo(maze_config.algo_id());
+                        static std::string selected_algo;
+                        selected_algo = std::string{mazes::to_sv_from_algo(maze_config.algo_id())};
                         static int rows = static_cast<int>(maze_config.rows());
                         static int columns = static_cast<int>(maze_config.columns());
                         static int levels = static_cast<int>(maze_config.levels());
@@ -769,7 +768,25 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        ImGui::Checkbox("Preview Enabled", &get_context().m_player->m_configs.preview_enabled);
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
+                        ImGui::Spacing();
+
+                        static char tag_buffer[256] = "";
+
+                        // Copy current tag to buffer on first use or when changed externally
+                        static bool initialized = false;
+                        if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
+                        {
+                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
+                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
+                            initialized = true;
+                        }
+
+                        if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
+                        {
+                            current_configs.tag = std::string(tag_buffer);
+                        }
+
                         ImGui::Separator();
                         ImGui::Spacing();
 
@@ -779,6 +796,8 @@ struct craft::craft_impl
                         ImGui::Text("3. Press 'E' key in editor to generate preview");
                         ImGui::Text("4. Aim at a block face");
                         ImGui::Separator();
+                        ImGui::Spacing();
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
                         ImGui::Spacing();
 
                         if (ImGui::Button("Apply Configs", ImVec2(200, 40)))
@@ -795,7 +814,7 @@ struct craft::craft_impl
 
                         ImGui::EndTabItem();
                     }
-                    if (ImGui::BeginTabItem("Settings"))
+                    if (ImGui::BeginTabItem("Graphics"))
                     {
                         static bool toggle_color_mode = false;
                         ImGui::Checkbox("Toggle Dark Mode", &toggle_color_mode);
@@ -835,8 +854,6 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::Spacing();
 
-                        auto&& current_configs = get_context().m_player->m_configs;
-
                         const auto last_vsync = current_configs.vsync;
                         const auto last_fullscreen = current_configs.fullscreen;
 
@@ -848,28 +865,6 @@ struct craft::craft_impl
                         ImGui::SliderInt("Orthographic scaling", &current_configs.ortho, 0, 64);
                         // ImGui::Checkbox("Apply Bloom Effect", &current_configs.use_bloom_effect);
                         // ImGui::SliderFloat("Exp", &current_configs.exposure_range, 0.1f, 1.0f, "%.2f");
-
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
-                        ImGui::Spacing();
-
-                        static char tag_buffer[256] = "";
-
-                        // Copy current tag to buffer on first use or when changed externally
-                        static bool initialized = false;
-                        if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
-                        {
-                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
-                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
-                            initialized = true;
-                        }
-
-                        if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
-                        {
-                            current_configs.tag = std::string(tag_buffer);
-                        }
 
                         ImGui::Separator();
                         ImGui::Spacing();
@@ -886,12 +881,26 @@ struct craft::craft_impl
 
                         ImGui::EndTabItem();
                     }
+                    if (ImGui::BeginTabItem("Exports"))
+                    {
+                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Artifact Export:");
+                        ImGui::Spacing();
+                        if (ImGui::Button("Download Artifacts", ImVec2(250, 60)))
+                        {
+                            current_configs.artifacts_ready = true;
+                            handle_artifacts(p);
+                        }
+                        ImGui::TextWrapped("%s\n", p->artifacts().data());
+                        ImGui::Separator();
+                        ImGui::Spacing();
+                        ImGui::EndTabItem();
+                    }
                     ImGui::EndTabBar();
                 }
                 ImGui::EndPopup();
             }
 
-            ImGui::PopStyleColor(17);
+            ImGui::PopStyleColor(18);
             ImGui::PopFont();
         }
 
@@ -1023,29 +1032,31 @@ struct craft::craft_impl
 
     static void handle_artifacts(player* p) noexcept
     {
-#if !defined(__EMSCRIPTEN__)
+        // Generate artifacts (common for both platforms)
         const auto artifacts = p->artifacts();
 
         if (artifacts.empty())
         {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
                          "Failed to generate artifacts.\n");
-            p->m_configs.download_ready = false;
             return;
         }
 
-        constexpr mazes::io_utils io_things{};
         const auto filename = make_filename(p);
+
+#if !defined(__EMSCRIPTEN__)
+        // Desktop: Write to file system and reset flag
+        constexpr mazes::io_utils io_things{};
         const auto success = io_things.write_file(filename, artifacts);
-        p->m_configs.download_ready = !success;
+        p->m_configs.artifacts_ready = false;
         SDL_Log("Write file '%s': %s (%zu bytes)\n",
                 filename.c_str(),
                 success ? "SUCCESS" : "FAILED",
                 artifacts.size());
-
 #else
-        SDL_Log("Web detected: download via calling for artifacts");
-        p->m_configs.download_ready = true;
+        // Web/Emscripten: Leave flag true so JavaScript can query artifacts
+        // JavaScript should call craft.artifacts() to get the OBJ data
+        SDL_Log("Web build: Artifacts ready for download via JavaScript\n");
 #endif
     }
 
@@ -1279,10 +1290,10 @@ std::string craft::artifacts() const noexcept
 
 bool craft::is_download_ready() const noexcept
 {
-    return this->m_impl->m_player.m_configs.download_ready;
+    return this->m_impl->m_player.is_download_ready();
 }
 
-void craft::set_download_ready(const bool ready) const noexcept
+void craft::reset_download_flag() const noexcept
 {
-    this->m_impl->m_player.m_configs.download_ready = ready;
+    this->m_impl->m_player.m_configs.artifacts_ready = false;
 }

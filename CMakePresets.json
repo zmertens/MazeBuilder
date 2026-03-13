@@ -1,15 +1,38 @@
 {
-  "version": 3,
-  "configurePresets": [
-    {
-      "name": "examples",
-      "displayName": "Build with examples",
-      "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build/",
-      "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build",
-      "cacheVariables": {
-        "MAZE_BUILDER_EXAMPLES": "1"
-      }
-    }
-  ]
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "ninja: examples",
+            "displayName": "Build with examples using Ninja",
+            "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build-ninja/",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build-ninja",
+            "cacheVariables": {
+                "MAZE_BUILDER_EXAMPLES": "1"
+            }
+        },
+        {
+            "name": "msvc: examples",
+            "displayName": "Visual Studio Community 2022 Release - amd64",
+            "description": "Using compilers for Visual Studio 17 2022 (x64 architecture)",
+            "generator": "Visual Studio 17 2022",
+            "toolset": "host=x64",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build-msvc",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "MAZE_BUILDER_EXAMPLES": "1"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "msvc: examples-debug",
+            "displayName": "Visual Studio Community 2022 Release - amd64 - Debug",
+            "configurePreset": "msvc: examples",
+            "configuration": "Debug"
+        }
+    ]
 }

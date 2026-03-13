@@ -85,6 +85,11 @@ namespace mazes
         static constexpr const auto VERSION_OPTION_STR = "--version";
         static constexpr const auto VERSION_WORD_STR = "version";
 
+        // Mask related constants
+        static constexpr const auto MASK_FLAG_STR = "-m";
+        static constexpr const auto MASK_OPTION_STR = "--mask";
+        static constexpr const auto MASK_WORD_STR = "mask";
+
         // Special values
         static constexpr const auto TRUE_VALUE = "true";
         static constexpr const auto FALSE_VALUE = "false";
