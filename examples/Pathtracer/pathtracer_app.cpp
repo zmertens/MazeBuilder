@@ -124,7 +124,6 @@ struct sphere
     const float sq = std::sqrt(disc);
 
     // Near root
-    float ;
     if (auto t = (-hb - sq) / a;t >= t_min && t <= t_max)
     {
         t_hit = t;
