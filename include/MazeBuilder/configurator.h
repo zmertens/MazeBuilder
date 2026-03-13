@@ -167,8 +167,8 @@ namespace mazes
         }
 
         /// @brief Set the help flag
-        /// @param help 
-        /// @return 
+        /// @param help
+        /// @return
         configurator &help(bool help) noexcept
         {
             m_help = help;
@@ -176,8 +176,8 @@ namespace mazes
         };
 
         /// @brief Set the version flag
-        /// @param version 
-        /// @return 
+        /// @param version
+        /// @return
         configurator &version(bool version) noexcept
         {
             m_version = version;
@@ -226,7 +226,7 @@ namespace mazes
 
         /// @brief Get the output_format filename
         /// @return The output_format filename
-        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{ DEFAULT_FILENAME }); }
+        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{DEFAULT_FILENAME}); }
 
         /// @brief Get the mask filename
         /// @return The mask file path, or empty string if not set
