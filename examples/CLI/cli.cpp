@@ -10,6 +10,8 @@
 #include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/mask.h>
+#include <MazeBuilder/masked_grid.h>
 #include <MazeBuilder/pixels.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/sidewinder.h>
@@ -55,10 +57,16 @@ static std::string get_cli_help_str()
         "\t                     example: '-d [0:10]'\n"
         "\t-h, --help         display this help message\n"
         "\t-j, --json         run with arguments in JSON format\n"
+        "\t-l, --levels       levels [max: 10]\n"
+        "\t-m, --mask         load mask from text file\n"
         "\t-s, --seed         seed for the number generator\n"
         "\t-r, --rows         rows [max: 100]\n"
+<<<<<<< HEAD
         "\t-o, --output       output format\n"
         "\t                     [json, obj, text, stdout]\n"
+=======
+        "\t-o, --output       output format [json, obj, text, stdout]\n"
+>>>>>>> masking2
         "\t-v, --version      display program version\n";
 }
 
@@ -113,6 +121,13 @@ std::string cli::convert(std::vector<std::string> const& args_vec) const noexcep
 
 std::string cli::convert_with_options(std::vector<std::string> const& args_vec, mazes::configurator& user_options) noexcept
 {
+    // When no CLI options are provided, default to help output.
+    if (args_vec.empty())
+    {
+        user_options.help(true);
+        return m_help_str;
+    }
+
     try
     {
         if (!config_mapper::map_args_to_config(std::cref(args_vec), std::ref(user_options)))
@@ -130,6 +145,12 @@ std::string cli::convert_with_options(std::vector<std::string> const& args_vec, 
     factory.register_creator(
         m_title_str, [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface>
         {
+            if (const auto mask_file = config.mask_filename(); !mask_file.empty())
+            {
+                const auto m = mazes::mask::from_txt(mask_file);
+                return std::make_unique<mazes::masked_grid>(m);
+            }
+
             return std::make_unique<mazes::distance_grid>(config.rows(), config.columns(), config.levels());
         });
 

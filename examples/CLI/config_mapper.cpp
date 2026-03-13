@@ -69,6 +69,9 @@ bool config_mapper::map_args_to_config(std::vector<std::string> const& args, maz
         } else if (key == args::OUTPUT_FILENAME_WORD_STR) {
 
             config.output_format_filename(value);
+        } else if (key == args::MASK_WORD_STR) {
+
+            config.mask_filename(value);
         } else if (key == args::HELP_WORD_STR) {
 
             config.help(true);
@@ -106,7 +109,8 @@ bool config_mapper::map_args_to_config(std::vector<std::string> const& args, maz
             mazes::args::DISTANCES_START_STR,
             mazes::args::DISTANCES_END_STR,
             mazes::args::OUTPUT_ID_WORD_STR,
-            mazes::args::OUTPUT_FILENAME_WORD_STR
+            mazes::args::OUTPUT_FILENAME_WORD_STR,
+            mazes::args::MASK_WORD_STR
         };
 
         // Process only the expected word keys to avoid processing duplicate entries

@@ -18,6 +18,8 @@ set(MAZE_BUILDER_CORE_SRCS
     io_utils.cpp
     json_helper.cpp
     lab.cpp
+    mask.cpp
+    masked_grid.cpp
     maze_factory.cpp
     objectify.cpp
     pixels.cpp

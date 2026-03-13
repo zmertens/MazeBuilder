@@ -44,6 +44,7 @@ public:
     std::vector<int> seed_values;
     std::vector<int> image_width_values;
     std::vector<int> image_height_values;
+    std::vector<std::string> mask_values;
 
     // Flag tracking
     bool help_flag = false;
@@ -126,6 +127,11 @@ public:
             current_map[args::VERSION_FLAG_STR] = value;
             current_map[args::VERSION_OPTION_STR] = value;
             current_map[args::VERSION_WORD_STR] = value;
+        } else if (key == args::MASK_WORD_STR) {
+
+            current_map[args::MASK_FLAG_STR] = value;
+            current_map[args::MASK_OPTION_STR] = value;
+            current_map[args::MASK_WORD_STR] = value;
         } else {
 
             // For other keys, store as-is (like app name)
@@ -253,7 +259,8 @@ public:
                     arg == args::HELP_FLAG_STR || arg == args::HELP_OPTION_STR ||
                     arg == args::IMAGE_WIDTH_FLAG_STR || arg == args::IMAGE_WIDTH_OPTION_STR ||
                     arg == args::IMAGE_HEIGHT_FLAG_STR || arg == args::IMAGE_HEIGHT_OPTION_STR ||
-                    arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR) {
+                    arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR ||
+                    arg == args::MASK_FLAG_STR || arg == args::MASK_OPTION_STR) {
 
                     continue;
                 }
@@ -265,7 +272,8 @@ public:
                         option_part == args::ALGO_ID_OPTION_STR || option_part == args::OUTPUT_ID_OPTION_STR ||
                         option_part == args::JSON_OPTION_STR || option_part == args::DISTANCES_OPTION_STR ||
                         option_part == args::IMAGE_WIDTH_OPTION_STR || option_part == args::IMAGE_HEIGHT_OPTION_STR ||
-                        option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR) {
+                        option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR ||
+                        option_part == args::MASK_OPTION_STR) {
 
                         // Validate the value part for slice syntax if it's distances
                         if (option_part == args::DISTANCES_OPTION_STR) {
@@ -295,7 +303,8 @@ public:
                         || short_opt == args::SEED_FLAG_STR[1]
                         || short_opt == args::IMAGE_WIDTH_FLAG_STR[1]
                         || short_opt == args::IMAGE_HEIGHT_FLAG_STR[1]
-                        || short_opt == args::VERSION_FLAG_STR[1]) {
+                        || short_opt == args::VERSION_FLAG_STR[1]
+                        || short_opt == args::MASK_FLAG_STR[1]) {
 
                         continue;
                     }
@@ -310,12 +319,18 @@ public:
             if (arg[0] != '-') {
                 // Allow if previous argument was an option that expects a value
                 if (i > 0) {
-                    if (const auto& prev_arg = args[i - 1]; prev_arg == args::ROW_FLAG_STR || prev_arg == args::COLUMN_FLAG_STR ||
-                        prev_arg == args::LEVEL_FLAG_STR || prev_arg == args::SEED_FLAG_STR ||
-                        prev_arg == args::ALGO_ID_FLAG_STR || prev_arg == args::OUTPUT_ID_FLAG_STR ||
-                        prev_arg == args::JSON_FLAG_STR || prev_arg == args::DISTANCES_FLAG_STR ||
-                        prev_arg == args::IMAGE_WIDTH_FLAG_STR || prev_arg == args::IMAGE_HEIGHT_FLAG_STR ||
-                        prev_arg == args::HELP_FLAG_STR || prev_arg == args::VERSION_FLAG_STR) {
+                    if (const auto& prev_arg = args[i - 1]; prev_arg == args::ROW_FLAG_STR || prev_arg == args::ROW_OPTION_STR ||
+                        prev_arg == args::COLUMN_FLAG_STR || prev_arg == args::COLUMN_OPTION_STR ||
+                        prev_arg == args::LEVEL_FLAG_STR || prev_arg == args::LEVEL_OPTION_STR ||
+                        prev_arg == args::SEED_FLAG_STR || prev_arg == args::SEED_OPTION_STR ||
+                        prev_arg == args::ALGO_ID_FLAG_STR || prev_arg == args::ALGO_ID_OPTION_STR ||
+                        prev_arg == args::OUTPUT_ID_FLAG_STR || prev_arg == args::OUTPUT_ID_OPTION_STR ||
+                        prev_arg == args::JSON_FLAG_STR || prev_arg == args::JSON_OPTION_STR ||
+                        prev_arg == args::DISTANCES_FLAG_STR || prev_arg == args::DISTANCES_OPTION_STR ||
+                        prev_arg == args::IMAGE_WIDTH_FLAG_STR || prev_arg == args::IMAGE_WIDTH_OPTION_STR ||
+                        prev_arg == args::IMAGE_HEIGHT_FLAG_STR || prev_arg == args::IMAGE_HEIGHT_OPTION_STR ||
+                        prev_arg == args::HELP_FLAG_STR || prev_arg == args::VERSION_FLAG_STR ||
+                        prev_arg == args::MASK_FLAG_STR || prev_arg == args::MASK_OPTION_STR) {
 
                             continue;
                     }
@@ -389,6 +404,10 @@ private:
 
         const auto IMAGE_HEIGHT_OPTIONS = string_utils::format("{},{}", args::IMAGE_HEIGHT_FLAG_STR, args::IMAGE_HEIGHT_OPTION_STR);
         cli_app.add_option(IMAGE_HEIGHT_OPTIONS, image_height_values, "Height of the output image")
+            ->capture_default_str();
+
+        const auto MASK_OPTIONS = string_utils::format("{},{}", args::MASK_FLAG_STR, args::MASK_OPTION_STR);
+        cli_app.add_option(MASK_OPTIONS, mask_values, "Mask file (.txt) to define available cells for maze generation")
             ->capture_default_str();
 
         // Add flags manually to avoid automatic exit behavior
@@ -498,6 +517,14 @@ public:
             if (const auto value = output_files.back(); !value.empty()) {
 
                 add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
+            }
+        }
+
+        // Handle mask file
+        if (!mask_values.empty()) {
+            if (const auto value = mask_values.back(); !value.empty()) {
+
+                add_argument_variants(args::MASK_WORD_STR, value);
             }
         }
 
@@ -747,6 +774,7 @@ public:
         distances_values.clear();
         json_inputs.clear();
         levels_values.clear();
+        mask_values.clear();
         output_files.clear();
         rows_values.clear();
         seed_values.clear();
@@ -819,6 +847,7 @@ args::args(const args& other) : pimpl{ std::make_unique<impl>() } {
         pimpl->help_flag = other.pimpl->help_flag;
         pimpl->json_inputs = other.pimpl->json_inputs;
         pimpl->levels_values = other.pimpl->levels_values;
+        pimpl->mask_values = other.pimpl->mask_values;
         pimpl->output_files = other.pimpl->output_files;
         pimpl->rows_values = other.pimpl->rows_values;
         pimpl->image_height_values = other.pimpl->image_height_values;
@@ -848,6 +877,7 @@ args& args::operator=(const args& other) {
         pimpl->help_flag = other.pimpl->help_flag;
         pimpl->json_inputs = other.pimpl->json_inputs;
         pimpl->levels_values = other.pimpl->levels_values;
+        pimpl->mask_values = other.pimpl->mask_values;
         pimpl->output_files = other.pimpl->output_files;
         pimpl->rows_values = other.pimpl->rows_values;
         pimpl->image_height_values = other.pimpl->image_height_values;
