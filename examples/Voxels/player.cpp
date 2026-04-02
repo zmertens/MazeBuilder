@@ -819,9 +819,10 @@ void player::on_attack_wall() noexcept
         hy > 0 && hy < 256 && item::is_destructable(hw))
     {
         auto key = std::make_tuple(hx, hy, hz);
-        const int hits = ++m_wall_damage[key];
+        m_wall_damage[key]++;
+        const int hits = m_wall_damage[key];
         SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-            "Wall at (%d,%d,%d) hit %d/%d\n", hx, hy, hz, hits, WALL_DAMAGE_THRESHOLD);
+            "Wall at (%d,%d,%d) hit %d/%d", hx, hy, hz, hits, WALL_DAMAGE_THRESHOLD);
         if (hits >= WALL_DAMAGE_THRESHOLD)
         {
             m_wall_damage.erase(key);
