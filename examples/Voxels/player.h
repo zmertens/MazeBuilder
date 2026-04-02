@@ -6,6 +6,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <tuple>
 
 #include <MazeBuilder/configurator.h>
 
@@ -31,6 +32,7 @@ enum class PlayerAction
     PLACE_LIGHT,
     PLACE_MAZE,
     PREVIEW_MAZE,
+    ATTACK_WALL,
     DONE,
     COUNT
 };
@@ -135,8 +137,12 @@ private:
     void on_right_click() const noexcept;
     void on_middle_click() noexcept;
     void on_tag_sign() const noexcept;
+    void on_attack_wall() noexcept;
 
     static float lerp(float a, float b, float t) noexcept;
+
+    // Number of hits required to break a wall block
+    static constexpr int WALL_DAMAGE_THRESHOLD = 3;
 
     std::map<std::uint32_t, PlayerAction> m_key_binding;
 
@@ -153,6 +159,9 @@ private:
     std::int32_t m_item_index;
 
     world* m_world;
+
+    // Per-block damage counter: (x, y, z) -> hit count
+    std::map<std::tuple<int, int, int>, int> m_wall_damage;
 
     std::function<std::unique_ptr<mazes::grid_interface>(const mazes::configurator&)> m_maze_task;
 

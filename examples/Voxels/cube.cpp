@@ -179,6 +179,10 @@ void make_player(
     float ma[16];
     float mb[16];
     mat_identity(ma);
+    // Rotate model 90 degrees around Y axis so it faces horizontally
+    // (model side faces the direction of movement)
+    mat_rotate(mb, 0, 1, 0, static_cast<float>(RADIANS(90.0)));
+    mat_multiply(ma, mb, ma);
     mat_rotate(mb, 0, 1, 0, rx);
     mat_multiply(ma, mb, ma);
     mat_rotate(mb, cosf(rx), 0, sinf(rx), -ry);

@@ -175,7 +175,7 @@ player::player()
     set_category(Entity::PLAYER);
 
     // Movement key bindings
-    assign_key(PlayerAction::MOVE_LEFT, SDL_SCANCODE_A);
+    assign_key(PlayerAction::MOVE_LEFT, SDL_SCANCODE_LEFT);
     assign_key(PlayerAction::MOVE_RIGHT, SDL_SCANCODE_D);
     assign_key(PlayerAction::MOVE_FORWARD, SDL_SCANCODE_W);
     assign_key(PlayerAction::MOVE_BACKWARD, SDL_SCANCODE_S);
@@ -189,6 +189,7 @@ player::player()
     assign_key(PlayerAction::PLACE_MAZE, SDL_SCANCODE_B);
     assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
     assign_key(PlayerAction::COPY_BLOCK, SDL_SCANCODE_C);
+    assign_key(PlayerAction::ATTACK_WALL, SDL_SCANCODE_A);
 
     m_configs.day_length = DAY_LENGTH;
     m_configs.start_time = DAY_LENGTH / 2 * 1000;
@@ -718,6 +719,15 @@ void player::initialize_actions()
 
             p.m_world->commit_preview_to_world();
         });
+
+    m_action_binding[PlayerAction::ATTACK_WALL].action = derived_action<player>(
+        [this](player& p, float dt, mazes::randomizer& rng)
+        {
+            if (p.m_world)
+            {
+                on_attack_wall();
+            }
+        });
 }
 
 bool player::is_realtime_action(const PlayerAction action) noexcept
@@ -798,6 +808,29 @@ void player::on_tag_sign() const noexcept
     if (auto result = m_world->hit_test_face(&hx, &hy, &hz, &face))
     {
         m_world->set_sign(hx, hy, hz, face, m_configs.tag);
+    }
+}
+
+void player::on_attack_wall() noexcept
+{
+    const position* s = &this->m_pos;
+    int hx, hy, hz;
+    if (const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+        hy > 0 && hy < 256 && item::is_destructable(hw))
+    {
+        auto key = std::make_tuple(hx, hy, hz);
+        const int hits = ++m_wall_damage[key];
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
+            "Wall at (%d,%d,%d) hit %d/%d\n", hx, hy, hz, hits, WALL_DAMAGE_THRESHOLD);
+        if (hits >= WALL_DAMAGE_THRESHOLD)
+        {
+            m_wall_damage.erase(key);
+            m_world->set_block(hx, hy, hz, 0);
+            if (item::is_plant(m_world->get_block(hx, hy + 1, hz)))
+            {
+                m_world->set_block(hx, hy + 1, hz, 0);
+            }
+        }
     }
 }
 
