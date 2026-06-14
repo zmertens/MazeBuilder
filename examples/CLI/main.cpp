@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
@@ -83,7 +84,13 @@ int main(const int argc, char *argv[])
     return EXIT_SUCCESS;
 #endif
 
+    auto find_str = [](const std::vector<std::string> &vec, const std::string &target) -> bool
+    {
+        return std::find(vec.cbegin(), vec.cend(), target) != vec.cend();
+    };
+
     auto &&app = mazes::runtime_app::instance();
+    auto &&logger = mazes::global_async_logger();
 
     // Copy command arguments and skip the program name
     const std::vector<std::string> args_vec{argv + 1, argv + argc};
@@ -94,17 +101,15 @@ int main(const int argc, char *argv[])
         {
             if (args_vec.empty())
             {
-                std::cout << my_cli->help() << std::endl;
+                logger.log_message(my_cli->help());
             }
-            else if (std::find(args_vec.cbegin(), args_vec.cend(), "-h") != args_vec.cend() ||
-                     std::find(args_vec.cbegin(), args_vec.cend(), "--help") != args_vec.cend())
+            else if (find_str(args_vec, "-h") || find_str(args_vec, "--help"))
             {
-                std::cout << my_cli->help() << std::endl;
+                logger.log_message(my_cli->help());
             }
-            else if (std::find(args_vec.cbegin(), args_vec.cend(), "-v") != args_vec.cend() ||
-                     std::find(args_vec.cbegin(), args_vec.cend(), "--version") != args_vec.cend())
+            else if (find_str(args_vec, "-v") || find_str(args_vec, "--version"))
             {
-                std::cout << my_cli->version() << std::endl;
+                logger.log_message(my_cli->version());
             }
             else
             {
@@ -117,29 +122,30 @@ int main(const int argc, char *argv[])
                 auto &&results = app->apply(concatenated_args);
                 if (!results.empty())
                 {
-                    if (std::find(args_vec.cbegin(), args_vec.cend(), "-o") != args_vec.cend() ||
-                        std::find(args_vec.cbegin(), args_vec.cend(), "--output") != args_vec.cend())
+                    if (find_str(args_vec, "-o") || find_str(args_vec, "--output"))
                     {
-                        std::cout << "Output generated in specified format." << std::endl;
+                        logger.log_message("Output generated in specified format.");
                     }
-                    std::cout << results << std::endl;
+                    logger.log_message(std::string{results});
                 }
                 else
                 {
-                    std::cerr << "No output generated from the provided arguments." << std::endl;
+                    logger.log_message("No output generated from the provided arguments.");
                 }
             }
         }
         else
         {
-            std::cerr << "Failed to create CLI instance." << std::endl;
+            logger.log_message("Failed to create CLI instance.");
         }
     }
     catch (const std::exception &ex)
     {
-        std::cerr << ex.what() << std::endl;
+        logger.log_message(ex.what());
         return EXIT_FAILURE;
     }
+
+    logger.flush();
 
     return EXIT_SUCCESS;
 } // main

@@ -1,1107 +1,668 @@
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
+#include <charconv>
 #include <filesystem>
-#include <functional>
-#include <iosfwd>
-#include <iostream>
-#include <iterator>
-#include <list>
+#include <ranges>
 #include <regex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include <CLI11/CLI11.hpp>
+#include <variant>
+#include <vector>
 
 using namespace mazes;
 
-// Implementation class
-class args::impl {
+// ============================================================================
+// Token and Parser Implementation  
+// ============================================================================
 
+namespace {
+
+enum class TokenType {
+    Program,       // program name
+    ShortFlag,     // -r, -c, etc.
+    LongOption,    // --rows, --columns, etc.
+    Value,         // any value
+    SliceNotation, // [0:10]
+    EndOfInput
+};
+
+struct Token {
+    TokenType type;
+    std::string text;
+    size_t position;
+};
+
+// Tokenizer: converts input string vector into token stream
+class Tokenizer {
 public:
-    impl() : cli_app(DEFAULT_CLI_IMPLEMENTATION_NAME) {
+    explicit Tokenizer(const std::vector<std::string>& args, bool skip_first = false) 
+        : args_(args), pos_(skip_first ? 1 : 0), has_program_name_(skip_first) {}
 
-        setup_cli();
+    Token next() {
+        if (pos_ >= args_.size()) {
+            return {TokenType::EndOfInput, "", pos_};
+        }
+
+        const auto& arg = args_[pos_++];
+        
+        // Check for slice notation: must be well-formed [..:..]  
+        // Properly formatted slices have '[' at start, ']' at end, and exactly one ':' in between
+        // Minimum valid slice is [:]  (size 3)
+        if (arg.starts_with('[') && arg.ends_with(']') && arg.size() >= 3) {
+            auto first_colon = arg.find(':');
+            if (first_colon != std::string::npos && first_colon > 0 && first_colon < arg.size() - 1) {
+                // Check if there's only one colon
+                if (arg.find(':', first_colon + 1) == std::string::npos) {
+                    return {TokenType::SliceNotation, arg, pos_ - 1};
+                }
+            }
+        }
+
+        // Check for long option
+        if (arg.starts_with("--")) {
+            return {TokenType::LongOption, arg, pos_ - 1};
+        }
+
+        // Check for short flag: must start with - (not --) and have at least 2 characters
+        // The second character must be a letter (the flag character)
+        // Everything after can be a concatenated value (e.g., -r10, -asidewinder)
+        if (arg.starts_with("-") && arg.size() >= 2 && !arg.starts_with("--")) {
+            if (std::isalpha(static_cast<unsigned char>(arg[1]))) {
+                return {TokenType::ShortFlag, arg, pos_ - 1};
+            }
+            // Invalid: single dash with non-letter second char (e.g., "-")
+            return {TokenType::Value, arg, pos_ - 1};  // Will fail validation
+        }
+
+        // Otherwise it's a value (or program name if first and skip_first was true)
+        if (pos_ == 1 && has_program_name_ && !arg.starts_with("-")) {
+            return {TokenType::Program, arg, pos_ - 1};
+        }
+
+        return {TokenType::Value, arg, pos_ - 1};
     }
 
-    // Storage for JSON array processing
-    std::vector<std::unordered_map<std::string, std::string>> arguments;
-
-    // Direct variable bindings for CLI11
-    std::vector<std::string> algo_values;
-    std::vector<int> columns_values;
-    std::vector<std::string> distances_values;
-    std::vector<std::string> json_inputs;
-    std::vector<int> levels_values;
-    std::vector<std::string> output_files;
-    std::vector<int> rows_values;
-    std::vector<int> seed_values;
-    std::vector<int> image_width_values;
-    std::vector<int> image_height_values;
-    std::vector<std::string> mask_values;
-
-    // Flag tracking
-    bool help_flag = false;
-    bool version_flag = false;
-    bool distances_flag = false;
-    bool show_steps_flag = false;
-
-    // CLI11 app
-    CLI::App cli_app;
+    bool has_more() const { return pos_ < args_.size(); }
+    void reset() { pos_ = 0; }
 
 private:
-    static constexpr auto DEFAULT_CLI_IMPLEMENTATION_NAME = "MazeBuilderCommandLineInterface";
+    const std::vector<std::string>& args_;
+    size_t pos_;
+    bool has_program_name_;
+};
 
+// Parser: processes tokens and builds argument map
+class Parser {
 public:
-    // Helper method to add argument variants for storing flags, options, and words
-    void add_argument_variants(std::string_view key, std::string_view value) noexcept {
+    using ArgMap = std::unordered_map<std::string, std::string>;
 
-        using namespace std;
+    Parser() = default;
 
-        // Ensure we have at least one map for command-line arguments
-        if (this->arguments.empty()) {
-            this->arguments.emplace_back();
-        }
+    bool parse(const std::vector<std::string>& args, bool has_program_name) {
+        Tokenizer tokenizer(args, has_program_name);
+        current_map_.clear();
 
-        // Get reference to the current (last) map - this will be the command-line args map
-        // or the last JSON object map
-        auto& current_map = this->arguments.back();
-
-        if (key == args::ROW_WORD_STR) {
-
-            current_map[args::ROW_FLAG_STR] = value;
-            current_map[args::ROW_OPTION_STR] = value;
-            current_map[args::ROW_WORD_STR] = value;
-        } else if (key == args::COLUMN_WORD_STR) {
-
-            current_map[args::COLUMN_FLAG_STR] = value;
-            current_map[args::COLUMN_OPTION_STR] = value;
-            current_map[args::COLUMN_WORD_STR] = value;
-        } else if (key == args::LEVEL_WORD_STR) {
-
-            current_map[args::LEVEL_FLAG_STR] = value;
-            current_map[args::LEVEL_OPTION_STR] = value;
-            current_map[args::LEVEL_WORD_STR] = value;
-        } else if (key == args::ALGO_ID_WORD_STR) {
-
-            current_map[args::ALGO_ID_FLAG_STR] = value;
-            current_map[args::ALGO_ID_OPTION_STR] = value;
-            current_map[args::ALGO_ID_WORD_STR] = value;
-        } else if (key == args::SEED_WORD_STR) {
-
-            current_map[args::SEED_FLAG_STR] = value;
-            current_map[args::SEED_OPTION_STR] = value;
-            current_map[args::SEED_WORD_STR] = value;
-        } else if (key == args::OUTPUT_ID_WORD_STR) {
-
-            current_map[args::OUTPUT_ID_FLAG_STR] = value;
-            current_map[args::OUTPUT_ID_OPTION_STR] = value;
-            current_map[args::OUTPUT_ID_WORD_STR] = value;
-        } else if (key == args::JSON_WORD_STR) {
-
-            current_map[args::JSON_FLAG_STR] = value;
-            current_map[args::JSON_OPTION_STR] = value;
-            current_map[args::JSON_WORD_STR] = value;
-        } else if (key == args::DISTANCES_WORD_STR) {
-
-            current_map[args::DISTANCES_FLAG_STR] = value;
-            current_map[args::DISTANCES_OPTION_STR] = value;
-            current_map[args::DISTANCES_WORD_STR] = value;
-        } else if (key == args::IMAGE_WIDTH_WORD_STR) {
-
-            current_map[args::IMAGE_WIDTH_FLAG_STR] = value;
-            current_map[args::IMAGE_WIDTH_OPTION_STR] = value;
-            current_map[args::IMAGE_WIDTH_WORD_STR] = value;
-        } else if (key == args::IMAGE_HEIGHT_WORD_STR) {
-
-            current_map[args::IMAGE_HEIGHT_FLAG_STR] = value;
-            current_map[args::IMAGE_HEIGHT_OPTION_STR] = value;
-            current_map[args::IMAGE_HEIGHT_WORD_STR] = value;
-        } else if (key == args::VERSION_WORD_STR) {
-
-            current_map[args::VERSION_FLAG_STR] = value;
-            current_map[args::VERSION_OPTION_STR] = value;
-            current_map[args::VERSION_WORD_STR] = value;
-        } else if (key == args::MASK_WORD_STR) {
-
-            current_map[args::MASK_FLAG_STR] = value;
-            current_map[args::MASK_OPTION_STR] = value;
-            current_map[args::MASK_WORD_STR] = value;
-        } else if (key == args::SHOW_STEPS_WORD_STR) {
-
-            current_map[args::SHOW_STEPS_OPTION_STR] = value;
-            current_map[args::SHOW_STEPS_WORD_STR] = value;
-        } else {
-
-            // For other keys, store as-is (like app name)
-            if (!key.empty() && !(key[0] == '.' || key[0] == '/' || key[0] == '-')) {
-
-                current_map.insert_or_assign(string{ key }, value);
+        try {
+            // Handle program name if present
+            if (has_program_name && !args.empty()) {
+                store_value(args::APP_KEY, args[0]);
             }
-        }
-    }
-
-    // Validate slice syntax before processing
-    static bool validate_slice_syntax(const std::string& input) noexcept {
-
-        using namespace std;
-
-        // Empty input is valid (flag without value)
-        if (input.empty()) {
-            return true;
-        }
-
-        // Check if it contains slice-like characters
-        const bool has_bracket_open = input.find('[') != string::npos;
-        const bool has_bracket_close = input.find(']') != string::npos;
-
-        // If it has any slice-like characters, it must be proper slice syntax
-        if (const bool has_colon = input.find(':') != string::npos; has_bracket_open || has_bracket_close || has_colon) {
-            // Must have proper slice format: starts with [, ends with ], contains exactly one :
-            if (input.front() != '[' || input.back() != ']' || input.find(':') == string::npos) {
-                return false;
-            }
-
-            // Extract content between brackets
-            auto content = input.substr(1, input.length() - 2);
-
-            // Split by colon to get start and end parts
-            const auto colon_pos = content.find(':');
-            if (colon_pos == string::npos) {
-                return false;
-            }
-
-            // Ensure there's only one colon
-            if (content.find(':', colon_pos + 1) != string::npos) {
-                return false; // Multiple colons not allowed
-            }
-
-            const auto start_part = content.substr(0, colon_pos);
-            const auto end_part = content.substr(colon_pos + 1);
-
-            // Each part can be empty (implicit start/end) or contain only digits (with optional minus sign)
-            auto is_valid_part = [](const std::string& part) {
-                if (part.empty()) {
-                    return true;
+            
+            while (tokenizer.has_more()) {
+                auto token = tokenizer.next();
+                
+                if (token.type == TokenType::EndOfInput) {
+                    break;
                 }
 
-                // Check if it's a valid integer (can start with minus)
-                const auto start_pos = (part.front() == '-') ? 1 : 0;
-                return start_pos < part.length() &&
-                       all_of(part.cbegin() + start_pos, part.cend(), ::isdigit);
-            };
-
-            return is_valid_part(start_part) && is_valid_part(end_part);
-        }
-
-        // If it doesn't contain any slice-like characters, it's valid (could be another option)
-        return true;
-    }
-
-    // Pre-validate arguments before passing to CLI11
-    static bool pre_validate_arguments(const std::vector<std::string>& args) noexcept {
-
-        using namespace std;
-
-        for (auto i{ 0 }; i < args.size(); ++i) {
-
-            const auto& arg = args[i];
-
-            // Check for malformed distances arguments
-            if (arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR) {
-
-                // Check if next argument exists and looks like a slice
-                if (i + 1 < args.size()) {
-                    // Only validate slice syntax if the next argument contains slice-like characters
-                    if (const auto next_arg = args[i + 1]; !next_arg.empty() && (next_arg.find('[') != string::npos || next_arg.find(']') != string::npos || next_arg.find(':') != string::npos)) {
-                        if (!validate_slice_syntax(next_arg)) {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            // Check for arguments with embedded slice syntax
-            if (arg.find(args::DISTANCES_FLAG_STR) == 0 || arg.find(args::DISTANCES_OPTION_STR) == 0) {
-
-                // Extract the slice part from the argument
-                string slice_part;
-
-                if (arg.find(args::DISTANCES_FLAG_STR) == 0) {
-                    // For flag format like "-d[0:10]"
-                    slice_part = arg.substr(string(args::DISTANCES_FLAG_STR).length());
-                } else if (arg.find(args::DISTANCES_OPTION_STR) == 0) {
-                    // For option format like "--distances=[:10]"
-                    auto equals_pos = arg.find('=');
-                    if (equals_pos != string::npos && equals_pos + 1 < arg.length()) {
-                        slice_part = arg.substr(equals_pos + 1);
-                    }
-                }
-
-                if (!validate_slice_syntax(slice_part)) {
-                    return false;
-                }
-            }
-
-            // Check for unknown options
-            if (arg.length() > 1 && arg[0] == '-') {
-
-                // Skip if it's a known option
-                if (arg == args::ROW_FLAG_STR || arg == args::ROW_OPTION_STR ||
-                    arg == args::COLUMN_FLAG_STR || arg == args::COLUMN_OPTION_STR ||
-                    arg == args::LEVEL_FLAG_STR || arg == args::LEVEL_OPTION_STR ||
-                    arg == args::SEED_FLAG_STR || arg == args::SEED_OPTION_STR ||
-                    arg == args::ALGO_ID_FLAG_STR || arg == args::ALGO_ID_OPTION_STR ||
-                    arg == args::OUTPUT_ID_FLAG_STR || arg == args::OUTPUT_ID_OPTION_STR ||
-                    arg == args::JSON_FLAG_STR || arg == args::JSON_OPTION_STR ||
-                    arg == args::DISTANCES_FLAG_STR || arg == args::DISTANCES_OPTION_STR ||
-                    arg == args::HELP_FLAG_STR || arg == args::HELP_OPTION_STR ||
-                    arg == args::IMAGE_WIDTH_FLAG_STR || arg == args::IMAGE_WIDTH_OPTION_STR ||
-                    arg == args::IMAGE_HEIGHT_FLAG_STR || arg == args::IMAGE_HEIGHT_OPTION_STR ||
-                    arg == args::VERSION_FLAG_STR || arg == args::VERSION_OPTION_STR ||
-                    arg == args::MASK_FLAG_STR || arg == args::MASK_OPTION_STR ||
-                    arg == args::SHOW_STEPS_OPTION_STR) {
-
+                if (token.type == TokenType::Program) {
+                    store_value(args::APP_KEY, token.text);
                     continue;
                 }
 
-                // Check for option=value format
-                if (const auto eq_pos = arg.find('='); eq_pos != std::string::npos) {
-                    if (string option_part = arg.substr(0, eq_pos); option_part == args::ROW_OPTION_STR || option_part == args::COLUMN_OPTION_STR ||
-                        option_part == args::LEVEL_OPTION_STR || option_part == args::SEED_OPTION_STR ||
-                        option_part == args::ALGO_ID_OPTION_STR || option_part == args::OUTPUT_ID_OPTION_STR ||
-                        option_part == args::JSON_OPTION_STR || option_part == args::DISTANCES_OPTION_STR ||
-                        option_part == args::IMAGE_WIDTH_OPTION_STR || option_part == args::IMAGE_HEIGHT_OPTION_STR ||
-                        option_part == args::HELP_OPTION_STR || option_part == args::VERSION_OPTION_STR ||
-                        option_part == args::MASK_OPTION_STR || option_part == args::SHOW_STEPS_OPTION_STR) {
-
-                        // Validate the value part for slice syntax if it's distances
-                        if (option_part == args::DISTANCES_OPTION_STR) {
-
-                            string value_part = arg.substr(eq_pos + 1);
-
-                            if (!validate_slice_syntax(value_part)) {
-
-                                return false;
-                            }
-                        }
-
-                        continue;
+                if (token.type == TokenType::ShortFlag) {
+                    if (!parse_short_flag(token, tokenizer)) {
+                        return false;
                     }
-                }
-
-                // Check for concatenated short options (like -r10, -adfs)
-                if (arg.length() > 2 && arg[1] != '-') {
-                    if (char short_opt = arg[1]; short_opt == args::ALGO_ID_FLAG_STR[1]
-                        || short_opt == args::COLUMN_FLAG_STR[1]
-                        || short_opt == args::DISTANCES_FLAG_STR[1]
-                        || short_opt == args::HELP_FLAG_STR[1]
-                        || short_opt == args::JSON_FLAG_STR[1]
-                        || short_opt == args::LEVEL_FLAG_STR[1]
-                        || short_opt == args::OUTPUT_ID_FLAG_STR[1]
-                        || short_opt == args::ROW_FLAG_STR[1]
-                        || short_opt == args::SEED_FLAG_STR[1]
-                        || short_opt == args::IMAGE_WIDTH_FLAG_STR[1]
-                        || short_opt == args::IMAGE_HEIGHT_FLAG_STR[1]
-                        || short_opt == args::VERSION_FLAG_STR[1]
-                        || short_opt == args::MASK_FLAG_STR[1]) {
-
-                        continue;
-                    }
-                }
-
-                // If we reach here, it's an unknown option
-                return false;
-            }
-
-            // Check for standalone positional arguments that aren't app names or values
-
-            if (arg[0] != '-') {
-                // Allow if previous argument was an option that expects a value
-                if (i > 0) {
-                    if (const auto& prev_arg = args[i - 1]; prev_arg == args::ROW_FLAG_STR || prev_arg == args::ROW_OPTION_STR ||
-                        prev_arg == args::COLUMN_FLAG_STR || prev_arg == args::COLUMN_OPTION_STR ||
-                        prev_arg == args::LEVEL_FLAG_STR || prev_arg == args::LEVEL_OPTION_STR ||
-                        prev_arg == args::SEED_FLAG_STR || prev_arg == args::SEED_OPTION_STR ||
-                        prev_arg == args::ALGO_ID_FLAG_STR || prev_arg == args::ALGO_ID_OPTION_STR ||
-                        prev_arg == args::OUTPUT_ID_FLAG_STR || prev_arg == args::OUTPUT_ID_OPTION_STR ||
-                        prev_arg == args::JSON_FLAG_STR || prev_arg == args::JSON_OPTION_STR ||
-                        prev_arg == args::DISTANCES_FLAG_STR || prev_arg == args::DISTANCES_OPTION_STR ||
-                        prev_arg == args::IMAGE_WIDTH_FLAG_STR || prev_arg == args::IMAGE_WIDTH_OPTION_STR ||
-                        prev_arg == args::IMAGE_HEIGHT_FLAG_STR || prev_arg == args::IMAGE_HEIGHT_OPTION_STR ||
-                        prev_arg == args::HELP_FLAG_STR || prev_arg == args::VERSION_FLAG_STR ||
-                        prev_arg == args::MASK_FLAG_STR || prev_arg == args::MASK_OPTION_STR ||
-                        prev_arg == args::SHOW_STEPS_OPTION_STR) {
-
-                            continue;
-                    }
-                }
-
-                // If this is the first argument and we have no options before it,
-                // it could be a program name that wasn't filtered out, so reject it
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-private:
-    void setup_cli() noexcept{
-
-        using namespace std;
-
-        // Configure CLI11 app to be more strict
-        // Don't allow unknown arguments
-        cli_app.allow_extras(false);
-        cli_app.prefix_command(false);
-        // Be case sensitive for better error detection
-        cli_app.ignore_case(false);
-
-        // Disable automatic help so we can handle it ourselves
-        cli_app.set_help_flag();
-        cli_app.set_version_flag();
-
-        // Add options with direct vector binding
-
-        const auto ALGO_OPTIONS = string_utils::format("{},{}", args::ALGO_ID_FLAG_STR, args::ALGO_ID_OPTION_STR);
-        cli_app.add_option(ALGO_OPTIONS, algo_values, "Algorithm to use for maze generation")
-            ->capture_default_str();
-
-        const auto COLUMNS_OPTIONS = string_utils::format("{},{}", args::COLUMN_FLAG_STR, args::COLUMN_OPTION_STR);
-        cli_app.add_option(COLUMNS_OPTIONS, columns_values, "Number of columns in the maze")
-            ->capture_default_str();
-
-        // Special handling for distances which can be flag or option with sliced array syntax
-        const auto DISTANCE_OPTIONS = string_utils::format("{},{}", args::DISTANCES_FLAG_STR, args::DISTANCES_OPTION_STR);
-        cli_app.add_option(DISTANCE_OPTIONS, distances_values,
-            "Calculate distances between cells, optionally with a range [start:end] where start and end are indices")
-            ->expected(0, 1)
-            ->capture_default_str();
-
-        const auto JSON_OPTIONS = string_utils::format("{},{}", args::JSON_FLAG_STR, args::JSON_OPTION_STR);
-        cli_app.add_option(JSON_OPTIONS, json_inputs, "Parse JSON input file or string")
-            ->capture_default_str();
-
-        const auto OUTPUT_OPTIONS = string_utils::format("{},{}", args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_OPTION_STR);
-        cli_app.add_option(OUTPUT_OPTIONS, output_files, "Output file")
-            ->capture_default_str();
-
-        const auto ROWS_OPTIONS = string_utils::format("{},{}", args::ROW_FLAG_STR, args::ROW_OPTION_STR);
-        cli_app.add_option(ROWS_OPTIONS, rows_values, "Number of rows in the maze")
-            ->capture_default_str();
-
-        const auto LEVELS_OPTIONS = string_utils::format("{},{}", args::LEVEL_FLAG_STR, args::LEVEL_OPTION_STR);
-        cli_app.add_option(LEVELS_OPTIONS, levels_values, "Number of levels in the maze")
-            ->capture_default_str();
-
-        const auto SEED_OPTIONS = string_utils::format("{},{}", args::SEED_FLAG_STR, args::SEED_OPTION_STR);
-        cli_app.add_option(SEED_OPTIONS, seed_values, "Random seed for maze generation")
-            ->capture_default_str();
-
-        const auto IMAGE_WIDTH_OPTIONS = string_utils::format("{},{}", args::IMAGE_WIDTH_FLAG_STR, args::IMAGE_WIDTH_OPTION_STR);
-        cli_app.add_option(IMAGE_WIDTH_OPTIONS, image_width_values, "Width of the output image")
-            ->capture_default_str();
-
-        const auto IMAGE_HEIGHT_OPTIONS = string_utils::format("{},{}", args::IMAGE_HEIGHT_FLAG_STR, args::IMAGE_HEIGHT_OPTION_STR);
-        cli_app.add_option(IMAGE_HEIGHT_OPTIONS, image_height_values, "Height of the output image")
-            ->capture_default_str();
-
-        const auto MASK_OPTIONS = string_utils::format("{},{}", args::MASK_FLAG_STR, args::MASK_OPTION_STR);
-        cli_app.add_option(MASK_OPTIONS, mask_values, "Mask file (.txt) to define available cells for maze generation")
-            ->capture_default_str();
-
-        // Add flags manually to avoid automatic exit behavior
-        const auto HELP_OPTIONS = string_utils::format("{},{}", args::HELP_FLAG_STR, args::HELP_OPTION_STR);
-        cli_app.add_flag(HELP_OPTIONS, help_flag, "Show help information");
-
-        const auto VERSION_OPTIONS = string_utils::format("{},{}", args::VERSION_FLAG_STR, args::VERSION_OPTION_STR);
-        cli_app.add_flag(VERSION_OPTIONS, version_flag, "Show version information");
-
-        cli_app.add_flag(args::SHOW_STEPS_OPTION_STR, show_steps_flag, "Show periodic maze generation snapshots");
-    }
-
-public:
-    bool parse(const int argc, char** argv, const bool has_program_name_at_first_index = true) noexcept {
-
-        // Convert to vector for pre-validation
-        std::vector<std::string> args_vector;
-        args_vector.reserve(argc);
-
-        for (int i = has_program_name_at_first_index ? 1 : 0; i < argc; ++i) {
-
-            if (argv[i]) {
-
-                args_vector.emplace_back(argv[i]);
-            }
-        }
-
-        // Pre-validate arguments
-        if (!pre_validate_arguments(args_vector)) {
-
-            return false;
-        }
-
-        try {
-            cli_app.parse(argc, argv);
-
-            populate_args_map();
-
-        } catch (const CLI::ParseError& e) {
-            // Handle help and version requests and skip argument population
-            if (e.get_exit_code() != 0) {
-
-                return false;
-            }
-
-            populate_args_map();
-        } catch (const std::exception& e) {
-
-            // Catch any other exceptions and return false
-            std::cerr << "Error parsing arguments: " << e.what() << std::endl;
-
-            return false;
-        }
-
-        return true;
-    }
-
-    // Can throw exceptions
-    void populate_args_map() {
-
-        using namespace std;
-
-        this->arguments.clear();
-
-        // Create the initial map for command-line arguments
-        this->arguments.emplace_back();
-
-        // Store any extra arguments (like app names) as positional arguments
-        if (const auto extras{ cli_app.remaining() }; !extras.empty()) {
-
-            // Store the first extra as the app name
-            add_argument_variants(args::APP_KEY, extras[0]);
-            // Store any other extras
-            for (size_t i = 1; i < extras.size(); ++i) {
-
-                add_argument_variants(string_utils::format("extra_{}", static_cast<int>(i)), extras[i]);
-            }
-        }
-
-        // Handle JSON inputs and process them
-        if (!json_inputs.empty()) {
-            if (const auto value = json_inputs.back(); !value.empty()) {
-
-                add_argument_variants(args::JSON_WORD_STR, value);
-
-                // Strip whitespace to determine if it's a JSON string vs file
-
-                // Process JSON if it's a string (starts with ` after trimming)
-                if (const auto trimmed_value = string_utils::strip_whitespace(value);
-                    !trimmed_value.empty() && trimmed_value.front() == '`') {
-
-                    if (!process_json_string(value)) {
-
-                        throw std::runtime_error("Invalid JSON input: " + value);
+                } else if (token.type == TokenType::LongOption) {
+                    if (!parse_long_option(token, tokenizer)) {
+                        return false;
                     }
                 } else {
-
-                    // Assume it's a file and process file-based JSON
-                    if (!process_json_file(value)) {
-
-                        throw std::runtime_error("Failed to load JSON file: " + value);
-                    }
-                }
-            }
-        }
-
-        // Handle output files
-        if (!output_files.empty()) {
-            if (const auto value = output_files.back(); !value.empty()) {
-
-                add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-            }
-        }
-
-        // Handle mask file
-        if (!mask_values.empty()) {
-            if (const auto value = mask_values.back(); !value.empty()) {
-
-                add_argument_variants(args::MASK_WORD_STR, value);
-            }
-        }
-
-        // Handle rows
-        if (!rows_values.empty()) {
-            if (const auto value = rows_values.back()) {
-
-                add_argument_variants(args::ROW_WORD_STR, to_string(value));
-            }
-        }
-
-        // Handle columns
-        if (!columns_values.empty()) {
-            if (const auto value = columns_values.back()) {
-
-                add_argument_variants(args::COLUMN_WORD_STR, to_string(value));
-            }
-        }
-
-        // Handle levels
-        if (!levels_values.empty()) {
-            if (const auto value = levels_values.back()) {
-
-                add_argument_variants(args::LEVEL_WORD_STR, to_string(value));
-            }
-        }
-
-        // Handle seed
-        if (!seed_values.empty()) {
-
-            // Seed can be 0, so don't use it as a boolean condition
-            add_argument_variants(args::SEED_WORD_STR, to_string(seed_values.back()));
-        }
-
-        // Handle algorithm
-        if (!algo_values.empty()) {
-            if (const auto value = algo_values.back(); !value.empty()) {
-
-                add_argument_variants(args::ALGO_ID_WORD_STR, value);
-            }
-        }
-
-        // Handle distances (special case with sliced array parsing)
-        const auto distances_specified = cli_app.count(
-            args::DISTANCES_FLAG_STR) || cli_app.count(args::DISTANCES_OPTION_STR);
-
-        if (!distances_values.empty()) {
-            if (auto value = distances_values.back(); !value.empty()) {
-
-                // Check if it looks like slice array syntax was used (contains colon)
-                // If so, reconstruct the brackets that CLI11 strips off
-                if (value.find(':') != string::npos && value.front() != '[') {
-
-                    value = "[" + value + "]";
-                }
-
-                // Parse sliced array syntax first to get normalized values
-                parse_sliced_array(value);
-
-                // Create normalized slice from parsed values if slice syntax was used
-                if (value.find(':') != string::npos) {
-                    const auto start_val = arguments.back().find(args::DISTANCES_START_STR);
-                    const auto end_val = arguments.back().find(args::DISTANCES_END_STR);
-
-                    if (start_val != arguments.back().end() && end_val != arguments.back().end()) {
-                        const string normalized_slice = "[" + start_val->second + ":" + end_val->second + "]";
-                        add_argument_variants(args::DISTANCES_WORD_STR, normalized_slice);
-                    } else {
-                        add_argument_variants(args::DISTANCES_WORD_STR, value);
-                    }
-                } else {
-                    add_argument_variants(args::DISTANCES_WORD_STR, value);
-                }
-
-            } else if (distances_specified) {
-
-                // Flag form without value
-                add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-            }
-        } else if (distances_specified) {
-
-            // Flag form without value
-            add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-        }
-
-        // Handle flags
-        if (help_flag) {
-
-            add_argument_variants(args::HELP_WORD_STR, args::TRUE_VALUE);
-        }
-
-        if (version_flag) {
-
-            add_argument_variants(args::VERSION_WORD_STR, args::TRUE_VALUE);
-        }
-
-        if (show_steps_flag) {
-
-            if (arguments.empty()) {
-                arguments.emplace_back();
-            }
-
-            for (auto& map : arguments) {
-                map[args::SHOW_STEPS_OPTION_STR] = args::TRUE_VALUE;
-                map[args::SHOW_STEPS_WORD_STR] = args::TRUE_VALUE;
-            }
-        }
-    } // populate_args_map
-
-    // Helper method to add JSON values to the current map
-    void add_json_values_to_current_map(const std::unordered_map<std::string, std::string>& json_map) {
-
-        using namespace std;
-
-        for (const auto& [key, value] : json_map) {
-            // Map JSON keys to argument keys and add using add_argument_variants
-            if (key == args::ROW_WORD_STR) {
-
-                add_argument_variants(args::ROW_WORD_STR, value);
-            } else if (key == args::COLUMN_WORD_STR) {
-
-                add_argument_variants(args::COLUMN_WORD_STR, value);
-            } else if (key == args::LEVEL_WORD_STR) {
-
-                add_argument_variants(args::LEVEL_WORD_STR, value);
-            } else if (key == args::SEED_WORD_STR) {
-
-                add_argument_variants(args::SEED_WORD_STR, value);
-            } else if (key == args::ALGO_ID_WORD_STR) {
-
-                add_argument_variants(args::ALGO_ID_WORD_STR, value);
-            } else if (key == args::OUTPUT_ID_WORD_STR) {
-
-                add_argument_variants(args::OUTPUT_ID_WORD_STR, value);
-            } else if (key == args::IMAGE_HEIGHT_FLAG_STR || key == args::IMAGE_HEIGHT_OPTION_STR || key == args::IMAGE_HEIGHT_WORD_STR) {
-                add_argument_variants(args::IMAGE_HEIGHT_WORD_STR, value);
-            } else if (key == args::IMAGE_WIDTH_FLAG_STR || key == args::IMAGE_WIDTH_OPTION_STR || key == args::IMAGE_WIDTH_WORD_STR) {
-                add_argument_variants(args::IMAGE_WIDTH_WORD_STR, value);
-            } else if (key == args::DISTANCES_WORD_STR) {
-
-                // Handle boolean distances field
-                if (value == args::TRUE_VALUE) {
-
-                    add_argument_variants(args::DISTANCES_WORD_STR, args::TRUE_VALUE);
-                } else if (value == args::FALSE_VALUE) {
-
-                    // Store false value for distances
-                    add_argument_variants(args::DISTANCES_WORD_STR, args::FALSE_VALUE);
-                } else {
-
-                    // Might be a slice notation as a string
-                    add_argument_variants(args::DISTANCES_WORD_STR, value);
-                    parse_sliced_array(value);
-                }
-            } else if (key == args::SHOW_STEPS_WORD_STR) {
-
-                if (value == args::TRUE_VALUE) {
-                    add_argument_variants(args::SHOW_STEPS_WORD_STR, args::TRUE_VALUE);
-                } else {
-                    add_argument_variants(args::SHOW_STEPS_WORD_STR, args::FALSE_VALUE);
-                }
-            } else {
-
-                // Store unknown JSON keys directly in the current map
-                if (this->arguments.empty()) {
-                    this->arguments.emplace_back();
-                }
-                this->arguments.back().insert_or_assign(key, value);
-            }
-        }
-    }
-
-    // Internal JSON processing methods for use in populate_args_map
-    bool process_json_string(const std::string& json_str) {
-
-        using namespace std;
-
-        try {
-
-            // Remove backticks and parse JSON
-            if (auto clean_json = string_utils::strip_whitespace(cref(json_str)); !clean_json.empty()
-                && clean_json.front() == '`' && clean_json.back() == '`') {
-
-                clean_json = clean_json.substr(1, clean_json.length() - 2);
-
-                // Use json_helper to parse the cleaned JSON string
-                const json_helper jh{};
-
-                unordered_map<std::string, std::string> parsed_json;
-
-                if (!jh.from(clean_json, parsed_json)) {
-
+                    // Unexpected value
+#ifdef MAZE_DEBUG
+                    global_async_logger().log("Unexpected value: {}", token.text);
+#endif
                     return false;
                 }
-
-                // Add JSON values to the current map (merge with command-line args)
-                add_json_values_to_current_map(parsed_json);
             }
-        } catch (const std::exception&) {
 
+            // Post-processing: if we parsed JSON, delegate to JSON handler
+            if (auto it = current_map_.find(args::JSON_WORD_STR); it != current_map_.end()) {
+                bool json_success = process_json(it->second);
+                
+                // For JSON strings, process_json merges into current_map
+                // For JSON files (arrays), process_json populates results directly
+                // Check if results was populated by process_json
+                if (!results_.empty()) {
+                    return json_success;  // JSON file (array) case
+                }
+                
+                // JSON string case: always move current_map to results (even on failure)
+                // This preserves the state for error reporting
+                results_.clear();
+                results_.push_back(std::move(current_map_));
+                return json_success;
+            }
+
+            // Success: move current_map to results (even if empty - program name only is valid)
+            results_.clear();
+            results_.push_back(std::move(current_map_));
+            return true;
+
+        } catch (const std::exception& e) {
+#ifdef MAZE_DEBUG
+            global_async_logger().log("Parse error: {}", e.what());
+#endif
+            return false;
+        }
+    }
+
+    const std::vector<ArgMap>& results() const { return results_; }
+
+private:
+    ArgMap current_map_;
+    std::vector<ArgMap> results_;
+
+    // Store value with automatic aliasing (flag/option/word forms)
+    void store_value(std::string_view key, std::string_view value) {
+        // Map of word-form keys to their flag and option aliases
+        static const std::unordered_map<std::string_view, std::tuple<std::string_view, std::string_view, std::string_view>> aliases = {
+            {args::ROW_WORD_STR, {args::ROW_FLAG_STR, args::ROW_OPTION_STR, args::ROW_WORD_STR}},
+            {args::COLUMN_WORD_STR, {args::COLUMN_FLAG_STR, args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR}},
+            {args::LEVEL_WORD_STR, {args::LEVEL_FLAG_STR, args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR}},
+            {args::SEED_WORD_STR, {args::SEED_FLAG_STR, args::SEED_OPTION_STR, args::SEED_WORD_STR}},
+            {args::ALGO_ID_WORD_STR, {args::ALGO_ID_FLAG_STR, args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR}},
+            {args::OUTPUT_ID_WORD_STR, {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR}},
+            {args::JSON_WORD_STR, {args::JSON_FLAG_STR, args::JSON_OPTION_STR, args::JSON_WORD_STR}},
+            {args::DISTANCES_WORD_STR, {args::DISTANCES_FLAG_STR, args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR}},
+            {args::MASK_WORD_STR, {args::MASK_FLAG_STR, args::MASK_OPTION_STR, args::MASK_WORD_STR}},
+            {args::IMAGE_WIDTH_WORD_STR, {args::IMAGE_WIDTH_FLAG_STR, args::IMAGE_WIDTH_OPTION_STR, args::IMAGE_WIDTH_WORD_STR}},
+            {args::IMAGE_HEIGHT_WORD_STR, {args::IMAGE_HEIGHT_FLAG_STR, args::IMAGE_HEIGHT_OPTION_STR, args::IMAGE_HEIGHT_WORD_STR}},
+            {args::HELP_WORD_STR, {args::HELP_FLAG_STR, args::HELP_OPTION_STR, args::HELP_WORD_STR}},
+            {args::VERSION_WORD_STR, {args::VERSION_FLAG_STR, args::VERSION_OPTION_STR, args::VERSION_WORD_STR}},
+            {args::SHOW_STEPS_WORD_STR, {"", args::SHOW_STEPS_OPTION_STR, args::SHOW_STEPS_WORD_STR}}
+        };
+
+        std::string_view word_key = key;
+        
+        // Find the alias tuple for this key
+        auto it = aliases.find(word_key);
+        if (it != aliases.end()) {
+            const auto& [flag, option, word] = it->second;
+            if (!flag.empty()) current_map_[std::string(flag)] = value;
+            if (!option.empty()) current_map_[std::string(option)] = value;
+            current_map_[std::string(word)] = value;
+        } else {
+            // No alias, just store as-is
+            current_map_[std::string(key)] = value;
+        }
+    }
+
+    // Normalize flag/option to word-form key
+    std::string_view normalize_key(std::string_view key) {
+        static const std::unordered_map<std::string_view, std::string_view> normalization = {
+            {args::ROW_FLAG_STR, args::ROW_WORD_STR}, {args::ROW_OPTION_STR, args::ROW_WORD_STR},
+            {args::COLUMN_FLAG_STR, args::COLUMN_WORD_STR}, {args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR},
+            {args::LEVEL_FLAG_STR, args::LEVEL_WORD_STR}, {args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR},
+            {args::SEED_FLAG_STR, args::SEED_WORD_STR}, {args::SEED_OPTION_STR, args::SEED_WORD_STR},
+            {args::ALGO_ID_FLAG_STR, args::ALGO_ID_WORD_STR}, {args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR},
+            {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_WORD_STR}, {args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR},
+            {args::JSON_FLAG_STR, args::JSON_WORD_STR}, {args::JSON_OPTION_STR, args::JSON_WORD_STR},
+            {args::DISTANCES_FLAG_STR, args::DISTANCES_WORD_STR}, {args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR},
+            {args::MASK_FLAG_STR, args::MASK_WORD_STR}, {args::MASK_OPTION_STR, args::MASK_WORD_STR},
+            {args::IMAGE_WIDTH_FLAG_STR, args::IMAGE_WIDTH_WORD_STR}, {args::IMAGE_WIDTH_OPTION_STR, args::IMAGE_WIDTH_WORD_STR},
+            {args::IMAGE_HEIGHT_FLAG_STR, args::IMAGE_HEIGHT_WORD_STR}, {args::IMAGE_HEIGHT_OPTION_STR, args::IMAGE_HEIGHT_WORD_STR},
+            {args::HELP_FLAG_STR, args::HELP_WORD_STR}, {args::HELP_OPTION_STR, args::HELP_WORD_STR},
+            {args::VERSION_FLAG_STR, args::VERSION_WORD_STR}, {args::VERSION_OPTION_STR, args::VERSION_WORD_STR},
+            {args::SHOW_STEPS_OPTION_STR, args::SHOW_STEPS_WORD_STR}
+        };
+        
+        if (auto it = normalization.find(key); it != normalization.end()) {
+            return it->second;
+        }
+        return key;
+    }
+
+    // Parse short flag: -r, -h, -r10, -r 10, -d[0:10]
+    bool parse_short_flag(const Token& token, Tokenizer& tokenizer) {
+        std::string flag = token.text;
+        
+        // Check for concatenated value (e.g., -r10)
+        if (flag.size() > 2) {
+            std::string_view key(flag.data(), 2);  // -r
+            std::string_view value(flag.data() + 2, flag.size() - 2);  // 10
+            
+            auto word_key = normalize_key(key);
+            
+            // Special case: -d[...] distances with slice
+            if (word_key == args::DISTANCES_WORD_STR && value.starts_with('[')) {
+                return parse_distances_value(word_key, std::string(value));
+            }
+            
+            store_value(word_key, value);
+            return true;
+        }
+
+        // Boolean flags (no value expected)
+        auto word_key = normalize_key(flag);
+        if (word_key == args::HELP_WORD_STR || word_key == args::VERSION_WORD_STR) {
+            store_value(word_key, args::TRUE_VALUE);
+            return true;
+        }
+
+        // Flag with value: check for next token
+        if (!tokenizer.has_more()) {
+            // Distances flag can be standalone
+            if (word_key == args::DISTANCES_WORD_STR) {
+                store_value(word_key, args::TRUE_VALUE);
+                return true;
+            }
+#ifdef MAZE_DEBUG
+            global_async_logger().log("Flag {} requires a value", flag);
+#endif
             return false;
         }
 
+        auto value_token = tokenizer.next();
+        
+        // Handle slice notation for distances
+        if (word_key == args::DISTANCES_WORD_STR) {
+            if (value_token.type == TokenType::SliceNotation) {
+                return parse_distances_value(word_key, value_token.text);
+            } else if (value_token.type == TokenType::Value) {
+                // Distances with non-slice value is invalid
+#ifdef MAZE_DEBUG
+                global_async_logger().log("Distances flag requires slice notation, got: {}", value_token.text);
+#endif
+                return false;
+            }
+            // Otherwise treat as boolean (no value)
+            store_value(word_key, args::TRUE_VALUE);
+            return true;
+        }
+
+        // Regular value
+        store_value(word_key, value_token.text);
         return true;
     }
 
-    // Internal JSON file processing for usage
-    bool process_json_file(const std::string& filename) {
+    // Parse long option: --help, --rows=10, --rows 10
+    bool parse_long_option(const Token& token, Tokenizer& tokenizer) {
+        std::string option = token.text;
+        
+        // Check for embedded value (--rows=10)
+        if (auto eq_pos = option.find('='); eq_pos != std::string::npos) {
+            std::string_view key(option.data(), eq_pos);
+            std::string_view value(option.data() + eq_pos + 1, option.size() - eq_pos - 1);
+            
+            auto word_key = normalize_key(key);
+            
+            // Special case: --distances=[...]
+            if (word_key == args::DISTANCES_WORD_STR) {
+                if (value.starts_with('[')) {
+                    return parse_distances_value(word_key, std::string(value));
+                } else {
+                    // Distances with non-slice value is invalid
+#ifdef MAZE_DEBUG
+                    global_async_logger().log("Distances option requires slice notation, got: {}", value);
+#endif
+                    return false;
+                }
+            }
+            
+            store_value(word_key, value);
+            return true;
+        }
 
+        // Boolean options (no value expected)
+        auto word_key = normalize_key(option);
+        if (word_key == args::HELP_WORD_STR || word_key == args::VERSION_WORD_STR || word_key == args::SHOW_STEPS_WORD_STR) {
+            store_value(word_key, args::TRUE_VALUE);
+            return true;
+        }
+
+        // Option with value: check for next token
+        if (!tokenizer.has_more()) {
+            // Distances can be standalone
+            if (word_key == args::DISTANCES_WORD_STR) {
+                store_value(word_key, args::TRUE_VALUE);
+                return true;
+            }
+#ifdef MAZE_DEBUG
+            global_async_logger().log("Option {} requires a value", option);
+#endif
+            return false;
+        }
+
+        auto value_token = tokenizer.next();
+        
+        // Handle slice notation for distances
+        if (word_key == args::DISTANCES_WORD_STR) {
+            if (value_token.type == TokenType::SliceNotation) {
+                return parse_distances_value(word_key, value_token.text);
+            } else if (value_token.type == TokenType::Value) {
+                // Distances with non-slice value is invalid
+#ifdef MAZE_DEBUG
+                global_async_logger().log("Distances option requires slice notation, got: {}", value_token.text);
+#endif
+                return false;
+            }
+            // Otherwise treat as boolean (no value)
+            store_value(word_key, args::TRUE_VALUE);
+            return true;
+        }
+
+        // Regular value
+        store_value(word_key, value_token.text);
+        return true;
+    }
+
+    // Parse distances value with slice notation [start:end]
+    bool parse_distances_value(std::string_view key, const std::string& value) {
+        static const std::regex slice_pattern(R"(\[(\d*):(-?\d*)\])");
+        
+        if (std::smatch matches; std::regex_match(value, matches, slice_pattern)) {
+            auto start_str = matches[1].str();
+            auto end_str = matches[2].str();
+            
+            // Default values
+            int start = configurator::DEFAULT_DISTANCES_START;
+            int end = configurator::DEFAULT_DISTANCES_END;
+            
+            if (!start_str.empty()) {
+                std::from_chars(start_str.data(), start_str.data() + start_str.size(), start);
+            }
+            if (!end_str.empty()) {
+                std::from_chars(end_str.data(), end_str.data() + end_str.size(), end);
+            }
+            
+            // Store slice notation and individual values
+            std::string normalized_slice = "[" + std::to_string(start) + ":" + std::to_string(end) + "]";
+            store_value(key, normalized_slice);
+            
+            current_map_[args::DISTANCES_START_STR] = std::to_string(start);
+            current_map_[args::DISTANCES_END_STR] = std::to_string(end);
+            
+            return true;
+        }
+        
+#ifdef MAZE_DEBUG
+        global_async_logger().log("Invalid slice notation: {}", value);
+#endif
+        return false;
+    }
+
+    // Process JSON input (file or string)
+    bool process_json(const std::string& json_input) {
         try {
-            std::filesystem::path resolved_path{filename};
-
+            // Strip whitespace and check format
+            auto trimmed = string_utils::strip_whitespace(json_input);
+            
+            json_helper jh{};
+            
+            // JSON string (backtick-enclosed)
+            if (trimmed.starts_with('`') && trimmed.ends_with('`')) {
+                auto clean_json = trimmed.substr(1, trimmed.size() - 2);
+                
+                std::unordered_map<std::string, std::string> parsed_json;
+                if (!jh.from(clean_json, parsed_json)) {
+                    return false;
+                }
+                
+                // Merge JSON values into current map
+                for (const auto& [k, v] : parsed_json) {
+                    auto word_key = normalize_key(k);
+                    store_value(word_key, v);
+                }
+                
+                return true;
+            }
+            
+            // JSON file
+            std::filesystem::path resolved_path{json_input};
+            
             if (!std::filesystem::exists(resolved_path)) {
-                static constexpr const char* fallback_dirs[] = {
-                    "tests",
-                    "build-msvc-tests/tests/RelWithDebInfo"
-                };
-
+                // Try fallback directories
+                static constexpr const char* fallback_dirs[] = {"tests", "build-msvc-tests/tests/RelWithDebInfo"};
                 bool found = false;
-                for (const char* dir : fallback_dirs) {
-                    const auto candidate = std::filesystem::path(dir) / filename;
+                
+                for (const auto& dir : fallback_dirs) {
+                    auto candidate = std::filesystem::path(dir) / json_input;
                     if (std::filesystem::exists(candidate)) {
                         resolved_path = candidate;
                         found = true;
                         break;
                     }
                 }
-
+                
                 if (!found) {
-                    throw std::runtime_error{string_utils::format("File not found: {}", filename)};
+                    throw std::runtime_error("File not found: " + json_input);
                 }
             }
-
-            const auto resolved_str = resolved_path.string();
-
-            const json_helper jh{};
-
-            // First try to load as an array
-            std::vector<std::unordered_map<std::string, std::string>> parsed_json_array;
-
-            if (jh.load_array(cref(resolved_str), ref(parsed_json_array))) {
-
-                // For JSON arrays, replace the command-line arguments with JSON objects
-                // Clear existing arguments and create maps for each JSON object
-                this->arguments.clear();
-                for (const auto& json_object : parsed_json_array) {
-                    // Add a new map to the arguments vector for each JSON object
-                    this->arguments.emplace_back();
-                    add_json_values_to_current_map(json_object);
+            
+            auto resolved_str = resolved_path.string();
+            
+            // Try loading as array first
+            std::vector<std::unordered_map<std::string, std::string>> parsed_array;
+            if (jh.load_array(resolved_str, parsed_array)) {
+                results_.clear();
+                
+                for (const auto& json_obj : parsed_array) {
+                    ArgMap map;
+                    for (const auto& [k, v] : json_obj) {
+                        auto word_key = normalize_key(k);
+                        
+                        // Use aliasing for known keys
+                        static const std::unordered_map<std::string_view, std::tuple<std::string_view, std::string_view, std::string_view>> aliases = {
+                            {args::ROW_WORD_STR, {args::ROW_FLAG_STR, args::ROW_OPTION_STR, args::ROW_WORD_STR}},
+                            {args::COLUMN_WORD_STR, {args::COLUMN_FLAG_STR, args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR}},
+                            {args::LEVEL_WORD_STR, {args::LEVEL_FLAG_STR, args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR}},
+                            {args::SEED_WORD_STR, {args::SEED_FLAG_STR, args::SEED_OPTION_STR, args::SEED_WORD_STR}},
+                            {args::ALGO_ID_WORD_STR, {args::ALGO_ID_FLAG_STR, args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR}},
+                            {args::OUTPUT_ID_WORD_STR, {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR}},
+                            {args::DISTANCES_WORD_STR, {args::DISTANCES_FLAG_STR, args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR}}
+                        };
+                        
+                        if (auto it = aliases.find(word_key); it != aliases.end()) {
+                            const auto& [flag, option, word] = it->second;
+                            if (!flag.empty()) map[std::string(flag)] = v;
+                            if (!option.empty()) map[std::string(option)] = v;
+                            map[std::string(word)] = v;
+                        } else {
+                            map[std::string(k)] = v;
+                        }
+                    }
+                    
+                    // Add JSON keys
+                    map[args::JSON_FLAG_STR] = json_input;
+                    map[args::JSON_OPTION_STR] = json_input;
+                    map[args::JSON_WORD_STR] = json_input;
+                    
+                    results_.push_back(std::move(map));
                 }
-
+                
                 return true;
-            } // load_array
-
-            // If array loading failed, try loading as a single object (backward compatibility)
-
-            if (std::unordered_map<std::string, std::string> parsed_json;
-                jh.load(cref(resolved_str), ref(parsed_json))) {
-
-                // For single JSON objects, merge into the current map
-                add_json_values_to_current_map(parsed_json);
-
+            }
+            
+            // Try loading as single object
+            std::unordered_map<std::string, std::string> parsed_json;
+            if (jh.load(resolved_str, parsed_json)) {
+                for (const auto& [k, v] : parsed_json) {
+                    auto word_key = normalize_key(k);
+                    store_value(word_key, v);
+                }
                 return true;
-            } // load
-        } catch (const std::exception& ex) {
-
-            throw std::runtime_error{string_utils::format("Error processing JSON file {}: {}", filename, ex.what())};
+            }
+            
+            return false;
+            
+        } catch (const std::exception& e) {
+#ifdef MAZE_DEBUG
+            global_async_logger().log("JSON processing error: {}", e.what());
+#endif
+            return false;
         }
-
-        return false;
     }
+};
 
+} // anonymous namespace
+
+// ============================================================================
+// args::impl (PIMPL)
+// ============================================================================
+
+class args::impl {
+public:
+    impl() = default;
+    
+    std::vector<std::unordered_map<std::string, std::string>> arguments;
+    
+    bool parse(const std::vector<std::string>& args_vec, bool has_program_name) {
+        Parser parser;
+        bool success = parser.parse(args_vec, has_program_name);
+        
+        // Always update arguments if we have results, even on partial failure
+        // This preserves the state up to the point of failure
+        if (!parser.results().empty()) {
+            arguments = parser.results();
+        }
+        
+        return success;
+    }
+    
     void clear() noexcept {
-
         arguments.clear();
-
-        // Clear vectors in impl
-        algo_values.clear();
-        columns_values.clear();
-        distances_values.clear();
-        json_inputs.clear();
-        levels_values.clear();
-        mask_values.clear();
-        output_files.clear();
-        rows_values.clear();
-        seed_values.clear();
-
-        // Reset flags
-        help_flag = false;
-        version_flag = false;
-        distances_flag = false;
-        show_steps_flag = false;
     }
+};
 
-    // Public method for external access to slice parsing
-    bool parse_sliced_array(const std::string& value) noexcept {
+// ============================================================================
+// args public API
+// ============================================================================
 
-        using namespace std;
-
-        const regex slice_pattern(R"(\[(\d*):(-?\d*)\])");
-
-        if (smatch matches; regex_match(value, matches, slice_pattern)) {
-
-            auto start_idx = matches[1].str();
-
-            auto end_idx = matches[2].str();
-
-            // Store the parsed start and end indices
-            if (!start_idx.empty()) {
-
-                if (!arguments.empty()) {
-                    arguments.back().insert_or_assign(args::DISTANCES_START_STR, start_idx);
-                }
-            } else {
-                if (!arguments.empty()) {
-                    arguments.back().insert_or_assign(args::DISTANCES_START_STR, std::to_string(configurator::DEFAULT_DISTANCES_START));
-                }
-            }
-
-            if (!end_idx.empty()) {
-
-                if (!arguments.empty()) {
-                    arguments.back().insert_or_assign(args::DISTANCES_END_STR, end_idx);
-                }
-            } else {
-
-                if (!arguments.empty()) {
-                    arguments.back().insert_or_assign(args::DISTANCES_END_STR, std::to_string(configurator::DEFAULT_DISTANCES_END));
-                }
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-}; // impl
-
-args::args() noexcept : pimpl{ std::make_unique<impl>() } {
-}
+args::args() noexcept : pimpl{std::make_unique<impl>()} {}
 
 args::~args() = default;
 
-args::args(args &&other) noexcept = default;
+args::args(args&& other) noexcept = default;
 
-args &args::operator=(args &&other) noexcept = default;
+args& args::operator=(args&& other) noexcept = default;
 
-args::args(const args& other) : pimpl{ std::make_unique<impl>() } {
-
+args::args(const args& other) : pimpl{std::make_unique<impl>()} {
     if (other.pimpl) {
-
         pimpl->arguments = other.pimpl->arguments;
-
-        pimpl->algo_values = other.pimpl->algo_values;
-        pimpl->columns_values = other.pimpl->columns_values;
-        pimpl->distances_flag = other.pimpl->distances_flag;
-        pimpl->distances_values = other.pimpl->distances_values;
-        pimpl->help_flag = other.pimpl->help_flag;
-        pimpl->json_inputs = other.pimpl->json_inputs;
-        pimpl->levels_values = other.pimpl->levels_values;
-        pimpl->mask_values = other.pimpl->mask_values;
-        pimpl->output_files = other.pimpl->output_files;
-        pimpl->rows_values = other.pimpl->rows_values;
-        pimpl->image_height_values = other.pimpl->image_height_values;
-        pimpl->image_width_values = other.pimpl->image_width_values;
-        pimpl->seed_values = other.pimpl->seed_values;
-        pimpl->version_flag = other.pimpl->version_flag;
     }
 }
 
 args& args::operator=(const args& other) {
-
-    if (this == &other) {
-
-        return *this;
-    }
-
-    pimpl = exchange(pimpl, std::make_unique<impl>());
-
-    if (other.pimpl) {
-
+    if (this != &other && other.pimpl) {
+        pimpl = std::make_unique<impl>();
         pimpl->arguments = other.pimpl->arguments;
-
-        pimpl->algo_values = other.pimpl->algo_values;
-        pimpl->columns_values = other.pimpl->columns_values;
-        pimpl->distances_flag = other.pimpl->distances_flag;
-        pimpl->distances_values = other.pimpl->distances_values;
-        pimpl->help_flag = other.pimpl->help_flag;
-        pimpl->json_inputs = other.pimpl->json_inputs;
-        pimpl->levels_values = other.pimpl->levels_values;
-        pimpl->mask_values = other.pimpl->mask_values;
-        pimpl->output_files = other.pimpl->output_files;
-        pimpl->rows_values = other.pimpl->rows_values;
-        pimpl->image_height_values = other.pimpl->image_height_values;
-        pimpl->image_width_values = other.pimpl->image_width_values;
-        pimpl->seed_values = other.pimpl->seed_values;
-        pimpl->version_flag = other.pimpl->version_flag;
     }
-
     return *this;
 }
 
-void args::clear() noexcept {
-
-    if (pimpl) {
-
-        pimpl->clear();
+bool args::parse(const std::vector<std::string>& arguments, bool has_program_name_as_first_arg) const noexcept {
+    if (arguments.empty()) {
+        return false;
     }
-}
-
-// Get a value from the args map by key (greedy , grabs first match)
-std::optional<std::string> args::get(const std::string& key) const noexcept {
-
-    if (pimpl->arguments.empty()) {
-
-        return std::nullopt;
-    }
-
-    // Search through all maps in the vector, starting with the first (command-line args)
-    for (const auto& map : pimpl->arguments) {
-
-        if (auto it = map.find(key); it != map.end()) {
-
-            return it->second;
-        }
-    }
-
-    return std::nullopt;
-}
-
-// Get an entire args map from the front
-std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
-
-    if (pimpl->arguments.empty()) {
-
-        return std::nullopt;
-    }
-
-    return std::make_optional(pimpl->arguments.front());
-}
-
-// Get vector of args maps for JSON array parsing
-std::optional<std::vector<std::unordered_map<std::string, std::string>>> args::get_array() const noexcept {
-
-    return std::make_optional(pimpl->arguments);
-}
-
-// MAIN PARSE METHOD - All other parse methods funnel into this one
-/// @brief Parse program arguments from a vector of strings
-/// @param arguments Command-line arguments
-/// @param has_program_name_as_first_arg Whether the first argument is the program name false
-/// @return True if parsing was successful
-bool args::parse(const std::vector<std::string>& arguments, const bool has_program_name_as_first_arg) const noexcept {
-
-    // Determine which arguments to validate (skip program name if indicated)
-    if (auto validation_args{arguments}; !validation_args.empty()) {
-
-        if (has_program_name_as_first_arg) {
-
-            validation_args.erase(validation_args.begin());
-        }
-
-        // Pre-validate arguments before passing to internal parser
-        if (!pimpl->pre_validate_arguments(std::cref(validation_args))) {
-
-            return false;
-        }
-
-        // Convert vector to argc/argv format for internal parser
-        std::vector<const char*> argv_vec;
-
-        // CLI11 expects argv[0] to be the program name, so add a dummy one
-        argv_vec.emplace_back("program");
-
-        for (const auto& arg : validation_args) {
-
-            argv_vec.emplace_back(arg.c_str());
-        }
-
-        const int argc = static_cast<int>(argv_vec.size());
-        const char** argv = argv_vec.data();
-
-        // Special case: if we removed the program name and have no arguments left,
-        // CLI11 might have issues with argc=1 (just program name). In this case, we know it's just
-        // the app name, so we can directly populate and return success.
-        if (has_program_name_as_first_arg && argc == 1) {
-            // Only app name was provided, populate it directly
-            pimpl->arguments.clear();
-            pimpl->arguments.emplace_back();
-            pimpl->add_argument_variants(args::APP_KEY, arguments.front());
-            return true;
-        }
-
-        // Use CLI11 to parse
-        try {
-
-            return this->pimpl->parse(argc, const_cast<char**>(argv), true);
-
-        } catch (const std::exception& e) {
-
-            std::cerr << "Arguments parsing error: " << e.what() << std::endl;
-        }
-    }
-
-    return false;
-}
-
-// String parse method - funnels to vector parse
-/// @brief Parse program arguments from a string
-/// @param arguments Space-delimited command-line arguments
-/// @param has_program_name_as_first_arg Whether the first argument is the program name false
-/// @return True if parsing was successful
-bool args::parse(const std::string& arguments, const bool has_program_name_as_first_arg) noexcept {
-
-    using namespace std;
-
-    // Funnel to vector version
+    
     try {
-
-        // Split the string into a vector of arguments
-        istringstream iss(arguments);
-
-        const vector<string> args_vector{ istream_iterator<string>{iss}, istream_iterator<string>{} };
-
-        return parse(args_vector, has_program_name_as_first_arg);
-    } catch (const std::exception& e) {
-
-        cerr << "Error parsing string arguments: " << e.what() << endl;
-
-        this->clear();
-
+        return pimpl->parse(arguments, has_program_name_as_first_arg);
+    } catch (...) {
         return false;
     }
 }
 
-// argc/argv parse method - funnels to vector parse
-/// @brief Parse program arguments from argc/argv
-/// @param argc Argument count
-/// @param argv Argument values
-/// @param has_program_name_as_first_arg Whether the first argument is the program name false
-/// @return True if parsing was successful
-bool args::parse(const int argc, char** argv, const bool has_program_name_as_first_arg) noexcept {
-
-    using namespace std;
-
-    try {
-
-        // Convert argc/argv to vector of strings
-        vector<string> args_vector;
-
-        args_vector.reserve(argc);
-
-        for (int i = 0; i < argc; ++i) {
-
-            if (argv[i]) {
-
-                args_vector.emplace_back(argv[i]);
-            }
-        }
-
-        return parse(args_vector, has_program_name_as_first_arg);
-
-    } catch (std::exception&) {
-
-        cerr << "Error parsing argc/argv arguments:\n" << argc << "\n" << argv << endl;
-
-        this->clear();
+bool args::parse(const std::string& arguments, bool has_program_name_as_first_arg) noexcept {
+    if (arguments.empty()) {
+        return false;
     }
-    return false;
+    
+    // Split string into tokens
+    std::vector<std::string> tokens;
+    std::istringstream iss(arguments);
+    std::string token;
+    
+    while (iss >> std::quoted(token)) {
+        tokens.push_back(token);
+    }
+    
+    return parse(tokens, has_program_name_as_first_arg);
 }
 
+bool args::parse(int argc, char** argv, bool has_program_name_as_first_arg) noexcept {
+    if (argc <= 0 || !argv) {
+        return false;
+    }
+    
+    std::vector<std::string> args_vec;
+    args_vec.reserve(argc);
+    
+    for (int i = 0; i < argc; ++i) {
+        if (argv[i]) {
+            args_vec.emplace_back(argv[i]);
+        }
+    }
+    
+    return parse(args_vec, has_program_name_as_first_arg);
+}
+
+void args::clear() noexcept {
+    if (pimpl) {
+        pimpl->clear();
+    }
+}
+
+std::optional<std::string> args::get(const std::string& key) const noexcept {
+    if (!pimpl || pimpl->arguments.empty()) {
+        return std::nullopt;
+    }
+    
+    // Search in first map (command-line args or first JSON object)
+    const auto& map = pimpl->arguments.front();
+    if (auto it = map.find(key); it != map.end()) {
+        return it->second;
+    }
+    
+    return std::nullopt;
+}
+
+std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept {
+    if (!pimpl || pimpl->arguments.empty()) {
+        return std::nullopt;
+    }
+    
+    return pimpl->arguments.front();
+}
+
+std::optional<std::vector<std::unordered_map<std::string, std::string>>> args::get_array() const noexcept {
+    if (!pimpl || pimpl->arguments.empty()) {
+        return std::nullopt;
+    }
+    
+    return pimpl->arguments;
+}
+
+bool args::process_json_input(std::string_view /* json_input */) noexcept {
+    // This is called internally; the new implementation handles JSON in the parser
+    return false;
+}
