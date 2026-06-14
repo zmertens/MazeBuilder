@@ -9,10 +9,10 @@
 
 #include <MazeBuilder/hash_funcs.h>
 
+/// @file cell.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file cell.h
     /// @class cell
     /// @brief Cell class with links to other cells
     class cell final

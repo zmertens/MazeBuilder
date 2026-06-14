@@ -1,13 +1,15 @@
-#ifndef RESOURCE_IDENTIFIERS_H
-#define RESOURCE_IDENTIFIERS_H
+#ifndef VOXELS_RESOURCE_IDENTIFIERS_H
+#define VOXELS_RESOURCE_IDENTIFIERS_H
 
 enum class ShaderIdentifier : unsigned int
 {
-    BLOCK_SHADER = 0,
-    LINE_SHADER = 1,
-    SKY_SHADER = 2,
-    TEXT_SHADER = 3,
-    TOTAL = 4
+    BLOCK_SHADER          = 0,
+    LINE_SHADER           = 1,
+    SKY_SHADER            = 2,
+    TEXT_SHADER           = 3,
+    BLOOM_BLUR_SHADER     = 4,
+    BLOOM_COMPOSITE_SHADER = 5,
+    TOTAL                 = 6
 };
 
 enum class TextureIdentifier : unsigned int
@@ -41,4 +43,4 @@ typedef resource_manager<font, FontIdentifier> font_manager;
 typedef resource_manager<shader, ShaderIdentifier> shader_manager;
 typedef resource_manager<texture, TextureIdentifier> texture_manager;
 
-#endif // RESOURCE_IDENTIFIERS_H
+#endif // VOXELS_RESOURCE_IDENTIFIERS_H

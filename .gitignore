@@ -46,3 +46,7 @@ scripts/__pycache__/
 
 # Cppcheck XML
 sources/cppcheck.xml
+
+# Rust
+rust/target/*
+

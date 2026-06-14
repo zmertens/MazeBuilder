@@ -9,13 +9,13 @@
 #include <unordered_map>
 #include <vector>
 
+/// @namespace mazes
+/// @file args.h
 namespace mazes
 {
-
-    /// @file args.h
     /// @class args
     /// @brief Command-line argument handler with JSON support
-    /// @details Uses PIMPL pattern to wrap CLI11 functionality with additional JSON support
+    /// @details 
     class args final
     {
     public:
@@ -90,6 +90,10 @@ namespace mazes
         static constexpr const auto MASK_OPTION_STR = "--mask";
         static constexpr const auto MASK_WORD_STR = "mask";
 
+        // Step visualization constants
+        static constexpr const auto SHOW_STEPS_OPTION_STR = "--show-steps";
+        static constexpr const auto SHOW_STEPS_WORD_STR = "show_steps";
+
         // Special values
         static constexpr const auto TRUE_VALUE = "true";
         static constexpr const auto FALSE_VALUE = "false";
@@ -113,12 +117,12 @@ namespace mazes
 
         /// @brief Move constructor
         /// @param other The other args object to move from
-        args(args &&other) noexcept = default;
+        args(args &&other) noexcept;
 
         /// @brief Move assignment operator
         /// @param other The other args object to move from
         /// @return Reference to this object
-        args &operator=(args &&other) noexcept = default;
+        args &operator=(args &&other) noexcept;
 
         /// @brief Parse program arguments from a vector of strings
         /// @param arguments Command-line arguments
@@ -140,9 +144,9 @@ namespace mazes
         bool parse(int argc, char **argv, bool has_program_name_as_first_arg = false) noexcept;
 
         /// @brief Clear the arguments map
-        void clear() const noexcept;
+        void clear() noexcept;
 
-        /// @brief Get a value from the args map (from front)
+        /// @brief Get a value
         /// @param key The key to look up
         /// @return The value if found, std::nullopt otherwise
         std::optional<std::string> get(const std::string &key) const noexcept;

@@ -4,14 +4,16 @@
 #include <stdexcept>
 #include <string>
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/singleton_base.h>
 
 #include "craft.h"
 
 // Run the SDL app
 static constexpr auto window_w = 1200, window_h = 800;
 
-const auto title{"Maze Builder 🔧 " + mazes::VERSION};
+const auto title{"Maze Builder - " + mazes::buildinfo::Version};
 
 // Setup for Emscripten/WebAssembly
 // Bind a getter method from C++ so that it can be accessed in the frontend with JS

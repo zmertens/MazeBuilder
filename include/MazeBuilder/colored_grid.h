@@ -3,6 +3,8 @@
 
 #include <MazeBuilder/grid_interface.h>
 
+/// @file colored_grid.h
+/// @namespace mazes
 namespace mazes
 {
 
@@ -10,6 +12,7 @@ namespace mazes
     class distances;
     class grid_operations;
 
+    /// @brief A colored grid implementation that extends the grid_interface to include distance-based coloring
     class colored_grid : public grid_interface
     {
 
@@ -43,15 +46,19 @@ namespace mazes
         /// @param goal_index The index of the goal cell for distance calculation.
         void initialize_distance_coloring(int start_index, int goal_index) noexcept;
 
-        // Delegate to embedded grid
+        // Delegate to the embedded grid
         grid_operations &operations() noexcept override;
 
+        // Delegate to the embedded grid
         const grid_operations &operations() const noexcept override;
 
+        /// @brief Resize the grid to the specified dimensions.
+        /// @param rows 
+        /// @param cols 
+        /// @param levels 
+        void resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept;
     private:
         std::shared_ptr<distances> m_distances;
-
-        // Change from grid_interface to grid since we need grid's implementation of operations()
         std::unique_ptr<grid_interface> m_grid;
     };
 

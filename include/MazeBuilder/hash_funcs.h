@@ -6,16 +6,15 @@
 #include <tuple>
 #include <utility>
 
+/// @file hash_funcs.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file hash_funcs.h
-
     /// @class uni_hash
     /// @brief A hash function object for a single value.
     struct uni_hash
     {
-        /// @brief Hash function for a single
+        /// @brief Hash function for a single value
         /// @tparam T1
         /// @param p
         /// @return the hash value

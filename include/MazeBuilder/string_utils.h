@@ -14,11 +14,10 @@
 #include <unordered_map>
 #include <vector>
 
+/// @file string_utils.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file string_utils.h
-
     /// @class string_utils
     /// @brief String helper class
     /// @details This class provides common string manipulation utilities
@@ -26,7 +25,6 @@ namespace mazes
     class string_utils
     {
     public:
-
         /// @brief Combine and return two strings
         /// @param a The first string
         /// @param b The second string

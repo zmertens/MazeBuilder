@@ -22,7 +22,6 @@
 
 #include <SDL3/SDL.h>
 
-#include "command_queue.h"
 #include "db.h"
 #include "resource_manager.h"
 #include "font.h"
@@ -33,8 +32,6 @@
 #include "texture.h"
 #include "world.h"
 
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/grid_factory.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
@@ -78,28 +75,27 @@ struct craft::craft_impl
 
         struct context
         {
-            explicit context(SDL_Window* window, font_manager& fonts, shader_manager& shaders
-                             , texture_manager& textures, player& p, sdl_gl_helper& sdl)
+            explicit context(SDL_Window *window, font_manager &fonts, shader_manager &shaders, texture_manager &textures, player &p, sdl_gl_helper &sdl)
                 : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p},
                   m_sdl{&sdl}
             {
             }
 
-            SDL_Window* m_window;
-            font_manager* m_fonts;
-            shader_manager* m_shaders;
-            texture_manager* m_textures;
-            player* m_player;
-            sdl_gl_helper* m_sdl;
+            SDL_Window *m_window;
+            font_manager *m_fonts;
+            shader_manager *m_shaders;
+            texture_manager *m_textures;
+            player *m_player;
+            sdl_gl_helper *m_sdl;
         };
 
-        explicit state(state_stack& stack, const context& _context) : m_stack{&stack}, m_context{_context}
+        explicit state(state_stack &stack, const context &_context) : m_stack{&stack}, m_context{_context}
         {
         }
 
         virtual void draw() const noexcept = 0;
-        virtual bool update(float delta_time, mazes::randomizer& rng) noexcept = 0;
-        virtual bool handle_event(SDL_Event& event) noexcept = 0;
+        virtual bool update(float delta_time, mazes::randomizer &rng) noexcept = 0;
+        virtual bool handle_event(SDL_Event &event) noexcept = 0;
 
     protected:
         void request_stack_push(const StateIdentifier state_id) const
@@ -117,18 +113,18 @@ struct craft::craft_impl
             m_stack->clear_states();
         }
 
-        [[nodiscard]] const context& get_context() const noexcept
+        [[nodiscard]] const context &get_context() const noexcept
         {
             return m_context;
         }
 
-        [[nodiscard]] state_stack& get_stack() const noexcept
+        [[nodiscard]] state_stack &get_stack() const noexcept
         {
             return *m_stack;
         }
 
     private:
-        state_stack* m_stack;
+        state_stack *m_stack;
         context m_context;
     };
 
@@ -151,7 +147,7 @@ struct craft::craft_impl
         std::map<StateIdentifier, std::function<state::ptr()>> m_factories;
 
     public:
-        explicit state_stack(const state::context& _context)
+        explicit state_stack(const state::context &_context)
             : m_context(_context)
         {
         }
@@ -160,9 +156,7 @@ struct craft::craft_impl
         void register_state(StateIdentifier state_id)
         {
             m_factories.insert_or_assign(state_id, [this]()
-            {
-                return state::ptr(std::make_unique<T>(*this, m_context));
-            });
+                                         { return state::ptr(std::make_unique<T>(*this, m_context)); });
         }
 
         template <typename Pointer>
@@ -170,10 +164,8 @@ struct craft::craft_impl
         {
             auto reversed = m_stack | std::views::reverse;
 
-            auto it = std::ranges::find_if(reversed, [](const auto& state_ptr)
-            {
-                return dynamic_cast<Pointer>(state_ptr.get()) != nullptr;
-            });
+            auto it = std::ranges::find_if(reversed, [](const auto &state_ptr)
+                                           { return dynamic_cast<Pointer>(state_ptr.get()) != nullptr; });
 
             if (it != std::ranges::end(reversed))
             {
@@ -183,7 +175,7 @@ struct craft::craft_impl
             return nullptr;
         }
 
-        void update(const float delta_time, mazes::randomizer& rng) noexcept
+        void update(const float delta_time, mazes::randomizer &rng) noexcept
         {
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
@@ -209,7 +201,7 @@ struct craft::craft_impl
             }
         }
 
-        void handle_event(SDL_Event& event) noexcept
+        void handle_event(SDL_Event &event) noexcept
         {
             for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
             {
@@ -239,7 +231,7 @@ struct craft::craft_impl
 
         void apply_pending_changes()
         {
-            for (const pending_change& change : m_pending_list)
+            for (const pending_change &change : m_pending_list)
             {
                 switch (change.action)
                 {
@@ -280,11 +272,11 @@ struct craft::craft_impl
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
     class editor_state final : public state
     {
-        player& m_player;
+        player &m_player;
         std::optional<world> m_world;
 
     public:
-        explicit editor_state(state_stack& stack, const context& _context)
+        explicit editor_state(state_stack &stack, const context &_context)
             : state{stack, _context}, m_player{*_context.m_player}
         {
         }
@@ -305,12 +297,12 @@ struct craft::craft_impl
             }
         }
 
-        bool update(const float delta_time, mazes::randomizer& rng) noexcept override
+        bool update(const float delta_time, mazes::randomizer &rng) noexcept override
         {
             // Initialize world only after loading state has finished
             if (!m_world.has_value())
             {
-                if (const auto* loading = get_stack().peek_state<loading_state*>())
+                if (const auto *loading = get_stack().peek_state<loading_state *>())
                 {
                     if (loading->is_finished())
                     {
@@ -352,14 +344,14 @@ struct craft::craft_impl
                 m_player.update(delta_time, std::ref(rng));
                 m_world->update(delta_time, std::ref(rng));
 
-                auto& commands = m_world->get_command_queue();
+                auto &commands = m_world->get_command_queue();
                 m_player.handle_realtime_input(std::ref(commands));
             }
 
             return true;
         }
 
-        bool handle_event(SDL_Event& event) noexcept override
+        bool handle_event(SDL_Event &event) noexcept override
         {
             switch (event.type)
             {
@@ -383,7 +375,7 @@ struct craft::craft_impl
 
             if (m_world.has_value())
             {
-                auto& commands = m_world->get_command_queue();
+                auto &commands = m_world->get_command_queue();
                 m_player.handle_event(event, std::ref(commands));
                 m_world->handle_event(event);
             }
@@ -400,9 +392,9 @@ struct craft::craft_impl
         void load_resources() const noexcept
         {
             // fonts
-            static constexpr auto FONT_PIXEL_SIZE = 28.f;
+            static constexpr auto FONT_PIXEL_SIZE = 18.f;
 
-            auto&& fonts = get_context().m_fonts;
+            auto &&fonts = get_context().m_fonts;
 
             fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data,
                         Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
@@ -413,55 +405,49 @@ struct craft::craft_impl
 
             // shaders
             std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_programs{
-                {
-                    ShaderIdentifier::BLOCK_SHADER,
-                    "shaders/block_vertex.glsl",
-                    "shaders/block_fragment.glsl"
-                },
-                {
-                    ShaderIdentifier::LINE_SHADER,
-                    "shaders/line_vertex.glsl",
-                    "shaders/line_fragment.glsl"
-                },
-                {
-                    ShaderIdentifier::SKY_SHADER,
-                    "shaders/sky_vertex.glsl",
-                    "shaders/sky_fragment.glsl"
-                },
-                {
-                    ShaderIdentifier::TEXT_SHADER,
-                    "shaders/text_vertex.glsl",
-                    "shaders/text_fragment.glsl"
-                }
-            };
+                {ShaderIdentifier::BLOCK_SHADER,
+                 "shaders/block_vertex.glsl",
+                 "shaders/block_fragment.glsl"},
+                {ShaderIdentifier::LINE_SHADER,
+                 "shaders/line_vertex.glsl",
+                 "shaders/line_fragment.glsl"},
+                {ShaderIdentifier::SKY_SHADER,
+                 "shaders/sky_vertex.glsl",
+                 "shaders/sky_fragment.glsl"},
+                {ShaderIdentifier::TEXT_SHADER,
+                 "shaders/text_vertex.glsl",
+                 "shaders/text_fragment.glsl"},
+                {ShaderIdentifier::BLOOM_BLUR_SHADER,
+                 "shaders/bloom_quad_vertex.glsl",
+                 "shaders/bloom_blur_fragment.glsl"},
+                {ShaderIdentifier::BLOOM_COMPOSITE_SHADER,
+                 "shaders/bloom_quad_vertex.glsl",
+                 "shaders/bloom_composite_fragment.glsl"}};
 
             std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_gles_programs{
-                {
-                    ShaderIdentifier::BLOCK_SHADER,
-                    "shaders/es/block_vertex.es.glsl",
-                    "shaders/es/block_fragment.es.glsl"
-                },
-                {
-                    ShaderIdentifier::LINE_SHADER,
-                    "shaders/es/line_vertex.es.glsl",
-                    "shaders/es/line_fragment.es.glsl"
-                },
-                {
-                    ShaderIdentifier::SKY_SHADER,
-                    "shaders/es/sky_vertex.es.glsl",
-                    "shaders/es/sky_fragment.es.glsl"
-                },
-                {
-                    ShaderIdentifier::TEXT_SHADER,
-                    "shaders/es/text_vertex.es.glsl",
-                    "shaders/es/text_fragment.es.glsl"
-                }
-            };
+                {ShaderIdentifier::BLOCK_SHADER,
+                 "shaders/es/block_vertex.es.glsl",
+                 "shaders/es/block_fragment.es.glsl"},
+                {ShaderIdentifier::LINE_SHADER,
+                 "shaders/es/line_vertex.es.glsl",
+                 "shaders/es/line_fragment.es.glsl"},
+                {ShaderIdentifier::SKY_SHADER,
+                 "shaders/es/sky_vertex.es.glsl",
+                 "shaders/es/sky_fragment.es.glsl"},
+                {ShaderIdentifier::TEXT_SHADER,
+                 "shaders/es/text_vertex.es.glsl",
+                 "shaders/es/text_fragment.es.glsl"},
+                {ShaderIdentifier::BLOOM_BLUR_SHADER,
+                 "shaders/es/bloom_quad_vertex.es.glsl",
+                 "shaders/es/bloom_blur_fragment.es.glsl"},
+                {ShaderIdentifier::BLOOM_COMPOSITE_SHADER,
+                 "shaders/es/bloom_quad_vertex.es.glsl",
+                 "shaders/es/bloom_composite_fragment.es.glsl"}};
 
 #if defined(__EMSCRIPTEN__)
-            for (const auto& [id, vertex_path, fragment_path] : shader_gles_programs)
+            for (const auto &[id, vertex_path, fragment_path] : shader_gles_programs)
 #else
-            for (const auto& [id, vertex_path, fragment_path] : shader_programs)
+            for (const auto &[id, vertex_path, fragment_path] : shader_programs)
 #endif
             {
                 get_context().m_shaders->load(id, vertex_path, fragment_path);
@@ -479,7 +465,7 @@ struct craft::craft_impl
             constexpr std::string_view signs_path = "textures/signs.png";
             constexpr std::string_view sky_path = "textures/sky.png";
 
-            auto&& textures = get_context().m_textures;
+            auto &&textures = get_context().m_textures;
 
             textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
@@ -496,10 +482,8 @@ struct craft::craft_impl
 
 #if defined(MAZE_DEBUG)
 
-            std::ranges::for_each(s_font_names, [](const auto& name)
-            {
-                SDL_Log("Loaded font: %s\n", name.data());
-            });
+            std::ranges::for_each(s_font_names, [](const auto &name)
+                                  { SDL_Log("Loaded font: %s\n", name.data()); });
 
             SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n%s\n", atlas_path.data(),
                     bitmap_font_path.data(), window_icon_path.data(), signs_path.data(), sky_path.data());
@@ -509,7 +493,7 @@ struct craft::craft_impl
         bool m_has_finished{false};
 
     public:
-        explicit loading_state(state_stack& _stack, const context& _context)
+        explicit loading_state(state_stack &_stack, const context &_context)
             : state(_stack, _context)
         {
         }
@@ -547,7 +531,7 @@ struct craft::craft_impl
 
                 ImGui::Spacing();
 
-                const char* status_text = m_has_finished ? "Complete!" : "Please wait...";
+                const char *status_text = m_has_finished ? "Complete!" : "Please wait...";
                 const float status_width = ImGui::CalcTextSize(status_text).x;
                 ImGui::SetCursorPosX((ImGui::GetWindowSize().x - status_width) * 0.5f);
                 ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "%s", status_text);
@@ -557,14 +541,12 @@ struct craft::craft_impl
             ImGui::PopStyleColor(4);
         }
 
-        bool update(const float delta_time, mazes::randomizer& rng) noexcept override
+        bool update(const float delta_time, mazes::randomizer &rng) noexcept override
         {
             if (!m_has_finished)
             {
                 std::call_once(s_load_resources_flag, [this]()
-                {
-                    load_resources();
-                });
+                               { load_resources(); });
 
                 m_has_finished = true;
                 request_stack_pop();
@@ -573,7 +555,7 @@ struct craft::craft_impl
             return true;
         }
 
-        bool handle_event(SDL_Event& event) noexcept override
+        bool handle_event(SDL_Event &event) noexcept override
         {
             return true;
         }
@@ -592,7 +574,7 @@ struct craft::craft_impl
         std::list<std::string> algo_list;
 
     public:
-        explicit menu_state(state_stack& stack, const context& context)
+        explicit menu_state(state_stack &stack, const context &context)
             : state{stack, context}
         {
             m_selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
@@ -612,304 +594,446 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
-            auto&& current_configs = get_context().m_player->m_configs;
-            auto* p = get_context().m_player;
-            static auto selected_font_index{0};
+            auto &&current_configs = get_context().m_player->m_configs;
+            auto *p = get_context().m_player;
+            static int selected_font_index{0};
+
+            // Human-readable label for each PlayerAction (used by the key-bindings table).
+            static constexpr auto action_label = [](const PlayerAction a) noexcept -> const char *
+            {
+                switch (a)
+                {
+                    case PlayerAction::MOVE_AUTO:     return "Auto Run";
+                    case PlayerAction::MOVE_LEFT:     return "Move Left";
+                    case PlayerAction::MOVE_RIGHT:    return "Move Right";
+                    case PlayerAction::MOVE_FORWARD:  return "Move Forward";
+                    case PlayerAction::MOVE_BACKWARD: return "Move Backward";
+                    case PlayerAction::MOVE_UP:       return "Fly Up";
+                    case PlayerAction::MOVE_DOWN:     return "Fly Down";
+                    case PlayerAction::JUMP:          return "Jump";
+                    case PlayerAction::FLY:           return "Toggle Fly";
+                    case PlayerAction::TAG_SIGN:      return "Tag Sign";
+                    case PlayerAction::BUILD_BLOCK:   return "Build Block";
+                    case PlayerAction::COPY_BLOCK:    return "Copy Block";
+                    case PlayerAction::DESTROY_BLOCK: return "Destroy Block";
+                    case PlayerAction::PLACE_LIGHT:   return "Place Light";
+                    case PlayerAction::PLACE_MAZE:    return "Build Maze";
+                    case PlayerAction::PREVIEW_MAZE:  return "Preview Maze";
+                    default:                          return "Unknown";
+                }
+            };
+
+            // Apply the per-player font scale (slider range 0.6 – 1.4).
+            ImGui::GetIO().FontGlobalScale = current_configs.gui_font_scale;
             ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
-            // Apply color schema
-            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.95f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            // Forest-green theme – 19 colour pushes.
+            ImGui::PushStyleColor(ImGuiCol_WindowBg,          ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg,           ImVec4(0.022f, 0.058f, 0.032f, 0.90f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBg,           ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBgActive,     ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button,            ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,     ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive,      ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Header,            ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,     ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive,      ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,  ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab,        ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Tab,               ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabActive,         ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabDimmed,         ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabHovered,        ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabSelected,       ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text,              ImVec4(0.933f, 1.0f,  0.8f,  1.0f));
 
-            // Center the modal window
-            const ImVec2 center = ImVec2(ImGui::GetIO().DisplaySize.x * 0.5f, ImGui::GetIO().DisplaySize.y * 0.5f);
-            ImGui::SetNextWindowPos(center, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+            static constexpr ImVec4 HEADER_COL{0.745f, 0.863f, 0.498f, 1.0f};
 
-            ImGui::SetNextWindowBgAlpha(0.95f);
+            // Full-screen overlay window – no decorations, no resize, no move.
+            const ImVec2 display = ImGui::GetIO().DisplaySize;
+            ImGui::SetNextWindowPos(ImVec2(0.f, 0.f), ImGuiCond_Always);
+            ImGui::SetNextWindowSize(display, ImGuiCond_Always);
 
-            constexpr ImGuiWindowFlags window_flags =
-                ImGuiWindowFlags_AlwaysAutoResize |
+            constexpr ImGuiWindowFlags win_flags =
+                ImGuiWindowFlags_NoDecoration      |
+                ImGuiWindowFlags_NoResize          |
+                ImGuiWindowFlags_NoMove            |
+                ImGuiWindowFlags_NoBringToFrontOnFocus |
                 ImGuiWindowFlags_NoSavedSettings;
 
-            ImGui::OpenPopup("Mazes");
-
-            if (ImGui::BeginPopupModal("Mazes", nullptr, window_flags))
+            if (ImGui::Begin("##menu", nullptr, win_flags))
             {
-                if (ImGui::BeginTabBar("MenuTabs"))
+                // ── Layout metrics (all scale automatically with FontGlobalScale) ──
+                const ImGuiStyle& sty = ImGui::GetStyle();
+                const float fs    = ImGui::GetIO().FontGlobalScale;
+                const float fhs   = ImGui::GetFrameHeightWithSpacing();   // one widget row
+                const float lhs   = ImGui::GetTextLineHeightWithSpacing(); // one text row
+                // Overhead per titled child-box: padding top+bottom, header, separator
+                const float box_oh = sty.WindowPadding.y * 2.f + lhs
+                                   + sty.ItemSpacing.y * 2.f + 1.f;
+                const float sidebar_w = std::clamp(std::round(290.f * fs), 200.f, 420.f);
+                const float btn_w     = std::clamp(std::round(120.f * fs),  80.f, 170.f);
+
+                // ── Title bar row ──────────────────────────────────────────────
+                ImGui::TextColored(HEADER_COL, "  MazeBuilder");
+                ImGui::SameLine(display.x - (btn_w * 2.f + sty.ItemSpacing.x
+                                             + sty.WindowPadding.x));
+                if (ImGui::Button("New Editor", ImVec2(btn_w, 0.f)))
                 {
-                    if (ImGui::BeginTabItem("Main"))
+                    db_flush();
+                    request_stack_clear();
+                    request_stack_push(StateIdentifier::EDITOR);
+                    request_stack_push(StateIdentifier::LOADING);
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Resume", ImVec2(btn_w, 0.f)))
+                    request_stack_pop();
+                ImGui::Separator();
+
+                const float avail_h   = ImGui::GetContentRegionAvail().y;
+                const float content_w = ImGui::GetContentRegionAvail().x - sidebar_w
+                                        - sty.ItemSpacing.x;
+
+                // ══ LEFT SIDEBAR ══════════════════════════════════════════════
+                ImGui::BeginChild("##sidebar", ImVec2(sidebar_w, avail_h), ImGuiChildFlags_Borders);
+
+                // ── Quick Options box ──────────────────────────────────────────
+                ImGui::TextColored(HEADER_COL, "Quick Options");
+                ImGui::Separator();
+                ImGui::Checkbox("Preview Enabled",    &p->m_configs.preview_enabled);
+                ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
+                ImGui::Spacing();
+
+                // ── Key Bindings table ─────────────────────────────────────────
+                ImGui::TextColored(HEADER_COL, "Key Bindings");
+                ImGui::Separator();
+                ImGui::Spacing();
+
+                // Sidebar non-table content height (headers, checkboxes, mouse rows, close btn).
+                const float sidebar_fixed = sty.WindowPadding.y * 2.f
+                    + 3.f * lhs + 2.f * fhs + 4.f * lhs + fhs
+                    + sty.ItemSpacing.y * 6.f + 8.f;
+                const float keybind_h = std::max(3.f * fhs, avail_h - sidebar_fixed);
+                if (ImGui::BeginTable("##keybinds", 2,
+                    ImGuiTableFlags_BordersOuter  |
+                    ImGuiTableFlags_BordersInnerH |
+                    ImGuiTableFlags_RowBg         |
+                    ImGuiTableFlags_ScrollY,
+                    ImVec2(-1.f, keybind_h)))
+                {
+                    ImGui::TableSetupScrollFreeze(0, 1);
+                    ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
+                    ImGui::TableSetupColumn("Key",    ImGuiTableColumnFlags_WidthFixed, 80.f);
+                    ImGui::TableHeadersRow();
+
+                    // Iterate enum in stable order; skip entries without a binding.
+                    for (int i = 0; i < static_cast<int>(PlayerAction::COUNT); ++i)
                     {
-                        ImGui::Checkbox("Preview Enabled", &p->m_configs.preview_enabled);
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f),
-                                           "Navigation Options:");
-                        ImGui::Spacing();
-                        if (ImGui::Button("Resume", ImVec2(220, 40)))
-                        {
-                            request_stack_pop();
-                        }
-                        ImGui::Separator();
-                        ImGui::Spacing();
-                        if (ImGui::Button("New Editor", ImVec2(220, 40)))
-                        {
-                            // Start a new editor session
-                            db_flush();
-                            request_stack_clear();
-                            request_stack_push(StateIdentifier::EDITOR);
-                            request_stack_push(StateIdentifier::LOADING);
-                        }
-                        ImGui::Separator();
-                        ImGui::Spacing();
-                        if (ImGui::Button("Close Application", ImVec2(270, 40)))
-                        {
-                            request_stack_clear();
-                        }
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        ImGui::Text("Commands:");
-                        ImGui::Spacing();
-                        ImGui::Text("Left Mouse Click: Delete a block");
-                        ImGui::Text("Right Mouse Click: Build a block");
-                        ImGui::Text("Middle Mouse Click: Copy selected block type");
-                        ImGui::Text("Middle Mouse Scroll: Cycle block types");
-                        ImGui::Text("Spacebar: Jump");
-                        ImGui::Text("Tab: Fly");
-                        ImGui::Text("Left Shift: Hover up while flying");
-                        ImGui::Text("F: Hover down while flying");
-                        ImGui::Text("Q: Auto run Movement");
-                        ImGui::Text("W: Forward Movement");
-                        ImGui::Text("A: Left Movement");
-                        ImGui::Text("S: Backward Movement");
-                        ImGui::Text("D: Right Movement");
-                        ImGui::Text("B: Build maze at cursor");
-                        ImGui::Text("E: Preview maze at cursor");
-                        ImGui::Text("T: Tag a block");
-                        ImGui::Text("Left Control: Place light");
-
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        ImGui::EndTabItem();
+                        const auto action  = static_cast<PlayerAction>(i);
+                        const auto scancode = static_cast<SDL_Scancode>(p->get_assigned_key(action));
+                        if (scancode == SDL_SCANCODE_UNKNOWN)
+                            continue;
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(action_label(action));
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(SDL_GetScancodeName(scancode));
                     }
+                    ImGui::EndTable();
+                }
+
+                ImGui::Spacing();
+
+                // ── Mouse Actions box ──────────────────────────────────────────
+                ImGui::TextColored(HEADER_COL, "Mouse Actions");
+                ImGui::Separator();
+                if (ImGui::BeginTable("##mouse", 2, ImGuiTableFlags_None))
+                {
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 100.f);
+                    ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+                    const char* mouse_rows[][2] = {
+                        {"Left Click",   "Destroy block"},
+                        {"Right Click",  "Build block"},
+                        {"Middle Click", "Copy block type"},
+                        {"Scroll",       "Cycle block types"},
+                    };
+                    for (const auto &row : mouse_rows)
+                    {
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(row[0]);
+                        ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(row[1]);
+                    }
+                    ImGui::EndTable();
+                }
+
+                ImGui::Spacing();
+                ImGui::Separator();
+                if (ImGui::Button("Close Application", ImVec2(-1.f, fhs)))
+                    request_stack_clear();
+
+                ImGui::EndChild(); // ##sidebar
+
+                ImGui::SameLine();
+
+                // ══ RIGHT CONTENT AREA ════════════════════════════════════════
+                ImGui::BeginChild("##content", ImVec2(content_w, avail_h), ImGuiChildFlags_Borders);
+
+                if (ImGui::BeginTabBar("##tabs"))
+                {
+                    // ── Builder tab ───────────────────────────────────────────
                     if (ImGui::BeginTabItem("Builder"))
                     {
-                        ImGui::Text("Maze Configuration");
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        auto&& maze_config = get_context().m_player->m_configs.maze;
+                        auto &&maze_config = get_context().m_player->m_configs.maze;
 
                         static std::string selected_algo;
                         selected_algo = std::string{mazes::to_sv_from_algo(maze_config.algo_id())};
-                        static int rows = static_cast<int>(maze_config.rows());
+                        static int rows    = static_cast<int>(maze_config.rows());
                         static int columns = static_cast<int>(maze_config.columns());
-                        static int levels = static_cast<int>(maze_config.levels());
-                        static int seed = static_cast<int>(maze_config.seed());
+                        static int levels  = static_cast<int>(maze_config.levels());
+                        static int seed    = static_cast<int>(maze_config.seed());
 
-                        ImGui::SliderInt("Rows", &rows, 2, 10);
+                        // ── Maze Dimensions box ───────────────────────────────
+                        ImGui::BeginChild("##dims", ImVec2(0.f, 160.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Maze Dimensions");
                         ImGui::Separator();
-                        ImGui::Spacing();
-
+                        ImGui::SliderInt("Rows",    &rows,    2, 10);
                         ImGui::SliderInt("Columns", &columns, 2, 10);
-                        ImGui::Separator();
+                        ImGui::SliderInt("Levels",  &levels,  1, 5);
+                        ImGui::EndChild();
+
                         ImGui::Spacing();
 
-                        ImGui::SliderInt("Levels", &levels, 1, 5);
+                        // ── Algorithm + Seed box ──────────────────────────────
+                        ImGui::BeginChild("##algoseed", ImVec2(0.f, 110.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Algorithm & Seed");
                         ImGui::Separator();
-                        ImGui::Spacing();
-
-                        if (ImGui::TreeNode("Algo"))
+                        if (constexpr ImGuiComboFlags combo_flags =
+                                ImGuiComboFlags_PopupAlignLeft | ImGuiComboFlags_WidthFitPreview;
+                            ImGui::BeginCombo("Algorithm", selected_algo.data(), combo_flags))
                         {
-                            auto preview{selected_algo};
-                            ImGui::NewLine();
-                            if (constexpr ImGuiComboFlags combo_flags = ImGuiComboFlags_PopupAlignLeft |
-                                    ImGuiComboFlags_WidthFitPreview;
-                                ImGui::BeginCombo("algorithm", preview.data(), combo_flags))
+                            for (const auto &itr : algo_list)
                             {
-                                for (const auto& itr : algo_list)
+                                const bool is_selected = (mazes::to_algo_from_sv(itr) == maze_config.algo_id());
+                                if (ImGui::Selectable(std::string{itr}.c_str(), is_selected))
                                 {
-                                    const bool is_selected = (mazes::to_algo_from_sv(itr) == maze_config.algo_id());
-                                    if (ImGui::Selectable(std::string{itr}.c_str(), is_selected))
-                                    {
-                                        maze_config.algo_id(mazes::to_algo_from_sv(itr));
-                                        selected_algo = itr;
-                                    }
-                                    if (is_selected)
-                                    {
-                                        ImGui::SetItemDefaultFocus();
-                                    }
+                                    maze_config.algo_id(mazes::to_algo_from_sv(itr));
+                                    selected_algo = itr;
                                 }
-                                ImGui::EndCombo();
+                                if (is_selected)
+                                    ImGui::SetItemDefaultFocus();
                             }
-                            ImGui::NewLine();
-                            ImGui::TreePop();
+                            ImGui::EndCombo();
                         }
-
                         ImGui::SliderInt("Seed", &seed, 0, 1000000);
+                        ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Sign Message box ──────────────────────────────────
+                        ImGui::BeginChild("##tag", ImVec2(0.f, box_oh + fhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Sign Message");
                         ImGui::Separator();
-                        ImGui::Spacing();
-
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
-                        ImGui::Spacing();
-
                         static char tag_buffer[256] = "";
-
-                        // Copy current tag to buffer on first use or when changed externally
-                        static bool initialized = false;
-                        if (!initialized || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
+                        static bool tag_init = false;
+                        if (!tag_init || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
                         {
                             SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
                             tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
-                            initialized = true;
+                            tag_init = true;
                         }
-
                         if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
-                        {
                             current_configs.tag = std::string(tag_buffer);
-                        }
+                        ImGui::EndChild();
 
+                        ImGui::Spacing();
+
+                        // ── Instructions box ──────────────────────────────────
+                        ImGui::BeginChild("##instruct", ImVec2(0.f, box_oh + 4.f * lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Instructions");
                         ImGui::Separator();
-                        ImGui::Spacing();
+                        ImGui::BulletText("Configure dimensions, algorithm and seed above");
+                        ImGui::BulletText("Press 'Apply Configs'");
+                        ImGui::BulletText("Press E in the editor to generate a preview");
+                        ImGui::BulletText("Aim at a block face and press B to build");
+                        ImGui::EndChild();
 
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Instructions:");
-                        ImGui::Text("1. Configure maze parameters above");
-                        ImGui::Text("2. Press 'Apply Configs' button");
-                        ImGui::Text("3. Press 'E' key in editor to generate preview");
-                        ImGui::Text("4. Aim at a block face");
-                        ImGui::Separator();
                         ImGui::Spacing();
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Message:");
-                        ImGui::Spacing();
-
-                        if (ImGui::Button("Apply Configs", ImVec2(200, 40)))
+                        if (ImGui::Button("Apply Configs", ImVec2(-1.f, 0.f)))
                         {
                             get_context().m_player->m_configs.maze
-                                         .algo_id(mazes::to_algo_from_sv(selected_algo))
-                                         .rows(static_cast<unsigned int>(rows))
-                                         .columns(static_cast<unsigned int>(columns))
-                                         .levels(static_cast<unsigned int>(levels))
-                                         .seed(static_cast<unsigned int>(seed));
+                                .algo_id(mazes::to_algo_from_sv(selected_algo))
+                                .rows(static_cast<unsigned int>(rows))
+                                .columns(static_cast<unsigned int>(columns))
+                                .levels(static_cast<unsigned int>(levels))
+                                .seed(static_cast<unsigned int>(seed));
                         }
-                        ImGui::Separator();
-                        ImGui::Spacing();
 
                         ImGui::EndTabItem();
                     }
+
+                    // ── Graphics / Rendering tab ──────────────────────────────
                     if (ImGui::BeginTabItem("Graphics"))
                     {
-                        static bool toggle_color_mode = false;
-                        ImGui::Checkbox("Toggle Dark Mode", &toggle_color_mode);
-                        if (toggle_color_mode)
-                        {
-                            ImGui::StyleColorsLight();
-                        }
-                        else
-                        {
-                            ImGui::StyleColorsDark();
-                        }
+                        const auto last_vsync      = current_configs.vsync;
+                        const auto last_fullscreen  = current_configs.fullscreen;
 
+                        // ── Display box ───────────────────────────────────────
+                        ImGui::BeginChild("##display", ImVec2(0.f, 190.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Display");
                         ImGui::Separator();
+                        ImGui::Checkbox("Enable VSync",         &current_configs.vsync);
+                        ImGui::Checkbox("Enable Fullscreen",    &current_configs.fullscreen);
+                        ImGui::Checkbox("Invert Mouse Y-Axis",  &current_configs.invert_mouse);
+                        ImGui::SliderFloat("Field of View", &current_configs.fov, 30.f, 120.f, "%.1f deg");
+                        ImGui::SliderInt("Orthographic Scale",  &current_configs.ortho, 0, 64);
+                        ImGui::SliderInt("Day Length (s)",      &current_configs.day_length, 60, 1800);
+                        ImGui::EndChild();
+
+                        if (last_vsync != current_configs.vsync)
+                            SDL_GL_SetSwapInterval(current_configs.vsync ? 1 : 0);
+                        if (last_fullscreen != current_configs.fullscreen)
+                            SDL_SetWindowFullscreen(get_context().m_window, current_configs.fullscreen);
+
                         ImGui::Spacing();
 
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Font Selection:");
+                        // ── Post-Process box ──────────────────────────────────
+                        ImGui::BeginChild("##postfx", ImVec2(0.f, box_oh + 2.f * fhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Bloom / Post-Process");
+                        ImGui::Separator();
+                        ImGui::Checkbox("Enable Bloom Effect", &current_configs.use_bloom_effect);
+                        ImGui::BeginDisabled(!current_configs.use_bloom_effect);
+                        ImGui::SliderFloat("Exposure", &current_configs.exposure_range, 0.1f, 2.0f, "%.2f");
+                        ImGui::EndDisabled();
+                        ImGui::EndChild();
+
                         ImGui::Spacing();
-                        if (ImGui::BeginListBox("##FontListBox", ImVec2(-100, 200)))
+
+                        // ── UI box ────────────────────────────────────────────
+                        ImGui::BeginChild("##ui_opts", ImVec2(0.f, box_oh + fhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "UI");
+                        ImGui::Separator();
+                        ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
+                        ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Theme & Font box ──────────────────────────────────
+                        {
+                        const float listbox_h = 3.f * fhs + sty.FramePadding.y * 2.f;
+                        const float theme_h   = box_oh + 3.f * fhs
+                                              + 2.f * sty.ItemSpacing.y + listbox_h;
+                        ImGui::BeginChild("##theme", ImVec2(0.f, theme_h), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Theme & Font");
+                        ImGui::Separator();
+                        static bool dark_mode = true;
+                        if (ImGui::Checkbox("Dark Mode", &dark_mode))
+                        {
+                            if (dark_mode) ImGui::StyleColorsDark();
+                            else           ImGui::StyleColorsLight();
+                        }
+                        ImGui::Spacing();
+                        ImGui::SliderFloat("Font Scale", &current_configs.gui_font_scale, 0.6f, 1.4f, "%.2f");
+                        ImGui::Spacing();
+                        if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
                         {
                             for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
                             {
-                                const bool is_selected = (selected_font_index == i);
-                                const auto& font_name = craft_impl::s_font_names.at(
+                                const bool is_sel = (selected_font_index == static_cast<int>(i));
+                                const auto &font_name = craft_impl::s_font_names.at(
                                     static_cast<std::size_t>(m_selectable_fonts.at(i)));
-                                if (ImGui::Selectable(font_name.data(), is_selected))
-                                {
-                                    selected_font_index = i;
-                                }
-                                if (is_selected)
-                                {
+                                if (ImGui::Selectable(font_name.data(), is_sel))
+                                    selected_font_index = static_cast<int>(i);
+                                if (is_sel)
                                     ImGui::SetItemDefaultFocus();
-                                }
                             }
                             ImGui::EndListBox();
                         }
-
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        const auto last_vsync = current_configs.vsync;
-                        const auto last_fullscreen = current_configs.fullscreen;
-
-                        ImGui::SliderFloat("FoV", &current_configs.fov, 30, 120, "%.3f degrees");
-                        ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
-                        ImGui::Checkbox("Enable VSync", &current_configs.vsync);
-                        ImGui::Checkbox("Enable fullscreen", &current_configs.fullscreen);
-                        ImGui::Checkbox("Invert Mouse Y-Axis", &current_configs.invert_mouse);
-                        ImGui::SliderInt("Orthographic scaling", &current_configs.ortho, 0, 64);
-                        // ImGui::Checkbox("Apply Bloom Effect", &current_configs.use_bloom_effect);
-                        // ImGui::SliderFloat("Exp", &current_configs.exposure_range, 0.1f, 1.0f, "%.2f");
-
-                        ImGui::Separator();
-                        ImGui::Spacing();
-
-                        if (last_vsync != current_configs.vsync)
-                        {
-                            SDL_GL_SetSwapInterval(current_configs.vsync ? 1 : 0);
-                        }
-
-                        if (last_fullscreen != current_configs.fullscreen)
-                        {
-                            SDL_SetWindowFullscreen(get_context().m_window, current_configs.fullscreen);
-                        }
+                        ImGui::EndChild();
+                        } // theme block scope
 
                         ImGui::EndTabItem();
                     }
+
+                    // ── Player tab ────────────────────────────────────────────
+                    if (ImGui::BeginTabItem("Player"))
+                    {
+                        // ── Identity box ──────────────────────────────────────
+                        ImGui::BeginChild("##ident", ImVec2(0.f, box_oh + 2.f * lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Identity");
+                        ImGui::Separator();
+                        ImGui::Text("Name: %s", p->get_name().c_str());
+                        ImGui::Text("Local time: %s", p->get_local_time().data());
+                        ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Position box ──────────────────────────────────────
+                        ImGui::BeginChild("##pos", ImVec2(0.f, box_oh + 2.f * lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Position");
+                        ImGui::Separator();
+                        ImGui::Text("X: %.2f   Y: %.2f   Z: %.2f",
+                                    p->m_pos.x, p->m_pos.y, p->m_pos.z);
+                        ImGui::Text("Yaw: %.1f deg   Pitch: %.1f deg",
+                                    p->m_pos.rx * (180.f / 3.14159f),
+                                    p->m_pos.ry * (180.f / 3.14159f));
+                        ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Inventory box ─────────────────────────────────────
+                        ImGui::BeginChild("##inv", ImVec2(0.f, box_oh + lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Inventory");
+                        ImGui::Separator();
+                        ImGui::Text("Selected block type: %d", p->get_item());
+                        ImGui::EndChild();
+
+                        ImGui::EndTabItem();
+                    }
+
+                    // ── Exports tab ───────────────────────────────────────────
                     if (ImGui::BeginTabItem("Exports"))
                     {
-                        ImGui::TextColored(ImVec4(0.745f, 0.863f, 0.498f, 1.0f), "Artifact Export:");
+                        ImGui::BeginChild("##export_box", ImVec2(0.f, box_oh + lhs + sty.ItemSpacing.y + 2.f * fhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Artifact Export");
+                        ImGui::Separator();
                         ImGui::Spacing();
-                        if (ImGui::Button("Download Artifacts", ImVec2(250, 60)))
+                        ImGui::TextWrapped("Export the current voxel world as a Wavefront OBJ file.");
+                        ImGui::Spacing();
+                        if (ImGui::Button("Download Artifacts", ImVec2(0.f, 2.f * fhs)))
                         {
                             current_configs.artifacts_ready = true;
                             handle_artifacts(p);
                         }
-                        ImGui::TextWrapped("%s\n", p->artifacts().data());
-                        ImGui::Separator();
+                        ImGui::EndChild();
+
                         ImGui::Spacing();
+                        ImGui::BeginChild("##artifact_preview", ImVec2(0.f, 0.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Preview");
+                        ImGui::Separator();
+                        ImGui::TextWrapped("%s", p->artifacts().data());
+                        ImGui::EndChild();
+
                         ImGui::EndTabItem();
                     }
-                    ImGui::EndTabBar();
-                }
-                ImGui::EndPopup();
-            }
 
-            ImGui::PopStyleColor(18);
+                    ImGui::EndTabBar();
+                } // BeginTabBar
+
+                ImGui::EndChild(); // ##content
+            }
+            ImGui::End(); // ##menu
+
+            ImGui::PopStyleColor(19); // 19 colours pushed above
             ImGui::PopFont();
         }
 
-        bool update(float delta_time, mazes::randomizer& rng) noexcept override
+        bool update(float delta_time, mazes::randomizer &rng) noexcept override
         {
             return false;
         }
 
-        bool handle_event(SDL_Event& event) noexcept override
+        bool handle_event(SDL_Event &event) noexcept override
         {
             if (SDL_EVENT_QUIT == event.type)
             {
@@ -925,11 +1049,16 @@ struct craft::craft_impl
                 request_stack_pop();
             }
 
+            // Let window resize / fullscreen events propagate to the state below
+            // (editor_state / runner_state) so the world can rebuild its FBOs.
+            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+                return true;
+
             return false;
         }
     }; // menu_state
 
-    const std::string& INIT_WINDOW_TITLE;
+    const std::string &INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
     std::unique_ptr<state_stack> m_crafting_states;
@@ -944,24 +1073,16 @@ struct craft::craft_impl
 
     sdl_gl_helper m_sdl;
 
-    mazes::grid_factory m_grid_factory;
-
     mutable double m_fps_update_timer{0.0};
     mutable int m_smoothed_fps{0};
     mutable float m_smoothed_frame_time{0.0f};
 
-    craft_impl(const std::string& title, const int w, const int h)
+    craft_impl(const std::string &title, const int w, const int h)
         : INIT_WINDOW_TITLE(title), INIT_WINDOW_WIDTH(w), INIT_WINDOW_HEIGHT(h)
     {
         start_SDL();
 
         setup_imgui();
-
-        m_grid_factory.register_creator(
-            title, [](const mazes::configurator& config) -> std::unique_ptr<mazes::grid_interface>
-            {
-                return std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
-            });
 
         m_crafting_states = std::make_unique<state_stack>(state::context{
             m_sdl.window,
@@ -969,8 +1090,7 @@ struct craft::craft_impl
             std::ref(m_shaders),
             std::ref(m_textures),
             std::ref(m_player),
-            std::ref(m_sdl)
-        });
+            std::ref(m_sdl)});
 
         register_states();
 
@@ -1016,7 +1136,7 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_Init(glsl_version.c_str());
     }
 
-    static std::string make_filename(const player* p) noexcept
+    static std::string make_filename(const player *p) noexcept
     {
         const auto rows = std::to_string(p->m_configs.maze.rows());
         const auto columns = std::to_string(p->m_configs.maze.columns());
@@ -1025,12 +1145,12 @@ struct craft::craft_impl
         std::string filename;
         filename.reserve(128);
         filename = rows + "x" + columns + "x" + levels + "_" +
-            p->get_name() + ".obj";
+                   p->get_name() + ".obj";
 
         return filename;
     }
 
-    static void handle_artifacts(player* p) noexcept
+    static void handle_artifacts(player *p) noexcept
     {
         // Generate artifacts (common for both platforms)
         const auto artifacts = p->artifacts();
@@ -1081,14 +1201,13 @@ struct craft::craft_impl
         ImGui::SetNextWindowBgAlpha(0.65f);
 
         constexpr ImGuiWindowFlags windowFlags = ImGuiWindowFlags_NoDecoration |
-            ImGuiWindowFlags_AlwaysAutoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoFocusOnAppearing |
-            ImGuiWindowFlags_NoNav |
-            ImGuiWindowFlags_NoMove;
+                                                 ImGuiWindowFlags_AlwaysAutoResize |
+                                                 ImGuiWindowFlags_NoSavedSettings |
+                                                 ImGuiWindowFlags_NoFocusOnAppearing |
+                                                 ImGuiWindowFlags_NoNav |
+                                                 ImGuiWindowFlags_NoMove;
 
-        if (this->m_player.m_configs.show_stats_window
-            && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        if (this->m_player.m_configs.show_stats_window && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
             ImGui::Text("FPS: %d", m_smoothed_fps);
             ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
@@ -1118,13 +1237,21 @@ struct craft::craft_impl
                 continue;
             }
 
+            // Window pixel-size events (resize / fullscreen) must always reach the
+            // world so it can rebuild its FBOs — bypass the ImGui capture filter.
+            if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
+            {
+                m_crafting_states->handle_event(event);
+                continue;
+            }
+
             // Check if ImGui wants to capture this event
-            const ImGuiIO& io = ImGui::GetIO();
+            const ImGuiIO &io = ImGui::GetIO();
             const bool imgui_wants_keyboard = io.WantCaptureKeyboard;
             const bool imgui_wants_mouse = io.WantCaptureMouse;
             const bool should_forward_event =
                 (event.type != SDL_EVENT_KEY_DOWN && event.type != SDL_EVENT_KEY_UP &&
-                    event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
+                 event.type != SDL_EVENT_TEXT_INPUT && !imgui_wants_mouse) ||
                 (!imgui_wants_keyboard && !imgui_wants_mouse);
 
             if (should_forward_event)
@@ -1134,7 +1261,7 @@ struct craft::craft_impl
         }
     }
 
-    void update(const float delta_time, mazes::randomizer& rng) const noexcept
+    void update(const float delta_time, mazes::randomizer &rng) const noexcept
     {
         m_crafting_states->update(delta_time, std::ref(rng));
     }
@@ -1164,10 +1291,9 @@ std::once_flag craft::craft_impl::loading_state::s_load_resources_flag;
 std::vector<std::string_view> craft::craft_impl::s_font_names{
     "Cousine Regular",
     "Limelight Regular",
-    "Nunito Sans"
-};
+    "Nunito Sans"};
 
-craft::craft(const std::string& title, const int w, const int h)
+craft::craft(const std::string &title, const int w, const int h)
     : m_impl{std::make_unique<craft_impl>(cref(title), w, h)}
 {
 }
@@ -1177,7 +1303,7 @@ craft::~craft() = default;
 /**
  * Run the craft-engine in a loop with SDL window open
  */
-bool craft::run([[maybe_unused]] mazes::grid_interface* g, mazes::randomizer& rng) const noexcept
+bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rng) const noexcept
 {
     if (!this->m_impl->m_sdl.window)
     {

@@ -7,12 +7,12 @@
 
 #include <memory>
 
+/// @file masked_grid.h
+/// @namespace mazes
 namespace mazes
 {
-
     class cell;
 
-    /// @file masked_grid.h
     /// @class masked_grid
     /// @brief A grid that restricts cell availability based on a boolean mask
     /// @details Cells at positions where the mask returns false are treated as non-existent.

@@ -1,60 +1,39 @@
 #ifndef CONFIGURATOR_H
 #define CONFIGURATOR_H
 
+#include <MazeBuilder/algos.h>
+#include <MazeBuilder/args.h>
+#include <MazeBuilder/convert_contract.h>
+#include <MazeBuilder/output_formats.h>
+
 #include <algorithm>
 #include <limits>
 #include <memory>
 #include <optional>
 #include <string>
 
-#include <MazeBuilder/binary_tree.h>
-#include <MazeBuilder/dfs.h>
-#include <MazeBuilder/enums.h>
-#include <MazeBuilder/sidewinder.h>
-
+/// @namespace mazes
+/// @file configurator.h
 namespace mazes
 {
-    /// @file configurator.h
     /// @class configurator
     /// @brief Configuration class for arguments
     /// @details This class stores maze generation parameters with safe default values
     class configurator final
     {
-
     public:
-        static constexpr auto DEFAULT_ROWS = 10u;
-
-        static constexpr auto DEFAULT_COLUMNS = 10u;
-
-        static constexpr auto DEFAULT_LEVELS = 1u;
-
-        static constexpr auto DEFAULT_BLOCK_ID = 0;
-
-        static constexpr auto DEFAULT_ALGO_ID = algo::BINARY_TREE;
-
-        static constexpr auto DEFAULT_SEED = 0u;
-
-        static constexpr auto DEFAULT_OUTPUT_ID = output_format::PLAIN_TEXT;
-
-        static constexpr auto DEFAULT_FILENAME = "";
-
-        static constexpr auto DEFAULT_DISTANCES = false;
-
-        static constexpr auto DEFAULT_DISTANCES_START = 0;
-
-        static constexpr auto DEFAULT_DISTANCES_END = -1;
-
-        static constexpr auto MAX_ROWS = 100u;
-
         static constexpr auto MAX_COLUMNS = 100u;
-
         static constexpr auto MAX_LEVELS = 10u;
+        static constexpr auto MAX_ROWS = 100u;
+        static constexpr auto DEFAULT_DISTANCES_START = 0;
+        static constexpr auto DEFAULT_DISTANCES_END = -1;
+        static constexpr auto DEFAULT_SEED_VALUE = 1'000'000u;
 
         /// @brief Set the number of rows
         /// @param rows The number of rows (must be > 0, will be clamped to reasonable limits)
         /// @return A reference to this configurator
-        /// @warning Values be clamped to prevent memory issues
-        configurator &rows(unsigned int rows) noexcept
+        /// @warning Values will be clamped to prevent memory issues
+        configurator &ensure_rows(unsigned int rows) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             m_rows = std::clamp(rows, 1u, MAX_ROWS);
@@ -65,7 +44,7 @@ namespace mazes
         /// @param columns The number of columns (must be > 0, will be clamped to reasonable limits)
         /// @return A reference to this configurator
         /// @warning Values will be clamped to prevent memory issues
-        configurator &columns(unsigned int columns) noexcept
+        configurator &ensure_columns(unsigned int columns) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             m_columns = std::clamp(columns, 1u, MAX_COLUMNS);
@@ -77,7 +56,7 @@ namespace mazes
         /// @return A reference to this configurator
         /// @warning Values will be clamped to prevent memory issues
         /// @note Most mazes are 2D (levels=1), 3D mazes should use moderate level counts
-        configurator &levels(unsigned int levels) noexcept
+        configurator &ensure_levels(unsigned int levels) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             // Levels are more memory-intensive than rows/columns, so lower limit
@@ -88,7 +67,7 @@ namespace mazes
         /// @brief Set the maze generation algorithm
         /// @param algorithm The algorithm to use
         /// @return A reference to this configurator
-        configurator &algo_id(algo algorithm) noexcept
+        configurator &ensure_algo_id(algo algorithm) noexcept
         {
             m_algo_id = algorithm;
             return *this;
@@ -97,7 +76,7 @@ namespace mazes
         /// @brief Set the block ID
         /// @param block_id The block ID
         /// @return A reference to this configurator
-        configurator &block_id(int block_id) noexcept
+        configurator &ensure_block_id(int block_id) noexcept
         {
             m_block_id = block_id;
             return *this;
@@ -106,7 +85,7 @@ namespace mazes
         /// @brief Set the random seed
         /// @param seed The random seed (0 = use random seed)
         /// @return A reference to this configurator
-        configurator &seed(unsigned int seed) noexcept
+        configurator &ensure_seed(unsigned int seed) noexcept
         {
             m_seed = seed;
             return *this;
@@ -115,7 +94,7 @@ namespace mazes
         /// @brief Set the distance calculation flag
         /// @param distances The distance calculation flag
         /// @return A reference to this configurator
-        configurator &distances(bool distances) noexcept
+        configurator &ensure_distances(bool distances) noexcept
         {
             m_distances = distances;
             return *this;
@@ -124,7 +103,7 @@ namespace mazes
         /// @brief Set the distance start index
         /// @param start_index The starting cell index for distance calculation
         /// @return A reference to this configurator
-        configurator &distances_start(int start_index) noexcept
+        configurator &ensure_distances_start(int start_index) noexcept
         {
             m_distances_start = start_index;
             return *this;
@@ -133,7 +112,7 @@ namespace mazes
         /// @brief Set the distance end index
         /// @param end_index The ending cell index for distance calculation
         /// @return A reference to this configurator
-        configurator &distances_end(int end_index) noexcept
+        configurator &ensure_distances_end(int end_index) noexcept
         {
             m_distances_end = end_index;
             return *this;
@@ -142,7 +121,7 @@ namespace mazes
         /// @brief Set the output_format ID
         /// @param output_format The output_format ID
         /// @return A reference to this configurator
-        configurator &output_format_id(output_format output_format) noexcept
+        configurator &ensure_output_format_id(output_format output_format) noexcept
         {
             m_output_format_id = output_format;
             return *this;
@@ -151,7 +130,7 @@ namespace mazes
         /// @brief Set the output_format filename
         /// @param filename The output_format filename
         /// @return A reference to this configurator
-        configurator &output_format_filename(std::string filename) noexcept
+        configurator &ensure_output_format_filename(std::string filename) noexcept
         {
             m_output_filename = std::move(filename);
             return *this;
@@ -160,7 +139,7 @@ namespace mazes
         /// @brief Set the mask filename
         /// @param filename The mask file path (.txt)
         /// @return A reference to this configurator
-        configurator &mask_filename(std::string filename) noexcept
+        configurator &ensure_mask_filename(std::string filename) noexcept
         {
             m_mask_filename = std::move(filename);
             return *this;
@@ -169,7 +148,7 @@ namespace mazes
         /// @brief Set the help flag
         /// @param help
         /// @return
-        configurator &help(bool help) noexcept
+        configurator &needs_help(bool help) noexcept
         {
             m_help = help;
             return *this;
@@ -178,39 +157,59 @@ namespace mazes
         /// @brief Set the version flag
         /// @param version
         /// @return
-        configurator &version(bool version) noexcept
+        configurator &needs_version(bool version) noexcept
         {
             m_version = version;
             return *this;
         };
 
+        /// @brief Set whether step snapshots should be shown during generation
+        /// @param show_steps True to emit periodic maze snapshots
+        /// @return A reference to this configurator
+        configurator &show_steps(bool show_steps) noexcept
+        {
+            m_show_steps = show_steps;
+            return *this;
+        }
+
+        // Shorthand setter overloads (non-const, take a value; getters are const with no params)
+        configurator &rows(unsigned int r) noexcept { return ensure_rows(r); }
+        configurator &columns(unsigned int c) noexcept { return ensure_columns(c); }
+        configurator &levels(unsigned int l) noexcept { return ensure_levels(l); }
+        configurator &algo_id(algo a) noexcept { return ensure_algo_id(a); }
+        configurator &seed(unsigned int s) noexcept { return ensure_seed(s); }
+
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
-        [[nodiscard]] unsigned int rows() const noexcept { return m_rows.value_or(DEFAULT_ROWS); }
+        [[nodiscard]] unsigned int rows() const noexcept { return m_rows.value_or(MAX_ROWS); }
 
         /// @brief Get the number of columns
         /// @return The number of columns (guaranteed to be > 0)
-        [[nodiscard]] unsigned int columns() const noexcept { return m_columns.value_or(DEFAULT_COLUMNS); }
+        [[nodiscard]] unsigned int columns() const noexcept { return m_columns.value_or(MAX_COLUMNS); }
 
         /// @brief Get the number of levels
         /// @return The number of levels (guaranteed to be > 0)
-        [[nodiscard]] unsigned int levels() const noexcept { return m_levels.value_or(DEFAULT_LEVELS); }
+        [[nodiscard]] unsigned int levels() const noexcept { return m_levels.value_or(MAX_LEVELS); }
 
         /// @brief Get the maze generation algorithm
         /// @return The algorithm used for maze generation
-        [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(DEFAULT_ALGO_ID); }
+        [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(static_cast<algo>(0)); }
+
+        /// @brief Get the mask filename
+        /// @return The mask filename (empty string if not set)
+        [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
 
         /// @brief Get the block ID
         /// @return The block ID
-        [[nodiscard]] int block_id() const noexcept { return m_block_id.value_or(DEFAULT_BLOCK_ID); }
+        [[nodiscard]] int block_ID() const noexcept { return m_block_id.value_or(0); }
 
         /// @brief Get the random seed
         /// @return The random seed
-        [[nodiscard]] unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED); }
+        [[nodiscard]] unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED_VALUE); }
 
         /// @brief Check if distances are calculated
         /// @return True if distances are calculated, false otherwise
-        [[nodiscard]] bool distances() const noexcept { return m_distances.value_or(DEFAULT_DISTANCES); }
+        [[nodiscard]] bool distances() const noexcept { return m_distances.value_or(false); }
 
         /// @brief Get the distance start index
         /// @return The starting cell index for distance calculation
@@ -222,23 +221,22 @@ namespace mazes
 
         /// @brief Get the output_format ID
         /// @return The output_format ID
-        [[nodiscard]] output_format output_format_id() const noexcept { return m_output_format_id.value_or(DEFAULT_OUTPUT_ID); }
+        [[nodiscard]] output_format output_format_id() const noexcept { return m_output_format_id.value_or(output_format::STDOUT); }
 
         /// @brief Get the output_format filename
         /// @return The output_format filename
-        [[nodiscard]] std::string output_filename() const noexcept { return m_output_filename.value_or(std::string{DEFAULT_FILENAME}); }
-
-        /// @brief Get the mask filename
-        /// @return The mask file path, or empty string if not set
-        [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
+        [[nodiscard]] std::string config_filename() const noexcept { return m_output_filename.value_or(std::string{"config.json"}); }
 
         [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
+
         [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
+
+        [[nodiscard]] bool show_steps() const noexcept { return m_show_steps.value_or(false); };
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
         /// @details Checks for potential infinite loop conditions and memory issues
-        [[nodiscard]] bool is_valid() const noexcept
+        [[nodiscard]] bool has_valid_dimensions() const noexcept
         {
 
             // Check for zero dimensions (would cause infinite loops or divisions by zero)
@@ -266,30 +264,6 @@ namespace mazes
             return true;
         }
 
-        /// @brief Determine the maze generation algorithm from the configuration
-        /// @param config The configurator containing the algorithm settings
-        /// @return A unique pointer to the selected algorithm interface
-        static std::optional<std::unique_ptr<algo_interface>> make_algo_from_config(const configurator &config)
-        {
-            if (config.algo_id() == algo::DFS)
-            {
-
-                return std::make_optional(std::make_unique<dfs>());
-            }
-            if (config.algo_id() == algo::BINARY_TREE)
-            {
-
-                return std::make_optional(std::make_unique<binary_tree>());
-            }
-            if (config.algo_id() == algo::SIDEWINDER)
-            {
-
-                return std::make_optional(std::make_unique<sidewinder>());
-            }
-
-            return std::nullopt;
-        }
-
     private:
         std::optional<unsigned int> m_rows;
 
@@ -297,9 +271,9 @@ namespace mazes
 
         std::optional<unsigned int> m_levels;
 
-        std::optional<int> m_block_id;
-
         std::optional<algo> m_algo_id;
+
+        std::optional<int> m_block_id;
 
         std::optional<unsigned int> m_seed;
 
@@ -311,13 +285,17 @@ namespace mazes
 
         std::optional<output_format> m_output_format_id;
 
+        std::optional<std::string> m_config_file;
+
+        std::optional<std::string> m_mask_filename;
+
         std::optional<std::string> m_output_filename;
 
         std::optional<bool> m_help;
 
         std::optional<bool> m_version;
 
-        std::optional<std::string> m_mask_filename;
+        std::optional<bool> m_show_steps;
     };
 
 } // namespace

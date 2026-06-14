@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <type_traits>
 
 #include "entity.h"
@@ -18,6 +19,8 @@ struct command
     std::function<void(scene_node &, float, mazes::randomizer& rng)> action;
     Entity category;
 };
+
+using command_queue = std::queue<command>;
 
 template <typename GameObject, typename Function>
 std::function<void(scene_node &, float, mazes::randomizer&)> derived_action(Function fn)

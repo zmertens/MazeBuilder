@@ -13,7 +13,7 @@
         },
         {
             "name": "msvc: examples",
-            "displayName": "Visual Studio Community 2022 Release - amd64",
+            "displayName": "msvc: examples - Visual Studio Community 2022 Release - amd64",
             "description": "Using compilers for Visual Studio 17 2022 (x64 architecture)",
             "generator": "Visual Studio 17 2022",
             "toolset": "host=x64",
@@ -23,15 +23,43 @@
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
                 "CMAKE_C_COMPILER": "cl.exe",
                 "CMAKE_CXX_COMPILER": "cl.exe",
-                "MAZE_BUILDER_EXAMPLES": "1"
+                "MAZE_BUILDER_EXAMPLES": "1",
+                "MAZE_BUILDER_TESTS": "0"
+            }
+        },
+        {
+            "name": "msvc: tests",
+            "displayName": "msvc: tests - Visual Studio Community 2022 Release - amd64",
+            "description": "Using compilers for Visual Studio 17 2022 (x64 architecture)",
+            "generator": "Visual Studio 17 2022",
+            "toolset": "host=x64",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/build-msvc-tests",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe",
+                "MAZE_BUILDER_EXAMPLES": "0",
+                "MAZE_BUILDER_TESTS": "1"
+            }
+        },
+        {
+            "name": "build-msvc-tests",
+            "displayName": "Custom configure preset",
+            "description": "Sets Ninja generator, build and install directory",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
             }
         }
     ],
     "buildPresets": [
         {
-            "name": "msvc: examples-debug",
+            "name": "msvc: tests-debug",
             "displayName": "Visual Studio Community 2022 Release - amd64 - Debug",
-            "configurePreset": "msvc: examples",
+            "configurePreset": "msvc: tests",
             "configuration": "Debug"
         }
     ]

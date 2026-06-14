@@ -8,8 +8,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <MazeBuilder/enums.h>
 #include <MazeBuilder/io_utils.h>
+#include <MazeBuilder/output_formats.h>
 
 using namespace std;
 using namespace mazes;

@@ -3,9 +3,13 @@
 
 #include <memory>
 
+/// @namespace mazes
+/// @file singleton_base.h
 namespace mazes
 {
 
+    /// @brief Base class for implementing the singleton pattern
+    /// @tparam T The type of the singleton class
     template <typename T>
     class singleton_base
     {

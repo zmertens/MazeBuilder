@@ -11,18 +11,17 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 
+/// @file distances.h
+/// @namespace mazes
 namespace mazes
 {
-
     class grid_interface;
 
-    /// @file distances.h
     /// @class distances
     /// @brief A class that manages distances associated with cells in a grid.
     /// @details This class provides functionality to initialize distances from a root cell,
     class distances
     {
-
     public:
         /// @brief Constructor that initializes the distances object with a given root index.
         /// @param root_index The index of the root cell used to initialize the distances object.

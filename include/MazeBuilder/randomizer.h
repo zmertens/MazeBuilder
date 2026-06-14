@@ -4,12 +4,10 @@
 #include <vector>
 #include <memory>
 
-/// @brief Namespace for the maze builder
+/// @file randomizer.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file randomizer.h
-
     /// @class randomizer
     /// @brief Provides random-number generating capabilities
     /// @details This class provides methods for generating random numbers
@@ -52,6 +50,12 @@ namespace mazes
         /// @param count The number of random integers to generate
         /// @return A vector containing all integers in [low, high] in random order
         std::vector<int> get_vector_ints(int low = 0, int high = 1, int count = 1) noexcept;
+
+        /// @brief Generates a random float within a specified range.
+        /// @param low The lower bound of the float (inclusive).
+        /// @param high The upper bound of the float (inclusive).
+        /// @return A random float between the specified range [low, high].
+        float get_float(float low = 0.0f, float high = 1.0f) noexcept;
 
         /// @brief Seeds the random number generator with the given seed value.
         /// @param seed The seed value to initialize the random number generator.

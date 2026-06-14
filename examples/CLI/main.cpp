@@ -5,45 +5,76 @@
 /// @details The application can also be compiled to WebAssembly for use in web applications
 /// @author zmertens
 
-#include <cstdint>
+#include <algorithm>
 #include <iostream>
-#include <functional>
-#include <stdexcept>
+#include <memory>
 #include <string>
-#include <sstream>
 #include <vector>
 
-#include <MazeBuilder/bytes.h>
-#include <MazeBuilder/configurator.h>
-#include <MazeBuilder/enums.h>
-#include <MazeBuilder/io_utils.h>
+#include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/runtime_app.h>
+#include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/string_utils.h>
 
-#include "cli.h"
+class command_line_parser;
 
 #if defined(__EMSCRIPTEN__)
 
 #include <emscripten/bind.h>
 
-std::shared_ptr<cli> get()
+std::shared_ptr<command_line_parser> get()
 {
-    return mazes::singleton_base<cli>::instance();
+    return mazes::singleton_base<command_line_parser>::instance();
 }
 
 EMSCRIPTEN_BINDINGS(cli_module)
 {
     emscripten::function("get", &get);
-    emscripten::class_<cli>("cli")
-        .smart_ptr<std::shared_ptr<cli>>("shared_ptr<cli>")
-        .function("convert", &cli::convert)
-        .function("convert_as_base64", &cli::convert_as_base64)
-        .function("help", &cli::help)
-        .function("version", &cli::version);
+    emscripten::class_<command_line_parser>("cli")
+        .smart_ptr<std::shared_ptr<command_line_parser>>("shared_ptr<command_line_parser>")
+        .function("help", &command_line_parser::help)
+        .function("version", &command_line_parser::version);
 
     emscripten::register_vector<std::string>("StringVector");
 }
 
 #endif // EMSCRIPTEN_BINDINGS
+
+class command_line_parser : public mazes::singleton_base<command_line_parser>
+{
+public:
+    std::string version() const noexcept
+    {
+        return mazes::string_utils::concat(mazes::string_utils::concat(" v", mazes::buildinfo::Version), " - " + mazes::buildinfo::CommitSHA);
+    }
+
+    std::string title()
+    {
+        return "mazebuildercli" + version();
+    }
+
+    std::string help()
+    {
+        return title() + "\n\n" +
+               "Generates mazes and converts to various formats\n\n"
+               "Example: ./cli -r 14 -c 10 -a binary_tree > maze.txt\n\n"
+               "Example: ./cli --rows=5 --columns=6 --algo=dfs -o maze.obj\n\n"
+               "** Commands are case-sensitive! **\n\n"
+               "\t-a, --algo         algorithm to generate maze links\n"
+               "\t                     [binary_tree, dfs, sidewinder]\n"
+               "\t-c, --columns      columns [max: 100]\n"
+               "\t-d, --distances    show distances with optional [start, steps] inclusive\n"
+               "\t                     example: '-d [0:10]'\n"
+               "\t-h, --help         display this help message\n"
+               "\t-j, --json         run with arguments in JSON format\n"
+               "\t-l, --levels       levels [max: 10]\n"
+               "\t-m, --mask         load mask from text file\n"
+               "\t-s, --seed         seed for the number generator\n"
+               "\t-r, --rows         rows [max: 100]\n"
+               "\t-o, --output       output format [json, obj, text, stdout]\n"
+               "\t-v, --version      display program version\n";
+    }
+}; // class
 
 int main(const int argc, char *argv[])
 {
@@ -52,78 +83,62 @@ int main(const int argc, char *argv[])
     return EXIT_SUCCESS;
 #endif
 
+    auto &&app = mazes::runtime_app::instance();
+
     // Copy command arguments and skip the program name
     const std::vector<std::string> args_vec{argv + 1, argv + argc};
 
     try
     {
-        if (const auto my_cli = mazes::singleton_base<cli>::instance())
+        if (const auto my_cli = mazes::singleton_base<command_line_parser>::instance())
         {
-            mazes::configurator user_options;
-            if (const auto str = my_cli->convert_with_options(std::cref(args_vec),
-                                                              std::ref(user_options));
-                !str.empty())
+            if (args_vec.empty())
             {
-                if (user_options.help())
-                {
-                    std::cout << my_cli->help() << std::endl;
-                    return EXIT_SUCCESS;
-                }
-
-                if (user_options.version())
-                {
-                    std::cout << my_cli->version() << std::endl;
-                    return EXIT_SUCCESS;
-                }
-
-                std::stringstream stream;
-                bool write_success{false};
-                constexpr mazes::io_utils writer{};
-                // Check if we have a specific output filename
-                if (const auto filename = user_options.output_filename(); !filename.empty())
-                {
-                    if (user_options.output_format_id() == mazes::output_format::STDOUT)
-                    {
-                        // Write to stdout
-                        write_success = writer.write(std::cout, str);
-                        stream << "Wrote to standard output." << std::endl;
-                    }
-                    else
-                    {
-                        // Write to file
-                        write_success = writer.write_file(user_options.output_filename(), str);
-                        stream << "Wrote file: " << filename << std::endl;
-                    }
-                }
-                else
-                {
-                    write_success = writer.write(std::cout, str);
-                    stream << "Wrote to standard output." << std::endl;
-                }
-
-                if (!write_success)
-                {
-                    throw std::runtime_error("Failed to write output.");
-                }
-
-#if defined(MAZE_DEBUG)
-
-                std::cout << stream.str() << std::endl;
-#endif
+                std::cout << my_cli->help() << std::endl;
+            }
+            else if (std::find(args_vec.cbegin(), args_vec.cend(), "-h") != args_vec.cend() ||
+                     std::find(args_vec.cbegin(), args_vec.cend(), "--help") != args_vec.cend())
+            {
+                std::cout << my_cli->help() << std::endl;
+            }
+            else if (std::find(args_vec.cbegin(), args_vec.cend(), "-v") != args_vec.cend() ||
+                     std::find(args_vec.cbegin(), args_vec.cend(), "--version") != args_vec.cend())
+            {
+                std::cout << my_cli->version() << std::endl;
             }
             else
             {
-                throw std::logic_error(str);
+                std::string concatenated_args;
+                for (const auto &arg : args_vec)
+                {
+                    concatenated_args += arg + " ";
+                }
+
+                auto &&results = app->apply(concatenated_args);
+                if (!results.empty())
+                {
+                    if (std::find(args_vec.cbegin(), args_vec.cend(), "-o") != args_vec.cend() ||
+                        std::find(args_vec.cbegin(), args_vec.cend(), "--output") != args_vec.cend())
+                    {
+                        std::cout << "Output generated in specified format." << std::endl;
+                    }
+                    std::cout << results << std::endl;
+                }
+                else
+                {
+                    std::cerr << "No output generated from the provided arguments." << std::endl;
+                }
             }
         }
         else
         {
-            throw std::runtime_error("Failed to create CLI instance");
+            std::cerr << "Failed to create CLI instance." << std::endl;
         }
     }
     catch (const std::exception &ex)
     {
         std::cerr << ex.what() << std::endl;
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;

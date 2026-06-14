@@ -7,10 +7,10 @@
 #include <utility>
 #include <vector>
 
+/// @file mask.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file mask.h
     /// @class mask
     /// @brief 2D boolean mask for controlling which cells are available in maze generation
     /// @details Cells marked as blocked (false) are excluded from maze generation.

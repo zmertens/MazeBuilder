@@ -6,9 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+/// @file json_helper.h
+/// @namespace mazes
 namespace mazes
 {
-    /// @file json_helper.h
     /// @class json_helper
     /// @brief JSON helper class
     /// @details This class provides methods to convert a map of strings into a JSON string

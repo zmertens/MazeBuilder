@@ -4,23 +4,18 @@
 #include <memory>
 #include <string>
 
-#include <MazeBuilder/algo_interface.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/singleton_base.h>
 
-namespace mazes
-{
-    class grid_interface;
-    class randomizer;
-}
-
 /// @brief Monolithic class to handle running a voxel engine
-class craft final : public mazes::algo_interface, mazes::singleton_base<craft> {
+class craft final : mazes::singleton_base<craft> {
     friend class singleton_base;
 public:
     craft(const std::string& title, int w, int h);
-    ~craft() override;
+    ~craft();
 
-    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept override;
+    bool run(mazes::grid_interface* g, mazes::randomizer& rng) const noexcept;
 
     // Web interaction
     [[nodiscard]] std::string artifacts() const noexcept;

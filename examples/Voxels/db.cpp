@@ -1,6 +1,6 @@
 #include "db.h"
 
-#include "map.h"
+#include "voxels_map.h"
 #include "ring.h"
 #include "sign.h"
 
@@ -450,7 +450,7 @@ void db_delete_all_signs()
     sqlite3_exec(db, "delete from sign;", nullptr, nullptr, nullptr);
 }
 
-void db_load_blocks(Map* map, int p, int q)
+void db_load_blocks(voxels_map* map, int p, int q)
 {
     if (!db_enabled)
     {
@@ -466,12 +466,12 @@ void db_load_blocks(Map* map, int p, int q)
         int y = sqlite3_column_int(load_blocks_stmt, 1);
         int z = sqlite3_column_int(load_blocks_stmt, 2);
         int w = sqlite3_column_int(load_blocks_stmt, 3);
-        map_set(map, x, y, z, w);
+        map->set(x, y, z, w);
     }
     load_mtx.unlock();
 }
 
-void db_load_lights(Map* map, int p, int q)
+void db_load_lights(voxels_map* map, int p, int q)
 {
     if (!db_enabled)
     {
@@ -487,7 +487,7 @@ void db_load_lights(Map* map, int p, int q)
         int y = sqlite3_column_int(load_lights_stmt, 1);
         int z = sqlite3_column_int(load_lights_stmt, 2);
         int w = sqlite3_column_int(load_lights_stmt, 3);
-        map_set(map, x, y, z, w);
+        map->set(x, y, z, w);
     }
     load_mtx.unlock();
 }
@@ -714,7 +714,7 @@ void db_insert_preview_blocks(int preview_id, const std::vector<std::tuple<int, 
 }
 
 // Load preview blocks for a specific chunk and preview_id
-void db_load_preview_blocks(Map* map, const int p, const int q, const int preview_id)
+void db_load_preview_blocks(voxels_map* map, const int p, const int q, const int preview_id)
 {
     if (!db_enabled)
     {
@@ -731,7 +731,7 @@ void db_load_preview_blocks(Map* map, const int p, const int q, const int previe
         const int y = sqlite3_column_int(load_preview_blocks_stmt, 1);
         const int z = sqlite3_column_int(load_preview_blocks_stmt, 2);
         const int w = sqlite3_column_int(load_preview_blocks_stmt, 3);
-        map_set(map, x, y, z, w);
+        map->set(x, y, z, w);
     }
     load_mtx.unlock();
 }

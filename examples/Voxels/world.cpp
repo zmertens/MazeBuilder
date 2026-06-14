@@ -1,12 +1,9 @@
 #include "world.h"
 
-#include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
 
 #include <noise/noise.h>
 
-#include "command_queue.h"
 #include "cube.h"
 #include "db.h"
 #include "resource_manager.h"
@@ -52,8 +49,8 @@ struct worker_item
     int p{};
     int q{};
     int load{};
-    Map* block_maps[3][3]{};
-    Map* light_maps[3][3]{};
+    voxels_map* block_maps[3][3]{};
+    voxels_map* light_maps[3][3]{};
     int miny{};
     int maxy{};
     int faces{};
@@ -66,6 +63,64 @@ enum class WorkerState : int
     BUSY = 1,
     DONE = 2
 };
+
+namespace
+{
+    struct ivec3
+    {
+        int x;
+        int y;
+        int z;
+    };
+
+    ivec3 face_normal(const int face) noexcept
+    {
+        switch (face)
+        {
+        case 0: return {-1, 0, 0};
+        case 1: return {1, 0, 0};
+        case 2: return {0, 0, -1};
+        case 3: return {0, 0, 1};
+        case 8: return {0, -1, 0};
+        default: return {0, 1, 0};
+        }
+    }
+
+    ivec3 face_u_axis(const int face) noexcept
+    {
+        switch (face)
+        {
+        case 0: return {0, 0, 1};
+        case 1: return {0, 0, -1};
+        case 2: return {-1, 0, 0};
+        case 3: return {1, 0, 0};
+        case 4: return {1, 0, 0};
+        case 5: return {0, 0, 1};
+        case 6: return {-1, 0, 0};
+        case 7: return {0, 0, -1};
+        case 8: return {1, 0, 0};
+        default: return {1, 0, 0};
+        }
+    }
+
+    ivec3 face_v_axis(const int face) noexcept
+    {
+        switch (face)
+        {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+            return {0, -1, 0};
+        case 4: return {0, 0, 1};
+        case 5: return {-1, 0, 0};
+        case 6: return {0, 0, -1};
+        case 7: return {1, 0, 0};
+        case 8: return {0, 0, 1};
+        default: return {0, 0, 1};
+        }
+    }
+}
 
 struct worker
 {
@@ -172,18 +227,11 @@ void world::build_scene()
     root->parent = nullptr;
     background_layer[0] = root;
 
-    // Initialize remaining slots to nullptr
-    for (std::size_t i = 1; i < background_layer.size(); ++i)
-    {
-        background_layer[i] = nullptr;
-    }
+    std::fill(background_layer.begin() + 1, background_layer.end(), nullptr);
 
     // Initialize FOREGROUND layer similarly if needed in the future
     auto& foreground_layer = m_scene_layers[static_cast<std::size_t>(Layer::FOREGROUND)];
-    for (std::size_t i = 0; i < foreground_layer.size(); ++i)
-    {
-        foreground_layer[i] = nullptr;
-    }
+    std::ranges::fill(foreground_layer, nullptr);
 }
 
 void world::attach_chunk_to_layer(scene_node* chunk, int layer_index) noexcept
@@ -390,13 +438,23 @@ void world::init() noexcept
     s_sky_attrib.timer = glGetUniformLocation(s_sky_attrib.program, "timer");
 
     m_sky_buffer = sdl_gl_helper::gen_sky_buffer();
+
+    auto [vw, vh] = m_sdl->get_window_size_in_pixels();
+    if (!m_bloom.init(
+            vw, vh,
+            m_shaders.get(ShaderIdentifier::BLOOM_BLUR_SHADER).get(),
+            m_shaders.get(ShaderIdentifier::BLOOM_COMPOSITE_SHADER).get()))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "world::init - bloom_pass init failed\n");
+    }
 }
 
 void world::update(const float delta_time, mazes::randomizer& rng) noexcept
 {
-    while (!m_command_queue.is_empty())
+    while (!m_command_queue.empty())
     {
-        auto [action, _] = m_command_queue.pop();
+        auto [action, _] = m_command_queue.front();
+        m_command_queue.pop();
         action(*m_player, delta_time, std::ref(rng));
     }
 
@@ -478,52 +536,57 @@ void world::draw() const noexcept
     SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
     glViewport(0, 0, viewport_width, viewport_height);
 
-    // Verify OpenGL state
     glEnable(GL_DEPTH_TEST);
     glDepthFunc(GL_LESS);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
-
     glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
+
+    // --- Pass 1: scene geometry → MRT FBO ---
+    m_bloom.bind_scene();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Get texture IDs from texture manager
     const auto atlas_texture = m_textures.get(TextureIdentifier::ATLAS).get();
     const auto signs_texture = m_textures.get(TextureIdentifier::SIGNS).get();
-    const auto sky_texture = m_textures.get(TextureIdentifier::SKY).get();
+    const auto sky_texture   = m_textures.get(TextureIdentifier::SKY).get();
 
-    // Disable culling and depth writes for sky sphere (camera is inside the sphere)
+    // Sky sphere: single output only (not a bloom-eligible emitter).
+    m_bloom.set_single_mode();
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
-    render_sky(&s_sky_attrib, m_sky_buffer, sky_texture);
+    render_sky(m_sky_buffer, sky_texture);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
 
-    const auto triangle_faces = render_chunks(&s_block_attrib, atlas_texture);
+    // Geometry with possible HDR bright pixels → enable both MRT attachments.
+    m_bloom.set_mrt_mode();
+    const auto triangle_faces = render_chunks(atlas_texture);
+    render_item(atlas_texture);
+    render_player(atlas_texture);
+    render_plane();
 
-    render_item(&s_block_attrib, atlas_texture);
-
-    render_player(&s_block_attrib, atlas_texture);
-
-    render_signs(&s_text_attrib, signs_texture);
-    render_sign(&s_text_attrib, signs_texture);
-
-    render_plane(&s_block_attrib);
+    // UI / overlay elements: no bloom needed.
+    m_bloom.set_single_mode();
+    render_signs(signs_texture);
+    render_sign(signs_texture);
 
     std::array<char, 256> buffer{};
     SDL_snprintf(buffer.data(), buffer.size(), "[%d triangle faces, %zu chunks]",
                  triangle_faces, get_chunk_count());
-    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
                 10, viewport_height - 15, 12.0f, buffer.data());
-
-    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
                 10, viewport_height - 35, 12.0f, "Press E to preview");
-    render_text(&s_text_attrib, m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
+    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 0,
                 10, viewport_height - 55, 12.0f, "Press B to build");
 
-    render_wireframe(&s_line_attrib);
+    render_wireframe();
+    render_crosshairs();
 
-    render_crosshairs(&s_line_attrib);
+    // --- Pass 2+3: Gaussian blur + composite bloom → default framebuffer ---
+    const float bloom_str = m_player->m_configs.use_bloom_effect ? bloom_pass::BLOOM_STRENGTH : 0.0f;
+    m_bloom.execute(bloom_str);
 }
 
 command_queue& world::get_command_queue() noexcept
@@ -533,6 +596,7 @@ command_queue& world::get_command_queue() noexcept
 
 void world::destroy_world()
 {
+    m_bloom.destroy();
     // Cleanup worker threads and chunks
     cleanup_worker_threads();
     delete_all_chunks();
@@ -541,14 +605,20 @@ void world::destroy_world()
 
 void world::handle_event(const SDL_Event& event) noexcept
 {
-    if (event.type == SDL_EVENT_QUIT)
+    if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
     {
-        // Handle quit event if needed
+        const int w = event.window.data1;
+        const int h = event.window.data2;
+        if (w > 0 && h > 0)
+        {
+            m_bloom.resize(w, h);
+            glViewport(0, 0, w, h);
+        }
     }
 }
 
 void world::create_world(const int p, const int q,
-                         const world_func& func, Map* m, const int chunk_size) noexcept
+                         const world_func& func, voxels_map* m, const int chunk_size) noexcept
 {
     constexpr int pad = 1;
     for (int dx = -pad; dx < chunk_size + pad; dx++)
@@ -660,24 +730,15 @@ void world::create_world(const int p, const int q,
     }
 } // create_world
 
-bool world::update_preview(mazes::grid_interface* g) const noexcept
+bool world::update_preview(const std::vector<std::uint8_t>& pixel_data,
+                           const int width,
+                           const int height) const noexcept
 {
-    // Calculate dimensions from actual pixel data
-    auto [rows, columns, _] = g->operations().get_dimensions();
-    const auto pixel_data = g->operations().get_pixels();
-
-    // Calculate scale
-    constexpr unsigned int MIN_SCALE = 1;
-    constexpr unsigned int MAX_SCALE = 10;
-    const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(static_cast<float>(rows * columns)));
-    const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
-
-    // Height is predictable: (rows*2+1) * scale
-    const auto ascii_height = rows * 2 + 1;
-    const int height = static_cast<int>(ascii_height * scale);
-
-    // Width must be calculated from pixel data size
-    const int width = static_cast<int>(pixel_data.size() / (height * 4));
+    if (pixel_data.empty() || width <= 0 || height <= 0)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid maze preview buffer\n");
+        return false;
+    }
 
     if (!m_projected_plane.projected_texture->update_from_memory(
         pixel_data.data(),
@@ -709,7 +770,7 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
 // Build the current preview at the targeted location
 // Called when user presses 'B' (BUILD/PLACE_MAZE action)
 // Uses stored preview data and builds at current crosshair target
-void world::commit_preview_to_world() noexcept
+void world::commit_preview_to_world(int item_type) noexcept
 {
     // Check if we have preview data
     if (!m_current_preview.has_data)
@@ -719,39 +780,15 @@ void world::commit_preview_to_world() noexcept
         return;
     }
 
-    // Calculate base position from current target face
-    int base_x = m_projected_plane.target_x;
-    int base_y = m_projected_plane.target_y;
-    int base_z = m_projected_plane.target_z;
+    const int face = m_projected_plane.target_face;
+    const ivec3 normal = face_normal(face);
+    const ivec3 axis_u = face_u_axis(face);
+    const ivec3 axis_v = face_v_axis(face);
 
-    // Adjust position based on which face is targeted
-    switch (m_projected_plane.target_face)
-    {
-    // Left face (-X)
-    case 0: base_x -= 1;
-        break;
-    // Right face (+X)
-    case 1: base_x += 1;
-        break;
-    // Front face (-Z)
-    case 2: base_z -= 1;
-        break;
-    // Back face (+Z)
-    case 3: base_z += 1;
-        break;
-    // Top faces
-    case 4:
-    case 5:
-    case 6:
-    case 7: base_y += 1;
-        break;
-    // Bottom face
-    case 8: base_y -= 1;
-        break;
-    // Fallback to top
-    default: base_y += 1;
-        break;
-    }
+    // Anchor one cell off the hit block, along face normal.
+    const int anchor_x = m_projected_plane.target_x + normal.x;
+    const int anchor_y = m_projected_plane.target_y + normal.y;
+    const int anchor_z = m_projected_plane.target_z + normal.z;
 
     // Calculate logical maze dimensions
     const int logical_width = m_current_preview.width / m_current_preview.scale;
@@ -776,14 +813,14 @@ void world::commit_preview_to_world() noexcept
             // Check if pixel is black (wall)
             if (r < 50 && g < 50 && b < 50)
             {
-                // Place a vertical column of blocks for this wall
-                for (int y = 0; y < m_current_preview.wall_height; ++y)
+                // Extrude wall thickness along the target face normal.
+                for (int depth = 0; depth < m_current_preview.wall_height; ++depth)
                 {
-                    const int world_x = base_x + cell_x;
-                    const int world_y = base_y + y;
-                    const int world_z = base_z + cell_y;
+                    const int world_x = anchor_x + cell_x * axis_u.x + cell_y * axis_v.x + depth * normal.x;
+                    const int world_y = anchor_y + cell_x * axis_u.y + cell_y * axis_v.y + depth * normal.y;
+                    const int world_z = anchor_z + cell_x * axis_u.z + cell_y * axis_v.z + depth * normal.z;
 
-                    set_block(world_x, world_y, world_z, m_current_preview.item_type);
+                    set_block(world_x, world_y, world_z, item_type);
                     blocks_placed++;
                 }
             }
@@ -793,14 +830,9 @@ void world::commit_preview_to_world() noexcept
 
 void world::process_build_queue() noexcept
 {
-    // Remove completed futures
-    m_building_processes.erase(
-        std::ranges::remove_if(m_building_processes,
-                               [](std::function<void()>& f)
-                               {
-                                   f();
-                                   return true;
-                               }).begin(), m_building_processes.end());
+    for (auto& f : m_building_processes)
+        f();
+    m_building_processes.clear();
 }
 
 bool world::worker_run(worker* w) const noexcept
@@ -988,21 +1020,20 @@ int world::highest_block(const float x, const float z) const noexcept
     const int q = chunked(z);
     if (const auto chunk = find_chunk(p, q); chunk.has_value())
     {
-        const Map* map = &chunk.value()->map;
-        MAP_FOR_EACH(map, ex, ey, ez, ew)
+        const voxels_map* map = &chunk.value()->map;
+        for (const auto [ex, ey, ez, ew] : *map)
+        {
+            // item.h -> is_obstacle
+            if (item::is_obstacle(ew) && ex == nx && ez == nz)
             {
-                // item.h -> is_obstacle
-                if (item::is_obstacle(ew) && ex == nx && ez == nz)
-                {
-                    result = SDL_max(result, ey);
-                }
+                result = SDL_max(result, ey);
             }
-        END_MAP_FOR_EACH;
+        }
     }
     return result;
 }
 
-int world::_hit_test(const Map* map, const float max_distance, const int previous,
+int world::_hit_test(const voxels_map* map, const float max_distance, const int previous,
                      float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept
 {
     static constexpr int m = 32;
@@ -1015,7 +1046,7 @@ int world::_hit_test(const Map* map, const float max_distance, const int previou
         const int ny = SDL_lroundf(y);
         if (const int nz = SDL_lroundf(z); nx != px || ny != py || nz != pz)
         {
-            if (const int hw = map_get(map, nx, ny, nz); hw > 0)
+            if (const int hw = map->get(nx, ny, nz); hw > 0)
             {
                 if (previous)
                 {
@@ -1131,8 +1162,8 @@ int world::hit_test_face(int* x, int* y, int* z, int* face) const noexcept
         }
         if (dx == 0 && dy == -1 && dz == 0)
         {
-            // Bottom face - use simple face index 5
-            *face = 5;
+            // Bottom face uses a dedicated id distinct from top orientations.
+            *face = 8;
             return 1;
         }
     }
@@ -1150,7 +1181,7 @@ int world::collide(const int height, float* x, float* y, float* z) const noexcep
         return result;
     }
     const scene_node* chunk = chunk_opt.value();
-    const Map* map = &chunk->map;
+    const voxels_map* map = &chunk->map;
     const int nx = static_cast<int>(SDL_roundf(*x));
     const int ny = static_cast<int>(SDL_roundf(*y));
     const int nz = static_cast<int>(SDL_roundf(*z));
@@ -1161,29 +1192,29 @@ int world::collide(const int height, float* x, float* y, float* z) const noexcep
     {
         constexpr float pad = 0.25f;
         // item.h -> is_obstacle
-        if (px < -pad && item::is_obstacle(map_get(map, nx - 1, ny - dy, nz)))
+        if (px < -pad && item::is_obstacle(map->get(nx - 1, ny - dy, nz)))
         {
             *x = nx - pad;
         }
-        if (px > pad && item::is_obstacle(map_get(map, nx + 1, ny - dy, nz)))
+        if (px > pad && item::is_obstacle(map->get(nx + 1, ny - dy, nz)))
         {
             *x = nx + pad;
         }
-        if (py < -pad && item::is_obstacle(map_get(map, nx, ny - dy - 1, nz)))
+        if (py < -pad && item::is_obstacle(map->get(nx, ny - dy - 1, nz)))
         {
             *y = ny - pad;
             result = 1;
         }
-        if (py > pad && item::is_obstacle(map_get(map, nx, ny - dy + 1, nz)))
+        if (py > pad && item::is_obstacle(map->get(nx, ny - dy + 1, nz)))
         {
             *y = ny + pad;
             result = 1;
         }
-        if (pz < -pad && item::is_obstacle(map_get(map, nx, ny - dy, nz - 1)))
+        if (pz < -pad && item::is_obstacle(map->get(nx, ny - dy, nz - 1)))
         {
             *z = nz - pad;
         }
-        if (pz > pad && item::is_obstacle(map_get(map, nx, ny - dy, nz + 1)))
+        if (pz > pad && item::is_obstacle(map->get(nx, ny - dy, nz + 1)))
         {
             *z = nz + pad;
         }
@@ -1209,34 +1240,17 @@ bool world::player_intersects_block(const int height, const float x, const float
 
 bool world::has_lights(const scene_node* chunk) const noexcept
 {
-    for (int dp = -1; dp <= 1; dp++)
+    static constexpr std::array<std::array<int, 2>, 9> offsets = {{
+        {-1,-1},{-1,0},{-1,1},{0,-1},{0,0},{0,1},{1,-1},{1,0},{1,1}
+    }};
+    return std::ranges::any_of(offsets, [&](const auto& off)
     {
-        for (int dq = -1; dq <= 1; dq++)
-        {
-            const scene_node* other = chunk;
-            if (dp || dq)
-            {
-                if (auto other_opt = this->find_chunk(chunk->p + dp, chunk->q + dq);
-                    !other_opt.has_value())
-                {
-                    other = nullptr;
-                }
-                else
-                {
-                    other = other_opt.value();
-                }
-            }
-            if (!other)
-            {
-                continue;
-            }
-            if (const Map* map = &other->lights; map->size)
-            {
-                return true;
-            }
-        }
-    }
-    return false;
+        const int dp = off[0], dq = off[1];
+        const scene_node* other = (dp || dq)
+            ? find_chunk(chunk->p + dp, chunk->q + dq).value_or(nullptr)
+            : chunk;
+        return other && other->lights.size() != 0;
+    });
 }
 
 void world::dirty_chunk(scene_node* chunk) const noexcept
@@ -1434,7 +1448,7 @@ void world::compute_chunk(worker_item* item) noexcept
     {
         for (int b = 0; b < 3; b++)
         {
-            if (Map* map = item->light_maps[a][b]; map && map->size)
+            if (voxels_map* map = item->light_maps[a][b]; map && map->size())
             {
                 has_light = 1;
             }
@@ -1446,13 +1460,13 @@ void world::compute_chunk(worker_item* item) noexcept
     {
         for (int b = 0; b < 3; b++)
         {
-            Map* block_map = item->block_maps[a][b];
+            voxels_map* block_map = item->block_maps[a][b];
             if (!block_map)
             {
                 continue;
             }
-            MAP_FOR_EACH(block_map, ex, ey, ez, ew)
-                {
+            for (const auto [ex, ey, ez, ew] : *block_map)
+            {
                     int x = ex - ox;
                     int y = ey - oy;
                     int z = ez - oz;
@@ -1472,8 +1486,7 @@ void world::compute_chunk(worker_item* item) noexcept
                     {
                         highest[XZ(x, z)] = SDL_max(highest[XZ(x, z)], y);
                     }
-                }
-            END_MAP_FOR_EACH;
+            }
         }
     }
 
@@ -1484,30 +1497,29 @@ void world::compute_chunk(worker_item* item) noexcept
         {
             for (int b = 0; b < 3; b++)
             {
-                Map* map = item->light_maps[a][b];
+                voxels_map* map = item->light_maps[a][b];
                 if (!map)
                 {
                     continue;
                 }
-                MAP_FOR_EACH(map, ex, ey, ez, ew)
+                for (const auto [ex, ey, ez, ew] : *map)
                     {
                         int x = ex - ox;
                         int y = ey - oy;
                         int z = ez - oz;
                         light_fill(opaque, light, x, y, z, ew, 1);
                     }
-                END_MAP_FOR_EACH;
             }
         }
     }
 
-    Map* block_map = item->block_maps[1][1];
+    voxels_map* block_map = item->block_maps[1][1];
 
     // count exposed faces
     int miny = 256;
     int maxy = 0;
     int faces = 0;
-    MAP_FOR_EACH(block_map, ex, ey, ez, ew)
+    for (const auto [ex, ey, ez, ew] : *block_map)
         {
             if (ew <= 0)
             {
@@ -1535,14 +1547,13 @@ void world::compute_chunk(worker_item* item) noexcept
             maxy = SDL_max(maxy, ey);
             faces += total;
         }
-    END_MAP_FOR_EACH;
 
     // generate geometry
     // each vertex has 10 components (x, y, z, nx, ny, nz, u, v, ao, light)
     static constexpr int components = 10;
     GLfloat* data = sdl_gl_helper::malloc_faces(components, faces);
     int offset = 0;
-    MAP_FOR_EACH(block_map, ex, ey, ez, ew)
+    for (const auto [ex, ey, ez, ew] : *block_map)
         {
             if (ew <= 0)
             {
@@ -1622,7 +1633,6 @@ void world::compute_chunk(worker_item* item) noexcept
             }
             offset += total * 60;
         }
-    END_MAP_FOR_EACH;
 
     SDL_free(opaque);
     SDL_free(light);
@@ -1684,11 +1694,6 @@ void world::gen_chunk_buffer(scene_node* chunk) const noexcept
     chunk->dirty = 0;
 }
 
-void world::map_set_func(int x, int y, int z, int w, Map* m) noexcept
-{
-    map_set(m, x, y, z, w);
-}
-
 // Create a chunk that represents a unique portion of the world
 // p, q represents the chunk key
 void world::load_chunk(const worker_item* item) noexcept
@@ -1696,10 +1701,10 @@ void world::load_chunk(const worker_item* item) noexcept
     const int p = item->p;
     const int q = item->q;
 
-    Map* block_map = item->block_maps[1][1];
-    Map* light_map = item->light_maps[1][1];
+    voxels_map* block_map = item->block_maps[1][1];
+    voxels_map* light_map = item->light_maps[1][1];
 
-    create_world(p, q, map_set_func, block_map, BUILD_CHUNK_SIZE);
+    create_world(p, q, [](int x, int y, int z, int w, voxels_map* m){ m->set(x, y, z, w); }, block_map, BUILD_CHUNK_SIZE);
     db_load_blocks(block_map, p, q);
     db_load_lights(light_map, p, q);
 }
@@ -1717,13 +1722,13 @@ void world::init_chunk(scene_node* chunk, int p, int q) noexcept
     auto* signs = &chunk->signs;
     sign_list_alloc(signs, 16);
     db_load_signs(signs, p, q);
-    Map* block_map = &chunk->map;
-    Map* light_map = &chunk->lights;
+    voxels_map* block_map = &chunk->map;
+    voxels_map* light_map = &chunk->lights;
     const int dx = p * BUILD_CHUNK_SIZE - 1;
     constexpr int dy = 0;
     const int dz = q * BUILD_CHUNK_SIZE - 1;
-    map_alloc(block_map, dx, dy, dz, 0x7fff);
-    map_alloc(light_map, dx, dy, dz, 0xf);
+    block_map->init(dx, dy, dz, 0x7fff);
+    light_map->init(dx, dy, dz, 0xf);
 
     this->attach_chunk_to_layer(chunk, static_cast<int>(Layer::BACKGROUND));
 }
@@ -1748,27 +1753,21 @@ void world::delete_chunks() noexcept
     const player::position* s1 = &m_player->m_pos;
     auto& background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
+    const int p = chunked(s1->x);
+    const int q = chunked(s1->z);
     // NOTE: Start at index 1 because index 0 is the root layer node
     for (std::size_t i = 1; i < count; ++i)
     {
         scene_node* chunk = background_layer[i];
         if (chunk == nullptr) continue;
 
-        int remove_chunk = 1;
-        int p = chunked(s1->x);
-        int q = chunked(s1->z);
         if (chunk_distance(chunk, p, q) < DELETE_CHUNK_RADIUS)
-        {
-            remove_chunk = 0;
             break;
-        }
-        if (remove_chunk)
+
         {
             // Detach from spatial hierarchy first
             detach_chunk_from_layer(chunk);
 
-            map_free(&chunk->map);
-            map_free(&chunk->lights);
             sign_list_free(&chunk->signs);
             sdl_gl_helper::del_buffer(chunk->buffer);
             sdl_gl_helper::del_buffer(chunk->sign_buffer);
@@ -1810,8 +1809,6 @@ void world::delete_all_chunks() noexcept
         // Detach from spatial hierarchy
         detach_chunk_from_layer(chunk);
 
-        map_free(&chunk->map);
-        map_free(&chunk->lights);
         sign_list_free(&chunk->signs);
         sdl_gl_helper::del_buffer(chunk->buffer);
         sdl_gl_helper::del_buffer(chunk->sign_buffer);
@@ -1843,28 +1840,24 @@ void world::check_workers() noexcept
                 scene_node* chunk = chunk_opt.value();
                 if (item->load)
                 {
-                    Map* block_map = item->block_maps[1][1];
-                    Map* light_map = item->light_maps[1][1];
-                    map_free(&chunk->map);
-                    map_free(&chunk->lights);
-                    map_copy(&chunk->map, block_map);
-                    map_copy(&chunk->lights, light_map);
+                    chunk->map    = *item->block_maps[1][1];
+                    chunk->lights = *item->light_maps[1][1];
                 }
                 generate_chunk(chunk, item);
             }
-            for (int a = 0; a < 3; a++)
+            // Only delete the heap-allocated maps from the load (ensure_chunks_worker) path.
+            // For dirty-chunk recomputes (load==0) the pointers are borrowed from live scene_nodes
+            // and must NOT be freed.
+            if (item->load)
             {
-                for (int b = 0; b < 3; b++)
+                for (int a = 0; a < 3; a++)
                 {
-                    Map* block_map = item->block_maps[a][b];
-                    Map* light_map = item->light_maps[a][b];
-                    if (block_map)
+                    for (int b = 0; b < 3; b++)
                     {
-                        map_free(block_map);
-                    }
-                    if (light_map)
-                    {
-                        map_free(light_map);
+                        delete item->block_maps[a][b];
+                        delete item->light_maps[a][b];
+                        item->block_maps[a][b] = nullptr;
+                        item->light_maps[a][b] = nullptr;
                     }
                 }
             }
@@ -2018,13 +2011,8 @@ void world::ensure_chunks_worker(player* _player, worker* w) noexcept
             }
             if (other)
             {
-                // These maps are freed using C-library free function
-                Map* block_map = (Map*)malloc(sizeof(Map));
-                map_copy(block_map, &other->map);
-                Map* light_map = (Map*)malloc(sizeof(Map));
-                map_copy(light_map, &other->lights);
-                item->block_maps[dp + 1][dq + 1] = block_map;
-                item->light_maps[dp + 1][dq + 1] = light_map;
+                item->block_maps[dp + 1][dq + 1] = new voxels_map{other->map};
+                item->light_maps[dp + 1][dq + 1] = new voxels_map{other->lights};
             }
             else
             {
@@ -2126,9 +2114,9 @@ void world::toggle_light(int x, int y, int z) const noexcept
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
-        Map* map = &chunk->lights;
-        const int w = map_get(map, x, y, z) ? 0 : 15;
-        map_set(map, x, y, z, w);
+        voxels_map* map = &chunk->lights;
+        const int w = map->get(x, y, z) ? 0 : 15;
+        map->set(x, y, z, w);
         db_insert_light(p, q, x, y, z, w);
         dirty_chunk(chunk);
     }
@@ -2139,7 +2127,7 @@ void world::set_light(int p, int q, int x, int y, int z, int w) const noexcept
     if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
-        if (Map* map = &chunk->lights; map_set(map, x, y, z, w))
+        if (voxels_map* map = &chunk->lights; map->set(x, y, z, w))
         {
             dirty_chunk(chunk);
             db_insert_light(p, q, x, y, z, w);
@@ -2156,7 +2144,7 @@ void world::_set_block(const int p, int q, int x, int y, int z, const int w, con
     if (const auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         scene_node* chunk = chunk_opt.value();
-        if (Map* map = &chunk->map; map_set(map, x, y, z, w))
+        if (voxels_map* map = &chunk->map; map->set(x, y, z, w))
         {
             if (dirty)
             {
@@ -2209,8 +2197,8 @@ int world::get_block(const int x, const int y, const int z) const noexcept
     if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
     {
         const scene_node* chunk = chunk_opt.value();
-        const Map* map = &chunk->map;
-        return map_get(map, x, y, z);
+        const voxels_map* map = &chunk->map;
+        return map->get(x, y, z);
     }
     return 0;
 }
@@ -2220,34 +2208,76 @@ std::size_t world::get_chunk_count() const noexcept
     return this->m_next_chunk_slot - 1;
 }
 
-int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
+// ---------------------------------------------------------------------------
+// Matrix setup helpers
+// ---------------------------------------------------------------------------
+
+std::pair<int,int> world::begin_3d_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
+    auto [w, h] = m_sdl->get_window_size();
+    const auto* s = &m_player->m_pos;
+    set_matrix_3d(matrix, w, h,
+        s->x, s->y, s->z, s->rx, s->ry,
+        m_player->m_configs.fov, m_player->m_configs.ortho, RENDER_CHUNK_RADIUS);
+    glUseProgram(a->program);
+    glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
+    return {w, h};
+}
+
+std::pair<int,int> world::begin_sky_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept
+{
+    auto [w, h] = m_sdl->get_window_size();
+    const auto* s = &m_player->m_pos;
+    // Sky sphere always renders from the origin with no ortho distortion.
+    set_matrix_3d(matrix, w, h,
+        0, 0, 0, s->rx, s->ry,
+        m_player->m_configs.fov, 0, RENDER_CHUNK_RADIUS);
+    glUseProgram(a->program);
+    glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
+    return {w, h};
+}
+
+std::pair<int,int> world::begin_item_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept
+{
+    auto [w, h] = m_sdl->get_window_size();
+    set_matrix_item(matrix, w, h, m_sdl->get_scale_factor());
+    glUseProgram(a->program);
+    glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
+    return {w, h};
+}
+
+std::pair<int,int> world::begin_2d_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept
+{
+    auto [w, h] = m_sdl->get_window_size();
+    set_matrix_2d(matrix, w, h);
+    glUseProgram(a->program);
+    glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
+    return {w, h};
+}
+
+// ---------------------------------------------------------------------------
+// Render routines
+// ---------------------------------------------------------------------------
+
+int world::render_chunks(const std::uint32_t texture) const noexcept
+{
+    float matrix[16];
+    begin_3d_pass(&s_block_attrib, matrix);
     int result = 0;
     const player::position* s = &this->m_player->m_pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     const float light = get_daylight();
-    float matrix[16];
-    // matrix.cpp -> set_matrix_3d
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
-
     float planes[6][4];
-    // matrix.cpp -> frustum_planes
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
-    glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
-    glUniform3f(attrib->camera, s->x, s->y, s->z);
-    glUniform1i(attrib->sampler, 0);
-    glUniform1f(attrib->extra2, light);
-    glUniform1f(attrib->extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
-    glUniform1i(attrib->extra4, static_cast<int>(m_player->m_configs.ortho));
-    glUniform1f(attrib->timer, time_of_day());
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
+    glUniform3f(s_block_attrib.camera, s->x, s->y, s->z);
+    glUniform1i(s_block_attrib.sampler, 0);
+    glUniform1f(s_block_attrib.extra2, light);
+    glUniform1f(s_block_attrib.extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
+    glUniform1i(s_block_attrib.extra4, static_cast<int>(m_player->m_configs.ortho));
+    glUniform1f(s_block_attrib.timer, time_of_day());
 
     int chunks_rendered = 0;
     int chunks_culled_distance = 0;
@@ -2277,7 +2307,7 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
         }
 
         // Render the chunk
-        sdl_gl_helper::draw_chunk(attrib, chunk);
+        sdl_gl_helper::draw_chunk(&s_block_attrib, chunk);
         result += chunk->faces;
         chunks_rendered++;
     });
@@ -2285,26 +2315,19 @@ int world::render_chunks(const sdl_gl_helper::attrib* attrib, const std::uint32_
     return result;
 }
 
-void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_t sign) const noexcept
+void world::render_signs(const std::uint32_t sign) const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
+    float matrix[16];
+    begin_3d_pass(&s_text_attrib, matrix);
     const player::position* s = &this->m_player->m_pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
-    float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
     float planes[6][4];
     frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
-
-    glUseProgram(attrib->program);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glBindTexture(GL_TEXTURE_2D, sign);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
-    glUniform1i(attrib->extra1, 1);
+    glUniform1i(s_text_attrib.sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
+    glUniform1i(s_text_attrib.extra1, 1);
 
     // Calculate bounds for spatial traversal (chunks within sign render radius)
     const int min_p = p - RENDER_SIGN_RADIUS;
@@ -2323,11 +2346,11 @@ void world::render_signs(const sdl_gl_helper::attrib* attrib, const std::uint32_
         {
             return;
         }
-        sdl_gl_helper::draw_signs(attrib, chunk);
+        sdl_gl_helper::draw_signs(&s_text_attrib, chunk);
     });
 }
 
-void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t sign) const noexcept
+void world::render_sign(const std::uint32_t sign) const noexcept
 {
     int x, y, z, face;
     if (!hit_test_face(&x, &y, &z, &face))
@@ -2335,19 +2358,12 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
         return;
     }
 
-    auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &this->m_player->m_pos;
     float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
-    glUseProgram(attrib->program);
+    begin_3d_pass(&s_text_attrib, matrix);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glBindTexture(GL_TEXTURE_2D, sign);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
-    glUniform1i(attrib->extra1, 1);
+    glUniform1i(s_text_attrib.sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
+    glUniform1i(s_text_attrib.extra1, 1);
     char text[MAX_SIGN_LENGTH];
     SDL_strlcpy(text, m_player->m_configs.tag.c_str(), MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
@@ -2356,92 +2372,73 @@ void world::render_sign(const sdl_gl_helper::attrib* attrib, const std::uint32_t
                                                        static_cast<float>(z), face,
                                                        text);
     const GLuint buffer = sdl_gl_helper::gen_faces(5, length, data);
-    sdl_gl_helper::draw_sign(attrib, buffer, length);
+    sdl_gl_helper::draw_sign(&s_text_attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }
 
-void world::render_sky(const sdl_gl_helper::attrib* attrib, const std::uint32_t buffer,
-                       const std::uint32_t sky) const noexcept
+void world::render_sky(const std::uint32_t buffer, const std::uint32_t sky_tex) const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
-    const auto* s = &this->m_player->m_pos;
     float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        0, 0, 0, s->rx, s->ry, m_player->m_configs.fov, 0, RENDER_CHUNK_RADIUS);
-    glUseProgram(attrib->program);
+    begin_sky_pass(&s_sky_attrib, matrix);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, sky);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, 0);
-    glUniform1f(attrib->timer, time_of_day());
-    sdl_gl_helper::draw_triangles_3d(attrib, buffer, 512 * 3);
+    glBindTexture(GL_TEXTURE_2D, sky_tex);
+    glUniform1i(s_sky_attrib.sampler, 0);
+    glUniform1f(s_sky_attrib.timer, time_of_day());
+    sdl_gl_helper::draw_triangles_3d(&s_sky_attrib, buffer, 512 * 3);
 }
 
-void world::render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept
+void world::render_wireframe() const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &this->m_player->m_pos;
     float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry, m_player->m_configs.fov, m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
+    begin_3d_pass(&s_line_attrib, matrix);
+    const player::position* s = &m_player->m_pos;
     int hx, hy, hz;
     if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         item::is_obstacle(hw))
     {
-        glUseProgram(attrib->program);
         glLineWidth(1);
-        glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
         const GLuint wireframe_buffer = sdl_gl_helper::gen_wireframe_buffer(
             static_cast<float>(hx), static_cast<float>(hy),
             static_cast<float>(hz), 0.53f);
-        sdl_gl_helper::draw_lines(attrib, wireframe_buffer, 3, 24);
+        sdl_gl_helper::draw_lines(&s_line_attrib, wireframe_buffer, 3, 24);
         sdl_gl_helper::del_buffer(wireframe_buffer);
     }
 }
 
-void world::render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept
+void world::render_crosshairs() const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
     float matrix[16];
-    set_matrix_2d(matrix, width, height);
-    glUseProgram(attrib->program);
+    begin_2d_pass(&s_line_attrib, matrix);
     glLineWidth(static_cast<GLfloat>(4 * m_sdl->get_scale_factor()));
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
     const GLuint crosshair_buffer = m_sdl->gen_crosshair_buffer();
-    sdl_gl_helper::draw_lines(attrib, crosshair_buffer, 2, 4);
+    sdl_gl_helper::draw_lines(&s_line_attrib, crosshair_buffer, 2, 4);
     sdl_gl_helper::del_buffer(crosshair_buffer);
 }
 
-void world::render_item(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
+void world::render_item(const std::uint32_t texture) const noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
     float matrix[16];
-    set_matrix_item(matrix, width, height, m_sdl->get_scale_factor());
-    glUseProgram(attrib->program);
+    begin_item_pass(&s_block_attrib, matrix);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform3f(attrib->camera, 0, 0, 5);
-    glUniform1i(attrib->sampler, 0);
-    glUniform1f(attrib->timer, time_of_day());
+    glUniform3f(s_block_attrib.camera, 0, 0, 5);
+    glUniform1i(s_block_attrib.sampler, 0);
+    glUniform1f(s_block_attrib.timer, time_of_day());
     if (const int w = m_player->get_item(); item::is_plant(w))
     {
         const GLuint buffer = sdl_gl_helper::gen_plant_buffer(0, 0, 0, 0.5, w);
-        sdl_gl_helper::draw_plant(attrib, buffer);
+        sdl_gl_helper::draw_plant(&s_block_attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
     else
     {
         const GLuint buffer = sdl_gl_helper::gen_cube_buffer(0, 0, 0, 0.5, w);
-        sdl_gl_helper::draw_cube(attrib, buffer);
+        sdl_gl_helper::draw_cube(&s_block_attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
 }
 
-void world::render_player(const sdl_gl_helper::attrib* attrib, const std::uint32_t texture) const noexcept
+void world::render_player(const std::uint32_t texture) const noexcept
 {
     // Only render player model in 3rd person mode (ortho 1-64)
     if (m_player->m_configs.ortho < 1 || m_player->m_configs.ortho > 64)
@@ -2449,25 +2446,14 @@ void world::render_player(const sdl_gl_helper::attrib* attrib, const std::uint32
         return;
     }
 
-    auto [width, height] = m_sdl->get_window_size();
-    const player::position* s = &m_player->m_pos;
-
-    // Set up 3D projection matrix
     float matrix[16];
-    set_matrix_3d(
-        matrix, width, height,
-        s->x, s->y, s->z, s->rx, s->ry,
-        m_player->m_configs.fov,
-        m_player->m_configs.ortho,
-        RENDER_CHUNK_RADIUS);
-
-    glUseProgram(attrib->program);
+    begin_3d_pass(&s_block_attrib, matrix);
+    const player::position* s = &m_player->m_pos;
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform3f(attrib->camera, s->x, s->y, s->z);
-    glUniform1i(attrib->sampler, 0);
-    glUniform1f(attrib->timer, time_of_day());
+    glUniform3f(s_block_attrib.camera, s->x, s->y, s->z);
+    glUniform1i(s_block_attrib.sampler, 0);
+    glUniform1f(s_block_attrib.timer, time_of_day());
 
     // Generate player buffer at current position
     // Offset player slightly behind camera for better visibility in 3rd person
@@ -2477,13 +2463,13 @@ void world::render_player(const sdl_gl_helper::attrib* attrib, const std::uint32
     const float pz = s->z + offset_distance * SDL_cosf(s->rx);
 
     const GLuint player_buffer = sdl_gl_helper::gen_player_buffer(px, py, pz, s->rx, s->ry);
-    sdl_gl_helper::draw_player(attrib, player_buffer);
+    sdl_gl_helper::draw_player(&s_block_attrib, player_buffer);
     sdl_gl_helper::del_buffer(player_buffer);
 }
 
-void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
+void world::render_plane() const noexcept
 {
-    if (!attrib || !m_player || !m_player->m_configs.preview_enabled)
+    if (!m_player || !m_player->m_configs.preview_enabled)
     {
         return;
     }
@@ -2505,16 +2491,10 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
         return;
     }
 
-    auto [width, height] = m_sdl->get_window_size();
-
-    // Set up 2D orthographic projection
     float matrix[16];
-    set_matrix_2d(matrix, width, height);
-
-    glUseProgram(attrib->program);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glUniform1i(attrib->extra1, 0);
+    auto [width, height] = begin_2d_pass(&s_block_attrib, matrix);
+    glUniform1i(s_block_attrib.sampler, static_cast<unsigned int>(TextureIdentifier::MAZE));
+    glUniform1i(s_block_attrib.extra1, 0);
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
@@ -2560,58 +2540,24 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
     const float bottom_right_x = static_cast<float>(width) - preview_width - PADDING;
     const float bottom_right_y = PADDING; // In 2D coords, 0 is at bottom
 
-    // Build 2D quad geometry (2 triangles)
     // Vertex format: x, y, u, v (4 floats per vertex, 6 vertices for 2 triangles)
-    float quad_data[6 * 4];
-    float* d = quad_data;
-
-    // Define the quad corners (bottom-left origin)
     const float x0 = bottom_right_x;
     const float y0 = bottom_right_y;
     const float x1 = bottom_right_x + preview_width;
     const float y1 = bottom_right_y + preview_height;
 
-    // Triangle 1: bottom-left, bottom-right, top-right
-    // Vertex 0: bottom-left
-    *(d++) = x0;
-    *(d++) = y0;
-    *(d++) = 0.0f; // u
-    *(d++) = 0.0f; // v
-
-    // Vertex 1: bottom-right
-    *(d++) = x1;
-    *(d++) = y0;
-    *(d++) = 1.0f; // u
-    *(d++) = 0.0f; // v
-
-    // Vertex 2: top-right
-    *(d++) = x1;
-    *(d++) = y1;
-    *(d++) = 1.0f; // u
-    *(d++) = 1.0f; // v
-
-    // Triangle 2: bottom-left, top-right, top-left
-    // Vertex 3: bottom-left
-    *(d++) = x0;
-    *(d++) = y0;
-    *(d++) = 0.0f; // u
-    *(d++) = 0.0f; // v
-
-    // Vertex 4: top-right
-    *(d++) = x1;
-    *(d++) = y1;
-    *(d++) = 1.0f; // u
-    *(d++) = 1.0f; // v
-
-    // Vertex 5: top-left
-    *(d++) = x0;
-    *(d++) = y1;
-    *(d++) = 0.0f; // u
-    *(d++) = 1.0f; // v
+    const std::array<float, 6 * 4> quad_data = {
+        x0, y0, 0.0f, 0.0f,  // tri1: bottom-left
+        x1, y0, 1.0f, 0.0f,  // tri1: bottom-right
+        x1, y1, 1.0f, 1.0f,  // tri1: top-right
+        x0, y0, 0.0f, 0.0f,  // tri2: bottom-left
+        x1, y1, 1.0f, 1.0f,  // tri2: top-right
+        x0, y1, 0.0f, 1.0f,  // tri2: top-left
+    };
 
     // Create and render the quad using 2D drawing
-    const GLuint temp_buffer = sdl_gl_helper::gen_buffer(sizeof(quad_data), quad_data);
-    sdl_gl_helper::draw_triangles_2d(attrib, temp_buffer, 6);
+    const GLuint temp_buffer = sdl_gl_helper::gen_buffer(sizeof(quad_data), quad_data.data());
+    sdl_gl_helper::draw_triangles_2d(&s_block_attrib, temp_buffer, 6);
     sdl_gl_helper::del_buffer(temp_buffer);
 
     // Restore GL state
@@ -2619,22 +2565,19 @@ void world::render_plane(const sdl_gl_helper::attrib* attrib) const noexcept
     glEnable(GL_DEPTH_TEST);
 }
 
-void world::render_text(const sdl_gl_helper::attrib* attrib, const std::uint32_t font, const int justify,
+void world::render_text(const std::uint32_t font, const int justify,
                         float x, const float y, const float n, const std::string_view text) const noexcept
 {
-    auto [w, h] = m_sdl->get_window_size();
     float matrix[16];
-    set_matrix_2d(matrix, w, h);
-    glUseProgram(attrib->program);
-    glUniformMatrix4fv(attrib->matrix, 1, GL_FALSE, matrix);
-    glUniform1i(attrib->sampler, static_cast<int>(TextureIdentifier::BITMAP_FONT));
-    glUniform1i(attrib->extra1, 0);
+    begin_2d_pass(&s_text_attrib, matrix);
+    glUniform1i(s_text_attrib.sampler, static_cast<int>(TextureIdentifier::BITMAP_FONT));
+    glUniform1i(s_text_attrib.extra1, 0);
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
     glBindTexture(GL_TEXTURE_2D, font);
 
     const GLsizei length = static_cast<GLsizei>(text.length());
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = sdl_gl_helper::gen_text_buffer(x, y, n, text);
-    sdl_gl_helper::draw_text(attrib, buffer, length);
+    sdl_gl_helper::draw_text(&s_text_attrib, buffer, length);
     sdl_gl_helper::del_buffer(buffer);
 }

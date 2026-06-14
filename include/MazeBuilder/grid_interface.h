@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
+/// @file grid_interface.h
+/// @namespace mazes
 namespace mazes
 {
-
     class cell;
 
-    /// @file grid_interface.h
     /// @class grid_interface
     /// @brief Interface for the grid class
     /// @details The interface provides methods to interact with the grid
@@ -20,11 +20,12 @@ namespace mazes
     {
 
     public:
+        /// @brief Virtual destructor for the grid_interface class
         virtual ~grid_interface() = default;
 
         /// @brief Get detailed information of a cell in the grid in the form of a string
-        /// @param c
-        /// @return
+        /// @param c A shared pointer to the cell for which to retrieve information.
+        /// @return A string containing detailed information about the specified cell.
         virtual std::string contents_of(std::shared_ptr<cell> const &c) const noexcept = 0;
 
         /// @brief Returns the background color for the specified cell, if available.

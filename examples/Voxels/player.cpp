@@ -5,7 +5,6 @@
 #include <ranges>
 #include <sstream>
 
-#include "command_queue.h"
 #include "db.h"
 #include "entity.h"
 #include "item.h"
@@ -22,22 +21,97 @@
 #endif
 
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/enums.h>
-#include <MazeBuilder/grid.h>
-#include <MazeBuilder/grid_factory.h>
-#include <MazeBuilder/grid_interface.h>
-#include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/objectify.h>
-#include <MazeBuilder/pixels.h>
+#include <MazeBuilder/algos.h>
 #include <MazeBuilder/randomizer.h>
-#include <MazeBuilder/stringify.h>
+#include <MazeBuilder/runtime_app.h>
+#include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/string_utils.h>
-#include <MazeBuilder/wavefront_object_helper.h>
 
 namespace
 {
+    std::string build_runtime_request(const mazes::configurator &config, std::string_view output)
+    {
+        std::string request;
+        request.reserve(160);
+        request = "--rows=" + std::to_string(config.rows()) +
+                  " --columns=" + std::to_string(config.columns()) +
+                  " --levels=1 --algo=" + std::string{mazes::to_sv_from_algo(config.algo_id())} +
+                  " --seed=" + std::to_string(config.seed()) +
+                  " --output=" + std::string{output};
+        return request;
+    }
+
+    bool looks_like_maze_ascii_line(const std::string &line) noexcept
+    {
+        if (line.empty())
+        {
+            return false;
+        }
+
+        for (const char ch : line)
+        {
+            if (ch != '+' && ch != '-' && ch != '|' && ch != ' ')
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    std::string extract_maze_ascii_block(const std::string_view text)
+    {
+        std::vector<std::string> lines;
+        lines.reserve(256);
+
+        std::string current;
+        current.reserve(256);
+        for (const char ch : text)
+        {
+            if (ch == '\n')
+            {
+                lines.push_back(current);
+                current.clear();
+            }
+            else if (ch != '\r')
+            {
+                current.push_back(ch);
+            }
+        }
+        if (!current.empty())
+        {
+            lines.push_back(current);
+        }
+
+        std::ostringstream maze_only;
+        bool in_maze = false;
+        bool wrote_any = false;
+        for (const auto &line : lines)
+        {
+            if (!in_maze)
+            {
+                if (!looks_like_maze_ascii_line(line))
+                {
+                    continue;
+                }
+
+                in_maze = true;
+            }
+
+            if (!looks_like_maze_ascii_line(line))
+            {
+                break;
+            }
+
+            maze_only << line << '\n';
+            wrote_any = true;
+        }
+
+        return wrote_any ? maze_only.str() : std::string{text};
+    }
+
     // Helper to convert block/voxel data to Wavefront OBJ format
-    std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>>& blocks) noexcept
+    std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>> &blocks) noexcept
     {
         if (blocks.empty())
         {
@@ -54,13 +128,13 @@ namespace
         // Cube vertex offsets (8 vertices per cube)
         static constexpr float cube_vertices[8][3] = {
             {-0.5f, -0.5f, -0.5f}, // 0
-            {0.5f, -0.5f, -0.5f}, // 1
-            {0.5f, 0.5f, -0.5f}, // 2
-            {-0.5f, 0.5f, -0.5f}, // 3
-            {-0.5f, -0.5f, 0.5f}, // 4
-            {0.5f, -0.5f, 0.5f}, // 5
-            {0.5f, 0.5f, 0.5f}, // 6
-            {-0.5f, 0.5f, 0.5f} // 7
+            {0.5f, -0.5f, -0.5f},  // 1
+            {0.5f, 0.5f, -0.5f},   // 2
+            {-0.5f, 0.5f, -0.5f},  // 3
+            {-0.5f, -0.5f, 0.5f},  // 4
+            {0.5f, -0.5f, 0.5f},   // 5
+            {0.5f, 0.5f, 0.5f},    // 6
+            {-0.5f, 0.5f, 0.5f}    // 7
         };
 
         // Cube face indices (6 faces, 2 triangles each = 6 vertices per face)
@@ -71,13 +145,13 @@ namespace
             {3, 7, 6, 3, 6, 2}, // top    (+Y)
             {0, 1, 5, 0, 5, 4}, // bottom (-Y)
             {1, 2, 6, 1, 6, 5}, // right  (+X)
-            {0, 4, 7, 0, 7, 3} // left   (-X)
+            {0, 4, 7, 0, 7, 3}  // left   (-X)
         };
 
         int vertex_count = 0;
 
         // Generate vertices and faces for each block
-        for (const auto& [x, y, z, w] : blocks)
+        for (const auto &[x, y, z, w] : blocks)
         {
             // Skip air blocks (w == 0)
             if (w == 0)
@@ -97,25 +171,121 @@ namespace
             // Write faces for this cube (all 6 faces)
             for (int face = 0; face < 6; ++face)
             {
-                result << "f";
-                for (int i = 0; i < 3; ++i)
-                {
-                    result << " " << (vertex_count + cube_faces[face][i] + 1);
-                }
-                result << "\n";
-
-                result << "f";
-                for (int i = 3; i < 6; ++i)
-                {
-                    result << " " << (vertex_count + cube_faces[face][i] + 1);
-                }
-                result << "\n";
+                const int base = vertex_count + 1;
+                result << "f " << base + cube_faces[face][0]
+                       << " " << base + cube_faces[face][1]
+                       << " " << base + cube_faces[face][2] << "\n"
+                       << "f " << base + cube_faces[face][3]
+                       << " " << base + cube_faces[face][4]
+                       << " " << base + cube_faces[face][5] << "\n";
             }
 
             vertex_count += 8;
         }
 
         return result.str();
+    }
+
+    std::optional<player::maze_preview_frame> make_preview_from_ascii(
+        const std::string_view ascii,
+        const unsigned int rows,
+        const unsigned int columns)
+    {
+        if (ascii.empty())
+        {
+            return std::nullopt;
+        }
+
+        std::vector<std::string> lines;
+        lines.reserve(static_cast<size_t>(rows) * 3u);
+
+        std::string current;
+        current.reserve(256);
+        for (const char ch : ascii)
+        {
+            if (ch == '\n')
+            {
+                lines.push_back(current);
+                current.clear();
+            }
+            else if (ch != '\r')
+            {
+                current.push_back(ch);
+            }
+        }
+        if (!current.empty())
+        {
+            lines.push_back(current);
+        }
+
+        if (lines.empty())
+        {
+            return std::nullopt;
+        }
+
+        size_t width_chars = 0;
+        for (const auto &line : lines)
+        {
+            width_chars = std::max(width_chars, line.size());
+        }
+        if (width_chars == 0)
+        {
+            return std::nullopt;
+        }
+
+        for (auto &line : lines)
+        {
+            line.resize(width_chars, ' ');
+        }
+
+        constexpr unsigned int MIN_SCALE = 1u;
+        constexpr unsigned int MAX_SCALE = 10u;
+        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(static_cast<float>(rows * columns)));
+        const auto scale = static_cast<int>(std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE));
+
+        const int width = static_cast<int>(width_chars) * scale;
+        const int height = static_cast<int>(lines.size()) * scale;
+        if (width <= 0 || height <= 0)
+        {
+            return std::nullopt;
+        }
+
+        player::maze_preview_frame frame;
+        frame.width = width;
+        frame.height = height;
+        frame.scale = scale;
+        frame.pixel_data.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4u);
+
+        auto write_pixel = [&frame](const int px, const int py, const bool is_wall)
+        {
+            const auto index = (static_cast<size_t>(py) * static_cast<size_t>(frame.width) + static_cast<size_t>(px)) * 4u;
+            const std::uint8_t color = is_wall ? 0u : 255u;
+            frame.pixel_data[index + 0u] = color;
+            frame.pixel_data[index + 1u] = color;
+            frame.pixel_data[index + 2u] = color;
+            frame.pixel_data[index + 3u] = 255u;
+        };
+
+        for (int char_y = 0; char_y < static_cast<int>(lines.size()); ++char_y)
+        {
+            for (int char_x = 0; char_x < static_cast<int>(width_chars); ++char_x)
+            {
+                const char tile = lines[static_cast<size_t>(char_y)][static_cast<size_t>(char_x)];
+                const bool is_wall = tile != ' ';
+
+                const int x0 = char_x * scale;
+                const int y0 = char_y * scale;
+                for (int oy = 0; oy < scale; ++oy)
+                {
+                    for (int ox = 0; ox < scale; ++ox)
+                    {
+                        write_pixel(x0 + ox, y0 + oy, is_wall);
+                    }
+                }
+            }
+        }
+
+        return frame;
     }
 }
 
@@ -127,51 +297,30 @@ constexpr auto SCROLL_THRESHOLD = 0.1f;
 constexpr auto ZOOM_FOV = 15.f;
 
 player::player()
-    : scene_node{}
-      , m_is_active{true}
-      , m_on_ground{false}
-      , m_is_flying{false}
-      , m_is_on_auto_run{false}
-      , m_name{"zm"}
-      , m_buffer{}
-      , m_item_index{0}
-      , m_world{nullptr}
-      , m_maze_task{
-          [this](const mazes::configurator& config)-> std::unique_ptr<mazes::grid_interface>
-          {
-              const auto a = mazes::configurator::make_algo_from_config(this->m_configs.maze);
-              auto g = std::make_unique<mazes::grid>(config.rows(), config.columns(), config.levels());
-              if (!a.has_value())
-              {
-                  return g;
-              }
+    : scene_node{}, m_is_active{true}, m_on_ground{false}, m_is_flying{false}, m_is_on_auto_run{false}, m_name{"zm"}, m_buffer{}, m_item_index{0}, m_world{nullptr}, m_maze_task{
+                                                                                                                                                                         [](const mazes::configurator &config) -> std::optional<maze_preview_frame>
+                                                                                                                                                                         {
+                                                                                                                                                                             const auto app = mazes::singleton_base<mazes::runtime_app>::instance();
+                                                                                                                                                                             if (!app)
+                                                                                                                                                                             {
+                                                                                                                                                                                 return std::nullopt;
+                                                                                                                                                                             }
 
-              mazes::randomizer rng{};
-              rng.seed(m_configs.maze.seed());
-              if (!a.value()->run(g.get(), std::ref(rng)))
-              {
-                  return nullptr;
-              }
+                                                                                                                                                                             const auto txt_request = build_runtime_request(config, "txt");
+                                                                                                                                                                             auto maze_text = std::string{app->apply(txt_request)};
+                                                                                                                                                                             if (maze_text.empty())
+                                                                                                                                                                             {
+                                                                                                                                                                                 const auto stdout_request = build_runtime_request(config, "stdout");
+                                                                                                                                                                                 maze_text = std::string{app->apply(stdout_request)};
+                                                                                                                                                                                 if (maze_text.empty())
+                                                                                                                                                                                 {
+                                                                                                                                                                                     return std::nullopt;
+                                                                                                                                                                                 }
+                                                                                                                                                                             }
 
-              // Set geometric data
-              if (thread_local mazes::wavefront_object_helper woh{}; !woh.run(g.get(), std::ref(rng)))
-              {
-                  return nullptr;
-              }
-
-              // Set bytes
-              if (thread_local mazes::pixels pixel_converter; !pixel_converter.run(g.get(), std::ref(rng)))
-              {
-                  return nullptr;
-              }
-
-              return std::move(g);
-          }
-      }
-      , m_grid_factory{std::make_unique<mazes::grid_factory>()}
+                                                                                                                                                                             return make_preview_from_ascii(extract_maze_ascii_block(maze_text), config.rows(), config.columns());
+                                                                                                                                                                         }}
 {
-    m_grid_factory->register_creator(m_name, m_maze_task);
-
     set_category(Entity::PLAYER);
 
     // Movement key bindings
@@ -197,17 +346,23 @@ player::player()
     m_configs.ortho = DEFAULT_ORTHO;
     m_configs.invert_mouse = false;
     m_configs.tag = "put maze here";
+    m_configs.maze
+        .algo_id(mazes::algo::DFS)
+        .rows(10)
+        .columns(10)
+        .levels(3)
+        .seed(42u);
 
     initialize_actions();
 
     // Set category for all player actions
-    for (auto& [_, category] : m_action_binding | std::views::values)
+    for (auto &[_, category] : m_action_binding | std::views::values)
     {
         category = Entity::PLAYER;
     }
 }
 
-void player::handle_event(const SDL_Event& event, command_queue& commands) noexcept
+void player::handle_event(const SDL_Event &event, command_queue &commands) noexcept
 {
     if (event.type == SDL_EVENT_QUIT)
     {
@@ -227,7 +382,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
             }
             else
             {
-                m_item_index = MAX_ITEM_INDEX;  // Wrap to last valid item
+                m_item_index = MAX_ITEM_INDEX; // Wrap to last valid item
             }
         }
         else if (event.wheel.y < -SCROLL_THRESHOLD)
@@ -239,7 +394,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
             }
             else
             {
-                m_item_index = 0;  // Wrap to first item
+                m_item_index = 0; // Wrap to first item
             }
         }
     }
@@ -281,7 +436,7 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
         constexpr float mouse_sensitivity = 0.0025f;
-        position* player_pos = &this->m_pos;
+        position *player_pos = &this->m_pos;
         player_pos->rx += event.motion.xrel * mouse_sensitivity;
 
         if (this->m_configs.invert_mouse)
@@ -307,18 +462,25 @@ void player::handle_event(const SDL_Event& event, command_queue& commands) noexc
     }
 }
 
-void player::update(float delta_time, mazes::randomizer& rng) noexcept
+void player::update(float delta_time, mazes::randomizer &rng) noexcept
 {
+    // Auto-generate the first preview as soon as a world is available.
+    if (m_world && m_auto_preview_pending)
+    {
+        m_auto_preview_pending = false;
+        request_preview_generation();
+    }
+    process_preview_generation();
 }
 
 void player::draw() const noexcept
 {
 }
 
-void player::handle_realtime_input(command_queue& commands)
+void player::handle_realtime_input(command_queue &commands)
 {
     int numKeys = 0;
-    const auto* keyState = SDL_GetKeyboardState(&numKeys);
+    const auto *keyState = SDL_GetKeyboardState(&numKeys);
 
     if (m_is_on_auto_run)
     {
@@ -326,7 +488,7 @@ void player::handle_realtime_input(command_queue& commands)
     }
 
     // Process all realtime action keys
-    for (auto& [id, action] : m_key_binding)
+    for (auto &[id, action] : m_key_binding)
     {
         if (is_realtime_action(action))
         {
@@ -348,8 +510,8 @@ void player::handle_realtime_input(command_queue& commands)
                 // Check for disablement
                 if (m_is_on_auto_run &&
                     (action == PlayerAction::MOVE_LEFT ||
-                        action == PlayerAction::MOVE_RIGHT ||
-                        action == PlayerAction::MOVE_BACKWARD))
+                     action == PlayerAction::MOVE_RIGHT ||
+                     action == PlayerAction::MOVE_BACKWARD))
                 {
                     m_is_on_auto_run = false;
                 }
@@ -360,32 +522,17 @@ void player::handle_realtime_input(command_queue& commands)
 
 void player::assign_key(const PlayerAction action, const std::uint32_t key)
 {
-    // Remove all keys that already map to action
-    for (auto it = m_key_binding.begin(); it != m_key_binding.end();)
-    {
-        if (it->second == action)
-        {
-            it = m_key_binding.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    // Insert new binding
+    std::erase_if(m_key_binding, [action](const auto &kv)
+                  { return kv.second == action; });
     m_key_binding.insert_or_assign(key, action);
 }
 
 [[nodiscard]] std::uint32_t player::get_assigned_key(const PlayerAction action) const
 {
-    for (const auto& [f, s] : m_key_binding)
-    {
-        if (s == action)
-            return f;
-    }
-
-    return SDL_SCANCODE_UNKNOWN;
+    const auto it = std::ranges::find_if(m_key_binding,
+                                         [action](const auto &kv)
+                                         { return kv.second == action; });
+    return it != m_key_binding.end() ? it->first : static_cast<std::uint32_t>(SDL_SCANCODE_UNKNOWN);
 }
 
 bool player::is_active() const noexcept
@@ -450,12 +597,12 @@ std::string player::get_name() const noexcept
     return m_name;
 }
 
-void player::set_name(const std::string& name) noexcept
+void player::set_name(const std::string &name) noexcept
 {
     m_name = name;
 }
 
-void player::set_world(world* w) noexcept
+void player::set_world(world *w) noexcept
 {
     m_world = w;
 }
@@ -491,7 +638,7 @@ void player::initialize_actions()
     constexpr float acceleration = 0.2f;
 
     m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             const float target_vx = -SDL_sinf(p.m_pos.rx) * max_move_speed;
             const float target_vz = SDL_cosf(p.m_pos.rx) * max_move_speed;
@@ -505,7 +652,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             const float target_vx = SDL_sinf(p.m_pos.rx) * max_move_speed;
             const float target_vz = -SDL_cosf(p.m_pos.rx) * max_move_speed;
@@ -519,7 +666,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             const float target_vx = -SDL_cosf(p.m_pos.rx) * max_move_speed;
             const float target_vz = -SDL_sinf(p.m_pos.rx) * max_move_speed;
@@ -533,7 +680,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             const float target_vx = SDL_cosf(p.m_pos.rx) * max_move_speed;
             const float target_vz = SDL_sinf(p.m_pos.rx) * max_move_speed;
@@ -547,13 +694,13 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_AUTO].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             p.m_is_on_auto_run = !p.m_is_on_auto_run;
         });
 
     m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
-        [](player& p, float dt, mazes::randomizer& rng)
+        [](player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_is_flying)
             {
@@ -571,7 +718,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::TAG_SIGN].action = derived_action<player>(
-        [this](player& p, float dt, mazes::randomizer& rng)
+        [this](player &p, float dt, mazes::randomizer &rng)
         {
             if (m_world)
             {
@@ -580,7 +727,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_DOWN].action = derived_action<player>(
-        [](player& p, float dt, mazes::randomizer& rng)
+        [](player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_is_flying)
             {
@@ -590,7 +737,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::MOVE_UP].action = derived_action<player>(
-        [](player& p, float dt, mazes::randomizer& rng)
+        [](player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_is_flying)
             {
@@ -600,7 +747,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::FLY].action = derived_action<player>(
-        [](player& p, float dt, mazes::randomizer& rng)
+        [](player &p, float dt, mazes::randomizer &rng)
         {
             p.m_is_flying = !p.m_is_flying;
             if (p.m_is_flying)
@@ -610,7 +757,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
-        [this](const player& p, float dt, mazes::randomizer& rng)
+        [this](const player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_world)
             {
@@ -619,7 +766,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::COPY_BLOCK].action = derived_action<player>(
-        [this](const player& p, float dt, mazes::randomizer& rng)
+        [this](const player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_world)
             {
@@ -627,9 +774,8 @@ void player::initialize_actions()
             }
         });
 
-
     m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
-        [this](const player& p, float dt, mazes::randomizer& rng)
+        [this](const player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_world)
             {
@@ -638,7 +784,7 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::PLACE_LIGHT].action = derived_action<player>(
-        [this](const player& p, float dt, mazes::randomizer& rng)
+        [this](const player &p, float dt, mazes::randomizer &rng)
         {
             if (p.m_world)
             {
@@ -647,61 +793,23 @@ void player::initialize_actions()
         });
 
     m_action_binding[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             constexpr auto PREVIEW_COOLDOWN_MS = 250;
-            static std::uint64_t last_preview_time = 0;
             const auto current_time = SDL_GetTicks();
 
-            if (const auto time_since_last_preview = current_time - last_preview_time;
-                time_since_last_preview > PREVIEW_COOLDOWN_MS && p.m_world)
+            if (const auto time_since_last_preview_request = current_time - p.m_last_preview_request_time;
+                time_since_last_preview_request > PREVIEW_COOLDOWN_MS)
             {
-                last_preview_time = current_time;
-
-                // Generate maze grid
-                if (auto g = p.m_grid_factory->create(p.get_name(),
-                    std::cref(p.m_configs.maze));
-                    g.has_value())
+                if (p.request_preview_generation())
                 {
-                    // Move grid ownership
-                    auto grid_ptr = std::move(g.value());
-                    if (p.m_world->update_preview(grid_ptr.get()))
-                    {
-                        // Get pixel data from the generated maze
-                        const auto pixel_data = grid_ptr->operations().get_pixels();
-                        auto [rows, columns, _] = grid_ptr->operations().get_dimensions();
-
-                        // Calculate scale
-                        constexpr unsigned int MIN_SCALE = 1;
-                        constexpr unsigned int MAX_SCALE = 10;
-                        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(rows * columns));
-                        const auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
-
-                        const auto ascii_height = rows * 2 + 1;
-                        const int height = static_cast<int>(ascii_height * scale);
-                        const int width = static_cast<int>(pixel_data.size() / (height * 4));
-
-                        p.m_world->finalize_buildings(
-                            pixel_data,
-                            width,
-                            height,
-                            scale,
-                            p.m_configs.maze.levels(),
-                            p.get_item()
-                        );
-
-                        p.m_last_preview_generation_time = SDL_GetTicks();
-                    }
-                    else
-                    {
-                        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to generate preview texture\n");
-                    }
+                    p.m_last_preview_request_time = current_time;
                 }
             }
         });
 
     m_action_binding[PlayerAction::PLACE_MAZE].action = derived_action<player>(
-        [](player& p, const float dt, mazes::randomizer& rng)
+        [](player &p, const float dt, mazes::randomizer &rng)
         {
             if (!p.m_world)
             {
@@ -716,7 +824,7 @@ void player::initialize_actions()
                 return;
             }
 
-            p.m_world->commit_preview_to_world();
+            p.m_world->commit_preview_to_world(p.get_item());
         });
 }
 
@@ -730,6 +838,7 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
     case PlayerAction::MOVE_BACKWARD:
     case PlayerAction::MOVE_DOWN:
     case PlayerAction::MOVE_UP:
+    case PlayerAction::PREVIEW_MAZE:   // polled every frame; cooldown in action lambda
         return true;
     default:
         return false;
@@ -738,7 +847,7 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
 
 void player::on_light() const noexcept
 {
-    const position* s = &this->m_pos;
+    const position *s = &this->m_pos;
     int hx, hy, hz;
     if (const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < item::TOTAL_BLOCKS && item::is_destructable(hw))
@@ -749,7 +858,7 @@ void player::on_light() const noexcept
 
 void player::on_left_click() const noexcept
 {
-    const position* s = &this->m_pos;
+    const position *s = &this->m_pos;
     int hx, hy, hz;
     if (const auto hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < 256 && item::is_destructable(hw))
@@ -765,7 +874,7 @@ void player::on_left_click() const noexcept
 
 void player::on_right_click() const noexcept
 {
-    const position* s = &this->m_pos;
+    const position *s = &this->m_pos;
     int hx, hy, hz;
     if (const int hw = m_world->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < item::TOTAL_BLOCKS && item::is_obstacle(hw))
@@ -779,17 +888,11 @@ void player::on_right_click() const noexcept
 
 void player::on_middle_click() noexcept
 {
-    const position* s = &this->m_pos;
+    const position *s = &this->m_pos;
     int hx, hy, hz;
     const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    for (int i = 0; i < item::items.size(); i++)
-    {
-        if (item::items.at(i) == hw)
-        {
-            this->m_item_index = i;
-            break;
-        }
-    }
+    if (const auto it = std::ranges::find(item::items, hw); it != item::items.end())
+        m_item_index = static_cast<std::int32_t>(it - item::items.begin());
 }
 
 void player::on_tag_sign() const noexcept
@@ -804,6 +907,79 @@ void player::on_tag_sign() const noexcept
 float player::lerp(float a, float b, float t) noexcept
 {
     return a + t * (b - a);
+}
+
+bool player::preview_generation_in_progress() const noexcept
+{
+    if (!m_preview_future.valid())
+    {
+        return false;
+    }
+
+    return m_preview_future.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready;
+}
+
+bool player::request_preview_generation() noexcept
+{
+    if (!m_world)
+    {
+        return false;
+    }
+
+    if (preview_generation_in_progress())
+    {
+        return false;
+    }
+
+    try
+    {
+        const auto config = m_configs.maze;
+        auto maze_task = m_maze_task;
+        m_preview_future = std::async(std::launch::async, [maze_task = std::move(maze_task), config]() mutable
+                                      { return maze_task(config); });
+        return true;
+    }
+    catch (const std::exception &)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to schedule maze preview generation\n");
+        return false;
+    }
+}
+
+void player::process_preview_generation() noexcept
+{
+    if (!m_world || !m_preview_future.valid())
+    {
+        return;
+    }
+
+    if (m_preview_future.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready)
+    {
+        return;
+    }
+
+    auto preview = m_preview_future.get();
+    if (!preview.has_value())
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze preview generation failed\n");
+        return;
+    }
+
+    if (!m_world->update_preview(preview->pixel_data, preview->width, preview->height))
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to upload maze preview texture\n");
+        return;
+    }
+
+    m_world->finalize_buildings(
+        preview->pixel_data,
+        preview->width,
+        preview->height,
+        preview->scale,
+        m_configs.maze.levels(),
+        get_item());
+
+    m_last_preview_generation_time = SDL_GetTicks();
 }
 
 /// Gather player's voxel world artifacts from the database

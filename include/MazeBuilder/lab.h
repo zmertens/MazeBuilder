@@ -4,17 +4,17 @@
 #include <memory>
 #include <vector>
 
-/// @brief Namespace for the maze builder
+/// @file lab.h
+/// @namespace mazes
 namespace mazes
 {
 
     class cell;
     class configurator;
 
-    /// @file lab.h
-    /// @class lab
+    /// @class lab - abbreviation of "labyrinth"
     /// @brief Provides link operations
-    /// @details Provides link operations
+    /// @details This class provides methods to link and unlink cells in a maze.
     class lab
     {
 

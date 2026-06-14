@@ -2,15 +2,17 @@
 #define WORLD_H
 
 #include <array>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "command_queue.h"
+#include "command.h"
+#include "bloom_pass.h"
 
-#include "map.h"
+#include "voxels_map.h"
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
 
@@ -18,14 +20,12 @@ struct worker;
 struct worker_item;
 union SDL_Event;
 
-using world_func = std::function<void(int, int, int, int, Map*)>;
+using world_func = std::function<void(int, int, int, int, voxels_map*)>;
 
 class attrib;
-class command_queue;
 class sdl_gl_helper;
 
 namespace mazes {
-    class grid_interface;
     class randomizer;
 }
 
@@ -53,14 +53,16 @@ public:
 
     void destroy_world();
 private:
-    static void create_world(int p, int q, const world_func& func, Map *m, int chunk_size) noexcept;
+    static void create_world(int p, int q, const world_func& func, voxels_map *m, int chunk_size) noexcept;
 
     // Building helper methods
-    bool update_preview(mazes::grid_interface* g) const noexcept;
+    bool update_preview(const std::vector<std::uint8_t>& pixel_data,
+                        int width,
+                        int height) const noexcept;
     void finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
                                   int width, int height, int scale,
                                   int wall_height, int item_type) noexcept;
-    void commit_preview_to_world() noexcept;
+    void commit_preview_to_world(int item_type) noexcept;
     void process_build_queue() noexcept;
 
     // Scene graph methods
@@ -88,7 +90,7 @@ private:
     bool chunk_visible(float planes[6][4], int p, int q, int miny, int maxy) const noexcept;
 
     [[nodiscard]] int highest_block(float x, float z) const noexcept;
-    static int _hit_test(const Map* map, float max_distance, int previous,
+    static int _hit_test(const voxels_map* map, float max_distance, int previous,
         float x, float y, float z, float vx, float vy, float vz, int* hx, int* hy, int* hz) noexcept;
     int hit_test(int previous, float x, float y, float z,
         float rx, float ry, int* bx, int* by, int* bz) const noexcept;
@@ -110,8 +112,6 @@ private:
 
     static void generate_chunk(scene_node* chunk, const worker_item* item) noexcept;
     void gen_chunk_buffer(scene_node* chunk) const noexcept;
-
-    static void map_set_func(int x, int y, int z, int w, Map* m) noexcept;
 
     static void load_chunk(const worker_item* item) noexcept;
     void init_chunk(scene_node* chunk, int p, int q) noexcept;
@@ -137,18 +137,24 @@ private:
 
     [[nodiscard]] std::size_t get_chunk_count() const noexcept;
 
-    int render_chunks(const sdl_gl_helper::attrib* attrib, uint32_t texture) const noexcept;
-    void render_signs(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
-    void render_sign(const sdl_gl_helper::attrib* attrib, std::uint32_t sign) const noexcept;
-    void render_sky(const sdl_gl_helper::attrib* attrib, std::uint32_t buffer,
-        std::uint32_t sign) const noexcept;
-    void render_wireframe(const sdl_gl_helper::attrib* attrib) const noexcept;
-    void render_crosshairs(const sdl_gl_helper::attrib* attrib) const noexcept;
-    void render_item(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
-    void render_player(const sdl_gl_helper::attrib* attrib, std::uint32_t texture) const noexcept;
-    void render_text(const sdl_gl_helper::attrib* attrib, std::uint32_t font, int justify,
+    [[nodiscard]] int render_chunks(std::uint32_t texture) const noexcept;
+    void render_signs(std::uint32_t sign) const noexcept;
+    void render_sign(std::uint32_t sign) const noexcept;
+    void render_sky(std::uint32_t buffer, std::uint32_t sky_tex) const noexcept;
+    void render_wireframe() const noexcept;
+    void render_crosshairs() const noexcept;
+    void render_item(std::uint32_t texture) const noexcept;
+    void render_player(std::uint32_t texture) const noexcept;
+    void render_text(std::uint32_t font, int justify,
         float x, float y, float n, std::string_view text) const noexcept;
-    void render_plane(const sdl_gl_helper::attrib* attrib) const noexcept;
+    void render_plane() const noexcept;
+
+    // Matrix setup helpers — bind shader program, upload projection matrix uniform.
+    // Each returns {viewport_width, viewport_height}.
+    std::pair<int,int> begin_3d_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept;
+    std::pair<int,int> begin_sky_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept;
+    std::pair<int,int> begin_item_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept;
+    std::pair<int,int> begin_2d_pass(const sdl_gl_helper::attrib* a, float matrix[16]) const noexcept;
 
     enum class Layer
     {
@@ -201,6 +207,8 @@ private:
     std::uint32_t m_sky_buffer;
 
     std::vector<std::function<void()>> m_building_processes;
+
+    bloom_pass m_bloom;
 };
 
 #endif // WORLD_H

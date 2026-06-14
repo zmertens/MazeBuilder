@@ -2,9 +2,7 @@
 set(EXE_NAME "mazebuildercli")
 
 set(CLI_SOURCES
-    cli.cpp
     main.cpp
-    config_mapper.cpp
 )
 
 if(EMSCRIPTEN)

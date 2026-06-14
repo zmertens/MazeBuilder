@@ -3,21 +3,22 @@ set(NOISE_SOURCES ${CMAKE_SOURCE_DIR}/deps/noise/noise.c)
 set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 
 set(CRAFT_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/bloom_pass.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/font.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/map.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/player.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/sdl_gl_helper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/sdl_gl_helper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/voxels_map.cpp)
 
 set(VOXELS_EXE "mazebuildervoxels")
 
@@ -53,8 +54,14 @@ else ()
 
     message(INFO ": Building ${VOXELS_EXE} examples for the Desktop!")
 
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/shaders" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/textures" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
+    add_custom_command(TARGET ${VOXELS_EXE} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+            "$<TARGET_FILE_DIR:${VOXELS_EXE}>/shaders"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/textures"
+            "$<TARGET_FILE_DIR:${VOXELS_EXE}>/textures"
+        VERBATIM)
 
     # Copy shared/dlls on Windows only
     if (WIN32)

@@ -2,10 +2,13 @@
 #define PLAYER_H
 
 #include <cstdint>
+#include <future>
 #include <functional>
-#include <map>
 #include <memory>
+#include <optional>
+#include <unordered_map>
 #include <string>
+#include <vector>
 
 #include <MazeBuilder/configurator.h>
 
@@ -35,20 +38,25 @@ enum class PlayerAction
     COUNT
 };
 
-class command_queue;
 union SDL_Event;
 class world;
 
 namespace mazes
 {
-    class grid_interface;
-    class grid_factory;
     class randomizer;
 }
 
 class player : public scene_node
 {
 public:
+    struct maze_preview_frame
+    {
+        std::vector<std::uint8_t> pixel_data;
+        int width{0};
+        int height{0};
+        int scale{1};
+    };
+
     struct position
     {
         float x, y, z, rx, ry, t;
@@ -61,40 +69,41 @@ public:
 
     struct configs
     {
-        bool fullscreen{ false };
-        bool invert_mouse{ false };
-        bool show_stats_window{ true };
-        bool use_bloom_effect{ false };
-        bool vsync{ true };
-        float exposure_range{ 0.5f };
-        float fov{ };
-        int day_length{ };
-        int ortho{ 0 };
-        std::uint64_t start_time{ };
-        std::uint64_t start_ticks{ };
-        mazes::configurator maze{ };
+        bool fullscreen{false};
+        bool invert_mouse{false};
+        bool show_stats_window{true};
+        bool use_bloom_effect{true};
+        bool vsync{true};
+        float exposure_range{0.5f};
+        float fov{};
+        int day_length{};
+        int ortho{0};
+        std::uint64_t start_time{};
+        std::uint64_t start_ticks{};
+        mazes::configurator maze{};
         std::string tag;
-        bool preview_enabled{ true };
-        bool artifacts_ready{ false };
+        bool preview_enabled{true};
+        bool artifacts_ready{false};
+        float gui_font_scale{1.0f};
     } m_configs{};
 
     explicit player();
 
     ~player() override = default;
 
-    player(const player&) = delete;
-    player& operator=(const player&) = delete;
+    player(const player &) = delete;
+    player &operator=(const player &) = delete;
 
-    player(player&&) noexcept = delete;
-    player& operator=(player&&) = delete;
+    player(player &&) noexcept = delete;
+    player &operator=(player &&) = delete;
 
-    void handle_event(const SDL_Event& event, command_queue& commands) noexcept;
+    void handle_event(const SDL_Event &event, command_queue &commands) noexcept;
 
-    void update(float delta_time, mazes::randomizer& rng) noexcept;
+    void update(float delta_time, mazes::randomizer &rng) noexcept;
 
     void draw() const noexcept;
 
-    void handle_realtime_input(command_queue& commands);
+    void handle_realtime_input(command_queue &commands);
 
     void assign_key(PlayerAction action, std::uint32_t key);
 
@@ -116,9 +125,9 @@ public:
     void set_item(std::int32_t value) noexcept;
 
     [[nodiscard]] std::string get_name() const noexcept;
-    void set_name(const std::string& name) noexcept;
+    void set_name(const std::string &name) noexcept;
 
-    void set_world(world* w) noexcept;
+    void set_world(world *w) noexcept;
 
     [[nodiscard]] std::string get_local_time() const noexcept;
 
@@ -129,6 +138,9 @@ public:
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;
+    bool preview_generation_in_progress() const noexcept;
+    bool request_preview_generation() noexcept;
+    void process_preview_generation() noexcept;
 
     void on_light() const noexcept;
     void on_left_click() const noexcept;
@@ -138,9 +150,9 @@ private:
 
     static float lerp(float a, float b, float t) noexcept;
 
-    std::map<std::uint32_t, PlayerAction> m_key_binding;
+    std::unordered_map<std::uint32_t, PlayerAction> m_key_binding;
 
-    std::map<PlayerAction, command> m_action_binding;
+    std::unordered_map<PlayerAction, command> m_action_binding;
 
     bool m_is_active;
     bool m_on_ground;
@@ -152,13 +164,14 @@ private:
 
     std::int32_t m_item_index;
 
-    world* m_world;
+    world *m_world;
 
-    std::function<std::unique_ptr<mazes::grid_interface>(const mazes::configurator&)> m_maze_task;
+    std::function<std::optional<maze_preview_frame>(const mazes::configurator &)> m_maze_task;
+    std::future<std::optional<maze_preview_frame>> m_preview_future;
 
-    std::unique_ptr<mazes::grid_factory> m_grid_factory;
-
-    std::uint64_t m_last_preview_generation_time{ 0 };
+    std::uint64_t m_last_preview_generation_time{0};
+    std::uint64_t m_last_preview_request_time{0};
+    bool m_auto_preview_pending{true};
 };
 
 #endif // PLAYER_H

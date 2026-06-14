@@ -6,10 +6,10 @@
 #include <string>
 #include <string_view>
 
+/// @file io_utils.h
+/// @namespace mazes
 namespace mazes
 {
-
-    /// @file io_utils.h
     /// @class io_utils
     /// @brief Handles file writing for text, stdout, and object files
     class io_utils
@@ -30,7 +30,7 @@ namespace mazes
         /// @brief Get the directory path from a full file path
         /// @param filepath Full file path
         /// @return Directory path
-        static std::string getDirectoryPath(const std::string &filepath) noexcept
+        static std::string get_full_directory_path(const std::string &filepath) noexcept
         {
             std::filesystem::path p(filepath);
             return p.parent_path().string();

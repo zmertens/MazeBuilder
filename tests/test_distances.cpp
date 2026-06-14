@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <MazeBuilder/maze_builder.h>
+#include <MazeBuilder/distances.h>
+#include <MazeBuilder/grid.h>
 
 #include <functional>
 #include <memory>

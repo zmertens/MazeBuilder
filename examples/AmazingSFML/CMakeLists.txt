@@ -25,6 +25,7 @@ else()
 
     target_link_libraries(${EXE_NAME} PRIVATE
         ${MAZE_BUILDER_CORE_LIB}_static
+        box2d::box2d
         SFML::Graphics)
 
     target_compile_definitions(${EXE_NAME} PRIVATE

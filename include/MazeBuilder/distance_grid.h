@@ -8,6 +8,8 @@
 #include <string>
 #include <unordered_map>
 
+/// @file distance_grid.h
+/// @namespace mazes
 namespace mazes
 {
 
@@ -16,7 +18,6 @@ namespace mazes
     class grid;
     class grid_operations;
 
-    /// @file distance_grid.h
     /// @class distance_grid
     /// @brief A grid that can calculate distances between cells
     class distance_grid : public grid_interface
@@ -52,16 +53,22 @@ namespace mazes
 
         virtual const grid_operations &operations() const noexcept override;
 
+        /// @brief Resize the grid
+        /// @param rows 
+        /// @param cols 
+        /// @param levels 
+        void resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept;
+
         /// @brief Calculates distances for a range of indices.
         /// @param start_index The starting index of the range (inclusive).
         /// @param end_index The ending index of the range (exclusive).
         void calculate_distances(int start_index, int end_index) noexcept;
 
+        /// @brief Get the distances object
+        /// @return A shared pointer to the distances object
         std::shared_ptr<distances> get_distances() const noexcept;
 
     private:
-        std::string to_base36(int value) const;
-
         std::shared_ptr<distances> m_distances;
 
         std::unique_ptr<grid_interface> m_grid;

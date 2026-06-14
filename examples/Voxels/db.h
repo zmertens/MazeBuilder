@@ -4,7 +4,7 @@
 #include <vector>
 #include <tuple>
 
-struct Map;
+class voxels_map;
 struct SignList;
 
 void db_enable();
@@ -23,8 +23,8 @@ void db_insert_sign(int p, int q, int x, int y, int z, int face, const char* tex
 void db_delete_sign(int x, int y, int z, int face);
 void db_delete_signs(int x, int y, int z);
 void db_delete_all_signs();
-void db_load_blocks(Map* map, int p, int q);
-void db_load_lights(Map* map, int p, int q);
+void db_load_blocks(voxels_map* map, int p, int q);
+void db_load_lights(voxels_map* map, int p, int q);
 void db_load_signs(SignList* list, int p, int q);
 int db_get_key(int p, int q);
 void db_set_key(int p, int q, int key);
@@ -35,7 +35,7 @@ int db_worker_run(void* arg);
 
 // Preview blocks functions - for temporary maze preview before committing
 void db_insert_preview_blocks(int preview_id, const std::vector<std::tuple<int, int, int, int, int, int>>& blocks);
-void db_load_preview_blocks(Map* map, int p, int q, int preview_id);
+void db_load_preview_blocks(voxels_map* map, int p, int q, int preview_id);
 int db_get_latest_preview_id();
 void db_commit_latest_preview_to_main();
 void db_flush_all_preview_blocks();

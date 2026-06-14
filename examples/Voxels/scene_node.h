@@ -2,7 +2,7 @@
 #define SCENE_NODE_H
 
 #include "entity.h"
-#include "map.h"
+#include "voxels_map.h"
 #include "sign.h"
 
 #include <vector>
@@ -12,8 +12,8 @@ class scene_node
 {
 public:
     // Chunk-specific data
-    Map map;
-    Map lights;
+    voxels_map map;
+    voxels_map lights;
     SignList signs;
     int p;
     int q;
