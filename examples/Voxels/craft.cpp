@@ -37,6 +37,7 @@
 #include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
 #include <list>
 #include <map>
