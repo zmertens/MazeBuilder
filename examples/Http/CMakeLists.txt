@@ -3,8 +3,7 @@ set(HTTP_EXE "mazebuilderhttp")
 
 set(HTTP_SOURCES
     main.cpp
-    maze_server.cpp
-    maze_viewer.cpp)
+    maze_server.cpp)
 
 message(STATUS "Http: building '${HTTP_EXE}' for desktop")
 
@@ -12,7 +11,6 @@ add_executable(${HTTP_EXE} ${HTTP_SOURCES})
 
 target_link_libraries(${HTTP_EXE} PRIVATE
     ${MAZE_BUILDER_CORE_LIB}_static
-    SFML::Graphics
     SFML::Network)
 
 target_compile_features(${HTTP_EXE} PRIVATE cxx_std_17)

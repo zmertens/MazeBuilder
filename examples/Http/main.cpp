@@ -6,7 +6,6 @@
 ///   mazebuilderhttp --client [--host <host>] [--port <N>]
 
 #include "maze_server.h"
-#include "maze_viewer.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -87,8 +86,6 @@ int main(int argc, char* argv[])
     }
     else if (mode == "--client")
     {
-        maze_viewer viewer(host, port);
-        return viewer.run();
     }
     else
     {

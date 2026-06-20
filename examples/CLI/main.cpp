@@ -17,30 +17,6 @@
 #include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/string_utils.h>
 
-class command_line_parser;
-
-#if defined(__EMSCRIPTEN__)
-
-#include <emscripten/bind.h>
-
-std::shared_ptr<command_line_parser> get()
-{
-    return mazes::singleton_base<command_line_parser>::instance();
-}
-
-EMSCRIPTEN_BINDINGS(cli_module)
-{
-    emscripten::function("get", &get);
-    emscripten::class_<command_line_parser>("cli")
-        .smart_ptr<std::shared_ptr<command_line_parser>>("shared_ptr<command_line_parser>")
-        .function("help", &command_line_parser::help)
-        .function("version", &command_line_parser::version);
-
-    emscripten::register_vector<std::string>("StringVector");
-}
-
-#endif // EMSCRIPTEN_BINDINGS
-
 class command_line_parser : public mazes::singleton_base<command_line_parser>
 {
 public:
@@ -76,6 +52,30 @@ public:
                "\t-v, --version      display program version\n";
     }
 }; // class
+
+
+
+#if defined(__EMSCRIPTEN__)
+
+#include <emscripten/bind.h>
+
+std::shared_ptr<command_line_parser> get()
+{
+    return mazes::singleton_base<command_line_parser>::instance();
+}
+
+EMSCRIPTEN_BINDINGS(cli_module)
+{
+    emscripten::function("get", &get);
+    emscripten::class_<command_line_parser>("cli")
+        .smart_ptr<std::shared_ptr<command_line_parser>>("shared_ptr<command_line_parser>")
+        .function("help", &command_line_parser::help)
+        .function("version", &command_line_parser::version);
+
+    emscripten::register_vector<std::string>("StringVector");
+}
+
+#endif // EMSCRIPTEN_BINDINGS
 
 int main(const int argc, char *argv[])
 {
