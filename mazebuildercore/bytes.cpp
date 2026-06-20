@@ -2,7 +2,7 @@
 
 #include <cpp-base64/base64.h>
 
-#include <utility>
+#include <algorithm>
 
 using namespace mazes;
 
