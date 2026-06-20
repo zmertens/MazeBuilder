@@ -2,6 +2,8 @@
 
 #include <cpp-base64/base64.h>
 
+#include <utility>
+
 using namespace mazes;
 
 std::string bytes::encode(std::string_view sv) noexcept
