@@ -12,6 +12,18 @@
             }
         },
         {
+            "name": "wasmjs: examples",
+            "displayName": "Build the examples using EMSDK",
+            "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build-wasmjs/",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/build-wasmjs",
+            "cacheVariables": {
+                "CMAKE_TOOLCHAIN_FILE":"$HOME/Git/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "CMAKE_BUILD_TYPE": "DEBUG",
+                "MAZE_BUILDER_EXAMPLES": "1"
+            }
+        },
+        {
             "name": "msvc: examples",
             "displayName": "msvc: examples - Visual Studio Community 2022 Release - amd64",
             "description": "Using compilers for Visual Studio 17 2022 (x64 architecture)",
