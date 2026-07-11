@@ -5,7 +5,6 @@
 
 #include <functional>
 #include <optional>
-#include <vector>
 
 /// @file state.h
 /// @namespace mazes
@@ -23,18 +22,18 @@ namespace mazes
             DFSING = 1,
             EMPTY = 2,
             LOADING = 3,
-            MAPPING = 4,
-            OBJECTIFYING = 5,
-            PARSING = 6,
-            PIXELIZING = 7,
-            SIDEWINDERING = 8,
-            STRINGIFYING = 9,
-            WAVEFRONT_OBJECTIFYING = 10,
-            TOTAL = 11
+            PARSING = 4,
+            PIXELIZING = 5,
+            SIDEWINDERING = 6,
+            STRINGIFYING = 7,
+            WAVEFRONT_OBJECTIFYING = 8,
+            TOTAL = 9
         };
 
-        explicit state(const runtime_app::context &c, runtime_stack *rs)
-            : ctx(c), _runtime_stack(rs) {}
+        explicit state(const runtime_app::context& c, runtime_stack* rs)
+            : ctx(c), _runtime_stack(rs)
+        {
+        }
 
         virtual ~state() = default;
 
@@ -44,24 +43,23 @@ namespace mazes
         /// @param args The optional arguments to pass to the state's update function
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        virtual bool update(const std::optional<args> &args, double delta_time) noexcept = 0;
+        virtual bool update(const std::optional<args>& args, double delta_time) noexcept = 0;
 
     protected:
-        void request_stack_push(ID state_id) noexcept;
+        void request_stack_push(ID state_id) const noexcept;
 
-        void request_stack_pop() noexcept;
+        void request_stack_pop() const noexcept;
 
-        void request_stack_clear() noexcept;
+        void request_stack_clear() const noexcept;
 
-        [[nodiscard]] const runtime_app::context &get_context() const noexcept;
+        [[nodiscard]] const runtime_app::context& get_context() const noexcept;
 
-        [[nodiscard]] runtime_stack &get_stack() const noexcept;
+        [[nodiscard]] runtime_stack& get_stack() const noexcept;
 
     private:
         std::reference_wrapper<const runtime_app::context> ctx;
-        runtime_stack *_runtime_stack;
+        runtime_stack* _runtime_stack;
     };
-
 } // namespace mazes
 
 #endif // STATE_H

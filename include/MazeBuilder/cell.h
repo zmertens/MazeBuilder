@@ -27,29 +27,29 @@ namespace mazes
 
         /// @brief Copy constructor for the cell class.
         /// @param other The cell object to copy from.
-        cell(const cell &other);
+        cell(const cell& other);
 
         /// @brief Assigns the value of another cell to this cell.
         /// @param other The cell whose value will be assigned to this cell.
         /// @return A reference to this cell after assignment.
-        cell &operator=(const cell &other);
+        cell& operator=(const cell& other);
 
         /// @brief Move constructor for the cell class. Transfers the resources from another cell to this one.
         /// @param other The cell object to move from.
-        cell(cell &&other) noexcept;
+        cell(cell&& other) noexcept;
 
         /// @brief Move assignment operator for the cell class.
         /// @param other The cell object to move from.
         /// @return A reference to the assigned cell object (*this).
-        cell &operator=(cell &&other) noexcept;
+        cell& operator=(cell&& other) noexcept;
 
         /// @brief Add a link to another cell (passage between cells)
         /// @param other The cell to link to
-        void add_link(const std::shared_ptr<cell> &other);
+        void add_link(const std::shared_ptr<cell>& other);
 
         /// @brief Remove a link to another cell
         /// @param other The cell to unlink from
-        void remove_link(const std::shared_ptr<cell> &other);
+        void remove_link(const std::shared_ptr<cell>& other);
 
         /// @brief Retrieves links to other cells
         /// @return A vector of pairs containing linked cells and their link status
@@ -58,7 +58,7 @@ namespace mazes
         /// @brief Checks if a cell is linked.
         /// @param c A shared pointer to the cell to check.
         /// @return True if the cell is linked, false otherwise.
-        bool is_linked(const std::shared_ptr<cell> &c);
+        bool is_linked(const std::shared_ptr<cell>& c);
 
         /// @brief Retrieves the index of the current cell.
         /// @return The index of the current cell.
@@ -75,16 +75,14 @@ namespace mazes
         /// @brief Equals function for weak pointers to cell objects.
         struct weak_ptr_equal
         {
-
             template <typename T>
-            bool operator()(const std::weak_ptr<T> &lhs, const std::weak_ptr<T> &rhs) const
+            bool operator()(const std::weak_ptr<T>& lhs, const std::weak_ptr<T>& rhs) const
             {
-
                 return !lhs.owner_before(rhs) && !rhs.owner_before(lhs);
             }
         };
 
-        bool has_key(const std::shared_ptr<cell> &c);
+        bool has_key(const std::shared_ptr<cell>& c);
 
         std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> m_links;
 
@@ -92,7 +90,6 @@ namespace mazes
 
         std::int32_t m_index;
     };
-
 } // namespace mazes
 
 #endif // CELL_H

@@ -3,12 +3,10 @@
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/convert_contract.h>
 #include <MazeBuilder/output_formats.h>
 
 #include <algorithm>
 #include <limits>
-#include <memory>
 #include <optional>
 #include <string>
 
@@ -33,7 +31,7 @@ namespace mazes
         /// @param rows The number of rows (must be > 0, will be clamped to reasonable limits)
         /// @return A reference to this configurator
         /// @warning Values will be clamped to prevent memory issues
-        configurator &ensure_rows(unsigned int rows) noexcept
+        configurator& ensure_rows(const unsigned int rows) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             m_rows = std::clamp(rows, 1u, MAX_ROWS);
@@ -44,7 +42,7 @@ namespace mazes
         /// @param columns The number of columns (must be > 0, will be clamped to reasonable limits)
         /// @return A reference to this configurator
         /// @warning Values will be clamped to prevent memory issues
-        configurator &ensure_columns(unsigned int columns) noexcept
+        configurator& ensure_columns(const unsigned int columns) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             m_columns = std::clamp(columns, 1u, MAX_COLUMNS);
@@ -56,7 +54,7 @@ namespace mazes
         /// @return A reference to this configurator
         /// @warning Values will be clamped to prevent memory issues
         /// @note Most mazes are 2D (levels=1), 3D mazes should use moderate level counts
-        configurator &ensure_levels(unsigned int levels) noexcept
+        configurator& ensure_levels(const unsigned int levels) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
             // Levels are more memory-intensive than rows/columns, so lower limit
@@ -67,7 +65,7 @@ namespace mazes
         /// @brief Set the maze generation algorithm
         /// @param algorithm The algorithm to use
         /// @return A reference to this configurator
-        configurator &ensure_algo_id(algo algorithm) noexcept
+        configurator& ensure_algo_id(const algo algorithm) noexcept
         {
             m_algo_id = algorithm;
             return *this;
@@ -76,16 +74,16 @@ namespace mazes
         /// @brief Set the block ID
         /// @param block_id The block ID
         /// @return A reference to this configurator
-        configurator &ensure_block_id(int block_id) noexcept
+        configurator& ensure_block_id(const int block_id) noexcept
         {
             m_block_id = block_id;
             return *this;
         }
 
         /// @brief Set the random seed
-        /// @param seed The random seed (0 = use random seed)
+        /// @param seed The random seed
         /// @return A reference to this configurator
-        configurator &ensure_seed(unsigned int seed) noexcept
+        configurator& ensure_seed(const unsigned int seed) noexcept
         {
             m_seed = seed;
             return *this;
@@ -94,7 +92,7 @@ namespace mazes
         /// @brief Set the distance calculation flag
         /// @param distances The distance calculation flag
         /// @return A reference to this configurator
-        configurator &ensure_distances(bool distances) noexcept
+        configurator& ensure_distances(const bool distances) noexcept
         {
             m_distances = distances;
             return *this;
@@ -103,7 +101,7 @@ namespace mazes
         /// @brief Set the distance start index
         /// @param start_index The starting cell index for distance calculation
         /// @return A reference to this configurator
-        configurator &ensure_distances_start(int start_index) noexcept
+        configurator& ensure_distances_start(const int start_index) noexcept
         {
             m_distances_start = start_index;
             return *this;
@@ -112,7 +110,7 @@ namespace mazes
         /// @brief Set the distance end index
         /// @param end_index The ending cell index for distance calculation
         /// @return A reference to this configurator
-        configurator &ensure_distances_end(int end_index) noexcept
+        configurator& ensure_distances_end(const int end_index) noexcept
         {
             m_distances_end = end_index;
             return *this;
@@ -121,63 +119,63 @@ namespace mazes
         /// @brief Set the output_format ID
         /// @param output_format The output_format ID
         /// @return A reference to this configurator
-        configurator &ensure_output_format_id(output_format output_format) noexcept
+        configurator& ensure_output_format_id(const output_format output_format) noexcept
         {
             m_output_format_id = output_format;
             return *this;
         }
 
-        /// @brief Set the output_format filename
-        /// @param filename The output_format filename
+        /// @brief Set the output filename
+        /// @param filename The filename
         /// @return A reference to this configurator
-        configurator &ensure_output_format_filename(std::string filename) noexcept
+        configurator& ensure_output_format_filename(const std::string& filename) noexcept
         {
-            m_output_filename = std::move(filename);
+            m_output_filename = filename.empty() ? std::make_optional("out.txt") : std::make_optional(filename);
             return *this;
         }
 
         /// @brief Set the mask filename
         /// @param filename The mask file path (.txt)
         /// @return A reference to this configurator
-        configurator &ensure_mask_filename(std::string filename) noexcept
+        configurator& ensure_mask_filename(const std::string& filename) noexcept
         {
-            m_mask_filename = std::move(filename);
+            m_mask_filename = filename.empty() ? std::make_optional("mask.txt") : std::make_optional(filename);
             return *this;
         }
 
         /// @brief Set the help flag
-        /// @param help
-        /// @return
-        configurator &needs_help(bool help) noexcept
+        /// @param help True to display help information
+        /// @return A reference to this configurator
+        configurator& set_help(bool help) noexcept
         {
             m_help = help;
             return *this;
-        };
+        }
 
         /// @brief Set the version flag
-        /// @param version
-        /// @return
-        configurator &needs_version(bool version) noexcept
+        /// @param version True to display version information
+        /// @return A reference to this configurator
+        configurator& set_version(bool version) noexcept
         {
             m_version = version;
             return *this;
-        };
+        }
 
         /// @brief Set whether step snapshots should be shown during generation
         /// @param show_steps True to emit periodic maze snapshots
         /// @return A reference to this configurator
-        configurator &show_steps(bool show_steps) noexcept
+        configurator& show_steps(bool show_steps) noexcept
         {
             m_show_steps = show_steps;
             return *this;
         }
 
         // Shorthand setter overloads (non-const, take a value; getters are const with no params)
-        configurator &rows(unsigned int r) noexcept { return ensure_rows(r); }
-        configurator &columns(unsigned int c) noexcept { return ensure_columns(c); }
-        configurator &levels(unsigned int l) noexcept { return ensure_levels(l); }
-        configurator &algo_id(algo a) noexcept { return ensure_algo_id(a); }
-        configurator &seed(unsigned int s) noexcept { return ensure_seed(s); }
+        configurator& rows(const unsigned int r) noexcept { return ensure_rows(r); }
+        configurator& columns(const unsigned int c) noexcept { return ensure_columns(c); }
+        configurator& levels(const unsigned int l) noexcept { return ensure_levels(l); }
+        configurator& algo_id(const algo a) noexcept { return ensure_algo_id(a); }
+        configurator& seed(const unsigned int s) noexcept { return ensure_seed(s); }
 
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
@@ -213,7 +211,10 @@ namespace mazes
 
         /// @brief Get the distance start index
         /// @return The starting cell index for distance calculation
-        [[nodiscard]] int distances_start() const noexcept { return m_distances_start.value_or(DEFAULT_DISTANCES_START); }
+        [[nodiscard]] int distances_start() const noexcept
+        {
+            return m_distances_start.value_or(DEFAULT_DISTANCES_START);
+        }
 
         /// @brief Get the distance end index
         /// @return The ending cell index for distance calculation
@@ -221,11 +222,10 @@ namespace mazes
 
         /// @brief Get the output_format ID
         /// @return The output_format ID
-        [[nodiscard]] output_format output_format_id() const noexcept { return m_output_format_id.value_or(output_format::STDOUT); }
-
-        /// @brief Get the output_format filename
-        /// @return The output_format filename
-        [[nodiscard]] std::string config_filename() const noexcept { return m_output_filename.value_or(std::string{"config.json"}); }
+        [[nodiscard]] output_format output_format_id() const noexcept
+        {
+            return m_output_format_id.value_or(output_format::STDOUT);
+        }
 
         [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
 
@@ -238,23 +238,20 @@ namespace mazes
         /// @details Checks for potential infinite loop conditions and memory issues
         [[nodiscard]] bool has_valid_dimensions() const noexcept
         {
-
             // Check for zero dimensions (would cause infinite loops or divisions by zero)
             if (!m_rows.has_value() || !m_columns.has_value() || !m_levels.has_value())
             {
-
                 return false;
             }
 
             // Check for excessive dimensions (would cause memory exhaustion)
             if (m_rows.value() > MAX_ROWS || m_columns.value() > MAX_COLUMNS || m_levels.value() > MAX_LEVELS)
             {
-
                 return false;
             }
 
             // Check for potential overflow in total cell calculation
-            if (constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void *);
+            if (constexpr auto max_cells = std::numeric_limits<size_t>::max() / sizeof(void*);
                 static_cast<size_t>(m_rows.value()) * m_columns.value() * m_levels.value() > max_cells)
             {
                 // Potential overflow detected
@@ -297,7 +294,6 @@ namespace mazes
 
         std::optional<bool> m_show_steps;
     };
-
 } // namespace
 
 #endif // CONFIGURATOR_H

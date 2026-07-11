@@ -30,17 +30,17 @@ The CLI lets you build mazes with configurable row, column, and a maze-generatin
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 ```
 
-Run the `binary_tree` algorithm with long arguments and put the output geometry of a maze in [Wavefront Object format](https://en.wikipedia.org/wiki/Wavefront_.obj_file).
+Run the `binary_tree` algorithm with long arguments and put the results in [Wavefront Object format](https://en.wikipedia.org/wiki/Wavefront_.obj_file):
 ```sh
 mazebuildercli.exe --rows=25 --columns=25 --seed=42 --algo=binary_tree --output=bt.obj
 ```
 
-Run the `dfs` algorithm with short arguments.
+Run the `dfs` algorithm with short arguments:
 ```sh
 mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o 25x25.obj
 ```
 
-Ask for help and print to standard output.
+Ask for help and print to standard output:
 ```sh
 mazebuildercli.exe --help
 ```
@@ -57,14 +57,17 @@ Creating JSON output is easy:
 
 ```json
 {
-  "rows": 2,
+  "rows": 3,
   "columns": 5,
   "seed": 2,
   "algo": "dfs",
+  "distances": true,
   "output": "+---+---+---+---+---+\n
-             |           |       |\n
-             +   +---+   +---+   +\n
-             |       |           |\n
+             | 0   1   2 | 9   A |\n
+             +   +---+   +   +---+\n
+             | 1   2 | 3 | 8   7 |\n
+             +---+   +---+---+   +\n
+             | 4   3   4   5   6 |\n
              +---+---+---+---+---+\n"
 }
 ```

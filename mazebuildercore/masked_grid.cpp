@@ -13,13 +13,12 @@ masked_grid::masked_grid(mask m)
 {
 }
 
-std::shared_ptr<cell> masked_grid::search(int index) const noexcept
+std::shared_ptr<cell> masked_grid::search(const int index) const noexcept
 {
     const auto [rows, columns, levels] = get_dimensions();
     const int col = index % static_cast<int>(columns);
-    const int row = (index / static_cast<int>(columns)) % static_cast<int>(rows);
 
-    if (!m_mask(static_cast<unsigned int>(row), static_cast<unsigned int>(col)))
+    if (const int row = index / static_cast<int>(columns) % static_cast<int>(rows); !m_mask(static_cast<unsigned int>(row), static_cast<unsigned int>(col)))
     {
         return nullptr;
     }
@@ -32,12 +31,12 @@ int masked_grid::num_cells() const noexcept
     return m_mask.count();
 }
 
-const mask &masked_grid::get_mask() const noexcept
+const mask& masked_grid::get_mask() const noexcept
 {
     return m_mask;
 }
 
-std::shared_ptr<cell> masked_grid::random_cell(randomizer &rng) noexcept
+std::shared_ptr<cell> masked_grid::random_cell(randomizer& rng) const noexcept
 {
     const auto [row, col] = m_mask.random_location(rng);
     const auto [rows, columns, levels] = get_dimensions();

@@ -1,11 +1,11 @@
 #ifndef WAVEFRONT_OBJECT_CREATE_H
 #define WAVEFRONT_OBJECT_CREATE_H
 
-#include <MazeBuilder/algos.h>
 #include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/state.h>
 
+#include <string>
 #include <string_view>
 
 /// @file wavefront_object_create_state.h
@@ -13,6 +13,7 @@
 namespace mazes
 {
     class args;
+    class configurator;
     class randomizer;
     class runtime_stack;
     struct context;
@@ -21,16 +22,16 @@ namespace mazes
     class wavefront_object_create_state final : public create_contract, public state
     {
     public:
-        explicit wavefront_object_create_state(const runtime_app::context &ctx, runtime_stack *stack);
+        explicit wavefront_object_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
         /// @brief Create a maze using the Wavefront Object algorithm
-        /// @param a 
-        /// @param rows 
-        /// @param cols 
-        /// @param levels 
-        /// @param rng 
-        /// @return 
-        virtual std::string_view create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept override;
+        /// @param a
+        /// @param rows
+        /// @param cols
+        /// @param levels
+        /// @param rng
+        /// @return
+        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
         void draw() const noexcept override;
 
@@ -41,18 +42,11 @@ namespace mazes
         bool update(const std::optional<args> &args, double delta_time) noexcept override;
 
     private:
-        /// @brief Implementation of the Wavefront Object maze creation algorithm
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
-        /// @return
-        std::string_view create_wavefront_object(unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept;
-
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
+        grid_identifier m_grid_id{grid_identifier::BASIC};
+        std::string m_result;
     };
-
 } // namespace mazes
 
 #endif // WAVEFRONT_OBJECT_CREATE_H

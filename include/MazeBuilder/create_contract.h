@@ -8,13 +8,15 @@
 /// @namespace mazes
 namespace mazes
 {
+    class configurator;
     class randomizer;
 
     /// @brief Contract for the create function in the runtime
     class create_contract
     {
     public:
-        [[nodiscard]] virtual std::string_view create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept = 0;
+        virtual ~create_contract() = default;
+        [[nodiscard]] virtual std::string_view create(const configurator& config, randomizer& rng) noexcept = 0;
     };
 }
 

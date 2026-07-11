@@ -1,7 +1,6 @@
 #ifndef RUNTIME_STACK_H
 #define RUNTIME_STACK_H
 
-#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
 
@@ -30,7 +29,7 @@ namespace mazes
             CLEAR = 2
         };
 
-        explicit runtime_stack(runtime_app::context ctx);
+        explicit runtime_stack(const runtime_app::context& ctx);
 
         // Stack operations (deferred — applied by apply_pending_changes)
         void push_state(state::ID state_id) noexcept;
@@ -41,7 +40,7 @@ namespace mazes
         ///        Applies pending stack changes after the pass.
         /// @param args The optional arguments to pass to each state's update function
         /// @param elapsed The elapsed time since the last update
-        void visit_states(const std::optional<args> &args, double elapsed) noexcept;
+        void visit_states(const std::optional<args>& args, double elapsed) noexcept;
 
         /// @brief Checks if the runtime stack is empty
         /// @return True if the stack is empty, false otherwise
@@ -53,7 +52,9 @@ namespace mazes
         void register_state(state::ID state_id)
         {
             m_factories.insert_or_assign(state_id, [this]()
-                                         { return std::make_unique<T>(runtime_context, this); });
+            {
+                return std::make_unique<T>(runtime_context, this);
+            });
         }
 
         /// @brief Find the topmost state that matches the pointer type T.
@@ -62,8 +63,10 @@ namespace mazes
         {
             auto reversed = m_states | std::views::reverse;
 
-            auto it = std::ranges::find_if(reversed, [](const auto &sp)
-                                           { return dynamic_cast<Pointer>(sp.get()) != nullptr; });
+            auto it = std::ranges::find_if(reversed, [](const auto& sp)
+            {
+                return dynamic_cast<Pointer>(sp.get()) != nullptr;
+            });
 
             if (it != std::ranges::cend(reversed))
             {
@@ -77,7 +80,9 @@ namespace mazes
         struct pending_change
         {
             explicit pending_change(operation action, state::ID id = state::ID::TOTAL)
-                : action(action), state_id(id) {}
+                : action(action), state_id(id)
+            {
+            }
 
             operation action;
             state::ID state_id;
@@ -96,16 +101,14 @@ namespace mazes
 
         [[nodiscard]] std::unique_ptr<state> create_state(state::ID state_id)
         {
-            if (const auto &found = m_factories.find(state_id); found != m_factories.cend())
+            if (const auto& found = m_factories.find(state_id); found != m_factories.cend())
             {
                 return found->second();
             }
 
             throw std::runtime_error("runtime_stack::create_state - No factory for state ID: " +
-                                     std::to_string(static_cast<unsigned int>(state_id)));
+                std::to_string(static_cast<unsigned int>(state_id)));
         }
-
-        void print_errors(std::string_view str) const noexcept;
 
         std::vector<std::unique_ptr<state>> m_states;
         std::vector<pending_change> m_pending;
@@ -113,9 +116,8 @@ namespace mazes
         std::unordered_map<state::ID,
                            std::function<std::unique_ptr<state>()>,
                            state_id_hash>
-            m_factories;
+        m_factories;
     };
-
 } // namespace mazes
 
 #endif // RUNTIME_STACK_H

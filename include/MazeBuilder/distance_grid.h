@@ -6,13 +6,11 @@
 #include <future>
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 /// @file distance_grid.h
 /// @namespace mazes
 namespace mazes
 {
-
     class cell;
     class distances;
     class grid;
@@ -25,39 +23,35 @@ namespace mazes
     public:
         explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
-        distance_grid(const distance_grid &) = delete;
+        distance_grid(const distance_grid&) = delete;
 
-        distance_grid &operator=(const distance_grid &) = delete;
+        distance_grid& operator=(const distance_grid&) = delete;
 
-        distance_grid(distance_grid &&) noexcept = default;
+        distance_grid(distance_grid&&) noexcept = default;
 
-        distance_grid &operator=(distance_grid &&) noexcept = default;
-
-        /// @brief
-        /// @param indices
-        /// @return
-        // void configure(const std::vector<int>& indices) noexcept override;
+        distance_grid& operator=(distance_grid&&) noexcept = default;
 
         /// @brief
         /// @param c
         /// @return
-        virtual std::string contents_of(std::shared_ptr<cell> const &c) const noexcept override;
+        [[nodiscard]] std::string contents_of(std::shared_ptr<cell> const& c) const noexcept override;
 
         /// @brief
         /// @param c
         /// @return
-        virtual std::uint32_t background_color_for(std::shared_ptr<cell> const &c) const noexcept override;
+        [[nodiscard]] std::uint32_t
+        background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
 
         // Delegate to embedded grid
-        virtual grid_operations &operations() noexcept override;
+        [[nodiscard]] grid_operations& operations() noexcept override;
 
-        virtual const grid_operations &operations() const noexcept override;
+        [[nodiscard]] const grid_operations& operations() const noexcept override;
 
         /// @brief Resize the grid
-        /// @param rows 
-        /// @param cols 
-        /// @param levels 
-        void resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept;
+        /// @param rows
+        /// @param cols
+        /// @param levels
+        void resize(unsigned int rows, unsigned int cols, unsigned int levels) const noexcept;
 
         /// @brief Calculates distances for a range of indices.
         /// @param start_index The starting index of the range (inclusive).
@@ -66,7 +60,7 @@ namespace mazes
 
         /// @brief Get the distances object
         /// @return A shared pointer to the distances object
-        std::shared_ptr<distances> get_distances() const noexcept;
+        [[nodiscard]] std::shared_ptr<distances> get_distances() const noexcept;
 
     private:
         std::shared_ptr<distances> m_distances;

@@ -7,13 +7,13 @@
 
 using namespace mazes;
 
-mask::mask(unsigned int rows, unsigned int columns)
+mask::mask(const unsigned int rows, const unsigned int columns)
     : m_rows(rows), m_columns(columns),
       m_bits(rows, std::vector<bool>(columns, true))
 {
 }
 
-bool mask::operator()(unsigned int row, unsigned int column) const noexcept
+bool mask::operator()(const unsigned int row, const unsigned int column) const noexcept
 {
     if (row >= m_rows || column >= m_columns)
     {
@@ -22,7 +22,7 @@ bool mask::operator()(unsigned int row, unsigned int column) const noexcept
     return m_bits[row][column];
 }
 
-void mask::set(unsigned int row, unsigned int column, bool is_on) noexcept
+void mask::set(const unsigned int row, const unsigned int column, const bool is_on) noexcept
 {
     if (row < m_rows && column < m_columns)
     {
@@ -46,26 +46,26 @@ int mask::count() const noexcept
     return total;
 }
 
-std::pair<unsigned int, unsigned int> mask::random_location(randomizer &rng) const noexcept
+std::pair<unsigned int, unsigned int> mask::random_location(randomizer& rng) const noexcept
 {
     while (true)
     {
         const auto row = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_rows) - 1));
-        const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_columns) - 1));
-        if (m_bits[row][col])
+        if (const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_columns) - 1)); m_bits[row][col])
         {
             return {row, col};
         }
     }
 }
 
-mask mask::from_txt(const std::string &filename)
+mask mask::from_txt(const std::string& filename)
 {
     namespace fs = std::filesystem;
 
     fs::path resolved = filename;
 
-    auto open_file = [](const fs::path &path) -> std::ifstream {
+    auto open_file = [](const fs::path& path) -> std::ifstream
+    {
         return std::ifstream(path);
     };
 
@@ -73,8 +73,8 @@ mask mask::from_txt(const std::string &filename)
     if (!file.is_open())
     {
         // Fallback for test/data files executed from repository root.
-        static constexpr const char *fallback_dirs[] = {"tests", "scripts"};
-        for (const char *dir : fallback_dirs)
+        static constexpr const char* fallback_dirs[] = {"tests", "scripts"};
+        for (const char* dir : fallback_dirs)
         {
             fs::path candidate = fs::path(dir) / filename;
             file = open_file(candidate);
@@ -115,7 +115,7 @@ mask mask::from_txt(const std::string &filename)
 
     // Use the maximum line length as the column count for potentially ragged input
     std::size_t max_cols = 0;
-    for (const auto &l : lines)
+    for (const auto& l : lines)
     {
         if (l.size() > max_cols) max_cols = l.size();
     }

@@ -9,13 +9,10 @@
 /// @file output_formats.h
 namespace mazes
 {
-    namespace
-    {
-        constexpr std::string_view JSON_FILE_FORMAT_STR = "json";
-        constexpr std::string_view WAVEFRONT_OBJECT_FILE_FORMAT_STR = "obj";
-        constexpr std::string_view STDOUT_FORMAT_STR = "stdout";
-        constexpr std::string_view PLAIN_TEXT_FORMAT_STR = "txt";
-    }
+    constexpr std::string_view JSON_FILE_FORMAT_STR = "json";
+    constexpr std::string_view WAVEFRONT_OBJECT_FILE_FORMAT_STR = "obj";
+    constexpr std::string_view STDOUT_FORMAT_STR = "stdout";
+    constexpr std::string_view PLAIN_TEXT_FORMAT_STR = "txt";
 
     /// @brief Enum class for output_format types
     enum class output_format : unsigned int
@@ -45,35 +42,31 @@ namespace mazes
         default:
             throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
         }
-    };
+    }
 
     /// @brief Convert a string to an output_format enum
     /// @param sv
     /// @return
-    inline output_format to_output_format_from_sv(std::string_view sv)
+    inline output_format to_output_format_from_sv(const std::string_view sv)
     {
-        if (sv.compare(PLAIN_TEXT_FORMAT_STR) == 0)
+        if (sv == PLAIN_TEXT_FORMAT_STR)
         {
             return output_format::PLAIN_TEXT;
         }
-        else if (sv.compare(JSON_FILE_FORMAT_STR) == 0)
+        if (sv == JSON_FILE_FORMAT_STR)
         {
             return output_format::JSON_FILE;
         }
-        else if (sv.compare(WAVEFRONT_OBJECT_FILE_FORMAT_STR) == 0)
+        if (sv == WAVEFRONT_OBJECT_FILE_FORMAT_STR)
         {
             return output_format::WAVEFRONT_OBJECT_FILE;
         }
-        else if (sv.compare(STDOUT_FORMAT_STR) == 0)
+        if (sv == STDOUT_FORMAT_STR)
         {
             return output_format::STDOUT;
         }
-        else
-        {
-            throw std::invalid_argument("Invalid output_format: " + std::string{sv});
-        }
-    };
-
+        throw std::invalid_argument("Invalid output_format: " + std::string{sv});
+    }
 } // namespace mazes
 
 #endif // OUTPUT_FORMATS_H

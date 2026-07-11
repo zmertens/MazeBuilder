@@ -9,10 +9,8 @@
 #include <MazeBuilder/runtime_stack.h>
 
 #include <any>
-#include <vector>
 
 #include <fmt/format.h>
-#include <fmt/ranges.h>
 
 using namespace mazes;
 
@@ -21,7 +19,7 @@ parsing_state::parsing_state(const runtime_app::context &ctx, runtime_stack *rs)
 {
 }
 
-std::optional<args> parsing_state::convert(std::string_view arguments) const noexcept
+std::optional<args> parsing_state::convert(const std::string_view arguments) const noexcept
 {
     if (arguments.empty())
     {
@@ -44,33 +42,22 @@ void parsing_state::draw() const noexcept
 
 bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
 {
-    std::optional<mazes::args> parsed_args;
+    // runtime_app already parses input before entering the state machine.
+    // Reuse the parsed args and only fall back to raw input conversion when needed.
+    std::optional<mazes::args> parsed_args = args;
 
-    if (const auto *raw_input = get_context().get_raw_input(); raw_input && !raw_input->empty())
+    if (!parsed_args.has_value())
     {
-        parsed_args = convert(*raw_input);
-    }
-
-    if (!parsed_args.has_value() && args.has_value())
-    {
-        parsed_args = args;
+        if (const auto *raw_input = get_context().get_raw_input(); raw_input && !raw_input->empty())
+        {
+            parsed_args = convert(*raw_input);
+        }
     }
 
     if (!parsed_args.has_value() || !processed_text_mapper)
     {
         request_stack_pop();
         return true;
-    }
-
-    // Log parsed key=value pairs asynchronously
-    if (auto parsed = parsed_args->get(); parsed.has_value())
-    {
-        std::vector<std::string> entries;
-        entries.reserve(parsed->size());
-        for (const auto &[k, v] : *parsed)
-        {
-            entries.emplace_back(fmt::format("{}={}", k, v));
-        }
     }
 
     // Determine which algo to run and push the matching create state on top of the stack
@@ -86,16 +73,33 @@ bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] dou
                 const algo a = to_algo_from_sv(it->second);
                 switch (a)
                 {
-                case algo::DFS:              next_state = state::ID::DFSING;           break;
-                case algo::SIDEWINDER:       next_state = state::ID::SIDEWINDERING;    break;
-                case algo::OBJECTIFY:        next_state = state::ID::OBJECTIFYING;     break;
-                case algo::PIXELS:           next_state = state::ID::PIXELIZING;       break;
-                case algo::STRINGIFY:        next_state = state::ID::STRINGIFYING;     break;
-                case algo::WAVEFRONT_OBJECT: next_state = state::ID::WAVEFRONT_OBJECTIFYING; break;
-                default:                     next_state = state::ID::BTING;            break;
+                case algo::BINARY_TREE:
+                    next_state = state::ID::BTING;
+                    break;
+                case algo::DFS:
+                    next_state = state::ID::DFSING;
+                    break;
+                case algo::PIXELS:
+                    next_state = state::ID::PIXELIZING;
+                    break;
+                case algo::SIDEWINDER:
+                    next_state = state::ID::SIDEWINDERING;
+                    break;
+                case algo::STRINGIFY:
+                    next_state = state::ID::STRINGIFYING;
+                    break;
+                case algo::WAVEFRONT_OBJECT:
+                    next_state = state::ID::WAVEFRONT_OBJECTIFYING;
+                    break;
+                default:
+                    next_state = state::ID::BTING;
+                    break;
                 }
             }
-            catch (...) { /* unknown algo → fallback to BT */ }
+            catch (...)
+            {
+                /* unknown algo → fallback to BT */
+            }
         }
     }
 

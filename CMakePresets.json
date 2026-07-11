@@ -18,8 +18,9 @@
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build-wasmjs",
             "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE":"$HOME/Git/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+                "CMAKE_TOOLCHAIN_FILE":"~/Git/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
                 "CMAKE_BUILD_TYPE": "DEBUG",
+                "CMAKE_CXX_COMPILER": "em++",
                 "MAZE_BUILDER_EXAMPLES": "1"
             }
         },

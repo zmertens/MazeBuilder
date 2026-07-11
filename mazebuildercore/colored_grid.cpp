@@ -7,16 +7,17 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <string>
 
 using namespace mazes;
 
 /// @brief
-/// @param rows 1
-/// @param cols 1
+/// @param width 1
+/// @param length 1
 /// @param levels 1
-colored_grid::colored_grid(unsigned int rows, unsigned int cols, unsigned int levels)
-    : m_grid{std::make_unique<grid>(rows, cols, levels)}, m_distances{std::make_shared<distances>(0)}
+colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int levels)
+    : m_grid{std::make_unique<grid>(width, length, levels)}, m_distances{std::make_shared<distances>(0)}
 {
 }
 
@@ -24,10 +25,8 @@ std::string colored_grid::contents_of(const std::shared_ptr<cell> &c) const noex
 {
     if (m_distances)
     {
-
         if (m_distances->contains(c->get_index()))
         {
-
             return std::to_string(m_distances->operator[](c->get_index()));
         }
     }
@@ -57,7 +56,7 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell> &c)
     }
 
     // 8-stop palette: deep blue (start) → red (goal)
-    static constexpr std::array<std::uint32_t, 8> kPalette = {
+    static constexpr std::array COLOR_PALETTE = {
         0x0015FFu, // deep blue
         0x0084FFu, // sky blue
         0x00E5FFu, // cyan
@@ -73,24 +72,22 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell> &c)
     float normalized = max_dist > 0 ? static_cast<float>(distance) / static_cast<float>(max_dist) : 0.0f;
     normalized = std::clamp(normalized, 0.0f, 1.0f);
 
-    const auto bucket = static_cast<std::size_t>(normalized * static_cast<float>(kPalette.size() - 1) + 0.5f);
-    return kPalette[std::min(bucket, kPalette.size() - 1)];
+    const auto bucket = static_cast<std::size_t>(lround(normalized * static_cast<float>(COLOR_PALETTE.size() - 1)));
+    return COLOR_PALETTE[std::min(bucket, COLOR_PALETTE.size() - 1)];
 }
 
 // Delegate to embedded grid
 grid_operations &colored_grid::operations() noexcept
 {
-
     return m_grid->operations();
 }
 
 const grid_operations &colored_grid::operations() const noexcept
 {
-
     return m_grid->operations();
 }
 
-void colored_grid::resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept
+void colored_grid::resize(const unsigned int rows, const unsigned int cols, const unsigned int levels) const noexcept
 {
     m_grid->operations().resize(rows, cols, levels);
 }

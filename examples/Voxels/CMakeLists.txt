@@ -32,7 +32,7 @@ target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:include> $<
 target_link_libraries(${VOXELS_EXE} PRIVATE ${CMAKE_THREAD_LIBS_INIT} ${MAZE_BUILDER_CORE_LIB}_static SDL3::SDL3)
 
 if (EMSCRIPTEN)
-    message(INFO ": Building ${VOXELS_EXE} examples for the Web!")
+    message(INFO ": Building ${VOXELS_EXE} for the Web!")
 
     target_compile_options(${VOXELS_EXE} PRIVATE ${BASE_COMPILE_FLAGS} "-pthread")
 
@@ -48,8 +48,15 @@ if (EMSCRIPTEN)
     target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map --profile>")
     target_link_options(${VOXELS_EXE} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
     set_target_properties(${VOXELS_EXE} PROPERTIES SUFFIX ".html" LINK_FLAGS "-lembind")
-    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py" DESTINATION "${CMAKE_BINARY_DIR}/bin/Voxels")
 
+    add_custom_command(TARGET ${VOXELS_EXE} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/textures/favicon.ico"
+            "$<TARGET_FILE_DIR:${VOXELS_EXE}>/favicon.ico"
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/secure_http_server.py"
+            "$<TARGET_FILE_DIR:${VOXELS_EXE}>/secure_http_server.py"
+        VERBATIM)
 else ()
 
     message(INFO ": Building ${VOXELS_EXE} examples for the Desktop!")

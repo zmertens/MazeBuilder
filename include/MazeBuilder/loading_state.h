@@ -6,7 +6,6 @@
 
 #include <mutex>
 #include <optional>
-#include <vector>
 
 /// @file loading_state.h
 /// @namespace mazes
@@ -20,7 +19,7 @@ namespace mazes
     {
     public:
         // constructor
-        explicit loading_state(const runtime_app::context &ctx, runtime_stack *rs);
+        explicit loading_state(const runtime_app::context& ctx, runtime_stack* rs);
 
         void draw() const noexcept override;
 
@@ -28,15 +27,15 @@ namespace mazes
         /// @param args Optional arguments for the update
         /// @param delta_time Time elapsed since the last update
         /// @return True if the update was successful, false otherwise
-        bool update(const std::optional<args> &args, double delta_time) noexcept override;
+        bool update(const std::optional<args>& args, double delta_time) noexcept override;
 
     private:
         /// @brief Loads the necessary resources for the loading state
         /// @param args Optional arguments for resource loading
-        void load_resources(const std::optional<args> &args) noexcept;
+        void load_resources(const std::optional<args>& args) const noexcept;
 
-        grid_manager *grid_mapper;
-        processed_text_manager *processed_text_mapper;
+        grid_manager* grid_mapper;
+        processed_text_manager* processed_text_mapper;
 
         std::once_flag resource_loaded_flag;
         bool has_finished{false};

@@ -2,14 +2,14 @@
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/randomizer.h>
-
-#include <fmt/format.h>
-
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/lab.h>
+#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_stack.h>
@@ -21,20 +21,14 @@
 
 using namespace mazes;
 
-dfs_maze_create_state::dfs_maze_create_state(const runtime_app::context &ctx, runtime_stack *stack)
-: state(ctx, stack), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+dfs_maze_create_state::dfs_maze_create_state(const runtime_app::context& ctx, runtime_stack* rs)
+    : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
 {
-
 }
 
-std::string_view dfs_maze_create_state::create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept
+std::string_view dfs_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
 {
-    if (a != algo::DFS)
-    {
-        return std::string_view{"Unsupported algorithm"};
-    }
-
-    return create_dfs_maze(rows, cols, levels, std::ref(rng));   
+    return create_dfs_maze(config.rows(), config.columns(), config.levels(), rng);
 }
 
 void dfs_maze_create_state::draw() const noexcept
@@ -42,7 +36,8 @@ void dfs_maze_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& args,
+                                   [[maybe_unused]] double delta_time) noexcept
 {
     if (!args.has_value() || !grid_mapper || !processed_text_mapper)
     {
@@ -50,55 +45,73 @@ bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args> &a
         return false;
     }
 
-    unsigned int rows   = configurator::MAX_ROWS;
-    unsigned int cols   = configurator::MAX_COLUMNS;
+    unsigned int rows = configurator::MAX_ROWS;
+    unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    if (auto parsed = args->get(); parsed.has_value())
+    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+
+    m_use_distances = maze_state_utils::has_distances(args);
+    m_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    const auto distance_settings = maze_state_utils::parse_distance_settings(args);
+    m_distances_start = distance_settings.start;
+    m_distances_end = distance_settings.end;
+
+    try { grid_mapper->get(m_grid_id).operations().resize(rows, cols, levels); }
+    catch (...)
     {
-        if (auto it = parsed->find(mazes::args::ROW_WORD_STR);    it != parsed->end())
-            try { rows   = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
-        if (auto it = parsed->find(mazes::args::COLUMN_WORD_STR); it != parsed->end())
-            try { cols   = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
-        if (auto it = parsed->find(mazes::args::LEVEL_WORD_STR);  it != parsed->end())
-            try { levels = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
+        request_stack_pop();
+        return false;
     }
 
-    try { grid_mapper->get(grid_identifier::BASIC).operations().resize(rows, cols, levels); }
-    catch (...) { request_stack_pop(); return false; }
-
     randomizer fallback_rng{};
-    randomizer *rng_ptr = &fallback_rng;
-    if (auto opt = get_context().get_rng(); opt.has_value()) rng_ptr = &opt->get();
+    auto* rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
 
-    auto result = create(algo::DFS, rows, cols, levels, *rng_ptr);
-    if (!result.empty())
+    configurator cfg{};
+    cfg.ensure_rows(rows)
+        .ensure_columns(cols)
+        .ensure_levels(levels)
+        .ensure_distances(m_use_distances)
+        .ensure_distances_start(m_distances_start)
+        .ensure_distances_end(m_distances_end)
+        .ensure_algo_id(algo::DFS);
+
+    if (const auto result = create(cfg, *rng_ptr); !result.empty())
     {
         try
         {
-            auto &txt = processed_text_mapper->get(processed_text_identifier::FINISHED);
-            txt.set_dirty(std::string{result});
-            txt.set_processed(std::string{result});
+            request_stack_pop();
+            request_stack_push(maze_state_utils::output_state_for(args));
         }
-        catch (...) {}
+        catch (...)
+        {
+        }
+    }
+    else
+    {
+        request_stack_pop();
     }
 
-    request_stack_pop();
     return false;
 }
 
-std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept
+std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels,
+                                                        randomizer& rng) noexcept
 {
     [[maybe_unused]] auto _levels = levels; // DFS operates on level 0; multi-level support is future work
     if (!grid_mapper) return {};
     try
     {
-        auto &grid_ops = grid_mapper->get(grid_identifier::BASIC).operations();
+        auto& grid_ref = grid_mapper->get(m_grid_id);
+        auto& grid_ops = grid_ref.operations();
 
         // Start in the first cell of level 0
         const int level0_max = static_cast<int>(rows * cols) - 1;
-        auto start = grid_ops.search(rng(0, level0_max));
-        if (!start) return {};
+        const auto start = grid_ops.search(rng(0, level0_max));
+        if (!start)
+        {
+            return {};
+        }
 
         std::stack<std::shared_ptr<cell>> stk;
         std::unordered_set<int> visited;
@@ -111,8 +124,13 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
             auto all_neighbors = grid_ops.get_neighbors(current);
 
             std::vector<std::shared_ptr<cell>> unvisited;
-            for (auto &n : all_neighbors)
-                if (n && visited.find(n->get_index()) == visited.end()) unvisited.push_back(n);
+            for (auto& n : all_neighbors)
+            {
+                if (n && !visited.contains(n->get_index()))
+                {
+                    unvisited.push_back(n);
+                }
+            }
 
             if (unvisited.empty())
             {
@@ -120,36 +138,22 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
             }
             else
             {
-                auto &chosen = unvisited.at(static_cast<size_t>(rng(0, static_cast<int>(unvisited.size()) - 1)));
+                auto& chosen = unvisited.at(static_cast<size_t>(rng(0, static_cast<int>(unvisited.size()) - 1)));
                 lab::link(current, chosen, true);
                 visited.insert(chosen->get_index());
                 stk.push(chosen);
             }
         }
 
-        // Stringify
-        m_result.clear();
-        m_result += "+";
-        for (unsigned int c = 0; c < cols; ++c) m_result += "---+";
-        m_result += "\n";
-
-        for (unsigned int r = 0; r < rows; ++r)
+        if (m_use_distances && m_grid_id == grid_identifier::DISTANCE)
         {
-            std::string top = "|", bot = "+";
-            for (unsigned int c = 0; c < cols; ++c)
+            if (auto* distance_grid_ref = dynamic_cast<distance_grid*>(&grid_ref))
             {
-                auto cp = grid_ops.search(static_cast<int>(r * cols + c));
-                auto e  = cp ? grid_ops.get_east(cp)  : nullptr;
-                auto s  = cp ? grid_ops.get_south(cp) : nullptr;
-                top += "   ";
-                top += (cp && e && cp->is_linked(e)) ? " " : "|";
-                bot += (cp && s && cp->is_linked(s)) ? "   +" : "---+";
+                distance_grid_ref->calculate_distances(m_distances_start, m_distances_end);
             }
-            m_result += top + "\n" + bot + "\n";
         }
 
-        grid_ops.set_str(m_result);
-        return m_result;
+        return std::string_view{"Maze generated"};
     }
     catch (...) { return {}; }
 }

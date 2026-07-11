@@ -22,11 +22,11 @@ namespace mazes
     {
     public:
         // Non-copyable (contains a mask with non-trivial state)
-        masked_grid(const masked_grid &) = delete;
-        masked_grid &operator=(const masked_grid &) = delete;
+        masked_grid(const masked_grid&) = delete;
+        masked_grid& operator=(const masked_grid&) = delete;
 
-        masked_grid(masked_grid &&) noexcept = default;
-        masked_grid &operator=(masked_grid &&) noexcept = default;
+        masked_grid(masked_grid&&) noexcept = default;
+        masked_grid& operator=(masked_grid&&) noexcept = default;
 
         /// @brief Construct a masked grid from a mask object
         /// @param m The mask controlling which cells are available
@@ -45,17 +45,16 @@ namespace mazes
 
         /// @brief Access the mask used by this grid
         /// @return Const reference to the mask
-        const mask &get_mask() const noexcept;
+        const mask& get_mask() const noexcept;
 
         /// @brief Return a random available cell based on the mask
         /// @param rng Randomizer to use
         /// @return A shared pointer to a random available cell
-        std::shared_ptr<cell> random_cell(randomizer &rng) noexcept;
+        std::shared_ptr<cell> random_cell(randomizer& rng) const noexcept;
 
     private:
         mask m_mask;
     };
-
 } // namespace mazes
 
 #endif // MASKED_GRID_H

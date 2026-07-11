@@ -1,9 +1,6 @@
 #ifndef RESOURCE_IDENTIFIERS_H
 #define RESOURCE_IDENTIFIERS_H
 
-#include <memory>
-#include <string>
-
 /// @file resource_identifiers.h
 /// @namespace mazes
 namespace mazes

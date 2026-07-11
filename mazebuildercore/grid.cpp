@@ -2,12 +2,8 @@
 
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/lab.h>
 
-#include <algorithm>
-#include <functional>
 #include <random>
-#include <stdexcept>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -17,36 +13,35 @@ using namespace mazes;
 /// @brief
 /// @param rows
 /// @param columns
-/// @param height
-grid::grid(unsigned int rows, unsigned int columns, unsigned int height)
-    : grid::grid(std::make_tuple(rows, columns, height))
+/// @param levels
+grid::grid(unsigned int rows, unsigned int columns, unsigned int levels)
+    : grid(std::make_tuple(rows, columns, levels))
 {
-
 }
 
 /// @brief
-/// @param dimensions
-grid::grid(std::tuple<unsigned int, unsigned int, unsigned int> dimens)
+/// @param dimens A tuple containing the dimensions of the grid (rows, columns, levels)
+grid::grid(const std::tuple<unsigned int, unsigned int, unsigned int>& dimens)
     : m_dimensions(dimens)
 {
-    auto total_cells = std::get<0>(m_dimensions) * std::get<1>(m_dimensions) * std::get<2>(m_dimensions);
+    const auto total_cells = std::get<0>(m_dimensions) * std::get<1>(m_dimensions) * std::get<2>(m_dimensions);
 
     m_cells.reserve(total_cells);
 
-    for (size_t i{0}; i < total_cells; ++i) {
+    for (std::size_t i{0}; i < total_cells; ++i)
+    {
         m_cells.emplace(static_cast<int32_t>(i), std::make_shared<cell>(static_cast<int32_t>(i)));
     }
 }
 
 // Copy constructor
-grid::grid(const grid &other)
-    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
+grid::grid(const grid& other)
+    : m_cells(other.m_cells), m_dimensions(other.m_dimensions)
 {
-
 }
 
 // Copy assignment operator
-grid &grid::operator=(const grid &other)
+grid& grid::operator=(const grid& other)
 {
     if (this == &other)
     {
@@ -61,14 +56,13 @@ grid &grid::operator=(const grid &other)
 }
 
 // Move constructor
-grid::grid(grid &&other) noexcept
-    : m_dimensions(other.m_dimensions), m_cells(other.m_cells)
+grid::grid(grid&& other) noexcept
+    : grid(other.m_dimensions)
 {
-
 }
 
 // Move assignment operator
-grid &grid::operator=(grid &&other) noexcept
+grid& grid::operator=(grid&& other) noexcept
 {
     if (this == &other)
     {
@@ -85,32 +79,28 @@ grid &grid::operator=(grid &&other) noexcept
 // Destructor
 grid::~grid()
 {
-
     // First clean up cell references
     grid::clear_cells();
 }
 
 void grid::clear_cells() noexcept
 {
-
     // Clear topology first
     {
-        std::lock_guard<std::mutex> lock(m_topology_mutex);
+        std::lock_guard lock(m_topology_mutex);
         m_topology.clear();
     }
 }
 
 std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
 {
-
     return this->m_dimensions;
 }
 
 std::shared_ptr<cell> grid::search(int index) const noexcept
 {
-
     // First check if cell already exists
-    if (auto cell_it = m_cells.find(index); cell_it != m_cells.cend())
+    if (const auto cell_it = m_cells.find(index); cell_it != m_cells.cend())
     {
         return cell_it->second;
     }
@@ -120,33 +110,32 @@ std::shared_ptr<cell> grid::search(int index) const noexcept
 
 int grid::num_cells() const noexcept
 {
-
     return static_cast<int>(m_cells.size());
 }
 
 // Get the contents of a cell for this type of grid
-std::string grid::contents_of([[maybe_unused]] std::shared_ptr<cell> const &c) const noexcept
+std::string grid::contents_of([[maybe_unused]] std::shared_ptr<cell> const& c) const noexcept
 {
     return " ";
 }
 
 // Get the background color for this type of grid
-std::uint32_t grid::background_color_for([[maybe_unused]] std::shared_ptr<cell> const &c) const noexcept
+std::uint32_t grid::background_color_for([[maybe_unused]] std::shared_ptr<cell> const& c) const noexcept
 {
     return 0xFFFFFFFF;
 }
 
-grid_operations &grid::operations() noexcept
+grid_operations& grid::operations() noexcept
 {
     return *this;
 }
 
-const grid_operations &grid::operations() const noexcept
+const grid_operations& grid::operations() const noexcept
 {
     return *this;
 }
 
-void grid::set_str(std::string const &str) noexcept
+void grid::set_str(std::string const& str) noexcept
 {
     this->m_str = str;
 }
@@ -156,7 +145,7 @@ std::string grid::get_str() const noexcept
     return this->m_str;
 }
 
-void grid::set_file(std::string const &f) noexcept
+void grid::set_file(std::string const& f) noexcept
 {
     this->m_file = f;
 }
@@ -166,7 +155,7 @@ std::string grid::get_file() const noexcept
     return this->m_file;
 }
 
-std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, direction dir) const noexcept
+std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, const direction dir) const noexcept
 {
     if (!c)
     {
@@ -175,13 +164,13 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, directi
 
     // Calculate neighbor index on-demand instead of pre-computing topology
     auto [rows, columns, levels] = m_dimensions;
-    int current_index = c->get_index();
+    const int current_index = c->get_index();
 
     // Calculate 3D coordinates from index
-    int level = current_index / (rows * columns);
-    int remaining = current_index % (rows * columns);
-    int row = remaining / columns;
-    int col = remaining % columns;
+    const int level = current_index / (rows * columns);
+    const int remaining = current_index % (rows * columns);
+    const int row = remaining / columns;
+    const int col = remaining % columns;
 
     int neighbor_index = -1;
 
@@ -217,7 +206,7 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, directi
     return (neighbor_index >= 0) ? search(neighbor_index) : nullptr;
 }
 
-std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> const &c) const noexcept
+std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> const& c) const noexcept
 {
     std::vector<std::shared_ptr<cell>> neighbors;
 
@@ -227,19 +216,19 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> con
     }
 
     // Get neighbors in all four directions
-    if (auto north = get_neighbor(c, direction::NORTH))
+    if (const auto north = get_neighbor(c, direction::NORTH))
     {
         neighbors.push_back(north);
     }
-    if (auto south = get_neighbor(c, direction::SOUTH))
+    if (const auto south = get_neighbor(c, direction::SOUTH))
     {
         neighbors.push_back(south);
     }
-    if (auto east = get_neighbor(c, direction::EAST))
+    if (const auto east = get_neighbor(c, direction::EAST))
     {
         neighbors.push_back(east);
     }
-    if (auto west = get_neighbor(c, direction::WEST))
+    if (const auto west = get_neighbor(c, direction::WEST))
     {
         neighbors.push_back(west);
     }
@@ -247,14 +236,14 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> con
     return neighbors;
 }
 
-void grid::set_neighbor(const std::shared_ptr<cell> &c, direction dir, std::shared_ptr<cell> const &neighbor) noexcept
+void grid::set_neighbor(const std::shared_ptr<cell>& c, direction dir, std::shared_ptr<cell> const& neighbor) noexcept
 {
     if (!c)
     {
         return;
     }
 
-    std::lock_guard<std::mutex> lock(m_topology_mutex);
+    std::lock_guard lock(m_topology_mutex);
 
     if (neighbor)
     {
@@ -272,22 +261,22 @@ void grid::set_neighbor(const std::shared_ptr<cell> &c, direction dir, std::shar
 }
 
 // Convenience methods for accessing neighbors
-std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell> &c) const noexcept
+std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept
 {
     return get_neighbor(c, direction::NORTH);
 }
 
-std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell> &c) const noexcept
+std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept
 {
     return get_neighbor(c, direction::SOUTH);
 }
 
-std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell> &c) const noexcept
+std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept
 {
     return get_neighbor(c, direction::EAST);
 }
 
-std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell> &c) const noexcept
+std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept
 {
     return get_neighbor(c, direction::WEST);
 }
@@ -301,7 +290,7 @@ std::vector<std::tuple<int, int, int, int>> grid::get_vertices() const noexcept
 
 /// @brief Set the vertices for wavefront object file generation
 /// @param vertices A vector of vertices as tuples (x, y, z, w)
-void grid::set_vertices(const std::vector<std::tuple<int, int, int, int>> &vertices) noexcept
+void grid::set_vertices(const std::vector<std::tuple<int, int, int, int>>& vertices) noexcept
 {
     m_vertices = vertices;
 }
@@ -315,7 +304,7 @@ std::vector<std::vector<std::uint32_t>> grid::get_faces() const noexcept
 
 /// @brief Set the faces for wavefront object file generation
 /// @param faces A vector of faces, where each face is a vector of vertex indices
-void grid::set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept
+void grid::set_faces(const std::vector<std::vector<std::uint32_t>>& faces) noexcept
 {
     m_faces = faces;
 }
@@ -329,7 +318,7 @@ std::vector<std::uint8_t> grid::get_pixels() const noexcept
 
 /// @brief Set the pixel data for image generation
 /// @param pixels A vector of RGBA pixel data
-void grid::set_pixels(const std::vector<std::uint8_t> &pixels) noexcept
+void grid::set_pixels(const std::vector<std::uint8_t>& pixels) noexcept
 {
     m_pixels = pixels;
 }
@@ -338,7 +327,7 @@ void grid::resize(unsigned int rows, unsigned int cols, unsigned int levels) noe
 {
     // Clear topology
     {
-        std::lock_guard<std::mutex> lock(m_topology_mutex);
+        std::lock_guard lock(m_topology_mutex);
         m_topology.clear();
     }
 

@@ -12,10 +12,11 @@ namespace mazes
     class convert_contract
     {
     public:
+        virtual ~convert_contract() = default;
         /// @brief Convert arguments to args
         /// @param arguments The arguments to convert
         /// @return The converted args, or std::nullopt if conversion failed
-        virtual std::optional<args> convert(std::string_view arguments) const noexcept = 0;
+        [[nodiscard]] virtual std::optional<args> convert(std::string_view arguments) const noexcept = 0;
     };
 
     /// @brief Convenience alias used by states that implement argument parsing

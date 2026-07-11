@@ -1,11 +1,12 @@
-#ifndef STRINGIFY_CREATE_STATE
-#define STRINGIFY_CREATE_STATE
+#ifndef STRINGIFY_CREATE_STATE_H
+#define STRINGIFY_CREATE_STATE_H
 
-#include <MazeBuilder/algos.h>
 #include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/state.h>
 
+#include <optional>
+#include <string>
 #include <string_view>
 
 /// @file stringify_create_state.h
@@ -13,6 +14,7 @@
 namespace mazes
 {
     class args;
+    class configurator;
     class randomizer;
     class runtime_stack;
     struct context;
@@ -21,9 +23,9 @@ namespace mazes
     class stringify_create_state final : public create_contract, public state
     {
     public:
-        explicit stringify_create_state(const runtime_app::context &ctx, runtime_stack *stack);
+        explicit stringify_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
-        virtual std::string_view create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept override;
+        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
         void draw() const noexcept override;
 
@@ -34,18 +36,10 @@ namespace mazes
         bool update(const std::optional<args> &args, double delta_time) noexcept override;
 
     private:
-        /// @brief Implementation of the stringify maze creation algorithm
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
-        /// @return
-        std::string_view create_stringify(unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept;
-
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
+        std::string m_result;
     };
-
 } // namespace mazes
 
-#endif // STRINGIFY_CREATE_STATE
+#endif // STRINGIFY_CREATE_STATE_H

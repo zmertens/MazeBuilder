@@ -2,39 +2,37 @@
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
-#include <MazeBuilder/randomizer.h>
-#include <MazeBuilder/runtime_stack.h>
-
-#include <fmt/format.h>
-
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/lab.h>
-#include <MazeBuilder/resource_identifiers.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/lab.h>
+#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
+#include <MazeBuilder/runtime_stack.h>
 
 #include <string>
 #include <vector>
 
 using namespace mazes;
 
-bt_maze_create_state::bt_maze_create_state(const runtime_app::context &ctx, runtime_stack *stack)
-    : state(ctx, stack),
+bt_maze_create_state::bt_maze_create_state(const runtime_app::context &ctx, runtime_stack *rs)
+    : state(ctx, rs),
       grid_mapper{ctx.get_grid_manager()},
-      processed_text_mapper{ctx.get_text_manager()}
+      processed_text_mapper{ctx.get_text_manager()},
+      m_grid_id{grid_identifier::BASIC},
+      m_use_distances{false},
+      m_distances_start{configurator::DEFAULT_DISTANCES_START},
+      m_distances_end{configurator::DEFAULT_DISTANCES_END}
 {
-
 }
 
-std::string_view bt_maze_create_state::create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept
+std::string_view bt_maze_create_state::create(const configurator &config, randomizer &rng) noexcept
 {
-    if (a != algo::BINARY_TREE)
-    {
-        return {};
-    }
-
-    return create_bt_maze(rows, cols, levels, std::ref(rng));   
+    return create_bt_maze(config.rows(), config.columns(), config.levels(), rng);
 }
 
 void bt_maze_create_state::draw() const noexcept
@@ -42,7 +40,8 @@ void bt_maze_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool bt_maze_create_state::update([[maybe_unused]] const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool bt_maze_create_state::update(const std::optional<args> &args,
+                                  [[maybe_unused]] double delta_time) noexcept
 {
     if (!args.has_value() || !grid_mapper || !processed_text_mapper)
     {
@@ -50,49 +49,68 @@ bool bt_maze_create_state::update([[maybe_unused]] const std::optional<args> &ar
         return false;
     }
 
-    unsigned int rows   = configurator::MAX_ROWS;
-    unsigned int cols   = configurator::MAX_COLUMNS;
+    unsigned int rows = configurator::MAX_ROWS;
+    unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    if (auto parsed = args->get(); parsed.has_value())
+    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+    m_use_distances = maze_state_utils::has_distances(args);
+    m_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+
+    const auto distance_settings = maze_state_utils::parse_distance_settings(args);
+    m_distances_start = distance_settings.start;
+    m_distances_end = distance_settings.end;
+
+    try
     {
-        if (auto it = parsed->find(mazes::args::ROW_WORD_STR);    it != parsed->end())
-            try { rows   = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
-        if (auto it = parsed->find(mazes::args::COLUMN_WORD_STR); it != parsed->end())
-            try { cols   = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
-        if (auto it = parsed->find(mazes::args::LEVEL_WORD_STR);  it != parsed->end())
-            try { levels = static_cast<unsigned int>(std::stoul(it->second)); } catch (...) {}
+        grid_mapper->get(m_grid_id).operations().resize(rows, cols, levels);
+    }
+    catch (...)
+    {
+        request_stack_pop();
+        return false;
     }
 
-    try { grid_mapper->get(grid_identifier::BASIC).operations().resize(rows, cols, levels); }
-    catch (...) { request_stack_pop(); return false; }
-
     randomizer fallback_rng{};
-    randomizer *rng_ptr = &fallback_rng;
-    if (auto opt = get_context().get_rng(); opt.has_value()) rng_ptr = &opt->get();
+    auto *rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
 
-    auto result = create(algo::BINARY_TREE, rows, cols, levels, *rng_ptr);
+    configurator cfg{};
+    cfg.ensure_rows(rows)
+        .ensure_columns(cols)
+        .ensure_levels(levels)
+        .ensure_distances(m_use_distances)
+        .ensure_distances_start(m_distances_start)
+        .ensure_distances_end(m_distances_end)
+        .ensure_algo_id(algo::BINARY_TREE);
+
+    auto result = create(cfg, *rng_ptr);
     if (!result.empty())
     {
         try
         {
-            auto &txt = processed_text_mapper->get(processed_text_identifier::FINISHED);
-            txt.set_dirty(std::string{result});
-            txt.set_processed(std::string{result});
+            request_stack_pop();
+            request_stack_push(maze_state_utils::output_state_for(args));
         }
-        catch (...) {}
+        catch (...)
+        {
+        }
     }
-
-    request_stack_pop();
+    else
+    {
+        request_stack_pop();
+    }
     return false;
 }
 
-std::string_view bt_maze_create_state::create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept
+std::string_view bt_maze_create_state::create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels,
+                                                      randomizer &rng) noexcept
 {
-    if (!grid_mapper) return {};
+    if (!grid_mapper)
+        return {};
     try
     {
-        auto &grid_ops = grid_mapper->get(grid_identifier::BASIC).operations();
+        auto &grid_ref = grid_mapper->get(m_grid_id);
+        auto &grid_ops = grid_ref.operations();
 
         for (unsigned int lv = 0; lv < levels; ++lv)
         {
@@ -101,38 +119,31 @@ std::string_view bt_maze_create_state::create_bt_maze(unsigned int rows, unsigne
                 for (unsigned int col = 0; col < cols; ++col)
                 {
                     auto c = grid_ops.search(static_cast<int>(lv * rows * cols + row * cols + col));
-                    if (!c) continue;
+                    if (!c)
+                        continue;
                     std::vector<std::shared_ptr<cell>> cands;
-                    if (auto n = grid_ops.get_north(c)) cands.push_back(n);
-                    if (auto e = grid_ops.get_east(c))  cands.push_back(e);
+                    if (auto n = grid_ops.get_north(c))
+                        cands.push_back(n);
+                    if (auto e = grid_ops.get_east(c))
+                        cands.push_back(e);
                     if (!cands.empty())
                         lab::link(c, cands.at(static_cast<size_t>(rng(0, static_cast<int>(cands.size()) - 1))), true);
                 }
             }
         }
 
-        m_result.clear();
-        m_result += "+";
-        for (unsigned int c = 0; c < cols; ++c) m_result += "---+";
-        m_result += "\n";
-
-        for (unsigned int r = 0; r < rows; ++r)
+        if (m_use_distances)
         {
-            std::string top = "|", bot = "+";
-            for (unsigned int c = 0; c < cols; ++c)
+            if (auto *distance_grid_ref = dynamic_cast<distance_grid *>(&grid_ref))
             {
-                auto cp = grid_ops.search(static_cast<int>(r * cols + c));
-                auto e  = cp ? grid_ops.get_east(cp)  : nullptr;
-                auto s  = cp ? grid_ops.get_south(cp) : nullptr;
-                top += "   ";
-                top += (cp && e && cp->is_linked(e)) ? " " : "|";
-                bot += (cp && s && cp->is_linked(s)) ? "   +" : "---+";
+                distance_grid_ref->calculate_distances(m_distances_start, m_distances_end);
             }
-            m_result += top + "\n" + bot + "\n";
         }
 
-        grid_ops.set_str(m_result);
-        return m_result;
+        return std::string_view{"Maze generated"};
     }
-    catch (...) { return {}; }
+    catch (...)
+    {
+        return {};
+    }
 }

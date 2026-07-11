@@ -41,7 +41,6 @@ namespace mazes
         /// @return A string representing the value in base36
         static std::string to_base36(std::uint32_t value) noexcept;
     }; // class
-
 } // namespace
 
 #endif // BYTES_H

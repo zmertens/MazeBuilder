@@ -1,15 +1,45 @@
 #include <MazeBuilder/pixels_create_state.h>
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/distances.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <filesystem>
+#include <string>
+#include <vector>
+
+#define STB_IMAGE_WRITE_STATIC
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 using namespace mazes;
 
-pixels_create_state::pixels_create_state(const runtime_app::context &ctx, runtime_stack *stack)
-: state(ctx, stack), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+namespace
 {
+    constexpr int cell_size_px = 12;
+    constexpr int wall_size_px = 2;
 
+    std::uint8_t lerp_u8(const std::uint8_t from, const std::uint8_t to, const float t) noexcept
+    {
+        const float clamped = std::clamp(t, 0.0f, 1.0f);
+        return static_cast<std::uint8_t>(static_cast<float>(from) + (static_cast<float>(to) - static_cast<float>(from)) * clamped);
+    }
+}
+
+pixels_create_state::pixels_create_state(const runtime_app::context &ctx, runtime_stack *stack)
+    : state(ctx, stack), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+{
 }
 
 void pixels_create_state::draw() const noexcept
@@ -17,150 +47,203 @@ void pixels_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &args,
+                                 [[maybe_unused]] double delta_time) noexcept
 {
-    // Implementation of the update function
-    return true;
-}
+    m_result.clear();
 
-
-std::string_view pixels_create_state::create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept
-{
-    if (a != algo::PIXELS)
+    if (!args.has_value() || !grid_mapper || !processed_text_mapper)
     {
-        return std::string_view{"Unsupported algorithm"};
+        request_stack_pop();
+        return false;
     }
 
-    auto sum = rows + cols + levels;
-    [[maybe_unused]] auto sum1 = rng(0, sum);
-    return std::string_view{"Pixels maze creation not yet implemented"};
+    unsigned int rows = configurator::MAX_ROWS;
+    unsigned int cols = configurator::MAX_COLUMNS;
+    unsigned int levels = 1u;
+    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+
+    m_grid_id = maze_state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+
+    std::string output_target;
+    if (const auto parsed = args->get(); parsed.has_value())
+    {
+        if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
+        {
+            output_target = it->second;
+        }
+    }
+
+    randomizer fallback_rng{};
+    auto *rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
+
+    configurator cfg{};
+    cfg.ensure_rows(rows)
+        .ensure_columns(cols)
+        .ensure_levels(levels)
+        .ensure_distances(m_grid_id == grid_identifier::DISTANCE)
+        .ensure_algo_id(algo::PIXELS);
+
+    m_result = std::string{create(cfg, *rng_ptr)};
+
+    if (!m_result.empty() && !output_target.empty())
+    {
+        bool write_ok = false;
+
+        try
+        {
+            auto &grid_ref = grid_mapper->get(m_grid_id);
+            const auto pixels = grid_ref.operations().get_pixels();
+            const auto extension = std::filesystem::path{output_target}.extension().string();
+
+            std::string normalized = extension;
+            std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
+                           { return static_cast<char>(std::tolower(ch)); });
+
+            if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
+            {
+                if (normalized == ".png")
+                {
+                    write_ok = stbi_write_png(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), m_image_width * 4) != 0;
+                }
+                else if (normalized == ".bmp")
+                {
+                    write_ok = stbi_write_bmp(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data()) != 0;
+                }
+                else if (normalized == ".jpg" || normalized == ".jpeg")
+                {
+                    write_ok = stbi_write_jpg(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), 95) != 0;
+                }
+            }
+        }
+        catch (...)
+        {
+        }
+
+        m_result = write_ok ? "Wrote maze to " + output_target : "Failed to write maze to " + output_target;
+    }
+
+    if (processed_text_mapper)
+    {
+        try
+        {
+            auto &finished = processed_text_mapper->get(processed_text_identifier::FINISHED);
+            finished.set_dirty(m_result);
+            finished.set_processed(m_result);
+        }
+        catch (...)
+        {
+        }
+    }
+
+    request_stack_pop();
+    return false;
 }
 
-    //  if (!g)
-    //     {
-    //         return false;
-    //     }
+std::string_view pixels_create_state::create(const configurator &config,
+                                             randomizer &rng) noexcept
+{
+    if (config.algo_id() != algo::PIXELS || !grid_mapper)
+    {
+        return {};
+    }
 
-    //     // Get the grid operations to access dimensions and other methods
-    //     auto &grid_ops = g->operations();
+    try
+    {
+        auto &grid_ref = grid_mapper->get(m_grid_id);
+        auto &grid_ops = grid_ref.operations();
 
-    //     // Ensure we have a string representation first
-    //     std::string maze_str = grid_ops.get_str();
-    //     if (maze_str.empty())
-    //     {
-    //         // Run stringify if not already done
-    //         if (stringify stringifier; !stringifier.run(g, rng))
-    //         {
-    //             return false;
-    //         }
-    //         maze_str = grid_ops.get_str();
+        m_image_width = static_cast<int>(config.columns()) * cell_size_px + (static_cast<int>(config.columns()) + 1) * wall_size_px;
+        m_image_height = static_cast<int>(config.rows()) * cell_size_px + (static_cast<int>(config.rows()) + 1) * wall_size_px;
 
-    //         if (maze_str.empty())
-    //         {
-    //             return false;
-    //         }
-    //     }
+        std::vector<std::uint8_t> pixels(static_cast<std::size_t>(m_image_width) * static_cast<std::size_t>(m_image_height) * 4u, 0u);
 
-    //     // Calculate scale based on grid dimensions
-    //     auto [rows, columns, _] = grid_ops.get_dimensions();
+        auto set_pixel = [&](const int x, const int y, const std::array<std::uint8_t, 4> &rgba)
+        {
+            if (x < 0 || y < 0 || x >= m_image_width || y >= m_image_height)
+            {
+                return;
+            }
 
-    //     constexpr unsigned int MIN_SCALE = 1;
-    //     constexpr unsigned int MAX_SCALE = 10;
+            const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_image_width) + static_cast<std::size_t>(x)) * 4u;
+            pixels[offset + 0u] = rgba[0];
+            pixels[offset + 1u] = rgba[1];
+            pixels[offset + 2u] = rgba[2];
+            pixels[offset + 3u] = rgba[3];
+        };
 
-    //     auto calculated_scale = static_cast<unsigned int>(std::sqrt(static_cast<double>(rows * columns)));
+        auto fill_rect = [&](const int x0, const int y0, const int width, const int height, const std::array<std::uint8_t, 4> &rgba)
+        {
+            for (int y = y0; y < y0 + height; ++y)
+            {
+                for (int x = x0; x < x0 + width; ++x)
+                {
+                    set_pixel(x, y, rgba);
+                }
+            }
+        };
 
-    //     auto scale = std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE);
+        const std::array<std::uint8_t, 4> wall_color{24u, 28u, 34u, 255u};
+        const std::array<std::uint8_t, 4> base_floor_color{244u, 241u, 232u, 255u};
 
-    //     // Parse the ASCII string to determine dimensions
-    //     std::istringstream iss(maze_str);
-    //     std::string line;
-    //     std::vector<std::string> lines;
+        for (int y = 0; y < m_image_height; ++y)
+        {
+            for (int x = 0; x < m_image_width; ++x)
+            {
+                set_pixel(x, y, wall_color);
+            }
+        }
 
-    //     while (std::getline(iss, line))
-    //     {
-    //         lines.push_back(line);
-    //     }
+        const auto *distance_grid_ref = dynamic_cast<const distance_grid *>(&grid_ref);
+        const auto distance_map = distance_grid_ref ? distance_grid_ref->get_distances() : std::shared_ptr<distances>{};
+        const auto max_distance = distance_map ? distance_map->max().second : 0;
 
-    //     if (lines.empty())
-    //     {
-    //         return false;
-    //     }
+        for (unsigned int row = 0; row < config.rows(); ++row)
+        {
+            for (unsigned int col = 0; col < config.columns(); ++col)
+            {
+                const auto index = static_cast<int>(row * config.columns() + col);
+                const auto current = grid_ops.search(index);
+                if (!current)
+                {
+                    continue;
+                }
 
-    //     // Calculate pixel dimensions
-    //     const size_t ascii_height = lines.size();
+                std::array<std::uint8_t, 4> floor_color = base_floor_color;
+                if (distance_map && distance_map->contains(index))
+                {
+                    const float t = max_distance > 0 ? static_cast<float>((*distance_map)[index]) / static_cast<float>(max_distance) : 0.0f;
+                    floor_color = {
+                        lerp_u8(255u, 70u, t),
+                        lerp_u8(238u, 120u, t),
+                        lerp_u8(179u, 245u, t),
+                        255u};
+                }
 
-    //     // Find the maximum line length to handle lines with trimmed trailing spaces
-    //     size_t ascii_width = 0;
-    //     size_t min_line_length = SIZE_MAX;
-    //     for (const auto & l : lines)
-    //     {
-    //         ascii_width = std::max(ascii_width, l.length());
-    //         min_line_length = std::min(min_line_length, l.length());
-    //     }
+                const int px = wall_size_px + static_cast<int>(col) * (cell_size_px + wall_size_px);
+                const int py = wall_size_px + static_cast<int>(row) * (cell_size_px + wall_size_px);
 
-    //     const auto pixel_width = static_cast<unsigned int>(ascii_width * scale);
-    //     const auto pixel_height = static_cast<unsigned int>(ascii_height * scale);
+                fill_rect(px, py, cell_size_px, cell_size_px, floor_color);
 
-    //     // RGBA format - 4 bytes per pixel
-    //     constexpr unsigned int STRIDE = 4;
-    //     const size_t pixel_data_size = static_cast<size_t>(pixel_width) * pixel_height * STRIDE;
+                if (const auto east = grid_ops.get_east(current); east && current->is_linked(east))
+                {
+                    fill_rect(px + cell_size_px, py, wall_size_px, cell_size_px, floor_color);
+                }
 
-    //     std::vector<std::uint8_t> pixel_data(pixel_data_size);
+                if (const auto south = grid_ops.get_south(current); south && current->is_linked(south))
+                {
+                    fill_rect(px, py + cell_size_px, cell_size_px, wall_size_px, floor_color);
+                }
+            }
+        }
 
-    //     // Convert ASCII to pixels
-    //     for (size_t ascii_y = 0; ascii_y < ascii_height; ++ascii_y)
-    //     {
-    //         const std::string &current_line = lines[ascii_y];
-
-    //         for (size_t ascii_x = 0; ascii_x < ascii_width; ++ascii_x)
-    //         {
-    //             // Define colors (RGBA format)
-    //             constexpr std::uint8_t BLACK_R = 0x00;
-    //             constexpr std::uint8_t BLACK_G = 0x00;
-    //             constexpr std::uint8_t BLACK_B = 0x00;
-    //             constexpr std::uint8_t BLACK_A = 0xFF;
-
-    //             constexpr std::uint8_t WHITE_R = 0xFF;
-    //             constexpr std::uint8_t WHITE_G = 0xFF;
-    //             constexpr std::uint8_t WHITE_B = 0xFF;
-    //             constexpr std::uint8_t WHITE_A = 0xFF;
-    //             // Get character at position, treating missing/beyond-length as space (passage)
-    //             const char ch = (ascii_x < current_line.length()) ? current_line[ascii_x] : ' ';
-
-    //             // Determine if this is a wall or passage
-    //             const bool is_wall = ch == static_cast<unsigned char>(barriers::CORNER) ||
-    //                 ch == static_cast<unsigned char>(barriers::HORIZONTAL) ||
-    //                 ch == static_cast<unsigned char>(barriers::VERTICAL);
-
-    //             const std::uint8_t red = is_wall ? BLACK_R : WHITE_R;
-    //             const std::uint8_t green = is_wall ? BLACK_G : WHITE_G;
-    //             const std::uint8_t blue = is_wall ? BLACK_B : WHITE_B;
-    //             const std::uint8_t alpha = is_wall ? BLACK_A : WHITE_A;
-
-    //             // Fill scaled pixel block
-    //             for (unsigned int sy = 0; sy < scale; ++sy)
-    //             {
-    //                 for (unsigned int sx = 0; sx < scale; ++sx)
-    //                 {
-    //                     const size_t pixel_y = ascii_y * scale + sy;
-
-    //                     if (const size_t pixel_x = ascii_x * scale + sx; pixel_y < pixel_height && pixel_x < pixel_width)
-    //                     {
-    //                         if (const size_t pixel_index = (pixel_y * pixel_width + pixel_x) * STRIDE;
-    //                             pixel_index + 3 < pixel_data_size)
-    //                         {
-    //                             pixel_data[pixel_index + 0] = red;
-    //                             pixel_data[pixel_index + 1] = green;
-    //                             pixel_data[pixel_index + 2] = blue;
-    //                             pixel_data[pixel_index + 3] = alpha;
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     }
-
-    //     // Store the pixel data in the grid
-    //     grid_ops.set_pixels(pixel_data);
-
-    //     return true;
+        grid_ops.set_pixels(pixels);
+        [[maybe_unused]] auto noise = rng(0, 1);
+        m_result = "Maze image generated";
+        return m_result;
+    }
+    catch (...)
+    {
+        return {};
+    }
+}

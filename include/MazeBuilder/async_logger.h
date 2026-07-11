@@ -28,15 +28,21 @@ namespace mazes
 
         async_logger()
             : sink_([](std::string_view msg)
-                    { fmt::print("{}\n", msg); }),
-              worker_([this](std::stop_token st)
-                      { run(st); })
+              {
+                  fmt::print("{}\n", msg);
+              }),
+              worker_([this](const std::stop_token& st)
+              {
+                  run(st);
+              })
         {
         }
 
         explicit async_logger(sink_type sink)
-            : sink_(std::move(sink)), worker_([this](std::stop_token st)
-                                              { run(st); })
+            : sink_(std::move(sink)), worker_([this](const std::stop_token& st)
+            {
+                run(st);
+            })
         {
         }
 
@@ -45,17 +51,17 @@ namespace mazes
             stop();
         }
 
-        async_logger(const async_logger &) = delete;
-        async_logger &operator=(const async_logger &) = delete;
-        async_logger(async_logger &&) = delete;
-        async_logger &operator=(async_logger &&) = delete;
+        async_logger(const async_logger&) = delete;
+        async_logger& operator=(const async_logger&) = delete;
+        async_logger(async_logger&&) = delete;
+        async_logger& operator=(async_logger&&) = delete;
 
         /// @brief Log a formatted message
         /// @tparam ...FormatArgs
         /// @param fmt_s Format string
         /// @param ...args Arguments for the format string
         template <typename... FormatArgs>
-        void log(fmt::format_string<FormatArgs...> fmt_s, FormatArgs &&...args)
+        void log(fmt::format_string<FormatArgs...> fmt_s, FormatArgs&&... args)
         {
             enqueue(fmt::format(fmt_s, std::forward<FormatArgs>(args)...));
         }
@@ -70,9 +76,11 @@ namespace mazes
         /// @brief Flush the logger, blocking until all pending messages are processed
         void flush()
         {
-            std::unique_lock<std::mutex> lock(mtx_);
+            std::unique_lock lock(mtx_);
             drained_cv_.wait(lock, [this]()
-                             { return pending_ == 0; });
+            {
+                return pending_ == 0;
+            });
         }
 
         /// @brief Stop the logger, blocking until all pending messages are processed
@@ -80,7 +88,7 @@ namespace mazes
         {
             bool should_join = false;
             {
-                std::lock_guard<std::mutex> lock(mtx_);
+                std::lock_guard lock(mtx_);
                 if (!stopped_)
                 {
                     stopped_ = true;
@@ -103,7 +111,7 @@ namespace mazes
         /// @param sink Sink function to handle log messages
         void set_sink(sink_type sink)
         {
-            std::lock_guard<std::mutex> lock(mtx_);
+            std::lock_guard lock(mtx_);
             sink_ = std::move(sink);
         }
 
@@ -112,7 +120,7 @@ namespace mazes
         /// @param msg Message to enqueue
         void enqueue(std::string msg)
         {
-            std::lock_guard<std::mutex> lock(mtx_);
+            std::lock_guard lock(mtx_);
             if (stopped_)
             {
                 return;
@@ -125,7 +133,7 @@ namespace mazes
 
         /// @brief Run the logger, processing messages until stopped
         /// @param st Stop token to request stopping the logger
-        void run(const std::stop_token &st)
+        void run(const std::stop_token& st)
         {
             for (;;)
             {
@@ -133,9 +141,11 @@ namespace mazes
                 sink_type sink;
 
                 {
-                    std::unique_lock<std::mutex> lock(mtx_);
+                    std::unique_lock lock(mtx_);
                     cv_.wait(lock, [this, &st]()
-                             { return st.stop_requested() || !queue_.empty(); });
+                    {
+                        return st.stop_requested() || !queue_.empty();
+                    });
 
                     if (st.stop_requested() && queue_.empty())
                     {
@@ -159,7 +169,7 @@ namespace mazes
                 }
 
                 {
-                    std::lock_guard<std::mutex> lock(mtx_);
+                    std::lock_guard lock(mtx_);
                     if (pending_ > 0)
                     {
                         --pending_;
@@ -171,7 +181,7 @@ namespace mazes
                 }
             }
 
-            std::lock_guard<std::mutex> lock(mtx_);
+            std::lock_guard lock(mtx_);
             if (pending_ == 0)
             {
                 drained_cv_.notify_all();
@@ -190,7 +200,7 @@ namespace mazes
 
     /// @brief Get the global async logger instance
     /// @return Reference to the global async logger
-    inline async_logger &global_async_logger()
+    inline async_logger& global_async_logger()
     {
         static async_logger logger{};
         return logger;
@@ -200,14 +210,20 @@ namespace mazes
     /// @param sink Sink function to handle log messages
     inline void set_printer_sink(async_logger::sink_type sink)
     {
+        // Drain already-queued messages to the current sink before rerouting output.
+        global_async_logger().flush();
         global_async_logger().set_sink(std::move(sink));
     }
 
     /// @brief Flush the global async logger, blocking until all pending messages are processed
     inline void reset_printer_sink()
     {
+        // Preserve message ordering and avoid redirecting queued messages mid-flight.
+        global_async_logger().flush();
         global_async_logger().set_sink([](std::string_view msg)
-                                       { fmt::print("{}\n", msg); });
+        {
+            fmt::print("{}\n", msg);
+        });
     }
 
     /// @brief Flush the global async logger, blocking until all pending messages are processed
@@ -220,12 +236,11 @@ namespace mazes
     /// @tparam ...Args Types of the arguments to format
     /// @param ...args Arguments to format and log
     template <typename... Args>
-    void printer(Args &&...args)
+    void printer(Args&&... args)
     {
         std::vector<std::string> parts = {fmt::format("{}", std::forward<Args>(args))...};
         global_async_logger().log("{}", fmt::join(parts, ", "));
     }
-
 } // namespace mazes
 
 #endif // ASYNC_LOGGER_H

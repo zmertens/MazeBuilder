@@ -25,11 +25,11 @@ namespace mazes
 
         ~mask() = default;
 
-        mask(const mask &) = default;
-        mask &operator=(const mask &) = default;
+        mask(const mask&) = default;
+        mask& operator=(const mask&) = default;
 
-        mask(mask &&) noexcept = default;
-        mask &operator=(mask &&) noexcept = default;
+        mask(mask&&) noexcept = default;
+        mask& operator=(mask&&) noexcept = default;
 
         /// @brief Check if a cell at (row, column) is available
         /// @param row Row index
@@ -51,7 +51,7 @@ namespace mazes
         /// @param rng Randomizer to use
         /// @return A pair (row, col) of a random available cell
         /// @pre count() > 0 — callers must ensure at least one cell is available
-        std::pair<unsigned int, unsigned int> random_location(randomizer &rng) const noexcept;
+        std::pair<unsigned int, unsigned int> random_location(randomizer& rng) const noexcept;
 
         /// @brief Get the number of rows
         /// @return Number of rows
@@ -66,14 +66,13 @@ namespace mazes
         /// @return A mask loaded from the file
         /// @throws std::runtime_error if the file cannot be opened or is empty
         /// @note Lines of different lengths are supported; shorter rows default to available
-        static mask from_txt(const std::string &filename);
+        static mask from_txt(const std::string& filename);
 
     private:
         unsigned int m_rows;
         unsigned int m_columns;
         std::vector<std::vector<bool>> m_bits;
     };
-
 } // namespace mazes
 
 #endif // MASK_H

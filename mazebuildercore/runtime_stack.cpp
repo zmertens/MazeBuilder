@@ -4,11 +4,10 @@
 #include <MazeBuilder/runtime_app.h>
 
 #include <ranges>
-#include <stdexcept>
 
 using namespace mazes;
 
-runtime_stack::runtime_stack(runtime_app::context ctx)
+runtime_stack::runtime_stack(const runtime_app::context& ctx)
     : runtime_context(ctx)
 {
 }
@@ -30,7 +29,7 @@ void runtime_stack::clear_states() noexcept
 
 void runtime_stack::apply_pending_changes() noexcept
 {
-    for (const auto &change : m_pending)
+    for (const auto& change : m_pending)
     {
         switch (change.action)
         {
@@ -65,15 +64,15 @@ bool runtime_stack::is_empty() const noexcept
     return m_states.empty() && m_pending.empty();
 }
 
-void runtime_stack::visit_states(const std::optional<args> &args, double elapsed) noexcept
+void runtime_stack::visit_states(const std::optional<args>& args, double elapsed) noexcept
 {
-    std::ranges::for_each(m_states | std::views::reverse, [&args, elapsed](const auto &state_ptr)
-                          {
-        if (!state_ptr->update(args, elapsed))
+    for (auto it = m_states.rbegin(); it != m_states.rend(); ++it)
+    {
+        if (!(*it)->update(args, elapsed))
         {
-            // If state does not update - do not change the stack - try to process next iteration
-            return;
-        } });
+            break;
+        }
+    }
 
     apply_pending_changes();
 }

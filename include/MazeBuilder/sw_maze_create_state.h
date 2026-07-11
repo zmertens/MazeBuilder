@@ -1,7 +1,6 @@
 #ifndef SW_MAZE_CREATE_STATE_H
 #define SW_MAZE_CREATE_STATE_H
 
-#include <MazeBuilder/algos.h>
 #include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/state.h>
@@ -14,6 +13,7 @@
 namespace mazes
 {
     class args;
+    class configurator;
     class randomizer;
     class runtime_stack;
     struct context;
@@ -22,9 +22,9 @@ namespace mazes
     class sw_maze_create_state final : public create_contract, public state
     {
     public:
-        explicit sw_maze_create_state(const runtime_app::context &ctx, runtime_stack *stack);
+        explicit sw_maze_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
-        virtual std::string_view create(algo a, unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept override;
+        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
         void draw() const noexcept override;
 
@@ -41,13 +41,17 @@ namespace mazes
         /// @param levels
         /// @param rng
         /// @return
-        std::string_view create_sw_maze(unsigned int rows, unsigned int cols, unsigned int levels, randomizer &rng) noexcept;
+        std::string_view create_sw_maze(unsigned int rows, unsigned int cols, unsigned int levels,
+                                        randomizer &rng) noexcept;
 
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
+        grid_identifier m_grid_id;
+        bool m_use_distances;
+        int m_distances_start;
+        int m_distances_end;
         std::string m_result;
     };
-
 } // namespace mazes
 
 #endif // SW_MAZE_CREATE_STATE_H

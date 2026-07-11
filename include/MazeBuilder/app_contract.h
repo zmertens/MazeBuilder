@@ -18,7 +18,6 @@ namespace mazes
         /// @return The formatted string view after applying the contract
         [[nodiscard]] virtual std::string_view apply(std::string_view unformatted_sv) noexcept = 0;
     };
-
 } // namespace mazes
 
 #endif // APP_CONTRACT_H

@@ -13,7 +13,7 @@ namespace mazes
     class processed_text final
     {
         /// @brief Type alias for the artifacts stored in the double buffer
-        using artifacts = std::variant<std::monostate, std::string, std::string_view, char *>;
+        using artifacts = std::variant<std::monostate, std::string, std::string_view, char*>;
 
         static constexpr auto DIRTY_INDEX = 0, PROCESSED_INDEX = 1, BUFFER_SIZE = 2;
 
@@ -36,7 +36,7 @@ namespace mazes
 
         /// @brief Required by resource_management::load(id, string_view).
         ///        Stores sv as the dirty (unprocessed) value; returns true on success.
-        bool set(std::string_view sv) noexcept
+        bool set(const std::string_view sv) noexcept
         {
             set_dirty(std::string{sv});
             return true;
@@ -45,11 +45,11 @@ namespace mazes
         /// @brief Checks if the dirty artifact is clean - empty or null
         /// @details clean artifacts are considered non-empty or don't care
         /// @return True if the dirty artifact is clean, false otherwise
-        [[nodiscard]] constexpr bool is_clean() const noexcept
+        [[nodiscard]] bool is_clean() const noexcept
         {
-            return std::visit([](const auto &value) -> bool
-                              {
-                using T = std::decay_t<decltype(value)>;
+            return std::visit([]<typename T0>(const T0& value) -> bool
+            {
+                using T = std::decay_t<T0>;
                 if constexpr (std::is_same_v<T, std::monostate>)
                 {
                     return true; // Consider monostate as clean
@@ -65,7 +65,8 @@ namespace mazes
                 else
                 {
                     return false;
-                } }, get_dirty());
+                }
+            }, get_dirty());
         }
 
     private:

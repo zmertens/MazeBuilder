@@ -20,7 +20,6 @@ set(MAZE_BUILDER_CORE_SRCS
     loading_state.cpp
     mask.cpp
     masked_grid.cpp
-    objectify_create_state.cpp
     parsing_state.cpp
     pixels_create_state.cpp
     randomizer.cpp
