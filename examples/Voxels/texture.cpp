@@ -321,11 +321,33 @@ bool texture::update_from_memory(const std::uint8_t* data, const int width, cons
     }
 
     // Efficient update using glTexSubImage2D (reuses existing texture)
+    while (glGetError() != GL_NO_ERROR)
+    {
+        // Clear prior errors so diagnostics below pinpoint the failing call.
+    }
+
+    const auto log_gl_error = [](const char* step)
+    {
+        if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+                         "OpenGL error in update_from_memory (%s): 0x%x\n",
+                         step, error);
+        }
+    };
+
     glActiveTexture(GL_TEXTURE0 + channel_offset);
+    log_gl_error("glActiveTexture");
+
     glBindTexture(GL_TEXTURE_2D, m_texture);
+    log_gl_error("glBindTexture");
+
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, GL_RGBA,
                     GL_UNSIGNED_BYTE, upload_data);
+    log_gl_error("glTexSubImage2D");
+
     glGenerateMipmap(GL_TEXTURE_2D);
+    log_gl_error("glGenerateMipmap");
 
     if (const GLenum error = glGetError(); error != GL_NO_ERROR)
     {

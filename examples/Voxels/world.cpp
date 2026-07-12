@@ -2568,16 +2568,55 @@ void world::render_plane() const noexcept
 void world::render_text(const std::uint32_t font, const int justify,
                         float x, const float y, const float n, const std::string_view text) const noexcept
 {
+    while (glGetError() != GL_NO_ERROR)
+    {
+        // Clear prior errors so diagnostics below pinpoint the failing call.
+    }
+
+    const auto log_gl_error = [](const char* step)
+    {
+        if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+        {
+            SDL_LogError(SDL_LOG_CATEGORY_ERROR,
+                         "OpenGL error in render_text (%s): 0x%x\n",
+                         step, error);
+        }
+    };
+
     float matrix[16];
     begin_2d_pass(&s_text_attrib, matrix);
+    log_gl_error("begin_2d_pass");
+
     glUniform1i(s_text_attrib.sampler, static_cast<int>(TextureIdentifier::BITMAP_FONT));
+    log_gl_error("glUniform1i sampler");
+
     glUniform1i(s_text_attrib.extra1, 0);
+    log_gl_error("glUniform1i extra1");
+
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
+    log_gl_error("glActiveTexture");
+
     glBindTexture(GL_TEXTURE_2D, font);
+    log_gl_error("glBindTexture");
 
     const GLsizei length = static_cast<GLsizei>(text.length());
+    if (length <= 0)
+    {
+        return;
+    }
+
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = sdl_gl_helper::gen_text_buffer(x, y, n, text);
+    log_gl_error("gen_text_buffer");
+
+    if (buffer == 0)
+    {
+        return;
+    }
+
     sdl_gl_helper::draw_text(&s_text_attrib, buffer, length);
+    log_gl_error("draw_text");
+
     sdl_gl_helper::del_buffer(buffer);
+    log_gl_error("del_buffer");
 }

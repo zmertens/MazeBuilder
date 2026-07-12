@@ -40,7 +40,8 @@ if (EMSCRIPTEN)
     target_include_directories(${VOXELS_EXE} PRIVATE $<INSTALL_INTERFACE:deps/emscripten_local> $<BUILD_INTERFACE:${EMSCRIPTEN_DEP_PATH}>)
 
     target_link_options(${VOXELS_EXE} PRIVATE
-            "SHELL:-s PTHREAD_POOL_SIZE=6 -s USE_PTHREADS -s ALLOW_MEMORY_GROWTH=1 -s STACK_SIZE=323232"
+            "SHELL:-pthread -s PTHREAD_POOL_SIZE=12"
+            "SHELL:-s INITIAL_MEMORY=268435456 -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=1073741824"
             "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s WASM=1"
             "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"
             "SHELL:--preload-file ${CMAKE_CURRENT_SOURCE_DIR}/shaders@/shaders"
@@ -54,7 +55,7 @@ if (EMSCRIPTEN)
             "${CMAKE_CURRENT_SOURCE_DIR}/textures/favicon.ico"
             "$<TARGET_FILE_DIR:${VOXELS_EXE}>/favicon.ico"
         COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_CURRENT_SOURCE_DIR}/../scripts/secure_http_server.py"
+            "${CMAKE_CURRENT_SOURCE_DIR}/../../scripts/secure_http_server.py"
             "$<TARGET_FILE_DIR:${VOXELS_EXE}>/secure_http_server.py"
         VERBATIM)
 else ()

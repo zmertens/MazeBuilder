@@ -2,11 +2,11 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <memory>
 #include <string>
 
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/randomizer.h>
-#include <MazeBuilder/singleton_base.h>
 
 #include "craft.h"
 
@@ -15,6 +15,10 @@ static constexpr auto window_w = 1200, window_h = 800;
 
 const auto title{"Maze Builder - " + mazes::buildinfo::Version};
 
+// Avoid function-local static initialization on wasm main thread.
+// Eager init sidesteps __cxa_guard_acquire/pthread_cond_wait warnings.
+std::shared_ptr<craft> g_voxel_engine = std::make_shared<craft>(title, window_w, window_h);
+
 // Setup for Emscripten/WebAssembly
 // Bind a getter method from C++ so that it can be accessed in the frontend with JS
 #if defined(__EMSCRIPTEN__)
@@ -22,7 +26,7 @@ const auto title{"Maze Builder - " + mazes::buildinfo::Version};
 
 std::shared_ptr<craft> get()
 {
-    return mazes::singleton_base<craft>::instance(title, window_w, window_h);
+    return g_voxel_engine;
 }
 
 EMSCRIPTEN_BINDINGS (craft_module)
@@ -43,8 +47,7 @@ int main()
     {
         mazes::randomizer rng;
 
-        if (const auto voxel_engine = mazes::singleton_base<craft>::instance(title, window_w, window_h);
-            !voxel_engine->run(nullptr, std::ref(rng)))
+        if (!g_voxel_engine->run(nullptr, std::ref(rng)))
         {
             throw std::runtime_error("ERROR: Running SDL app failed.");
         }

@@ -283,10 +283,15 @@ void sdl_gl_helper::del_buffer(const std::uint32_t buffer) noexcept
 
 std::uint32_t sdl_gl_helper::gen_buffer(const std::size_t size, const float* data) noexcept
 {
+    if (size == 0)
+    {
+        return 0;
+    }
+
     GLuint buffer;
     glGenBuffers(1, &buffer);
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
-    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizei>(size), data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(size), data, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     return buffer;
 }
@@ -363,7 +368,18 @@ std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float
                                              const std::string_view text) noexcept
 {
     const auto length = static_cast<GLsizei>(text.size());
+    if (length <= 0)
+    {
+        return 0;
+    }
+
     GLfloat* data = malloc_faces(4, length);
+    if (!data)
+    {
+        SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to allocate text vertex buffer data\n");
+        return 0;
+    }
+
     for (int i = 0; i < length; i++)
     {
         make_character(data + i * 24, x, y, n / 2, n, text[i]);
