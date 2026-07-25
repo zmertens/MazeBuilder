@@ -708,101 +708,127 @@
                 onRuntimeInitialized() {
                     if (overlayElement) overlayElement.hidden = true;
 
-                    // Get the instance once
+                    // Acquire the singleton engine instance created in C++ main.cpp.
                     let inst = null;
                     try {
-                        console.log("Calling Module.get()...");
                         inst = Module.get();
-                        console.log("Instance retrieved:", inst);
+                        console.log("[MazeBuilder] engine version:", inst.get_version());
                     } catch (e) {
-                        console.error("Error calling Module.get():", e);
+                        console.error("[MazeBuilder] Module.get() failed:", e);
                         Module.print("Error: " + e.message);
                         return;
                     }
 
-                    // Poll is_download_ready() every 3-5ms (using 4ms as middle ground)
-                    let pollCount = 0;
-                    const pollInterval = setInterval(() => {
-                        pollCount++;
-                        try {
-                            const isReady = inst.is_download_ready();
+                    // ----------------------------------------------------------------
+                    // triggerObjDownload(objString)
+                    // Creates a temporary <a> element and fires a browser download of
+                    // the provided Wavefront OBJ text as a .obj file.
+                    // ----------------------------------------------------------------
+                    function triggerObjDownload(objString) {
+                        const blob = new Blob([objString], { type: "text/plain" });
+                        const url  = URL.createObjectURL(blob);
+                        const a    = document.createElement("a");
+                        a.href     = url;
+                        a.download = "maze_export_" +
+                            new Date().toISOString().replace(/[:.]/g, "-") + ".obj";
+                        document.body.appendChild(a);
+                        a.click();
+                        // Defer cleanup so the browser has time to open the download.
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            inst.reset_download_flag(); // re-arm for next export
+                            Module.print("[MazeBuilder] OBJ downloaded successfully.");
+                        }, 200);
+                    }
 
-                            // Log every ~1 second
-                            if (pollCount % 250 === 0) {
-                                console.log(
-                                    `Polling is_download_ready() [${pollCount}]: ${isReady}`,
-                                );
-                            }
+                    // ----------------------------------------------------------------
+                    // startAsyncExport(opts?)
+                    //   opts.rows    – maze row count (default: engine current)
+                    //   opts.cols    – maze column count
+                    //   opts.algo    – "binary_tree" | "sidewinder" | "dfs"
+                    //   opts.seed    – integer seed; 0 = random
+                    //
+                    // Pattern: begin_export() signals the C++ worker thread to start
+                    // the SQL query + OBJ conversion asynchronously.  We then poll
+                    // is_export_ready() at a low frequency (250 ms) so the main
+                    // render loop is never blocked.  When ready, get_export() returns
+                    // the full OBJ string in a single call and we trigger the download.
+                    // ----------------------------------------------------------------
+                    function startAsyncExport(opts) {
+                        opts = opts || {};
 
-                            if (isReady) {
-                                clearInterval(pollInterval);
-                                console.log(
-                                    "Download ready! Calling artifacts()...",
-                                );
-                                Module.print(
-                                    "Download ready! Retrieving artifacts...",
-                                );
+                        // Apply optional maze config from the JS caller.
+                        if (opts.rows   != null) inst.set_maze_rows(opts.rows | 0);
+                        if (opts.cols   != null) inst.set_maze_columns(opts.cols | 0);
+                        if (opts.algo   != null) inst.set_maze_algo(String(opts.algo));
+                        if (opts.seed   != null) inst.set_maze_seed(opts.seed | 0);
 
-                                // Get the artifacts
-                                const result = inst.artifacts();
-                                console.log(
-                                    "Artifacts retrieved, length:",
-                                    result.length,
-                                );
+                        // Kick off the background OBJ-generation worker (returns immediately).
+                        inst.begin_export();
+                        Module.print("[MazeBuilder] OBJ export started (status: " +
+                                     inst.get_export_status() + ")");
 
-                                // Check if artifacts are not empty
-                                if (!result || result.length === 0) {
-                                    console.warn("Artifacts are empty!");
-                                    Module.print(
-                                        "Warning: Artifacts are empty, nothing to download.",
-                                    );
+                        let pollCount = 0;
+
+                        // Poll is_export_ready() at 250 ms — low overhead, no busy-wait.
+                        const poll = setInterval(() => {
+                            pollCount++;
+                            try {
+                                if (!inst.is_export_ready()) {
+                                    // Log progress every ~5 seconds so the user can see activity.
+                                    if (pollCount % 20 === 0) {
+                                        Module.print("[MazeBuilder] export in progress… " +
+                                                     "(" + (pollCount * 250 / 1000).toFixed(1) + "s)");
+                                    }
+                                    return; // still running — check again next tick
+                                }
+
+                                clearInterval(poll);
+
+                                // Retrieve the completed OBJ data (single call, no re-computation).
+                                const obj = inst.get_export();
+                                if (!obj || obj.length === 0) {
+                                    Module.print("[MazeBuilder] Warning: export produced empty OBJ.");
+                                    console.warn("[MazeBuilder] get_export() returned empty string.");
                                     return;
                                 }
 
-                                Module.print(
-                                    `Artifacts retrieved: ${result.length} characters`,
-                                );
+                                Module.print("[MazeBuilder] Export ready: " + obj.length + " bytes.");
+                                triggerObjDownload(obj);
 
-                                // Create a blob from the artifacts string
-                                const blob = new Blob([result], {
-                                    type: "text/plain",
-                                });
-
-                                // Create a download link and trigger download
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement("a");
-                                a.href = url;
-                                a.download =
-                                    "artifacts_" +
-                                    new Date()
-                                        .toISOString()
-                                        .replace(/[:.]/g, "-") +
-                                    ".obj";
-                                document.body.appendChild(a);
-                                a.click();
-
-                                // Cleanup
-                                setTimeout(() => {
-                                    inst.reset_download_flag();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    Module.print(
-                                        "Artifacts downloaded successfully!",
-                                    );
-                                    console.log(
-                                        "Download triggered, cleanup complete",
-                                    );
-                                }, 100);
+                            } catch (err) {
+                                clearInterval(poll);
+                                console.error("[MazeBuilder] Export poll error:", err);
+                                Module.print("Export error: " + err.message);
                             }
-                        } catch (e) {
-                            clearInterval(pollInterval);
-                            console.error(
-                                "Error during polling or artifact retrieval:",
-                                e,
-                            );
-                            Module.print("Error: " + e.message);
+                        }, 250);
+                    }
+
+                    // Expose startAsyncExport on Module so page-level scripts / buttons
+                    // can call Module.startExport({ rows:12, cols:12, algo:"dfs" }).
+                    Module.startExport = startAsyncExport;
+
+                    // ----------------------------------------------------------------
+                    // Legacy compatibility: if the engine sets is_download_ready()
+                    // through its own internal path, honour that and download too.
+                    // Uses a low-frequency check (5 s) to remain non-intrusive.
+                    // ----------------------------------------------------------------
+                    const legacyPoll = setInterval(() => {
+                        try {
+                            if (inst.is_download_ready()) {
+                                clearInterval(legacyPoll);
+                                Module.print("[MazeBuilder] Legacy download flag set — retrieving artifacts.");
+                                const obj = inst.artifacts();
+                                if (obj && obj.length > 0) {
+                                    triggerObjDownload(obj);
+                                }
+                            }
+                        } catch (err) {
+                            clearInterval(legacyPoll);
+                            console.error("[MazeBuilder] Legacy poll error:", err);
                         }
-                    }, 3000);
+                    }, 5000);
                 },
             };
             Module.setStatus("Downloading...");

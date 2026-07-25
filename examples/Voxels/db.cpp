@@ -8,6 +8,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <chrono>
+
 #include <condition_variable>
 #include <mutex>
 #include <string>
@@ -111,6 +113,7 @@ int db_init(const char* path)
         "    text text not null"
         ");"
         "create unique index if not exists block_pqxyz_idx on block (p, q, x, y, z);"
+        "create index if not exists block_pqw_idx on block (p, q, w);"  // Optimized for range queries
         "create index if not exists preview_blocks_id_idx on preview_blocks (preview_id);"
         "create index if not exists preview_blocks_pqxyz_idx on preview_blocks (p, q, x, y, z);"
         "create unique index if not exists light_pqxyz_idx on light (p, q, x, y, z);"
@@ -559,7 +562,7 @@ std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int cent
         return blocks;
     }
 
-    load_mtx.lock();
+    const auto start_time = std::chrono::steady_clock::now();
 
     // Query blocks from chunks within radius of center chunk
     // The 'block' table has columns: p, q, x, y, z, w
@@ -569,12 +572,11 @@ std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int cent
     const char* query =
         "SELECT x, y, z, w FROM block "
         "WHERE p >= ? AND p <= ? AND q >= ? AND q <= ? "
-        "AND w > 0 "  // Only non-air blocks
-        "ORDER BY p, q, x, y, z "
-        "LIMIT 50000;";  // Increased limit for larger exports
+        "AND w > 0 ";  // Only non-air blocks - removed ORDER BY for performance
 
     sqlite3_stmt* stmt = nullptr;
 
+    load_mtx.lock();
     int rc = sqlite3_prepare_v2(db, query, -1, &stmt, nullptr);
     if (rc != SQLITE_OK)
     {
@@ -590,8 +592,10 @@ std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int cent
     sqlite3_bind_int(stmt, 2, center_p + radius);
     sqlite3_bind_int(stmt, 3, center_q - radius);
     sqlite3_bind_int(stmt, 4, center_q + radius);
+    load_mtx.unlock();
 
-    // Execute query and collect results
+    // Execute query and collect results (no lock needed for reading)
+    blocks.reserve(10000);  // Reserve space to reduce reallocations
     int row_count = 0;
     while (sqlite3_step(stmt) == SQLITE_ROW)
     {
@@ -605,7 +609,10 @@ std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int cent
     }
 
     sqlite3_finalize(stmt);
-    load_mtx.unlock();
+
+    const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now() - start_time).count();
+    SDL_Log("db_query_blocks_near_chunks: Retrieved %d blocks in %lld ms\n", row_count, (long long)elapsed_ms);
 
     return blocks;
 }

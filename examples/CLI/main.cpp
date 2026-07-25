@@ -22,20 +22,15 @@
 class command_line_parser : public mazes::singleton_base<command_line_parser>
 {
 public:
-    static std::string version() noexcept
+    std::string version() noexcept
     {
         return mazes::string_utils::concat(mazes::string_utils::concat(" v", mazes::buildinfo::Version),
                                            " - " + mazes::buildinfo::CommitSHA);
     }
 
-    static std::string title() noexcept
+    std::string help() noexcept
     {
-        return "mazebuildercli" + version();
-    }
-
-    static std::string help() noexcept
-    {
-        return title() + "\n\n" +
+        return "mazebuildercli - v" + version() + "\n\n" +
             "Generates mazes and converts to various formats\n\n"
             "Example: ./cli -r 14 -c 10 -a binary_tree > maze.txt\n\n"
             "Example: ./cli --rows=5 --columns=6 --algo=dfs -o maze.obj\n\n"
@@ -54,8 +49,18 @@ public:
             "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, stdout]\n"
             "\t-v, --version      display program version\n";
     }
+
+    std::string run(const std::string& arguments) noexcept
+    {
+        if (auto app = mazes::runtime_app::instance())
+        {
+            return std::string{app->apply(arguments)};
+        }
+        return {};
+    }
 }; // class
 
+std::shared_ptr<command_line_parser> parser = std::make_shared<command_line_parser>();
 
 #if defined(__EMSCRIPTEN__)
 
@@ -63,7 +68,7 @@ public:
 
 std::shared_ptr<command_line_parser> get()
 {
-    return mazes::singleton_base<command_line_parser>::instance();
+    return parser;
 }
 
 EMSCRIPTEN_BINDINGS (cli_module)
@@ -71,8 +76,9 @@ EMSCRIPTEN_BINDINGS (cli_module)
     emscripten::function("get", &get);
     emscripten::class_<command_line_parser>("cli")
         .smart_ptr<std::shared_ptr<command_line_parser>>("shared_ptr<command_line_parser>")
-        .class_function("help", &command_line_parser::help)
-        .class_function("version", &command_line_parser::version);
+        .function("help", &command_line_parser::help)
+        .function("version", &command_line_parser::version)
+        .function("run", &command_line_parser::run);
 
     emscripten::register_vector<std::string>("StringVector");
 }
@@ -136,11 +142,11 @@ int main(const int argc, char* argv[])
         {
             if (args_vec.empty() || find_str(args_vec, "-h") || find_str(args_vec, "--help"))
             {
-                logger.log_message(command_line_parser::help());
+                logger.log_message(my_cli->help());
             }
             else if (find_str(args_vec, "-v") || find_str(args_vec, "--version"))
             {
-                logger.log_message(command_line_parser::version());
+                logger.log_message(my_cli->version());
             }
             else
             {

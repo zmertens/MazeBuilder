@@ -145,6 +145,13 @@ private:
     void render_crosshairs() const noexcept;
     void render_item(std::uint32_t texture) const noexcept;
     void render_player(std::uint32_t texture) const noexcept;
+    
+    // CAD Feature Rendering (Tier 1)
+    void render_hover_info() const noexcept;
+    void render_grid_overlay() const noexcept;
+    void render_measurement_lines() const noexcept;
+    void render_maze_preview_ghost() const noexcept;
+    
     void render_text(std::uint32_t font, int justify,
         float x, float y, float n, std::string_view text) const noexcept;
     void render_plane() const noexcept;

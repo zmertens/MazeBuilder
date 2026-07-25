@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <random>
@@ -14,7 +15,12 @@ class randomizer::randomizer_impl
     std::mt19937 rng_device;
 
 public:
-    randomizer_impl() : rng_device{std::random_device{}()}
+    randomizer_impl()
+#if defined(__EMSCRIPTEN__)
+        : rng_device{5489u}
+#else
+        : rng_device{std::random_device{}()}
+#endif
     {
     }
 
@@ -59,12 +65,17 @@ public:
 
     void seed() noexcept
     {
+#if defined(__EMSCRIPTEN__)
+        const auto now = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        rng_device.seed(static_cast<std::mt19937::result_type>(now));
+#else
         std::random_device rd;
         std::array<int, std::mt19937::state_size> seed_data{};
         std::ranges::generate(seed_data, std::ref(rd));
         std::seed_seq seq(seed_data.begin(), seed_data.end());
 
         rng_device.seed(seq);
+#endif
     }
 
     void seed(const unsigned long long seed) noexcept

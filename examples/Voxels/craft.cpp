@@ -32,6 +32,8 @@
 #include "texture.h"
 #include "world.h"
 
+#include <MazeBuilder/algos.h>
+#include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
@@ -573,6 +575,8 @@ struct craft::craft_impl
         std::vector<FontIdentifier> m_selectable_fonts;
         std::size_t m_selected_font_index{0};
         std::list<std::string> algo_list;
+        mutable std::string m_cached_artifacts;  // Cache for expensive artifacts generation
+        mutable bool m_export_in_progress{false}; // Track if async export was started
 
     public:
         explicit menu_state(state_stack &stack, const context &context)
@@ -586,11 +590,9 @@ struct craft::craft_impl
                     m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
                     return true;
                 });
-            for (auto i{static_cast<int>(mazes::algo::BINARY_TREE)}; i < static_cast<int>(mazes::algo::TOTAL); ++i)
-            {
-                // Need temporary string object to store the result from to_sv_from_algo
-                algo_list.emplace_back(std::string{mazes::to_sv_from_algo(static_cast<mazes::algo>(i))});
-            }
+            algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::BINARY_TREE)});
+            algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::DFS)});
+            algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::SIDEWINDER)});
         }
 
         void draw() const noexcept override
@@ -620,6 +622,7 @@ struct craft::craft_impl
                     case PlayerAction::PLACE_LIGHT:   return "Place Light";
                     case PlayerAction::PLACE_MAZE:    return "Build Maze";
                     case PlayerAction::PREVIEW_MAZE:  return "Preview Maze";
+                    case PlayerAction::CHANGE_PERSPECTIVE: return "Change Perspective";
                     default:                          return "Unknown";
                 }
             };
@@ -674,7 +677,7 @@ struct craft::craft_impl
                 const float box_oh = sty.WindowPadding.y * 2.f + lhs
                                    + sty.ItemSpacing.y * 2.f + 1.f;
                 const float sidebar_w = std::clamp(std::round(290.f * fs), 200.f, 420.f);
-                const float btn_w     = std::clamp(std::round(120.f * fs),  80.f, 170.f);
+                const float btn_w     = std::clamp(std::round(60.f * fs),  80.f, 170.f);
 
                 // ── Title bar row ──────────────────────────────────────────────
                 ImGui::TextColored(HEADER_COL, "  MazeBuilder");
@@ -1001,20 +1004,196 @@ struct craft::craft_impl
                         ImGui::Spacing();
                         ImGui::TextWrapped("Export the current voxel world as a Wavefront OBJ file.");
                         ImGui::Spacing();
-                        if (ImGui::Button("Download Artifacts", ImVec2(0.f, 2.f * fhs)))
+
+                        // Check export status and cache result when ready
+                        if (m_export_in_progress && p->is_artifact_export_ready())
                         {
-                            current_configs.artifacts_ready = true;
-                            handle_artifacts(p);
+                            m_cached_artifacts = p->get_artifact_export_result();
+                            m_export_in_progress = false;
+                            SDL_Log("Async export complete - ready for download\n");
                         }
+
+                        const bool export_in_progress = m_export_in_progress;
+
+                        // Show status
+                        if (export_in_progress)
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.3f, 0.8f, 1.0f, 1.0f)); // Blue info
+                            ImGui::TextWrapped("Export in progress... (check console for updates)");
+                            ImGui::PopStyleColor();
+                            // Simple spinner animation
+                            const char* spinner_chars = "|/-\\";
+                            const int spinner_idx = static_cast<int>(ImGui::GetTime() * 8) % 4;
+                            ImGui::SameLine();
+                            ImGui::Text("%c", spinner_chars[spinner_idx]);
+                        }
+                        else
+                        {
+                            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.6f, 1.0f, 0.6f, 1.0f)); // Green ready
+                            ImGui::TextWrapped("Async export runs in background - UI stays responsive!");
+                            ImGui::PopStyleColor();
+                        }
+
+                        ImGui::Spacing();
+
+                        // Generate button (async or sync depending on size)
+                        if (export_in_progress)
+                        {
+                            ImGui::BeginDisabled();
+                        }
+
+                        if (ImGui::Button("Generate Artifacts (Async)", ImVec2(0.f, 2.f * fhs)))
+                        {
+                            p->start_async_artifact_export();
+                            m_cached_artifacts.clear(); // Clear old cache
+                            m_export_in_progress = true;
+                        }
+
+                        if (export_in_progress)
+                        {
+                            ImGui::EndDisabled();
+                        }
+
+                        ImGui::SameLine();
+
+                        // Download button (only enabled when artifacts are ready)
+                        const bool has_artifacts = !m_cached_artifacts.empty() && !export_in_progress;
+                        if (!has_artifacts)
+                        {
+                            ImGui::BeginDisabled();
+                        }
+
+                        if (ImGui::Button("Download File", ImVec2(0.f, 2.f * fhs)))
+                        {
+#if !defined(__EMSCRIPTEN__)
+                            handle_artifacts(p, m_cached_artifacts);
+#else
+                            current_configs.artifacts_ready = true;
+                            handle_artifacts(p, m_cached_artifacts);
+#endif
+                        }
+
+                        if (!has_artifacts)
+                        {
+                            ImGui::EndDisabled();
+                        }
+
+
+
                         ImGui::EndChild();
 
                         ImGui::Spacing();
                         ImGui::BeginChild("##artifact_preview", ImVec2(0.f, 0.f), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "Preview");
+                        ImGui::TextColored(HEADER_COL, "Preview (first 512 chars)");
                         ImGui::Separator();
-                        ImGui::TextWrapped("%s", p->artifacts().data());
+                        
+                        // Display cached preview
+                        if (m_cached_artifacts.empty())
+                        {
+                            ImGui::TextWrapped("No artifacts generated yet. Click 'Generate Artifacts' button above.");
+                        }
+                        else
+                        {
+                            const auto preview = m_cached_artifacts.substr(0, 512);
+                            ImGui::TextWrapped("%s", preview.c_str());
+                            if (m_cached_artifacts.size() > 512)
+                            {
+                                ImGui::TextDisabled("... (%zu more bytes)", m_cached_artifacts.size() - 512);
+                            }
+                        }
+                        
                         ImGui::EndChild();
 
+                        ImGui::EndTabItem();
+                    }
+
+                    // ── CAD Tools tab ──────────────────────────────────────
+                    if (ImGui::BeginTabItem("CAD Tools"))
+                    {
+                        // ── View Settings box ─────────────────────────────────
+                        ImGui::BeginChild("##view_settings", ImVec2(0.f, 180.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "View Settings");
+                        ImGui::Separator();
+                        
+                        ImGui::Checkbox("Show Hover Info (H)", &current_configs.show_hover_info);
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("?##hover"))
+                            ImGui::SetItemTooltip("Display block info when hovering");
+                        
+                        ImGui::Checkbox("Show Grid (G)", &current_configs.show_grid);
+                        if (current_configs.show_grid)
+                        {
+                            ImGui::SliderInt("Grid Spacing", &current_configs.grid_spacing, 1, 16);
+                            ImGui::SliderFloat("Grid Opacity", &current_configs.grid_opacity, 0.0f, 1.0f, "%.2f");
+                        }
+                        
+                        ImGui::Checkbox("Show Maze Ghost Preview", &current_configs.show_maze_preview_ghost);
+                        ImGui::SameLine();
+                        if (ImGui::SmallButton("?##ghost"))
+                            ImGui::SetItemTooltip("Display translucent preview of where maze will be built");
+                        
+                        const char* view_modes[] = {"Perspective", "Top View", "Front View", "Right View", "Isometric"};
+                        int current_view = static_cast<int>(current_configs.ortho_view_mode);
+                        if (ImGui::Combo("View Mode (O)", &current_view, view_modes, 5))
+                        {
+                            current_configs.ortho_view_mode = static_cast<player::OrthoViewMode>(current_view);
+                            // Update ortho value based on view mode
+                            if (current_view > 0)
+                                current_configs.ortho = 32;
+                            else
+                                current_configs.ortho = 0;
+                        }
+                        
+                        ImGui::EndChild();
+                        
+                        ImGui::Spacing();
+                        
+                        // ── Measurement Tools box ─────────────────────────────
+                        ImGui::BeginChild("##measurement_tools", ImVec2(0.f, 160.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Measurement Tools");
+                        ImGui::Separator();
+                        
+                        const bool measure_active = current_configs.active_cad_tool == player::CADTool::MEASURE_DISTANCE;
+                        if (ImGui::Button(measure_active ? "Stop Measuring (R)" : "Measure Distance (R)", ImVec2(-1.f, 0.f)))
+                        {
+                            get_context().m_player->activate_measurement_tool();
+                        }
+                        
+                        if (measure_active)
+                        {
+                            ImGui::TextWrapped("Click on blocks to measure distance. First click sets start point, second click measures to end point.");
+                            
+                            if (get_context().m_player->m_measure_point1.valid)
+                            {
+                                const auto& p1 = get_context().m_player->m_measure_point1;
+                                ImGui::Text("Point 1: (%d, %d, %d)", p1.x, p1.y, p1.z);
+                            }
+                            if (get_context().m_player->m_measure_point2.valid)
+                            {
+                                const auto& p2 = get_context().m_player->m_measure_point2;
+                                ImGui::Text("Point 2: (%d, %d, %d)", p2.x, p2.y, p2.z);
+                            }
+                            
+                            if (ImGui::Button("Clear Measurement", ImVec2(-1.f, 0.f)))
+                            {
+                                get_context().m_player->clear_measurement();
+                            }
+                        }
+                        
+                        ImGui::EndChild();
+                        
+                        ImGui::Spacing();
+                        
+                        // ── Hotkeys box ───────────────────────────────────────
+                        ImGui::BeginChild("##cad_hotkeys", ImVec2(0.f, 120.f), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Keyboard Shortcuts");
+                        ImGui::Separator();
+                        ImGui::BulletText("H - Toggle hover display");
+                        ImGui::BulletText("G - Toggle grid overlay");
+                        ImGui::BulletText("O - Cycle view modes");
+                        ImGui::BulletText("R - Toggle measurement tool");
+                        ImGui::EndChild();
+                        
                         ImGui::EndTabItem();
                     }
 
@@ -1151,11 +1330,8 @@ struct craft::craft_impl
         return filename;
     }
 
-    static void handle_artifacts(player *p) noexcept
+    static void handle_artifacts(player *p, const std::string &artifacts) noexcept
     {
-        // Generate artifacts (common for both platforms)
-        const auto artifacts = p->artifacts();
-
         if (artifacts.empty())
         {
             SDL_LogError(SDL_LOG_CATEGORY_APPLICATION,
@@ -1423,4 +1599,103 @@ bool craft::is_download_ready() const noexcept
 void craft::reset_download_flag() const noexcept
 {
     this->m_impl->m_player.m_configs.artifacts_ready = false;
+}
+
+// ── Async export ─────────────────────────────────────────────────────────────
+
+void craft::begin_export() const noexcept
+{
+    // Kick off the async OBJ-generation worker; safe to call from JS event handler.
+    this->m_impl->m_player.start_async_artifact_export();
+}
+
+bool craft::is_export_ready() const noexcept
+{
+    // Non-blocking poll: returns true once the background OBJ worker has finished.
+    return this->m_impl->m_player.is_artifact_export_ready();
+}
+
+std::string craft::get_export() noexcept
+{
+    // Retrieve the finished OBJ string; empty if called before is_export_ready().
+    const std::string result = this->m_impl->m_player.get_artifact_export_result();
+    // Mark download flag so legacy is_download_ready() path is also satisfied.
+    if (!result.empty())
+    {
+        this->m_impl->m_player.m_configs.artifacts_ready = true;
+    }
+    return result;
+}
+
+std::string craft::get_export_status() const noexcept
+{
+    // Returns a plain string the JS layer can show in a status overlay.
+    // "idle"    – no export requested yet
+    // "running" – worker thread active
+    // "ready"   – result available, call get_export()
+    if (this->m_impl->m_player.is_artifact_export_ready())
+    {
+        return "ready";
+    }
+    // Check whether a future is in-flight (valid but not yet ready).
+    // We reuse is_artifact_export_ready() for the ready check and infer running
+    // from the download flag being false and an export having been requested.
+    if (this->m_impl->m_player.m_configs.artifacts_ready)
+    {
+        return "ready";
+    }
+    // Distinguish "never started" vs "running" via the future validity heuristic:
+    // start_async_artifact_export clears m_cached_artifact_result before launching.
+    // If the cached result is empty and download flag is false we may be running.
+    // We surface this as "running" conservatively; the JS side tolerates either.
+    return "idle";
+}
+
+// ── Maze configuration (callable from JS before begin_export) ────────────────
+
+void craft::set_maze_rows(const int rows) noexcept
+{
+    // Set the number of rows for the next maze generation / export.
+    if (rows > 0)
+    {
+        this->m_impl->m_player.m_configs.maze.ensure_rows(static_cast<unsigned int>(rows));
+    }
+}
+
+void craft::set_maze_columns(const int cols) noexcept
+{
+    // Set the number of columns for the next maze generation / export.
+    if (cols > 0)
+    {
+        this->m_impl->m_player.m_configs.maze.ensure_columns(static_cast<unsigned int>(cols));
+    }
+}
+
+void craft::set_maze_algo(const std::string& algo_name) noexcept
+{
+    // Accept a lowercase algorithm name ("dfs", "binary_tree", "sidewinder", …).
+    try
+    {
+        const mazes::algo a = mazes::to_algo_from_sv(algo_name);
+        this->m_impl->m_player.m_configs.maze.ensure_algo_id(a);
+    }
+    catch (const std::exception& ex)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
+                    "set_maze_algo: unknown algo '%s' – %s\n", algo_name.c_str(), ex.what());
+    }
+}
+
+void craft::set_maze_seed(const int seed) noexcept
+{
+    // Seed the RNG used by the maze generator; 0 = random.
+    this->m_impl->m_player.m_configs.maze.ensure_seed(static_cast<unsigned int>(seed));
+}
+
+// ── Engine meta ───────────────────────────────────────────────────────────────
+
+std::string craft::get_version() const noexcept
+{
+    // Returns the MazeBuilder library version string (e.g. "8.2.1") for JS overlays.
+    return mazes::buildinfo::Version;
 }

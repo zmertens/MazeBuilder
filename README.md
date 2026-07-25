@@ -53,7 +53,7 @@ The library supports different export formats like Wavefront object format, JSON
 
 Creating JSON output is easy:
 
-`mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
+`mazebuildercli.exe -j in.json -o 3x5_with_distances.json`
 
 ```json
 {

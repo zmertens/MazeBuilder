@@ -58,6 +58,8 @@ public:
 
     [[nodiscard]] std::uint32_t gen_crosshair_buffer() const noexcept;
     [[nodiscard]] static std::uint32_t gen_wireframe_buffer(float x, float y, float z, float n) noexcept;
+    [[nodiscard]] static std::uint32_t gen_line_buffer(float x1, float y1, float z1, 
+                                                         float x2, float y2, float z2) noexcept;
     [[nodiscard]] static std::uint32_t gen_cube_buffer(float x, float y, float z, float n, int w) noexcept;
     [[nodiscard]] static std::uint32_t gen_plant_buffer(float x, float y, float z, float n, int w) noexcept;
     [[nodiscard]] static std::uint32_t gen_player_buffer(float x, float y, float z, float rx, float ry) noexcept;

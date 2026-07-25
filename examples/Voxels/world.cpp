@@ -120,6 +120,7 @@ namespace
         default: return {0, 0, 1};
         }
     }
+
 }
 
 struct worker
@@ -562,12 +563,14 @@ void world::draw() const noexcept
     // Geometry with possible HDR bright pixels → enable both MRT attachments.
     m_bloom.set_mrt_mode();
     const auto triangle_faces = render_chunks(atlas_texture);
-    render_item(atlas_texture);
     render_player(atlas_texture);
+
+    // Item preview and maze preview are clean 2D UI overlays — no bloom contribution.
+    m_bloom.set_single_mode();
+    render_item(atlas_texture);
     render_plane();
 
-    // UI / overlay elements: no bloom needed.
-    m_bloom.set_single_mode();
+    // UI / overlay elements — already in single mode, no redundant switch needed.
     render_signs(signs_texture);
     render_sign(signs_texture);
 
@@ -583,6 +586,12 @@ void world::draw() const noexcept
 
     render_wireframe();
     render_crosshairs();
+    
+    // Render CAD features (Tier 1)
+    render_grid_overlay();
+    render_measurement_lines();
+    render_hover_info();
+    render_maze_preview_ghost();
 
     // --- Pass 2+3: Gaussian blur + composite bloom → default framebuffer ---
     const float bloom_str = m_player->m_configs.use_bloom_effect ? bloom_pass::BLOOM_STRENGTH : 0.0f;
@@ -765,6 +774,9 @@ void world::finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
     m_current_preview.wall_height = wall_height;
     m_current_preview.item_type = item_type;
     m_current_preview.has_data = true;
+    
+    SDL_Log("Preview finalized: %dx%d, scale=%d, height=%d, item=%d\n", 
+            width, height, scale, wall_height, item_type);
 }
 
 // Build the current preview at the targeted location
@@ -2415,33 +2427,388 @@ void world::render_crosshairs() const noexcept
     sdl_gl_helper::del_buffer(crosshair_buffer);
 }
 
+// ============================================================================
+// CAD Feature Rendering (Tier 1)
+// ============================================================================
+
+void world::render_hover_info() const noexcept
+{
+    if (!m_player->m_configs.show_hover_info)
+        return;
+        
+    if (!m_projected_plane.has_valid_target)
+        return;
+    
+    // Get viewport dimensions
+    int viewport_width, viewport_height;
+    SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
+    
+    const int hx = m_projected_plane.target_x;
+    const int hy = m_projected_plane.target_y;
+    const int hz = m_projected_plane.target_z;
+    const int face = m_projected_plane.target_face;
+    const int block_type = get_block(hx, hy, hz);
+    
+    // Calculate distance from player
+    const float dx = m_player->m_pos.x - static_cast<float>(hx);
+    const float dy = m_player->m_pos.y - static_cast<float>(hy);
+    const float dz = m_player->m_pos.z - static_cast<float>(hz);
+    const float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+    
+    // Render info text near crosshair (slightly offset from center)
+    const float x_offset = static_cast<float>(viewport_width) * 0.5f + 30.0f;
+    const float y_base = static_cast<float>(viewport_height) * 0.5f;
+    const float line_height = 15.0f;
+    
+    char info_buffer[256];
+    const auto font_tex = m_textures.get(TextureIdentifier::BITMAP_FONT).get();
+    
+    // Block type
+    SDL_snprintf(info_buffer, sizeof(info_buffer), "Block: %s", player::get_block_name(block_type));
+    render_text(font_tex, 0, x_offset, y_base - line_height * 2, 10.0f, info_buffer);
+    
+    // Coordinates
+    SDL_snprintf(info_buffer, sizeof(info_buffer), "Pos: (%d, %d, %d)", hx, hy, hz);
+    render_text(font_tex, 0, x_offset, y_base - line_height, 10.0f, info_buffer);
+    
+    // Face
+    SDL_snprintf(info_buffer, sizeof(info_buffer), "Face: %s", player::get_face_name(face));
+    render_text(font_tex, 0, x_offset, y_base, 10.0f, info_buffer);
+    
+    // Distance
+    SDL_snprintf(info_buffer, sizeof(info_buffer), "Dist: %.1f", distance);
+    render_text(font_tex, 0, x_offset, y_base + line_height, 10.0f, info_buffer);
+}
+
+void world::render_grid_overlay() const noexcept
+{
+    if (!m_player->m_configs.show_grid)
+        return;
+    
+    float matrix[16];
+    begin_3d_pass(&s_line_attrib, matrix);
+    
+    const int grid_spacing = m_player->m_configs.grid_spacing;
+    const int grid_size = 64; // Size in blocks from center
+    
+    // Grid at Y=0 (or player's Y level)
+    const int grid_y = 0; // Could use: static_cast<int>(m_player->m_pos.y)
+    
+    // Set grid color with opacity
+    const float opacity = m_player->m_configs.grid_opacity;
+    glUniform4f(s_line_attrib.extra1, 0.5f, 0.5f, 0.5f, opacity);
+    
+    glLineWidth(1.0f);
+    
+    // Draw grid lines along X axis (parallel to Z)
+    for (int x = -grid_size; x <= grid_size; x += grid_spacing)
+    {
+        const GLuint buffer = sdl_gl_helper::gen_line_buffer(
+            static_cast<float>(x), static_cast<float>(grid_y), static_cast<float>(-grid_size),
+            static_cast<float>(x), static_cast<float>(grid_y), static_cast<float>(grid_size)
+        );
+        sdl_gl_helper::draw_lines(&s_line_attrib, buffer, 3, 2);
+        sdl_gl_helper::del_buffer(buffer);
+    }
+    
+    // Draw grid lines along Z axis (parallel to X)
+    for (int z = -grid_size; z <= grid_size; z += grid_spacing)
+    {
+        const GLuint buffer = sdl_gl_helper::gen_line_buffer(
+            static_cast<float>(-grid_size), static_cast<float>(grid_y), static_cast<float>(z),
+            static_cast<float>(grid_size), static_cast<float>(grid_y), static_cast<float>(z)
+        );
+        sdl_gl_helper::draw_lines(&s_line_attrib, buffer, 3, 2);
+        sdl_gl_helper::del_buffer(buffer);
+    }
+    
+    // Reset color
+    glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+void world::render_measurement_lines() const noexcept
+{
+    if (m_player->m_configs.active_cad_tool != player::CADTool::MEASURE_DISTANCE)
+        return;
+    
+    // Only draw if we have at least one point
+    if (!m_player->m_measure_point1.valid)
+        return;
+    
+    float matrix[16];
+    begin_3d_pass(&s_line_attrib, matrix);
+    
+    const auto& p1 = m_player->m_measure_point1;
+    
+    // Draw marker at first point
+    glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 0.0f, 1.0f); // Yellow
+    glLineWidth(3.0f);
+    
+    const float marker_size = 0.3f;
+    GLuint marker_buffer = sdl_gl_helper::gen_line_buffer(
+        static_cast<float>(p1.x) - marker_size, static_cast<float>(p1.y), static_cast<float>(p1.z),
+        static_cast<float>(p1.x) + marker_size, static_cast<float>(p1.y), static_cast<float>(p1.z)
+    );
+    sdl_gl_helper::draw_lines(&s_line_attrib, marker_buffer, 3, 2);
+    sdl_gl_helper::del_buffer(marker_buffer);
+    
+    // If we have second point, draw measurement line
+    if (m_player->m_measure_point2.valid)
+    {
+        const auto& p2 = m_player->m_measure_point2;
+        
+        // Draw line between points
+        glUniform4f(s_line_attrib.extra1, 0.0f, 1.0f, 1.0f, 1.0f); // Cyan
+        const GLuint line_buffer = sdl_gl_helper::gen_line_buffer(
+            static_cast<float>(p1.x), static_cast<float>(p1.y), static_cast<float>(p1.z),
+            static_cast<float>(p2.x), static_cast<float>(p2.y), static_cast<float>(p2.z)
+        );
+        sdl_gl_helper::draw_lines(&s_line_attrib, line_buffer, 3, 2);
+        sdl_gl_helper::del_buffer(line_buffer);
+        
+        // Draw marker at second point
+        glUniform4f(s_line_attrib.extra1, 1.0f, 0.0f, 0.0f, 1.0f); // Red
+        marker_buffer = sdl_gl_helper::gen_line_buffer(
+            static_cast<float>(p2.x) - marker_size, static_cast<float>(p2.y), static_cast<float>(p2.z),
+            static_cast<float>(p2.x) + marker_size, static_cast<float>(p2.y), static_cast<float>(p2.z)
+        );
+        sdl_gl_helper::draw_lines(&s_line_attrib, marker_buffer, 3, 2);
+        sdl_gl_helper::del_buffer(marker_buffer);
+        
+        // Calculate and display distance
+        const int dx = p2.x - p1.x;
+        const int dy = p2.y - p1.y;
+        const int dz = p2.z - p1.z;
+        const float distance = std::sqrt(static_cast<float>(dx*dx + dy*dy + dz*dz));
+        
+        // Display distance text (2D overlay)
+        int viewport_width, viewport_height;
+        SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
+        
+        char distance_text[128];
+        SDL_snprintf(distance_text, sizeof(distance_text), 
+                    "Distance: %.2f blocks (dx:%d dy:%d dz:%d)", 
+                    distance, dx, dy, dz);
+        
+        render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).get(), 
+                   0, 10.0f, static_cast<float>(viewport_height) - 100.0f, 12.0f, distance_text);
+    }
+    
+    // Reset color
+    glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 1.0f, 1.0f);
+    glLineWidth(1.0f);
+}
+
+void world::render_maze_preview_ghost() const noexcept
+{
+    // Check if feature is enabled
+    if (!m_player->m_configs.show_maze_preview_ghost)
+    {
+        static bool logged_disabled = false;
+        if (!logged_disabled)
+        {
+            SDL_Log("Ghost preview: Feature disabled in config\n");
+            logged_disabled = true;
+        }
+        return;
+    }
+    
+    // Check if we have preview data
+    if (!m_current_preview.has_data)
+    {
+        return;
+    }
+    
+    // Check if we have a valid target to place the maze
+    if (!m_projected_plane.has_valid_target)
+    {
+        static int no_target_count = 0;
+        if (no_target_count++ % 60 == 0)  // Log every 60 frames (~1 second)
+        {
+            SDL_Log("Ghost preview: No valid target (point crosshair at a block surface)\n");
+        }
+        return;
+    }
+    
+    static int log_counter = 0;
+    const bool should_log = (log_counter++ % 60 == 0);  // Log every 60 frames (~1 second)
+    
+    if (should_log)
+    {
+        SDL_Log("Ghost preview at (%d,%d,%d) face=%d, preview: %dx%d, data_size=%zu\n", 
+                m_projected_plane.target_x, m_projected_plane.target_y, m_projected_plane.target_z,
+                m_projected_plane.target_face, m_current_preview.width, m_current_preview.height,
+                m_current_preview.pixel_data.size());
+    }
+    
+    // Calculate where the maze would be placed
+    const int face = m_projected_plane.target_face;
+    const ivec3 normal = face_normal(face);
+    const ivec3 axis_u = face_u_axis(face);
+    const ivec3 axis_v = face_v_axis(face);
+    
+    // Anchor one cell off the hit block, along face normal
+    const int anchor_x = m_projected_plane.target_x + normal.x;
+    const int anchor_y = m_projected_plane.target_y + normal.y;
+    const int anchor_z = m_projected_plane.target_z + normal.z;
+    
+    // Calculate logical maze dimensions
+    const int logical_width = m_current_preview.width / m_current_preview.scale;
+    const int logical_height = m_current_preview.height / m_current_preview.scale;
+    
+    // Setup rendering for wireframe lines
+    float matrix[16];
+    begin_3d_pass(&s_line_attrib, matrix);
+    
+    // Line shader outputs cyan color by default (1.0 - red = cyan)
+    // No need to set color uniform as shader hardcodes it
+    glLineWidth(1.0f);
+    
+    int blocks_rendered = 0;
+    int wall_pixels_found = 0;
+    int blocks_skipped = 0;
+    int blocks_culled = 0;
+    
+    // Collect all wireframe vertices into a single buffer for batching (huge performance gain)
+    std::vector<float> wireframe_data;
+    wireframe_data.reserve(100000);  // Pre-allocate for large mazes
+    
+    // Get player position for distance culling
+    const float player_x = m_player->m_pos.x;
+    const float player_y = m_player->m_pos.y;
+    const float player_z = m_player->m_pos.z;
+    constexpr float render_distance = 64.0f;  // Only render preview within this distance
+    
+    // Iterate through preview pixels and collect wireframe vertices
+    for (int pix_row = 0; pix_row < m_current_preview.height; ++pix_row)
+    {
+        for (int pix_col = 0; pix_col < m_current_preview.width; ++pix_col)
+        {
+            const int idx = (pix_row * m_current_preview.width + pix_col) * 4;  // RGBA format
+            if (idx + 3 >= static_cast<int>(m_current_preview.pixel_data.size()))
+                continue;
+            
+            const auto r = m_current_preview.pixel_data[idx];
+            const auto g = m_current_preview.pixel_data[idx + 1];
+            const auto b = m_current_preview.pixel_data[idx + 2];
+            
+            // Wall = dark blue-gray (24, 28, 34) - this is what we want to render as wireframe
+            if (r == 24 && g == 28 && b == 34)
+            {
+                wall_pixels_found++;
+                
+                // Convert pixel coordinates to logical maze coordinates
+                const int logical_col = pix_col / m_current_preview.scale;
+                const int logical_row = pix_row / m_current_preview.scale;
+                
+                // Render only the bottom and top levels for performance
+                // (showing just the outline/footprint of the maze)
+                for (int level = 0; level < m_current_preview.wall_height; level += std::max(1, m_current_preview.wall_height - 1))
+                {
+                    // Calculate world position
+                    const int world_x = anchor_x + axis_u.x * logical_col + axis_v.x * logical_row;
+                    const int world_y = anchor_y + axis_u.y * logical_col + axis_v.y * logical_row + level;
+                    const int world_z = anchor_z + axis_u.z * logical_col + axis_v.z * logical_row;
+                    
+                    // Distance culling - skip blocks far from player
+                    const float dx = static_cast<float>(world_x) - player_x;
+                    const float dy = static_cast<float>(world_y) - player_y;
+                    const float dz = static_cast<float>(world_z) - player_z;
+                    const float dist_sq = dx*dx + dy*dy + dz*dz;
+                    if (dist_sq > render_distance * render_distance)
+                    {
+                        blocks_culled++;
+                        continue;
+                    }
+                    
+                    // Skip if block already exists at this location
+                    if (get_block(world_x, world_y, world_z) != 0)
+                    {
+                        blocks_skipped++;
+                        continue;
+                    }
+                    
+                    // Generate wireframe vertices for this cube (72 floats = 24 vertices)
+                    float cube_data[72];
+                    make_cube_wireframe(cube_data, 
+                                       static_cast<float>(world_x),
+                                       static_cast<float>(world_y),
+                                       static_cast<float>(world_z),
+                                       0.51f);
+                    
+                    // Append to batch buffer
+                    wireframe_data.insert(wireframe_data.end(), cube_data, cube_data + 72);
+                    blocks_rendered++;
+                }
+            }
+        }
+    }
+    
+    // Render all wireframes in a single draw call (massive performance improvement)
+    if (!wireframe_data.empty())
+    {
+        const GLuint batch_buffer = sdl_gl_helper::gen_buffer(
+            wireframe_data.size() * sizeof(float),
+            wireframe_data.data()
+        );
+        
+        sdl_gl_helper::draw_lines(&s_line_attrib, batch_buffer, 3, 
+                                   static_cast<int>(wireframe_data.size() / 3));
+        sdl_gl_helper::del_buffer(batch_buffer);
+    }
+    
+    if (should_log)
+    {
+        SDL_Log("Ghost stats: wall_pixels=%d, rendered=%d, skipped=%d, culled=%d\n", 
+                wall_pixels_found, blocks_rendered, blocks_skipped, blocks_culled);
+    }
+    
+    // Reset line width
+    glLineWidth(1.0f);
+}
+
 void world::render_item(const std::uint32_t texture) const noexcept
 {
+    const GLboolean depth_was_enabled = glIsEnabled(GL_DEPTH_TEST);
+
+    // Render item preview as a UI-style overlay so it looks identical across camera modes.
+    glDisable(GL_DEPTH_TEST);
+    glDepthMask(GL_FALSE);
+
     float matrix[16];
     begin_item_pass(&s_block_attrib, matrix);
+
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniform3f(s_block_attrib.camera, 0, 0, 5);
     glUniform1i(s_block_attrib.sampler, 0);
     glUniform1f(s_block_attrib.timer, time_of_day());
+    glUniform1i(s_block_attrib.extra4, 0);
+
     if (const int w = m_player->get_item(); item::is_plant(w))
     {
-        const GLuint buffer = sdl_gl_helper::gen_plant_buffer(0, 0, 0, 0.5, w);
+        const GLuint buffer = sdl_gl_helper::gen_plant_buffer(0, 0, 0, 0.5f, w);
         sdl_gl_helper::draw_plant(&s_block_attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
     }
     else
     {
-        const GLuint buffer = sdl_gl_helper::gen_cube_buffer(0, 0, 0, 0.5, w);
+        const GLuint buffer = sdl_gl_helper::gen_cube_buffer(0, 0, 0, 0.5f, w);
         sdl_gl_helper::draw_cube(&s_block_attrib, buffer);
         sdl_gl_helper::del_buffer(buffer);
+    }
+
+    glDepthMask(GL_TRUE);
+    if (depth_was_enabled)
+    {
+        glEnable(GL_DEPTH_TEST);
     }
 }
 
 void world::render_player(const std::uint32_t texture) const noexcept
 {
-    // Only render player model in 3rd person mode (ortho 1-64)
-    if (m_player->m_configs.ortho < 1 || m_player->m_configs.ortho > 64)
+    // Only render player model in 3rd person mode (any non-zero ortho)
+    if (m_player->m_configs.ortho < 1)
     {
         return;
     }
@@ -2455,16 +2822,149 @@ void world::render_player(const std::uint32_t texture) const noexcept
     glUniform1i(s_block_attrib.sampler, 0);
     glUniform1f(s_block_attrib.timer, time_of_day());
 
-    // Generate player buffer at current position
-    // Offset player slightly behind camera for better visibility in 3rd person
-    const float offset_distance = 3.0f;
-    const float px = s->x - offset_distance * SDL_sinf(s->rx);
-    const float py = s->y - 0.5f; // Slight downward offset
-    const float pz = s->z + offset_distance * SDL_cosf(s->rx);
+    const bool is_isometric_mode =
+        m_player->m_configs.ortho_view_mode == player::OrthoViewMode::ISOMETRIC;
+    const bool is_orthographic_active = m_player->m_configs.ortho > 0;
+    // Fallback: some UI paths can leave mode enum in Perspective while ortho camera is active.
+    const bool use_isometric_fx = is_isometric_mode || is_orthographic_active;
 
-    const GLuint player_buffer = sdl_gl_helper::gen_player_buffer(px, py, pz, s->rx, s->ry);
+    static bool logged_iso_player_fx = false;
+    if (use_isometric_fx && !logged_iso_player_fx)
+    {
+        SDL_Log("Player marker FX enabled (mode=%d, ortho=%d)\n",
+                static_cast<int>(m_player->m_configs.ortho_view_mode),
+                m_player->m_configs.ortho);
+        logged_iso_player_fx = true;
+    }
+
+    const float t = static_cast<float>(SDL_GetTicks()) / 1000.0f;
+
+    // In isometric mode, keep marker at screen center by placing it along sight vector.
+    // In other ortho modes, keep the legacy 3rd-person offset behavior.
+    float px = s->x;
+    float py = s->y - 0.5f;
+    float pz = s->z;
+    if (use_isometric_fx)
+    {
+        float vx, vy, vz;
+        compute_sight_vector(s->rx, s->ry, vx, vy, vz);
+        constexpr float marker_distance = 3.0f;
+        px = s->x + vx * marker_distance;
+        py = s->y + vy * marker_distance - 0.35f + 0.16f * SDL_sinf(t * 3.0f);
+        pz = s->z + vz * marker_distance;
+    }
+    else
+    {
+        constexpr float offset_distance = 3.0f;
+        px = s->x - offset_distance * SDL_sinf(s->rx);
+        pz = s->z + offset_distance * SDL_cosf(s->rx);
+    }
+
+    const float animated_rx = use_isometric_fx
+        ? (s->rx + 0.20f * SDL_sinf(t * 2.4f) + 0.10f * SDL_sinf(t * 6.1f))
+        : s->rx;
+    const float animated_ry = use_isometric_fx
+        ? (s->ry + 0.08f * SDL_sinf(t * 1.9f + 0.7f))
+        : s->ry;
+
+    const GLboolean depth_was_enabled = glIsEnabled(GL_DEPTH_TEST);
+    const GLboolean cull_was_enabled = glIsEnabled(GL_CULL_FACE);
+    if (use_isometric_fx)
+    {
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+    }
+
+    const GLuint player_buffer = sdl_gl_helper::gen_player_buffer(px, py, pz, animated_rx, animated_ry);
     sdl_gl_helper::draw_player(&s_block_attrib, player_buffer);
     sdl_gl_helper::del_buffer(player_buffer);
+
+    if (use_isometric_fx)
+    {
+        // Pulsing halo and particles around the centered player marker.
+        float line_matrix[16];
+        begin_3d_pass(&s_line_attrib, line_matrix);
+
+        const float pulse_n = 0.55f + 0.10f * SDL_sinf(t * 3.8f);
+        glLineWidth(2.0f);
+        const GLuint halo = sdl_gl_helper::gen_wireframe_buffer(px, py, pz, pulse_n);
+        sdl_gl_helper::draw_lines(&s_line_attrib, halo, 3, 24);
+        sdl_gl_helper::del_buffer(halo);
+        glLineWidth(1.0f);
+
+        constexpr int particle_count = 10;
+        for (int i = 0; i < particle_count; ++i)
+        {
+            const float phase = t * 2.0f + static_cast<float>(i) * 0.65f;
+            const float radius = 0.90f + 0.16f * SDL_sinf(t * 2.2f + static_cast<float>(i));
+            const float ox = SDL_cosf(phase) * radius;
+            const float oy = 0.35f * SDL_sinf(phase * 1.37f);
+            const float oz = SDL_sinf(phase) * radius;
+            const float s_marker = 0.05f;
+
+            const GLuint lx = sdl_gl_helper::gen_line_buffer(
+                px + ox - s_marker, py + oy, pz + oz,
+                px + ox + s_marker, py + oy, pz + oz);
+            sdl_gl_helper::draw_lines(&s_line_attrib, lx, 3, 2);
+            sdl_gl_helper::del_buffer(lx);
+
+            const GLuint ly = sdl_gl_helper::gen_line_buffer(
+                px + ox, py + oy - s_marker, pz + oz,
+                px + ox, py + oy + s_marker, pz + oz);
+            sdl_gl_helper::draw_lines(&s_line_attrib, ly, 3, 2);
+            sdl_gl_helper::del_buffer(ly);
+        }
+
+        // Guaranteed on-screen marker in isometric view: center pulsing square + orbit particles.
+        float overlay_matrix[16];
+        auto [overlay_w, overlay_h] = begin_2d_pass(&s_line_attrib, overlay_matrix);
+        const float cx = static_cast<float>(overlay_w) * 0.5f;
+        const float cy = static_cast<float>(overlay_h) * 0.5f;
+        const float r = 18.0f + 5.0f * SDL_sinf(t * 4.2f);
+
+        const GLuint top = sdl_gl_helper::gen_line_buffer(cx - r, cy + r, 0.0f, cx + r, cy + r, 0.0f);
+        sdl_gl_helper::draw_lines(&s_line_attrib, top, 3, 2);
+        sdl_gl_helper::del_buffer(top);
+
+        const GLuint right = sdl_gl_helper::gen_line_buffer(cx + r, cy + r, 0.0f, cx + r, cy - r, 0.0f);
+        sdl_gl_helper::draw_lines(&s_line_attrib, right, 3, 2);
+        sdl_gl_helper::del_buffer(right);
+
+        const GLuint bottom = sdl_gl_helper::gen_line_buffer(cx + r, cy - r, 0.0f, cx - r, cy - r, 0.0f);
+        sdl_gl_helper::draw_lines(&s_line_attrib, bottom, 3, 2);
+        sdl_gl_helper::del_buffer(bottom);
+
+        const GLuint left = sdl_gl_helper::gen_line_buffer(cx - r, cy - r, 0.0f, cx - r, cy + r, 0.0f);
+        sdl_gl_helper::draw_lines(&s_line_attrib, left, 3, 2);
+        sdl_gl_helper::del_buffer(left);
+
+        constexpr int overlay_particles = 8;
+        for (int i = 0; i < overlay_particles; ++i)
+        {
+            const float phase = t * 2.8f + static_cast<float>(i) * 0.785f;
+            const float pr = r + 10.0f + 3.0f * SDL_sinf(t * 3.1f + static_cast<float>(i));
+            const float px2 = cx + SDL_cosf(phase) * pr;
+            const float py2 = cy + SDL_sinf(phase) * pr;
+            const float s2 = 2.0f;
+
+            const GLuint hp = sdl_gl_helper::gen_line_buffer(px2 - s2, py2, 0.0f, px2 + s2, py2, 0.0f);
+            sdl_gl_helper::draw_lines(&s_line_attrib, hp, 3, 2);
+            sdl_gl_helper::del_buffer(hp);
+
+            const GLuint vp = sdl_gl_helper::gen_line_buffer(px2, py2 - s2, 0.0f, px2, py2 + s2, 0.0f);
+            sdl_gl_helper::draw_lines(&s_line_attrib, vp, 3, 2);
+            sdl_gl_helper::del_buffer(vp);
+        }
+
+        if (depth_was_enabled)
+        {
+            glEnable(GL_DEPTH_TEST);
+        }
+        if (cull_was_enabled)
+        {
+            glEnable(GL_CULL_FACE);
+        }
+    }
 }
 
 void world::render_plane() const noexcept

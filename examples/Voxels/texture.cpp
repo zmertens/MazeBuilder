@@ -88,6 +88,22 @@ void texture::free() noexcept
 {
     if (m_texture != 0)
     {
+        // Unbind texture from all texture units before deleting to avoid INVALID_OPERATION
+        // Query current active texture unit
+        GLint current_texture_unit;
+        glGetIntegerv(GL_ACTIVE_TEXTURE, &current_texture_unit);
+        
+        // Unbind from common texture units (0-7) to be safe
+        for (int i = 0; i < 8; ++i)
+        {
+            glActiveTexture(GL_TEXTURE0 + i);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        
+        // Restore original active texture unit
+        glActiveTexture(current_texture_unit);
+        
+        // Now safe to delete
         glDeleteTextures(1, &m_texture);
         m_texture = 0;
         m_width = 0;
@@ -220,6 +236,12 @@ bool texture::load_from_memory(const std::uint8_t* data, const int width, const 
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Invalid parameters for load_from_memory\n");
         return false;
+    }
+
+    // Clear any existing OpenGL errors before we start
+    while (glGetError() != GL_NO_ERROR)
+    {
+        // Drain error queue
     }
 
     this->free();

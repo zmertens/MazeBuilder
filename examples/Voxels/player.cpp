@@ -22,6 +22,8 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/algos.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
@@ -29,6 +31,18 @@
 
 namespace
 {
+    // Calculate dimensions for PIXELS algorithm output
+    // Based on pixels_create_state.cpp: cell_size_px=12, wall_size_px=2
+    constexpr int PIXELS_CELL_SIZE = 12;
+    constexpr int PIXELS_WALL_SIZE = 2;
+
+    std::pair<int, int> calculate_pixel_dimensions(unsigned int rows, unsigned int cols) noexcept
+    {
+        const int width = static_cast<int>(cols) * PIXELS_CELL_SIZE + (static_cast<int>(cols) + 1) * PIXELS_WALL_SIZE;
+        const int height = static_cast<int>(rows) * PIXELS_CELL_SIZE + (static_cast<int>(rows) + 1) * PIXELS_WALL_SIZE;
+        return {width, height};
+    }
+
     std::string build_runtime_request(const mazes::configurator &config, std::string_view output)
     {
         std::string request;
@@ -41,75 +55,6 @@ namespace
         return request;
     }
 
-    bool looks_like_maze_ascii_line(const std::string &line) noexcept
-    {
-        if (line.empty())
-        {
-            return false;
-        }
-
-        for (const char ch : line)
-        {
-            if (ch != '+' && ch != '-' && ch != '|' && ch != ' ')
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    std::string extract_maze_ascii_block(const std::string_view text)
-    {
-        std::vector<std::string> lines;
-        lines.reserve(256);
-
-        std::string current;
-        current.reserve(256);
-        for (const char ch : text)
-        {
-            if (ch == '\n')
-            {
-                lines.push_back(current);
-                current.clear();
-            }
-            else if (ch != '\r')
-            {
-                current.push_back(ch);
-            }
-        }
-        if (!current.empty())
-        {
-            lines.push_back(current);
-        }
-
-        std::ostringstream maze_only;
-        bool in_maze = false;
-        bool wrote_any = false;
-        for (const auto &line : lines)
-        {
-            if (!in_maze)
-            {
-                if (!looks_like_maze_ascii_line(line))
-                {
-                    continue;
-                }
-
-                in_maze = true;
-            }
-
-            if (!looks_like_maze_ascii_line(line))
-            {
-                break;
-            }
-
-            maze_only << line << '\n';
-            wrote_any = true;
-        }
-
-        return wrote_any ? maze_only.str() : std::string{text};
-    }
-
     // Helper to convert block/voxel data to Wavefront OBJ format
     std::string blocks_to_wavefront_obj(const std::vector<std::tuple<int, int, int, int>> &blocks) noexcept
     {
@@ -118,7 +63,11 @@ namespace
             return "";
         }
 
+        const auto start_time = SDL_GetTicks();
+
         std::ostringstream result;
+        // Pre-allocate buffer to reduce reallocations (estimate ~200 bytes per block)
+        result.str().reserve(blocks.size() * 200);
 
         // Write header
         result << "# Voxel World Export\n";
@@ -149,6 +98,7 @@ namespace
         };
 
         int vertex_count = 0;
+        int processed_blocks = 0;
 
         // Generate vertices and faces for each block
         for (const auto &[x, y, z, w] : blocks)
@@ -157,6 +107,12 @@ namespace
             if (w == 0)
             {
                 continue;
+            }
+
+            // Progress logging for large exports (every 10,000 blocks)
+            if (++processed_blocks % 10000 == 0)
+            {
+                SDL_Log("OBJ export progress: %d / %zu blocks\n", processed_blocks, blocks.size());
             }
 
             // Write vertices for this cube
@@ -183,109 +139,10 @@ namespace
             vertex_count += 8;
         }
 
+        const auto elapsed = SDL_GetTicks() - start_time;
+        SDL_Log("blocks_to_wavefront_obj: Generated OBJ with %d blocks in %u ms\n", processed_blocks, elapsed);
+
         return result.str();
-    }
-
-    std::optional<player::maze_preview_frame> make_preview_from_ascii(
-        const std::string_view ascii,
-        const unsigned int rows,
-        const unsigned int columns)
-    {
-        if (ascii.empty())
-        {
-            return std::nullopt;
-        }
-
-        std::vector<std::string> lines;
-        lines.reserve(static_cast<size_t>(rows) * 3u);
-
-        std::string current;
-        current.reserve(256);
-        for (const char ch : ascii)
-        {
-            if (ch == '\n')
-            {
-                lines.push_back(current);
-                current.clear();
-            }
-            else if (ch != '\r')
-            {
-                current.push_back(ch);
-            }
-        }
-        if (!current.empty())
-        {
-            lines.push_back(current);
-        }
-
-        if (lines.empty())
-        {
-            return std::nullopt;
-        }
-
-        size_t width_chars = 0;
-        for (const auto &line : lines)
-        {
-            width_chars = std::max(width_chars, line.size());
-        }
-        if (width_chars == 0)
-        {
-            return std::nullopt;
-        }
-
-        for (auto &line : lines)
-        {
-            line.resize(width_chars, ' ');
-        }
-
-        constexpr unsigned int MIN_SCALE = 1u;
-        constexpr unsigned int MAX_SCALE = 10u;
-        const auto calculated_scale = static_cast<unsigned int>(SDL_sqrtf(static_cast<float>(rows * columns)));
-        const auto scale = static_cast<int>(std::clamp(calculated_scale, MIN_SCALE, MAX_SCALE));
-
-        const int width = static_cast<int>(width_chars) * scale;
-        const int height = static_cast<int>(lines.size()) * scale;
-        if (width <= 0 || height <= 0)
-        {
-            return std::nullopt;
-        }
-
-        player::maze_preview_frame frame;
-        frame.width = width;
-        frame.height = height;
-        frame.scale = scale;
-        frame.pixel_data.resize(static_cast<size_t>(width) * static_cast<size_t>(height) * 4u);
-
-        auto write_pixel = [&frame](const int px, const int py, const bool is_wall)
-        {
-            const auto index = (static_cast<size_t>(py) * static_cast<size_t>(frame.width) + static_cast<size_t>(px)) * 4u;
-            const std::uint8_t color = is_wall ? 0u : 255u;
-            frame.pixel_data[index + 0u] = color;
-            frame.pixel_data[index + 1u] = color;
-            frame.pixel_data[index + 2u] = color;
-            frame.pixel_data[index + 3u] = 255u;
-        };
-
-        for (int char_y = 0; char_y < static_cast<int>(lines.size()); ++char_y)
-        {
-            for (int char_x = 0; char_x < static_cast<int>(width_chars); ++char_x)
-            {
-                const char tile = lines[static_cast<size_t>(char_y)][static_cast<size_t>(char_x)];
-                const bool is_wall = tile != ' ';
-
-                const int x0 = char_x * scale;
-                const int y0 = char_y * scale;
-                for (int oy = 0; oy < scale; ++oy)
-                {
-                    for (int ox = 0; ox < scale; ++ox)
-                    {
-                        write_pixel(x0 + ox, y0 + oy, is_wall);
-                    }
-                }
-            }
-        }
-
-        return frame;
     }
 }
 
@@ -295,6 +152,8 @@ constexpr auto DEFAULT_ORTHO = 0u;
 constexpr auto ORTHO_ENABLED_VAL = 64;
 constexpr auto SCROLL_THRESHOLD = 0.1f;
 constexpr auto ZOOM_FOV = 15.f;
+constexpr auto ORTHO_MIN_SCALE = 8;
+constexpr auto ORTHO_MAX_SCALE = 96;
 
 player::player()
     : scene_node{}, m_is_active{true}, m_on_ground{false}, m_is_flying{false}, m_is_on_auto_run{false}, m_name{"zm"}, m_buffer{}, m_item_index{0}, m_world{nullptr}, m_maze_task{
@@ -306,19 +165,95 @@ player::player()
                                                                                                                                                                                  return std::nullopt;
                                                                                                                                                                              }
 
-                                                                                                                                                                             const auto txt_request = build_runtime_request(config, "txt");
-                                                                                                                                                                             auto maze_text = std::string{app->apply(txt_request)};
-                                                                                                                                                                             if (maze_text.empty())
+                                                                                                                                                                             // Generate the maze with the configured algorithm (DFS, Binary Tree, etc.)
+                                                                                                                                                                             std::string maze_request;
+                                                                                                                                                                             maze_request.reserve(160);
+                                                                                                                                                                             maze_request = "--rows=" + std::to_string(config.rows()) +
+                                                                                                                                                                                            " --columns=" + std::to_string(config.columns()) +
+                                                                                                                                                                                            " --levels=1 --algo=" + std::string{mazes::to_sv_from_algo(config.algo_id())} +
+                                                                                                                                                                                            " --seed=" + std::to_string(config.seed()) +
+                                                                                                                                                                                            " --output=stdout";
+
+                                                                                                                                                                             [[maybe_unused]] const auto maze_result = app->apply(maze_request);
+
+                                                                                                                                                                             // Get the generated grid with cell linkages
+                                                                                                                                                                             const auto *grid = app->get_last_grid();
+                                                                                                                                                                             if (!grid)
                                                                                                                                                                              {
-                                                                                                                                                                                 const auto stdout_request = build_runtime_request(config, "stdout");
-                                                                                                                                                                                 maze_text = std::string{app->apply(stdout_request)};
-                                                                                                                                                                                 if (maze_text.empty())
+                                                                                                                                                                                 return std::nullopt;
+                                                                                                                                                                             }
+
+                                                                                                                                                                             // Manually create pixel data from the grid (like AmazingSFML does)
+                                                                                                                                                                             const auto &grid_ops = grid->operations();
+                                                                                                                                                                             
+                                                                                                                                                                             const auto [width, height] = calculate_pixel_dimensions(config.rows(), config.columns());
+                                                                                                                                                                             std::vector<std::uint8_t> pixel_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+
+                                                                                                                                                                             // Fill with wall color (dark)
+                                                                                                                                                                             const std::array<std::uint8_t, 4> wall_color{24u, 28u, 34u, 255u};
+                                                                                                                                                                             const std::array<std::uint8_t, 4> floor_color{244u, 241u, 232u, 255u};
+
+                                                                                                                                                                             auto set_pixel = [&](int x, int y, const std::array<std::uint8_t, 4> &color)
+                                                                                                                                                                             {
+                                                                                                                                                                                 if (x >= 0 && y >= 0 && x < width && y < height)
                                                                                                                                                                                  {
-                                                                                                                                                                                     return std::nullopt;
+                                                                                                                                                                                     const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4u;
+                                                                                                                                                                                     pixel_data[offset + 0] = color[0];
+                                                                                                                                                                                     pixel_data[offset + 1] = color[1];
+                                                                                                                                                                                     pixel_data[offset + 2] = color[2];
+                                                                                                                                                                                     pixel_data[offset + 3] = color[3];
+                                                                                                                                                                                 }
+                                                                                                                                                                             };
+
+                                                                                                                                                                             auto fill_rect = [&](int x0, int y0, int w, int h, const std::array<std::uint8_t, 4> &color)
+                                                                                                                                                                             {
+                                                                                                                                                                                 for (int y = y0; y < y0 + h; ++y)
+                                                                                                                                                                                     for (int x = x0; x < x0 + w; ++x)
+                                                                                                                                                                                         set_pixel(x, y, color);
+                                                                                                                                                                             };
+
+                                                                                                                                                                             // Initialize all pixels to wall color
+                                                                                                                                                                             for (int y = 0; y < height; ++y)
+                                                                                                                                                                                 for (int x = 0; x < width; ++x)
+                                                                                                                                                                                     set_pixel(x, y, wall_color);
+
+                                                                                                                                                                             // Draw maze cells and passages
+                                                                                                                                                                             for (unsigned int row = 0; row < config.rows(); ++row)
+                                                                                                                                                                             {
+                                                                                                                                                                                 for (unsigned int col = 0; col < config.columns(); ++col)
+                                                                                                                                                                                 {
+                                                                                                                                                                                     const auto index = static_cast<int>(row * config.columns() + col);
+                                                                                                                                                                                     const auto current = grid_ops.search(index);
+                                                                                                                                                                                     if (!current)
+                                                                                                                                                                                         continue;
+
+                                                                                                                                                                                     const int px = PIXELS_WALL_SIZE + static_cast<int>(col) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
+                                                                                                                                                                                     const int py = PIXELS_WALL_SIZE + static_cast<int>(row) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
+
+                                                                                                                                                                                     // Draw cell interior
+                                                                                                                                                                                     fill_rect(px, py, PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, floor_color);
+
+                                                                                                                                                                                     // Draw passage to east if linked
+                                                                                                                                                                                     if (const auto east = grid_ops.get_east(current); east && current->is_linked(east))
+                                                                                                                                                                                     {
+                                                                                                                                                                                         fill_rect(px + PIXELS_CELL_SIZE, py, PIXELS_WALL_SIZE, PIXELS_CELL_SIZE, floor_color);
+                                                                                                                                                                                     }
+
+                                                                                                                                                                                     // Draw passage to south if linked
+                                                                                                                                                                                     if (const auto south = grid_ops.get_south(current); south && current->is_linked(south))
+                                                                                                                                                                                     {
+                                                                                                                                                                                         fill_rect(px, py + PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, PIXELS_WALL_SIZE, floor_color);
+                                                                                                                                                                                     }
                                                                                                                                                                                  }
                                                                                                                                                                              }
 
-                                                                                                                                                                             return make_preview_from_ascii(extract_maze_ascii_block(maze_text), config.rows(), config.columns());
+                                                                                                                                                                             // Create and return the preview frame
+                                                                                                                                                                             maze_preview_frame frame;
+                                                                                                                                                                             frame.pixel_data = std::move(pixel_data);
+                                                                                                                                                                             frame.width = width;
+                                                                                                                                                                             frame.height = height;
+                                                                                                                                                                             frame.scale = 1;
+                                                                                                                                                                             return frame;
                                                                                                                                                                          }}
 {
     set_category(Entity::PLAYER);
@@ -338,6 +273,7 @@ player::player()
     assign_key(PlayerAction::PLACE_MAZE, SDL_SCANCODE_B);
     assign_key(PlayerAction::PREVIEW_MAZE, SDL_SCANCODE_E);
     assign_key(PlayerAction::COPY_BLOCK, SDL_SCANCODE_C);
+    assign_key(PlayerAction::CHANGE_PERSPECTIVE, SDL_SCANCODE_O);
 
     m_configs.day_length = DAY_LENGTH;
     m_configs.start_time = DAY_LENGTH / 2 * 1000;
@@ -400,6 +336,62 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
+        // Handle CAD feature keys first (H, G, O, R)
+        switch (event.key.scancode)
+        {
+        case SDL_SCANCODE_H:
+            toggle_hover_display();
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Hover Display: %s", 
+                        m_configs.show_hover_info ? "ON" : "OFF");
+            return;
+        case SDL_SCANCODE_G:
+            toggle_grid();
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Grid Overlay: %s", 
+                        m_configs.show_grid ? "ON" : "OFF");
+            return;
+        case SDL_SCANCODE_O:
+            cycle_ortho_view();
+            {
+                const char* view_name = "Perspective";
+                switch (m_configs.ortho_view_mode)
+                {
+                case OrthoViewMode::TOP: view_name = "Top View"; break;
+                case OrthoViewMode::FRONT: view_name = "Front View"; break;
+                case OrthoViewMode::RIGHT: view_name = "Right View"; break;
+                case OrthoViewMode::ISOMETRIC: view_name = "Isometric View"; break;
+                default: break;
+                }
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "View Mode: %s", view_name);
+            }
+            return;
+        case SDL_SCANCODE_R:
+            activate_measurement_tool();
+            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Measurement Tool: %s", 
+                        m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE ? "ACTIVE" : "OFF");
+            return;
+        case SDL_SCANCODE_EQUALS:
+        case SDL_SCANCODE_KP_PLUS:
+            if (m_configs.ortho_view_mode == OrthoViewMode::ISOMETRIC)
+            {
+                m_configs.ortho = SDL_max(ORTHO_MIN_SCALE, m_configs.ortho - 2);
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", m_configs.ortho);
+                return;
+            }
+            break;
+        case SDL_SCANCODE_MINUS:
+        case SDL_SCANCODE_KP_MINUS:
+            if (m_configs.ortho_view_mode == OrthoViewMode::ISOMETRIC)
+            {
+                m_configs.ortho = SDL_min(ORTHO_MAX_SCALE, m_configs.ortho + 2);
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", m_configs.ortho);
+                return;
+            }
+            break;
+        default:
+            break;
+        }
+        
+        // Handle regular key bindings
         if (const auto found = m_key_binding.find(event.key.scancode);
             found != m_key_binding.cend() && !is_realtime_action(found->second))
         {
@@ -422,6 +414,14 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     {
         if (event.button.button == SDL_BUTTON_LEFT)
         {
+            // If measurement tool is active, record point instead of destroying
+            if (m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE && m_world && m_world->m_projected_plane.has_valid_target)
+            {
+                record_measurement_point(m_world->m_projected_plane.target_x,
+                                        m_world->m_projected_plane.target_y,
+                                        m_world->m_projected_plane.target_z);
+                return;
+            }
             commands.push(m_action_binding[PlayerAction::DESTROY_BLOCK]);
         }
         else if (event.button.button == SDL_BUTTON_RIGHT)
@@ -838,8 +838,9 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
     case PlayerAction::MOVE_BACKWARD:
     case PlayerAction::MOVE_DOWN:
     case PlayerAction::MOVE_UP:
-    case PlayerAction::PREVIEW_MAZE:   // polled every frame; cooldown in action lambda
+    case PlayerAction::PREVIEW_MAZE: // polled every frame; cooldown in action lambda
         return true;
+    case PlayerAction::CHANGE_PERSPECTIVE: [[fallthrough]];
     default:
         return false;
     }
@@ -1014,4 +1015,235 @@ std::string player::artifacts() const noexcept
 bool player::is_download_ready() const noexcept
 {
     return m_configs.artifacts_ready;
+}
+
+// ============================================================================
+// Async Artifact Export
+// ============================================================================
+
+void player::start_async_artifact_export() noexcept
+{
+    // Don't start a new export if one is already running (future is valid and not ready)
+    if (m_artifact_export_future.valid() && 
+        m_artifact_export_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Artifact export already in progress\n");
+        return;
+    }
+
+    SDL_Log("Starting async artifact export...\n");
+
+    if (!get_db_enabled())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Database not enabled for artifacts export\n");
+        // Set future to a ready empty result so callers don't spin forever
+        std::promise<std::string> p;
+        p.set_value("");
+        m_artifact_export_future = p.get_future();
+        return;
+    }
+
+    // Query blocks on the calling (main) thread.
+    // SQLite is not safe to call from std::async worker threads in Emscripten
+    // (SQLITE_THREADSAFE=0 builds) because sqlite3_step runs outside load_mtx
+    // while the db_worker can concurrently execute "commit; begin;", causing a
+    // data race that silently returns 0 rows.
+    const int player_chunk_p = world::chunked(m_pos.x);
+    const int player_chunk_q = world::chunked(m_pos.z);
+
+    SDL_Log("Async export: Querying database for blocks...\n");
+    constexpr int chunk_radius = 4;
+    auto blocks = db_query_blocks_near_chunks(player_chunk_p, player_chunk_q, chunk_radius);
+
+    if (blocks.empty())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No blocks found in database for export\n");
+        std::promise<std::string> p;
+        p.set_value("");
+        m_artifact_export_future = p.get_future();
+        return;
+    }
+
+    m_cached_artifact_result.clear();
+
+    // Offload only the CPU-bound OBJ conversion to a background thread
+    m_artifact_export_future = std::async(std::launch::async, [blocks = std::move(blocks)]() -> std::string
+    {
+        SDL_Log("Async export: Converting %zu blocks to OBJ format...\n", blocks.size());
+        return blocks_to_wavefront_obj(blocks);
+    });
+}
+
+bool player::is_artifact_export_ready() const noexcept
+{
+    return m_artifact_export_future.valid() && 
+           m_artifact_export_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+}
+
+std::string player::get_artifact_export_result() noexcept
+{
+    if (!is_artifact_export_ready())
+    {
+        SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Artifact export not ready yet\n");
+        return "";
+    }
+
+    // Cache the result so we can return it multiple times
+    if (m_cached_artifact_result.empty())
+    {
+        m_cached_artifact_result = m_artifact_export_future.get();
+        SDL_Log("Async export complete: %zu bytes\n", m_cached_artifact_result.size());
+    }
+
+    return m_cached_artifact_result;
+}
+
+// ============================================================================
+// CAD Helper Functions (Tier 1)
+// ============================================================================
+
+const char* player::get_block_name(const int block_type) noexcept
+{
+    switch (block_type)
+    {
+    case EMPTY: return "Empty";
+    case GRASS: return "Grass";
+    case SAND: return "Sand";
+    case STONE: return "Stone";
+    case BRICK: return "Brick";
+    case WOOD: return "Wood";
+    case CEMENT: return "Cement";
+    case DIRT: return "Dirt";
+    case PLANK: return "Plank";
+    case SNOW: return "Snow";
+    case GLASS: return "Glass";
+    case COBBLE: return "Cobblestone";
+    case LIGHT_STONE: return "Light Stone";
+    case DARK_STONE: return "Dark Stone";
+    case CHEST: return "Chest";
+    case LEAVES: return "Leaves";
+    case CLOUD: return "Cloud";
+    case TALL_GRASS: return "Tall Grass";
+    case YELLOW_FLOWER: return "Yellow Flower";
+    case RED_FLOWER: return "Red Flower";
+    case PURPLE_FLOWER: return "Purple Flower";
+    case SUN_FLOWER: return "Sun Flower";
+    case WHITE_FLOWER: return "White Flower";
+    case BLUE_FLOWER: return "Blue Flower";
+    case SDL_LOGO: return "SDL Logo";
+    case SFML_LOGO: return "SFML Logo";
+    case CACTUS_1: return "Cactus 1";
+    case CACTUS_2: return "Cactus 2";
+    default:
+        if (block_type >= COLOR_00 && block_type <= COLOR_31)
+        {
+            static char color_name[32];
+            SDL_snprintf(color_name, sizeof(color_name), "Color %02d", block_type - COLOR_00);
+            return color_name;
+        }
+        return "Unknown";
+    }
+}
+
+const char* player::get_face_name(const int face) noexcept
+{
+    switch (face)
+    {
+    case 0: return "Left";
+    case 1: return "Right";
+    case 2: return "Top";
+    case 3: return "Bottom";
+    case 4: return "Front";
+    case 5: return "Back";
+    default: return "Unknown";
+    }
+}
+
+void player::cycle_ortho_view() noexcept
+{
+    const auto current = static_cast<int>(m_configs.ortho_view_mode);
+    const auto next = (current + 1) % 5; // 5 total view modes
+    m_configs.ortho_view_mode = static_cast<OrthoViewMode>(next);
+    
+    // Update legacy ortho value based on view mode
+    switch (m_configs.ortho_view_mode)
+    {
+    case OrthoViewMode::PERSPECTIVE:
+        m_configs.ortho = 0;
+        break;
+    case OrthoViewMode::TOP:
+    case OrthoViewMode::FRONT:
+    case OrthoViewMode::RIGHT:
+    case OrthoViewMode::ISOMETRIC:
+        m_configs.ortho = 32; // Use reasonable ortho scale
+        break;
+    }
+}
+
+void player::toggle_grid() noexcept
+{
+    m_configs.show_grid = !m_configs.show_grid;
+}
+
+void player::toggle_hover_display() noexcept
+{
+    m_configs.show_hover_info = !m_configs.show_hover_info;
+}
+
+void player::activate_measurement_tool() noexcept
+{
+    if (m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE)
+    {
+        // Deactivate if already active
+        m_configs.active_cad_tool = CADTool::NONE;
+        clear_measurement();
+    }
+    else
+    {
+        // Activate measurement tool
+        m_configs.active_cad_tool = CADTool::MEASURE_DISTANCE;
+        clear_measurement();
+    }
+}
+
+void player::record_measurement_point(const int x, const int y, const int z) noexcept
+{
+    if (!m_measure_point1.valid)
+    {
+        // Record first point
+        m_measure_point1.x = x;
+        m_measure_point1.y = y;
+        m_measure_point1.z = z;
+        m_measure_point1.valid = true;
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Measurement point 1: (%d, %d, %d)", x, y, z);
+    }
+    else if (!m_measure_point2.valid)
+    {
+        // Record second point and calculate distance
+        m_measure_point2.x = x;
+        m_measure_point2.y = y;
+        m_measure_point2.z = z;
+        m_measure_point2.valid = true;
+        
+        const int dx = m_measure_point2.x - m_measure_point1.x;
+        const int dy = m_measure_point2.y - m_measure_point1.y;
+        const int dz = m_measure_point2.z - m_measure_point1.z;
+        const float distance = std::sqrt(static_cast<float>(dx*dx + dy*dy + dz*dz));
+        
+        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, 
+                    "Measurement point 2: (%d, %d, %d) - Distance: %.2f blocks", 
+                    x, y, z, distance);
+    }
+    else
+    {
+        // Already have two points, start over
+        clear_measurement();
+        record_measurement_point(x, y, z);
+    }
+}
+
+void player::clear_measurement() noexcept
+{
+    m_measure_point1.valid = false;
+    m_measure_point2.valid = false;
 }

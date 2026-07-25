@@ -30,20 +30,25 @@ namespace mazes
             : sink_([](std::string_view msg)
               {
                   fmt::print("{}\n", msg);
-              }),
-              worker_([this](const std::stop_token& st)
-              {
-                  run(st);
               })
         {
+#if !defined(__EMSCRIPTEN__)
+            worker_ = std::jthread([this](const std::stop_token& st)
+            {
+                run(st);
+            });
+#endif
         }
 
         explicit async_logger(sink_type sink)
-            : sink_(std::move(sink)), worker_([this](const std::stop_token& st)
+            : sink_(std::move(sink))
+        {
+#if !defined(__EMSCRIPTEN__)
+            worker_ = std::jthread([this](const std::stop_token& st)
             {
                 run(st);
-            })
-        {
+            });
+#endif
         }
 
         ~async_logger()
@@ -76,16 +81,23 @@ namespace mazes
         /// @brief Flush the logger, blocking until all pending messages are processed
         void flush()
         {
+#if defined(__EMSCRIPTEN__)
+            return;
+#else
             std::unique_lock lock(mtx_);
             drained_cv_.wait(lock, [this]()
             {
                 return pending_ == 0;
             });
+#endif
         }
 
         /// @brief Stop the logger, blocking until all pending messages are processed
         void stop() noexcept
         {
+#if defined(__EMSCRIPTEN__)
+            return;
+#else
             bool should_join = false;
             {
                 std::lock_guard lock(mtx_);
@@ -105,6 +117,7 @@ namespace mazes
                     worker_.join();
                 }
             }
+#endif
         }
 
         /// @brief Set the sink function for the logger
@@ -120,6 +133,18 @@ namespace mazes
         /// @param msg Message to enqueue
         void enqueue(std::string msg)
         {
+#if defined(__EMSCRIPTEN__)
+            sink_type sink;
+            {
+                std::lock_guard lock(mtx_);
+                sink = sink_;
+            }
+            if (sink)
+            {
+                sink(msg);
+            }
+            return;
+#else
             std::lock_guard lock(mtx_);
             if (stopped_)
             {
@@ -129,10 +154,12 @@ namespace mazes
             queue_.emplace_back(std::move(msg));
             ++pending_;
             cv_.notify_one();
+#endif
         }
 
         /// @brief Run the logger, processing messages until stopped
         /// @param st Stop token to request stopping the logger
+#if !defined(__EMSCRIPTEN__)
         void run(const std::stop_token& st)
         {
             for (;;)
@@ -187,15 +214,18 @@ namespace mazes
                 drained_cv_.notify_all();
             }
         }
+#endif
 
         mutable std::mutex mtx_;
+        sink_type sink_;
+    #if !defined(__EMSCRIPTEN__)
         std::condition_variable cv_;
         std::condition_variable drained_cv_;
         std::deque<std::string> queue_;
-        sink_type sink_;
         std::jthread worker_;
         std::size_t pending_{0};
         bool stopped_{false};
+    #endif
     };
 
     /// @brief Get the global async logger instance
