@@ -24,29 +24,33 @@ class command_line_parser : public mazes::singleton_base<command_line_parser>
 public:
     std::string version() noexcept
     {
-        return mazes::string_utils::concat(mazes::string_utils::concat(" v", mazes::buildinfo::Version),
+        return mazes::string_utils::concat(mazes::string_utils::concat("v", mazes::buildinfo::Version),
                                            " - " + mazes::buildinfo::CommitSHA);
     }
 
     std::string help() noexcept
     {
-        return "mazebuildercli - v" + version() + "\n\n" +
+        return "mazebuildercli " + version() + "\n\n" +
             "Generates mazes and converts to various formats\n\n"
-            "Example: ./cli -r 14 -c 10 -a binary_tree > maze.txt\n\n"
-            "Example: ./cli --rows=5 --columns=6 --algo=dfs -o maze.obj\n\n"
+            "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
+            "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
+            "Example: mazebuildercli -r 20 -c 20 -a sidewinder -o maze.png\n\n"
             "** Commands are case-sensitive! **\n\n"
             "\t-a, --algo         algorithm to generate maze links\n"
             "\t                     [binary_tree, dfs, sidewinder]\n"
             "\t-c, --columns      columns [max: 100]\n"
-            "\t-d, --distances    show distances with optional [start, steps] inclusive\n"
+            "\t-d, --distances    show distances with optional [start, end] inclusive\n"
             "\t                     example: '-d [0:10]'\n"
             "\t-h, --help         display this help message\n"
+            "\t-H, --image-height output image height in pixels (reserved)\n"
             "\t-j, --json         run with arguments in JSON format\n"
             "\t-l, --levels       levels [max: 10]\n"
             "\t-m, --mask         load mask from text file\n"
+            "\t    --show-steps   emit step snapshots during generation\n"
             "\t-s, --seed         seed for the number generator\n"
             "\t-r, --rows         rows [max: 100]\n"
-            "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, stdout]\n"
+            "\t-W, --image-width  output image width in pixels (reserved)\n"
+            "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, sfml, stdout]\n"
             "\t-v, --version      display program version\n";
     }
 
