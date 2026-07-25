@@ -2619,28 +2619,6 @@ void world::render_maze_preview_ghost() const noexcept
         return;
     }
     
-    // Check if we have a valid target to place the maze
-    if (!m_projected_plane.has_valid_target)
-    {
-        static int no_target_count = 0;
-        if (no_target_count++ % 60 == 0)  // Log every 60 frames (~1 second)
-        {
-            SDL_Log("Ghost preview: No valid target (point crosshair at a block surface)\n");
-        }
-        return;
-    }
-    
-    static int log_counter = 0;
-    const bool should_log = (log_counter++ % 60 == 0);  // Log every 60 frames (~1 second)
-    
-    if (should_log)
-    {
-        SDL_Log("Ghost preview at (%d,%d,%d) face=%d, preview: %dx%d, data_size=%zu\n", 
-                m_projected_plane.target_x, m_projected_plane.target_y, m_projected_plane.target_z,
-                m_projected_plane.target_face, m_current_preview.width, m_current_preview.height,
-                m_current_preview.pixel_data.size());
-    }
-    
     // Calculate where the maze would be placed
     const int face = m_projected_plane.target_face;
     const ivec3 normal = face_normal(face);
@@ -2755,12 +2733,6 @@ void world::render_maze_preview_ghost() const noexcept
         sdl_gl_helper::draw_lines(&s_line_attrib, batch_buffer, 3, 
                                    static_cast<int>(wireframe_data.size() / 3));
         sdl_gl_helper::del_buffer(batch_buffer);
-    }
-    
-    if (should_log)
-    {
-        SDL_Log("Ghost stats: wall_pixels=%d, rendered=%d, skipped=%d, culled=%d\n", 
-                wall_pixels_found, blocks_rendered, blocks_skipped, blocks_culled);
     }
     
     // Reset line width
