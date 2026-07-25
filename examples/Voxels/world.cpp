@@ -2453,7 +2453,7 @@ void world::render_hover_info() const noexcept
     const float dx = m_player->m_pos.x - static_cast<float>(hx);
     const float dy = m_player->m_pos.y - static_cast<float>(hy);
     const float dz = m_player->m_pos.z - static_cast<float>(hz);
-    const float distance = std::sqrt(dx*dx + dy*dy + dz*dz);
+    const float distance = SDL_sqrt(dx*dx + dy*dy + dz*dz);
     
     // Render info text near crosshair (slightly offset from center)
     const float x_offset = static_cast<float>(viewport_width) * 0.5f + 30.0f;
@@ -2579,7 +2579,7 @@ void world::render_measurement_lines() const noexcept
         const int dx = p2.x - p1.x;
         const int dy = p2.y - p1.y;
         const int dz = p2.z - p1.z;
-        const float distance = std::sqrt(static_cast<float>(dx*dx + dy*dy + dz*dz));
+        const float distance = SDL_sqrt(static_cast<float>(dx*dx + dy*dy + dz*dz));
         
         // Display distance text (2D overlay)
         int viewport_width, viewport_height;
