@@ -14,6 +14,8 @@ if(NOT CATCH2_FOUND)
     list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 endif()
 
+find_package(Threads REQUIRED)
+
 enable_testing()
 
 message(INFO ": Building tests")
@@ -31,14 +33,22 @@ add_test(NAME RUN_MAZE_TESTS COMMAND ${MAZE_BUILDER_TESTS_EXE}
         --order lex
         -s)
 target_compile_features(${MAZE_BUILDER_TESTS_EXE} PRIVATE cxx_std_20)
-target_compile_definitions(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:RelWithDebInfo>:MAZE_BENCHMARK>")
-target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static Catch2::Catch2WithMain)
+target_compile_definitions(${MAZE_BUILDER_TESTS_EXE} PRIVATE "$<$<CONFIG:Release>:MAZE_BENCHMARK>")
+target_link_libraries(${MAZE_BUILDER_TESTS_EXE} PRIVATE ${MAZE_BUILDER_CORE_LIB}_static Catch2::Catch2WithMain fmt::fmt Threads::Threads)
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
 target_include_directories(${MAZE_BUILDER_TESTS_EXE} PRIVATE $<INSTALL_INTERFACE:deps> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps>)
 
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/array.json" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/maze.json" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/mask.txt" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+add_custom_command(TARGET ${MAZE_BUILDER_TESTS_EXE} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/array.json"
+        "$<TARGET_FILE_DIR:${MAZE_BUILDER_TESTS_EXE}>/array.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/maze.json"
+        "$<TARGET_FILE_DIR:${MAZE_BUILDER_TESTS_EXE}>/maze.json"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/mask.txt"
+        "$<TARGET_FILE_DIR:${MAZE_BUILDER_TESTS_EXE}>/mask.txt"
+)
 
 if(MAZE_BUILDER_MEMCHECK)
 

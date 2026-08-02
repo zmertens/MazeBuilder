@@ -20,5 +20,5 @@ namespace mazes
 
 }
 
-#endif // buildinfo.h
+#endif // BUILDINFO_H
 

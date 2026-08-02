@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en-us">
     <head>
         <title>Maze Builder - LOCAL</title>
@@ -14,7 +14,10 @@
             name="keywords"
             content="mazes, programming, examples, html5, C, C++, library, learn, prototype, videogames"
         />
-        <meta name="viewport" content="width=1080, height=720 initial-scale=1.0" />
+        <meta
+            name="viewport"
+            content="width=1080, height=720 initial-scale=1.0"
+        />
         <link rel="shortcut icon" href="favicon.ico" />
         <style>
             @-webkit-keyframes rotation {
@@ -50,98 +53,597 @@
                 }
             }
 
+            html,
             body {
+                width: 100%;
+                height: 100%;
                 font-family: arial;
                 margin: 0;
-                padding: unset;
+                padding: 0;
+                overflow: hidden;
+                background: black;
             }
 
             .emscripten {
                 padding-right: 0;
-                margin-left: auto;
-                margin-right: auto;
+                margin: 0;
                 display: block;
             }
-            div.emscripten {
-                text-align: center;
+
+            .viewport {
+                position: fixed;
+                inset: 0;
+                width: 100vw;
+                height: 100vh;
+                overflow: hidden;
             }
+
             div.emscripten_border {
-                border: 1px solid black;
+                position: absolute;
+                inset: 0;
+                border: 0;
             }
 
             canvas.emscripten {
+                position: absolute;
+                inset: 0;
                 border: 0px none;
                 background: black;
-                width: 1080px;
-                height: 720px;
+                width: 100%;
+                height: 100%;
+                display: block;
+            }
+
+            .overlay {
+                position: fixed;
+                left: 50%;
+                top: 16px;
+                transform: translateX(-50%);
+                z-index: 10;
+                text-align: center;
+                pointer-events: none;
+                color: white;
+            }
+
+            .overlay[hidden] {
+                display: none;
             }
 
             .spinner {
                 height: 50px;
                 width: 50px;
-                margin: 0px auto;
-                -webkit-animation: rotation .8s infinite linear;
-                -moz-animation: rotation .8s infinite linear;
-                -o-animation: rotation .8s infinite linear;
-                animation: rotation .8s infinite linear;
-                border-left: 10px solid rgb(0,150,240);
-                border-right: 10px solid rgb(0,150,240);
-                border-bottom: 10px solid rgb(0,150,240);
-                border-top: 10px solid rgb(100,0,200);
+                margin: 0 auto 12px;
+                -webkit-animation: rotation 0.8s infinite linear;
+                -moz-animation: rotation 0.8s infinite linear;
+                -o-animation: rotation 0.8s infinite linear;
+                animation: rotation 0.8s infinite linear;
+                border-left: 10px solid rgb(0, 150, 240);
+                border-right: 10px solid rgb(0, 150, 240);
+                border-bottom: 10px solid rgb(0, 150, 240);
+                border-top: 10px solid rgb(100, 0, 200);
                 border-radius: 100%;
-                background-color: rgb(200,100,250);
+                background-color: rgb(200, 100, 250);
+            }
+
+            #status,
+            #progress,
+            #output {
+                pointer-events: auto;
+            }
+
+            #status {
+                display: inline-block;
+                max-width: calc(100vw - 32px);
+                padding: 8px 12px;
+                border-radius: 999px;
+                background: rgba(0, 0, 0, 0.6);
+                backdrop-filter: blur(8px);
             }
 
             textarea.emscripten {
                 font-family: monospace;
-                width: 80%;
-            }
-
-            div.emscripten {
-                text-align: center;
+                position: fixed;
+                left: -10000px;
+                top: 0;
+                width: 640px;
+                height: 120px;
+                resize: none;
+                z-index: 10;
+                background: rgba(0, 0, 0, 0.75);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.2);
             }
 
             progress {
-                width: 30%;
+                width: min(320px, calc(100vw - 32px));
                 height: 30px;
+                margin-top: 12px;
             }
         </style>
     </head>
     <body>
-        <div class="spinner" id='spinner'></div>
-        <div class="emscripten" id="status">Downloading...</div>
-
-        <div class="emscripten">
-            <progress value="0" max="100" id="progress" hidden=1></progress>
+        <div class="viewport">
+            <div class="overlay" id="overlay">
+                <div class="spinner" id="spinner"></div>
+                <div class="emscripten" id="status">Downloading...</div>
+                <div class="emscripten">
+                    <progress value="0" max="100" id="progress" hidden="1"></progress>
+                </div>
+            </div>
+            <div class="emscripten_border">
+                <canvas
+                    class="emscripten"
+                    id="canvas"
+                    oncontextmenu="event.preventDefault()"
+                    tabindex="-1"
+                ></canvas>
+            </div>
         </div>
+        <textarea class="emscripten" id="output" rows="8"></textarea>
 
-        <div class="emscripten_border">
-            <canvas
-                class="emscripten"
-                id="canvas"
-                oncontextmenu="event.preventDefault()"
-                tabindex="-1"
-            ></canvas>
-        </div>
-        <textarea id="output" rows="8"></textarea>
+        <script type="text/javascript">
+            var statusElement = document.getElementById("status");
+            var progressElement = document.getElementById("progress");
+            var spinnerElement = document.getElementById("spinner");
+            var overlayElement = document.getElementById("overlay");
+            var canvasElement = document.getElementById("canvas");
+            var outputElement = document.getElementById("output");
+            if (outputElement) outputElement.value = ""; // clear browser cache
 
-        <script type='text/javascript'>
-            var statusElement = document.getElementById('status');
-            var progressElement = document.getElementById('progress');
-            var spinnerElement = document.getElementById('spinner');
-            var canvasElement = document.getElementById('canvas');
-            var outputElement = document.getElementById('output');
-            if (outputElement) outputElement.value = ''; // clear browser cache
+            // Work around browsers rejecting growable/resizable buffer views in WebGL uniform calls.
+            (function installUniformUploadPatch() {
+                const proto =
+                    globalThis.WebGL2RenderingContext &&
+                    WebGL2RenderingContext.prototype;
+                if (!proto || proto.__maze_uniform_upload_patch_applied) {
+                    return;
+                }
+
+                Object.defineProperty(
+                    proto,
+                    "__maze_uniform_upload_patch_applied",
+                    {
+                        value: true,
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                    },
+                );
+
+                const patchedMethods = [
+                    "uniform1fv",
+                    "uniform2fv",
+                    "uniform3fv",
+                    "uniform4fv",
+                    "uniformMatrix2fv",
+                    "uniformMatrix3fv",
+                    "uniformMatrix4fv",
+                    "uniformMatrix2x3fv",
+                    "uniformMatrix2x4fv",
+                    "uniformMatrix3x2fv",
+                    "uniformMatrix3x4fv",
+                    "uniformMatrix4x2fv",
+                    "uniformMatrix4x3fv",
+                ];
+
+                const needsCopy = (view) =>
+                    !!(
+                        view &&
+                        ArrayBuffer.isView(view) &&
+                        view.buffer &&
+                        (view.buffer.resizable === true ||
+                            view.buffer.growable === true)
+                    );
+
+                const copySafeRange = (view, srcOffset, srcLength) => {
+                    const start = Math.max(0, srcOffset | 0);
+                    const available = Math.max(0, view.length - start);
+                    const requested =
+                        srcLength != null
+                            ? Math.max(0, srcLength | 0)
+                            : available;
+                    const safeLength = Math.min(requested, available);
+                    if (safeLength <= 0) {
+                        return null;
+                    }
+
+                    const copy = new Float32Array(safeLength);
+                    copy.set(view.subarray(start, start + safeLength));
+                    return copy;
+                };
+
+                for (const methodName of patchedMethods) {
+                    const original = proto[methodName];
+                    if (typeof original !== "function") {
+                        continue;
+                    }
+
+                    proto[methodName] = function (...args) {
+                        // uniform*fv(location, data[, srcOffset[, srcLength]])
+                        if (
+                            methodName.startsWith("uniform") &&
+                            !methodName.startsWith("uniformMatrix")
+                        ) {
+                            const data = args[1];
+                            if (!needsCopy(data)) {
+                                return original.apply(this, args);
+                            }
+
+                            const copied = copySafeRange(
+                                data,
+                                args[2],
+                                args[3],
+                            );
+                            if (!copied) {
+                                return;
+                            }
+                            return original.call(this, args[0], copied);
+                        }
+
+                        // uniformMatrix*fv(location, transpose, data[, srcOffset[, srcLength]])
+                        const data = args[2];
+                        if (!needsCopy(data)) {
+                            return original.apply(this, args);
+                        }
+
+                        const copied = copySafeRange(data, args[3], args[4]);
+                        if (!copied) {
+                            return;
+                        }
+                        return original.call(this, args[0], args[1], copied);
+                    };
+                }
+            })();
+
+            // Work around browsers rejecting or mis-validating growable buffer ranges
+            // for WebGL bufferData/bufferSubData overloads with srcOffset/srcLength.
+            (function installBufferUploadPatch() {
+                const patchProto = (proto, guardName) => {
+                    if (!proto || proto[guardName]) {
+                        return;
+                    }
+
+                    Object.defineProperty(proto, guardName, {
+                        value: true,
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                    });
+
+                    const needsCopy = (view) =>
+                        !!(
+                            view &&
+                            ArrayBuffer.isView(view) &&
+                            view.buffer &&
+                            (view.buffer.resizable === true ||
+                                view.buffer.growable === true)
+                        );
+
+                    const copySafeRange = (view, srcOffset, srcLength) => {
+                        const start = Math.max(0, srcOffset | 0);
+                        const available = Math.max(0, view.length - start);
+                        const requested =
+                            srcLength != null
+                                ? Math.max(0, srcLength | 0)
+                                : available;
+                        const safeLength = Math.min(requested, available);
+                        if (safeLength <= 0) {
+                            return null;
+                        }
+
+                        const copy = new Uint8Array(safeLength);
+                        copy.set(view.subarray(start, start + safeLength));
+                        return copy;
+                    };
+
+                    const originalBufferData = proto.bufferData;
+                    if (typeof originalBufferData === "function") {
+                        proto.bufferData = function (
+                            target,
+                            srcOrSize,
+                            usage,
+                            srcOffset,
+                            srcLength,
+                        ) {
+                            if (
+                                !ArrayBuffer.isView(srcOrSize) ||
+                                !needsCopy(srcOrSize)
+                            ) {
+                                return originalBufferData.apply(
+                                    this,
+                                    arguments,
+                                );
+                            }
+
+                            if (arguments.length >= 4) {
+                                const copied = copySafeRange(
+                                    srcOrSize,
+                                    srcOffset,
+                                    srcLength,
+                                );
+                                if (!copied) {
+                                    return;
+                                }
+                                return originalBufferData.call(
+                                    this,
+                                    target,
+                                    copied,
+                                    usage,
+                                );
+                            }
+
+                            const copied = new Uint8Array(
+                                srcOrSize.length >>> 0,
+                            );
+                            copied.set(srcOrSize.subarray(0, srcOrSize.length));
+                            return originalBufferData.call(
+                                this,
+                                target,
+                                copied,
+                                usage,
+                            );
+                        };
+                    }
+
+                    const originalBufferSubData = proto.bufferSubData;
+                    if (typeof originalBufferSubData === "function") {
+                        proto.bufferSubData = function (
+                            target,
+                            dstByteOffset,
+                            srcData,
+                            srcOffset,
+                            srcLength,
+                        ) {
+                            if (
+                                !ArrayBuffer.isView(srcData) ||
+                                !needsCopy(srcData)
+                            ) {
+                                return originalBufferSubData.apply(
+                                    this,
+                                    arguments,
+                                );
+                            }
+
+                            if (arguments.length >= 4) {
+                                const copied = copySafeRange(
+                                    srcData,
+                                    srcOffset,
+                                    srcLength,
+                                );
+                                if (!copied) {
+                                    return;
+                                }
+                                return originalBufferSubData.call(
+                                    this,
+                                    target,
+                                    dstByteOffset,
+                                    copied,
+                                );
+                            }
+
+                            const copied = new Uint8Array(srcData.length >>> 0);
+                            copied.set(srcData.subarray(0, srcData.length));
+                            return originalBufferSubData.call(
+                                this,
+                                target,
+                                dstByteOffset,
+                                copied,
+                            );
+                        };
+                    }
+                };
+
+                patchProto(
+                    globalThis.WebGL2RenderingContext &&
+                        WebGL2RenderingContext.prototype,
+                    "__maze_buffer_upload_patch_applied_gl2",
+                );
+                patchProto(
+                    globalThis.WebGLRenderingContext &&
+                        WebGLRenderingContext.prototype,
+                    "__maze_buffer_upload_patch_applied_gl1",
+                );
+            })();
+
+            // Work around typed-array texImage2D/texSubImage2D srcOffset range issues
+            // that can occur with growable/resizable wasm-backed buffers.
+            (function installTextureUploadPatch() {
+                const patchProto = (proto, guardName) => {
+                    if (!proto || proto[guardName]) {
+                        return;
+                    }
+
+                    Object.defineProperty(proto, guardName, {
+                        value: true,
+                        configurable: false,
+                        enumerable: false,
+                        writable: false,
+                    });
+
+                    const bytesPerComponent = (type) => {
+                        switch (type) {
+                            case 0x1400: // BYTE
+                            case 0x1401: // UNSIGNED_BYTE
+                                return 1;
+                            case 0x1402: // SHORT
+                            case 0x1403: // UNSIGNED_SHORT
+                            case 0x140b: // HALF_FLOAT
+                            case 0x8033: // UNSIGNED_SHORT_4_4_4_4
+                            case 0x8034: // UNSIGNED_SHORT_5_5_5_1
+                            case 0x8363: // UNSIGNED_SHORT_5_6_5
+                                return 2;
+                            case 0x1404: // INT
+                            case 0x1405: // UNSIGNED_INT
+                            case 0x1406: // FLOAT
+                            case 0x84fa: // UNSIGNED_INT_24_8
+                            case 0x8c3b: // UNSIGNED_INT_10F_11F_11F_REV
+                            case 0x8c3e: // UNSIGNED_INT_5_9_9_9_REV
+                                return 4;
+                            default:
+                                return 1;
+                        }
+                    };
+
+                    const componentsForFormat = (format) => {
+                        switch (format) {
+                            case 0x1906: // ALPHA
+                            case 0x1903: // RED
+                            case 0x1909: // LUMINANCE
+                                return 1;
+                            case 0x8227: // RG
+                            case 0x190a: // LUMINANCE_ALPHA
+                                return 2;
+                            case 0x1907: // RGB
+                                return 3;
+                            case 0x1908: // RGBA
+                                return 4;
+                            default:
+                                return 4;
+                        }
+                    };
+
+                    const requiredBytes = (width, height, format, type) => {
+                        const w = Math.max(0, width | 0);
+                        const h = Math.max(0, height | 0);
+                        return (
+                            w *
+                            h *
+                            componentsForFormat(format) *
+                            bytesPerComponent(type)
+                        );
+                    };
+
+                    const buildSafeView = (
+                        srcView,
+                        srcOffsetElems,
+                        reqBytes,
+                    ) => {
+                        const ctor = srcView.constructor;
+                        const elemBytes = srcView.BYTES_PER_ELEMENT || 1;
+                        const reqElems = Math.max(
+                            0,
+                            Math.ceil(reqBytes / elemBytes),
+                        );
+                        const out = new ctor(reqElems);
+                        const start = Math.max(0, srcOffsetElems | 0);
+                        const available = Math.max(0, srcView.length - start);
+                        const copyElems = Math.min(reqElems, available);
+                        if (copyElems > 0) {
+                            out.set(srcView.subarray(start, start + copyElems));
+                        }
+                        return out;
+                    };
+
+                    const originalTexSubImage2D = proto.texSubImage2D;
+                    if (typeof originalTexSubImage2D === "function") {
+                        proto.texSubImage2D = function (...args) {
+                            // Typed array overload: target, level, xoff, yoff, width, height, format, type, srcData[, srcOffset]
+                            if (
+                                args.length >= 9 &&
+                                ArrayBuffer.isView(args[8])
+                            ) {
+                                const srcData = args[8];
+                                const srcOffset =
+                                    args.length >= 10 ? args[9] | 0 : 0;
+                                const req = requiredBytes(
+                                    args[4],
+                                    args[5],
+                                    args[6],
+                                    args[7],
+                                );
+                                const safe = buildSafeView(
+                                    srcData,
+                                    srcOffset,
+                                    req,
+                                );
+                                return originalTexSubImage2D.call(
+                                    this,
+                                    args[0],
+                                    args[1],
+                                    args[2],
+                                    args[3],
+                                    args[4],
+                                    args[5],
+                                    args[6],
+                                    args[7],
+                                    safe,
+                                );
+                            }
+                            return originalTexSubImage2D.apply(this, args);
+                        };
+                    }
+
+                    const originalTexImage2D = proto.texImage2D;
+                    if (typeof originalTexImage2D === "function") {
+                        proto.texImage2D = function (...args) {
+                            // Typed array overload: target, level, internalformat, width, height, border, format, type, srcData[, srcOffset]
+                            if (
+                                args.length >= 9 &&
+                                ArrayBuffer.isView(args[8]) &&
+                                typeof args[3] === "number" &&
+                                typeof args[4] === "number"
+                            ) {
+                                const srcData = args[8];
+                                const srcOffset =
+                                    args.length >= 10 ? args[9] | 0 : 0;
+                                const req = requiredBytes(
+                                    args[3],
+                                    args[4],
+                                    args[6],
+                                    args[7],
+                                );
+                                const safe = buildSafeView(
+                                    srcData,
+                                    srcOffset,
+                                    req,
+                                );
+                                return originalTexImage2D.call(
+                                    this,
+                                    args[0],
+                                    args[1],
+                                    args[2],
+                                    args[3],
+                                    args[4],
+                                    args[5],
+                                    args[6],
+                                    args[7],
+                                    safe,
+                                );
+                            }
+                            return originalTexImage2D.apply(this, args);
+                        };
+                    }
+                };
+
+                patchProto(
+                    globalThis.WebGL2RenderingContext &&
+                        WebGL2RenderingContext.prototype,
+                    "__maze_texture_upload_patch_applied_gl2",
+                );
+                patchProto(
+                    globalThis.WebGLRenderingContext &&
+                        WebGLRenderingContext.prototype,
+                    "__maze_texture_upload_patch_applied_gl1",
+                );
+            })();
 
             // As a default initial behavior, pop up an alert when webgl context is lost. To make your
             // application robust, you may want to override this behavior before shipping!
             // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
-            canvasElement.addEventListener('webglcontextlost', (e) => {
-                alert('WebGL context lost. You will need to reload the page.');
-                e.preventDefault();
-            }, false);
+            canvasElement.addEventListener(
+                "webglcontextlost",
+                (e) => {
+                    alert(
+                        "WebGL context lost. You will need to reload the page.",
+                    );
+                    e.preventDefault();
+                },
+                false,
+            );
 
             const Module = {
+                // Ensure SDL can safely override this hook during runtime init.
+                requestFullscreen: undefined,
                 print(...args) {
                     console.log(...args);
                     // These replacements are necessary if you render to raw HTML
@@ -150,14 +652,15 @@
                     //text = text.replace(/>/g, "&gt;");
                     //text = text.replace('\n', '<br>', 'g');
                     if (outputElement) {
-                        var text = args.join(' ');
+                        var text = args.join(" ");
                         outputElement.value += text + "\n";
                         outputElement.scrollTop = outputElement.scrollHeight; // focus on bottom
                     }
                 },
                 canvas: canvasElement,
                 setStatus(text) {
-                    if (!Module.setStatus.last) Module.setStatus.last = {time: Date.now(), text: ''};
+                    if (!Module.setStatus.last)
+                        Module.setStatus.last = { time: Date.now(), text: "" };
                     if (text === Module.setStatus.last.text) return;
                     const m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
                     const now = Date.now();
@@ -171,100 +674,170 @@
                         progressElement.max = parseInt(m[4]) * 100;
                         progressElement.hidden = false;
                         spinnerElement.hidden = false;
+                        if (overlayElement) overlayElement.hidden = false;
                     } else {
                         progressElement.value = null;
                         progressElement.max = null;
                         progressElement.hidden = true;
-                        if (!text) spinnerElement.style.display = 'none';
+                        if (!text) {
+                            spinnerElement.style.display = "none";
+                            if (overlayElement) overlayElement.hidden = true;
+                        } else {
+                            if (overlayElement) overlayElement.hidden = false;
+                            spinnerElement.style.display = "block";
+                        }
                     }
                     statusElement.innerHTML = text;
                 },
                 totalDependencies: 0,
                 monitorRunDependencies(left) {
-                    this.totalDependencies = Math.max(this.totalDependencies, left);
-                    Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : 'All downloads complete.');
+                    this.totalDependencies = Math.max(
+                        this.totalDependencies,
+                        left,
+                    );
+                    Module.setStatus(
+                        left
+                            ? "Preparing... (" +
+                                  (this.totalDependencies - left) +
+                                  "/" +
+                                  this.totalDependencies +
+                                  ")"
+                            : "All downloads complete.",
+                    );
                 },
                 onRuntimeInitialized() {
-                    // Force a resize event to ensure canvas sizes correctly on initial load
-                    window.dispatchEvent(new Event('resize'));
+                    if (overlayElement) overlayElement.hidden = true;
 
-                    // Get the instance once
+                    // Acquire the singleton engine instance created in C++ main.cpp.
                     let inst = null;
                     try {
-                        console.log('Calling Module.get()...');
                         inst = Module.get();
-                        console.log('Instance retrieved:', inst);
+                        console.log("[MazeBuilder] engine version:", inst.get_version());
                     } catch (e) {
-                        console.error('Error calling Module.get():', e);
-                        Module.print('Error: ' + e.message);
+                        console.error("[MazeBuilder] Module.get() failed:", e);
+                        Module.print("Error: " + e.message);
                         return;
                     }
 
-                    // Poll is_download_ready() every 3-5ms (using 4ms as middle ground)
-                    let pollCount = 0;
-                    const pollInterval = setInterval(() => {
-                        pollCount++;
-                        try {
-                            const isReady = inst.is_download_ready();
+                    // ----------------------------------------------------------------
+                    // triggerObjDownload(objString)
+                    // Creates a temporary <a> element and fires a browser download of
+                    // the provided Wavefront OBJ text as a .obj file.
+                    // ----------------------------------------------------------------
+                    function triggerObjDownload(objString) {
+                        const blob = new Blob([objString], { type: "text/plain" });
+                        const url  = URL.createObjectURL(blob);
+                        const a    = document.createElement("a");
+                        a.href     = url;
+                        a.download = "maze_export_" +
+                            new Date().toISOString().replace(/[:.]/g, "-") + ".obj";
+                        document.body.appendChild(a);
+                        a.click();
+                        // Defer cleanup so the browser has time to open the download.
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                            inst.reset_download_flag(); // re-arm for next export
+                            Module.print("[MazeBuilder] OBJ downloaded successfully.");
+                        }, 200);
+                    }
 
-                            // Log every ~1 second
-                            if (pollCount % 250 === 0) {
-                                console.log(`Polling is_download_ready() [${pollCount}]: ${isReady}`);
-                            }
+                    // ----------------------------------------------------------------
+                    // startAsyncExport(opts?)
+                    //   opts.rows    – maze row count (default: engine current)
+                    //   opts.cols    – maze column count
+                    //   opts.algo    – "binary_tree" | "sidewinder" | "dfs"
+                    //   opts.seed    – integer seed; 0 = random
+                    //
+                    // Pattern: begin_export() signals the C++ worker thread to start
+                    // the SQL query + OBJ conversion asynchronously.  We then poll
+                    // is_export_ready() at a low frequency (250 ms) so the main
+                    // render loop is never blocked.  When ready, get_export() returns
+                    // the full OBJ string in a single call and we trigger the download.
+                    // ----------------------------------------------------------------
+                    function startAsyncExport(opts) {
+                        opts = opts || {};
 
-                            if (isReady) {
-                                clearInterval(pollInterval);
-                                console.log('Download ready! Calling artifacts()...');
-                                Module.print('Download ready! Retrieving artifacts...');
+                        // Apply optional maze config from the JS caller.
+                        if (opts.rows   != null) inst.set_maze_rows(opts.rows | 0);
+                        if (opts.cols   != null) inst.set_maze_columns(opts.cols | 0);
+                        if (opts.algo   != null) inst.set_maze_algo(String(opts.algo));
+                        if (opts.seed   != null) inst.set_maze_seed(opts.seed | 0);
 
-                                // Get the artifacts
-                                const result = inst.artifacts();
-                                console.log('Artifacts retrieved, length:', result.length);
+                        // Kick off the background OBJ-generation worker (returns immediately).
+                        inst.begin_export();
+                        Module.print("[MazeBuilder] OBJ export started (status: " +
+                                     inst.get_export_status() + ")");
 
-                                // Check if artifacts are not empty
-                                if (!result || result.length === 0) {
-                                    console.warn('Artifacts are empty!');
-                                    Module.print('Warning: Artifacts are empty, nothing to download.');
+                        let pollCount = 0;
+
+                        // Poll is_export_ready() at 250 ms — low overhead, no busy-wait.
+                        const poll = setInterval(() => {
+                            pollCount++;
+                            try {
+                                if (!inst.is_export_ready()) {
+                                    // Log progress every ~5 seconds so the user can see activity.
+                                    if (pollCount % 20 === 0) {
+                                        Module.print("[MazeBuilder] export in progress… " +
+                                                     "(" + (pollCount * 250 / 1000).toFixed(1) + "s)");
+                                    }
+                                    return; // still running — check again next tick
+                                }
+
+                                clearInterval(poll);
+
+                                // Retrieve the completed OBJ data (single call, no re-computation).
+                                const obj = inst.get_export();
+                                if (!obj || obj.length === 0) {
+                                    Module.print("[MazeBuilder] Warning: export produced empty OBJ.");
+                                    console.warn("[MazeBuilder] get_export() returned empty string.");
                                     return;
                                 }
 
-                                Module.print(`Artifacts retrieved: ${result.length} characters`);
+                                Module.print("[MazeBuilder] Export ready: " + obj.length + " bytes.");
+                                triggerObjDownload(obj);
 
-                                // Create a blob from the artifacts string
-                                const blob = new Blob([result], { type: 'text/plain' });
-
-                                // Create a download link and trigger download
-                                const url = URL.createObjectURL(blob);
-                                const a = document.createElement('a');
-                                a.href = url;
-                                a.download = 'artifacts_' + new Date().toISOString().replace(/[:.]/g, '-') + '.obj';
-                                document.body.appendChild(a);
-                                a.click();
-
-                                // Cleanup
-                                setTimeout(() => {
-                                    inst.reset_download_flag();
-                                    document.body.removeChild(a);
-                                    URL.revokeObjectURL(url);
-                                    Module.print('Artifacts downloaded successfully!');
-                                    console.log('Download triggered, cleanup complete');
-                                }, 100);
+                            } catch (err) {
+                                clearInterval(poll);
+                                console.error("[MazeBuilder] Export poll error:", err);
+                                Module.print("Export error: " + err.message);
                             }
-                        } catch (e) {
-                            clearInterval(pollInterval);
-                            console.error('Error during polling or artifact retrieval:', e);
-                            Module.print('Error: ' + e.message);
+                        }, 250);
+                    }
+
+                    // Expose startAsyncExport on Module so page-level scripts / buttons
+                    // can call Module.startExport({ rows:12, cols:12, algo:"dfs" }).
+                    Module.startExport = startAsyncExport;
+
+                    // ----------------------------------------------------------------
+                    // Legacy compatibility: if the engine sets is_download_ready()
+                    // through its own internal path, honour that and download too.
+                    // Uses a low-frequency check (5 s) to remain non-intrusive.
+                    // ----------------------------------------------------------------
+                    const legacyPoll = setInterval(() => {
+                        try {
+                            if (inst.is_download_ready()) {
+                                clearInterval(legacyPoll);
+                                Module.print("[MazeBuilder] Legacy download flag set — retrieving artifacts.");
+                                const obj = inst.artifacts();
+                                if (obj && obj.length > 0) {
+                                    triggerObjDownload(obj);
+                                }
+                            }
+                        } catch (err) {
+                            clearInterval(legacyPoll);
+                            console.error("[MazeBuilder] Legacy poll error:", err);
                         }
-                    }, 3000);
-                }
+                    }, 5000);
+                },
             };
-            Module.setStatus('Downloading...');
+            Module.setStatus("Downloading...");
             window.onerror = (event) => {
                 // TODO: do not warn on ok events like simulating an infinite loop or exitStatus
-                Module.setStatus('Exception thrown, see JavaScript console');
-                spinnerElement.style.display = 'none';
+                Module.setStatus("Exception thrown, see JavaScript console");
+                spinnerElement.style.display = "none";
                 Module.setStatus = (text) => {
-                    if (text) console.error('[post-exception status] ' + text);
+                    if (text) console.error("[post-exception status] " + text);
                 };
             };
         </script>

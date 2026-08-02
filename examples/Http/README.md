@@ -1,107 +1,91 @@
-# MazeBuilder HTTP Terminal Interface
+# MazeBuilder HTTP Example
 
-This is a terminal-based HTTP client for interacting with the Corners maze building server. It provides a UNIX-style terminal interface with various commands for creating, retrieving, and managing mazes.
+A single executable (`mazebuilderhttp`) that runs as either a **local HTTP server**
+or an **SFML visualisation client**.  The server generates mazes on demand via a
+RESTful-style GET endpoint; the client fetches a maze from the server and renders
+it in an interactive SFML window.
 
-## Building
+---
 
-The HTTP example is built with CMake using the configuration `-DMAZE_BUILDER_EXAMPLES=1` as part of the MazeBuilder project. The executable is named `mazebuilderhttp`.
-
-## Usage
-
-### Starting the Terminal
+## Quick-start (two terminals)
 
 ```bash
-./mazebuilderhttp <server_url>
+# Terminal 1 � start the server
+./mazebuilderhttp --server
+
+# Terminal 2 � open the SFML client
+./mazebuilderhttp --client
 ```
 
-**Arguments:**
-- `server_url`: URL of the Corners server
-  - For development: `http://localhost:3000`
-  - For production: `http://corners-app-9d22c3fdfd0c.herokuapp.com/`
+### Server mode
 
-**Examples:**
 ```bash
-./mazebuilderhttp http://localhost:3000
-./mazebuilderhttp http://corners-app-9d22c3fdfd0c.herokuapp.com/
+mazebuilderhttp --server              # listens on localhost:8080
+mazebuilderhttp --server --port 9090  # custom port
 ```
 
-### Terminal Commands
+### Client mode
 
-Once the terminal is running, you'll see a prompt like:
-```
-builder123@mazes:~/http$
-```
+`mazebuilderhttp --client [--host <host>] [--port <N>]`
 
-#### Available Commands
+`mazebuilderhttp --client --host 192.168.1.5 --port 9090`
 
-1. **maze_client** - HTTP client for Corners maze building server
-   ```bash
-   maze_client --help
-   maze_client --create -r 10 -c 10 -s 42 -a dfs -d [0:1]
-   ```
+---
 
-2. **ls** - List available programs
-   ```bash
-   ls
-   ```
-   Output: `find  maze_client ls  help  exit`
+## Server endpoint
 
-3. **find** - Find programs matching pattern
-   ```bash
-   find maze
-   ```
-   Output: `maze_client`
+| Method | Path     | Description                          |
+|--------|----------|--------------------------------------|
+| GET    | `/mazes` | Generate and return a maze as text   |
 
-4. **help** - Show terminal help
-   ```bash
-   help
-   ```
+### Query parameters
 
-5. **exit** - Exit the terminal
-   ```bash
-   exit
-   ```
+| Parameter | Type   | Default       | Description                              |
+|-----------|--------|---------------|------------------------------------------|
+| `rows`    | uint   | `10`          | Number of rows (clamped to 1:100)        |
+| `columns` | uint   | `10`          | Number of columns (clamped to 1:100)     |
+| `algo`    | string | `binary_tree` | Algorithm: `binary_tree` `sidewinder` `dfs` |
 
-#### MazeBuilder HTTP Options
+### Example requests
 
-- `-r, --rows <number>`: Number of rows (default: 10)
-- `-c, --columns <number>`: Number of columns (default: 10)  
-- `-s, --seed <number>`: Random seed (default: 42)
-- `-a, --algorithm <name>`: Algorithm to use (default: dfs)
-  - Available algorithms: `dfs`, `binary_tree`, `sidewinder`
-
-## Examples
-
-### Creating a Maze
 ```bash
-builder123@mazes:~/http$ maze_client --create -r 15 -c 20 -s 123 -a binary_tree
-HTTP Response Status: 201 (Created)
-Response Body:
-{"data":"base64_encoded_maze_data","createdAt":"2024-01-01T12:00:00Z","version_str":"v7.2.6"}
+# Default 10x10 binary_tree maze
+curl http://localhost:8080/mazes
+
+# 15-row x 12-column DFS maze
+curl "http://localhost:8080/mazes?rows=15&columns=12&algo=dfs"
+
+# Sidewinder with non-square grid
+curl "http://localhost:8080/mazes?rows=8&columns=20&algo=sidewinder"
 ```
 
+### Example response
 
-## Communication Protocols
-
-### HTTP Communication
-The client communicates with the Corners server using HTTP REST API:
-- **POST /api/mazes/create** - Create a new maze
-
-All HTTP responses are displayed as JSON in the terminal.
-
-## Error Handling
-
-### HTTP Errors
-If there are HTTP connection issues or server errors, appropriate messages are displayed:
-```bash
-builder123@mazes:~/http$ maze_client --create -r 10 -c 10
-HTTP Response Status: 500 (Internal Server Error)
-Response Body:
-{"error": "Database connection failed"}
+```
+rows=10 columns=10 algo=dfs
++--+--+--+--+--+--+--+--+--+--+
+|                               |
++  +--+--+--+--+--+--+--+--+  +
+|  |                          |  |
+...
 ```
 
-## Getting Help
+The first line is a metadata header (`rows=N columns=M algo=X`).
+All subsequent lines are the ASCII maze.
 
-- Use `maze_client --help` for HTTP maze builder specific help
-- Use `help` for general terminal commands
-- Use `./mazebuilderhttp --help` (before starting) for usage information
+---
+
+## Client controls
+
+| Key        | Action                                      |
+|------------|---------------------------------------------|
+| G / Enter  | Fetch a new maze from the server            |
+| Tab        | Cycle algorithm (binary_tree ? sidewinder ? dfs) |
+| + / =      | Grow maze by 2 rows and columns             |
+| - / _      | Shrink maze by 2 rows and columns           |
+| Q / Esc    | Quit                                        |
+
+The window title shows the current algorithm and server address.
+The status bar shows the metadata line returned by the last request.
+
+---

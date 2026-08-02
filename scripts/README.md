@@ -61,6 +61,10 @@ The script provides clear error messages for:
 - Write permission issues
 - Corrupted image files
 
+## `scripts/benchmark.bat`
+
+Run the app and time it.
+
 ## `scripts/secure_http_server.py`
 
 Provides a secure local HTTP server for testing.

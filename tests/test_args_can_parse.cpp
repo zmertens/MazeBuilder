@@ -1,14 +1,15 @@
+#include <catch2/catch_test_macros.hpp>
+
 #include <algorithm>
 #include <functional>
 #include <string>
 #include <vector>
 
-#include <catch2/catch_test_macros.hpp>
-
+#include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/enums.h>
 #include <MazeBuilder/json_helper.h>
+#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/string_utils.h>
 
 using namespace mazes;
@@ -108,13 +109,13 @@ TEST_CASE("Args simple parses", "[simple_parses]")
 TEST_CASE("Args parses and can get values", "[parses_and_then_gets_value]")
 {
 
-    static constexpr auto ALGO{configurator::DEFAULT_ALGO_ID};
+    static constexpr auto ALGO{algo::BINARY_TREE};
     static constexpr auto DISTANCES_START{configurator::DEFAULT_DISTANCES_START};
     static constexpr auto DISTANCES_END{configurator::DEFAULT_DISTANCES_END};
-    static constexpr auto NUM_ROWS{configurator::DEFAULT_ROWS};
-    static constexpr auto NUM_COLS{configurator::DEFAULT_COLUMNS};
-    static constexpr auto OUTPUT{configurator::DEFAULT_OUTPUT_ID};
-    static constexpr auto SEED{configurator::DEFAULT_SEED};
+    static constexpr auto NUM_ROWS{configurator::MAX_ROWS};
+    static constexpr auto NUM_COLS{configurator::MAX_COLUMNS};
+    static constexpr auto OUTPUT{output_format::STDOUT};
+    static constexpr auto SEED{configurator::DEFAULT_SEED_VALUE};
 
     auto check_optional_equals_value = [](auto opt, auto val) -> bool
     {
@@ -284,7 +285,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         }`)json";
 
     static const string VALID_JSON_STR_2 =
-        "`{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS) + ",\n\"columns\": " + to_string(configurator::DEFAULT_COLUMNS) + "\n}`";
+        "`{\n\"rows\": " + to_string(configurator::MAX_ROWS) + ",\n\"columns\": " + to_string(configurator::MAX_COLUMNS) + "\n}`";
 
     args args_handler{};
 
@@ -315,7 +316,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
     {
         // Ensure the JSON string is properly formatted without leading spaces before backticks
         static const string VALID_JSON_STR_2_FIXED =
-            "`{\n\"rows\": " + to_string(configurator::DEFAULT_ROWS) + ",\n\"columns\": " + to_string(configurator::DEFAULT_COLUMNS) + "\n}`";
+            "`{\n\"rows\": " + to_string(configurator::MAX_ROWS) + ",\n\"columns\": " + to_string(configurator::MAX_COLUMNS) + "\n}`";
 
         vector<string> args_vec = {args::JSON_OPTION_STR + string("=") + VALID_JSON_STR_2_FIXED};
         REQUIRE(args_handler.parse(args_vec));
@@ -333,9 +334,9 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         REQUIRE_FALSE(safe_at(m_val, args::JSON_WORD_STR).empty());
 
         REQUIRE(check_key_exists(m_val, args::COLUMN_WORD_STR));
-        REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::DEFAULT_COLUMNS));
+        REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS));
         REQUIRE(check_key_exists(m_val, args::ROW_WORD_STR));
-        REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::DEFAULT_ROWS));
+        REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS));
     }
 
     SECTION("Cannot parse JSON string")
@@ -470,7 +471,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]")
 
     static const string rows_str = to_string(configurator::MAX_ROWS - 1);
     static const string cols_str = to_string(configurator::MAX_COLUMNS - 1);
-    static const string algo_str = std::string{to_sv_from_algo(configurator::DEFAULT_ALGO_ID)};
+    static const string algo_str = std::string{to_sv_from_algo(algo::BINARY_TREE)};
 
     static char *test_argv[ARGC_7] = {
         const_cast<char *>("program"),
@@ -488,7 +489,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]")
     const auto &m_val = m.value();
     REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(algo::BINARY_TREE));
 }
 
 TEST_CASE("Args parse with string input", "[parse_string_input]")
@@ -496,7 +497,7 @@ TEST_CASE("Args parse with string input", "[parse_string_input]")
 
     args args_handler{};
 
-    static const auto VALID_ARGS_STR = "./app -r " + to_string(configurator::MAX_ROWS - 1) + " -c " + to_string(configurator::MAX_COLUMNS - 1) + " -a " + std::string{to_sv_from_algo(configurator::DEFAULT_ALGO_ID)};
+    static const auto VALID_ARGS_STR = "./app -r " + to_string(configurator::MAX_ROWS - 1) + " -c " + to_string(configurator::MAX_COLUMNS - 1) + " -a " + std::string{to_sv_from_algo(algo::BINARY_TREE)};
 
     REQUIRE(args_handler.parse(cref(VALID_ARGS_STR), true));
 
@@ -506,7 +507,7 @@ TEST_CASE("Args parse with string input", "[parse_string_input]")
     const auto &m_val = m.value();
     REQUIRE(safe_at(m_val, args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(safe_at(m_val, args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
-    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(configurator::DEFAULT_ALGO_ID));
+    REQUIRE(safe_at(m_val, args::ALGO_ID_WORD_STR) == to_sv_from_algo(algo::BINARY_TREE));
 }
 
 // Add this test case to verify the sliced array syntax for distances flag

@@ -25,18 +25,23 @@ if(MAZE_BUILDER_EXAMPLES)
     if(EMSCRIPTEN)
         message(INFO ": Building examples for the Web!")
 
+        option(MAZE_EMSCRIPTEN_PTHREADS "Enable pthreads for Emscripten builds (requires SharedArrayBuffer + COOP/COEP)" OFF)
+
         # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
         if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
             message(FATAL_ERROR "CMAKE_TOOLCHAIN_FILE is not set. Please specify the path to the Emscripten toolchain file.")
         endif()
 
-        # Set global compile flags that will be inherited by all targets
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory -pthread")
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory -pthread")
+        # Set baseline WebAssembly flags for all Emscripten targets.
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
 
-        # Set threading flags for Emscripten
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
-        set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pthread")
+        if(MAZE_EMSCRIPTEN_PTHREADS)
+            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
+            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
+            set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pthread")
+        endif()
 
         # Fix for Emscripten/WebAssembly type detection issues in Ogg/Vorbis
         set(SIZEOF_SHORT 2 CACHE INTERNAL "Size of short")
@@ -53,19 +58,30 @@ if(MAZE_BUILDER_EXAMPLES)
         set(HAVE_MEMORY_H 1 CACHE INTERNAL "Have memory.h")
         set(HAVE_SYS_TYPES_H 1 CACHE INTERNAL "Have sys/types.h")
 
-        # Create a fake Threads target for Emscripten since it doesn't use standard threads
+        # Create a fake Threads target for Emscripten.
         if(NOT TARGET Threads::Threads)
             add_library(Threads::Threads INTERFACE IMPORTED)
-            set_property(TARGET Threads::Threads PROPERTY INTERFACE_COMPILE_OPTIONS "-pthread")
-            set_property(TARGET Threads::Threads PROPERTY INTERFACE_LINK_LIBRARIES "-pthread")
+            if(MAZE_EMSCRIPTEN_PTHREADS)
+                set_property(TARGET Threads::Threads PROPERTY INTERFACE_COMPILE_OPTIONS "-pthread")
+                set_property(TARGET Threads::Threads PROPERTY INTERFACE_LINK_LIBRARIES "-pthread")
+            endif()
         endif()
 
         # Set variables that FindThreads would normally set
         set(Threads_FOUND TRUE)
-        set(CMAKE_THREAD_LIBS_INIT "-pthread")
-        set(CMAKE_USE_PTHREADS_INIT TRUE)
+        if(MAZE_EMSCRIPTEN_PTHREADS)
+            set(CMAKE_THREAD_LIBS_INIT "-pthread")
+            set(CMAKE_USE_PTHREADS_INIT TRUE)
+        else()
+            set(CMAKE_THREAD_LIBS_INIT "")
+            set(CMAKE_USE_PTHREADS_INIT FALSE)
+        endif()
 
-        list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory;-pthread>")
+        if(MAZE_EMSCRIPTEN_PTHREADS)
+            list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory;-pthread>")
+        else()
+            list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
+        endif()
 
         include(FetchGitRepo)
 
@@ -143,7 +159,5 @@ if(MAZE_BUILDER_EXAMPLES)
     add_subdirectory(Voxels)
     add_subdirectory(CLI)
     add_subdirectory(Http)
-    add_subdirectory(Physics)
-    add_subdirectory(Pathtracer)
     add_subdirectory(AmazingSFML)
 endif()

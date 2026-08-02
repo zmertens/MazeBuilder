@@ -1,8 +1,10 @@
-![Sample](scripts/sample_icon.bmp)
-
 # Maze Builder
 
-Create and customize mazes on multiple platforms and languages. An example output string is shown here:
+A text-processing tool that represents mazes as strings on multiple platforms and languages.
+
+# Examples
+
+The CLI lets you build mazes with configurable row, column, and a maze-generating algorithm.
 
 ```text
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
@@ -28,109 +30,91 @@ Create and customize mazes on multiple platforms and languages. An example outpu
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 ```
 
-## Data Formats
-
-The library provides support for different export formats like Wavefront object format, JSON, and plain text or stdout.
-
-There is an included example for parsing command-line arguments and creating JSON output:
-
-`mazebuildercli.exe -r 2 -c 5 -o 2x5.json`
-
-```json
-{
-  "rows": 2,
-  "columns": 5,
-  "seed": 2,
-  "algo": "dfs",
-  "output": "+---+---+---+---+---+\n
-             |           |       |\n
-             +   +---+   +---+   +\n
-             |       |           |\n
-             +---+---+---+---+---+\n"
-}
-```
-
----
-
-# Examples
-
-## Command-Line Interface (CLI)
-
-This example lets you build mazes with all the functionality of the computer terminal.
-
-Run the `binary_tree` algorithm with long arguments and make a Wavefront object maze:
-
+Run the `binary_tree` algorithm with long arguments and put the results in [Wavefront Object format](https://en.wikipedia.org/wiki/Wavefront_.obj_file):
 ```sh
-mazebuildercli.exe --rows=25 --columns=25 --seed=42 --algo=binary_tree --output=bt.obj
+mazebuildercli --rows=25 --columns=25 --seed=42 --algo=binary_tree --output=bt.obj
 ```
 
 Run the `dfs` algorithm with short arguments:
-
 ```sh
-mazebuildercli.exe -r 25 -c 25 -s 42 -a dfs -o dfs.obj
+mazebuildercli -r 25 -c 25 -s 42 -a dfs -o 25x25.obj
 ```
 
-Get some help and print to standard output:
+Run the `sidewinder` algorithm and write an image:
 ```sh
-mazebuildercli.exe --help
+mazebuildercli -r 25 -c 25 -s 42 -a sidewinder -o 25x25.png
+```
+
+Ask for help and print to standard output:
+```sh
+mazebuildercli --help
 ```
 
 **Commands are case-sensitive!**
 
-## C++ API
+### Data Formats
+
+The library supports export to plain text (`stdout` or `.txt`), Wavefront object (`.obj`), JSON (`.json`), and raster image outputs (`.png`, `.jpg`, `.jpeg`, `.bmp`).
+Output routing is based on `--output`; file extensions automatically select the renderer.
+
+Creating JSON output is easy:
+
+`mazebuildercli -j in.json -o 3x5_with_distances.json`
+
+```json
+{
+  "rows": 3,
+  "columns": 5,
+  "seed": 2,
+  "algo": "dfs",
+  "distances": true,
+  "output": "+---+---+---+---+---+\n
+             | 0   1   2 | 9   A |\n
+             +   +---+   +   +---+\n
+             | 1   2 | 3 | 8   7 |\n
+             +---+   +---+---+   +\n
+             | 4   3   4   5   6 |\n
+             +---+---+---+---+---+\n"
+}
+```
+
+### C++ API
 
 Interface with the C++ API in a modern C++ program:
 
 ```cpp
-#include <iostream>
-#include <string>
-
-// Get all the headers from Maze Builder
-#include <MazeBuilder/maze_builder.h>
-
-int main() {
-
-  auto maze_str = mazes::create(mazes::configurator().rows(10).columns(10));
-
-  std::cout << maze_str << std::endl;
-
-  return 0;
-}
+  std::string maze(const std::string& arguments) noexcept
+  {
+      using mazes::singleton_base;
+      if (auto app = mazes::runtime_app::instance())
+      {
+          return std::string{app->apply(arguments)};
+      }
+      return {};
+  }
 ```
 
----
+## Images and Media
 
-## HTTP Network
+![Sample](scripts/sample_icon.bmp)
 
-  - User can connect with [Corners](https://github.com/zmertens/Corners), the maze building service, to create mazes
+![Maze Preview 1](https://imgur.com/vB006Ok.jpg)
 
-## Physics
-
-![](https://media1.giphy.com/media/v1.Y2lkPTc5MGI3NjExMnBkc3ZhODZwdWV0eG8wOXZjZzB4NTNucjJlY21xcmh5cm5nbm1kOSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/drKQ8LIwH5ZJQi2jMV/giphy.gif)
-
-  - Physics sandbox for testing maze creation with physical properties
-  - Spawn balls that interact with the bricks and other balls
-  - Event handling with mouse and keyboard support
-
-## Voxels
+![Maze Preview 3](https://imgur.com/CvMsCZs.jpg)
 
 ![](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjEwNzU4aTBjamE0aDhtN281YW11N2QxYWhxM2F2eGU3a3RpdGg5NCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VOT4sVJVxgK2RXADkZ/giphy.gif)
 
-  - Build in a 3D voxel world and download scenes as Wavefront object files.
+Build on the Web in a 3D voxel world and download scenes.
 
-[Check out the this example in a live app!](https://jade-semifreddo-f24ef0.netlify.app/)
-
----
+[Check out the live Web app on itch.io!](https://flipsandale.itch.io/maze-builder)
 
 ## CMake Configuration and Testing
 
-[CMake](https://cmake.org) is used for project configuration.
+[CMake](https://cmake.org) is used for project configuration. Only [fmtlib](https://github.com/fmtlib/fmt) is required for the core library, and [Catch2](https://github.com/catchorg/Catch2) for tests. The remaining dependencies are used by examples.
 
 Here are the external dependencies which can be grabbed from the Internet by CMake:
 
   - [box2d](https://box2d.org/documentation/hello.html)
-  - [catch2](https://github.com/catchorg/Catch2)
-  - [fmt](https://fmt.dev/latest/index.html)
   - [SDL](https://libsdl.org)
   - [SFML](https://sfml-dev.org)
 
@@ -139,16 +123,14 @@ Use the following CMake options to configure the project:
 | CMake Option | Default | Description |
 |--------------|---------|------------ |
 | MAZE_BUILDER_EXAMPLES | OFF | Build with project examples enabled |
-| MAZE_BUILDER_COVERAGE | OFF | Build with code coverage using `CppCheck` |
+| MAZE_BUILDER_COVERAGE | OFF | Enable coverage flags and add the `run_cppcheck` static-analysis target |
 | MAZE_BUILDER_TESTS | OFF | Build with testing using `Catch2` |
 | MAZE_BUILDER_DOCS | OFF | Build the docs using `doxygen` |
 | MAZE_BUILDER_MEMCHECK | OFF | Build with `Valgrind` and `Memcheck` support |
 
----
-
 ### Build Commands
 
-Configure it with [Ninja](https://ninja-build.org/) generator: `cmake -G"Ninja Multi-Config" -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
+Configure with [Ninja](https://ninja-build.org/): `cmake -G"Ninja Multi-Config" -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON`
 
 Build it: `cmake --build build-examples --config Release`
 
@@ -161,32 +143,24 @@ The shared and static files have different naming conventions depending on the p
 | Linux | `libmazebuildercore_static.a` | `libmazebuildercore_shared.so` |
 | MacOS | `libmazebuildercore_static.a` | `libmazebuildercore_shared.dylib` |
 
----
-
 ### Testing
 
 Configure the project for testing:
 `cmake -S . -B build-tests -DMAZE_BUILDER_TESTS:BOOL=ON`
 
-Run the tests: `ctest --test-dir build-tests/tests --verbose -C Debug`
-
----
+Run the tests: `ctest --test-dir build-tests --verbose -C Debug`
 
 ### Configure for the Web
 
 Configure the examples for the Web using [Emscripten](https://emscripten.org/) and their toolchain file (or `emcmake`).
 
 ```sh
-cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${my/emsdk/repo}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${EMSDK_ROOT}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
 ```
-
----
 
 ## Scripts
 
 See [README Scripts](scripts/README.md)
-
----
 
 ## Helpful Resources on Mazes
 

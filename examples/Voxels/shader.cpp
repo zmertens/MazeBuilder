@@ -84,7 +84,7 @@ std::uint32_t shader::make_program(const std::uint32_t shader1, const std::uint3
     if (status == GL_FALSE) {
         GLint length;
         glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
-        const auto info = static_cast<GLchar*>(calloc(length, sizeof(GLchar)));
+        const auto info = static_cast<GLchar*>(SDL_calloc(length, sizeof(GLchar)));
         glGetProgramInfoLog(program, length, nullptr, info);
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "glLinkProgram failed: %s\n", info);
         SDL_free(info);

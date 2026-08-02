@@ -25,10 +25,18 @@ else()
 
     target_link_libraries(${EXE_NAME} PRIVATE
         ${MAZE_BUILDER_CORE_LIB}_static
+        box2d::box2d
         SFML::Graphics)
 
     target_compile_definitions(${EXE_NAME} PRIVATE
         "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
+
+    # Copy resources
+    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            "${CMAKE_CURRENT_SOURCE_DIR}/../Voxels/textures/icon.bmp"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/icon.bmp"
+        VERBATIM)
 
     # On Windows, copy the SFML shared libraries next to the executable
     if(WIN32 AND BUILD_SHARED_LIBS)
