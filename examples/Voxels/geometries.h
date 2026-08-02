@@ -2,8 +2,11 @@
 #define GEOMETRIES_H
 
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <vector>
+
+class voxels_map;
 
 namespace mazes
 {
@@ -54,6 +57,12 @@ public:
 
     static std::optional<maze_preview_frame> generate_maze_preview(
         const mazes::configurator &config);
+
+    static void create_voxel_world(const std::function<void(voxels_map *, int, int, int, int)> &setter,
+                                   voxels_map *m, const int p, const int q, const int chunk_size,
+                                   bool enable_heightmap = true,
+                                   float player_x = 0.0f, float player_z = 0.0f,
+                                   float flatten_radius = 128.0f) noexcept;
 
 private:
     static int _make_sphere(

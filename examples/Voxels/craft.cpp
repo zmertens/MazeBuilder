@@ -1,7 +1,7 @@
 // Showcases basic voxel world and editing capabilities
 // Follows game development patterns like Command Queues and State Stacks
 // Creates mazes with Maze Builder library
-// Originally written in C99, and I ported it to C++17
+// Originally written in C99, and then it got ported to C++20
 
 #include "craft.h"
 
@@ -79,20 +79,20 @@ struct craft::craft_impl
         struct context
         {
             explicit context(SDL_Window *window, font_manager &fonts, shader_manager &shaders, texture_manager &textures, player &p, sdl_gl_helper &sdl)
-                : m_window{window}, m_fonts{&fonts}, m_shaders{&shaders}, m_textures{&textures}, m_player{&p},
-                  m_sdl{&sdl}
+                : ctx_window{window}, ctx_fonts{&fonts}, ctx_shaders{&shaders}, ctx_textures{&textures}, active_player{&p},
+                  ctx_sdl{&sdl}
             {
             }
 
-            SDL_Window *m_window;
-            font_manager *m_fonts;
-            shader_manager *m_shaders;
-            texture_manager *m_textures;
-            player *m_player;
-            sdl_gl_helper *m_sdl;
+            SDL_Window *ctx_window;
+            font_manager *ctx_fonts;
+            shader_manager *ctx_shaders;
+            texture_manager *ctx_textures;
+            player *active_player;
+            sdl_gl_helper *ctx_sdl;
         };
 
-        explicit state(state_stack &stack, const context &_context) : m_stack{&stack}, m_context{_context}
+        explicit state(state_stack &stack, const context &_context) : active_stack{&stack}, craft_ctx{_context}
         {
         }
 
@@ -103,32 +103,32 @@ struct craft::craft_impl
     protected:
         void request_stack_push(const StateIdentifier state_id) const
         {
-            m_stack->push_state(state_id);
+            active_stack->push_state(state_id);
         }
 
         void request_stack_pop() const
         {
-            m_stack->pop_state();
+            active_stack->pop_state();
         }
 
         void request_stack_clear() const
         {
-            m_stack->clear_states();
+            active_stack->clear_states();
         }
 
         [[nodiscard]] const context &get_context() const noexcept
         {
-            return m_context;
+            return craft_ctx;
         }
 
         [[nodiscard]] state_stack &get_stack() const noexcept
         {
-            return *m_stack;
+            return *active_stack;
         }
 
     private:
-        state_stack *m_stack;
-        context m_context;
+        state_stack *active_stack;
+        context craft_ctx;
     };
 
     class state_stack
@@ -144,28 +144,28 @@ struct craft::craft_impl
             StateIdentifier state_id;
         };
 
-        std::vector<state::ptr> m_stack;
-        std::vector<pending_change> m_pending_list;
-        state::context m_context;
-        std::map<StateIdentifier, std::function<state::ptr()>> m_factories;
+        std::vector<state::ptr> active_stack;
+        std::vector<pending_change> pending_changes_list;
+        state::context craft_ctx;
+        std::map<StateIdentifier, std::function<state::ptr()>> change_factories;
 
     public:
         explicit state_stack(const state::context &_context)
-            : m_context(_context)
+            : craft_ctx(_context)
         {
         }
 
         template <typename T>
         void register_state(StateIdentifier state_id)
         {
-            m_factories.insert_or_assign(state_id, [this]()
-                                         { return state::ptr(std::make_unique<T>(*this, m_context)); });
+            change_factories.insert_or_assign(state_id, [this]()
+                                              { return state::ptr(std::make_unique<T>(*this, craft_ctx)); });
         }
 
         template <typename Pointer>
         [[nodiscard]] Pointer peek_state() const noexcept
         {
-            auto reversed = m_stack | std::views::reverse;
+            auto reversed = active_stack | std::views::reverse;
 
             auto it = std::ranges::find_if(reversed, [](const auto &state_ptr)
                                            { return dynamic_cast<Pointer>(state_ptr.get()) != nullptr; });
@@ -180,7 +180,7 @@ struct craft::craft_impl
 
         void update(const float delta_time, mazes::randomizer &rng) noexcept
         {
-            for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
+            for (auto it = active_stack.rbegin(); it != active_stack.rend(); ++it)
             {
                 if (!(*it)->update(delta_time, std::ref(rng)))
                 {
@@ -193,20 +193,13 @@ struct craft::craft_impl
 
         void draw() const noexcept
         {
-            if (m_stack.empty())
-            {
-                return;
-            }
-
-            for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
-            {
-                (*it)->draw();
-            }
+            std::ranges::for_each(active_stack.rbegin(), active_stack.rend(), [](const auto &state_ptr)
+                                  { state_ptr->draw(); });
         }
 
         void handle_event(SDL_Event &event) noexcept
         {
-            for (auto it = m_stack.rbegin(); it != m_stack.rend(); ++it)
+            for (auto it = active_stack.rbegin(); it != active_stack.rend(); ++it)
             {
                 if (!(*it)->handle_event(event))
                 {
@@ -219,49 +212,49 @@ struct craft::craft_impl
 
         void push_state(StateIdentifier state_id)
         {
-            m_pending_list.emplace_back(StackAction::PUSH, state_id);
+            pending_changes_list.emplace_back(StackAction::PUSH, state_id);
         }
 
         void pop_state()
         {
-            m_pending_list.emplace_back(StackAction::POP);
+            pending_changes_list.emplace_back(StackAction::POP);
         }
 
         void clear_states()
         {
-            m_pending_list.emplace_back(StackAction::CLEAR);
+            pending_changes_list.emplace_back(StackAction::CLEAR);
         }
 
         void apply_pending_changes()
         {
-            for (const pending_change &change : m_pending_list)
+            for (const pending_change &change : pending_changes_list)
             {
                 switch (change.action)
                 {
                 case StackAction::PUSH:
-                    m_stack.push_back(create_state(change.state_id));
+                    active_stack.push_back(create_state(change.state_id));
                     break;
                 case StackAction::POP:
-                    m_stack.pop_back();
+                    active_stack.pop_back();
                     break;
                 case StackAction::CLEAR:
-                    m_stack.clear();
+                    active_stack.clear();
                     break;
                 }
             }
 
-            m_pending_list.clear();
+            pending_changes_list.clear();
         }
 
         [[nodiscard]] bool is_empty() const noexcept
         {
-            return m_stack.empty();
+            return active_stack.empty();
         }
 
     private:
         state::ptr create_state(const StateIdentifier state_id)
         {
-            if (const auto found = m_factories.find(state_id); found != m_factories.cend())
+            if (const auto found = change_factories.find(state_id); found != change_factories.cend())
             {
                 return found->second();
             }
@@ -275,48 +268,49 @@ struct craft::craft_impl
     // Handles main gameplay workflow (building, editing, and rendering the voxel world)
     class editor_state final : public state
     {
-        player &m_player;
-        std::optional<world> m_world;
+        player &active_player;
+        std::optional<world> current_voxel_world;
 
     public:
         explicit editor_state(state_stack &stack, const context &_context)
-            : state{stack, _context}, m_player{*_context.m_player}
+            : state{stack, _context}, active_player{*_context.active_player}
         {
         }
 
         ~editor_state() override
         {
-            if (m_world.has_value())
+            if (current_voxel_world.has_value())
             {
-                m_world.reset();
+                current_voxel_world.reset();
             }
         }
 
         void draw() const noexcept override
         {
-            if (m_world.has_value())
+            if (current_voxel_world.has_value())
             {
-                m_world->draw();
+                current_voxel_world->draw();
             }
         }
 
         bool update(const float delta_time, mazes::randomizer &rng) noexcept override
         {
+            auto &&ctx = get_context();
             // Initialize world only after loading state has finished
-            if (!m_world.has_value())
+            if (!current_voxel_world.has_value())
             {
                 if (const auto *loading = get_stack().peek_state<loading_state *>())
                 {
                     if (loading->is_finished())
                     {
-                        m_world.emplace(get_context().m_window, *get_context().m_fonts,
-                                        &m_player, *get_context().m_shaders, *get_context().m_textures,
-                                        get_context().m_sdl);
+                        current_voxel_world.emplace(ctx.ctx_window, *ctx.ctx_fonts,
+                                                    &active_player, *ctx.ctx_shaders, *ctx.ctx_textures,
+                                                    ctx.ctx_sdl);
 
-                        m_world.value().init();
+                        current_voxel_world.value().init();
 
                         // Enable mouse capture for editor
-                        SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+                        SDL_SetWindowRelativeMouseMode(get_context().ctx_window, true);
 
                         SDL_Log("Editor: World initialized after loading completed\n");
                     }
@@ -324,31 +318,31 @@ struct craft::craft_impl
                 // Loading state might already be popped, initialize if it's not in the stack
                 else
                 {
-                    m_world.emplace(get_context().m_window,
-                                    *get_context().m_fonts, &m_player,
-                                    *get_context().m_shaders, *get_context().m_textures,
-                                    get_context().m_sdl);
+                    current_voxel_world.emplace(ctx.ctx_window,
+                                                *ctx.ctx_fonts, &active_player,
+                                                *ctx.ctx_shaders, *ctx.ctx_textures,
+                                                ctx.ctx_sdl);
 
                     // Enable mouse capture for editor
-                    SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, true);
 
                     SDL_Log("Editor: World initialized (loading state not found)\n");
                 }
             }
 
-            if (m_world.has_value())
+            if (current_voxel_world.has_value())
             {
                 // Re-enable mouse capture when returning from menu
-                if (!SDL_GetWindowRelativeMouseMode(get_context().m_window))
+                if (!SDL_GetWindowRelativeMouseMode(ctx.ctx_window))
                 {
-                    SDL_SetWindowRelativeMouseMode(get_context().m_window, true);
+                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, true);
                 }
 
-                m_player.update(delta_time, std::ref(rng));
-                m_world->update(delta_time, std::ref(rng));
+                active_player.update(delta_time, std::ref(rng));
+                current_voxel_world->update(delta_time, std::ref(rng));
 
-                auto &commands = m_world->get_command_queue();
-                m_player.handle_realtime_input(std::ref(commands));
+                auto &commands = current_voxel_world->get_command_queue();
+                active_player.handle_realtime_input(std::ref(commands));
             }
 
             return true;
@@ -356,17 +350,18 @@ struct craft::craft_impl
 
         bool handle_event(SDL_Event &event) noexcept override
         {
+            auto &&ctx = get_context();
             switch (event.type)
             {
             case SDL_EVENT_QUIT:
                 SDL_Log("Editor: Received SDL_QUIT event - clearing stack\n");
-                m_player.set_active(false);
+                active_player.set_active(false);
                 return false;
 
             case SDL_EVENT_KEY_DOWN:
                 if (event.key.scancode == SDL_SCANCODE_ESCAPE)
                 {
-                    SDL_SetWindowRelativeMouseMode(get_context().m_window, false);
+                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, false);
                     request_stack_push(StateIdentifier::MENU);
                     return false;
                 }
@@ -376,11 +371,11 @@ struct craft::craft_impl
                 break;
             }
 
-            if (m_world.has_value())
+            if (current_voxel_world.has_value())
             {
-                auto &commands = m_world->get_command_queue();
-                m_player.handle_event(event, std::ref(commands));
-                m_world->handle_event(event);
+                auto &commands = current_voxel_world->get_command_queue();
+                active_player.handle_event(event, std::ref(commands));
+                current_voxel_world->handle_event(event);
             }
 
             return true;
@@ -390,22 +385,22 @@ struct craft::craft_impl
     class loading_state final : public state
     {
         // Static once_flag to ensure load_resources is called only once across all instances
-        static std::once_flag s_load_resources_flag;
+        static std::once_flag LOAD_RESOURCES_ONCE_FLAG;
 
         void load_resources() const noexcept
         {
             // fonts
-            static constexpr auto FONT_PIXEL_SIZE = 18.f;
+            static constexpr float DEFAULT_FONT_PIXEL_SIZE = 18.f;
 
-            auto &&fonts = get_context().m_fonts;
+            auto &&ctx = get_context();
+            font_manager *fonts = ctx.ctx_fonts;
 
             fonts->load(FontIdentifier::COUSINE_REGULAR, Cousine_Regular_compressed_data,
-                        Cousine_Regular_compressed_size, FONT_PIXEL_SIZE);
+                        Cousine_Regular_compressed_size, DEFAULT_FONT_PIXEL_SIZE);
             fonts->load(FontIdentifier::LIMELIGHT, Limelight_Regular_compressed_data, Limelight_Regular_compressed_size,
-                        FONT_PIXEL_SIZE);
+                        DEFAULT_FONT_PIXEL_SIZE);
             fonts->load(FontIdentifier::NUNITO_SANS, NunitoSans_compressed_data, NunitoSans_compressed_size,
-                        FONT_PIXEL_SIZE);
-
+                        DEFAULT_FONT_PIXEL_SIZE);
             // shaders
             std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_programs{
                 {ShaderIdentifier::BLOCK_SHADER,
@@ -427,6 +422,7 @@ struct craft::craft_impl
                  "shaders/bloom_quad_vertex.glsl",
                  "shaders/bloom_composite_fragment.glsl"}};
 
+#if defined(__EMSCRIPTEN__)
             std::vector<std::tuple<ShaderIdentifier, std::string, std::string>> shader_gles_programs{
                 {ShaderIdentifier::BLOCK_SHADER,
                  "shaders/es/block_vertex.es.glsl",
@@ -447,13 +443,12 @@ struct craft::craft_impl
                  "shaders/es/bloom_quad_vertex.es.glsl",
                  "shaders/es/bloom_composite_fragment.es.glsl"}};
 
-#if defined(__EMSCRIPTEN__)
             for (const auto &[id, vertex_path, fragment_path] : shader_gles_programs)
 #else
             for (const auto &[id, vertex_path, fragment_path] : shader_programs)
 #endif
             {
-                get_context().m_shaders->load(id, vertex_path, fragment_path);
+                ctx.ctx_shaders->load(id, vertex_path, fragment_path);
 
 #if defined(MAZE_DEBUG)
                 SDL_Log("Loaded shader: %d ( %s , %s )\n", static_cast<int>(id),
@@ -468,7 +463,7 @@ struct craft::craft_impl
             constexpr std::string_view signs_path = "textures/signs.png";
             constexpr std::string_view sky_path = "textures/sky.png";
 
-            auto &&textures = get_context().m_textures;
+            auto &&textures = ctx.ctx_textures;
 
             textures->load(TextureIdentifier::ATLAS, atlas_path, static_cast<unsigned int>(TextureIdentifier::ATLAS));
             textures->load(TextureIdentifier::BITMAP_FONT, bitmap_font_path,
@@ -481,11 +476,11 @@ struct craft::craft_impl
 
             textures->load(TextureIdentifier::SIGNS, signs_path, static_cast<unsigned int>(TextureIdentifier::SIGNS));
             textures->load(TextureIdentifier::SKY, sky_path, static_cast<unsigned int>(TextureIdentifier::SKY));
-            textures->load(get_context().m_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
+            textures->load(ctx.ctx_window, TextureIdentifier::WINDOW_ICON, window_icon_path);
 
 #if defined(MAZE_DEBUG)
 
-            std::ranges::for_each(s_font_names, [](const auto &name)
+            std::ranges::for_each(LOADING_FONTS_WITH_NAMES, [](const auto &name)
                                   { SDL_Log("Loaded font: %s\n", name.data()); });
 
             SDL_Log("Loaded textures\n%s\n%s\n%s\n%s\n%s\n", atlas_path.data(),
@@ -548,7 +543,7 @@ struct craft::craft_impl
         {
             if (!m_has_finished)
             {
-                std::call_once(s_load_resources_flag, [this]()
+                std::call_once(LOAD_RESOURCES_ONCE_FLAG, [this]()
                                { load_resources(); });
 
                 m_has_finished = true;
@@ -597,10 +592,11 @@ struct craft::craft_impl
 
         void draw() const noexcept override
         {
-            auto &&current_configs = get_context().m_player->m_configs;
-            auto *p = get_context().m_player;
+            auto &&ctx = get_context();
+            auto &&c = ctx.active_player->_configs;
+            auto *p = ctx.active_player;
             // Default to last font in the list
-            static auto selected_font_index{static_cast<int>(s_font_names.size()) - 1};
+            static auto selected_font_index{static_cast<int>(LOADING_FONTS_WITH_NAMES.size()) - 1};
 
             // Human-readable label for each PlayerAction (used by the key-bindings table).
             static constexpr auto action_label = [](const PlayerAction a) noexcept -> const char *
@@ -650,9 +646,9 @@ struct craft::craft_impl
                 }
             };
 
-            // Apply the per-player font scale (slider range 0.6 – 1.4).
-            ImGui::GetIO().FontGlobalScale = current_configs.gui_font_scale;
-            ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
+            // Apply the per-player font scale
+            ImGui::GetIO().FontGlobalScale = c.gui_font_scale();
+            ImGui::PushFont(ctx.ctx_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
             // Forest-green theme – 19 colour pushes.
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
@@ -709,23 +705,28 @@ struct craft::craft_impl
                 const float avail_h = ImGui::GetContentRegionAvail().y;
                 const float content_w = ImGui::GetContentRegionAvail().x - sidebar_w - sty.ItemSpacing.x;
 
-                // ══ LEFT SIDEBAR ══════════════════════════════════════════════
+                // LEFT SIDEBAR
                 ImGui::BeginChild("##sidebar", ImVec2(sidebar_w, avail_h), ImGuiChildFlags_Borders);
 
-                // ── Quick Options box ──────────────────────────────────────────
+                // Quick Options box
+                bool last_show_maze_preview_2d_enabled{c.show_maze_preview_2d_enabled()};
+                bool last_show_stats_window{c.show_stats_window()};
+                ImGui::Spacing();
                 ImGui::TextColored(HEADER_COL, "Options");
                 ImGui::Separator();
-                ImGui::Checkbox("Preview Enabled", &p->m_configs.preview_enabled);
-                ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
+                ImGui::Checkbox("Preview Enabled", &last_show_maze_preview_2d_enabled);
+                ImGui::Checkbox("Show Stats Overlay", &last_show_stats_window);
                 ImGui::Separator();
                 if (ImGui::Button("Resume", ImVec2(btn_w * 2.f, 0.f)))
                 {
+                    c.show_maze_preview_2d_enabled(last_show_maze_preview_2d_enabled);
+                    c.show_stats_window(last_show_stats_window);
                     request_stack_pop();
                 }
                 ImGui::Spacing();
                 ImGui::Separator();
 
-                // ── Key Bindings table ─────────────────────────────────────────
+                // Key Bindings table
                 ImGui::TextColored(HEADER_COL, "Key Bindings");
                 ImGui::Separator();
                 ImGui::Spacing();
@@ -760,6 +761,9 @@ struct craft::craft_impl
                     }
                     ImGui::EndTable();
                 }
+
+                c.show_maze_preview_2d_enabled(last_show_maze_preview_2d_enabled)
+                    .show_stats_window(last_show_stats_window);
 
                 ImGui::Spacing();
 
@@ -804,10 +808,10 @@ struct craft::craft_impl
                     // ── Builder tab ───────────────────────────────────────────
                     if (ImGui::BeginTabItem("Builder"))
                     {
-                        auto &&maze_config = get_context().m_player->m_configs.maze;
+                        auto &&maze_config = c.maze();
 
                         ImGui::Spacing();
-                        if (ImGui::Button("New World", ImVec2(btn_w * 2.f, 0.f)))
+                        if (ImGui::Button("Make New World", ImVec2(btn_w * 2.f, 0.f)))
                         {
                             db_flush();
                             request_stack_clear();
@@ -866,14 +870,33 @@ struct craft::craft_impl
                         ImGui::Separator();
                         static char tag_buffer[256] = "";
                         static bool tag_init = false;
-                        if (!tag_init || SDL_strcmp(tag_buffer, current_configs.tag.c_str()) != 0)
+                        std::string_view current_tag = c.tag();
+                        if (!tag_init || SDL_strcmp(tag_buffer, current_tag.data()) != 0)
                         {
-                            SDL_strlcpy(tag_buffer, current_configs.tag.c_str(), SDL_arraysize(tag_buffer));
+                            SDL_strlcpy(tag_buffer, current_tag.data(), SDL_arraysize(tag_buffer));
                             tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
                             tag_init = true;
                         }
                         if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
-                            current_configs.tag = std::string(tag_buffer);
+                        {
+                            c.tag(std::string{tag_buffer});
+                        }
+                        ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Terrain Settings box ──────────────────────────────
+                        ImGui::BeginChild("##terrain", ImVec2(0.f, box_oh + 2.f * lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Terrain Settings");
+                        ImGui::Separator();
+
+                        auto has_heightmap_changed{c.show_heightmap()};
+                        ImGui::Checkbox("Build with Mountains (requires new world)", &has_heightmap_changed);
+                        if (has_heightmap_changed != c.show_heightmap())
+                        {
+                            c.show_heightmap(has_heightmap_changed);
+                        }
+
                         ImGui::EndChild();
 
                         ImGui::Spacing();
@@ -884,53 +907,76 @@ struct craft::craft_impl
                         ImGui::Separator();
                         ImGui::BulletText("Configure dimensions, algorithm and seed above");
                         ImGui::BulletText("Press 'Apply Configs'");
-                        ImGui::BulletText("Press E in the editor to generate a preview");
+                        ImGui::BulletText("Press [E] in the editor to generate a preview");
                         ImGui::BulletText("Aim at a block face and press B to build");
                         ImGui::EndChild();
 
                         ImGui::Spacing();
                         if (ImGui::Button("Apply Configs", ImVec2(btn_w, btn_w * 0.5f)))
                         {
-                            get_context().m_player->m_configs.maze.algo_id(mazes::to_algo_from_sv(selected_algo)).rows(static_cast<unsigned int>(rows)).columns(static_cast<unsigned int>(columns)).levels(static_cast<unsigned int>(levels)).seed(static_cast<unsigned int>(seed));
+                            c.maze(mazes::configurator{}
+                                       .algo_id(mazes::to_algo_from_sv(selected_algo))
+                                       .rows(static_cast<unsigned int>(rows))
+                                       .columns(static_cast<unsigned int>(columns))
+                                       .levels(static_cast<unsigned int>(levels))
+                                       .seed(static_cast<unsigned int>(seed)));
                         }
 
                         ImGui::EndTabItem();
                     }
 
-                    // ── Graphics / Rendering tab ──────────────────────────────
+                    // Graphics / Rendering tab
                     if (ImGui::BeginTabItem("Graphics"))
                     {
-                        const auto last_vsync = current_configs.vsync;
-                        const auto last_fullscreen = current_configs.fullscreen;
-
-                        // ── Display box ───────────────────────────────────────
+                        // Display box
                         ImGui::BeginChild("##display", ImVec2(0.f, 190.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Display");
                         ImGui::Separator();
-                        ImGui::Checkbox("Enable VSync", &current_configs.vsync);
-                        ImGui::Checkbox("Enable Fullscreen", &current_configs.fullscreen);
-                        ImGui::Checkbox("Invert Mouse Y-Axis", &current_configs.invert_mouse);
-                        ImGui::SliderFloat("Field of View", &current_configs.fov, 30.f, 120.f, "%.1f deg");
-                        ImGui::SliderInt("Orthographic Scale", &current_configs.ortho, 0, 64);
-                        ImGui::SliderInt("Day Length (s)", &current_configs.day_length, 60, 1800);
+
+                        bool last_vsync{c.vsync()};
+                        bool last_fullscreen{c.fullscreen()};
+                        bool last_invert_mouse{c.invert_mouse()};
+                        float fov{c.fov()};
+                        int ortho{c.ortho_scaling()};
+                        int day{c.day_length()};
+                        ImGui::Checkbox("Enable VSync", &last_vsync);
+                        ImGui::Checkbox("Enable Fullscreen", &last_fullscreen);
+                        ImGui::Checkbox("Invert Mouse Y-Axis", &last_invert_mouse);
+                        ImGui::SliderFloat("Field of View", &fov, 30.f, 120.f, "%.1f deg");
+                        ImGui::SliderInt("Orthographic Scale", &ortho, 0, 64);
+                        ImGui::SliderInt("Day Length (s)", &day, 60, 1800);
                         ImGui::EndChild();
 
-                        if (last_vsync != current_configs.vsync)
-                            SDL_GL_SetSwapInterval(current_configs.vsync ? 1 : 0);
-                        if (last_fullscreen != current_configs.fullscreen)
-                            SDL_SetWindowFullscreen(get_context().m_window, current_configs.fullscreen);
+                        if (last_vsync != c.vsync())
+                        {
+                            SDL_GL_SetSwapInterval(last_vsync ? 1 : 0);
+                        }
+                        if (last_fullscreen != c.fullscreen())
+                        {
+                            SDL_SetWindowFullscreen(ctx.ctx_window, last_fullscreen ? SDL_WINDOW_FULLSCREEN : 0);
+                        }
+
+                        c.fov(std::clamp(fov, 30.f, 120.f))
+                            .ortho_scaling(ortho)
+                            .day_length(day)
+                            .invert_mouse(last_invert_mouse)
+                            .vsync(last_vsync)
+                            .fullscreen(last_fullscreen);
 
                         ImGui::Spacing();
 
-                        // ── Post-Process box ──────────────────────────────────
+                        // Post-Process box
+                        bool last_use_bloom{c.use_bloom_effect()};
+                        float last_exposure{c.exposure_range()};
                         ImGui::BeginChild("##postfx", ImVec2(0.f, box_oh + 2.f * fhs), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Bloom / Post-Process");
                         ImGui::Separator();
-                        ImGui::Checkbox("Enable Bloom Effect", &current_configs.use_bloom_effect);
-                        ImGui::BeginDisabled(!current_configs.use_bloom_effect);
-                        ImGui::SliderFloat("Exposure", &current_configs.exposure_range, 0.1f, 2.0f, "%.2f");
+                        ImGui::Checkbox("Enable Bloom Effect", &last_use_bloom);
+                        ImGui::BeginDisabled(!last_use_bloom);
+                        ImGui::SliderFloat("Exposure", &last_exposure, 0.1f, 2.0f, "%.2f");
                         ImGui::EndDisabled();
                         ImGui::EndChild();
+                        c.use_bloom_effect(last_use_bloom).exposure_range(std::clamp(last_exposure, 0.1f, 2.0f));
 
                         ImGui::Spacing();
 
@@ -950,14 +996,16 @@ struct craft::craft_impl
                                     ImGui::StyleColorsLight();
                             }
                             ImGui::Spacing();
-                            ImGui::SliderFloat("Font Scale", &current_configs.gui_font_scale, 0.6f, 1.4f, "%.2f");
+
+                            float last_font_scale{c.gui_font_scale()};
+                            ImGui::SliderFloat("Font Scale", &last_font_scale, 0.6f, 1.4f, "%.2f");
                             ImGui::Spacing();
                             if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
                             {
                                 for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
                                 {
                                     const bool is_sel = (selected_font_index == static_cast<int>(i));
-                                    const auto &font_name = craft_impl::s_font_names.at(
+                                    const auto &font_name = craft_impl::LOADING_FONTS_WITH_NAMES.at(
                                         static_cast<std::size_t>(m_selectable_fonts.at(i)));
                                     if (ImGui::Selectable(font_name.data(), is_sel))
                                         selected_font_index = static_cast<int>(i);
@@ -967,6 +1015,8 @@ struct craft::craft_impl
                                 ImGui::EndListBox();
                             }
                             ImGui::EndChild();
+
+                            c.gui_font_scale(std::clamp(last_font_scale, 0.6f, 1.4f));
                         } // theme block scope
 
                         ImGui::EndTabItem();
@@ -990,10 +1040,10 @@ struct craft::craft_impl
                         ImGui::TextColored(HEADER_COL, "Position");
                         ImGui::Separator();
                         ImGui::Text("X: %.2f   Y: %.2f   Z: %.2f",
-                                    p->m_pos.x, p->m_pos.y, p->m_pos.z);
+                                    p->pos.x, p->pos.y, p->pos.z);
                         ImGui::Text("Yaw: %.1f deg   Pitch: %.1f deg",
-                                    p->m_pos.rx * (180.f / 3.14159f),
-                                    p->m_pos.ry * (180.f / 3.14159f));
+                                    p->pos.rx * (180.f / 3.14159f),
+                                    p->pos.ry * (180.f / 3.14159f));
                         ImGui::EndChild();
 
                         ImGui::Spacing();
@@ -1126,72 +1176,44 @@ struct craft::craft_impl
                         ImGui::TextColored(HEADER_COL, "View Settings");
                         ImGui::Separator();
 
-                        ImGui::Checkbox("Show Hover Info (H)", &current_configs.show_hover_info);
+                        bool last_crosshair_details{c.show_crosshair_details()};
+                        bool last_show_grid{c.show_grid_overlay()};
+                        bool last_show_maze_preview_ghost{c.show_maze_preview_ghost()};
+                        float last_grid_opacity{c.grid_opacity()};
+                        int last_grid_spacing{c.grid_spacing()};
+
+                        ImGui::Checkbox("Show Hover Info [H]", &last_crosshair_details);
                         ImGui::Spacing();
-                        ImGui::Checkbox("Show Grid (G)", &current_configs.show_grid);
-                        if (current_configs.show_grid)
+                        ImGui::Checkbox("Show Grid (G)", &last_show_grid);
+                        if (last_show_grid)
                         {
-                            ImGui::SliderInt("Grid Spacing", &current_configs.grid_spacing, 1, 16);
-                            ImGui::SliderFloat("Grid Opacity", &current_configs.grid_opacity, 0.0f, 1.0f, "%.2f");
+                            ImGui::SliderInt("Grid Spacing", &last_grid_spacing, 1, 16);
+                            ImGui::SliderFloat("Grid Opacity", &last_grid_opacity, 0.0f, 1.0f, "%.2f");
                         }
                         ImGui::Spacing();
 
-                        ImGui::Checkbox("Show Maze Ghost Preview", &current_configs.show_maze_preview_ghost);
+                        ImGui::Checkbox("Show Maze Preview Ghost", &last_show_maze_preview_ghost);
                         ImGui::SameLine();
-                        if (ImGui::SmallButton("?##ghost"))
-                            ImGui::SetItemTooltip("Display translucent preview of where maze will be built");
 
                         ImGui::EndChild();
-
-                        ImGui::Spacing();
-
-                        // ── Measurement Tools box ─────────────────────────────
-                        ImGui::BeginChild("##measurement_tools", ImVec2(0.f, 160.f), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "Measurement Tools");
-                        ImGui::Separator();
-
-                        const bool measure_active = current_configs.active_cad_tool == player::CADTool::MEASURE_DISTANCE;
-                        if (ImGui::Button(measure_active ? "Stop Measuring (R)" : "Measure Distance (R)", ImVec2(-1.f, 0.f)))
-                        {
-                            get_context().m_player->activate_measurement_tool();
-                        }
-
-                        if (measure_active)
-                        {
-                            ImGui::TextWrapped("Click on blocks to measure distance. First click sets start point, second click measures to end point.");
-
-                            if (get_context().m_player->m_measure_point1.valid)
-                            {
-                                const auto &p1 = get_context().m_player->m_measure_point1;
-                                ImGui::Text("Point 1: (%d, %d, %d)", p1.x, p1.y, p1.z);
-                            }
-                            if (get_context().m_player->m_measure_point2.valid)
-                            {
-                                const auto &p2 = get_context().m_player->m_measure_point2;
-                                ImGui::Text("Point 2: (%d, %d, %d)", p2.x, p2.y, p2.z);
-                            }
-
-                            if (ImGui::Button("Clear Measurement", ImVec2(-1.f, 0.f)))
-                            {
-                                get_context().m_player->clear_measurement();
-                            }
-                        }
-
-                        ImGui::EndChild();
-
                         ImGui::Spacing();
 
                         // ── Hotkeys box ───────────────────────────────────────
                         ImGui::BeginChild("##cad_hotkeys", ImVec2(0.f, 120.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Keyboard Shortcuts");
                         ImGui::Separator();
-                        ImGui::BulletText("H - Toggle hover display");
-                        ImGui::BulletText("G - Toggle grid overlay");
-                        ImGui::BulletText("O - Cycle view modes");
-                        ImGui::BulletText("R - Toggle measurement tool");
+                        ImGui::BulletText("[G] - Toggle grid overlay");
+                        ImGui::BulletText("[H] - Toggle crosshair details");
+                        ImGui::BulletText("[M] - Toggle maze preview ghost");
                         ImGui::EndChild();
 
                         ImGui::EndTabItem();
+
+                        c.show_crosshair_details(last_crosshair_details)
+                            .show_grid_overlay(last_show_grid)
+                            .grid_opacity(last_grid_opacity)
+                            .grid_spacing(last_grid_spacing)
+                            .show_maze_preview_ghost(last_show_maze_preview_ghost);
                     }
 
                     ImGui::EndTabBar();
@@ -1215,7 +1237,7 @@ struct craft::craft_impl
             if (SDL_EVENT_QUIT == event.type)
             {
                 SDL_Log("Menu: Received SDL_QUIT event - clearing states\n");
-                get_context().m_player->set_active(false);
+                get_context().active_player->set_active(false);
                 request_stack_clear();
             }
 
@@ -1238,17 +1260,17 @@ struct craft::craft_impl
     const std::string &INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
-    std::unique_ptr<state_stack> m_crafting_states;
+    std::unique_ptr<state_stack> crafting_states;
 
-    static std::vector<std::string_view> s_font_names;
+    static std::vector<std::string_view> LOADING_FONTS_WITH_NAMES;
 
-    font_manager m_fonts;
-    shader_manager m_shaders;
-    texture_manager m_textures;
+    font_manager active_fonts;
+    shader_manager world_shaders;
+    texture_manager world_textures;
 
-    player m_player;
+    player active_player;
 
-    sdl_gl_helper m_sdl;
+    sdl_gl_helper simple_direct_medialayer;
 
     mutable double m_fps_update_timer{0.0};
     mutable int m_smoothed_fps{0};
@@ -1261,30 +1283,30 @@ struct craft::craft_impl
 
         setup_imgui();
 
-        m_crafting_states = std::make_unique<state_stack>(state::context{
-            m_sdl.window,
-            std::ref(m_fonts),
-            std::ref(m_shaders),
-            std::ref(m_textures),
-            std::ref(m_player),
-            std::ref(m_sdl)});
+        crafting_states = std::make_unique<state_stack>(state::context{
+            simple_direct_medialayer.window,
+            std::ref(active_fonts),
+            std::ref(world_shaders),
+            std::ref(world_textures),
+            std::ref(active_player),
+            std::ref(simple_direct_medialayer)});
 
         register_states();
 
-        m_crafting_states->push_state(StateIdentifier::EDITOR);
-        m_crafting_states->push_state(StateIdentifier::LOADING);
+        crafting_states->push_state(StateIdentifier::EDITOR);
+        crafting_states->push_state(StateIdentifier::LOADING);
     }
 
     void register_states() const noexcept
     {
-        m_crafting_states->register_state<editor_state>(StateIdentifier::EDITOR);
-        m_crafting_states->register_state<loading_state>(StateIdentifier::LOADING);
-        m_crafting_states->register_state<menu_state>(StateIdentifier::MENU);
+        crafting_states->register_state<editor_state>(StateIdentifier::EDITOR);
+        crafting_states->register_state<loading_state>(StateIdentifier::LOADING);
+        crafting_states->register_state<menu_state>(StateIdentifier::MENU);
     }
 
     void start_SDL() noexcept
     {
-        if (m_sdl.initialize(INIT_WINDOW_TITLE, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT))
+        if (simple_direct_medialayer.initialize(INIT_WINDOW_TITLE, INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT))
         {
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "SDL initialized successfully.\n");
         }
@@ -1300,7 +1322,7 @@ struct craft::craft_impl
         ImGui::GetIO().ConfigWindowsMoveFromTitleBarOnly = true;
         ImGui::GetIO().IniFilename = nullptr;
 
-        ImGui_ImplSDL3_InitForOpenGL(m_sdl.window, m_sdl.gl_context);
+        ImGui_ImplSDL3_InitForOpenGL(simple_direct_medialayer.window, simple_direct_medialayer.gl_context);
 
         std::string glsl_version;
 
@@ -1315,14 +1337,14 @@ struct craft::craft_impl
 
     static std::string make_filename(const player *p) noexcept
     {
-        const auto rows = std::to_string(p->m_configs.maze.rows());
-        const auto columns = std::to_string(p->m_configs.maze.columns());
-        const auto levels = std::to_string(p->m_configs.maze.levels());
+        auto &&temp = p->_configs.maze();
+        const auto rows = std::to_string(temp.rows());
+        const auto columns = std::to_string(temp.columns());
+        const auto levels = std::to_string(temp.levels());
 
         std::string filename;
         filename.reserve(128);
-        filename = rows + "x" + columns + "x" + levels + "_" +
-                   p->get_name() + ".obj";
+        filename = rows + "x" + columns + "x" + levels + "_" + std::to_string(SDL_GetTicks()) + "_" + p->get_name() + ".obj";
 
         return filename;
     }
@@ -1342,7 +1364,7 @@ struct craft::craft_impl
         // Desktop: Write to file system and reset flag
         constexpr mazes::io_utils io_things{};
         const auto success = io_things.write_file(filename, artifacts);
-        p->m_configs.artifacts_ready = false;
+        p->_configs.artifacts_ready(false);
         SDL_Log("Write file '%s': %s (%zu bytes)\n",
                 filename.c_str(),
                 success ? "SUCCESS" : "FAILED",
@@ -1381,11 +1403,11 @@ struct craft::craft_impl
                                                  ImGuiWindowFlags_NoNav |
                                                  ImGuiWindowFlags_NoMove;
 
-        if (this->m_player.m_configs.show_stats_window && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
+        if (this->active_player._configs.show_stats_window() && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
             ImGui::Text("FPS: %d", m_smoothed_fps);
             ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
-            ImGui::Text("local time: %s\n", this->m_player.get_local_time().data());
+            ImGui::Text("local time: %s\n", this->active_player.get_local_time().data());
             ImGui::End();
         }
     }
@@ -1401,13 +1423,13 @@ struct craft::craft_impl
 
             if (event.type == SDL_EVENT_QUIT)
             {
-                m_crafting_states->handle_event(event);
+                crafting_states->handle_event(event);
                 break;
             }
 
             if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE)
             {
-                m_crafting_states->handle_event(event);
+                crafting_states->handle_event(event);
                 continue;
             }
 
@@ -1415,7 +1437,7 @@ struct craft::craft_impl
             // world so it can rebuild its FBOs — bypass the ImGui capture filter.
             if (event.type == SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED)
             {
-                m_crafting_states->handle_event(event);
+                crafting_states->handle_event(event);
                 continue;
             }
 
@@ -1430,14 +1452,14 @@ struct craft::craft_impl
 
             if (should_forward_event)
             {
-                m_crafting_states->handle_event(event);
+                crafting_states->handle_event(event);
             }
         }
     }
 
     void update(const float delta_time, mazes::randomizer &rng) const noexcept
     {
-        m_crafting_states->update(delta_time, std::ref(rng));
+        crafting_states->update(delta_time, std::ref(rng));
     }
 
     void render(const double elapsed) const noexcept
@@ -1449,26 +1471,26 @@ struct craft::craft_impl
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
 
-        m_crafting_states->draw();
+        crafting_states->draw();
 
         render_FPS(elapsed);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        SDL_GL_SwapWindow(this->m_sdl.window);
+        SDL_GL_SwapWindow(this->simple_direct_medialayer.window);
     }
 }; // craft_impl
 
 // Static member definitions
-std::once_flag craft::craft_impl::loading_state::s_load_resources_flag;
-std::vector<std::string_view> craft::craft_impl::s_font_names{
+std::once_flag craft::craft_impl::loading_state::LOAD_RESOURCES_ONCE_FLAG;
+std::vector<std::string_view> craft::craft_impl::LOADING_FONTS_WITH_NAMES{
     "Cousine Regular",
     "Limelight Regular",
     "Nunito Sans"};
 
 craft::craft(const std::string &title, const int w, const int h)
-    : m_impl{std::make_unique<craft_impl>(cref(title), w, h)}
+    : crafting_impl{std::make_unique<craft_impl>(cref(title), w, h)}
 {
 }
 
@@ -1479,7 +1501,7 @@ craft::~craft() = default;
  */
 bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rng) const noexcept
 {
-    if (!this->m_impl->m_sdl.window)
+    if (!this->crafting_impl->simple_direct_medialayer.window)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "SDL not initialized (%s)\n", SDL_GetError());
         return false;
@@ -1493,7 +1515,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
 #if defined(__EMSCRIPTEN__)
         db_file = ":memory:";
 #else
-        db_file = "craft.db";
+        db_file = "voxels.db";
 #endif
 
         if (db_init(db_file.data()) != 0)
@@ -1510,13 +1532,13 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
     double time_step = 0.0;
     double accumulator = 0.0;
 
-    this->m_impl->m_crafting_states->update(0.0f, std::ref(rng));
+    this->crafting_impl->crafting_states->update(0.0f, std::ref(rng));
 
     // BEGIN EVENT LOOP
 #if defined(__EMSCRIPTEN__)
     EMSCRIPTEN_MAINLOOP_BEGIN
 #else
-    while (this->m_impl->m_player.is_active() && !this->m_impl->m_crafting_states->is_empty())
+    while (this->crafting_impl->active_player.is_active() && !this->crafting_impl->crafting_states->is_empty())
 #endif
     {
         // FRAME RATE
@@ -1536,15 +1558,15 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
 
         while (accumulator >= FIXED_TIME_STEP)
         {
-            this->m_impl->process_input();
+            this->crafting_impl->process_input();
 
             time_step += FIXED_TIME_STEP;
             accumulator -= FIXED_TIME_STEP;
 
-            this->m_impl->update(FIXED_TIME_STEP, std::ref(rng));
+            this->crafting_impl->update(FIXED_TIME_STEP, std::ref(rng));
         }
 
-        this->m_impl->render(elapsed);
+        this->crafting_impl->render(elapsed);
 
         time_step = time_step >= 1000.0 ? 0.0 : time_step;
     } // EVENT LOOP
@@ -1557,10 +1579,10 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
     SDL_Log("Run loop ended, beginning cleanup...\n");
 
     SDL_Log("Clearing state stack...\n");
-    if (!this->m_impl->m_crafting_states->is_empty())
+    if (!this->crafting_impl->crafting_states->is_empty())
     {
-        this->m_impl->m_crafting_states->clear_states();
-        this->m_impl->m_crafting_states->apply_pending_changes();
+        this->crafting_impl->crafting_states->clear_states();
+        this->crafting_impl->crafting_states->apply_pending_changes();
     }
 
     // Cleanup ImGui
@@ -1576,7 +1598,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
 
     // Cleanup SDL (this must be last)
     SDL_Log("Shutting down SDL...\n");
-    this->m_impl->m_sdl.destroy_and_quit();
+    this->crafting_impl->simple_direct_medialayer.destroy_and_quit();
 
     SDL_Log("Cleanup complete, exiting gracefully.\n");
 
@@ -1585,17 +1607,17 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
 
 std::string craft::artifacts() const noexcept
 {
-    return this->m_impl->m_player.artifacts();
+    return this->crafting_impl->active_player.artifacts();
 }
 
 bool craft::is_download_ready() const noexcept
 {
-    return this->m_impl->m_player.is_download_ready();
+    return this->crafting_impl->active_player.is_download_ready();
 }
 
 void craft::reset_download_flag() const noexcept
 {
-    this->m_impl->m_player.m_configs.artifacts_ready = false;
+    this->crafting_impl->active_player._configs.artifacts_ready(false);
 }
 
 // ── Async export ─────────────────────────────────────────────────────────────
@@ -1603,23 +1625,23 @@ void craft::reset_download_flag() const noexcept
 void craft::begin_export() const noexcept
 {
     // Kick off the async OBJ-generation worker; safe to call from JS event handler.
-    this->m_impl->m_player.start_async_artifact_export();
+    this->crafting_impl->active_player.start_async_artifact_export();
 }
 
 bool craft::is_export_ready() const noexcept
 {
     // Non-blocking poll: returns true once the background OBJ worker has finished.
-    return this->m_impl->m_player.is_artifact_export_ready();
+    return this->crafting_impl->active_player.is_artifact_export_ready();
 }
 
 std::string craft::get_export() noexcept
 {
     // Retrieve the finished OBJ string; empty if called before is_export_ready().
-    const std::string result = this->m_impl->m_player.get_artifact_export_result();
+    const std::string result = this->crafting_impl->active_player.get_artifact_export_result();
     // Mark download flag so legacy is_download_ready() path is also satisfied.
     if (!result.empty())
     {
-        this->m_impl->m_player.m_configs.artifacts_ready = true;
+        this->crafting_impl->active_player._configs.artifacts_ready(true);
     }
     return result;
 }
@@ -1630,19 +1652,19 @@ std::string craft::get_export_status() const noexcept
     // "idle"    – no export requested yet
     // "running" – worker thread active
     // "ready"   – result available, call get_export()
-    if (this->m_impl->m_player.is_artifact_export_ready())
+    if (this->crafting_impl->active_player.is_artifact_export_ready())
     {
         return "ready";
     }
     // Check whether a future is in-flight (valid but not yet ready).
     // We reuse is_artifact_export_ready() for the ready check and infer running
     // from the download flag being false and an export having been requested.
-    if (this->m_impl->m_player.m_configs.artifacts_ready)
+    if (this->crafting_impl->active_player._configs.artifacts_ready() && !this->crafting_impl->active_player.is_artifact_export_ready())
     {
         return "ready";
     }
     // Distinguish "never started" vs "running" via the future validity heuristic:
-    // start_async_artifact_export clears m_cached_artifact_result before launching.
+    // start_async_artifact_export clears artifact_cache_results before launching.
     // If the cached result is empty and download flag is false we may be running.
     // We surface this as "running" conservatively; the JS side tolerates either.
     return "idle";
@@ -1655,7 +1677,7 @@ void craft::set_maze_rows(const int rows) noexcept
     // Set the number of rows for the next maze generation / export.
     if (rows > 0)
     {
-        this->m_impl->m_player.m_configs.maze.ensure_rows(static_cast<unsigned int>(rows));
+        this->crafting_impl->active_player._configs.maze().ensure_rows(static_cast<unsigned int>(rows));
     }
 }
 
@@ -1664,7 +1686,7 @@ void craft::set_maze_columns(const int cols) noexcept
     // Set the number of columns for the next maze generation / export.
     if (cols > 0)
     {
-        this->m_impl->m_player.m_configs.maze.ensure_columns(static_cast<unsigned int>(cols));
+        this->crafting_impl->active_player._configs.maze().ensure_columns(static_cast<unsigned int>(cols));
     }
 }
 
@@ -1674,7 +1696,7 @@ void craft::set_maze_algo(const std::string &algo_name) noexcept
     try
     {
         const mazes::algo a = mazes::to_algo_from_sv(algo_name);
-        this->m_impl->m_player.m_configs.maze.ensure_algo_id(a);
+        this->crafting_impl->active_player._configs.maze().algo_id(a);
     }
     catch (const std::exception &ex)
     {
@@ -1686,7 +1708,7 @@ void craft::set_maze_algo(const std::string &algo_name) noexcept
 void craft::set_maze_seed(const int seed) noexcept
 {
     // Seed the RNG used by the maze generator; 0 = random.
-    this->m_impl->m_player.m_configs.maze.ensure_seed(static_cast<unsigned int>(seed));
+    this->crafting_impl->active_player._configs.maze().ensure_seed(static_cast<unsigned int>(seed));
 }
 
 // ── Engine meta ───────────────────────────────────────────────────────────────

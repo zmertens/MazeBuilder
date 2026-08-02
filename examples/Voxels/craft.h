@@ -49,7 +49,7 @@ public:
 private:
     struct craft_impl;
 
-    std::unique_ptr<craft_impl> m_impl;
+    std::unique_ptr<craft_impl> crafting_impl;
 };
 
 #endif // CRAFT_H

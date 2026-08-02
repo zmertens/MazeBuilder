@@ -9,8 +9,8 @@
 #include <SDL3/SDL.h>
 
 #include "geometries.h"
-#include "player.h"
 #include "shader.h"
+#include "world.h"
 
 bool sdl_gl_helper::initialize(std::string_view title, int width, int height) noexcept
 {

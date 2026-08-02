@@ -4,6 +4,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <noise/noise.h>
+
 #include "item.h"
 #include "matrix.h"
 
@@ -526,3 +528,130 @@ std::optional<maze_preview_frame> geometries::generate_maze_preview(const mazes:
     frame.scale = 1;
     return frame;
 }
+
+void geometries::create_voxel_world(const std::function<void(voxels_map *, int, int, int, int)> &setter,
+                                    voxels_map *m, const int p, const int q, const int chunk_size,
+                                    bool enable_heightmap,
+                                    float player_x, float player_z,
+                                    float flatten_radius) noexcept
+{
+    constexpr int pad = 1;
+    for (int dx = -pad; dx < chunk_size + pad; dx++)
+    {
+        for (int dz = -pad; dz < chunk_size + pad; dz++)
+        {
+            int flag = 1;
+            if (dx < 0 || dz < 0 || dx >= chunk_size || dz >= chunk_size)
+            {
+                flag = -1;
+            }
+            const int x = p * chunk_size + dx;
+            const int z = q * chunk_size + dz;
+
+            // Check if this position should be flattened
+            const float dist_to_player = SDL_sqrtf(
+                (static_cast<float>(x) - player_x) * (static_cast<float>(x) - player_x) +
+                (static_cast<float>(z) - player_z) * (static_cast<float>(z) - player_z));
+            const bool should_flatten = !enable_heightmap && dist_to_player <= flatten_radius;
+
+            // Build the environment
+            const float f = simplex2(static_cast<float>(x) * 0.01f, static_cast<float>(z) * 0.01f,
+                                     4, 0.5f, 2.f);
+            const float g = simplex2(static_cast<float>(-x) * 0.01f, static_cast<float>(-z) * 0.01f,
+                                     2, 0.9f, 2.f);
+            const int mh = g * 32 + 16;
+            auto h = static_cast<int>(f * static_cast<float>(mh));
+            int w = 1;
+            if (constexpr int t = 12; h <= t)
+            {
+                h = t;
+                w = 2;
+            }
+
+            // Apply flattening if within range and heightmap disabled
+            if (should_flatten)
+            {
+                h = 12;  // Flatten to water level
+                w = 1;   // Grass terrain
+            }
+
+            // sand and grass terrain
+            for (int y = 0; y < h; y++)
+            {
+                setter(m, x, y, z, w * flag);
+            }
+
+            if (w == 1 && !should_flatten)
+            {
+                // grass
+                if (simplex2(static_cast<float>(-x) * 0.1f,
+                             static_cast<float>(z) * 0.1f,
+                             4,
+                             0.8f, 2.0f) > 0.6f)
+                {
+                    setter(m, x, h, z, 17 * flag);
+                }
+                // flowers
+                if (simplex2(static_cast<float>(x) * 0.05f,
+                             static_cast<float>(-z) * 0.05f,
+                             4,
+                             0.8f,
+                             2.0f) > 0.7f)
+                {
+                    const auto w1 = 18.f + simplex2(static_cast<float>(x) * 0.1f,
+                                                    static_cast<float>(z) * 0.1f,
+                                                    4,
+                                                    0.8f,
+                                                    2.0f) *
+                                               7.f;
+
+                    setter(m, x, h, z, static_cast<int>(w1 * static_cast<float>(flag)));
+                }
+
+                // trees
+                int ok = 1;
+                if (dx - 4 < 0 || dz - 4 < 0 ||
+                    dx + 4 >= chunk_size || dz + 4 >= chunk_size)
+                {
+                    ok = 0;
+                }
+                if (ok && simplex2(static_cast<float>(x), static_cast<float>(z), 6, 0.5f, 2.0f) > 0.84f)
+                {
+                    for (int y = h + 3; y < h + 8; y++)
+                    {
+                        for (int ox = -3; ox <= 3; ox++)
+                        {
+                            for (int oz = -3; oz <= 3; oz++)
+                            {
+                                const int d = (ox * ox) + (oz * oz) +
+                                              (y - (h + 4)) * (y - (h + 4));
+                                if (d < 11)
+                                {
+                                    setter(m, x + ox, y, z + oz, 15);
+                                }
+                            }
+                        }
+                    }
+                    for (int y = h; y < h + 7; y++)
+                    {
+                        setter(m, x, y, z, 5);
+                    }
+                }
+            }
+            // clouds
+            for (int y = 64; y < 72; y++)
+            {
+                if (simplex3(
+                        static_cast<float>(x) * 0.01f,
+                        static_cast<float>(y) * 0.1f,
+                        static_cast<float>(z) * 0.01f,
+                        8,
+                        0.5f,
+                        2.0f) > 0.75f)
+                {
+                    setter(m, x, y, z, 16 * flag);
+                }
+            }
+        }
+    }
+} // create_voxel_world

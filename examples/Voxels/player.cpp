@@ -38,10 +38,10 @@ namespace
 
         std::ostringstream result;
         // Pre-allocate buffer to reduce reallocations (estimate ~200 bytes per block)
-        result.str().reserve(blocks.size() * 200);
+        result.rdbuf()->pubsetbuf(0, blocks.size() * 200);
 
         // Write header
-        result << "# Voxel World Export\n";
+        result << "# Maze Builder Export\n";
         result << "# Generated from database\n";
         result << "# Block count: " << blocks.size() << "\n\n";
 
@@ -127,10 +127,16 @@ constexpr auto ORTHO_MIN_SCALE = 8;
 constexpr auto ORTHO_MAX_SCALE = 96;
 
 player::player()
-    : scene_node{}, m_is_active{true}, m_on_ground{false}, m_is_flying{false}, m_is_on_auto_run{false}, m_name{"zm"}, m_buffer{}, m_item_index{0}, m_world{nullptr}, m_maze_task{geometries::generate_maze_preview}
+    : _is_active{true}
+    , _is_on_ground{false}
+    , _is_flying{false}
+    , _is_auto_running{false}
+    , my_name{"zm"}
+    , player_buffer{}
+    , current_item_index{0}
+    , current_voxel_world{nullptr}
+    , generate_maze_task{geometries::generate_maze_preview}
 {
-    set_category(Entity::PLAYER);
-
     // Movement key bindings
     assign_key(PlayerAction::MOVE_LEFT, SDL_SCANCODE_A);
     assign_key(PlayerAction::MOVE_RIGHT, SDL_SCANCODE_D);
@@ -150,24 +156,25 @@ player::player()
     assign_key(PlayerAction::ZOOM_IN_ISO_VIEW, SDL_SCANCODE_EQUALS);
     assign_key(PlayerAction::ZOOM_OUT_ISO_VIEW, SDL_SCANCODE_MINUS);
 
-    m_configs.day_length = DAY_LENGTH;
-    m_configs.start_time = DAY_LENGTH / 2 * 1000;
-    m_configs.start_ticks = SDL_GetTicks();
-    m_configs.fov = DEFAULT_FOV;
-    m_configs.ortho = static_cast<int>(OrthoViewMode::FIXED_INT_FOR_ISO_VIEW);
-    m_configs.invert_mouse = false;
-    m_configs.tag = "put maze here";
-    m_configs.maze
+    auto &&c = _configs;
+    c.day_length(DAY_LENGTH);
+    c.start_time(DAY_LENGTH / 2 * 1000);
+    c.start_ticks(SDL_GetTicks());
+    c.fov(DEFAULT_FOV);
+    c.ortho_scaling(static_cast<int>(PlayerViewMode::FIXED_INT_FOR_ORTHO_SCALING));
+    c.invert_mouse(false);
+    c.tag("put maze here");
+    c.maze(mazes::configurator{}
         .algo_id(mazes::algo::DFS)
         .rows(10)
         .columns(10)
         .levels(3)
-        .seed(42u);
+        .seed(42u));
 
     initialize_actions();
 
     // Set category for all player actions
-    for (auto &[_, category] : m_action_binding | std::views::values)
+    for (auto &[_, category] : player_commands | std::views::values)
     {
         category = Entity::PICKUP;
     }
@@ -177,8 +184,10 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
 {
     if (event.type == SDL_EVENT_QUIT)
     {
-        m_is_active = false;
+        _is_active = false;
     }
+
+    auto &&c = _configs;
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
     {
         // Note: items array has 58 valid items (0-57), though array size is 64
@@ -187,35 +196,35 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         if (event.wheel.y > SCROLL_THRESHOLD)
         {
             // Scroll up (backward through items)
-            if (m_item_index > 0)
+            if (current_item_index > 0)
             {
-                m_item_index--;
+                current_item_index--;
             }
             else
             {
-                m_item_index = MAX_ITEM_INDEX; // Wrap to last valid item
+                current_item_index = MAX_ITEM_INDEX; // Wrap to last valid item
             }
         }
         else if (event.wheel.y < -SCROLL_THRESHOLD)
         {
             // Scroll down (forward through items)
-            if (m_item_index < MAX_ITEM_INDEX)
+            if (current_item_index < MAX_ITEM_INDEX)
             {
-                m_item_index++;
+                current_item_index++;
             }
             else
             {
-                m_item_index = 0; // Wrap to first item
+                current_item_index = 0; // Wrap to first item
             }
         }
 
         // The cached maze preview is tied to the selected build item.
         // Invalidate it so B cannot reuse stale preview state after a hotbar change.
-        if (m_world)
+        if (current_voxel_world)
         {
-            m_world->invalidate_preview();
+            current_voxel_world->invalidate_preview();
         }
-        m_auto_preview_pending = true;
+        auto_preview_pending = true;
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
     {
@@ -223,51 +232,45 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         switch (event.key.scancode)
         {
         case SDL_SCANCODE_H:
-            toggle_hover_display();
+            toggle_crosshair_details();
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Hover Display: %s",
-                        m_configs.show_hover_info ? "ON" : "OFF");
+                        _configs.show_crosshair_details() ? "ON" : "OFF");
             return;
         case SDL_SCANCODE_G:
-            toggle_grid();
+            toggle_grid_overlay();
             SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Grid Overlay: %s",
-                        m_configs.show_grid ? "ON" : "OFF");
+                        _configs.show_grid_overlay() ? "ON" : "OFF");
             return;
         case SDL_SCANCODE_O:
             cycle_ortho_view();
             {
                 const char *view_name = "Perspective";
-                switch (m_configs.ortho_view_mode)
-                    switch (m_configs.ortho_view_mode)
-                    {
-                    case OrthoViewMode::ISOMETRIC:
-                        view_name = "Isometric View";
-                        break;
-                    default:
-                        break;
-                    }
+                switch (c.player_view_mode())
+                {
+                case PlayerViewMode::ISOMETRIC:
+                    view_name = "Isometric View";
+                    break;
+                default:
+                    break;
+                }
                 SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "View Mode: %s", view_name);
             }
             return;
-        case SDL_SCANCODE_R:
-            activate_measurement_tool();
-            SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Measurement Tool: %s",
-                        m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE ? "ACTIVE" : "OFF");
-            return;
         case SDL_SCANCODE_EQUALS:
         case SDL_SCANCODE_KP_PLUS:
-            if (m_configs.ortho_view_mode == OrthoViewMode::ISOMETRIC)
+            if (c.player_view_mode() == PlayerViewMode::ISOMETRIC)
             {
-                m_configs.ortho = SDL_max(ORTHO_MIN_SCALE, m_configs.ortho - 2);
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", m_configs.ortho);
+                c.ortho_scaling(SDL_max(c.ortho_scaling(), c.ortho_scaling() - 2));
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", c.ortho_scaling());
                 return;
             }
             break;
         case SDL_SCANCODE_MINUS:
         case SDL_SCANCODE_KP_MINUS:
-            if (m_configs.ortho_view_mode == OrthoViewMode::ISOMETRIC)
+            if (c.player_view_mode() == PlayerViewMode::ISOMETRIC)
             {
-                m_configs.ortho = SDL_min(ORTHO_MAX_SCALE, m_configs.ortho + 2);
-                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", m_configs.ortho);
+                c.ortho_scaling(SDL_min(ORTHO_MAX_SCALE, c.ortho_scaling() + 2));
+                SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Isometric Zoom: %d", c.ortho_scaling());
                 return;
             }
             break;
@@ -276,11 +279,11 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
         }
 
         // Handle regular key bindings
-        if (const auto found = m_key_binding.find(event.key.scancode);
-            found != m_key_binding.cend() && !is_realtime_action(found->second))
+        if (const auto found = keyboard_bindings.find(event.key.scancode);
+            found != keyboard_bindings.cend() && !is_realtime_action(found->second))
         {
-            const auto binding = m_action_binding.find(found->second);
-            if (binding == m_action_binding.cend() || !binding->second.action)
+            const auto binding = player_commands.find(found->second);
+            if (binding == player_commands.cend() || !binding->second.action)
             {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Ignoring unmapped player action %d\n",
                             static_cast<int>(found->second));
@@ -290,7 +293,7 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
             if (found->second == PlayerAction::JUMP)
             {
                 // Only allow jumping when on ground
-                if (m_on_ground)
+                if (_is_on_ground)
                 {
                     commands.push(binding->second);
                 }
@@ -304,34 +307,18 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     }
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
-        if (event.button.button == SDL_BUTTON_LEFT)
+      if (event.button.button == SDL_BUTTON_RIGHT)
         {
-            // If measurement tool is active, record point instead of destroying
-            if (m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE && m_world && m_world->m_projected_plane.has_valid_target)
-            {
-                record_measurement_point(m_world->m_projected_plane.target_x,
-                                         m_world->m_projected_plane.target_y,
-                                         m_world->m_projected_plane.target_z);
-                return;
-            }
-            if (const auto binding = m_action_binding.find(PlayerAction::DESTROY_BLOCK);
-                binding != m_action_binding.cend() && binding->second.action)
-            {
-                commands.push(binding->second);
-            }
-        }
-        else if (event.button.button == SDL_BUTTON_RIGHT)
-        {
-            if (const auto binding = m_action_binding.find(PlayerAction::BUILD_BLOCK);
-                binding != m_action_binding.cend() && binding->second.action)
+            if (const auto binding = player_commands.find(PlayerAction::BUILD_BLOCK);
+                binding != player_commands.cend() && binding->second.action)
             {
                 commands.push(binding->second);
             }
         }
         else if (event.button.button == SDL_BUTTON_MIDDLE)
         {
-            if (const auto binding = m_action_binding.find(PlayerAction::COPY_BLOCK);
-                binding != m_action_binding.cend() && binding->second.action)
+            if (const auto binding = player_commands.find(PlayerAction::COPY_BLOCK);
+                binding != player_commands.cend() && binding->second.action)
             {
                 commands.push(binding->second);
             }
@@ -340,10 +327,10 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     if (event.type == SDL_EVENT_MOUSE_MOTION)
     {
         constexpr float mouse_sensitivity = 0.0025f;
-        position *player_pos = &this->m_pos;
+        position *player_pos = &this->pos;
         player_pos->rx += event.motion.xrel * mouse_sensitivity;
 
-        if (this->m_configs.invert_mouse)
+        if (this->_configs.invert_mouse())
         {
             player_pos->ry += event.motion.yrel * mouse_sensitivity;
         }
@@ -369,9 +356,9 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
 void player::update(float delta_time, mazes::randomizer &rng) noexcept
 {
     // Auto-generate the first preview as soon as a world is available.
-    if (m_world && m_auto_preview_pending)
+    if (current_voxel_world && auto_preview_pending)
     {
-        m_auto_preview_pending = false;
+        auto_preview_pending = false;
         request_preview_generation();
     }
     process_preview_generation();
@@ -386,27 +373,27 @@ void player::handle_realtime_input(command_queue &commands)
     int numKeys = 0;
     const auto *keyState = SDL_GetKeyboardState(&numKeys);
 
-    if (m_is_on_auto_run)
+    if (_is_auto_running)
     {
-        if (const auto binding = m_action_binding.find(PlayerAction::MOVE_FORWARD);
-            binding != m_action_binding.cend() && binding->second.action)
+        if (const auto binding = player_commands.find(PlayerAction::MOVE_FORWARD);
+            binding != player_commands.cend() && binding->second.action)
         {
             commands.push(binding->second);
         }
     }
 
     // Process all realtime action keys
-    for (auto &[id, action] : m_key_binding)
+    for (auto &[id, action] : keyboard_bindings)
     {
         if (is_realtime_action(action))
         {
             // Skip JUMP if not flying
-            if (action == PlayerAction::JUMP && !m_is_flying)
+            if (action == PlayerAction::JUMP && !_is_flying)
             {
                 continue;
             }
 
-            if (action == PlayerAction::MOVE_FORWARD && m_is_on_auto_run)
+            if (action == PlayerAction::MOVE_FORWARD && _is_auto_running)
             {
                 continue;
             }
@@ -414,18 +401,18 @@ void player::handle_realtime_input(command_queue &commands)
             // Check if the key is currently pressed
             if (keyState && id < static_cast<std::uint32_t>(numKeys) && keyState[id])
             {
-                if (const auto binding = m_action_binding.find(action);
-                    binding != m_action_binding.cend() && binding->second.action)
+                if (const auto binding = player_commands.find(action);
+                    binding != player_commands.cend() && binding->second.action)
                 {
                     commands.push(binding->second);
                 }
                 // Check for disablement
-                if (m_is_on_auto_run &&
+                if (_is_auto_running &&
                     (action == PlayerAction::MOVE_LEFT ||
                      action == PlayerAction::MOVE_RIGHT ||
                      action == PlayerAction::MOVE_BACKWARD))
                 {
-                    m_is_on_auto_run = false;
+                    _is_auto_running = false;
                 }
             }
         }
@@ -434,64 +421,64 @@ void player::handle_realtime_input(command_queue &commands)
 
 void player::assign_key(const PlayerAction action, const std::uint32_t key)
 {
-    std::erase_if(m_key_binding, [action](const auto &kv)
+    std::erase_if(keyboard_bindings, [action](const auto &kv)
                   { return kv.second == action; });
-    m_key_binding.insert_or_assign(key, action);
+    keyboard_bindings.insert_or_assign(key, action);
 }
 
 [[nodiscard]] std::uint32_t player::get_assigned_key(const PlayerAction action) const
 {
-    const auto it = std::ranges::find_if(m_key_binding,
+    const auto it = std::ranges::find_if(keyboard_bindings,
                                          [action](const auto &kv)
                                          { return kv.second == action; });
-    return it != m_key_binding.end() ? it->first : static_cast<std::uint32_t>(SDL_SCANCODE_UNKNOWN);
+    return it != keyboard_bindings.end() ? it->first : static_cast<std::uint32_t>(SDL_SCANCODE_UNKNOWN);
 }
 
 bool player::is_active() const noexcept
 {
-    return m_is_active;
+    return _is_active;
 }
 
-void player::set_active(const bool active) noexcept
+void player::set_active(bool active) noexcept
 {
-    m_is_active = active;
+    this->_is_active = active;
 }
 
 bool player::is_flying() const noexcept
 {
-    return m_is_flying;
+    return _is_flying;
 }
 
 void player::set_flying(const bool flying) noexcept
 {
-    this->m_is_flying = flying;
+    this->_is_flying = flying;
 }
 
 bool player::is_on_ground() const noexcept
 {
-    return m_on_ground;
+    return _is_on_ground;
 }
 
 void player::set_on_ground(const bool grounded) noexcept
 {
-    this->m_on_ground = grounded;
+    this->_is_on_ground = grounded;
 }
 
 std::uint32_t player::get_buffer() const noexcept
 {
-    return this->m_buffer;
+    return this->player_buffer;
 }
 
 void player::set_buffer(const std::uint32_t value) noexcept
 {
-    this->m_buffer = value;
+    this->player_buffer = value;
 }
 
 std::int32_t player::get_item() const noexcept
 {
-    if (this->m_item_index >= 0 && this->m_item_index < item::items.size())
+    if (this->current_item_index >= 0 && this->current_item_index < item::items.size())
     {
-        return item::items.at(this->m_item_index);
+        return item::items.at(this->current_item_index);
     }
     return -1;
 }
@@ -500,34 +487,34 @@ void player::set_item(const std::int32_t value) noexcept
 {
     if (value >= 0 && value < item::items.size())
     {
-        this->m_item_index = value;
+        this->current_item_index = value;
     }
 }
 
 std::string player::get_name() const noexcept
 {
-    return m_name;
+    return my_name;
 }
 
 void player::set_name(const std::string &name) noexcept
 {
-    m_name = name;
+    my_name = name;
 }
 
 void player::set_world(world *w) noexcept
 {
-    m_world = w;
+    current_voxel_world = w;
 }
 
 std::string player::get_local_time() const noexcept
 {
-    if (!m_world)
+    if (!current_voxel_world)
     {
         return "00:00";
     }
 
     // time_of_day() returns 0.0-1.0 representing position in the day cycle
-    const float time_fraction = m_world->time_of_day();
+    const float time_fraction = current_voxel_world->time_of_day();
     const float total_hours = time_fraction * 24.0f;
 
     // Extract hours and minutes
@@ -549,194 +536,194 @@ void player::initialize_actions()
     constexpr float max_move_speed = 5.0f;
     constexpr float acceleration = 0.2f;
 
-    m_action_binding[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_BACKWARD].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            const float target_vx = -SDL_sinf(p.m_pos.rx) * max_move_speed;
-            const float target_vz = SDL_cosf(p.m_pos.rx) * max_move_speed;
+            const float target_vx = -SDL_sinf(p.pos.rx) * max_move_speed;
+            const float target_vz = SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.m_vel.vx = lerp(p.m_vel.vx, target_vx, acceleration);
-            p.m_vel.vz = lerp(p.m_vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
-            p.m_pos.x += p.m_vel.vx * dt_seconds;
-            p.m_pos.z += p.m_vel.vz * dt_seconds;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
-    m_action_binding[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_FORWARD].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            const float target_vx = SDL_sinf(p.m_pos.rx) * max_move_speed;
-            const float target_vz = -SDL_cosf(p.m_pos.rx) * max_move_speed;
+            const float target_vx = SDL_sinf(p.pos.rx) * max_move_speed;
+            const float target_vz = -SDL_cosf(p.pos.rx) * max_move_speed;
 
-            p.m_vel.vx = lerp(p.m_vel.vx, target_vx, acceleration);
-            p.m_vel.vz = lerp(p.m_vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
-            p.m_pos.x += p.m_vel.vx * dt_seconds;
-            p.m_pos.z += p.m_vel.vz * dt_seconds;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
-    m_action_binding[PlayerAction::MOVE_LEFT].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_LEFT].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            const float target_vx = -SDL_cosf(p.m_pos.rx) * max_move_speed;
-            const float target_vz = -SDL_sinf(p.m_pos.rx) * max_move_speed;
+            const float target_vx = -SDL_cosf(p.pos.rx) * max_move_speed;
+            const float target_vz = -SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.m_vel.vx = lerp(p.m_vel.vx, target_vx, acceleration);
-            p.m_vel.vz = lerp(p.m_vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
-            p.m_pos.x += p.m_vel.vx * dt_seconds;
-            p.m_pos.z += p.m_vel.vz * dt_seconds;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
-    m_action_binding[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_RIGHT].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            const float target_vx = SDL_cosf(p.m_pos.rx) * max_move_speed;
-            const float target_vz = SDL_sinf(p.m_pos.rx) * max_move_speed;
+            const float target_vx = SDL_cosf(p.pos.rx) * max_move_speed;
+            const float target_vz = SDL_sinf(p.pos.rx) * max_move_speed;
 
-            p.m_vel.vx = lerp(p.m_vel.vx, target_vx, acceleration);
-            p.m_vel.vz = lerp(p.m_vel.vz, target_vz, acceleration);
+            p.vel.vx = lerp(p.vel.vx, target_vx, acceleration);
+            p.vel.vz = lerp(p.vel.vz, target_vz, acceleration);
 
             const float dt_seconds = dt / 1000.0f;
-            p.m_pos.x += p.m_vel.vx * dt_seconds;
-            p.m_pos.z += p.m_vel.vz * dt_seconds;
+            p.pos.x += p.vel.vx * dt_seconds;
+            p.pos.z += p.vel.vz * dt_seconds;
         });
 
-    m_action_binding[PlayerAction::MOVE_AUTO].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_AUTO].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            p.m_is_on_auto_run = !p.m_is_on_auto_run;
+            p._is_auto_running = !p._is_auto_running;
         });
 
-    m_action_binding[PlayerAction::JUMP].action = derived_action<player>(
+    player_commands[PlayerAction::JUMP].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_is_flying)
+            if (p._is_flying)
             {
                 // In flying mode, move up
                 constexpr float flySpeed = 0.15f;
-                p.m_vel.vy = flySpeed;
+                p.vel.vy = flySpeed;
             }
-            else if (p.m_on_ground)
+            else if (p._is_on_ground)
             {
                 // Normal jump when on ground
                 constexpr float jumpVelocity = 8.0f;
-                p.m_vel.vy = jumpVelocity;
-                p.m_on_ground = false;
+                p.vel.vy = jumpVelocity;
+                p._is_on_ground = false;
             }
         });
 
-    m_action_binding[PlayerAction::TAG_SIGN].action = derived_action<player>(
+    player_commands[PlayerAction::TAG_SIGN].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_world)
+            if (p.current_voxel_world)
             {
                 p.on_tag_sign();
             }
         });
 
-    m_action_binding[PlayerAction::MOVE_DOWN].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_DOWN].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_is_flying)
+            if (p._is_flying)
             {
                 constexpr float flySpeed = 4.85f;
-                p.m_vel.vy = -flySpeed;
+                p.vel.vy = -flySpeed;
             }
         });
 
-    m_action_binding[PlayerAction::MOVE_UP].action = derived_action<player>(
+    player_commands[PlayerAction::MOVE_UP].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_is_flying)
+            if (p._is_flying)
             {
                 constexpr float flySpeed = 4.85f;
-                p.m_vel.vy = flySpeed;
+                p.vel.vy = flySpeed;
             }
         });
 
-    m_action_binding[PlayerAction::FLY].action = derived_action<player>(
+    player_commands[PlayerAction::FLY].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            p.m_is_flying = !p.m_is_flying;
-            if (p.m_is_flying)
+            p._is_flying = !p._is_flying;
+            if (p._is_flying)
             {
-                p.m_vel.vy = 0.0f;
+                p.vel.vy = 0.0f;
             }
         });
 
-    m_action_binding[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
+    player_commands[PlayerAction::BUILD_BLOCK].action = derived_action<player>(
         [](const player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_world)
+            if (p.current_voxel_world)
             {
                 p.on_right_click();
             }
         });
 
-    m_action_binding[PlayerAction::COPY_BLOCK].action = derived_action<player>(
+    player_commands[PlayerAction::COPY_BLOCK].action = derived_action<player>(
         [](player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_world)
+            if (p.current_voxel_world)
             {
                 p.on_middle_click();
             }
         });
 
-    m_action_binding[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
+    player_commands[PlayerAction::DESTROY_BLOCK].action = derived_action<player>(
         [](const player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_world)
+            if (p.current_voxel_world)
             {
                 p.on_left_click();
             }
         });
 
-    m_action_binding[PlayerAction::PLACE_LIGHT].action = derived_action<player>(
+    player_commands[PlayerAction::PLACE_LIGHT].action = derived_action<player>(
         [](const player &p, float dt, mazes::randomizer &rng)
         {
-            if (p.m_world)
+            if (p.current_voxel_world)
             {
                 p.on_light();
             }
         });
 
-    m_action_binding[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
+    player_commands[PlayerAction::PREVIEW_MAZE].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
             constexpr auto PREVIEW_COOLDOWN_MS = 250;
             const auto current_time = SDL_GetTicks();
 
-            if (const auto time_since_last_preview_request = current_time - p.m_last_preview_request_time;
+            if (const auto time_since_last_preview_request = current_time - p.last_preview_request_time;
                 time_since_last_preview_request > PREVIEW_COOLDOWN_MS)
             {
                 if (p.request_preview_generation())
                 {
-                    p.m_last_preview_request_time = current_time;
+                    p.last_preview_request_time = current_time;
                 }
             }
         });
 
-    m_action_binding[PlayerAction::PLACE_MAZE].action = derived_action<player>(
+    player_commands[PlayerAction::PLACE_MAZE].action = derived_action<player>(
         [](player &p, const float dt, mazes::randomizer &rng)
         {
-            if (!p.m_world)
+            if (!p.current_voxel_world)
             {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No world available for maze building\n");
                 return;
             }
 
             // Check if we have a valid crosshair target
-            if (!p.m_world->m_projected_plane.has_valid_target)
+            if (!p.current_voxel_world->current_projected_plane.has_valid_target)
             {
                 SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No valid target block. Aim at a block face first.\n");
                 return;
             }
 
-            p.m_world->commit_preview_to_world(p.get_item());
+            p.current_voxel_world->commit_preview_to_world(p.get_item());
         });
 }
 
@@ -765,60 +752,60 @@ bool player::is_realtime_action(const PlayerAction action) noexcept
 
 void player::on_light() const noexcept
 {
-    const position *s = &this->m_pos;
+    const position *s = &this->pos;
     int hx, hy, hz;
-    if (const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    if (const int hw = current_voxel_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < item::TOTAL_BLOCKS && item::is_destructable(hw))
     {
-        m_world->toggle_light(hx, hy, hz);
+        current_voxel_world->toggle_light(hx, hy, hz);
     }
 }
 
 void player::on_left_click() const noexcept
 {
-    const position *s = &this->m_pos;
+    const position *s = &this->pos;
     int hx, hy, hz;
-    if (const auto hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    if (const auto hw = current_voxel_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < 256 && item::is_destructable(hw))
     {
-        m_world->set_block(hx, hy, hz, 0);
+        current_voxel_world->set_block(hx, hy, hz, 0);
 
-        if (item::is_plant(m_world->get_block(hx, hy + 1, hz)))
+        if (item::is_plant(current_voxel_world->get_block(hx, hy + 1, hz)))
         {
-            m_world->set_block(hx, hy + 1, hz, 0);
+            current_voxel_world->set_block(hx, hy + 1, hz, 0);
         }
     }
 }
 
 void player::on_right_click() const noexcept
 {
-    const position *s = &this->m_pos;
+    const position *s = &this->pos;
     int hx, hy, hz;
-    if (const int hw = m_world->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    if (const int hw = current_voxel_world->hit_test(1, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         hy > 0 && hy < item::TOTAL_BLOCKS && item::is_obstacle(hw))
     {
         if (!world::player_intersects_block(2, s->x, s->y, s->z, hx, hy, hz))
         {
-            m_world->set_block(hx, hy, hz, get_item());
+            current_voxel_world->set_block(hx, hy, hz, get_item());
         }
     }
 }
 
 void player::on_middle_click() noexcept
 {
-    const position *s = &this->m_pos;
+    const position *s = &this->pos;
     int hx, hy, hz;
-    const int hw = m_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
+    const int hw = current_voxel_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
     if (const auto it = std::ranges::find(item::items, hw); it != item::items.end())
-        m_item_index = static_cast<std::int32_t>(it - item::items.begin());
+        current_item_index = static_cast<std::int32_t>(it - item::items.begin());
 }
 
 void player::on_tag_sign() const noexcept
 {
     int hx, hy, hz, face;
-    if (auto result = m_world->hit_test_face(&hx, &hy, &hz, &face))
+    if (auto result = current_voxel_world->hit_test_face(&hx, &hy, &hz, &face))
     {
-        m_world->set_sign(hx, hy, hz, face, m_configs.tag);
+        current_voxel_world->set_sign(hx, hy, hz, face, _configs.tag());
     }
 }
 
@@ -829,17 +816,17 @@ float player::lerp(float a, float b, float t) noexcept
 
 bool player::preview_generation_in_progress() const noexcept
 {
-    if (!m_preview_future.valid())
+    if (!preview_maze_2d_fut.valid())
     {
         return false;
     }
 
-    return m_preview_future.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready;
+    return preview_maze_2d_fut.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready;
 }
 
 bool player::request_preview_generation() noexcept
 {
-    if (!m_world)
+    if (!current_voxel_world)
     {
         return false;
     }
@@ -851,16 +838,14 @@ bool player::request_preview_generation() noexcept
 
     try
     {
-        const auto config = m_configs.maze;
-        auto maze_task = m_maze_task;
 
 #if defined(__EMSCRIPTEN__)
         // Web builds share the runtime_app singleton with rendering, so run preview
         // generation synchronously to avoid racing the GL/event loop.
-        m_pending_preview = maze_task(config);
+        pending_maze_preview_2d = maze_task(_configs.maze());
 #else
-        m_preview_future = std::async(std::launch::async, [maze_task = std::move(maze_task), config]() mutable
-                                      { return maze_task(config); });
+        preview_maze_2d_fut = std::async(std::launch::async, [this, maze_config = _configs.maze()]()
+                                      { return generate_maze_task(maze_config); });
 #endif
         return true;
     }
@@ -873,31 +858,31 @@ bool player::request_preview_generation() noexcept
 
 void player::process_preview_generation() noexcept
 {
-    if (!m_world)
+    if (!current_voxel_world)
     {
         return;
     }
 
 #if defined(__EMSCRIPTEN__)
-    if (!m_pending_preview.has_value())
+    if (!pending_maze_preview_2d.has_value())
     {
         return;
     }
 
-    auto preview = std::move(m_pending_preview);
-    m_pending_preview.reset();
+    auto preview = std::move(pending_maze_preview_2d);
+    pending_maze_preview_2d.reset();
 #else
-    if (!m_preview_future.valid())
+    if (!preview_maze_2d_fut.valid())
     {
         return;
     }
 
-    if (m_preview_future.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready)
+    if (preview_maze_2d_fut.wait_for(std::chrono::milliseconds{0}) != std::future_status::ready)
     {
         return;
     }
 
-    auto preview = m_preview_future.get();
+    auto preview = preview_maze_2d_fut.get();
 #endif
     if (!preview.has_value())
     {
@@ -905,21 +890,21 @@ void player::process_preview_generation() noexcept
         return;
     }
 
-    if (!m_world->update_preview(preview->pixel_data, preview->width, preview->height))
+    if (!current_voxel_world->update_preview(preview->pixel_data, preview->width, preview->height))
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Failed to upload maze preview texture\n");
         return;
     }
 
-    m_world->finalize_buildings(
+    current_voxel_world->finalize_buildings(
         std::move(preview->pixel_data),
         preview->width,
         preview->height,
         preview->scale,
-        m_configs.maze.levels(),
+        _configs.maze().levels(),
         get_item());
 
-    m_last_preview_generation_time = SDL_GetTicks();
+    last_preview_generation_time = SDL_GetTicks();
 }
 
 /// Gather player's voxel world artifacts from the database
@@ -934,8 +919,8 @@ std::string player::artifacts() const noexcept
     }
 
     // Calculate player's chunk coordinates
-    const int player_chunk_p = world::chunked(m_pos.x);
-    const int player_chunk_q = world::chunked(m_pos.z);
+    const int player_chunk_p = world::chunked(pos.x);
+    const int player_chunk_q = world::chunked(pos.z);
     // Query blocks from nearby chunks - increased radius for better coverage
     // Radius of 4 chunks = 9x9 chunk area (~2304 blocks if fully populated)
     constexpr int chunk_radius = 4;
@@ -953,7 +938,7 @@ std::string player::artifacts() const noexcept
 
 bool player::is_download_ready() const noexcept
 {
-    return m_configs.artifacts_ready;
+    return _configs.artifacts_ready();
 }
 
 // ============================================================================
@@ -963,8 +948,8 @@ bool player::is_download_ready() const noexcept
 void player::start_async_artifact_export() noexcept
 {
     // Don't start a new export if one is already running (future is valid and not ready)
-    if (m_artifact_export_future.valid() &&
-        m_artifact_export_future.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+    if (artifact_export_fut.valid() &&
+        artifact_export_fut.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "Artifact export already in progress\n");
         return;
@@ -978,7 +963,7 @@ void player::start_async_artifact_export() noexcept
         // Set future to a ready empty result so callers don't spin forever
         std::promise<std::string> p;
         p.set_value("");
-        m_artifact_export_future = p.get_future();
+        artifact_export_fut = p.get_future();
         return;
     }
 
@@ -987,8 +972,8 @@ void player::start_async_artifact_export() noexcept
     // (SQLITE_THREADSAFE=0 builds) because sqlite3_step runs outside load_mtx
     // while the db_worker can concurrently execute "commit; begin;", causing a
     // data race that silently returns 0 rows.
-    const int player_chunk_p = world::chunked(m_pos.x);
-    const int player_chunk_q = world::chunked(m_pos.z);
+    const int player_chunk_p = world::chunked(pos.x);
+    const int player_chunk_q = world::chunked(pos.z);
 
     SDL_Log("Async export: Querying database for blocks...\n");
     constexpr int chunk_radius = 4;
@@ -999,14 +984,14 @@ void player::start_async_artifact_export() noexcept
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, "No blocks found in database for export\n");
         std::promise<std::string> p;
         p.set_value("");
-        m_artifact_export_future = p.get_future();
+        artifact_export_fut = p.get_future();
         return;
     }
 
-    m_cached_artifact_result.clear();
+    artifact_cache_results.clear();
 
     // Offload only the CPU-bound OBJ conversion to a background thread
-    m_artifact_export_future = std::async(std::launch::async, [blocks = std::move(blocks)]() -> std::string
+    artifact_export_fut = std::async(std::launch::async, [blocks = std::move(blocks)]() -> std::string
                                           {
         SDL_Log("Async export: Converting %zu blocks to OBJ format...\n", blocks.size());
         return blocks_to_wavefront_obj(blocks); });
@@ -1014,8 +999,8 @@ void player::start_async_artifact_export() noexcept
 
 bool player::is_artifact_export_ready() const noexcept
 {
-    return m_artifact_export_future.valid() &&
-           m_artifact_export_future.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
+    return artifact_export_fut.valid() &&
+           artifact_export_fut.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
 }
 
 std::string player::get_artifact_export_result() noexcept
@@ -1027,13 +1012,13 @@ std::string player::get_artifact_export_result() noexcept
     }
 
     // Cache the result so we can return it multiple times
-    if (m_cached_artifact_result.empty())
+    if (artifact_cache_results.empty())
     {
-        m_cached_artifact_result = m_artifact_export_future.get();
-        SDL_Log("Async export complete: %zu bytes\n", m_cached_artifact_result.size());
+        artifact_cache_results = artifact_export_fut.get();
+        SDL_Log("Async export complete: %zu bytes\n", artifact_cache_results.size());
     }
 
-    return m_cached_artifact_result;
+    return artifact_cache_results;
 }
 
 // ============================================================================
@@ -1134,86 +1119,28 @@ const char *player::get_face_name(const int face) noexcept
 
 void player::cycle_ortho_view() noexcept
 {
-    const auto current = static_cast<int>(m_configs.ortho_view_mode);
-    const auto next = (current + 1) % 2; // 2 total view modes
-    m_configs.ortho_view_mode = static_cast<OrthoViewMode>(next);
+    const auto current = static_cast<int>(_configs.player_view_mode());
+    const auto next = (current + 1) % static_cast<int>(PlayerViewMode::COUNT);
+    _configs.player_view_mode(static_cast<PlayerViewMode>(next));
 
     // Update legacy ortho value based on view mode
-    switch (m_configs.ortho_view_mode)
+    switch (_configs.player_view_mode())
     {
-    case OrthoViewMode::PERSPECTIVE:
-        m_configs.ortho = 0;
+    case PlayerViewMode::PERSPECTIVE:
+        _configs.ortho_scaling(0);
         break;
-    case OrthoViewMode::ISOMETRIC:
-        m_configs.ortho = static_cast<int>(OrthoViewMode::FIXED_INT_FOR_ISO_VIEW);
+    case PlayerViewMode::ISOMETRIC:
+        _configs.ortho_scaling(static_cast<int>(PlayerViewMode::FIXED_INT_FOR_ORTHO_SCALING));
         break;
     }
 }
 
-void player::toggle_grid() noexcept
+void player::toggle_grid_overlay() noexcept
 {
-    m_configs.show_grid = !m_configs.show_grid;
+    _configs.show_grid_overlay(!_configs.show_grid_overlay());
 }
 
-void player::toggle_hover_display() noexcept
+void player::toggle_crosshair_details() noexcept
 {
-    m_configs.show_hover_info = !m_configs.show_hover_info;
-}
-
-void player::activate_measurement_tool() noexcept
-{
-    if (m_configs.active_cad_tool == CADTool::MEASURE_DISTANCE)
-    {
-        // Deactivate if already active
-        m_configs.active_cad_tool = CADTool::NONE;
-        clear_measurement();
-    }
-    else
-    {
-        // Activate measurement tool
-        m_configs.active_cad_tool = CADTool::MEASURE_DISTANCE;
-        clear_measurement();
-    }
-}
-
-void player::record_measurement_point(const int x, const int y, const int z) noexcept
-{
-    if (!m_measure_point1.valid)
-    {
-        // Record first point
-        m_measure_point1.x = x;
-        m_measure_point1.y = y;
-        m_measure_point1.z = z;
-        m_measure_point1.valid = true;
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION, "Measurement point 1: (%d, %d, %d)", x, y, z);
-    }
-    else if (!m_measure_point2.valid)
-    {
-        // Record second point and calculate distance
-        m_measure_point2.x = x;
-        m_measure_point2.y = y;
-        m_measure_point2.z = z;
-        m_measure_point2.valid = true;
-
-        const int dx = m_measure_point2.x - m_measure_point1.x;
-        const int dy = m_measure_point2.y - m_measure_point1.y;
-        const int dz = m_measure_point2.z - m_measure_point1.z;
-        const float distance = std::sqrt(static_cast<float>(dx * dx + dy * dy + dz * dz));
-
-        SDL_LogInfo(SDL_LOG_CATEGORY_APPLICATION,
-                    "Measurement point 2: (%d, %d, %d) - Distance: %.2f blocks",
-                    x, y, z, distance);
-    }
-    else
-    {
-        // Already have two points, start over
-        clear_measurement();
-        record_measurement_point(x, y, z);
-    }
-}
-
-void player::clear_measurement() noexcept
-{
-    m_measure_point1.valid = false;
-    m_measure_point2.valid = false;
+    _configs.show_crosshair_details(!_configs.show_crosshair_details());
 }

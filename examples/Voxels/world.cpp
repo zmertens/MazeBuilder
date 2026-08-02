@@ -2,8 +2,6 @@
 
 #include <MazeBuilder/randomizer.h>
 
-#include <noise/noise.h>
-
 #include "db.h"
 #include "font.h"
 #include "geometries.h"
@@ -31,15 +29,12 @@
 #include <thread>
 
 // World configs
-#define DAY_LENGTH 600
-#define MAX_TEXT_LENGTH 256
 #define CREATE_CHUNK_RADIUS 10
 #define RENDER_CHUNK_RADIUS 20
 #define BUILD_CHUNK_SIZE 32
 #define RENDER_SIGN_RADIUS 4
-#define SHOW_CLOUDS true
 #define DELETE_CHUNK_RADIUS 14
-#define NUM_WORKERS 4
+#define CHUNK_WORKERS_TOTAL 4
 
 struct worker_item
 {
@@ -140,6 +135,10 @@ namespace
         }
     }
 
+    [[nodiscard]] inline chunk_view to_chunk_view(const scene_node *legacy) noexcept
+    {
+        return chunk_view{legacy};
+    }
 }
 
 struct worker
@@ -204,22 +203,22 @@ world::world(SDL_Window *window, font_manager &fonts,
              shader_manager &shaders,
              texture_manager &textures,
              const sdl_gl_helper *sdl)
-    : m_sdl{sdl}, m_fonts{fonts}, m_shaders{shaders}, m_textures{textures}, m_scene_layers{}, m_next_chunk_slot{1}, m_command_queue{}, m_player{p}, m_sky_buffer{0}, m_projected_plane{}
+    : simple_direct_medialayer{sdl}, active_fonts{fonts}, world_shaders{shaders}, world_textures{textures}, scene_graph_layers{}, next_chunk_slot_in_view{1}, commands_during_world_events{}, active_player{p}, world_sky_gl_buffer{0}, current_projected_plane{}
 {
-    m_projected_plane.projected_texture = &m_textures.get(TextureIdentifier::MAZE);
+    current_projected_plane.projected_texture = &world_textures.get(TextureIdentifier::MAZE);
 
     // Set bidirectional reference between player and world
-    if (m_player)
+    if (active_player)
     {
-        m_player->set_world(this);
+        active_player->set_world(this);
     }
 }
 
 world::~world()
 {
-    if (m_player)
+    if (active_player)
     {
-        m_player->set_world(nullptr);
+        active_player->set_world(nullptr);
     }
     destroy_world();
 }
@@ -227,7 +226,7 @@ world::~world()
 void world::build_scene()
 {
     // Initialize the BACKGROUND layer with a root node at index 0
-    auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
     // Create root layer node at index 0
     scene_node *root = new scene_node{};
@@ -242,7 +241,7 @@ void world::build_scene()
     std::fill(background_layer.begin() + 1, background_layer.end(), nullptr);
 
     // Initialize FOREGROUND layer similarly if needed in the future
-    auto &foreground_layer = m_scene_layers[static_cast<std::size_t>(Layer::FOREGROUND)];
+    auto &foreground_layer = scene_graph_layers[static_cast<std::size_t>(Layer::FOREGROUND)];
     std::ranges::fill(foreground_layer, nullptr);
 }
 
@@ -284,7 +283,7 @@ void world::insert_chunk_into_spatial_tree(scene_node *chunk) const noexcept
     }
 
     // Get the layer root (background layer)
-    scene_node *root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
+    scene_node *root = scene_graph_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -320,7 +319,7 @@ void world::remove_chunk_from_spatial_tree(scene_node *chunk) noexcept
 void world::traverse_chunks(const std::function<void(scene_node *)> &callback) const noexcept
 {
     // Traverse the spatial hierarchy
-    scene_node *root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
+    scene_node *root = scene_graph_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -350,6 +349,21 @@ void world::traverse_chunks(const std::function<void(scene_node *)> &callback) c
     traverse_node(root);
 }
 
+void world::traverse_chunks_composed(const std::function<void(chunk)> &callback) const noexcept
+{
+    traverse_chunks([&callback](scene_node *legacy_chunk)
+                    {
+                        if (legacy_chunk == nullptr)
+                        {
+                            return;
+                        }
+
+                        chunk composed;
+                        composed.graph = to_scene_graph_node(*legacy_chunk);
+                        composed.data = to_chunk_data(*legacy_chunk);
+                        callback(composed); });
+}
+
 void world::traverse_chunks_in_bounds(const int min_p, const int min_q, const int max_p, const int max_q,
                                       const std::function<void(scene_node *)> &callback) const noexcept
 {
@@ -360,7 +374,7 @@ void world::traverse_chunks_in_bounds(const int min_p, const int min_q, const in
     const int max_x = (max_p + 1) * CHUNK_SIZE - 1;
     const int max_z = (max_q + 1) * CHUNK_SIZE - 1;
 
-    scene_node *root = m_scene_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
+    scene_node *root = scene_graph_layers.at(static_cast<std::size_t>(Layer::BACKGROUND)).at(0);
     if (root == nullptr)
     {
         return;
@@ -396,6 +410,39 @@ void world::traverse_chunks_in_bounds(const int min_p, const int min_q, const in
     traverse_node(root);
 }
 
+void world::traverse_chunks_in_bounds_composed(const int min_p, const int min_q, const int max_p, const int max_q,
+                                               const std::function<void(chunk)> &callback) const noexcept
+{
+    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q,
+                              [&callback](scene_node *legacy_chunk)
+                              {
+                                  if (legacy_chunk == nullptr)
+                                  {
+                                      return;
+                                  }
+
+                                  chunk composed;
+                                  composed.graph = to_scene_graph_node(*legacy_chunk);
+                                  composed.data = to_chunk_data(*legacy_chunk);
+                                  callback(composed);
+                              });
+}
+
+void world::traverse_chunks_in_bounds_view(const int min_p, const int min_q, const int max_p, const int max_q,
+                                           const std::function<void(const chunk_view &)> &callback) const noexcept
+{
+    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q,
+                              [&callback](scene_node *legacy_chunk)
+                              {
+                                  if (legacy_chunk == nullptr)
+                                  {
+                                      return;
+                                  }
+                                  const chunk_view view = to_chunk_view(legacy_chunk);
+                                  callback(view);
+                              });
+}
+
 void world::init() noexcept
 {
     glEnable(GL_CULL_FACE);
@@ -410,11 +457,11 @@ void world::init() noexcept
     init_worker_threads();
 
     // Force create initial chunks around player
-    force_chunks(m_player);
+    force_chunks(active_player);
 
-    m_player->m_pos.y = static_cast<float>(highest_block(m_player->m_pos.x, m_player->m_pos.z) + 2);
+    active_player->pos.y = static_cast<float>(highest_block(active_player->pos.x, active_player->pos.z) + 2);
 
-    s_block_attrib.program = m_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
+    s_block_attrib.program = world_shaders.get(ShaderIdentifier::BLOCK_SHADER).get();
     s_block_attrib.position = 0;
     s_block_attrib.normal = 1;
     s_block_attrib.uv = 2;
@@ -427,19 +474,19 @@ void world::init() noexcept
     s_block_attrib.camera = glGetUniformLocation(s_block_attrib.program, "camera");
     s_block_attrib.timer = glGetUniformLocation(s_block_attrib.program, "timer");
 
-    s_line_attrib.program = m_shaders.get(ShaderIdentifier::LINE_SHADER).get();
+    s_line_attrib.program = world_shaders.get(ShaderIdentifier::LINE_SHADER).get();
     s_line_attrib.position = 0;
     s_line_attrib.matrix = glGetUniformLocation(s_line_attrib.program, "matrix");
     s_line_attrib.extra1 = glGetUniformLocation(s_line_attrib.program, "color");
 
-    s_text_attrib.program = m_shaders.get(ShaderIdentifier::TEXT_SHADER).get();
+    s_text_attrib.program = world_shaders.get(ShaderIdentifier::TEXT_SHADER).get();
     s_text_attrib.position = 0;
     s_text_attrib.uv = 1;
     s_text_attrib.matrix = glGetUniformLocation(s_text_attrib.program, "matrix");
     s_text_attrib.sampler = glGetUniformLocation(s_text_attrib.program, "sampler");
     s_text_attrib.extra1 = glGetUniformLocation(s_text_attrib.program, "is_sign");
 
-    s_sky_attrib.program = m_shaders.get(ShaderIdentifier::SKY_SHADER).get();
+    s_sky_attrib.program = world_shaders.get(ShaderIdentifier::SKY_SHADER).get();
     s_sky_attrib.position = 0;
     s_sky_attrib.normal = 1;
     s_sky_attrib.uv = 2;
@@ -447,13 +494,13 @@ void world::init() noexcept
     s_sky_attrib.sampler = glGetUniformLocation(s_sky_attrib.program, "sampler");
     s_sky_attrib.timer = glGetUniformLocation(s_sky_attrib.program, "timer");
 
-    m_sky_buffer = sdl_gl_helper::gen_sky_buffer();
+    world_sky_gl_buffer = sdl_gl_helper::gen_sky_buffer();
 
-    auto [vw, vh] = m_sdl->get_window_size_in_pixels();
+    auto [vw, vh] = simple_direct_medialayer->get_window_size_in_pixels();
     if (!m_bloom.init(
             vw, vh,
-            m_shaders.get(ShaderIdentifier::BLOOM_BLUR_SHADER).get(),
-            m_shaders.get(ShaderIdentifier::BLOOM_COMPOSITE_SHADER).get()))
+            world_shaders.get(ShaderIdentifier::BLOOM_BLUR_SHADER).get(),
+            world_shaders.get(ShaderIdentifier::BLOOM_COMPOSITE_SHADER).get()))
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "world::init - bloom_pass init failed\n");
     }
@@ -461,11 +508,11 @@ void world::init() noexcept
 
 void world::update(const float delta_time, mazes::randomizer &rng) noexcept
 {
-    while (!m_command_queue.empty())
+    while (!commands_during_world_events.empty())
     {
-        auto [action, _] = m_command_queue.front();
-        m_command_queue.pop();
-        action(*m_player, delta_time, std::ref(rng));
+        auto [action, _] = commands_during_world_events.front();
+        commands_during_world_events.pop();
+        action(*active_player, delta_time, std::ref(rng));
     }
 
     process_build_queue();
@@ -474,66 +521,66 @@ void world::update(const float delta_time, mazes::randomizer &rng) noexcept
     const float dt_seconds = delta_time / 1000.0f;
 
     // Only apply gravity when not flying
-    if (!m_player->is_flying())
+    if (!active_player->is_flying())
     {
-        m_player->m_vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
+        active_player->vel.vy += FORCE_DUE_TO_GRAVITY * dt_seconds;
     }
     else
     {
         // In flying mode, apply damping to vertical velocity to stop floating
-        m_player->m_vel.vy *= 0.85f;
+        active_player->vel.vy *= 0.85f;
     }
 
     // Apply damping to horizontal velocity when not actively moving
     // This prevents velocity from persisting after keys are released
     constexpr float horizontal_damping = 0.80f;
-    m_player->m_vel.vx *= horizontal_damping;
-    m_player->m_vel.vz *= horizontal_damping;
+    active_player->vel.vx *= horizontal_damping;
+    active_player->vel.vz *= horizontal_damping;
 
     // Apply velocity to position
-    m_player->m_pos.y += m_player->m_vel.vy * dt_seconds;
+    active_player->pos.y += active_player->vel.vy * dt_seconds;
 
     int hx, hy, hz, face;
     if (hit_test_face(&hx, &hy, &hz, &face))
     {
         // Track target for building purposes
-        m_projected_plane.target_x = hx;
-        m_projected_plane.target_y = hy;
-        m_projected_plane.target_z = hz;
-        m_projected_plane.target_face = face;
-        m_projected_plane.has_valid_target = true;
+        current_projected_plane.target_x = hx;
+        current_projected_plane.target_y = hy;
+        current_projected_plane.target_z = hz;
+        current_projected_plane.target_face = face;
+        current_projected_plane.has_valid_target = true;
     }
     else
     {
         // No valid target (looking at sky/void) - can't build here, but preview stays visible
-        m_projected_plane.has_valid_target = false;
+        current_projected_plane.has_valid_target = false;
     }
 
     // Apply collision detection (height = 2 blocks for player)
     // Skip collision when flying (allows clipping through blocks)
-    if (!m_player->is_flying())
+    if (!active_player->is_flying())
     {
         // Update ground state based on collision via helper (world is friend of player)
-        if (const int collision_result = collide(2, &m_player->m_pos.x, &m_player->m_pos.y, &m_player->m_pos.z);
+        if (const int collision_result = collide(2, &active_player->pos.x, &active_player->pos.y, &active_player->pos.z);
             collision_result == 1)
         {
-            m_player->m_vel.vy = 0.0f;
-            m_player->set_on_ground(true);
+            active_player->vel.vy = 0.0f;
+            active_player->set_on_ground(true);
         }
         else
         {
-            m_player->set_on_ground(false);
+            active_player->set_on_ground(false);
         }
     }
     else
     {
         // When flying, not on ground
-        m_player->set_on_ground(false);
+        active_player->set_on_ground(false);
     }
 
     delete_chunks();
-    sdl_gl_helper::del_buffer(m_player->get_buffer());
-    ensure_chunks(m_player);
+    sdl_gl_helper::del_buffer(active_player->get_buffer());
+    ensure_chunks(active_player);
     update_dirty_chunks_async();
 }
 
@@ -543,7 +590,7 @@ void world::draw() const noexcept
 
     // Set viewport to match window dimensions
     int viewport_width, viewport_height;
-    SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
+    SDL_GetWindowSizeInPixels(simple_direct_medialayer->window, &viewport_width, &viewport_height);
     glViewport(0, 0, viewport_width, viewport_height);
 
     glEnable(GL_DEPTH_TEST);
@@ -557,20 +604,21 @@ void world::draw() const noexcept
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Get texture IDs from texture manager
-    const auto atlas_texture = m_textures.get(TextureIdentifier::ATLAS).gl_texture;
-    const auto signs_texture = m_textures.get(TextureIdentifier::SIGNS).gl_texture;
-    const auto sky_texture = m_textures.get(TextureIdentifier::SKY).gl_texture;
+    const auto atlas_texture = world_textures.get(TextureIdentifier::ATLAS).gl_texture;
+    const auto signs_texture = world_textures.get(TextureIdentifier::SIGNS).gl_texture;
+    const auto sky_texture = world_textures.get(TextureIdentifier::SKY).gl_texture;
 
     // Sky sphere: single output only (not a bloom-eligible emitter).
     m_bloom.set_single_mode();
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
-    render_sky(m_sky_buffer, sky_texture);
+    render_sky(world_sky_gl_buffer, sky_texture);
     glDepthMask(GL_TRUE);
     glEnable(GL_CULL_FACE);
 
     // Geometry with possible HDR bright pixels → enable both MRT attachments.
     m_bloom.set_mrt_mode();
+    [[maybe_unused]]
     const auto triangle_faces = render_chunks(atlas_texture);
     render_player(atlas_texture);
 
@@ -583,38 +631,38 @@ void world::draw() const noexcept
     render_signs(signs_texture);
     render_sign(signs_texture);
 
-    std::array<char, 256> buffer{};
-    SDL_snprintf(buffer.data(), buffer.size(), "[%d triangle faces, %zu chunks]",
-                 triangle_faces, get_chunk_count());
-    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
-                10, viewport_height - 15, 12.0f, buffer.data());
-    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
-                10, viewport_height - 35, 12.0f, "Press E to preview");
-    render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
-                10, viewport_height - 55, 12.0f, "Press B to build");
+    std::array<std::string, 3> debug_lines{"Press [ESC] for menu",
+                                           "Press [E] to make new maze",
+                                           "Press [B] to build a maze"};
+    SDL_snprintf(debug_lines[0].data(), debug_lines[0].size(), debug_lines.at(0).c_str());
+    render_text(world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
+                10, viewport_height - 15, 12.0f, debug_lines[0].c_str());
+    render_text(world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
+                10, viewport_height - 35, 12.0f, debug_lines[1].c_str());
+    render_text(world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
+                10, viewport_height - 55, 12.0f, debug_lines[2].c_str());
 
     render_wireframe();
     render_crosshairs();
 
     // Render CAD features (Tier 1)
     render_grid_overlay();
-    render_measurement_lines();
     render_hover_info();
     render_maze_preview_ghost();
 
     // --- Pass 2+3: Gaussian blur + composite bloom → default framebuffer ---
-    const float bloom_str = m_player->m_configs.use_bloom_effect ? bloom_pass::BLOOM_STRENGTH : 0.0f;
+    const float bloom_str = active_player->_configs.use_bloom_effect() ? bloom_pass::BLOOM_STRENGTH : 0.0f;
     m_bloom.execute(bloom_str);
 }
 
 command_queue &world::get_command_queue() noexcept
 {
-    return m_command_queue;
+    return commands_during_world_events;
 }
 
 void world::invalidate_preview() noexcept
 {
-    m_current_preview = {};
+    current_preview_data = {};
 }
 
 void world::destroy_world()
@@ -623,7 +671,7 @@ void world::destroy_world()
     // Cleanup worker threads and chunks
     cleanup_worker_threads();
     delete_all_chunks();
-    sdl_gl_helper::del_buffer(m_player->get_buffer());
+    sdl_gl_helper::del_buffer(active_player->get_buffer());
 }
 
 void world::handle_event(const SDL_Event &event) noexcept
@@ -640,120 +688,6 @@ void world::handle_event(const SDL_Event &event) noexcept
     }
 }
 
-void world::create_world(const int p, const int q,
-                         const world_func &func, voxels_map *m, const int chunk_size) noexcept
-{
-    constexpr int pad = 1;
-    for (int dx = -pad; dx < chunk_size + pad; dx++)
-    {
-        for (int dz = -pad; dz < chunk_size + pad; dz++)
-        {
-            int flag = 1;
-            if (dx < 0 || dz < 0 || dx >= chunk_size || dz >= chunk_size)
-            {
-                flag = -1;
-            }
-            const int x = p * chunk_size + dx;
-            const int z = q * chunk_size + dz;
-
-            // Build the environment
-            const float f = simplex2(static_cast<float>(x) * 0.01f, static_cast<float>(z) * 0.01f,
-                                     4, 0.5f, 2.f);
-            const float g = simplex2(static_cast<float>(-x) * 0.01f, static_cast<float>(-z) * 0.01f,
-                                     2, 0.9f, 2.f);
-            const int mh = g * 32 + 16;
-            auto h = static_cast<int>(f * static_cast<float>(mh));
-            int w = 1;
-            if (constexpr int t = 12; h <= t)
-            {
-                h = t;
-                w = 2;
-            }
-
-            // sand and grass terrain
-            for (int y = 0; y < h; y++)
-            {
-                func(x, y, z, w * flag, m);
-            }
-
-            if (w == 1)
-            {
-                // grass
-                if (simplex2(static_cast<float>(-x) * 0.1f,
-                             static_cast<float>(z) * 0.1f,
-                             4,
-                             0.8f, 2.0f) > 0.6f)
-                {
-                    func(x, h, z, 17 * flag, m);
-                }
-                // flowers
-                if (simplex2(static_cast<float>(x) * 0.05f,
-                             static_cast<float>(-z) * 0.05f,
-                             4,
-                             0.8f,
-                             2.0f) > 0.7f)
-                {
-                    const auto w1 = 18.f + simplex2(static_cast<float>(x) * 0.1f,
-                                                    static_cast<float>(z) * 0.1f,
-                                                    4,
-                                                    0.8f,
-                                                    2.0f) *
-                                               7.f;
-
-                    func(x, h, z, w1 * static_cast<float>(flag), m);
-                }
-
-                // trees
-                int ok = 1;
-                if (dx - 4 < 0 || dz - 4 < 0 ||
-                    dx + 4 >= BUILD_CHUNK_SIZE || dz + 4 >= BUILD_CHUNK_SIZE)
-                {
-                    ok = 0;
-                }
-                if (ok && simplex2(static_cast<float>(x), static_cast<float>(z), 6, 0.5f, 2.0f) > 0.84f)
-                {
-                    for (int y = h + 3; y < h + 8; y++)
-                    {
-                        for (int ox = -3; ox <= 3; ox++)
-                        {
-                            for (int oz = -3; oz <= 3; oz++)
-                            {
-                                const int d = (ox * ox) + (oz * oz) +
-                                              (y - (h + 4)) * (y - (h + 4));
-                                if (d < 11)
-                                {
-                                    func(x + ox, y, z + oz, 15, m);
-                                }
-                            }
-                        }
-                    }
-                    for (int y = h; y < h + 7; y++)
-                    {
-                        func(x, y, z, 5, m);
-                    }
-                }
-            }
-            // clouds
-            if (SHOW_CLOUDS)
-            {
-                for (int y = 64; y < 72; y++)
-                {
-                    if (simplex3(
-                            static_cast<float>(x) * 0.01f,
-                            static_cast<float>(y) * 0.1f,
-                            static_cast<float>(z) * 0.01f,
-                            8,
-                            0.5f,
-                            2.0f) > 0.75f)
-                    {
-                        func(x, y, z, 16 * flag, m);
-                    }
-                }
-            }
-        }
-    }
-} // create_world
-
 bool world::update_preview(const std::vector<std::uint8_t> &pixel_data,
                            const int width,
                            const int height) const noexcept
@@ -764,13 +698,13 @@ bool world::update_preview(const std::vector<std::uint8_t> &pixel_data,
         return false;
     }
 
-    if (!m_projected_plane.projected_texture)
+    if (!current_projected_plane.projected_texture)
     {
         SDL_LogError(SDL_LOG_CATEGORY_ERROR, "Maze preview texture is not initialized\n");
         return false;
     }
 
-    if (!m_projected_plane.projected_texture->update_from_memory(
+    if (!current_projected_plane.projected_texture->update_from_memory(
             pixel_data.data(),
             width,
             height,
@@ -788,16 +722,13 @@ void world::finalize_buildings(std::vector<std::uint8_t> pixel_data,
                                int wall_height, int item_type) noexcept
 {
     // Store preview data in memory for reusable building
-    m_current_preview.pixel_data = std::move(pixel_data);
-    m_current_preview.width = width;
-    m_current_preview.height = height;
-    m_current_preview.scale = scale;
-    m_current_preview.wall_height = wall_height;
-    m_current_preview.item_type = item_type;
-    m_current_preview.has_data = true;
-
-    SDL_Log("Preview finalized: %dx%d, scale=%d, height=%d, item=%d\n",
-            width, height, scale, wall_height, item_type);
+    current_preview_data.pixel_data = std::move(pixel_data);
+    current_preview_data.width = width;
+    current_preview_data.height = height;
+    current_preview_data.scale = scale;
+    current_preview_data.wall_height = wall_height;
+    current_preview_data.item_type = item_type;
+    current_preview_data.has_data = true;
 }
 
 // Build the current preview at the targeted location
@@ -806,40 +737,40 @@ void world::finalize_buildings(std::vector<std::uint8_t> pixel_data,
 void world::commit_preview_to_world(int item_type) noexcept
 {
     // Check if we have preview data
-    if (!m_current_preview.has_data)
+    if (!current_preview_data.has_data)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "No preview to build - press 'E' first to generate a preview\n");
         return;
     }
 
-    if (m_current_preview.item_type != item_type)
+    if (current_preview_data.item_type != item_type)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Maze preview is stale after changing the build item - press 'E' to regenerate it\n");
         return;
     }
 
-    if (m_current_preview.scale <= 0 || m_current_preview.width <= 0 || m_current_preview.height <= 0)
+    if (current_preview_data.scale <= 0 || current_preview_data.width <= 0 || current_preview_data.height <= 0)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "Maze preview has invalid dimensions - press 'E' to regenerate it\n");
         return;
     }
 
-    const int face = m_projected_plane.target_face;
+    const int face = current_projected_plane.target_face;
     const ivec3 normal = face_normal(face);
     const ivec3 axis_u = face_u_axis(face);
     const ivec3 axis_v = face_v_axis(face);
 
     // Anchor one cell off the hit block, along face normal.
-    const int anchor_x = m_projected_plane.target_x + normal.x;
-    const int anchor_y = m_projected_plane.target_y + normal.y;
-    const int anchor_z = m_projected_plane.target_z + normal.z;
+    const int anchor_x = current_projected_plane.target_x + normal.x;
+    const int anchor_y = current_projected_plane.target_y + normal.y;
+    const int anchor_z = current_projected_plane.target_z + normal.z;
 
     // Calculate logical maze dimensions
-    const int logical_width = m_current_preview.width / m_current_preview.scale;
-    const int logical_height = m_current_preview.height / m_current_preview.scale;
+    const int logical_width = current_preview_data.width / current_preview_data.scale;
+    const int logical_height = current_preview_data.height / current_preview_data.scale;
 
     // Build the maze at the current target location
     int blocks_placed = 0;
@@ -848,25 +779,25 @@ void world::commit_preview_to_world(int item_type) noexcept
         for (int cell_x = 0; cell_x < logical_width; ++cell_x)
         {
             // Sample the center of each scaled cell region
-            const int pix_x = cell_x * m_current_preview.scale + m_current_preview.scale / 2;
-            const int pix_y = cell_y * m_current_preview.scale + m_current_preview.scale / 2;
-            const int pixel_index = (pix_y * m_current_preview.width + pix_x) * 4;
+            const int pix_x = cell_x * current_preview_data.scale + current_preview_data.scale / 2;
+            const int pix_y = cell_y * current_preview_data.scale + current_preview_data.scale / 2;
+            const int pixel_index = (pix_y * current_preview_data.width + pix_x) * 4;
 
-            if (pixel_index < 0 || pixel_index + 2 >= static_cast<int>(m_current_preview.pixel_data.size()))
+            if (pixel_index < 0 || pixel_index + 2 >= static_cast<int>(current_preview_data.pixel_data.size()))
             {
                 continue;
             }
 
             // Read RGB values
-            const uint8_t r = m_current_preview.pixel_data[pixel_index + 0];
-            const uint8_t g = m_current_preview.pixel_data[pixel_index + 1];
-            const uint8_t b = m_current_preview.pixel_data[pixel_index + 2];
+            const uint8_t r = current_preview_data.pixel_data[pixel_index + 0];
+            const uint8_t g = current_preview_data.pixel_data[pixel_index + 1];
+            const uint8_t b = current_preview_data.pixel_data[pixel_index + 2];
 
             // Check if pixel is black (wall)
             if (r < 50 && g < 50 && b < 50)
             {
                 // Extrude wall thickness along the target face normal.
-                for (int depth = 0; depth < m_current_preview.wall_height; ++depth)
+                for (int depth = 0; depth < current_preview_data.wall_height; ++depth)
                 {
                     const int world_x = anchor_x + cell_x * axis_u.x + cell_y * axis_v.x + depth * normal.x;
                     const int world_y = anchor_y + cell_x * axis_u.y + cell_y * axis_v.y + depth * normal.y;
@@ -882,9 +813,9 @@ void world::commit_preview_to_world(int item_type) noexcept
 
 void world::process_build_queue() noexcept
 {
-    for (auto &f : m_building_processes)
-        f();
-    m_building_processes.clear();
+    std::ranges::for_each(m_player_building_events, [](const auto &f)
+                          { f(); });
+    m_player_building_events.clear();
 }
 
 bool world::worker_run(worker *w) const noexcept
@@ -917,15 +848,15 @@ bool world::worker_run(worker *w) const noexcept
 
 void world::init_worker_threads() noexcept
 {
-    m_workers.reserve(NUM_WORKERS);
-    for (int i = 0; i < NUM_WORKERS; i++)
+    chunk_workers.reserve(CHUNK_WORKERS_TOTAL);
+    for (int i = 0; i < CHUNK_WORKERS_TOTAL; i++)
     {
         auto w = std::make_unique<worker>();
         w->index = i;
         w->state = WorkerState::IDLE;
         w->should_stop = false;
-        m_workers.emplace_back(std::move(w));
-        worker *worker_ptr = m_workers.back().get();
+        chunk_workers.emplace_back(std::move(w));
+        worker *worker_ptr = chunk_workers.back().get();
         worker_ptr->thrd = std::thread([this, worker_ptr]()
                                        { this->worker_run(worker_ptr); });
     }
@@ -934,7 +865,7 @@ void world::init_worker_threads() noexcept
 void world::cleanup_worker_threads() noexcept
 {
     // signal all worker threads to stop
-    for (auto &&w : m_workers)
+    for (auto &&w : chunk_workers)
     {
         w->mtx.lock();
         w->should_stop = true;
@@ -942,7 +873,7 @@ void world::cleanup_worker_threads() noexcept
         w->mtx.unlock();
     }
 
-    for (auto &&w : m_workers)
+    for (auto &&w : chunk_workers)
     {
 #if !defined(__EMSCRIPTEN__)
         // Emscripten: blocking join on the main browser thread deadlocks the JS
@@ -955,7 +886,7 @@ void world::cleanup_worker_threads() noexcept
 #endif
     }
 
-    m_workers.clear();
+    chunk_workers.clear();
 }
 
 int world::chunked(const float x) noexcept
@@ -965,17 +896,17 @@ int world::chunked(const float x) noexcept
 
 double world::get_time() const noexcept
 {
-    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(m_player->m_configs.start_time) - static_cast<double>(m_player->m_configs.start_ticks)) / 1000.0;
+    return (static_cast<double>(SDL_GetTicks()) + static_cast<double>(active_player->_configs.start_time()) - static_cast<double>(active_player->_configs.start_ticks())) / 1000.0;
 }
 
 float world::time_of_day() const noexcept
 {
-    if (m_player->m_configs.day_length <= 0)
+    if (active_player->_configs.day_length() <= 0)
     {
         return 0.5f;
     }
     auto t = static_cast<float>(get_time());
-    t /= static_cast<float>(m_player->m_configs.day_length);
+    t /= static_cast<float>(active_player->_configs.day_length());
     t -= static_cast<float>(static_cast<int>(t));
     return t;
 }
@@ -998,9 +929,9 @@ std::optional<scene_node *> world::find_chunk(const int p, const int q) const no
 {
     // Iterate through all active chunks in the BACKGROUND layer
     // NOTE: Start at index 1 because index 0 is the root layer node
-    // Iterate up to m_next_chunk_slot (exclusive) which points to the next available slot
-    const auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
-    for (std::size_t i = 1; i < m_next_chunk_slot && i < background_layer.size(); ++i)
+    // Iterate up to next_chunk_slot_in_view (exclusive) which points to the next available slot
+    const auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    for (std::size_t i = 1; i < next_chunk_slot_in_view && i < background_layer.size(); ++i)
     {
         scene_node *chunk = background_layer[i];
         if (chunk != nullptr && chunk->p == p && chunk->q == q)
@@ -1008,6 +939,38 @@ std::optional<scene_node *> world::find_chunk(const int p, const int q) const no
             return chunk;
         }
     }
+    return std::nullopt;
+}
+
+std::optional<chunk_view> world::find_chunk_view(const int p, const int q) const noexcept
+{
+    if (const auto legacy_chunk_opt = find_chunk(p, q); legacy_chunk_opt.has_value())
+    {
+        if (scene_node *legacy_chunk = legacy_chunk_opt.value(); legacy_chunk != nullptr)
+        {
+            return to_chunk_view(legacy_chunk);
+        }
+    }
+
+    return std::nullopt;
+}
+
+std::optional<chunk> world::find_chunk_composed(const int p, const int q) const noexcept
+{
+    if (const auto legacy_chunk_opt = find_chunk(p, q); legacy_chunk_opt.has_value())
+    {
+        scene_node *legacy_chunk = legacy_chunk_opt.value();
+        if (legacy_chunk == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        chunk composed;
+        composed.graph = to_scene_graph_node(*legacy_chunk);
+        composed.data = to_chunk_data(*legacy_chunk);
+        return composed;
+    }
+
     return std::nullopt;
 }
 
@@ -1034,7 +997,7 @@ bool world::chunk_visible(float planes[6][4], const int p, const int q, const in
         {x + d, maxy_f, z + 0.f},
         {x + 0.f, maxy_f, z + d},
         {x + d, maxy_f, z + d}};
-    const int n = m_player->m_configs.ortho ? 4 : 6;
+    const int n = active_player->_configs.ortho_scaling() ? 4 : 6;
     for (int i = 0; i < n; i++)
     {
         int in = 0;
@@ -1074,9 +1037,9 @@ int world::highest_block(const float x, const float z) const noexcept
     const int nz = static_cast<int>(SDL_roundf(z));
     const int p = chunked(x);
     const int q = chunked(z);
-    if (const auto chunk = find_chunk(p, q); chunk.has_value())
+    if (const auto chunk = find_chunk_view(p, q); chunk.has_value())
     {
-        const voxels_map *map = &chunk.value()->map;
+        const voxels_map *map = &chunk.value().map();
         for (const auto [ex, ey, ez, ew] : *map)
         {
             // item.h -> is_obstacle
@@ -1141,9 +1104,9 @@ int world::hit_test(const int previous, const float x, const float y,
 
     matrix::compute_sight_vector(rx, ry, std::ref(vx), std::ref(vy), std::ref(vz));
 
-    const auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    const auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
     // NOTE: Start at index 1 because index 0 is the root layer node
-    for (std::size_t i = 1; i < m_next_chunk_slot; ++i)
+    for (std::size_t i = 1; i < next_chunk_slot_in_view; ++i)
     {
         const scene_node *chunk = background_layer[i];
         if (chunk == nullptr || chunk_distance(chunk, p, q) > 1)
@@ -1171,7 +1134,7 @@ int world::hit_test(const int previous, const float x, const float y,
 
 int world::hit_test_face(int *x, int *y, int *z, int *face) const noexcept
 {
-    const player::position *s = &m_player->m_pos;
+    const player::position *s = &active_player->pos;
     // item.h -> is_obstacle
     if (int w = this->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, x, y, z);
         item::is_obstacle(w))
@@ -1333,22 +1296,22 @@ void world::dirty_chunk(scene_node *chunk) const noexcept
 
 void world::update_dirty_chunks_async() const noexcept
 {
-    for (auto &&worker : m_workers)
+    for (auto &&worker : chunk_workers)
     {
         worker->mtx.lock();
         if (worker->state == WorkerState::IDLE)
         {
             // Find a dirty chunk that needs updating and is assigned to this worker
             // NOTE: Start at index 1 because index 0 is the root layer node
-            const auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
-            for (std::size_t i = 1; i < m_next_chunk_slot && i < background_layer.size(); ++i)
+            const auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+            for (std::size_t i = 1; i < next_chunk_slot_in_view && i < background_layer.size(); ++i)
             {
                 scene_node *chunk = background_layer[i];
                 if (chunk == nullptr)
                     continue;
                 if (chunk->dirty)
                 {
-                    int index = (SDL_abs(chunk->p) ^ SDL_abs(chunk->q)) % m_workers.size();
+                    int index = (SDL_abs(chunk->p) ^ SDL_abs(chunk->q)) % chunk_workers.size();
                     if (index == worker->index)
                     {
                         // Assign this dirty chunk to the worker
@@ -1454,45 +1417,59 @@ void world::light_fill(char *opaque, char *light, const int x, const int y, cons
 #define Y_SIZE 258
 #define XYZ(x, y, z) ((y) * XZ_SIZE * XZ_SIZE + (x) * XZ_SIZE + (z))
 #define XZ(x, z) ((x) * XZ_SIZE + (z))
-    struct entry { int x, y, z, w; };
+    struct entry
+    {
+        int x, y, z, w;
+    };
     // Max entries bounded by light radius; 512 is well above the practical worst case.
     std::vector<entry> stk;
     stk.reserve(512);
 
     // Seed: the initial call may override the opaque check via force.
-    if (x + w < XZ_LO || z + w < XZ_LO) return;
-    if (x - w > XZ_HI || z - w > XZ_HI) return;
-    if (y < 0 || y >= Y_SIZE) return;
-    if (light[XYZ(x, y, z)] >= w) return;
-    if (!force && opaque[XYZ(x, y, z)]) return;
+    if (x + w < XZ_LO || z + w < XZ_LO)
+        return;
+    if (x - w > XZ_HI || z - w > XZ_HI)
+        return;
+    if (y < 0 || y >= Y_SIZE)
+        return;
+    if (light[XYZ(x, y, z)] >= w)
+        return;
+    if (!force && opaque[XYZ(x, y, z)])
+        return;
     light[XYZ(x, y, z)] = static_cast<char>(w);
     if (w - 1 > 0)
     {
-        stk.push_back({x - 1, y,     z,     w - 1});
-        stk.push_back({x + 1, y,     z,     w - 1});
-        stk.push_back({x,     y - 1, z,     w - 1});
-        stk.push_back({x,     y + 1, z,     w - 1});
-        stk.push_back({x,     y,     z - 1, w - 1});
-        stk.push_back({x,     y,     z + 1, w - 1});
+        stk.push_back({x - 1, y, z, w - 1});
+        stk.push_back({x + 1, y, z, w - 1});
+        stk.push_back({x, y - 1, z, w - 1});
+        stk.push_back({x, y + 1, z, w - 1});
+        stk.push_back({x, y, z - 1, w - 1});
+        stk.push_back({x, y, z + 1, w - 1});
     }
 
     while (!stk.empty())
     {
         const auto [cx, cy, cz, cw] = stk.back();
         stk.pop_back();
-        if (cx + cw < XZ_LO || cz + cw < XZ_LO) continue;
-        if (cx - cw > XZ_HI || cz - cw > XZ_HI) continue;
-        if (cy < 0 || cy >= Y_SIZE) continue;
-        if (light[XYZ(cx, cy, cz)] >= cw) continue;
-        if (opaque[XYZ(cx, cy, cz)]) continue;
+        if (cx + cw < XZ_LO || cz + cw < XZ_LO)
+            continue;
+        if (cx - cw > XZ_HI || cz - cw > XZ_HI)
+            continue;
+        if (cy < 0 || cy >= Y_SIZE)
+            continue;
+        if (light[XYZ(cx, cy, cz)] >= cw)
+            continue;
+        if (opaque[XYZ(cx, cy, cz)])
+            continue;
         light[XYZ(cx, cy, cz)] = static_cast<char>(cw);
-        if (cw - 1 <= 0) continue;
-        stk.push_back({cx - 1, cy,     cz,     cw - 1});
-        stk.push_back({cx + 1, cy,     cz,     cw - 1});
-        stk.push_back({cx,     cy - 1, cz,     cw - 1});
-        stk.push_back({cx,     cy + 1, cz,     cw - 1});
-        stk.push_back({cx,     cy,     cz - 1, cw - 1});
-        stk.push_back({cx,     cy,     cz + 1, cw - 1});
+        if (cw - 1 <= 0)
+            continue;
+        stk.push_back({cx - 1, cy, cz, cw - 1});
+        stk.push_back({cx + 1, cy, cz, cw - 1});
+        stk.push_back({cx, cy - 1, cz, cw - 1});
+        stk.push_back({cx, cy + 1, cz, cw - 1});
+        stk.push_back({cx, cy, cz - 1, cw - 1});
+        stk.push_back({cx, cy, cz + 1, cw - 1});
     }
 }
 
@@ -1667,7 +1644,8 @@ void world::compute_chunk(worker_item *item) noexcept
                     {
                         for (int oy1 = 0; oy1 < 8; oy1++)
                         {
-                            if (y + dy + oy1 >= Y_SIZE) break;
+                            if (y + dy + oy1 >= Y_SIZE)
+                                break;
                             if (opaque[XYZ(x + dx, y + dy + oy1, z + dz)])
                             {
                                 shades[index] = 1.0f - oy1 * 0.125f;
@@ -1695,7 +1673,7 @@ void world::compute_chunk(worker_item *item) noexcept
                     max_light = SDL_max(max_light, light2[a][b]);
                 }
             }
-            float rotation = simplex2(static_cast<float>(ex), static_cast<float>(ez), 4, 0.5f, 2.f) * 360.f;
+            float rotation = SDL_sinf(static_cast<float>(ex) * 12.9898f + static_cast<float>(ez) * 78.233f) * 43758.5453f;
             geometries::make_plant(
                 data + offset, min_ao, max_light,
                 static_cast<float>(ex), static_cast<float>(ey), static_cast<float>(ez),
@@ -1776,7 +1754,7 @@ void world::gen_chunk_buffer(scene_node *chunk) const noexcept
 
 // Create a chunk that represents a unique portion of the world
 // p, q represents the chunk key
-void world::load_chunk(const worker_item *item) noexcept
+void world::load_chunk(const worker_item *item) const noexcept
 {
     const int p = item->p;
     const int q = item->q;
@@ -1784,8 +1762,19 @@ void world::load_chunk(const worker_item *item) noexcept
     voxels_map *block_map = item->block_maps[1][1];
     voxels_map *light_map = item->light_maps[1][1];
 
-    create_world(p, q, [](int x, int y, int z, int w, voxels_map *m)
-                 { m->set(x, y, z, w); }, block_map, BUILD_CHUNK_SIZE);
+    // Pass player position and heightmap config for conditional terrain flattening
+    const bool enable_heightmap = active_player ? active_player->_configs.show_heightmap() : true;
+    const float player_x = active_player ? active_player->pos.x : 0.0f;
+    const float player_z = active_player ? active_player->pos.z : 0.0f;
+    // Flatten terrain within ~8 chunks of player
+    constexpr float flatten_radius = 256.0f;
+
+    geometries::create_voxel_world(
+        [](voxels_map *m, int x, int y, int z, int w)
+        { m->set(x, y, z, w); },
+        block_map, p, q, BUILD_CHUNK_SIZE,
+        enable_heightmap, player_x, player_z, flatten_radius);
+
     db_load_blocks(block_map, p, q);
     db_load_lights(light_map, p, q);
 }
@@ -1830,9 +1819,9 @@ void world::create_chunk(scene_node *chunk, const int p, const int q) noexcept
 
 void world::delete_chunks() noexcept
 {
-    std::size_t count = this->m_next_chunk_slot;
-    const player::position *s1 = &m_player->m_pos;
-    auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    std::size_t count = this->next_chunk_slot_in_view;
+    const player::position *s1 = &active_player->pos;
+    auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
     const int p = chunked(s1->x);
     const int q = chunked(s1->z);
@@ -1863,15 +1852,15 @@ void world::delete_chunks() noexcept
         }
         background_layer[count] = nullptr;
     }
-    this->m_next_chunk_slot = count;
+    this->next_chunk_slot_in_view = count;
 }
 
 void world::delete_all_chunks() noexcept
 {
-    auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+    auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
 
     // NOTE: Start at index 1 because index 0 is the root layer node
-    for (std::size_t i = 1; i < this->m_next_chunk_slot; ++i)
+    for (std::size_t i = 1; i < this->next_chunk_slot_in_view; ++i)
     {
         scene_node *chunk = background_layer[i];
         if (chunk == nullptr)
@@ -1889,7 +1878,7 @@ void world::delete_all_chunks() noexcept
         background_layer[i] = nullptr;
     }
     // Reset to 1 to preserve root layer node at index 0
-    this->m_next_chunk_slot = 1;
+    this->next_chunk_slot_in_view = 1;
 
     // Clear the root node children in the background layer
     if (background_layer[0] != nullptr && background_layer[0]->get_category() == Entity::SCENE)
@@ -1900,7 +1889,7 @@ void world::delete_all_chunks() noexcept
 
 void world::check_workers() noexcept
 {
-    for (auto &&w : m_workers)
+    for (auto &&w : chunk_workers)
     {
         w->mtx.lock();
         if (w->state == WorkerState::DONE)
@@ -1942,7 +1931,7 @@ void world::check_workers() noexcept
 // Used to init the terrain (chunks) around the player
 void world::force_chunks(player *_player) noexcept
 {
-    player::position *s = &_player->m_pos;
+    player::position *s = &_player->pos;
     int p = chunked(s->x);
     int q = chunked(s->z);
 
@@ -1965,12 +1954,12 @@ void world::force_chunks(player *_player) noexcept
                 }
                 // Dirty chunks with existing buffers will be updated by workers
             }
-            else if (this->m_next_chunk_slot < MAX_CHUNKS)
+            else if (this->next_chunk_slot_in_view < MAX_CHUNKS)
             {
-                auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+                auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
                 scene_node *chunk = new scene_node{};
-                background_layer[this->m_next_chunk_slot] = chunk;
-                ++this->m_next_chunk_slot; // Move to next available slot
+                background_layer[this->next_chunk_slot_in_view] = chunk;
+                ++this->next_chunk_slot_in_view; // Move to next available slot
                 create_chunk(chunk, a, b);
                 gen_chunk_buffer(chunk);
             }
@@ -1980,14 +1969,14 @@ void world::force_chunks(player *_player) noexcept
 
 void world::ensure_chunks_worker(player *_player, worker *w) noexcept
 {
-    auto [width, height] = m_sdl->get_window_size();
-    player::position *s = &_player->m_pos;
+    auto [width, height] = simple_direct_medialayer->get_window_size();
+    player::position *s = &_player->pos;
     float matrix[16];
     matrix::set_3d(matrix, width, height,
-                  s->x, s->y, s->z, s->rx, s->ry,
-                  m_player->m_configs.fov,
-                  m_player->m_configs.ortho,
-                  RENDER_CHUNK_RADIUS);
+                   s->x, s->y, s->z, s->rx, s->ry,
+                   active_player->_configs.fov(),
+                   active_player->_configs.ortho_scaling(),
+                   RENDER_CHUNK_RADIUS);
     float planes[6][4];
     matrix::frustum_planes(planes, RENDER_CHUNK_RADIUS, matrix);
     int p = chunked(s->x);
@@ -2003,7 +1992,7 @@ void world::ensure_chunks_worker(player *_player, worker *w) noexcept
         {
             int a = p + dp;
             int b = q + dq;
-            int index = (SDL_abs(a) ^ SDL_abs(b)) % NUM_WORKERS;
+            int index = (SDL_abs(a) ^ SDL_abs(b)) % CHUNK_WORKERS_TOTAL;
             if (index != w->index)
             {
                 continue;
@@ -2043,12 +2032,12 @@ void world::ensure_chunks_worker(player *_player, worker *w) noexcept
     if (!chunk_opt.has_value())
     {
         load = 1;
-        if (this->m_next_chunk_slot < MAX_CHUNKS)
+        if (this->next_chunk_slot_in_view < MAX_CHUNKS)
         {
-            auto &background_layer = m_scene_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
+            auto &background_layer = scene_graph_layers[static_cast<std::size_t>(Layer::BACKGROUND)];
             chunk = new scene_node{};
-            background_layer[this->m_next_chunk_slot] = chunk;
-            ++this->m_next_chunk_slot; // Move to next available slot
+            background_layer[this->next_chunk_slot_in_view] = chunk;
+            ++this->next_chunk_slot_in_view; // Move to next available slot
             init_chunk(chunk, a, b);
         }
         else
@@ -2102,7 +2091,7 @@ void world::ensure_chunks(player *_player) noexcept
 {
     check_workers();
     force_chunks(_player);
-    for (auto &&w : m_workers)
+    for (auto &&w : chunk_workers)
     {
         w->mtx.lock();
         if (w->state == WorkerState::IDLE)
@@ -2266,10 +2255,9 @@ int world::get_block(const int x, const int y, const int z) const noexcept
 {
     const int p = chunked(static_cast<float>(x));
     const int q = chunked(static_cast<float>(z));
-    if (auto chunk_opt = find_chunk(p, q); chunk_opt.has_value())
+    if (auto chunk_opt = find_chunk_view(p, q); chunk_opt.has_value())
     {
-        const scene_node *chunk = chunk_opt.value();
-        const voxels_map *map = &chunk->map;
+        const voxels_map *map = &chunk_opt->map();
         return map->get(x, y, z);
     }
     return 0;
@@ -2277,7 +2265,7 @@ int world::get_block(const int x, const int y, const int z) const noexcept
 
 std::size_t world::get_chunk_count() const noexcept
 {
-    return this->m_next_chunk_slot - 1;
+    return this->next_chunk_slot_in_view - 1;
 }
 
 // ---------------------------------------------------------------------------
@@ -2286,11 +2274,11 @@ std::size_t world::get_chunk_count() const noexcept
 
 std::pair<int, int> world::begin_3d_pass(const sdl_gl_helper::attrib *a, float matrix[16]) const noexcept
 {
-    auto [w, h] = m_sdl->get_window_size();
-    const auto *s = &m_player->m_pos;
+    auto [w, h] = simple_direct_medialayer->get_window_size();
+    const auto *s = &active_player->pos;
     matrix::set_3d(matrix, w, h,
-                  s->x, s->y, s->z, s->rx, s->ry,
-                  m_player->m_configs.fov, m_player->m_configs.ortho, RENDER_CHUNK_RADIUS);
+                   s->x, s->y, s->z, s->rx, s->ry,
+                   active_player->_configs.fov(), active_player->_configs.ortho_scaling(), RENDER_CHUNK_RADIUS);
     glUseProgram(a->program);
     glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
     return {w, h};
@@ -2298,12 +2286,12 @@ std::pair<int, int> world::begin_3d_pass(const sdl_gl_helper::attrib *a, float m
 
 std::pair<int, int> world::begin_sky_pass(const sdl_gl_helper::attrib *a, float matrix[16]) const noexcept
 {
-    auto [w, h] = m_sdl->get_window_size();
-    const auto *s = &m_player->m_pos;
+    auto [w, h] = simple_direct_medialayer->get_window_size();
+    const auto *s = &active_player->pos;
     // Sky sphere always renders from the origin with no ortho distortion.
     matrix::set_3d(matrix, w, h,
-                  0, 0, 0, s->rx, s->ry,
-                  m_player->m_configs.fov, 0, RENDER_CHUNK_RADIUS);
+                   0, 0, 0, s->rx, s->ry,
+                   active_player->_configs.fov(), 0, RENDER_CHUNK_RADIUS);
     glUseProgram(a->program);
     glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
     return {w, h};
@@ -2311,8 +2299,8 @@ std::pair<int, int> world::begin_sky_pass(const sdl_gl_helper::attrib *a, float 
 
 std::pair<int, int> world::begin_item_pass(const sdl_gl_helper::attrib *a, float matrix[16]) const noexcept
 {
-    auto [w, h] = m_sdl->get_window_size();
-    matrix::set_item(matrix, w, h, m_sdl->get_scale_factor());
+    auto [w, h] = simple_direct_medialayer->get_window_size();
+    matrix::set_item(matrix, w, h, simple_direct_medialayer->get_scale_factor());
     glUseProgram(a->program);
     glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
     return {w, h};
@@ -2320,7 +2308,7 @@ std::pair<int, int> world::begin_item_pass(const sdl_gl_helper::attrib *a, float
 
 std::pair<int, int> world::begin_2d_pass(const sdl_gl_helper::attrib *a, float matrix[16]) const noexcept
 {
-    auto [w, h] = m_sdl->get_window_size();
+    auto [w, h] = simple_direct_medialayer->get_window_size();
     matrix::set_2d(matrix, w, h);
     glUseProgram(a->program);
     glUniformMatrix4fv(a->matrix, 1, GL_FALSE, matrix);
@@ -2336,7 +2324,7 @@ int world::render_chunks(const std::uint32_t texture) const noexcept
     float matrix[16];
     begin_3d_pass(&s_block_attrib, matrix);
     int result = 0;
-    const player::position *s = &this->m_player->m_pos;
+    const player::position *s = &this->active_player->pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     const float light = get_daylight();
@@ -2348,7 +2336,7 @@ int world::render_chunks(const std::uint32_t texture) const noexcept
     glUniform1i(s_block_attrib.sampler, 0);
     glUniform1f(s_block_attrib.extra2, light);
     glUniform1f(s_block_attrib.extra3, static_cast<GLfloat>(RENDER_CHUNK_RADIUS * BUILD_CHUNK_SIZE));
-    glUniform1i(s_block_attrib.extra4, static_cast<int>(m_player->m_configs.ortho));
+    glUniform1i(s_block_attrib.extra4, static_cast<int>(active_player->_configs.ortho_scaling()));
     glUniform1f(s_block_attrib.timer, time_of_day());
 
     int chunks_rendered = 0;
@@ -2362,25 +2350,25 @@ int world::render_chunks(const std::uint32_t texture) const noexcept
     int max_q = q + RENDER_CHUNK_RADIUS;
 
     // Use spatial hierarchy traversal with bounds culling
-    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](const scene_node *chunk)
-                              {
+    traverse_chunks_in_bounds_view(min_p, min_q, max_p, max_q, [&](const chunk_view &chunk)
+                                   {
         // Additional distance check
-        if (chunk_distance(chunk, p, q) > RENDER_CHUNK_RADIUS)
+        if (const scene_node *legacy_chunk = chunk.legacy; chunk_distance(legacy_chunk, p, q) > RENDER_CHUNK_RADIUS)
         {
             chunks_culled_distance++;
             return;
         }
 
         // Frustum culling
-        if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
+        if (!chunk_visible(planes, chunk.p(), chunk.q(), chunk.miny(), chunk.maxy()))
         {
             chunks_culled_frustum++;
             return;
         }
 
         // Render the chunk
-        sdl_gl_helper::draw_chunk(&s_block_attrib, chunk);
-        result += chunk->faces;
+        sdl_gl_helper::draw_chunk(&s_block_attrib, chunk.legacy);
+        result += chunk.faces();
         chunks_rendered++; });
 
     return result;
@@ -2390,7 +2378,7 @@ void world::render_signs(const std::uint32_t sign) const noexcept
 {
     float matrix[16];
     begin_3d_pass(&s_text_attrib, matrix);
-    const player::position *s = &this->m_player->m_pos;
+    const player::position *s = &this->active_player->pos;
     const int p = chunked(s->x);
     const int q = chunked(s->z);
     float planes[6][4];
@@ -2407,17 +2395,17 @@ void world::render_signs(const std::uint32_t sign) const noexcept
     const int max_q = q + RENDER_SIGN_RADIUS;
 
     // Use spatial hierarchy traversal
-    traverse_chunks_in_bounds(min_p, min_q, max_p, max_q, [&](scene_node *chunk)
-                              {
-        if (chunk_distance(chunk, p, q) > RENDER_SIGN_RADIUS)
+    traverse_chunks_in_bounds_view(min_p, min_q, max_p, max_q, [&](const chunk_view &chunk)
+                                   {
+        if (const scene_node *legacy_chunk = chunk.legacy; chunk_distance(legacy_chunk, p, q) > RENDER_SIGN_RADIUS)
         {
             return;
         }
-        if (!chunk_visible(planes, chunk->p, chunk->q, chunk->miny, chunk->maxy))
+        if (!chunk_visible(planes, chunk.p(), chunk.q(), chunk.miny(), chunk.maxy()))
         {
             return;
         }
-        sdl_gl_helper::draw_signs(&s_text_attrib, chunk); });
+        sdl_gl_helper::draw_signs(&s_text_attrib, chunk.legacy); });
 }
 
 void world::render_sign(const std::uint32_t sign) const noexcept
@@ -2435,7 +2423,7 @@ void world::render_sign(const std::uint32_t sign) const noexcept
     glUniform1i(s_text_attrib.sampler, static_cast<unsigned int>(TextureIdentifier::SIGNS));
     glUniform1i(s_text_attrib.extra1, 1);
     char text[MAX_SIGN_LENGTH];
-    SDL_strlcpy(text, m_player->m_configs.tag.c_str(), MAX_SIGN_LENGTH);
+    SDL_strlcpy(text, active_player->_configs.tag().c_str(), MAX_SIGN_LENGTH);
     text[MAX_SIGN_LENGTH - 1] = '\0';
     GLfloat *data = sdl_gl_helper::malloc_faces(5, SDL_strlen(text));
     const int length = sdl_gl_helper::_gen_sign_buffer(data, static_cast<float>(x), static_cast<float>(y),
@@ -2461,7 +2449,7 @@ void world::render_wireframe() const noexcept
 {
     float matrix[16];
     begin_3d_pass(&s_line_attrib, matrix);
-    const player::position *s = &m_player->m_pos;
+    const player::position *s = &active_player->pos;
     int hx, hy, hz;
     if (const int hw = hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
         item::is_obstacle(hw))
@@ -2479,8 +2467,8 @@ void world::render_crosshairs() const noexcept
 {
     float matrix[16];
     begin_2d_pass(&s_line_attrib, matrix);
-    glLineWidth(static_cast<GLfloat>(4 * m_sdl->get_scale_factor()));
-    const GLuint crosshair_buffer = m_sdl->gen_crosshair_buffer();
+    glLineWidth(static_cast<GLfloat>(4 * simple_direct_medialayer->get_scale_factor()));
+    const GLuint crosshair_buffer = simple_direct_medialayer->gen_crosshair_buffer();
     sdl_gl_helper::draw_lines(&s_line_attrib, crosshair_buffer, 2, 4);
     sdl_gl_helper::del_buffer(crosshair_buffer);
 }
@@ -2488,29 +2476,32 @@ void world::render_crosshairs() const noexcept
 // ============================================================================
 // CAD Feature Rendering (Tier 1)
 // ============================================================================
-
 void world::render_hover_info() const noexcept
 {
-    if (!m_player->m_configs.show_hover_info)
+    if (!active_player->_configs.show_crosshair_details())
+    {
         return;
+    }
 
-    if (!m_projected_plane.has_valid_target)
+    if (!current_projected_plane.has_valid_target)
+    {
         return;
+    }
 
     // Get viewport dimensions
     int viewport_width, viewport_height;
-    SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
+    SDL_GetWindowSizeInPixels(simple_direct_medialayer->window, &viewport_width, &viewport_height);
 
-    const int hx = m_projected_plane.target_x;
-    const int hy = m_projected_plane.target_y;
-    const int hz = m_projected_plane.target_z;
-    const int face = m_projected_plane.target_face;
+    const int hx = current_projected_plane.target_x;
+    const int hy = current_projected_plane.target_y;
+    const int hz = current_projected_plane.target_z;
+    const int face = current_projected_plane.target_face;
     const int block_type = get_block(hx, hy, hz);
 
     // Calculate distance from player
-    const float dx = m_player->m_pos.x - static_cast<float>(hx);
-    const float dy = m_player->m_pos.y - static_cast<float>(hy);
-    const float dz = m_player->m_pos.z - static_cast<float>(hz);
+    const float dx = active_player->pos.x - static_cast<float>(hx);
+    const float dy = active_player->pos.y - static_cast<float>(hy);
+    const float dz = active_player->pos.z - static_cast<float>(hz);
     const float distance = SDL_sqrt(dx * dx + dy * dy + dz * dz);
 
     // Render info text near crosshair (slightly offset from center)
@@ -2519,7 +2510,7 @@ void world::render_hover_info() const noexcept
     const float line_height = 15.0f;
 
     char info_buffer[256];
-    const auto font_tex = m_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture;
+    const auto font_tex = world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture;
 
     // Block type
     SDL_snprintf(info_buffer, sizeof(info_buffer), "Block: %s", player::get_block_name(block_type));
@@ -2540,20 +2531,23 @@ void world::render_hover_info() const noexcept
 
 void world::render_grid_overlay() const noexcept
 {
-    if (!m_player->m_configs.show_grid)
+    auto &&c = active_player->_configs;
+    if (!c.show_grid_overlay())
+    {
         return;
+    }
 
     float matrix[16];
     begin_3d_pass(&s_line_attrib, matrix);
 
-    const int grid_spacing = m_player->m_configs.grid_spacing;
+    const int grid_spacing = c.grid_spacing();
     const int grid_size = 64; // Size in blocks from center
 
     // Grid at Y=0 (or player's Y level)
-    const int grid_y = 0; // Could use: static_cast<int>(m_player->m_pos.y)
+    const int grid_y = 0; // Could use: static_cast<int>(active_player->pos.y)
 
     // Set grid color with opacity
-    const float opacity = m_player->m_configs.grid_opacity;
+    const float opacity = c.grid_opacity();
     glUniform4f(s_line_attrib.extra1, 0.5f, 0.5f, 0.5f, opacity);
 
     glLineWidth(1.0f);
@@ -2582,110 +2576,28 @@ void world::render_grid_overlay() const noexcept
     glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 1.0f, 1.0f);
 }
 
-void world::render_measurement_lines() const noexcept
-{
-    if (m_player->m_configs.active_cad_tool != player::CADTool::MEASURE_DISTANCE)
-        return;
-
-    // Only draw if we have at least one point
-    if (!m_player->m_measure_point1.valid)
-        return;
-
-    float matrix[16];
-    begin_3d_pass(&s_line_attrib, matrix);
-
-    const auto &p1 = m_player->m_measure_point1;
-
-    // Draw marker at first point
-    glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 0.0f, 1.0f); // Yellow
-    glLineWidth(3.0f);
-
-    const float marker_size = 0.3f;
-    GLuint marker_buffer = sdl_gl_helper::gen_line_buffer(
-        static_cast<float>(p1.x) - marker_size, static_cast<float>(p1.y), static_cast<float>(p1.z),
-        static_cast<float>(p1.x) + marker_size, static_cast<float>(p1.y), static_cast<float>(p1.z));
-    sdl_gl_helper::draw_lines(&s_line_attrib, marker_buffer, 3, 2);
-    sdl_gl_helper::del_buffer(marker_buffer);
-
-    // If we have second point, draw measurement line
-    if (m_player->m_measure_point2.valid)
-    {
-        const auto &p2 = m_player->m_measure_point2;
-
-        // Draw line between points
-        glUniform4f(s_line_attrib.extra1, 0.0f, 1.0f, 1.0f, 1.0f); // Cyan
-        const GLuint line_buffer = sdl_gl_helper::gen_line_buffer(
-            static_cast<float>(p1.x), static_cast<float>(p1.y), static_cast<float>(p1.z),
-            static_cast<float>(p2.x), static_cast<float>(p2.y), static_cast<float>(p2.z));
-        sdl_gl_helper::draw_lines(&s_line_attrib, line_buffer, 3, 2);
-        sdl_gl_helper::del_buffer(line_buffer);
-
-        // Draw marker at second point
-        glUniform4f(s_line_attrib.extra1, 1.0f, 0.0f, 0.0f, 1.0f); // Red
-        marker_buffer = sdl_gl_helper::gen_line_buffer(
-            static_cast<float>(p2.x) - marker_size, static_cast<float>(p2.y), static_cast<float>(p2.z),
-            static_cast<float>(p2.x) + marker_size, static_cast<float>(p2.y), static_cast<float>(p2.z));
-        sdl_gl_helper::draw_lines(&s_line_attrib, marker_buffer, 3, 2);
-        sdl_gl_helper::del_buffer(marker_buffer);
-
-        // Calculate and display distance
-        const int dx = p2.x - p1.x;
-        const int dy = p2.y - p1.y;
-        const int dz = p2.z - p1.z;
-        const float distance = SDL_sqrt(static_cast<float>(dx * dx + dy * dy + dz * dz));
-
-        // Display distance text (2D overlay)
-        int viewport_width, viewport_height;
-        SDL_GetWindowSizeInPixels(m_sdl->window, &viewport_width, &viewport_height);
-
-        char distance_text[128];
-        SDL_snprintf(distance_text, sizeof(distance_text),
-                     "Distance: %.2f blocks (dx:%d dy:%d dz:%d)",
-                     distance, dx, dy, dz);
-
-        render_text(m_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture,
-                    0, 10.0f, static_cast<float>(viewport_height) - 100.0f, 12.0f, distance_text);
-    }
-
-    // Reset color
-    glUniform4f(s_line_attrib.extra1, 1.0f, 1.0f, 1.0f, 1.0f);
-    glLineWidth(1.0f);
-}
-
 void world::render_maze_preview_ghost() const noexcept
 {
     // Check if feature is enabled
-    if (!m_player->m_configs.show_maze_preview_ghost)
-    {
-        static bool logged_disabled = false;
-        if (!logged_disabled)
-        {
-            SDL_Log("Ghost preview: Feature disabled in config\n");
-            logged_disabled = true;
-        }
-        return;
-    }
-
-    // Check if we have preview data
-    if (!m_current_preview.has_data)
+    if (!(active_player->_configs.show_maze_preview_ghost() || current_preview_data.has_data))
     {
         return;
     }
 
     // Calculate where the maze would be placed
-    const int face = m_projected_plane.target_face;
+    const int face = current_projected_plane.target_face;
     const ivec3 normal = face_normal(face);
     const ivec3 axis_u = face_u_axis(face);
     const ivec3 axis_v = face_v_axis(face);
 
     // Anchor one cell off the hit block, along face normal
-    const int anchor_x = m_projected_plane.target_x + normal.x;
-    const int anchor_y = m_projected_plane.target_y + normal.y;
-    const int anchor_z = m_projected_plane.target_z + normal.z;
+    const int anchor_x = current_projected_plane.target_x + normal.x;
+    const int anchor_y = current_projected_plane.target_y + normal.y;
+    const int anchor_z = current_projected_plane.target_z + normal.z;
 
     // Calculate logical maze dimensions
-    const int logical_width = m_current_preview.width / m_current_preview.scale;
-    const int logical_height = m_current_preview.height / m_current_preview.scale;
+    const int logical_width = current_preview_data.width / current_preview_data.scale;
+    const int logical_height = current_preview_data.height / current_preview_data.scale;
 
     // Setup rendering for wireframe lines
     float matrix[16];
@@ -2705,9 +2617,9 @@ void world::render_maze_preview_ghost() const noexcept
     wireframe_data.reserve(100000); // Pre-allocate for large mazes
 
     // Get player position for distance culling
-    const float player_x = m_player->m_pos.x;
-    const float player_y = m_player->m_pos.y;
-    const float player_z = m_player->m_pos.z;
+    const float player_x = active_player->pos.x;
+    const float player_y = active_player->pos.y;
+    const float player_z = active_player->pos.z;
     constexpr float render_distance = 64.0f; // Only render preview within this distance
 
     // Web builds are much more sensitive to per-frame heap churn, so sample the
@@ -2719,17 +2631,17 @@ void world::render_maze_preview_ghost() const noexcept
 #endif
 
     // Iterate through preview pixels and collect wireframe vertices
-    for (int pix_row = 0; pix_row < m_current_preview.height; pix_row += pixel_step)
+    for (int pix_row = 0; pix_row < current_preview_data.height; pix_row += pixel_step)
     {
-        for (int pix_col = 0; pix_col < m_current_preview.width; pix_col += pixel_step)
+        for (int pix_col = 0; pix_col < current_preview_data.width; pix_col += pixel_step)
         {
-            const int idx = (pix_row * m_current_preview.width + pix_col) * 4; // RGBA format
-            if (idx + 3 >= static_cast<int>(m_current_preview.pixel_data.size()))
+            const int idx = (pix_row * current_preview_data.width + pix_col) * 4; // RGBA format
+            if (idx + 3 >= static_cast<int>(current_preview_data.pixel_data.size()))
                 continue;
 
-            const auto r = m_current_preview.pixel_data[idx];
-            const auto g = m_current_preview.pixel_data[idx + 1];
-            const auto b = m_current_preview.pixel_data[idx + 2];
+            const auto r = current_preview_data.pixel_data[idx];
+            const auto g = current_preview_data.pixel_data[idx + 1];
+            const auto b = current_preview_data.pixel_data[idx + 2];
 
             // Wall = dark blue-gray (24, 28, 34) - this is what we want to render as wireframe
             if (r == 24 && g == 28 && b == 34)
@@ -2737,12 +2649,12 @@ void world::render_maze_preview_ghost() const noexcept
                 wall_pixels_found++;
 
                 // Convert pixel coordinates to logical maze coordinates
-                const int logical_col = pix_col / m_current_preview.scale;
-                const int logical_row = pix_row / m_current_preview.scale;
+                const int logical_col = pix_col / current_preview_data.scale;
+                const int logical_row = pix_row / current_preview_data.scale;
 
                 // Render only the bottom and top levels for performance
                 // (showing just the outline/footprint of the maze)
-                for (int level = 0; level < m_current_preview.wall_height; level += std::max(1, m_current_preview.wall_height - 1))
+                for (int level = 0; level < current_preview_data.wall_height; level += std::max(1, current_preview_data.wall_height - 1))
                 {
                     // Calculate world position
                     const int world_x = anchor_x + axis_u.x * logical_col + axis_v.x * logical_row;
@@ -2770,10 +2682,10 @@ void world::render_maze_preview_ghost() const noexcept
                     // Generate wireframe vertices for this cube (72 floats = 24 vertices)
                     float cube_data[72];
                     geometries::make_cube_wireframe(cube_data,
-                                        static_cast<float>(world_x),
-                                        static_cast<float>(world_y),
-                                        static_cast<float>(world_z),
-                                        0.51f);
+                                                    static_cast<float>(world_x),
+                                                    static_cast<float>(world_y),
+                                                    static_cast<float>(world_z),
+                                                    0.51f);
 
                     // Append to batch buffer
                     wireframe_data.insert(wireframe_data.end(), cube_data, cube_data + 72);
@@ -2817,7 +2729,7 @@ void world::render_item(const std::uint32_t texture) const noexcept
     glUniform1f(s_block_attrib.timer, time_of_day());
     glUniform1i(s_block_attrib.extra4, 0);
 
-    if (const int w = m_player->get_item(); item::is_plant(w))
+    if (const int w = active_player->get_item(); item::is_plant(w))
     {
         const GLuint buffer = sdl_gl_helper::gen_plant_buffer(0, 0, 0, 0.5f, w);
         sdl_gl_helper::draw_plant(&s_block_attrib, buffer);
@@ -2839,15 +2751,16 @@ void world::render_item(const std::uint32_t texture) const noexcept
 
 void world::render_player(const std::uint32_t texture) const noexcept
 {
+    auto &&c = active_player->_configs;
     // Only render player model in 3rd person mode (any non-zero ortho)
-    if (m_player->m_configs.ortho < 1)
+    if (c.ortho_scaling() < 1)
     {
         return;
     }
 
     float matrix[16];
     begin_3d_pass(&s_block_attrib, matrix);
-    const player::position *s = &m_player->m_pos;
+    const player::position *s = &active_player->pos;
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::ATLAS));
     glBindTexture(GL_TEXTURE_2D, texture);
     glUniform3f(s_block_attrib.camera, s->x, s->y, s->z);
@@ -2855,17 +2768,17 @@ void world::render_player(const std::uint32_t texture) const noexcept
     glUniform1f(s_block_attrib.timer, time_of_day());
 
     const bool is_isometric_mode =
-        m_player->m_configs.ortho_view_mode == player::OrthoViewMode::ISOMETRIC;
-    const bool is_orthographic_active = m_player->m_configs.ortho > 0;
+        c.player_view_mode() == player::PlayerViewMode::ISOMETRIC;
+    const bool is_orthographic_active = c.ortho_scaling() > 0;
     // Fallback: some UI paths can leave mode enum in Perspective while ortho camera is active.
     const bool use_isometric_fx = is_isometric_mode || is_orthographic_active;
 
     static bool logged_iso_player_fx = false;
     if (use_isometric_fx && !logged_iso_player_fx)
     {
-        SDL_Log("Player marker FX enabled (mode=%d, ortho=%d)\n",
-                static_cast<int>(m_player->m_configs.ortho_view_mode),
-                m_player->m_configs.ortho);
+        SDL_LogDebug(SDL_LOG_CATEGORY_RENDER, "Player marker FX enabled (mode=%d, ortho=%d)\n",
+                     static_cast<int>(c.player_view_mode()),
+                     c.ortho_scaling());
         logged_iso_player_fx = true;
     }
 
@@ -3001,7 +2914,7 @@ void world::render_player(const std::uint32_t texture) const noexcept
 
 void world::render_plane() const noexcept
 {
-    if (!m_player || !m_player->m_configs.preview_enabled)
+    if (auto active_player = this->active_player; !(active_player && active_player->_configs.show_maze_preview_2d_enabled()))
     {
         return;
     }
@@ -3009,14 +2922,14 @@ void world::render_plane() const noexcept
     // Check if we have a valid texture to display
     // Note: We don't check visibility or target since this is now a persistent 2D overlay
     // The target is still tracked for building purposes, but not required for display
-    if (!m_projected_plane.projected_texture)
+    if (!current_projected_plane.projected_texture)
     {
         return;
     }
 
     // Only render if a maze texture has been generated (width/height > 0)
-    const float tex_width = static_cast<float>(m_projected_plane.projected_texture->width);
-    const float tex_height = static_cast<float>(m_projected_plane.projected_texture->height);
+    const float tex_width = static_cast<float>(current_projected_plane.projected_texture->width);
+    const float tex_height = static_cast<float>(current_projected_plane.projected_texture->height);
 
     if (tex_width <= 0.0f || tex_height <= 0.0f)
     {
@@ -3030,7 +2943,7 @@ void world::render_plane() const noexcept
 
     // Bind the maze texture
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::MAZE));
-    glBindTexture(GL_TEXTURE_2D, m_textures.get(TextureIdentifier::MAZE).gl_texture);
+    glBindTexture(GL_TEXTURE_2D, world_textures.get(TextureIdentifier::MAZE).gl_texture);
 
     // Enable blending for transparency
     glEnable(GL_BLEND);
@@ -3127,31 +3040,15 @@ void world::render_text(const std::uint32_t font, const int justify,
         // Clear prior errors so diagnostics below pinpoint the failing call.
     }
 
-    const auto log_gl_error = [](const char *step)
-    {
-        if (const GLenum error = glGetError(); error != GL_NO_ERROR)
-        {
-            SDL_LogError(SDL_LOG_CATEGORY_ERROR,
-                         "OpenGL error in render_text (%s): 0x%x\n",
-                         step, error);
-        }
-    };
-
     float matrix[16];
     begin_2d_pass(&s_text_attrib, matrix);
-    log_gl_error("begin_2d_pass");
 
     glUniform1i(s_text_attrib.sampler, static_cast<int>(TextureIdentifier::BITMAP_FONT));
-    log_gl_error("glUniform1i sampler");
-
     glUniform1i(s_text_attrib.extra1, 0);
-    log_gl_error("glUniform1i extra1");
 
     glActiveTexture(GL_TEXTURE0 + static_cast<unsigned int>(TextureIdentifier::BITMAP_FONT));
-    log_gl_error("glActiveTexture");
 
     glBindTexture(GL_TEXTURE_2D, font);
-    log_gl_error("glBindTexture");
 
     const GLsizei length = static_cast<GLsizei>(text.length());
     if (length <= 0)
@@ -3161,7 +3058,6 @@ void world::render_text(const std::uint32_t font, const int justify,
 
     x -= n * justify * (length - 1) / 2;
     const GLuint buffer = sdl_gl_helper::gen_text_buffer(x, y, n, text);
-    log_gl_error("gen_text_buffer");
 
     if (buffer == 0)
     {
@@ -3169,8 +3065,5 @@ void world::render_text(const std::uint32_t font, const int justify,
     }
 
     sdl_gl_helper::draw_text(&s_text_attrib, buffer, length);
-    log_gl_error("draw_text");
-
     sdl_gl_helper::del_buffer(buffer);
-    log_gl_error("del_buffer");
 }
