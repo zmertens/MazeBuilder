@@ -1,15 +1,40 @@
 #ifndef DB_H
 #define DB_H
 
-#include <vector>
+#include <cstddef>
+#include <string_view>
 #include <tuple>
+#include <vector>
 
 class voxels_map;
-struct SignList;
+
+constexpr std::size_t MAX_SIGN_LENGTH = 16;
+
+struct sign
+{
+	int x;
+	int y;
+	int z;
+	int face;
+	char text[MAX_SIGN_LENGTH];
+};
+
+struct sign_list
+{
+	std::size_t capacity{};
+	std::size_t size{};
+	sign *data{};
+};
+
+void sign_list_alloc(sign_list *list, std::size_t capacity);
+void sign_list_free(sign_list *list);
+void sign_list_add(sign_list *list, int x, int y, int z, int face, std::string_view text);
+int sign_list_remove(sign_list *list, int x, int y, int z, int face);
+int sign_list_remove_all(sign_list *list, int x, int y, int z);
 
 void db_enable();
 void db_disable();
-int get_db_enabled();
+bool db_is_enabled();
 int db_init(const char* path);
 void db_close();
 void db_commit();
@@ -25,7 +50,7 @@ void db_delete_signs(int x, int y, int z);
 void db_delete_all_signs();
 void db_load_blocks(voxels_map* map, int p, int q);
 void db_load_lights(voxels_map* map, int p, int q);
-void db_load_signs(SignList* list, int p, int q);
+void db_load_signs(sign_list *list, int p, int q);
 int db_get_key(int p, int q);
 void db_set_key(int p, int q, int key);
 std::vector<std::tuple<int, int, int, int>> db_query_blocks_near_chunks(int center_p, int center_q, int radius);

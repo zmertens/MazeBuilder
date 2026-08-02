@@ -9,12 +9,11 @@
 #include <string>
 #include <vector>
 
-#include "command.h"
 #include "bloom_pass.h"
-
-#include "voxels_map.h"
+#include "player.h"
 #include "resource_identifiers.h"
 #include "sdl_gl_helper.h"
+#include "voxels_map.h"
 
 struct worker;
 struct worker_item;
@@ -51,6 +50,8 @@ public:
 
     command_queue& get_command_queue() noexcept;
 
+    void invalidate_preview() noexcept;
+
     void destroy_world();
 private:
     static void create_world(int p, int q, const world_func& func, voxels_map *m, int chunk_size) noexcept;
@@ -59,7 +60,7 @@ private:
     bool update_preview(const std::vector<std::uint8_t>& pixel_data,
                         int width,
                         int height) const noexcept;
-    void finalize_buildings(const std::vector<std::uint8_t>& pixel_data,
+    void finalize_buildings(std::vector<std::uint8_t> pixel_data,
                                   int width, int height, int scale,
                                   int wall_height, int item_type) noexcept;
     void commit_preview_to_world(int item_type) noexcept;
@@ -104,7 +105,7 @@ private:
 
     static void occlusion(char neighbors[27], char lights[27], float shades[27],
         float ao[6][4], float light[6][4]) noexcept;
-    static void light_fill(char* opaque, char* light, int x, int y, int z, int w, int force) noexcept;
+    static void light_fill(char* opaque, char* light, int x, int y, int z, const int w, int force) noexcept;
     bool has_lights(const scene_node* chunk) const noexcept;
 
     [[nodiscard]] static int chunked(float x) noexcept;

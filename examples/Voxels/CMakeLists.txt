@@ -5,17 +5,15 @@ set(SQLITE3_SOURCES ${CMAKE_SOURCE_DIR}/deps/sqlite/sqlite3.c)
 set(CRAFT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/bloom_pass.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/craft.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/cube.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/db.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/font.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/geometries.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/item.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/matrix.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/player.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/ring.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/sdl_gl_helper.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/shader.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/sign.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/texture.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/world.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/voxels_map.cpp)
@@ -41,6 +39,7 @@ if (EMSCRIPTEN)
 
     target_link_options(${VOXELS_EXE} PRIVATE
             "SHELL:-pthread -s PTHREAD_POOL_SIZE=12"
+            "SHELL:-s STACK_SIZE=5242880 -s DEFAULT_PTHREAD_STACK_SIZE=2097152"
             "SHELL:-s INITIAL_MEMORY=268435456 -s ALLOW_MEMORY_GROWTH=1 -s MAXIMUM_MEMORY=1073741824"
             "SHELL:-s FULL_ES3=1 -s MAX_WEBGL_VERSION=2 -s MODULARIZE=1 -s EXPORT_ES6=1 -s WASM=1"
             "SHELL:--shell-file ${CMAKE_SOURCE_DIR}/deps/emscripten_local/shell_minimal.html"

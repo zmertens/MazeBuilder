@@ -8,11 +8,9 @@
 
 #include <SDL3/SDL.h>
 
-#include "cube.h"
+#include "geometries.h"
 #include "player.h"
-#include "scene_node.h"
 #include "shader.h"
-#include "sign.h"
 
 bool sdl_gl_helper::initialize(std::string_view title, int width, int height) noexcept
 {
@@ -324,8 +322,7 @@ std::uint32_t sdl_gl_helper::gen_crosshair_buffer() const noexcept
 std::uint32_t sdl_gl_helper::gen_wireframe_buffer(const float x, const float y, const float z, const float n) noexcept
 {
     float data[72];
-    // cube.h -> make_cube_wireframe
-    make_cube_wireframe(data, x, y, z, n);
+    geometries::make_cube_wireframe(data, x, y, z, n);
     return gen_buffer(sizeof(data), data);
 }
 
@@ -353,7 +350,7 @@ std::uint32_t sdl_gl_helper::gen_cube_buffer(const float x, const float y, const
         {0.5, 0.5, 0.5, 0.5},
         {0.5, 0.5, 0.5, 0.5}
     };
-    make_cube(data, ao, light, 1, 1, 1, 1, 1, 1, x, y, z, n, w);
+    geometries::make_cube(data, ao, light, 1, 1, 1, 1, 1, 1, x, y, z, n, w);
     return gen_faces(10, 6, data);
 }
 
@@ -363,7 +360,7 @@ std::uint32_t sdl_gl_helper::gen_plant_buffer(const float x, const float y, cons
     GLfloat* data = malloc_faces(10, 4);
     float ao = 0;
     float light = 1;
-    make_plant(data, ao, light, x, y, z, n, w, 45);
+    geometries::make_plant(data, ao, light, x, y, z, n, w, 45);
     return gen_faces(10, 4, data);
 }
 
@@ -371,7 +368,7 @@ std::uint32_t sdl_gl_helper::gen_player_buffer(const float x, const float y, con
                                                const float ry) noexcept
 {
     GLfloat* data = malloc_faces(10, 6);
-    make_player(data, x, y, z, rx, ry);
+    geometries::make_player(data, x, y, z, rx, ry);
     return gen_faces(10, 6, data);
 }
 
@@ -393,7 +390,7 @@ std::uint32_t sdl_gl_helper::gen_text_buffer(float x, const float y, const float
 
     for (int i = 0; i < length; i++)
     {
-        make_character(data + i * 24, x, y, n / 2, n, text[i]);
+        geometries::make_character(data + i * 24, x, y, n / 2, n, text[i]);
         x += n;
     }
     return gen_faces(4, length, data);
@@ -536,7 +533,7 @@ int sdl_gl_helper::_gen_sign_buffer(float* data, const float x, const float y, c
             rz += dz * width / max_width / 2;
             if (line[i] != ' ')
             {
-                make_character_3d(
+                geometries::make_character_3d(
                     data + count * 30, rx, ry, rz, n / 2, face, line[i]);
                 count++;
             }
@@ -558,13 +555,13 @@ int sdl_gl_helper::_gen_sign_buffer(float* data, const float x, const float y, c
 
 void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
 {
-    const SignList* signs = &chunk->signs;
+    const sign_list* signs = &chunk->signs;
 
     // first pass - count characters
     std::size_t max_faces = 0;
     for (int i = 0; i < signs->size; i++)
     {
-        const Sign* e = signs->data + i;
+        const sign* e = signs->data + i;
         max_faces += SDL_strlen(e->text);
     }
 
@@ -573,7 +570,7 @@ void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
     std::size_t faces = 0;
     for (int i = 0; i < signs->size; i++)
     {
-        const Sign* e = signs->data + i;
+        const sign* e = signs->data + i;
         faces += static_cast<std::size_t>(_gen_sign_buffer(data + static_cast<int>(faces) * 30,
                                                            static_cast<float>(e->x),
                                                            static_cast<float>(e->y),
@@ -588,12 +585,17 @@ void sdl_gl_helper::gen_sign_buffer(scene_node* chunk) noexcept
 std::uint32_t sdl_gl_helper::gen_sky_buffer() noexcept
 {
     float data[12288];
-    make_sphere(data, 1, 3);
+    geometries::make_sphere(data, 1, 3);
     return gen_buffer(sizeof(data), data);
 }
 
 void sdl_gl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
+    if (!a || a->position < 0 || a->normal < 0 || a->uv < 0)
+    {
+        return;
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
     glEnableVertexAttribArray(a->normal);
@@ -613,6 +615,11 @@ void sdl_gl_helper::draw_triangles_3d_ao(const attrib* a, const std::uint32_t bu
 
 void sdl_gl_helper::draw_triangles_3d_text(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
+    if (!a || a->position < 0 || a->uv < 0)
+    {
+        return;
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
     glEnableVertexAttribArray(a->uv);
@@ -628,6 +635,11 @@ void sdl_gl_helper::draw_triangles_3d_text(const attrib* a, const std::uint32_t 
 
 void sdl_gl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffer, const int count) noexcept
 {
+    if (!a || a->position < 0 || a->normal < 0 || a->uv < 0)
+    {
+        return;
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
 
     glEnableVertexAttribArray(a->position);
@@ -652,6 +664,11 @@ void sdl_gl_helper::draw_triangles_3d(const attrib* a, const std::uint32_t buffe
 void sdl_gl_helper::draw_triangles_2d(const attrib* a, const std::uint32_t buffer,
                                       const std::size_t count) noexcept
 {
+    if (!a || a->position < 0 || a->uv < 0)
+    {
+        return;
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
     glEnableVertexAttribArray(a->uv);
@@ -668,6 +685,11 @@ void sdl_gl_helper::draw_triangles_2d(const attrib* a, const std::uint32_t buffe
 void sdl_gl_helper::draw_lines(const attrib* a, const std::uint32_t buffer, const int components,
                                const int count) noexcept
 {
+    if (!a || a->position < 0)
+    {
+        return;
+    }
+
     glBindBuffer(GL_ARRAY_BUFFER, buffer);
     glEnableVertexAttribArray(a->position);
     glVertexAttribPointer(

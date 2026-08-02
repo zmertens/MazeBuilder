@@ -5,9 +5,11 @@
 #include <vector>
 
 // Compact 4-byte entry: value == 0 means the slot is empty.
-union MapEntry {
+union MapEntry
+{
     unsigned int value;
-    struct {
+    struct
+    {
         unsigned char x;
         unsigned char y;
         unsigned char z;
@@ -23,18 +25,23 @@ union MapEntry {
 //
 // Supports range-for via a nested iterator that yields decoded absolute
 // coordinates, replacing the old MAP_FOR_EACH / END_MAP_FOR_EACH macros.
-class voxels_map {
+class voxels_map
+{
 public:
     // Value exposed by the iterator.
-    struct voxel { int x, y, z, w; };
+    struct voxel
+    {
+        int x, y, z, w;
+    };
 
     // Forward iterator over occupied (non-zero) entries.
-    struct iterator {
-        const voxels_map*   m;
+    struct iterator
+    {
+        const voxels_map *m;
         unsigned int idx;
         voxel operator*() const noexcept;
-        iterator& operator++() noexcept;
-        bool operator!=(const iterator& o) const noexcept { return idx != o.idx; }
+        iterator &operator++() noexcept;
+        bool operator!=(const iterator &o) const noexcept { return idx != o.idx; }
     };
 
     voxels_map() = default;
@@ -43,11 +50,11 @@ public:
     voxels_map(int dx, int dy, int dz, unsigned int mask);
 
     // Rule-of-five: std::vector provides automatic deep-copy and destruction.
-    voxels_map(const voxels_map&)                = default;
-    voxels_map& operator=(const voxels_map&)     = default;
-    voxels_map(voxels_map&&) noexcept            = default;
-    voxels_map& operator=(voxels_map&&) noexcept = default;
-    ~voxels_map()                               = default;
+    voxels_map(const voxels_map &) = default;
+    voxels_map &operator=(const voxels_map &) = default;
+    voxels_map(voxels_map &&) noexcept = default;
+    voxels_map &operator=(voxels_map &&) noexcept = default;
+    ~voxels_map() = default;
 
     // Re-initialise in place (replaces the old map_alloc pattern on existing objects).
     void init(int dx, int dy, int dz, unsigned int mask);
@@ -60,23 +67,23 @@ public:
 
     // Range-for support.
     [[nodiscard]] iterator begin() const noexcept;
-    [[nodiscard]] iterator end()   const noexcept;
+    [[nodiscard]] iterator end() const noexcept;
 
     [[nodiscard]] unsigned int size() const noexcept { return m_size; }
-    [[nodiscard]] bool         empty() const noexcept { return m_size == 0; }
-    [[nodiscard]] int          dx()    const noexcept { return m_dx; }
-    [[nodiscard]] int          dy()    const noexcept { return m_dy; }
-    [[nodiscard]] int          dz()    const noexcept { return m_dz; }
+    [[nodiscard]] bool empty() const noexcept { return m_size == 0; }
+    [[nodiscard]] int dx() const noexcept { return m_dx; }
+    [[nodiscard]] int dy() const noexcept { return m_dy; }
+    [[nodiscard]] int dz() const noexcept { return m_dz; }
 
 private:
     void grow();
 
-    int          m_dx{};
-    int          m_dy{};
-    int          m_dz{};
+    int m_dx{};
+    int m_dy{};
+    int m_dz{};
     unsigned int m_mask{};
     unsigned int m_size{};
-    std::vector<MapEntry> m_data;   // zero-initialised; empty ↔ not yet initialised
+    std::vector<MapEntry> m_data;
 };
 
 #endif // VOXELS_MAP_H

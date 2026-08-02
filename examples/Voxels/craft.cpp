@@ -575,7 +575,7 @@ struct craft::craft_impl
         std::vector<FontIdentifier> m_selectable_fonts;
         std::size_t m_selected_font_index{0};
         std::list<std::string> algo_list;
-        mutable std::string m_cached_artifacts;  // Cache for expensive artifacts generation
+        mutable std::string m_cached_artifacts;   // Cache for expensive artifacts generation
         mutable bool m_export_in_progress{false}; // Track if async export was started
 
     public:
@@ -599,31 +599,54 @@ struct craft::craft_impl
         {
             auto &&current_configs = get_context().m_player->m_configs;
             auto *p = get_context().m_player;
-            static int selected_font_index{0};
+            // Default to last font in the list
+            static auto selected_font_index{static_cast<int>(s_font_names.size()) - 1};
 
             // Human-readable label for each PlayerAction (used by the key-bindings table).
             static constexpr auto action_label = [](const PlayerAction a) noexcept -> const char *
             {
                 switch (a)
                 {
-                    case PlayerAction::MOVE_AUTO:     return "Auto Run";
-                    case PlayerAction::MOVE_LEFT:     return "Move Left";
-                    case PlayerAction::MOVE_RIGHT:    return "Move Right";
-                    case PlayerAction::MOVE_FORWARD:  return "Move Forward";
-                    case PlayerAction::MOVE_BACKWARD: return "Move Backward";
-                    case PlayerAction::MOVE_UP:       return "Fly Up";
-                    case PlayerAction::MOVE_DOWN:     return "Fly Down";
-                    case PlayerAction::JUMP:          return "Jump";
-                    case PlayerAction::FLY:           return "Toggle Fly";
-                    case PlayerAction::TAG_SIGN:      return "Tag Sign";
-                    case PlayerAction::BUILD_BLOCK:   return "Build Block";
-                    case PlayerAction::COPY_BLOCK:    return "Copy Block";
-                    case PlayerAction::DESTROY_BLOCK: return "Destroy Block";
-                    case PlayerAction::PLACE_LIGHT:   return "Place Light";
-                    case PlayerAction::PLACE_MAZE:    return "Build Maze";
-                    case PlayerAction::PREVIEW_MAZE:  return "Preview Maze";
-                    case PlayerAction::CHANGE_PERSPECTIVE: return "Change Perspective";
-                    default:                          return "Unknown";
+                case PlayerAction::MOVE_AUTO:
+                    return "Auto Run";
+                case PlayerAction::MOVE_LEFT:
+                    return "Move Left";
+                case PlayerAction::MOVE_RIGHT:
+                    return "Move Right";
+                case PlayerAction::MOVE_FORWARD:
+                    return "Move Forward";
+                case PlayerAction::MOVE_BACKWARD:
+                    return "Move Backward";
+                case PlayerAction::MOVE_UP:
+                    return "Fly Up";
+                case PlayerAction::MOVE_DOWN:
+                    return "Fly Down";
+                case PlayerAction::JUMP:
+                    return "Jump";
+                case PlayerAction::FLY:
+                    return "Toggle Fly";
+                case PlayerAction::TAG_SIGN:
+                    return "Tag Sign";
+                case PlayerAction::BUILD_BLOCK:
+                    return "Build Block";
+                case PlayerAction::COPY_BLOCK:
+                    return "Copy Block";
+                case PlayerAction::DESTROY_BLOCK:
+                    return "Destroy Block";
+                case PlayerAction::PLACE_LIGHT:
+                    return "Place Light";
+                case PlayerAction::PLACE_MAZE:
+                    return "Build Maze";
+                case PlayerAction::PREVIEW_MAZE:
+                    return "Preview Maze";
+                case PlayerAction::CHANGE_PERSPECTIVE:
+                    return "Change Perspective";
+                case PlayerAction::ZOOM_IN_ISO_VIEW:
+                    return "Zoom In Isometric View";
+                case PlayerAction::ZOOM_OUT_ISO_VIEW:
+                    return "Zoom Out Isometric View";
+                default:
+                    return "Unknown";
                 }
             };
 
@@ -632,25 +655,25 @@ struct craft::craft_impl
             ImGui::PushFont(get_context().m_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
 
             // Forest-green theme – 19 colour pushes.
-            ImGui::PushStyleColor(ImGuiCol_WindowBg,          ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
-            ImGui::PushStyleColor(ImGuiCol_ChildBg,           ImVec4(0.022f, 0.058f, 0.032f, 0.90f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBg,           ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TitleBgActive,     ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Button,            ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered,     ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_ButtonActive,      ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Header,            ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderHovered,     ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_HeaderActive,      ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive,  ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_SliderGrab,        ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Tab,               ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabActive,         ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabDimmed,         ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabHovered,        ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_TabSelected,       ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
+            ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.022f, 0.058f, 0.032f, 0.90f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBg, ImVec4(0.067f, 0.137f, 0.094f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TitleBgActive, ImVec4(0.118f, 0.227f, 0.161f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_HeaderActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_SliderGrab, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Tab, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabActive, ImVec4(0.745f, 0.863f, 0.498f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabDimmed, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabHovered, ImVec4(0.302f, 0.502f, 0.380f, 1.0f));
+            ImGui::PushStyleColor(ImGuiCol_TabSelected, ImVec4(0.537f, 0.635f, 0.341f, 1.0f));
             ImGui::PushStyleColor(ImGuiCol_TabDimmedSelected, ImVec4(0.188f, 0.365f, 0.259f, 1.0f));
-            ImGui::PushStyleColor(ImGuiCol_Text,              ImVec4(0.933f, 1.0f,  0.8f,  1.0f));
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.933f, 1.0f, 0.8f, 1.0f));
 
             static constexpr ImVec4 HEADER_COL{0.745f, 0.863f, 0.498f, 1.0f};
 
@@ -660,54 +683,47 @@ struct craft::craft_impl
             ImGui::SetNextWindowSize(display, ImGuiCond_Always);
 
             constexpr ImGuiWindowFlags win_flags =
-                ImGuiWindowFlags_NoDecoration      |
-                ImGuiWindowFlags_NoResize          |
-                ImGuiWindowFlags_NoMove            |
+                ImGuiWindowFlags_NoDecoration |
+                ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove |
                 ImGuiWindowFlags_NoBringToFrontOnFocus |
                 ImGuiWindowFlags_NoSavedSettings;
 
             if (ImGui::Begin("##menu", nullptr, win_flags))
             {
                 // ── Layout metrics (all scale automatically with FontGlobalScale) ──
-                const ImGuiStyle& sty = ImGui::GetStyle();
-                const float fs    = ImGui::GetIO().FontGlobalScale;
-                const float fhs   = ImGui::GetFrameHeightWithSpacing();   // one widget row
-                const float lhs   = ImGui::GetTextLineHeightWithSpacing(); // one text row
+                const ImGuiStyle &sty = ImGui::GetStyle();
+                const float fs = ImGui::GetIO().FontGlobalScale;
+                const float fhs = ImGui::GetFrameHeightWithSpacing();    // one widget row
+                const float lhs = ImGui::GetTextLineHeightWithSpacing(); // one text row
                 // Overhead per titled child-box: padding top+bottom, header, separator
-                const float box_oh = sty.WindowPadding.y * 2.f + lhs
-                                   + sty.ItemSpacing.y * 2.f + 1.f;
+                const float box_oh = sty.WindowPadding.y * 2.f + lhs + sty.ItemSpacing.y * 2.f + 1.f;
                 const float sidebar_w = std::clamp(std::round(290.f * fs), 200.f, 420.f);
-                const float btn_w     = std::clamp(std::round(60.f * fs),  80.f, 170.f);
+                const float btn_w = std::clamp(std::round(60.f * fs), 80.f, 170.f);
 
                 // ── Title bar row ──────────────────────────────────────────────
                 ImGui::TextColored(HEADER_COL, "  MazeBuilder");
-                ImGui::SameLine(display.x - (btn_w * 2.f + sty.ItemSpacing.x
-                                             + sty.WindowPadding.x));
-                if (ImGui::Button("New Editor", ImVec2(btn_w, 0.f)))
-                {
-                    db_flush();
-                    request_stack_clear();
-                    request_stack_push(StateIdentifier::EDITOR);
-                    request_stack_push(StateIdentifier::LOADING);
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Resume", ImVec2(btn_w, 0.f)))
-                    request_stack_pop();
+                ImGui::SameLine(display.x - (btn_w * 2.f + sty.ItemSpacing.x + sty.WindowPadding.x));
                 ImGui::Separator();
 
-                const float avail_h   = ImGui::GetContentRegionAvail().y;
-                const float content_w = ImGui::GetContentRegionAvail().x - sidebar_w
-                                        - sty.ItemSpacing.x;
+                const float avail_h = ImGui::GetContentRegionAvail().y;
+                const float content_w = ImGui::GetContentRegionAvail().x - sidebar_w - sty.ItemSpacing.x;
 
                 // ══ LEFT SIDEBAR ══════════════════════════════════════════════
                 ImGui::BeginChild("##sidebar", ImVec2(sidebar_w, avail_h), ImGuiChildFlags_Borders);
 
                 // ── Quick Options box ──────────────────────────────────────────
-                ImGui::TextColored(HEADER_COL, "Quick Options");
+                ImGui::TextColored(HEADER_COL, "Options");
                 ImGui::Separator();
-                ImGui::Checkbox("Preview Enabled",    &p->m_configs.preview_enabled);
+                ImGui::Checkbox("Preview Enabled", &p->m_configs.preview_enabled);
                 ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
+                ImGui::Separator();
+                if (ImGui::Button("Resume", ImVec2(btn_w * 2.f, 0.f)))
+                {
+                    request_stack_pop();
+                }
                 ImGui::Spacing();
+                ImGui::Separator();
 
                 // ── Key Bindings table ─────────────────────────────────────────
                 ImGui::TextColored(HEADER_COL, "Key Bindings");
@@ -715,26 +731,24 @@ struct craft::craft_impl
                 ImGui::Spacing();
 
                 // Sidebar non-table content height (headers, checkboxes, mouse rows, close btn).
-                const float sidebar_fixed = sty.WindowPadding.y * 2.f
-                    + 3.f * lhs + 2.f * fhs + 4.f * lhs + fhs
-                    + sty.ItemSpacing.y * 6.f + 8.f;
+                const float sidebar_fixed = sty.WindowPadding.y * 2.f + 3.f * lhs + 2.f * fhs + 4.f * lhs + fhs + sty.ItemSpacing.y * 6.f + 8.f;
                 const float keybind_h = std::max(3.f * fhs, avail_h - sidebar_fixed);
                 if (ImGui::BeginTable("##keybinds", 2,
-                    ImGuiTableFlags_BordersOuter  |
-                    ImGuiTableFlags_BordersInnerH |
-                    ImGuiTableFlags_RowBg         |
-                    ImGuiTableFlags_ScrollY,
-                    ImVec2(-1.f, keybind_h)))
+                                      ImGuiTableFlags_BordersOuter |
+                                          ImGuiTableFlags_BordersInnerH |
+                                          ImGuiTableFlags_RowBg |
+                                          ImGuiTableFlags_ScrollY,
+                                      ImVec2(-1.f, keybind_h)))
                 {
                     ImGui::TableSetupScrollFreeze(0, 1);
                     ImGui::TableSetupColumn("Action", ImGuiTableColumnFlags_WidthStretch);
-                    ImGui::TableSetupColumn("Key",    ImGuiTableColumnFlags_WidthFixed, 80.f);
+                    ImGui::TableSetupColumn("Key", ImGuiTableColumnFlags_WidthFixed, 80.f);
                     ImGui::TableHeadersRow();
 
                     // Iterate enum in stable order; skip entries without a binding.
                     for (int i = 0; i < static_cast<int>(PlayerAction::COUNT); ++i)
                     {
-                        const auto action  = static_cast<PlayerAction>(i);
+                        const auto action = static_cast<PlayerAction>(i);
                         const auto scancode = static_cast<SDL_Scancode>(p->get_assigned_key(action));
                         if (scancode == SDL_SCANCODE_UNKNOWN)
                             continue;
@@ -756,17 +770,19 @@ struct craft::craft_impl
                 {
                     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, 100.f);
                     ImGui::TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
-                    const char* mouse_rows[][2] = {
-                        {"Left Click",   "Destroy block"},
-                        {"Right Click",  "Build block"},
+                    const char *mouse_rows[][2] = {
+                        {"Left Click", "Destroy block"},
+                        {"Right Click", "Build block"},
                         {"Middle Click", "Copy block type"},
-                        {"Scroll",       "Cycle block types"},
+                        {"Scroll", "Cycle block types"},
                     };
                     for (const auto &row : mouse_rows)
                     {
                         ImGui::TableNextRow();
-                        ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(row[0]);
-                        ImGui::TableSetColumnIndex(1); ImGui::TextUnformatted(row[1]);
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::TextUnformatted(row[0]);
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::TextUnformatted(row[1]);
                     }
                     ImGui::EndTable();
                 }
@@ -790,20 +806,30 @@ struct craft::craft_impl
                     {
                         auto &&maze_config = get_context().m_player->m_configs.maze;
 
+                        ImGui::Spacing();
+                        if (ImGui::Button("New World", ImVec2(btn_w * 2.f, 0.f)))
+                        {
+                            db_flush();
+                            request_stack_clear();
+                            request_stack_push(StateIdentifier::EDITOR);
+                            request_stack_push(StateIdentifier::LOADING);
+                        }
+                        ImGui::Spacing();
+
                         static std::string selected_algo;
                         selected_algo = std::string{mazes::to_sv_from_algo(maze_config.algo_id())};
-                        static int rows    = static_cast<int>(maze_config.rows());
+                        static int rows = static_cast<int>(maze_config.rows());
                         static int columns = static_cast<int>(maze_config.columns());
-                        static int levels  = static_cast<int>(maze_config.levels());
-                        static int seed    = static_cast<int>(maze_config.seed());
+                        static int levels = static_cast<int>(maze_config.levels());
+                        static int seed = static_cast<int>(maze_config.seed());
 
                         // ── Maze Dimensions box ───────────────────────────────
                         ImGui::BeginChild("##dims", ImVec2(0.f, 160.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Maze Dimensions");
                         ImGui::Separator();
-                        ImGui::SliderInt("Rows",    &rows,    2, 10);
+                        ImGui::SliderInt("Rows", &rows, 2, 10);
                         ImGui::SliderInt("Columns", &columns, 2, 10);
-                        ImGui::SliderInt("Levels",  &levels,  1, 5);
+                        ImGui::SliderInt("Levels", &levels, 1, 5);
                         ImGui::EndChild();
 
                         ImGui::Spacing();
@@ -863,14 +889,9 @@ struct craft::craft_impl
                         ImGui::EndChild();
 
                         ImGui::Spacing();
-                        if (ImGui::Button("Apply Configs", ImVec2(-1.f, 0.f)))
+                        if (ImGui::Button("Apply Configs", ImVec2(btn_w, btn_w * 0.5f)))
                         {
-                            get_context().m_player->m_configs.maze
-                                .algo_id(mazes::to_algo_from_sv(selected_algo))
-                                .rows(static_cast<unsigned int>(rows))
-                                .columns(static_cast<unsigned int>(columns))
-                                .levels(static_cast<unsigned int>(levels))
-                                .seed(static_cast<unsigned int>(seed));
+                            get_context().m_player->m_configs.maze.algo_id(mazes::to_algo_from_sv(selected_algo)).rows(static_cast<unsigned int>(rows)).columns(static_cast<unsigned int>(columns)).levels(static_cast<unsigned int>(levels)).seed(static_cast<unsigned int>(seed));
                         }
 
                         ImGui::EndTabItem();
@@ -879,19 +900,19 @@ struct craft::craft_impl
                     // ── Graphics / Rendering tab ──────────────────────────────
                     if (ImGui::BeginTabItem("Graphics"))
                     {
-                        const auto last_vsync      = current_configs.vsync;
-                        const auto last_fullscreen  = current_configs.fullscreen;
+                        const auto last_vsync = current_configs.vsync;
+                        const auto last_fullscreen = current_configs.fullscreen;
 
                         // ── Display box ───────────────────────────────────────
                         ImGui::BeginChild("##display", ImVec2(0.f, 190.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Display");
                         ImGui::Separator();
-                        ImGui::Checkbox("Enable VSync",         &current_configs.vsync);
-                        ImGui::Checkbox("Enable Fullscreen",    &current_configs.fullscreen);
-                        ImGui::Checkbox("Invert Mouse Y-Axis",  &current_configs.invert_mouse);
+                        ImGui::Checkbox("Enable VSync", &current_configs.vsync);
+                        ImGui::Checkbox("Enable Fullscreen", &current_configs.fullscreen);
+                        ImGui::Checkbox("Invert Mouse Y-Axis", &current_configs.invert_mouse);
                         ImGui::SliderFloat("Field of View", &current_configs.fov, 30.f, 120.f, "%.1f deg");
-                        ImGui::SliderInt("Orthographic Scale",  &current_configs.ortho, 0, 64);
-                        ImGui::SliderInt("Day Length (s)",      &current_configs.day_length, 60, 1800);
+                        ImGui::SliderInt("Orthographic Scale", &current_configs.ortho, 0, 64);
+                        ImGui::SliderInt("Day Length (s)", &current_configs.day_length, 60, 1800);
                         ImGui::EndChild();
 
                         if (last_vsync != current_configs.vsync)
@@ -913,47 +934,39 @@ struct craft::craft_impl
 
                         ImGui::Spacing();
 
-                        // ── UI box ────────────────────────────────────────────
-                        ImGui::BeginChild("##ui_opts", ImVec2(0.f, box_oh + fhs), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "UI");
-                        ImGui::Separator();
-                        ImGui::Checkbox("Show Stats Overlay", &current_configs.show_stats_window);
-                        ImGui::EndChild();
-
-                        ImGui::Spacing();
-
                         // ── Theme & Font box ──────────────────────────────────
                         {
-                        const float listbox_h = 3.f * fhs + sty.FramePadding.y * 2.f;
-                        const float theme_h   = box_oh + 3.f * fhs
-                                              + 2.f * sty.ItemSpacing.y + listbox_h;
-                        ImGui::BeginChild("##theme", ImVec2(0.f, theme_h), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "Theme & Font");
-                        ImGui::Separator();
-                        static bool dark_mode = true;
-                        if (ImGui::Checkbox("Dark Mode", &dark_mode))
-                        {
-                            if (dark_mode) ImGui::StyleColorsDark();
-                            else           ImGui::StyleColorsLight();
-                        }
-                        ImGui::Spacing();
-                        ImGui::SliderFloat("Font Scale", &current_configs.gui_font_scale, 0.6f, 1.4f, "%.2f");
-                        ImGui::Spacing();
-                        if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
-                        {
-                            for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
+                            const float listbox_h = 3.f * fhs + sty.FramePadding.y * 2.f;
+                            const float theme_h = box_oh + 3.f * fhs + 2.f * sty.ItemSpacing.y + listbox_h;
+                            ImGui::BeginChild("##theme", ImVec2(0.f, theme_h), ImGuiChildFlags_Borders);
+                            ImGui::TextColored(HEADER_COL, "Theme & Font");
+                            ImGui::Separator();
+                            static bool dark_mode = true;
+                            if (ImGui::Checkbox("Dark Mode", &dark_mode))
                             {
-                                const bool is_sel = (selected_font_index == static_cast<int>(i));
-                                const auto &font_name = craft_impl::s_font_names.at(
-                                    static_cast<std::size_t>(m_selectable_fonts.at(i)));
-                                if (ImGui::Selectable(font_name.data(), is_sel))
-                                    selected_font_index = static_cast<int>(i);
-                                if (is_sel)
-                                    ImGui::SetItemDefaultFocus();
+                                if (dark_mode)
+                                    ImGui::StyleColorsDark();
+                                else
+                                    ImGui::StyleColorsLight();
                             }
-                            ImGui::EndListBox();
-                        }
-                        ImGui::EndChild();
+                            ImGui::Spacing();
+                            ImGui::SliderFloat("Font Scale", &current_configs.gui_font_scale, 0.6f, 1.4f, "%.2f");
+                            ImGui::Spacing();
+                            if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
+                            {
+                                for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
+                                {
+                                    const bool is_sel = (selected_font_index == static_cast<int>(i));
+                                    const auto &font_name = craft_impl::s_font_names.at(
+                                        static_cast<std::size_t>(m_selectable_fonts.at(i)));
+                                    if (ImGui::Selectable(font_name.data(), is_sel))
+                                        selected_font_index = static_cast<int>(i);
+                                    if (is_sel)
+                                        ImGui::SetItemDefaultFocus();
+                                }
+                                ImGui::EndListBox();
+                            }
+                            ImGui::EndChild();
                         } // theme block scope
 
                         ImGui::EndTabItem();
@@ -1022,7 +1035,7 @@ struct craft::craft_impl
                             ImGui::TextWrapped("Export in progress... (check console for updates)");
                             ImGui::PopStyleColor();
                             // Simple spinner animation
-                            const char* spinner_chars = "|/-\\";
+                            const char *spinner_chars = "|/-\\";
                             const int spinner_idx = static_cast<int>(ImGui::GetTime() * 8) % 4;
                             ImGui::SameLine();
                             ImGui::Text("%c", spinner_chars[spinner_idx]);
@@ -1078,15 +1091,13 @@ struct craft::craft_impl
                             ImGui::EndDisabled();
                         }
 
-
-
                         ImGui::EndChild();
 
                         ImGui::Spacing();
                         ImGui::BeginChild("##artifact_preview", ImVec2(0.f, 0.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Preview (first 512 chars)");
                         ImGui::Separator();
-                        
+
                         // Display cached preview
                         if (m_cached_artifacts.empty())
                         {
@@ -1101,7 +1112,7 @@ struct craft::craft_impl
                                 ImGui::TextDisabled("... (%zu more bytes)", m_cached_artifacts.size() - 512);
                             }
                         }
-                        
+
                         ImGui::EndChild();
 
                         ImGui::EndTabItem();
@@ -1114,76 +1125,62 @@ struct craft::craft_impl
                         ImGui::BeginChild("##view_settings", ImVec2(0.f, 180.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "View Settings");
                         ImGui::Separator();
-                        
+
                         ImGui::Checkbox("Show Hover Info (H)", &current_configs.show_hover_info);
-                        ImGui::SameLine();
-                        if (ImGui::SmallButton("?##hover"))
-                            ImGui::SetItemTooltip("Display block info when hovering");
-                        
+                        ImGui::Spacing();
                         ImGui::Checkbox("Show Grid (G)", &current_configs.show_grid);
                         if (current_configs.show_grid)
                         {
                             ImGui::SliderInt("Grid Spacing", &current_configs.grid_spacing, 1, 16);
                             ImGui::SliderFloat("Grid Opacity", &current_configs.grid_opacity, 0.0f, 1.0f, "%.2f");
                         }
-                        
+                        ImGui::Spacing();
+
                         ImGui::Checkbox("Show Maze Ghost Preview", &current_configs.show_maze_preview_ghost);
                         ImGui::SameLine();
                         if (ImGui::SmallButton("?##ghost"))
                             ImGui::SetItemTooltip("Display translucent preview of where maze will be built");
-                        
-                        const char* view_modes[] = {"Perspective", "Top View", "Front View", "Right View", "Isometric"};
-                        int current_view = static_cast<int>(current_configs.ortho_view_mode);
-                        if (ImGui::Combo("View Mode (O)", &current_view, view_modes, 5))
-                        {
-                            current_configs.ortho_view_mode = static_cast<player::OrthoViewMode>(current_view);
-                            // Update ortho value based on view mode
-                            if (current_view > 0)
-                                current_configs.ortho = 32;
-                            else
-                                current_configs.ortho = 0;
-                        }
-                        
+
                         ImGui::EndChild();
-                        
+
                         ImGui::Spacing();
-                        
+
                         // ── Measurement Tools box ─────────────────────────────
                         ImGui::BeginChild("##measurement_tools", ImVec2(0.f, 160.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Measurement Tools");
                         ImGui::Separator();
-                        
+
                         const bool measure_active = current_configs.active_cad_tool == player::CADTool::MEASURE_DISTANCE;
                         if (ImGui::Button(measure_active ? "Stop Measuring (R)" : "Measure Distance (R)", ImVec2(-1.f, 0.f)))
                         {
                             get_context().m_player->activate_measurement_tool();
                         }
-                        
+
                         if (measure_active)
                         {
                             ImGui::TextWrapped("Click on blocks to measure distance. First click sets start point, second click measures to end point.");
-                            
+
                             if (get_context().m_player->m_measure_point1.valid)
                             {
-                                const auto& p1 = get_context().m_player->m_measure_point1;
+                                const auto &p1 = get_context().m_player->m_measure_point1;
                                 ImGui::Text("Point 1: (%d, %d, %d)", p1.x, p1.y, p1.z);
                             }
                             if (get_context().m_player->m_measure_point2.valid)
                             {
-                                const auto& p2 = get_context().m_player->m_measure_point2;
+                                const auto &p2 = get_context().m_player->m_measure_point2;
                                 ImGui::Text("Point 2: (%d, %d, %d)", p2.x, p2.y, p2.z);
                             }
-                            
+
                             if (ImGui::Button("Clear Measurement", ImVec2(-1.f, 0.f)))
                             {
                                 get_context().m_player->clear_measurement();
                             }
                         }
-                        
+
                         ImGui::EndChild();
-                        
+
                         ImGui::Spacing();
-                        
+
                         // ── Hotkeys box ───────────────────────────────────────
                         ImGui::BeginChild("##cad_hotkeys", ImVec2(0.f, 120.f), ImGuiChildFlags_Borders);
                         ImGui::TextColored(HEADER_COL, "Keyboard Shortcuts");
@@ -1193,7 +1190,7 @@ struct craft::craft_impl
                         ImGui::BulletText("O - Cycle view modes");
                         ImGui::BulletText("R - Toggle measurement tool");
                         ImGui::EndChild();
-                        
+
                         ImGui::EndTabItem();
                     }
 
@@ -1671,7 +1668,7 @@ void craft::set_maze_columns(const int cols) noexcept
     }
 }
 
-void craft::set_maze_algo(const std::string& algo_name) noexcept
+void craft::set_maze_algo(const std::string &algo_name) noexcept
 {
     // Accept a lowercase algorithm name ("dfs", "binary_tree", "sidewinder", …).
     try
@@ -1679,7 +1676,7 @@ void craft::set_maze_algo(const std::string& algo_name) noexcept
         const mazes::algo a = mazes::to_algo_from_sv(algo_name);
         this->m_impl->m_player.m_configs.maze.ensure_algo_id(a);
     }
-    catch (const std::exception& ex)
+    catch (const std::exception &ex)
     {
         SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION,
                     "set_maze_algo: unknown algo '%s' – %s\n", algo_name.c_str(), ex.what());

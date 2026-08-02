@@ -1,9 +1,8 @@
-#pragma once
+#ifndef BLOOM_PASS_H
+#define BLOOM_PASS_H
 
 #include <array>
 #include <cstdint>
-
-#include "render_pass.h"
 
 // Gaussian bloom compositor inspired by OGRE3D's Compositor system.
 //
@@ -19,7 +18,7 @@ class bloom_pass
 {
 public:
     // Number of horizontal+vertical blur iterations.  Higher = wider, softer bloom.
-    static constexpr int   BLUR_PASSES    = 5;
+    static constexpr int BLUR_PASSES = 5;
     static constexpr float BLOOM_STRENGTH = 0.6f;
 
     [[nodiscard]] bool init(int width, int height,
@@ -42,10 +41,30 @@ public:
     // Recreate FBOs at a new resolution (call on window resize).
     void resize(int new_width, int new_height) noexcept;
 
-    // Free all GL resources.  Safe to call even if init() was never called.
     void destroy() noexcept;
 
 private:
+    struct components final
+    {
+        static constexpr int MAX_COLOR_ATTACHMENTS = 2;
+
+        std::uint32_t fbo{};
+        std::array<std::uint32_t, MAX_COLOR_ATTACHMENTS> color_tex{};
+        std::uint32_t depth_rbo{};
+        int num_color_attachments{1};
+
+        components();
+        ~components() noexcept;
+        components &operator=(const components &) = delete;
+        components &operator=(components &&) noexcept = delete;
+        components(const components &) = delete;
+        components(components &&) noexcept = delete;
+
+        [[nodiscard]] bool init(int w, int h,
+                                int color_attachments = 1,
+                                bool depth = true) noexcept;
+    };
+
     void create_fbos(int w, int h) noexcept;
     void destroy_fbos() noexcept;
     void create_screen_quad() noexcept;
@@ -53,10 +72,10 @@ private:
     // Pass 1 — MRT scene FBO:
     //   color_tex[0] = full scene colour
     //   color_tex[1] = pixels above brightness threshold (bloom candidates)
-    render_pass m_scene_pass{};
+    components m_scene_pass{};
 
     // Passes 2-3 — ping-pong Gaussian blur on the bright texture.
-    std::array<render_pass, 2> m_blur_pass{};
+    std::array<components, 2> m_blur_pass{};
 
     // Shared full-screen triangle-strip quad (NDC positions + UVs).
     std::uint32_t m_quad_vao{};
@@ -67,12 +86,14 @@ private:
     std::uint32_t m_composite_program{};
 
     // Cached uniform locations (set during init to avoid per-frame queries).
-    int m_blur_loc_horizontal{-1};
-    int m_blur_loc_image{-1};
-    int m_comp_loc_scene{-1};
-    int m_comp_loc_bloom{-1};
-    int m_comp_loc_strength{-1};
+    std::uint32_t m_blur_loc_horizontal{-1u};
+    std::uint32_t m_blur_loc_image{-1u};
+    std::uint32_t m_comp_loc_scene{-1u};
+    std::uint32_t m_comp_loc_bloom{-1u};
+    std::uint32_t m_comp_loc_strength{-1u};
 
-    int m_width{};
-    int m_height{};
+    std::uint32_t m_width{};
+    std::uint32_t m_height{};
 };
+
+#endif // BLOOM_PASS_H

@@ -6,15 +6,109 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <unordered_map>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include <MazeBuilder/configurator.h>
 
-#include "command.h"
+#include "db.h"
+#include "geometries.h"
+#include "voxels_map.h"
 
 class texture;
+
+enum class Entity : unsigned int
+{
+    NONE = 0,
+    SCENE = 1 << 0,
+    PLAYER = 1 << 1,
+    ENEMY = 1 << 2,
+    PROJECTILE = 1 << 3,
+    PICKUP = 1 << 4,
+    CHUNK = 1 << 5,
+    SPATIAL = 1 << 6,
+    ALL = 1 << 7
+};
+
+// Base class for all game objects that can interact in the world
+class scene_node
+{
+public:
+    virtual ~scene_node() = default;
+
+    // Chunk-specific data
+    voxels_map map;
+    voxels_map lights;
+    sign_list signs;
+    int p;
+    int q;
+    int faces;
+    int sign_faces;
+    int dirty;
+    int miny;
+    int maxy;
+    std::uint32_t buffer;
+    std::uint32_t sign_buffer;
+
+    scene_node *parent;
+    std::vector<scene_node *> children;
+
+    // Spatial bounds (for quadtree nodes)
+    int bounds_min_x;
+    int bounds_min_z;
+    int bounds_max_x;
+    int bounds_max_z;
+
+    [[nodiscard]] Entity get_category() const noexcept
+    {
+        return m_category;
+    }
+
+    void set_category(const Entity category) noexcept
+    {
+        m_category = category;
+    }
+
+    // Check if this node or its children intersect with a 2D bounds (for frustum culling)
+    [[nodiscard]] bool intersects_bounds(const int min_x, const int min_z,
+                                         const int max_x, const int max_z) const noexcept
+    {
+        return !(bounds_max_x < min_x || bounds_min_x > max_x ||
+                 bounds_max_z < min_z || bounds_min_z > max_z);
+    }
+
+private:
+    Entity m_category;
+};
+
+namespace mazes
+{
+    class randomizer;
+}
+
+struct command
+{
+    std::function<void(scene_node &, float, mazes::randomizer &rng)> action;
+    Entity category;
+};
+
+using command_queue = std::queue<command>;
+
+template <typename GameObject, typename Function>
+std::function<void(scene_node &, float, mazes::randomizer &)> derived_action(Function fn)
+{
+    return [=](scene_node &node, float dt, mazes::randomizer &rng)
+    {
+        // Ensure that the cast is safe - check if scene_node is base of GameObject
+        if constexpr (std::is_base_of_v<scene_node, GameObject>)
+        {
+            fn(static_cast<GameObject &>(node), dt, std::ref(rng));
+        }
+    };
+}
 
 enum class PlayerAction
 {
@@ -35,6 +129,8 @@ enum class PlayerAction
     PLACE_MAZE,
     PREVIEW_MAZE,
     CHANGE_PERSPECTIVE,
+    ZOOM_IN_ISO_VIEW,
+    ZOOM_OUT_ISO_VIEW,
     DONE,
     COUNT
 };
@@ -50,14 +146,6 @@ namespace mazes
 class player : public scene_node
 {
 public:
-    struct maze_preview_frame
-    {
-        std::vector<std::uint8_t> pixel_data;
-        int width{0};
-        int height{0};
-        int scale{1};
-    };
-
     struct position
     {
         float x, y, z, rx, ry, t;
@@ -71,10 +159,8 @@ public:
     enum class OrthoViewMode : int
     {
         PERSPECTIVE = 0,
-        TOP = 1,        // Top view (XZ plane, looking down -Y)
-        FRONT = 2,      // Front view (XY plane, looking down -Z)
-        RIGHT = 3,      // Right view (ZY plane, looking down -X)
-        ISOMETRIC = 4   // Isometric 3/4 view
+        ISOMETRIC = 1,
+        FIXED_INT_FOR_ISO_VIEW = 32
     };
 
     enum class CADTool : int
@@ -109,7 +195,7 @@ public:
         bool preview_enabled{true};
         bool artifacts_ready{false};
         float gui_font_scale{1.0f};
-        
+
         // CAD Features (Tier 1)
         bool show_hover_info{true};
         bool show_grid{false};
@@ -179,8 +265,8 @@ public:
     [[nodiscard]] std::string get_artifact_export_result() noexcept;
 
     // CAD Helper Functions
-    [[nodiscard]] static const char* get_block_name(int block_type) noexcept;
-    [[nodiscard]] static const char* get_face_name(int face) noexcept;
+    [[nodiscard]] static const char *get_block_name(int block_type) noexcept;
+    [[nodiscard]] static const char *get_face_name(int face) noexcept;
     void cycle_ortho_view() noexcept;
     void toggle_grid() noexcept;
     void toggle_hover_display() noexcept;
@@ -221,6 +307,9 @@ private:
 
     std::function<std::optional<maze_preview_frame>(const mazes::configurator &)> m_maze_task;
     std::future<std::optional<maze_preview_frame>> m_preview_future;
+#if defined(__EMSCRIPTEN__)
+    std::optional<maze_preview_frame> m_pending_preview;
+#endif
 
     std::uint64_t m_last_preview_generation_time{0};
     std::uint64_t m_last_preview_request_time{0};
