@@ -111,7 +111,7 @@ namespace
         }
 
         const auto elapsed = SDL_GetTicks() - start_time;
-        SDL_Log("blocks_to_wavefront_obj: Generated OBJ with %d blocks in %u ms\n", processed_blocks, elapsed);
+        SDL_Log("blocks_to_wavefront_obj: Generated OBJ with %d blocks in %lu ms\n", processed_blocks, elapsed);
 
         return result.str();
     }
@@ -842,7 +842,7 @@ bool player::request_preview_generation() noexcept
 #if defined(__EMSCRIPTEN__)
         // Web builds share the runtime_app singleton with rendering, so run preview
         // generation synchronously to avoid racing the GL/event loop.
-        pending_maze_preview_2d = maze_task(_configs.maze());
+        pending_maze_preview_2d = generate_maze_task(_configs.maze());
 #else
         preview_maze_2d_fut = std::async(std::launch::async, [this, maze_config = _configs.maze()]()
                                       { return generate_maze_task(maze_config); });

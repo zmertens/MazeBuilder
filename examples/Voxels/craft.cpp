@@ -567,22 +567,21 @@ struct craft::craft_impl
     // Handles GUI options
     class menu_state final : public state
     {
-        std::vector<FontIdentifier> m_selectable_fonts;
-        std::size_t m_selected_font_index{0};
+        std::vector<FontIdentifier> selectable_fonts;
         std::list<std::string> algo_list;
-        mutable std::string m_cached_artifacts;   // Cache for expensive artifacts generation
-        mutable bool m_export_in_progress{false}; // Track if async export was started
+        mutable std::string cached_artifacts;   // Cache for expensive artifacts generation
+        mutable bool artifact_export_in_progress{false}; // Track if async export was started
 
     public:
         explicit menu_state(state_stack &stack, const context &context)
             : state{stack, context}
         {
-            m_selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
+            selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
             std::ranges::for_each(
                 std::views::iota(0, static_cast<int>(FontIdentifier::TOTAL)),
                 [this](const int id)
                 {
-                    m_selectable_fonts.push_back(static_cast<FontIdentifier>(id));
+                    selectable_fonts.push_back(static_cast<FontIdentifier>(id));
                     return true;
                 });
             algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::BINARY_TREE)});
@@ -648,7 +647,7 @@ struct craft::craft_impl
 
             // Apply the per-player font scale
             ImGui::GetIO().FontGlobalScale = c.gui_font_scale();
-            ImGui::PushFont(ctx.ctx_fonts->get(m_selectable_fonts.at(selected_font_index)).get());
+            ImGui::PushFont(ctx.ctx_fonts->get(selectable_fonts.at(selected_font_index)).get());
 
             // Forest-green theme – 19 colour pushes.
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
@@ -870,7 +869,7 @@ struct craft::craft_impl
                         ImGui::Separator();
                         static char tag_buffer[256] = "";
                         static bool tag_init = false;
-                        std::string_view current_tag = c.tag();
+                        std::string current_tag = c.tag();
                         if (!tag_init || SDL_strcmp(tag_buffer, current_tag.data()) != 0)
                         {
                             SDL_strlcpy(tag_buffer, current_tag.data(), SDL_arraysize(tag_buffer));
@@ -1002,11 +1001,11 @@ struct craft::craft_impl
                             ImGui::Spacing();
                             if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
                             {
-                                for (std::size_t i = 0; i < m_selectable_fonts.size(); ++i)
+                                for (std::size_t i = 0; i < selectable_fonts.size(); ++i)
                                 {
                                     const bool is_sel = (selected_font_index == static_cast<int>(i));
                                     const auto &font_name = craft_impl::LOADING_FONTS_WITH_NAMES.at(
-                                        static_cast<std::size_t>(m_selectable_fonts.at(i)));
+                                        static_cast<std::size_t>(selectable_fonts.at(i)));
                                     if (ImGui::Selectable(font_name.data(), is_sel))
                                         selected_font_index = static_cast<int>(i);
                                     if (is_sel)
@@ -1069,14 +1068,14 @@ struct craft::craft_impl
                         ImGui::Spacing();
 
                         // Check export status and cache result when ready
-                        if (m_export_in_progress && p->is_artifact_export_ready())
+                        if (artifact_export_in_progress && p->is_artifact_export_ready())
                         {
-                            m_cached_artifacts = p->get_artifact_export_result();
-                            m_export_in_progress = false;
+                            cached_artifacts = p->get_artifact_export_result();
+                            artifact_export_in_progress = false;
                             SDL_Log("Async export complete - ready for download\n");
                         }
 
-                        const bool export_in_progress = m_export_in_progress;
+                        const bool export_in_progress = artifact_export_in_progress;
 
                         // Show status
                         if (export_in_progress)
@@ -1108,8 +1107,8 @@ struct craft::craft_impl
                         if (ImGui::Button("Generate Artifacts (Async)", ImVec2(0.f, 2.f * fhs)))
                         {
                             p->start_async_artifact_export();
-                            m_cached_artifacts.clear(); // Clear old cache
-                            m_export_in_progress = true;
+                            cached_artifacts.clear(); // Clear old cache
+                            artifact_export_in_progress = true;
                         }
 
                         if (export_in_progress)
@@ -1120,7 +1119,7 @@ struct craft::craft_impl
                         ImGui::SameLine();
 
                         // Download button (only enabled when artifacts are ready)
-                        const bool has_artifacts = !m_cached_artifacts.empty() && !export_in_progress;
+                        const bool has_artifacts = !cached_artifacts.empty() && !export_in_progress;
                         if (!has_artifacts)
                         {
                             ImGui::BeginDisabled();
@@ -1129,10 +1128,10 @@ struct craft::craft_impl
                         if (ImGui::Button("Download File", ImVec2(0.f, 2.f * fhs)))
                         {
 #if !defined(__EMSCRIPTEN__)
-                            handle_artifacts(p, m_cached_artifacts);
+                            handle_artifacts(p, cached_artifacts);
 #else
-                            current_configs.artifacts_ready = true;
-                            handle_artifacts(p, m_cached_artifacts);
+                            c.artifacts_ready(true);
+                            handle_artifacts(p, cached_artifacts);
 #endif
                         }
 
@@ -1149,17 +1148,17 @@ struct craft::craft_impl
                         ImGui::Separator();
 
                         // Display cached preview
-                        if (m_cached_artifacts.empty())
+                        if (cached_artifacts.empty())
                         {
                             ImGui::TextWrapped("No artifacts generated yet. Click 'Generate Artifacts' button above.");
                         }
                         else
                         {
-                            const auto preview = m_cached_artifacts.substr(0, 512);
+                            const auto preview = cached_artifacts.substr(0, 512);
                             ImGui::TextWrapped("%s", preview.c_str());
-                            if (m_cached_artifacts.size() > 512)
+                            if (cached_artifacts.size() > 512)
                             {
-                                ImGui::TextDisabled("... (%zu more bytes)", m_cached_artifacts.size() - 512);
+                                ImGui::TextDisabled("... (%zu more bytes)", cached_artifacts.size() - 512);
                             }
                         }
 
