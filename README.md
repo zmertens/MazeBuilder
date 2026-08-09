@@ -127,6 +127,13 @@ mazebuildercli -j in.json -o 3x5_with_distances.json
 
 Array-style JSON files can be used to store multiple configurations. This is covered by the parser tests in `tests/test_args_can_parse.cpp`.
 
+```json
+[
+  { "rows": 10, "columns": 10, "algo": "dfs", "output": "maze1.txt" },
+  { "rows": 20, "columns": 12, "algo": "sidewinder", "output": "maze2.txt" }
+]
+```
+
 ## C++ API
 
 The simplest integration point is `mazes::runtime_app`, which accepts a command-like string and returns the generated artifact:
