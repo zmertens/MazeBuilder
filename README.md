@@ -134,7 +134,6 @@ The simplest integration point is `mazes::runtime_app`, which accepts a command-
 ```cpp
 std::string maze(const std::string& arguments) noexcept
 {
-    using mazes::singleton_base;
     if (auto app = mazes::runtime_app::instance())
     {
         return std::string{app->apply(arguments)};
