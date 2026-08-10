@@ -6,7 +6,8 @@
 #include <MazeBuilder/distances.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/state_utils.h>
+#include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
@@ -118,9 +119,9 @@ bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+    state_utils::parse_dimensions(args, rows, cols, levels);
 
-    m_grid_id = maze_state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    m_grid_id = state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
 
     algo maze_algo = algo::BINARY_TREE;
     std::string output_target;
@@ -150,7 +151,7 @@ bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused
     }
 
     randomizer fallback_rng{};
-    auto *rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
+    auto *rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -164,12 +165,13 @@ bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused
     if (!m_result.empty() && !output_target.empty())
     {
         bool write_ok = false;
+        const auto normalized_output = io_utils::normalize_path(output_target);
 
         try
         {
             auto &grid_ref = grid_mapper->get(m_grid_id);
             const auto pixels = grid_ref.operations().get_pixels();
-            const auto extension = std::filesystem::path{output_target}.extension().string();
+            const auto extension = std::filesystem::path{normalized_output}.extension().string();
 
             std::string normalized = extension;
             std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
@@ -179,15 +181,15 @@ bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused
             {
                 if (normalized == ".png")
                 {
-                    write_ok = stbi_write_png(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), m_image_width * 4) != 0;
+                    write_ok = stbi_write_png(normalized_output.c_str(), m_image_width, m_image_height, 4, pixels.data(), m_image_width * 4) != 0;
                 }
                 else if (normalized == ".bmp")
                 {
-                    write_ok = stbi_write_bmp(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data()) != 0;
+                    write_ok = stbi_write_bmp(normalized_output.c_str(), m_image_width, m_image_height, 4, pixels.data()) != 0;
                 }
                 else if (normalized == ".jpg" || normalized == ".jpeg")
                 {
-                    write_ok = stbi_write_jpg(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), 95) != 0;
+                    write_ok = stbi_write_jpg(normalized_output.c_str(), m_image_width, m_image_height, 4, pixels.data(), 95) != 0;
                 }
             }
         }
@@ -195,7 +197,7 @@ bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused
         {
         }
 
-        m_result = write_ok ? "Wrote maze to " + output_target : "Failed to write maze to " + output_target;
+        m_result = write_ok ? "Wrote maze to " + normalized_output : "Failed to write maze to " + normalized_output;
     }
 
     if (processed_text_mapper)

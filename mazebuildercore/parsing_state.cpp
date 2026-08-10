@@ -3,6 +3,7 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/processed_text.h>
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
@@ -61,58 +62,8 @@ bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] dou
         return true;
     }
 
-    // Determine which algo to run and push the matching create state on top of the stack
-    state::ID next_state = state::ID::BINARY_TREE;
-
-    if (auto parsed = parsed_args->get(); parsed.has_value())
-    {
-        if (auto it = parsed->find(mazes::args::OUTPUT_FILENAME_WORD_STR); it != parsed->cend())
-        {
-            try
-            {
-                const algo a = to_algo_from_sv(it->second);
-                switch (a)
-                {
-                case algo::BINARY_TREE:
-                    next_state = state::ID::BINARY_TREE;
-                    break;
-                case algo::DFS:
-                    next_state = state::ID::DFS;
-                    break;
-                case algo::SIDEWINDER:
-                    next_state = state::ID::SIDEWINDER;
-                    break;
-                default:
-                    throw std::logic_error({});
-                }
-            }
-            catch (...)
-            {
-                next_state = state::ID::BINARY_TREE;
-            }
-
-            if (auto found = mazes::string_utils::find(it->second, '.'); found != std::string_view::npos)
-            {
-                const auto extension = mazes::string_utils::get_file_extension(it->second);
-                if (extension == "png" || extension == "bmp" || extension == "jpg" || extension == "jpeg")
-                {
-                    next_state = state::ID::PIXELIZING;
-                }
-                else if (extension == "obj")
-                {
-                    next_state = state::ID::WAVEFRONT_OBJECTIFY;
-                }
-                else if (extension == "json" || extension == "txt")
-                {
-                    next_state = state::ID::STRINGIFYING;
-                }
-            }
-            else if (it->second == "stdout")
-            {
-                next_state = state::ID::STRINGIFYING;
-            }
-        }
-    }
+    // Determine which output state to run based on the requested output target.
+    const state::ID next_state = state_utils::output_state_for(parsed_args);
 
     request_stack_pop();
     request_stack_push(next_state);

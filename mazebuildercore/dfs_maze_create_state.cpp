@@ -6,7 +6,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/lab.h>
-#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/grid_interface.h>
@@ -49,11 +49,11 @@ bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& a
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+    state_utils::parse_dimensions(args, rows, cols, levels);
 
-    m_use_distances = maze_state_utils::has_distances(args);
+    m_use_distances = state_utils::has_distances(args);
     m_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-    const auto distance_settings = maze_state_utils::parse_distance_settings(args);
+    const auto distance_settings = state_utils::parse_distance_settings(args);
     m_distances_start = distance_settings.start;
     m_distances_end = distance_settings.end;
 
@@ -65,7 +65,7 @@ bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& a
     }
 
     randomizer fallback_rng{};
-    auto* rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
+    auto* rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -81,7 +81,7 @@ bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& a
         try
         {
             request_stack_pop();
-            request_stack_push(maze_state_utils::output_state_for(args));
+            request_stack_push(state_utils::output_state_for(args));
         }
         catch (...)
         {
