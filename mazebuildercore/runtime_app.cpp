@@ -85,12 +85,12 @@ void runtime_app::register_states() const noexcept
     // Begin with loading_state
     runtime_stack_ptr->register_state<loading_state>(state::ID::LOADING);
     runtime_stack_ptr->register_state<parsing_state>(state::ID::PARSING);
-    runtime_stack_ptr->register_state<bt_maze_create_state>(state::ID::BTING);
-    runtime_stack_ptr->register_state<dfs_maze_create_state>(state::ID::DFSING);
-    runtime_stack_ptr->register_state<sw_maze_create_state>(state::ID::SIDEWINDERING);
+    runtime_stack_ptr->register_state<bt_maze_create_state>(state::ID::BINARY_TREE);
+    runtime_stack_ptr->register_state<dfs_maze_create_state>(state::ID::DFS);
+    runtime_stack_ptr->register_state<sw_maze_create_state>(state::ID::SIDEWINDER);
     runtime_stack_ptr->register_state<pixels_create_state>(state::ID::PIXELIZING);
     runtime_stack_ptr->register_state<stringify_create_state>(state::ID::STRINGIFYING);
-    runtime_stack_ptr->register_state<wavefront_object_create_state>(state::ID::WAVEFRONT_OBJECTIFYING);
+    runtime_stack_ptr->register_state<wavefront_object_create_state>(state::ID::WAVEFRONT_OBJECTIFY);
 }
 
 std::string_view runtime_app::apply(const std::string_view unformatted_sv) noexcept
@@ -189,7 +189,7 @@ std::string_view runtime_app::visit_states(const std::optional<args> &arguments)
     return m_last_result;
 }
 
-const grid_interface *runtime_app::get_last_grid() const noexcept
+grid_interface *runtime_app::get_last_grid() noexcept
 {
     try
     {

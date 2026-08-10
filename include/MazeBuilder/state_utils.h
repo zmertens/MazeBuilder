@@ -1,5 +1,5 @@
-#ifndef MAZE_STATE_UTILS_H
-#define MAZE_STATE_UTILS_H
+#ifndef STATE_UTILS_H
+#define STATE_UTILS_H
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
@@ -12,7 +12,7 @@
 #include <optional>
 #include <string>
 
-namespace mazes::maze_state_utils
+namespace mazes::state_utils
 {
     inline void parse_dimensions(const std::optional<args> &args, unsigned int &rows, unsigned int &cols,
                                  unsigned int &levels) noexcept
@@ -108,7 +108,7 @@ namespace mazes::maze_state_utils
             if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
             {
                 const std::string output = it->second;
-                if (output.empty() || output == STDOUT_FORMAT_STR)
+                if (output.empty() || output == "stdout")
                 {
                     return state::ID::STRINGIFYING;
                 }
@@ -125,23 +125,19 @@ namespace mazes::maze_state_utils
                     normalized.erase(normalized.begin());
                 }
 
-                try
+                if (normalized == "txt" || normalized == "stdout")
                 {
-                    switch (to_output_format_from_sv(normalized))
-                    {
-                    case output_format::PLAIN_TEXT:
-                    case output_format::STDOUT:
-                        return state::ID::STRINGIFYING;
-                    case output_format::JSON_FILE:
-                        return state::ID::PARSING;
-                    case output_format::WAVEFRONT_OBJECT_FILE:
-                        return state::ID::WAVEFRONT_OBJECTIFYING;
-                    default:
-                        break;
-                    }
+                    return state::ID::STRINGIFYING;
                 }
-                catch (...)
+
+                if (normalized == "json")
                 {
+                    return state::ID::PARSING;
+                }
+
+                if (normalized == "obj")
+                {
+                    return state::ID::WAVEFRONT_OBJECTIFY;
                 }
 
                 if (normalized == "png" || normalized == "jpg" || normalized == "jpeg" || normalized == "bmp")
@@ -163,6 +159,6 @@ namespace mazes::maze_state_utils
 
         return &fallback_rng;
     }
-} // namespace mazes::maze_state_utils
+} // namespace mazes::state_utils
 
-#endif // MAZE_STATE_UTILS_H
+#endif // STATE_UTILS_H

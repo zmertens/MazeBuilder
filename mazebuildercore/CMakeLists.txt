@@ -78,7 +78,30 @@ FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TA
 set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
 set(FMT_TEST OFF CACHE BOOL "" FORCE)
 set(FMT_DOC OFF CACHE BOOL "" FORCE)
+
+set(_fmt_source_dir "${CMAKE_BINARY_DIR}/_deps/fmt-src")
+if(EXISTS "${_fmt_source_dir}" AND NOT EXISTS "${_fmt_source_dir}/CMakeLists.txt")
+    message(STATUS "Detected stale empty fmt cache, forcing FetchContent re-clone")
+    file(REMOVE_RECURSE "${_fmt_source_dir}")
+    file(REMOVE
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/fmt-gitclone-lastrun.txt"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/download.stamp"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/update.stamp"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/patch.stamp")
+endif()
+
 FetchContent_MakeAvailable(fmt)
+
+# Normalize fmt target name across package variants.
+if(NOT TARGET fmt::fmt)
+    if(TARGET fmt)
+        add_library(fmt::fmt ALIAS fmt)
+    elseif(TARGET fmt-header-only)
+        add_library(fmt::fmt ALIAS fmt-header-only)
+    else()
+        message(FATAL_ERROR "fmt dependency target was not created. If using an existing build directory, clear stale fmt cache under _deps (fmt-src/fmt-build/fmt-tmp) and reconfigure.")
+    endif()
+endif()
 
 find_package(Threads REQUIRED)
 

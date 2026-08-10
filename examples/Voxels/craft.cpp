@@ -1715,5 +1715,5 @@ void craft::set_maze_seed(const int seed) noexcept
 std::string craft::get_version() const noexcept
 {
     // Returns the MazeBuilder library version string (e.g. "8.2.1") for JS overlays.
-    return mazes::buildinfo::Version;
+    return mazes::buildinfo::VERSION;
 }

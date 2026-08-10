@@ -634,7 +634,7 @@ void world::draw() const noexcept
     std::array<std::string, 3> debug_lines{"Press [ESC] for menu",
                                            "Press [E] to make new maze",
                                            "Press [B] to build a maze"};
-    SDL_snprintf(debug_lines[0].data(), debug_lines[0].size(), debug_lines.at(0).c_str());
+    SDL_snprintf(debug_lines[0].data(), debug_lines[0].size(), "%s", debug_lines.at(0).c_str());
     render_text(world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,
                 10, viewport_height - 15, 12.0f, debug_lines[0].c_str());
     render_text(world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture, 0,

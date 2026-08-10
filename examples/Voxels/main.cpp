@@ -13,7 +13,7 @@
 // Run the SDL app
 static constexpr auto window_w = 1200, window_h = 800;
 
-const auto title{"Maze Builder - " + mazes::buildinfo::Version};
+const auto title{"Maze Builder - " + mazes::buildinfo::VERSION + " - " + mazes::buildinfo::COMMIT_SHA};
 
 // Avoid function-local static initialization on wasm main thread.
 // Eager init sidesteps __cxa_guard_acquire/pthread_cond_wait warnings.
