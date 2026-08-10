@@ -19,6 +19,8 @@ cmake-build-*/
 
 .idea/
 
+emsdk/
+
 # Script output files
 scripts/*.txt
 scripts/*.png

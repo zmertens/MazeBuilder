@@ -34,12 +34,12 @@ jobs:
       uses: actions/checkout@v3
       with:
         repository: emscripten-core/emsdk
-        path: ${{github.workspace}}/../emsdk
+        path: ${{github.workspace}}/emsdk
 
     # Step to install and activate the latest Emscripten SDK
     - name: Install Emscripten
       run: |
-        cd ${{github.workspace}}/../emsdk
+        cd ${{github.workspace}}/emsdk
         ./emsdk install latest
         ./emsdk activate latest
         source ./emsdk_env.sh

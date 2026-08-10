@@ -14,11 +14,11 @@
         },
         {
             "name": "wasmjs-examples",
+            "generator": "emcmake",
             "displayName": "Build the examples using EMSDK",
             "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build-wasmjs/",
             "binaryDir": "${sourceDir}/build-wasmjs",
             "cacheVariables": {
-                "CMAKE_TOOLCHAIN_FILE":"${sourceDir}/../emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
                 "CMAKE_BUILD_TYPE": "DEBUG",
                 "MAZE_BUILDER_EXAMPLES": "1",
                 "CMAKE_MAKE_PROGRAM": "Ninja Multi-Config",
