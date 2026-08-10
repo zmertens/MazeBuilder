@@ -24,8 +24,8 @@ class command_line_parser : public mazes::singleton_base<command_line_parser>
 public:
     std::string version() noexcept
     {
-        return mazes::string_utils::concat(mazes::string_utils::concat("v", mazes::buildinfo::Version),
-                                           " - " + mazes::buildinfo::CommitSHA);
+        return mazes::string_utils::concat(mazes::string_utils::concat("v", mazes::buildinfo::VERSION),
+                                           " - " + mazes::buildinfo::COMMIT_SHA);
     }
 
     std::string help() noexcept

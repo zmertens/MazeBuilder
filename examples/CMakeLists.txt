@@ -90,6 +90,9 @@ if(MAZE_BUILDER_EXAMPLES)
         include(FetchGitRepo)
 
         # Get box2d
+        # Emscripten does not expose x86 SSE by default; disable Box2D SIMD so
+        # compat/emmintrin.h is not pulled in during C compilation.
+        set(BOX2D_DISABLE_SIMD ON CACHE BOOL "Disable Box2D SIMD for Emscripten builds" FORCE)
         FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.1)
         # Add Box2D include directory if not already included by find_package
         if(TARGET box2d)
@@ -152,7 +155,7 @@ if(MAZE_BUILDER_EXAMPLES)
         endif()
 
         # Get SFML from web and build dependencies locally
-        set(SFML_BUILD_AUDIO ON)
+        set(SFML_BUILD_AUDIO OFF)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS ON)
         set(SFML_BUILD_WINDOW ON)

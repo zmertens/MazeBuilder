@@ -25,10 +25,13 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
 {
+    constexpr std::string_view APP_NAME = "AmazingSFML " + mazes::buildinfo::VERSION;
+
     constexpr unsigned int MAZE_ROWS = 20u;
     constexpr unsigned int MAZE_COLS = 20u;
     constexpr float CELL_SIZE = 24.f;
