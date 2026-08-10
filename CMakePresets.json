@@ -21,7 +21,6 @@
             "cacheVariables": {
                 "CMAKE_TOOLCHAIN_FILE":"${sourceDir}/../emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
                 "CMAKE_BUILD_TYPE": "DEBUG",
-                "CMAKE_CXX_COMPILER": "em++",
                 "MAZE_BUILDER_EXAMPLES": "1"
             }
         },

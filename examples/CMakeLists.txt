@@ -1,6 +1,10 @@
 
 if(MAZE_BUILDER_EXAMPLES)
 
+    # Some third-party deps (for example ogg pulled by SFML audio) still declare
+    # very old cmake_minimum_required values. Keep compatibility enabled for them.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for legacy third-party dependencies" FORCE)
+
     set(DEAR_IMGUI_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_demo.cpp
@@ -102,7 +106,9 @@ if(MAZE_BUILDER_EXAMPLES)
         # Get SFML with Emscripten-specific settings
         set(SFML_REPO_URL "https://github.com/zmertens/SFML.git")
         message(STATUS "Fetching SFML from ${SFML_REPO_URL}")
-        set(SFML_BUILD_AUDIO ON)
+        # SFML audio brings in legacy ogg/vorbis CMake projects and is not needed
+        # for the current web examples.
+        set(SFML_BUILD_AUDIO OFF)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS OFF)
         set(SFML_BUILD_WINDOW OFF)
