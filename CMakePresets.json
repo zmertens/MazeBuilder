@@ -21,8 +21,8 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "DEBUG",
                 "MAZE_BUILDER_EXAMPLES": "1",
-                "CMAKE_C_COMPILER": "emcc",
-                "CMAKE_CXX_COMPILER": "em++"
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
             }
         },
         {
