@@ -8,7 +8,8 @@
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/build-ninja",
             "cacheVariables": {
-                "MAZE_BUILDER_EXAMPLES": "1"
+                "MAZE_BUILDER_EXAMPLES": "1",
+                "MAZE_BUILDER_TESTS": "1"
             }
         },
         {
