@@ -8,8 +8,6 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/cell.h>
-#include <MazeBuilder/distance_grid.h>
-#include <MazeBuilder/distances.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
@@ -18,12 +16,10 @@
 
 #include <algorithm>
 #include <array>
-#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
-#include <limits>
 #include <memory>
 #include <optional>
 #include <sstream>
@@ -46,15 +42,12 @@ namespace
         bool south{true};
         bool east{true};
         bool west{true};
-        int distance{-1};
     };
 
     struct maze_topology
     {
         unsigned int rows{0};
         unsigned int columns{0};
-        bool has_distances{false};
-        int max_distance{0};
         std::vector<maze_cell_walls> cells;
 
         [[nodiscard]] const maze_cell_walls *at(const unsigned int row, const unsigned int col) const noexcept
@@ -69,165 +62,6 @@ namespace
         }
     };
 
-    maze_topology parse_ascii_topology(const std::string &ascii)
-    {
-        std::vector<std::string> lines;
-        lines.reserve(256);
-
-        std::string line;
-        std::string current;
-        current.reserve(256);
-        for (const char ch : ascii)
-        {
-            if (ch == '\n')
-            {
-                lines.push_back(current);
-                current.clear();
-            }
-            else if (ch != '\r')
-            {
-                current.push_back(ch);
-            }
-        }
-        if (!current.empty())
-        {
-            lines.push_back(current);
-        }
-
-        if (lines.size() < 3)
-        {
-            throw std::runtime_error("AmazingSFML: maze text is too small.");
-        }
-
-        size_t max_width = 0;
-        for (const auto &ln : lines)
-        {
-            max_width = std::max(max_width, ln.size());
-        }
-        for (auto &ln : lines)
-        {
-            ln.resize(max_width, ' ');
-        }
-
-        const auto ascii_h = static_cast<unsigned int>(lines.size());
-
-        std::vector<unsigned int> plus_positions;
-        plus_positions.reserve(max_width / 2u + 2u);
-        for (unsigned int x = 0; x < static_cast<unsigned int>(max_width); ++x)
-        {
-            if (lines.front()[x] == '+')
-            {
-                plus_positions.push_back(x);
-            }
-        }
-
-        if (plus_positions.size() < 2u || (ascii_h - 1u) % 2u != 0u)
-        {
-            throw std::runtime_error("AmazingSFML: unsupported maze text layout.");
-        }
-
-        const unsigned int stride = plus_positions[1] - plus_positions[0];
-        if (stride < 2u)
-        {
-            throw std::runtime_error("AmazingSFML: unsupported maze text layout.");
-        }
-
-        for (size_t i = 1; i < plus_positions.size(); ++i)
-        {
-            if (plus_positions[i] - plus_positions[i - 1] != stride)
-            {
-                throw std::runtime_error("AmazingSFML: unsupported maze text layout.");
-            }
-        }
-
-        const unsigned int cell_inner_width = stride - 1u;
-
-        const auto parse_base36 = [](const std::string &token) -> std::optional<int>
-        {
-            if (token.empty())
-            {
-                return std::nullopt;
-            }
-
-            int value = 0;
-            for (const char raw_ch : token)
-            {
-                const unsigned char uch = static_cast<unsigned char>(raw_ch);
-                const char ch = static_cast<char>(std::toupper(uch));
-
-                int digit = -1;
-                if (ch >= '0' && ch <= '9')
-                {
-                    digit = ch - '0';
-                }
-                else if (ch >= 'A' && ch <= 'Z')
-                {
-                    digit = 10 + (ch - 'A');
-                }
-                else
-                {
-                    return std::nullopt;
-                }
-
-                if (value > (std::numeric_limits<int>::max() - digit) / 36)
-                {
-                    return std::nullopt;
-                }
-
-                value = value * 36 + digit;
-            }
-
-            return value;
-        };
-
-        maze_topology out;
-        out.rows = (ascii_h - 1u) / 2u;
-        out.columns = static_cast<unsigned int>(plus_positions.size() - 1u);
-        out.cells.resize(static_cast<size_t>(out.rows) * static_cast<size_t>(out.columns));
-
-        for (unsigned int row = 0; row < out.rows; ++row)
-        {
-            for (unsigned int col = 0; col < out.columns; ++col)
-            {
-                const unsigned int x0 = col * stride;
-                const unsigned int y_top = row * 2u;
-                const unsigned int y_mid = row * 2u + 1u;
-                const unsigned int y_bottom = row * 2u + 2u;
-
-                bool north = false;
-                bool south = false;
-                for (unsigned int x = x0 + 1u; x <= x0 + cell_inner_width; ++x)
-                {
-                    north = north || (lines[y_top][x] == '-');
-                    south = south || (lines[y_bottom][x] == '-');
-                }
-
-                const bool west = lines[y_mid][x0] == '|';
-                const bool east = lines[y_mid][x0 + stride] == '|';
-
-                int distance = -1;
-                {
-                    const std::string cell_text = lines[y_mid].substr(x0 + 1u, cell_inner_width);
-                    if (const auto start = cell_text.find_first_not_of(' '); start != std::string::npos)
-                    {
-                        const auto end = cell_text.find_last_not_of(' ');
-                        if (const auto parsed = parse_base36(cell_text.substr(start, end - start + 1u)); parsed.has_value())
-                        {
-                            distance = *parsed;
-                            out.has_distances = true;
-                            out.max_distance = std::max(out.max_distance, distance);
-                        }
-                    }
-                }
-
-                const auto idx = static_cast<size_t>(row) * static_cast<size_t>(out.columns) + static_cast<size_t>(col);
-                out.cells[idx] = {north, south, east, west, distance};
-            }
-        }
-
-        return out;
-    }
-
     maze_topology build_topology_from_grid(const mazes::grid_interface &grid, const unsigned int rows,
                                            const unsigned int columns)
     {
@@ -237,38 +71,6 @@ namespace
         out.cells.resize(static_cast<size_t>(rows) * static_cast<size_t>(columns));
 
         const auto &ops = grid.operations();
-
-        const mazes::distance_grid *dist_grid = dynamic_cast<const mazes::distance_grid *>(&grid);
-        std::shared_ptr<mazes::distances> distances;
-        std::shared_ptr<mazes::distances> shortest_path;
-        if (dist_grid)
-        {
-            distances = dist_grid->get_distances();
-            if (distances)
-            {
-                const int total_cells = static_cast<int>(rows * columns);
-                int start_index = 0;
-                for (int i = 0; i < total_cells; ++i)
-                {
-                    if (distances->contains(i) && (*distances)[i] == 0)
-                    {
-                        start_index = i;
-                        break;
-                    }
-                }
-
-                const auto [goal_index, _max_dist] = distances->max();
-                shortest_path = mazes::distances::path_to(const_cast<mazes::grid_interface *>(&grid),
-                                                          start_index,
-                                                          goal_index);
-                out.has_distances = static_cast<bool>(shortest_path);
-                if (shortest_path)
-                {
-                    const auto [_, path_max] = shortest_path->max();
-                    out.max_distance = path_max;
-                }
-            }
-        }
 
         for (unsigned int row = 0; row < rows; ++row)
         {
@@ -292,11 +94,6 @@ namespace
                 cell_data.east = !(e && c->is_linked(e));
                 cell_data.west = !(w && c->is_linked(w));
 
-                if (shortest_path && shortest_path->contains(idx))
-                {
-                    cell_data.distance = (*shortest_path)[idx];
-                }
-
                 out.cells[static_cast<size_t>(row) * static_cast<size_t>(columns) + static_cast<size_t>(col)] =
                     cell_data;
             }
@@ -315,11 +112,14 @@ namespace
     {
     public:
         amazing_sfml_app()
-            : m_wall_color(40, 40, 60), m_vertices(sf::PrimitiveType::Triangles), m_window(
-                                                                                      sf::VideoMode(
-                                                                                          {static_cast<unsigned int>(MAZE_COLS * (CELL_SIZE + WALL_SIZE) + WALL_SIZE),
-                                                                                           static_cast<unsigned int>(MAZE_ROWS * (CELL_SIZE + WALL_SIZE) + WALL_SIZE)}),
-                                                                                      "AmazingSFML + Box2D + MazeBuilder v" + mazes::buildinfo::Version)
+            : m_wall_color(40, 40, 60)
+            , m_maze_sprite{m_maze_texture}
+            , m_window(
+                                            sf::VideoMode(
+                                                {static_cast<unsigned int>(MAZE_COLS * (CELL_SIZE + WALL_SIZE) + WALL_SIZE),
+                                                 static_cast<unsigned int>(MAZE_ROWS * (CELL_SIZE + WALL_SIZE) + WALL_SIZE)}),
+                                            "AmazingSFML + Box2D + MazeBuilder v" + mazes::buildinfo::Version)
+                        
         {
             if (sf::Image icon = sf::Image{}; icon.loadFromFile("icon.bmp"))
             {
@@ -354,7 +154,10 @@ namespace
                 sync_ball_drawables();
 
                 m_window.clear(m_wall_color);
-                m_window.draw(m_vertices);
+                if (m_has_maze_texture)
+                {
+                    m_window.draw(m_maze_sprite);
+                }
                 for (const auto &ball : m_balls)
                 {
                     m_window.draw(ball.drawable);
@@ -375,10 +178,13 @@ namespace
 
     private:
         const sf::Color m_wall_color;
-        sf::VertexArray m_vertices;
         sf::RenderWindow m_window;
         mazes::randomizer m_rng;
         std::optional<maze_topology> m_maze;
+        sf::Texture m_maze_texture;
+        sf::Sprite m_maze_sprite;
+        bool m_has_maze_texture{false};
+        const std::filesystem::path m_maze_image_path{std::filesystem::temp_directory_path() / "amazingsfml_maze.png"};
 
         sf::Font m_font;
         bool m_show_help{true};
@@ -390,40 +196,6 @@ namespace
         b2WorldId m_world{b2_nullWorldId};
         std::vector<b2BodyId> m_wall_bodies;
         std::vector<dynamic_ball> m_balls;
-
-        static sf::Color color_from_uint32(const std::uint32_t packed)
-        {
-            return {
-                static_cast<std::uint8_t>((packed >> 16) & 0xFF),
-                static_cast<std::uint8_t>((packed >> 8) & 0xFF),
-                static_cast<std::uint8_t>(packed & 0xFF)};
-        }
-
-        static std::uint8_t lerp_u8(const std::uint8_t a, const std::uint8_t b, const float t)
-        {
-            const float clamped = std::clamp(t, 0.0f, 1.0f);
-            return static_cast<std::uint8_t>(static_cast<float>(a) + (static_cast<float>(b) - static_cast<float>(a)) * clamped);
-        }
-
-        void push_rect(const float x, const float y, const float w, const float h, const sf::Color color)
-        {
-            sf::Vertex top_left, top_right, bottom_left, bottom_right;
-            top_left.position = {x, y};
-            top_left.color = color;
-            top_right.position = {x + w, y};
-            top_right.color = color;
-            bottom_left.position = {x, y + h};
-            bottom_left.color = color;
-            bottom_right.position = {x + w, y + h};
-            bottom_right.color = color;
-
-            m_vertices.append(top_left);
-            m_vertices.append(top_right);
-            m_vertices.append(bottom_left);
-            m_vertices.append(top_right);
-            m_vertices.append(bottom_right);
-            m_vertices.append(bottom_left);
-        }
 
         void load_font()
         {
@@ -584,8 +356,6 @@ namespace
                 return;
             }
 
-            m_vertices.clear();
-
             for (unsigned int row = 0u; row < m_maze->rows; ++row)
             {
                 for (unsigned int col = 0u; col < m_maze->columns; ++col)
@@ -599,27 +369,6 @@ namespace
                         continue;
                     }
 
-                    sf::Color floor_color;
-                    if (m_maze->has_distances && cell->distance >= 0)
-                    {
-                        const float t = m_maze->max_distance > 0
-                                            ? static_cast<float>(cell->distance) / static_cast<float>(m_maze->max_distance)
-                                            : 0.0f;
-                        floor_color = {
-                            lerp_u8(45u, 255u, t),
-                            lerp_u8(95u, 70u, t),
-                            lerp_u8(225u, 50u, t)};
-                    }
-                    else
-                    {
-                        const auto color_mod = static_cast<std::uint8_t>((row * 11u + col * 17u) % 70u);
-                        floor_color = {
-                            static_cast<std::uint8_t>(170u + color_mod),
-                            static_cast<std::uint8_t>(170u + color_mod / 2u),
-                            190u};
-                    }
-                    push_rect(cx, cy, CELL_SIZE, CELL_SIZE, floor_color);
-
                     // Left/top boundaries come from the first row/column.
                     if (col == 0u && cell->west)
                     {
@@ -630,20 +379,12 @@ namespace
                         add_wall_body_from_rect(cx, cy - WALL_SIZE, CELL_SIZE, WALL_SIZE);
                     }
 
-                    if (!cell->east)
-                    {
-                        push_rect(cx + CELL_SIZE, cy, WALL_SIZE, CELL_SIZE, floor_color);
-                    }
-                    else
+                    if (cell->east)
                     {
                         add_wall_body_from_rect(cx + CELL_SIZE, cy, WALL_SIZE, CELL_SIZE);
                     }
 
-                    if (!cell->south)
-                    {
-                        push_rect(cx, cy + CELL_SIZE, CELL_SIZE, WALL_SIZE, floor_color);
-                    }
-                    else
+                    if (cell->south)
                     {
                         add_wall_body_from_rect(cx, cy + CELL_SIZE, CELL_SIZE, WALL_SIZE);
                     }
@@ -669,7 +410,7 @@ namespace
                       " --columns=" + std::to_string(MAZE_COLS) +
                       " --levels=1 --algo=" + std::string{mazes::to_sv_from_algo(m_rng(0, 1) == 0 ? mazes::algo::DFS : mazes::algo::BINARY_TREE)} +
                       " --seed=" + std::to_string(m_rng(1u, 4'200'000u)) +
-                      " --output=sfml --distances";
+                      " --output=" + m_maze_image_path.string() + " --distances";
 
             const auto apply_start = std::chrono::steady_clock::now();
             const auto result = app->apply(request);
@@ -687,6 +428,25 @@ namespace
             {
                 throw std::runtime_error("AmazingSFML failed to retrieve generated grid.");
             }
+
+            if (!m_maze_texture.loadFromFile(m_maze_image_path.string()))
+            {
+                throw std::runtime_error("AmazingSFML failed to load generated maze image.");
+            }
+
+            const auto image_size = m_maze_texture.getSize();
+            if (image_size.x == 0u || image_size.y == 0u)
+            {
+                throw std::runtime_error("AmazingSFML generated an invalid maze image.");
+            }
+
+            const float expected_width = static_cast<float>(MAZE_COLS) * (CELL_SIZE + WALL_SIZE) + WALL_SIZE;
+            const float expected_height = static_cast<float>(MAZE_ROWS) * (CELL_SIZE + WALL_SIZE) + WALL_SIZE;
+            const float maze_scale_x = expected_width / static_cast<float>(image_size.x);
+            const float maze_scale_y = expected_height / static_cast<float>(image_size.y);
+            m_maze_sprite = sf::Sprite{m_maze_texture};
+            m_maze_sprite.setScale({maze_scale_x, maze_scale_y});
+            m_has_maze_texture = true;
 
             m_maze = build_topology_from_grid(*generated_grid, MAZE_ROWS, MAZE_COLS);
 

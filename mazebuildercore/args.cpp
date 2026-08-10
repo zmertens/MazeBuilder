@@ -245,7 +245,10 @@ namespace
                 },
                 {args::HELP_WORD_STR, {args::HELP_FLAG_STR, args::HELP_OPTION_STR, args::HELP_WORD_STR}},
                 {args::VERSION_WORD_STR, {args::VERSION_FLAG_STR, args::VERSION_OPTION_STR, args::VERSION_WORD_STR}},
-                {args::SHOW_STEPS_WORD_STR, {"", args::SHOW_STEPS_OPTION_STR, args::SHOW_STEPS_WORD_STR}}
+                {
+                    args::SHOW_STEPS_WORD_STR,
+                    {args::SHOW_STEPS_FLAG_STR, args::SHOW_STEPS_OPTION_STR, args::SHOW_STEPS_WORD_STR}
+                }
             };
 
             std::string_view word_key = key;
@@ -287,6 +290,7 @@ namespace
                 {args::IMAGE_HEIGHT_OPTION_STR, args::IMAGE_HEIGHT_WORD_STR},
                 {args::HELP_FLAG_STR, args::HELP_WORD_STR}, {args::HELP_OPTION_STR, args::HELP_WORD_STR},
                 {args::VERSION_FLAG_STR, args::VERSION_WORD_STR}, {args::VERSION_OPTION_STR, args::VERSION_WORD_STR},
+                {args::SHOW_STEPS_FLAG_STR, args::SHOW_STEPS_WORD_STR},
                 {args::SHOW_STEPS_OPTION_STR, args::SHOW_STEPS_WORD_STR}
             };
 
@@ -322,7 +326,8 @@ namespace
 
             // Boolean flags (no value expected)
             auto word_key = normalize_key(flag);
-            if (word_key == args::HELP_WORD_STR || word_key == args::VERSION_WORD_STR)
+            if (word_key == args::HELP_WORD_STR || word_key == args::VERSION_WORD_STR || word_key ==
+                args::SHOW_STEPS_WORD_STR)
             {
                 store_value(word_key, args::TRUE_VALUE);
                 return true;

@@ -821,6 +821,18 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]")
         REQUIRE(check_optional_equals_value(args_handler.get(args::VERSION_WORD_STR), args::TRUE_VALUE));
     }
 
+    SECTION("With show-steps short flag and other options")
+    {
+        vector<string> args_vec = {"app", "--rows=10", "--columns=10", "--seed=2", "--algo=binary_tree", "--output=1.jpg", "-S"};
+        REQUIRE(args_handler.parse(args_vec, true));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ROW_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::COLUMN_WORD_STR), "10"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SEED_WORD_STR), "2"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_WORD_STR), "binary_tree"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.jpg"));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::SHOW_STEPS_WORD_STR), args::TRUE_VALUE));
+    }
+
     SECTION("Simple short args")
     {
         vector<string> args_vec = {"app", "-r", "10", "-c", "10", "-s", "2"};

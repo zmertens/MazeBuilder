@@ -46,7 +46,7 @@ public:
                "\t-j, --json         run with arguments in JSON format\n"
                "\t-l, --levels       levels [max: 10]\n"
                "\t-m, --mask         load mask from text file\n"
-               "\t    --show-steps   emit step snapshots during generation\n"
+               "\t-S, --show-steps   emit step snapshots during generation\n"
                "\t-s, --seed         seed for the number generator\n"
                "\t-r, --rows         rows [max: 100]\n"
                "\t-W, --image-width  output image width in pixels (reserved)\n"
