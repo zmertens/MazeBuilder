@@ -93,7 +93,7 @@ namespace mazes
         [[nodiscard]] std::string_view apply(std::string_view unformatted_sv) noexcept override;
 
         /// @brief Returns the last generated grid used by apply(), if available.
-        [[nodiscard]] const grid_interface *get_last_grid() const noexcept;
+        [[nodiscard]] grid_interface *get_last_grid() noexcept;
 
     private:
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories

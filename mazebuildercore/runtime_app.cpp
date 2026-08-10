@@ -189,7 +189,7 @@ std::string_view runtime_app::visit_states(const std::optional<args> &arguments)
     return m_last_result;
 }
 
-const grid_interface *runtime_app::get_last_grid() const noexcept
+grid_interface *runtime_app::get_last_grid() noexcept
 {
     try
     {
