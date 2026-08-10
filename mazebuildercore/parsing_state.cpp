@@ -3,12 +3,10 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/processed_text.h>
-#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/runtime_stack.h>
-#include <MazeBuilder/string_utils.h>
 
 #include <any>
 
@@ -62,8 +60,38 @@ bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] dou
         return true;
     }
 
-    // Determine which output state to run based on the requested output target.
-    const state::ID next_state = state_utils::output_state_for(parsed_args);
+    // Determine which maze algorithm state to run first. The create state
+    // will push the appropriate output state when generation is done.
+    state::ID next_state = state::ID::BINARY_TREE;
+
+    if (auto parsed = parsed_args->get(); parsed.has_value())
+    {
+        if (const auto it = parsed->find(mazes::args::ALGO_ID_WORD_STR); it != parsed->cend())
+        {
+            try
+            {
+                switch (to_algo_from_sv(it->second))
+                {
+                case algo::BINARY_TREE:
+                    next_state = state::ID::BINARY_TREE;
+                    break;
+                case algo::DFS:
+                    next_state = state::ID::DFS;
+                    break;
+                case algo::SIDEWINDER:
+                    next_state = state::ID::SIDEWINDER;
+                    break;
+                default:
+                    next_state = state::ID::BINARY_TREE;
+                    break;
+                }
+            }
+            catch (...)
+            {
+                next_state = state::ID::BINARY_TREE;
+            }
+        }
+    }
 
     request_stack_pop();
     request_stack_push(next_state);

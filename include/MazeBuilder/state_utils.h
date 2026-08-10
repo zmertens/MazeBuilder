@@ -1,5 +1,5 @@
-#ifndef MAZE_STATE_UTILS_H
-#define MAZE_STATE_UTILS_H
+#ifndef STATE_UTILS_H
+#define STATE_UTILS_H
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
@@ -161,4 +161,4 @@ namespace mazes::state_utils
     }
 } // namespace mazes::state_utils
 
-#endif // MAZE_STATE_UTILS_H
+#endif // STATE_UTILS_H
