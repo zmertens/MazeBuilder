@@ -28,6 +28,11 @@ namespace mazes
         /// @return True if the write was successful, false otherwise
         static bool write_file(const std::string& filename, const std::string& data) noexcept;
 
+        /// @brief Expand a leading '~' to the current user's home directory.
+        /// @param path Path to normalize
+        /// @return Path with '~' expanded when applicable
+        static std::string normalize_path(const std::string& path) noexcept;
+
         /// @brief Get the directory path from a full file path
         /// @param filepath Full file path
         /// @return Directory path

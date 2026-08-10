@@ -52,6 +52,7 @@ namespace mazes
         std::string m_result;
         int m_image_width{0};
         int m_image_height{0};
+        std::optional<unsigned long long> m_palette_seed;
     };
 } // namespace mazes
 

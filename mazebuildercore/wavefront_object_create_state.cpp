@@ -3,7 +3,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
-#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
@@ -164,9 +164,9 @@ bool wavefront_object_create_state::update(const std::optional<args> &args, [[ma
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    maze_state_utils::parse_dimensions(args, rows, cols, levels);
+    state_utils::parse_dimensions(args, rows, cols, levels);
 
-    m_grid_id = maze_state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    m_grid_id = state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
 
     std::string output_target;
     if (const auto parsed = args->get(); parsed.has_value())
@@ -178,7 +178,7 @@ bool wavefront_object_create_state::update(const std::optional<args> &args, [[ma
     }
 
     randomizer fallback_rng{};
-    auto *rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
+    auto *rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -190,13 +190,14 @@ bool wavefront_object_create_state::update(const std::optional<args> &args, [[ma
 
     if (!m_result.empty() && !output_target.empty())
     {
-        if (io_utils::write_file(output_target, m_result))
+        const auto normalized_output = io_utils::normalize_path(output_target);
+        if (io_utils::write_file(normalized_output, m_result))
         {
-            m_result = "Wrote maze to " + output_target;
+            m_result = "Wrote maze to " + normalized_output;
         }
         else
         {
-            m_result = "Failed to write maze to " + output_target;
+            m_result = "Failed to write maze to " + normalized_output;
         }
     }
 

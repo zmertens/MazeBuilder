@@ -89,10 +89,6 @@ namespace mazes
         static constexpr auto MASK_OPTION_STR = "--mask";
         static constexpr auto MASK_WORD_STR = "mask";
 
-        // Step visualization constants
-        static constexpr auto SHOW_STEPS_OPTION_STR = "--show-steps";
-        static constexpr auto SHOW_STEPS_WORD_STR = "show_steps";
-
         // Special values
         static constexpr auto TRUE_VALUE = "true";
         static constexpr auto FALSE_VALUE = "false";

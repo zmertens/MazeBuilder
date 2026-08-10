@@ -3,7 +3,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
-#include <MazeBuilder/maze_state_utils.h>
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
@@ -46,27 +46,28 @@ bool stringify_create_state::update(const std::optional<args> &args, [[maybe_unu
         unsigned int rows = configurator::MAX_ROWS;
         unsigned int cols = configurator::MAX_COLUMNS;
         unsigned int levels = 1u;
-        maze_state_utils::parse_dimensions(args, rows, cols, levels);
+        state_utils::parse_dimensions(args, rows, cols, levels);
 
         randomizer fallback_rng{};
-        auto* rng_ptr = maze_state_utils::get_rng_or_default(get_context(), fallback_rng);
+        auto* rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
 
         configurator cfg{};
         cfg.ensure_rows(rows)
             .ensure_columns(cols)
             .ensure_levels(levels)
-            .ensure_distances(maze_state_utils::has_distances(args));
+            .ensure_distances(state_utils::has_distances(args));
         m_result = std::string{this->create(cfg, *rng_ptr)};
 
-        if (!m_result.empty() && !output_target.empty() && output_target != STDOUT_FORMAT_STR)
+        if (!m_result.empty() && !output_target.empty() && output_target != "stdout")
         {
-            if (io_utils::write_file(output_target, m_result))
+            const auto normalized_output = io_utils::normalize_path(output_target);
+            if (io_utils::write_file(normalized_output, m_result))
             {
-                m_result = "Wrote maze to " + output_target;
+                m_result = "Wrote maze to " + normalized_output;
             }
             else
             {
-                m_result = "Failed to write maze to " + output_target;
+                m_result = "Failed to write maze to " + normalized_output;
             }
         }
     }

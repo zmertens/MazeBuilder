@@ -1,6 +1,10 @@
 
 if(MAZE_BUILDER_EXAMPLES)
 
+    # Some third-party deps (for example ogg pulled by SFML audio) still declare
+    # very old cmake_minimum_required values. Keep compatibility enabled for them.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for legacy third-party dependencies" FORCE)
+
     set(DEAR_IMGUI_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_demo.cpp
@@ -86,6 +90,9 @@ if(MAZE_BUILDER_EXAMPLES)
         include(FetchGitRepo)
 
         # Get box2d
+        # Emscripten does not expose x86 SSE by default; disable Box2D SIMD so
+        # compat/emmintrin.h is not pulled in during C compilation.
+        set(BOX2D_DISABLE_SIMD ON CACHE BOOL "Disable Box2D SIMD for Emscripten builds" FORCE)
         FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.1)
         # Add Box2D include directory if not already included by find_package
         if(TARGET box2d)
@@ -102,7 +109,9 @@ if(MAZE_BUILDER_EXAMPLES)
         # Get SFML with Emscripten-specific settings
         set(SFML_REPO_URL "https://github.com/zmertens/SFML.git")
         message(STATUS "Fetching SFML from ${SFML_REPO_URL}")
-        set(SFML_BUILD_AUDIO ON)
+        # SFML audio brings in legacy ogg/vorbis CMake projects and is not needed
+        # for the current web examples.
+        set(SFML_BUILD_AUDIO OFF)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS OFF)
         set(SFML_BUILD_WINDOW OFF)
@@ -146,14 +155,13 @@ if(MAZE_BUILDER_EXAMPLES)
         endif()
 
         # Get SFML from web and build dependencies locally
-        set(SFML_BUILD_AUDIO ON)
+        set(SFML_BUILD_AUDIO OFF)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS ON)
         set(SFML_BUILD_WINDOW ON)
         set(SFML_USE_SYSTEM_DEPS OFF)
         set(BUILD_SHARED_LIBS OFF)
-        FetchGitRepo(SFML https://github.com/SFML/SFML.git 3.0.1)
-        set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sfml-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
+        FetchGitRepo(SFML https://github.com/SFML/SFML.git 3.0.2)
     endif(EMSCRIPTEN)
 
     add_subdirectory(Voxels)
