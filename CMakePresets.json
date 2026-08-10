@@ -14,7 +14,7 @@
         },
         {
             "name": "wasmjs-examples",
-            "generator": "emcmake",
+            "generator": "Ninja Multi-Config",
             "displayName": "Build the examples using EMSDK",
             "description": "Configure with MAZE_BUILDER_EXAMPLES=1 into build-wasmjs/",
             "binaryDir": "${sourceDir}/build-wasmjs",
