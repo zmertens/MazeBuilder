@@ -15,6 +15,7 @@
 
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/string_utils.h>
@@ -38,19 +39,16 @@ public:
                "** Commands are case-sensitive! **\n\n"
                "\t-a, --algo         algorithm to generate maze links\n"
                "\t                     [binary_tree, dfs, sidewinder]\n"
-               "\t-c, --columns      columns [max: 100]\n"
+               "\t-c, --columns      columns [max: " + std::to_string(mazes::configurator::MAX_COLUMNS) + "]\n"
                "\t-d, --distances    show distances with optional [start, end] inclusive\n"
                "\t                     example: '-d [0:10]'\n"
                "\t-h, --help         display this help message\n"
-               "\t-H, --image-height output image height in pixels (reserved)\n"
                "\t-j, --json         run with arguments in JSON format\n"
                "\t-l, --levels       levels [max: 10]\n"
                "\t-m, --mask         load mask from text file\n"
-               "\t-S, --show-steps   emit step snapshots during generation\n"
                "\t-s, --seed         seed for the number generator\n"
-               "\t-r, --rows         rows [max: 100]\n"
-               "\t-W, --image-width  output image width in pixels (reserved)\n"
-               "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, sfml, stdout]\n"
+               "\t-r, --rows         rows [max: " + std::to_string(mazes::configurator::MAX_ROWS) + "]\n"
+               "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, stdout]\n"
                "\t-v, --version      display program version\n";
     }
 
