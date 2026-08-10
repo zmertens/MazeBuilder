@@ -104,8 +104,7 @@ void pixels_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &args,
-                                 [[maybe_unused]] double delta_time) noexcept
+bool pixels_create_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
 {
     m_result.clear();
     m_palette_seed.reset();
@@ -123,9 +122,15 @@ bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &arg
 
     m_grid_id = maze_state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
 
+    algo maze_algo = algo::BINARY_TREE;
     std::string output_target;
     if (const auto parsed = args->get(); parsed.has_value())
     {
+        if (const auto it = parsed->find(mazes::args::ALGO_ID_WORD_STR); it != parsed->cend())
+        {
+            maze_algo = mazes::to_algo_from_sv(it->second);
+        }
+
         if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
         {
             output_target = it->second;
@@ -152,7 +157,7 @@ bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &arg
         .ensure_columns(cols)
         .ensure_levels(levels)
         .ensure_distances(m_grid_id == grid_identifier::DISTANCE)
-        .ensure_algo_id(algo::PIXELS);
+        .ensure_algo_id(maze_algo);
 
     m_result = std::string{create(cfg, *rng_ptr)};
 
@@ -213,7 +218,7 @@ bool pixels_create_state::update([[maybe_unused]] const std::optional<args> &arg
 std::string_view pixels_create_state::create(const configurator &config,
                                              randomizer &rng) noexcept
 {
-    if (config.algo_id() != algo::PIXELS || !grid_mapper)
+    if (!grid_mapper)
     {
         return {};
     }

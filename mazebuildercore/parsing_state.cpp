@@ -7,6 +7,7 @@
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <any>
 
@@ -61,12 +62,11 @@ bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] dou
     }
 
     // Determine which algo to run and push the matching create state on top of the stack
-    state::ID next_state = state::ID::BTING; // default
+    state::ID next_state = state::ID::BINARY_TREE;
 
     if (auto parsed = parsed_args->get(); parsed.has_value())
     {
-        auto it = parsed->find(args::ALGO_ID_WORD_STR);
-        if (it != parsed->end())
+        if (auto it = parsed->find(mazes::args::OUTPUT_FILENAME_WORD_STR); it != parsed->cend())
         {
             try
             {
@@ -74,31 +74,42 @@ bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] dou
                 switch (a)
                 {
                 case algo::BINARY_TREE:
-                    next_state = state::ID::BTING;
+                    next_state = state::ID::BINARY_TREE;
                     break;
                 case algo::DFS:
-                    next_state = state::ID::DFSING;
-                    break;
-                case algo::PIXELS:
-                    next_state = state::ID::PIXELIZING;
+                    next_state = state::ID::DFS;
                     break;
                 case algo::SIDEWINDER:
-                    next_state = state::ID::SIDEWINDERING;
-                    break;
-                case algo::STRINGIFY:
-                    next_state = state::ID::STRINGIFYING;
-                    break;
-                case algo::WAVEFRONT_OBJECT:
-                    next_state = state::ID::WAVEFRONT_OBJECTIFYING;
+                    next_state = state::ID::SIDEWINDER;
                     break;
                 default:
-                    next_state = state::ID::BTING;
-                    break;
+                    throw std::logic_error({});
                 }
             }
             catch (...)
             {
-                /* unknown algo → fallback to BT */
+                next_state = state::ID::BINARY_TREE;
+            }
+
+            if (auto found = mazes::string_utils::find(it->second, '.'); found != std::string_view::npos)
+            {
+                const auto extension = mazes::string_utils::get_file_extension(it->second);
+                if (extension == "png" || extension == "bmp" || extension == "jpg" || extension == "jpeg")
+                {
+                    next_state = state::ID::PIXELIZING;
+                }
+                else if (extension == "obj")
+                {
+                    next_state = state::ID::WAVEFRONT_OBJECTIFY;
+                }
+                else if (extension == "json" || extension == "txt")
+                {
+                    next_state = state::ID::STRINGIFYING;
+                }
+            }
+            else if (it->second == "stdout")
+            {
+                next_state = state::ID::STRINGIFYING;
             }
         }
     }

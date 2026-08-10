@@ -135,7 +135,7 @@ namespace mazes::maze_state_utils
                     case output_format::JSON_FILE:
                         return state::ID::PARSING;
                     case output_format::WAVEFRONT_OBJECT_FILE:
-                        return state::ID::WAVEFRONT_OBJECTIFYING;
+                        return state::ID::WAVEFRONT_OBJECTIFY;
                     default:
                         break;
                     }

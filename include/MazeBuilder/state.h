@@ -18,15 +18,15 @@ namespace mazes
     {
         enum class ID : unsigned int
         {
-            BTING = 0,
-            DFSING = 1,
+            BINARY_TREE = 0,
+            DFS = 1,
             EMPTY = 2,
             LOADING = 3,
             PARSING = 4,
             PIXELIZING = 5,
-            SIDEWINDERING = 6,
+            SIDEWINDER = 6,
             STRINGIFYING = 7,
-            WAVEFRONT_OBJECTIFYING = 8,
+            WAVEFRONT_OBJECTIFY = 8,
             TOTAL = 9
         };
 

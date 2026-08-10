@@ -12,7 +12,7 @@
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
-#include <MazeBuilder/singleton_base.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <array>
@@ -494,9 +494,13 @@ namespace
             request.reserve(128);
             request = "--rows=" + std::to_string(MAZE_ROWS) +
                       " --columns=" + std::to_string(MAZE_COLS) +
-                      " --levels=1 --algo=" + std::string{mazes::to_sv_from_algo(RNG(0, 1) == 0 ? mazes::algo::DFS : mazes::algo::BINARY_TREE)} +
+                      " --levels=1" +
+                      " --algo=" + std::string{mazes::to_sv_from_algo(RNG(0, 1) == 0 ? mazes::algo::DFS : mazes::algo::BINARY_TREE)} +
                       " --seed=" + std::to_string(RNG(1u, 4'200'000u)) +
-                      " --output=" + MAZE_TEMP_IMAGE_PATH.string() + " --distances=[0:-1]";
+                      " --output=" + MAZE_TEMP_IMAGE_PATH.string() +
+                      " --distances=[0:-1]";
+
+            std::cout << mazes::string_utils::format("AmazingSFML: Requesting maze generation with: {}\n", request);
 
             const auto apply_start = std::chrono::steady_clock::now();
             const auto result = app->apply(request);
