@@ -40,7 +40,8 @@ std::string_view wavefront_object_create_state::create(const configurator &confi
 
         auto append_box = [&](float x0, float y0, float z0, float x1, float y1, float z1)
         {
-            const auto base = static_cast<unsigned int>(vertices.size());
+            // OBJ indices are 1-based, not 0-based.
+            const auto base = static_cast<unsigned int>(vertices.size()) + 1u;
 
             vertices.push_back({x0, y0, z0});
             vertices.push_back({x1, y0, z0});
