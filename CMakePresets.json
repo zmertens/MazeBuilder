@@ -21,7 +21,6 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "DEBUG",
                 "MAZE_BUILDER_EXAMPLES": "1",
-                "CMAKE_MAKE_PROGRAM": "Ninja Multi-Config",
                 "CMAKE_C_COMPILER": "emcc",
                 "CMAKE_CXX_COMPILER": "em++"
             }
