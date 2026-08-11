@@ -1,14 +1,12 @@
 #include <MazeBuilder/runtime_app.h>
 
 #include <MazeBuilder/bt_maze_create_state.h>
-#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/dfs_maze_create_state.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/loading_state.h>
 #include <MazeBuilder/parsing_state.h>
 #include <MazeBuilder/pixels_create_state.h>
 #include <MazeBuilder/processed_text.h>
-#include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
