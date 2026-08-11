@@ -14,6 +14,8 @@
 
 #include <MazeBuilder/runtime_app.h>
 
+#include "test_output_dir.h"
+
 static mazes::args arguments{};
 static mazes::randomizer rng{};
 
@@ -30,14 +32,14 @@ TEST_CASE("E2E testing starting with apply", "[apply][slow]")
 
 TEST_CASE("OBJ output writes file through apply", "[apply][obj]")
 {
-    const std::filesystem::path output_path = "test_runtime_output.obj";
-    std::remove(output_path.string().c_str());
+    test_output_dir output_dir{"test_runtime_obj"};
+    const std::filesystem::path output_path = output_dir.path / "test_runtime_output.obj";
 
     const std::string input = "-r10 -c12 --levels=1 -s42 -adfs -d -o " + output_path.string();
 
     const std::string_view result = inst->apply(input);
 
-    REQUIRE(result == "Wrote maze to test_runtime_output.obj");
+    REQUIRE(result == "Wrote maze to " + output_path.string());
     REQUIRE(std::filesystem::exists(output_path));
 
     std::ifstream file{output_path};
@@ -50,19 +52,18 @@ TEST_CASE("OBJ output writes file through apply", "[apply][obj]")
     REQUIRE(contents.find("\nf ") != std::string::npos);
 
     file.close();
-    std::remove(output_path.string().c_str());
 }
 
 TEST_CASE("PNG output writes file through apply", "[apply][png]")
 {
-    const std::filesystem::path output_path = "test_runtime_output.png";
-    std::remove(output_path.string().c_str());
+    test_output_dir output_dir{"test_runtime_png"};
+    const std::filesystem::path output_path = output_dir.path / "test_runtime_output.png";
 
     const std::string input = "-r10 -c12 --levels=1 -s42 -adfs -d -o " + output_path.string();
 
     const std::string_view result = inst->apply(input);
 
-    REQUIRE(result == "Wrote maze to test_runtime_output.png");
+    REQUIRE(result == "Wrote maze to " + output_path.string());
     REQUIRE(std::filesystem::exists(output_path));
 
     std::ifstream file{output_path, std::ios::binary};
@@ -76,7 +77,6 @@ TEST_CASE("PNG output writes file through apply", "[apply][png]")
     REQUIRE(signature == expected_signature);
 
     file.close();
-    std::remove(output_path.string().c_str());
 }
 
 #if defined(MAZE_BENCHMARK)
