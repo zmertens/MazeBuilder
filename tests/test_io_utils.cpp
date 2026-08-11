@@ -11,28 +11,10 @@
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/output_formats.h>
 
+#include "test_output_dir.h"
+
 using namespace std;
 using namespace mazes;
-
-namespace
-{
-    struct test_output_dir
-    {
-        std::filesystem::path path;
-
-        explicit test_output_dir(std::string_view name)
-            : path(std::filesystem::temp_directory_path() / "MazeBuilder" / name)
-        {
-            std::filesystem::remove_all(path);
-            std::filesystem::create_directories(path);
-        }
-
-        ~test_output_dir()
-        {
-            std::filesystem::remove_all(path);
-        }
-    };
-}
 
 TEST_CASE("io_utils can process good text file names", "[good text filenames]")
 {
@@ -81,6 +63,7 @@ TEST_CASE("io_utils writes data to file successfully", "[io_utils writes]")
     REQUIRE(f1.is_open());
     std::string f1_content((std::istreambuf_iterator<char>(f1)), std::istreambuf_iterator<char>());
     REQUIRE(f1_content == data);
+    f1.close();
 }
 
 TEST_CASE("io_utils writes data to stdout successfully", "[io_utils to stdout]")

@@ -14,30 +14,12 @@
 
 #include <MazeBuilder/runtime_app.h>
 
+#include "test_output_dir.h"
+
 static mazes::args arguments{};
 static mazes::randomizer rng{};
 
 auto inst = mazes::runtime_app::instance();
-
-namespace
-{
-    struct test_output_dir
-    {
-        std::filesystem::path path;
-
-        explicit test_output_dir(std::string_view name)
-            : path(std::filesystem::temp_directory_path() / "MazeBuilder" / name)
-        {
-            std::filesystem::remove_all(path);
-            std::filesystem::create_directories(path);
-        }
-
-        ~test_output_dir()
-        {
-            std::filesystem::remove_all(path);
-        }
-    };
-}
 
 TEST_CASE("E2E testing starting with apply", "[apply][slow]")
 {
