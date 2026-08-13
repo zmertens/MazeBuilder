@@ -60,7 +60,7 @@ bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
 
     const auto result = std::string{this->create(cfg, *rng_ptr)};
 
-    if (!result.empty() && io_utils::is_an_absolute_path(output_target))
+    if (!result.empty() && !output_target.empty() && output_target != "stdout")
     {
         if (!io_utils::write_file(output_target, result))
         {

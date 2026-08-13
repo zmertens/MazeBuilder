@@ -191,7 +191,7 @@ bool wavefront_object_create_state::update([[maybe_unused]] double delta_time) n
     const std::string obj_result{create(cfg, *rng_ptr)};
 
     std::string final_result = obj_result;
-    if (!obj_result.empty() && io_utils::is_an_absolute_path(output_target))
+    if (!obj_result.empty() && !output_target.empty() && output_target != "stdout")
     {
         if (io_utils::write_file(output_target, obj_result))
         {

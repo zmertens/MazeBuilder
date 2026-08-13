@@ -166,7 +166,7 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
 
     m_result = std::string{create(cfg, *rng_ptr)};
 
-    if (!m_result.empty() && !output_target.empty() && io_utils::is_an_absolute_path(output_target))
+    if (!m_result.empty() && !output_target.empty() && output_target != "stdout")
     {
         bool write_ok = false;
 

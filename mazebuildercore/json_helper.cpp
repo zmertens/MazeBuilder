@@ -61,7 +61,8 @@ public:
 
             for (auto jit = j.cbegin(); jit != j.cend(); ++jit)
             {
-                m[jit.key()] = jit.value().dump();
+                // Unwrap JSON strings so consumers get the raw value instead of a quoted dump.
+                m[jit.key()] = jit.value().is_string() ? jit.value().get<std::string>() : jit.value().dump();
             }
 
             return true;
@@ -118,7 +119,8 @@ public:
 
                 for (auto it = obj.cbegin(); it != obj.cend(); ++it)
                 {
-                    item_map[it.key()] = it.value().dump();
+                    // Unwrap JSON strings so consumers get the raw value instead of a quoted dump.
+                    item_map[it.key()] = it.value().is_string() ? it.value().get<std::string>() : it.value().dump();
                 }
                 vm.push_back(std::move(item_map));
             }

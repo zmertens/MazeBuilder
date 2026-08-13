@@ -15,12 +15,25 @@ bool io_utils::write(std::ostream &oss, std::string_view data, std::string_view 
 
 bool io_utils::write_file(std::string_view filename, std::string_view data) noexcept
 {
-    if (!is_an_absolute_path(filename))
+    if (filename.empty())
     {
         return false;
     }
 
     std::filesystem::path data_path{filename};
+
+    // Resolve relative paths against the current working directory instead of rejecting them.
+    if (!data_path.is_absolute())
+    {
+        try
+        {
+            data_path = std::filesystem::absolute(data_path);
+        }
+        catch (const std::exception &)
+        {
+            return false;
+        }
+    }
 
     std::ofstream out_writer{data_path};
 

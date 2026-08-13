@@ -14,12 +14,35 @@
 
 #include <MazeBuilder/runtime_app.h>
 
+#include "progress.h"
 #include "test_output_dir.h"
 
-static mazes::args arguments{};
-static mazes::randomizer rng{};
+#include <fmt/format.h>
 
 auto inst = mazes::runtime_app::instance();
+
+#if defined(MAZE_BENCHMARK)
+
+TEST_CASE("E2E benchmarking with runtime", "[benchmark]")
+{
+    // No whitespace inside the JSON literal: apply() tokenizes on whitespace, which would split this into garbage tokens.
+    constexpr std::string_view input = "--json=`{\"rows\":\"100\",\"columns\":\"100\",\"levels\":\"10\",\"seed\":\"3\",\"algo\":\"dfs\"}`";
+
+        constexpr auto ITERATIONS = 1;
+
+    auto benchmark = [](auto sv, auto iterations) -> void
+    {
+        std::ranges::for_each(std::views::iota(0, iterations), [sv](auto)
+                              { REQUIRE_FALSE(inst->apply(sv).empty()); });
+    };
+    auto time = progress<>::duration(benchmark, input, ITERATIONS);
+
+    fmt::print("Benchmark: runtime apply took {} microseconds for iterations: {}\n",
+               std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(time).count()),
+               std::to_string(ITERATIONS));
+}
+
+#endif // MAZE_BENCHMARK
 
 TEST_CASE("E2E testing starting with apply", "[apply][slow]")
 {
@@ -78,25 +101,3 @@ TEST_CASE("PNG output writes file through apply", "[apply][png]")
 
     file.close();
 }
-
-#if defined(MAZE_BENCHMARK)
-TEST_CASE("Apply lots of applies", "[lots of applies]")
-{
-    constexpr std::array<std::string_view, 5> input = {"-r100 -c100 --levels=1 -s3 -adfs -d",
-                                                       "-r50 -c10 --levels=2 -s6 -adfs",
-                                                       "-r10 -c50 --levels=3 -s9 -adfs -d[0:10]",
-                                                       "-r2 -c5 --levels=4 -s12 -asidewinder",
-                                                       "-r5 -c2 --levels=5 -s15 -abinary_tree"};
-
-    constexpr int rounds = 5;
-    for (int i = 0; i < rounds; ++i)
-    {
-        std::ranges::for_each(input, [](std::string_view in)
-        {
-            const std::string_view result = inst->apply(in);
-            REQUIRE_FALSE(result.empty());
-        });
-    }
-}
-
-#endif // MAZE_BENCHMARK

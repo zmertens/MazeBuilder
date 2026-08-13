@@ -310,7 +310,7 @@ namespace
                     return parse_distances_value(word_key, std::string(value));
                 }
 
-                // Only algo and numeric flags support a value glued directly onto the flag letter.
+                // Only algo, numeric, and json (file path) flags support a value glued directly onto the flag letter.
                 if (word_key == args::ALGO_ID_WORD_STR)
                 {
                     try
@@ -322,7 +322,7 @@ namespace
                         return false;
                     }
                 }
-                else if (!is_numeric_word(word_key))
+                else if (word_key != args::JSON_WORD_STR && !is_numeric_word(word_key))
                 {
                     return false;
                 }

@@ -14,6 +14,8 @@
 
 #include <fmt/format.h>
 
+#include "progress.h"
+
 using namespace mazes;
 using namespace std;
 
@@ -240,12 +242,18 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
             "columns": 10,
             "seed": 2,
             "distances": true,
-            "output": "validjsonstr1.txt",
+            "output": "stdout",
             "algo": "sidewinder"
         }`)json";
 
-    static const string VALID_JSON_STR_2 =
-        "`{\n\"rows\": " + to_string(configurator::MAX_ROWS) + ",\n\"columns\": " + to_string(configurator::MAX_COLUMNS) + "\n}`";
+    static constexpr auto VALID_JSON_STR_2 = R"json(`{
+            "rows": 100,
+            "columns": 100,
+            "levels": 10,
+            "seed": 123456789,
+            "distances": true,
+            "output": "validjsonstr2.txt"
+        }`)json";
 
     args args_handler{};
 
@@ -308,6 +316,24 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         REQUIRE(m.has_value());
         REQUIRE_FALSE(m.value().empty());
     }
+
+    SECTION("Quick benchmark on parsing")
+    {
+        vector<string> args_vec = {args::JSON_FLAG_STR, VALID_JSON_STR_2};
+
+        auto benchmark = [&args_handler, &args_vec](auto iterations = 10) -> void
+        {
+            for (auto i = 0; i < iterations; ++i)
+            {
+                REQUIRE(args_handler.parse(args_vec));
+            }
+        };
+        auto time = progress<>::duration(benchmark, 10);
+
+        fmt::print("Benchmark: Parsed JSON string in {} microseconds for iterations: {}\n",
+            std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(time).count()),
+            std::to_string(10));
+    }
 }
 
 TEST_CASE("Args can handle a JSON file input", "[json_file_input]")
@@ -317,7 +343,6 @@ TEST_CASE("Args can handle a JSON file input", "[json_file_input]")
 
     SECTION("JSON input file")
     {
-
         string valid_json_file_input = fmt::format("{}={}", args::JSON_OPTION_STR, ARRAY_DOT_JSON_FILE);
 
         REQUIRE(args_handler.parse(valid_json_file_input, false));
@@ -371,8 +396,8 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]")
         REQUIRE(m_val.at(args::COLUMN_WORD_STR) == "20");
         REQUIRE(m_val.at(args::LEVEL_WORD_STR) == "30");
         REQUIRE(m_val.at(args::SEED_WORD_STR) == "9000000");
-        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "\"dfs\"");
-        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "\"maze_dfs.txt\"");
+        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "dfs");
+        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "maze_dfs.txt");
         REQUIRE(m_val.at(args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
     }
 }
@@ -1043,8 +1068,8 @@ TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_
         REQUIRE(m_val.at(args::COLUMN_WORD_STR) == "20");
         REQUIRE(m_val.at(args::LEVEL_WORD_STR) == "30");
         REQUIRE(m_val.at(args::SEED_WORD_STR) == "9001");
-        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "\"dfs\"");
-        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "\"maze_dfs.txt\"");
+        REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "dfs");
+        REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "maze_dfs.txt");
         REQUIRE(m_val.at(args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
     }
 }
