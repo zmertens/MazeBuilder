@@ -59,6 +59,34 @@ namespace mazes
             }, get());
         }
 
+        static std::string to_string(const artifacts& artifact) noexcept
+        {
+            return std::visit([](const auto& value) -> std::string
+            {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, std::monostate>)
+                {
+                    return {};
+                }
+                else if constexpr (std::is_same_v<T, std::string>)
+                {
+                    return value;
+                }
+                else if constexpr (std::is_same_v<T, std::string_view>)
+                {
+                    return std::string{value};
+                }
+                else if constexpr (std::is_same_v<T, char*>)
+                {
+                    return value ? std::string{value} : std::string{};
+                }
+                else
+                {
+                    return {};
+                }
+            }, artifact);
+        }
+
     private:
         artifacts buffer;
     };

@@ -1,9 +1,11 @@
 #ifndef IO_UTILS_H
 #define IO_UTILS_H
 
+#include <cstdint>
 #include <filesystem>
 #include <ostream>
 #include <string_view>
+#include <vector>
 
 /// @file io_utils.h
 /// @namespace mazes
@@ -40,6 +42,11 @@ namespace mazes
         /// @param filepath Full file path
         /// @return Directory path
         static std::string_view get_full_directory_path(std::string_view filepath) noexcept;
+
+        /// @brief Read an entire file into memory
+        /// @param file_path Full file path
+        /// @return The file contents as bytes, or an empty vector on failure
+        static std::vector<std::uint8_t> read_file_to_bytes(const std::filesystem::path &file_path) noexcept;
     }; // io_utils
 }
 

@@ -24,7 +24,6 @@ bt_maze_create_state::bt_maze_create_state(const runtime_app::context &ctx, runt
     : state(ctx, rs),
       grid_mapper{ctx.get_grid_manager()},
       processed_text_mapper{ctx.get_text_manager()},
-      current_grid_id{grid_identifier::BASIC},
       m_use_distances{false},
       m_distances_start{configurator::DEFAULT_DISTANCES_START},
       m_distances_end{configurator::DEFAULT_DISTANCES_END}
@@ -86,11 +85,6 @@ bool bt_maze_create_state::update([[maybe_unused]] double delta_time) noexcept
         .ensure_algo_id(algo::BINARY_TREE);
 
     const auto result = create(cfg, *rng_ptr);
-
-    if (auto *last_grid_id = get_context().get_last_grid_id())
-    {
-        *last_grid_id = current_grid_id;
-    }
 
     request_stack_pop();
     if (!result.empty())

@@ -7,6 +7,7 @@
 #include <MazeBuilder/parsing_state.h>
 #include <MazeBuilder/pixels_create_state.h>
 #include <MazeBuilder/processed_text.h>
+#include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
@@ -18,8 +19,8 @@
 
 #include <fmt/format.h>
 
-#include <chrono>
-#include <array>
+#include <algorithm>
+#include <any>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -54,9 +55,8 @@ runtime_app::runtime_app()
                   std::lock_guard lock(logging_mtx);
                   received_logs.emplace_back(msg);
               }})},
-      logging_mtx{}, received_logs{}, runtime_stack_ptr{std::make_unique<runtime_stack>(
-                                          context{}.with_args_manager(args_mapper).with_grid_manager(grid_mapper).with_text_manager(processed_text_mapper).with_rng(rng).with_last_grid_id(last_grid_id))},
-      last_grid_id{grid_identifier::BASIC}
+    logging_mtx{}, received_logs{}, last_result_buffer{}, runtime_stack_ptr{std::make_unique<runtime_stack>(
+                                          context{}.with_args_manager(args_mapper).with_grid_manager(grid_mapper).with_text_manager(processed_text_mapper).with_rng(rng))}
 {
 
     register_states();
@@ -112,37 +112,38 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
 // Empty string_view on default
 std::string_view runtime_app::visit_states(std::string_view sv) noexcept
 {
+    last_result_buffer.clear();
+
     {
         std::lock_guard<std::mutex> lock(logging_mtx);
         received_logs.clear();
     }
 
-    // If the stack drained (e.g. a prior call exhausted it), re-seed the state machine.
-    // Run LOADING only when core resources are not initialized yet; otherwise jump
-    // directly to PARSING to avoid reloading heavy resources on every apply().
     if (!sv.empty())
     {
         runtime_stack_ptr->push_state(state::ID::PARSING);
 
-        // UNKNOWN may not be registered yet (first call, before LOADING has run);
-        // parsing_state will bail out gracefully in that case, so ignore failures here.
-        try
+        if (auto &txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !txt.is_processed())
         {
-            if (auto &txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !txt.is_processed())
-            {
-                txt.set(sv);
-            }
-        }
-        catch (...)
-        {
+            txt.set(sv);
         }
     }
 
+    double accumulator{0.0};
     // Drive the state machine until the stack is empty
     while (!runtime_stack_ptr->is_empty())
     {
-        runtime_stack_ptr->visit_states(0.0);
+        const auto diff = progress<>::duration([&accumulator, this]
+                                               { return runtime_stack_ptr->visit_states(accumulator); });
+        accumulator += progress<>::to_double_from_duration(diff);
     }
+
+#if defined(MAZE_DEBUG)
+
+    logger.log_message(fmt::format("runtime visited states in: {:.6f} ms\n", accumulator));
+#endif
+
+    accumulator = 0.0;
 
     try
     {
@@ -150,22 +151,8 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
         {
             if (const auto processed = txt.get(); !std::holds_alternative<std::monostate>(processed))
             {
-                if (const auto *p1 = std::get_if<std::string>(&processed))
-                {
-                    last_result = *p1;
-                }
-                else if (const auto *p2 = std::get_if<std::string_view>(&processed))
-                {
-                    last_result = std::string{*p2};
-                }
-                else if (const auto *p3 = std::get_if<char *>(&processed); p3 && *p3)
-                {
-                    last_result = *p3;
-                }
-
-                // txt no longer holds a stale value once consumed.
-                txt.set_processed(std::monostate{});
-                return last_result;
+                last_result_buffer = processed_text::to_string(processed);
+                return last_result_buffer;
             }
         }
     }
@@ -181,14 +168,19 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
     return {};
 }
 
-grid_interface *runtime_app::get_last_grid() noexcept
+std::string_view runtime_app::get_finished_text() noexcept
 {
-    try
+    last_result_buffer.clear();
+
+    auto &txt = processed_text_mapper.get(processed_text_identifier::FINISHED);
+    if (txt.is_processed())
     {
-        return &grid_mapper.get(last_grid_id);
+        if (const auto processed = txt.get(); !std::holds_alternative<std::monostate>(processed))
+        {
+            last_result_buffer = processed_text::to_string(processed);
+            return last_result_buffer;
+        }
     }
-    catch (...)
-    {
-        return nullptr;
-    }
+
+    return {};
 }

@@ -1,7 +1,9 @@
 #ifndef MAZE_SERVER_H
 #define MAZE_SERVER_H
 
+#include <filesystem>
 #include <string>
+#include <string_view>
 
 /// @brief Minimal single-threaded HTTP server that serves generated mazes.
 ///
@@ -10,7 +12,8 @@
 ///   columns  – number of columns (default 10, clamped to [1, 100])
 ///   algo     – binary_tree | sidewinder | dfs  (default binary_tree)
 ///
-/// Returns plain-text: a metadata line followed by the ASCII maze.
+/// Response body (plain-text, binary-safe): a metadata line, then the ASCII
+/// maze, then IMAGE_DELIMITER followed by the maze PNG encoded as base64.
 /// Example URL: http://localhost:8080/mazes?rows=12&columns=10&algo=dfs
 class maze_server
 {
@@ -27,9 +30,15 @@ public:
     /// @brief Signal the server loop to exit after the current request finishes.
     void stop() noexcept;
 
+    /// @brief Marks the end of the ASCII maze and the start of the base64-encoded PNG.
+    static constexpr std::string_view IMAGE_DELIMITER{"\n--MAZE-IMAGE-BASE64--\n"};
+
 private:
+    static const std::filesystem::path MAZE_TEMP_IMAGE_PATH;
+
     struct query_params
     {
+        bool use_distances{true};
         unsigned int rows{10};
         unsigned int columns{10};
         std::string algo{"binary_tree"};

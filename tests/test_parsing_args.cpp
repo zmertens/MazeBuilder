@@ -14,7 +14,7 @@
 
 #include <fmt/format.h>
 
-#include "progress.h"
+#include <MazeBuilder/progress.h>
 
 using namespace mazes;
 using namespace std;

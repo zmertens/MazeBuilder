@@ -67,20 +67,11 @@ namespace mazes
                 return *this;
             }
 
-            [[nodiscard]] grid_identifier *get_last_grid_id() const noexcept { return _last_grid_id; }
-
-            context &with_last_grid_id(grid_identifier &id) noexcept
-            {
-                _last_grid_id = &id;
-                return *this;
-            }
-
         private:
             args_manager *_args{};
             grid_manager *_grid_manager{};
             processed_text_manager *_text_manager{};
             randomizer *_rng{};
-            grid_identifier *_last_grid_id{};
         };
 
         // Constructor / Destructor
@@ -93,7 +84,7 @@ namespace mazes
         [[nodiscard]] std::string_view apply(std::string_view unformatted_args) noexcept override;
 
         /// @brief Returns the last generated grid used by apply(), if available.
-        [[nodiscard]] grid_interface *get_last_grid() noexcept;
+        [[nodiscard]] std::string_view get_finished_text() noexcept;
 
     private:
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories
@@ -112,14 +103,11 @@ namespace mazes
 
         randomizer rng;
 
-        grid_identifier last_grid_id{grid_identifier::BASIC};
-
         async_logger logger;
 
         std::mutex logging_mtx;
         std::vector<std::string> received_logs;
-
-        std::string last_result;
+        std::string last_result_buffer;
 
         std::unique_ptr<runtime_stack> runtime_stack_ptr;
     };

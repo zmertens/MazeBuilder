@@ -75,3 +75,23 @@ std::string_view io_utils::get_full_directory_path(std::string_view filepath) no
 
     return std::string_view{p.parent_path().string()};
 }
+
+std::vector<std::uint8_t> io_utils::read_file_to_bytes(const std::filesystem::path &file_path) noexcept
+{
+    std::ifstream file(file_path, std::ios::binary | std::ios::ate);
+    if (!file.is_open())
+    {
+        return {};
+    }
+
+    const std::streamsize size = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    std::vector<std::uint8_t> buffer(static_cast<std::size_t>(size));
+    if (size > 0 && !file.read(reinterpret_cast<char *>(buffer.data()), size))
+    {
+        return {};
+    }
+
+    return buffer;
+}

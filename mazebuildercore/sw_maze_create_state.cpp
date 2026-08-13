@@ -84,11 +84,6 @@ bool sw_maze_create_state::update([[maybe_unused]] double delta_time) noexcept
 
     const auto result = create(cfg, *rng_ptr);
 
-    if (auto *last_grid_id = get_context().get_last_grid_id())
-    {
-        *last_grid_id = current_grid_id;
-    }
-
     request_stack_pop();
     if (!result.empty())
     {

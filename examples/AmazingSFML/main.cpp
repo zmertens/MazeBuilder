@@ -2,11 +2,13 @@
 /// @brief AmazingSFML - gradient maze rendering with Box2D integration
 
 #include <SFML/Graphics.hpp>
+#include <SFML/Network.hpp>
 
 #include <box2d/box2d.h>
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
@@ -21,6 +23,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
@@ -36,6 +39,7 @@ namespace
 {
     static const std::string APP_NAME = "AmazingSFML " + mazes::buildinfo::VERSION;
     static const std::filesystem::path MAZE_TEMP_IMAGE_PATH{std::filesystem::temp_directory_path() / "amazingsfml_maze.png"};
+    static const std::filesystem::path MAZE_TEMP_TEXT_PATH{std::filesystem::temp_directory_path() / "amazingsfml_maze.txt"};
     static constexpr std::string_view ICON_FILEPATH{"icon.bmp"};
 
     static mazes::randomizer RNG{};
@@ -48,6 +52,62 @@ namespace
     constexpr float MAZE_WALL_SIZE = 4.f;
     constexpr float MAZE_PIXELS_PER_METER = MAZE_CELL_SIZE;
     constexpr float BALL_RADIUS_PIXELS = static_cast<float>(MAZE_CELL_SIZE) / 4.f;
+
+    constexpr std::string_view NETWORK_HOST{"localhost"};
+    constexpr unsigned short NETWORK_PORT = 8050u;
+    constexpr sf::Time NETWORK_CONNECT_TIMEOUT = sf::seconds(1.f);
+    constexpr std::array<std::string_view, 3> NETWORK_ALGOS{"binary_tree", "sidewinder", "dfs"};
+    // Must match maze_server::IMAGE_DELIMITER (examples/Http/maze_server.h).
+    constexpr std::string_view NETWORK_IMAGE_DELIMITER{"\n--MAZE-IMAGE-BASE64--\n"};
+
+    // GETs a maze from maze_server (see examples/Http) in a single request and returns the
+    // plain-text/binary-safe response body (metadata line + ASCII grid + base64 PNG), or
+    // nullopt on any failure.
+    std::optional<std::string> fetch_maze_over_http(const std::string_view host, const unsigned short port,
+                                                     const unsigned int rows, const unsigned int columns,
+                                                     const std::string_view algo)
+    {
+        const auto address = sf::IpAddress::resolve(host);
+        if (!address.has_value())
+        {
+            return std::nullopt;
+        }
+
+        sf::TcpSocket socket;
+        if (socket.connect(*address, port, NETWORK_CONNECT_TIMEOUT) != sf::Socket::Status::Done)
+        {
+            return std::nullopt;
+        }
+
+        std::ostringstream request;
+        request << "GET /mazes?rows=" << rows << "&columns=" << columns << "&algo=" << algo
+                << " HTTP/1.1\r\nHost: " << host << "\r\nConnection: close\r\n\r\n";
+        const std::string request_str = request.str();
+        if (socket.send(request_str.data(), request_str.size()) != sf::Socket::Status::Done)
+        {
+            return std::nullopt;
+        }
+
+        std::string response;
+        std::array<char, 4096> buffer{};
+        for (;;)
+        {
+            std::size_t received = 0u;
+            if (socket.receive(buffer.data(), buffer.size(), received) != sf::Socket::Status::Done)
+            {
+                break; // Disconnected (server closes after response) or an error either way.
+            }
+            response.append(buffer.data(), received);
+        }
+
+        const auto header_end = response.find("\r\n\r\n");
+        if (header_end == std::string::npos)
+        {
+            return std::nullopt;
+        }
+
+        return response.substr(response.size() < header_end + 4u ? response.size() : header_end + 4u);
+    }
 
     struct maze_cell_walls
     {
@@ -75,44 +135,123 @@ namespace
         }
     };
 
-    maze_topology build_topology_from_grid(const mazes::grid_interface &grid)
+    maze_topology build_topology_from_grid(const std::string_view txt)
     {
-
-        if (const auto &ops = grid.operations(); ops.is_valid_ops(&ops))
+        if (txt.empty())
         {
-            maze_topology out;
-            auto [rows, columns, _] = ops.get_dimensions();
-            out.rows = rows;
-            out.columns = columns;
-            out.cells.resize(static_cast<size_t>(rows) * static_cast<size_t>(columns));
+            return {};
+        }
 
-            for (unsigned int row = 0; row < rows; ++row)
+        std::vector<std::string_view> lines;
+        lines.reserve(static_cast<std::size_t>(std::count(txt.begin(), txt.end(), '\n')) + 1u);
+
+        std::size_t start = 0u;
+        while (start <= txt.size())
+        {
+            const std::size_t end = txt.find('\n', start);
+            std::string_view line = (end == std::string_view::npos)
+                                        ? txt.substr(start)
+                                        : txt.substr(start, end - start);
+
+            if (!line.empty() && line.back() == '\r')
             {
-                for (unsigned int col = 0; col < columns; ++col)
+                line.remove_suffix(1u);
+            }
+
+            if (!line.empty())
+            {
+                lines.push_back(line);
+            }
+
+            if (end == std::string_view::npos)
+            {
+                break;
+            }
+            start = end + 1u;
+        }
+
+        if (lines.empty() || lines.at(0).size() < 3u)
+        {
+            return {};
+        }
+
+        const std::string_view top_border = lines.front();
+        std::vector<std::size_t> plus_positions;
+        plus_positions.reserve(top_border.size());
+        for (std::size_t i = 0u; i < top_border.size(); ++i)
+        {
+            if (top_border[i] == '+')
+            {
+                plus_positions.push_back(i);
+            }
+        }
+
+        if (plus_positions.size() < 2u)
+        {
+            return {};
+        }
+
+        const auto rows_count = static_cast<unsigned int>((lines.size() - 1u) / 2u);
+        const auto cols_count = static_cast<unsigned int>(plus_positions.size() - 1u);
+
+        maze_topology out{};
+        out.rows = rows_count;
+        out.columns = cols_count;
+        out.cells.resize(static_cast<std::size_t>(out.rows) * static_cast<std::size_t>(out.columns));
+
+        auto has_horizontal_wall = [](const std::string_view border, const std::size_t from, const std::size_t to) -> bool
+        {
+            if (from >= border.size() || to > border.size() || from >= to)
+            {
+                return false;
+            }
+
+            for (std::size_t i = from; i < to; ++i)
+            {
+                if (border[i] == '-')
                 {
-                    const auto idx = static_cast<int>(row * columns + col);
-                    if (const auto c = ops.search(idx))
-                    {
-                        const auto n = ops.get_north(c);
-                        const auto s = ops.get_south(c);
-                        const auto e = ops.get_east(c);
-                        const auto w = ops.get_west(c);
-
-                        maze_cell_walls cell_data;
-                        cell_data.north = !(n && c->is_linked(n));
-                        cell_data.south = !(s && c->is_linked(s));
-                        cell_data.east = !(e && c->is_linked(e));
-                        cell_data.west = !(w && c->is_linked(w));
-
-                        out.cells[static_cast<size_t>(row) * static_cast<size_t>(columns) + static_cast<size_t>(col)] =
-                            cell_data;
-                    }
+                    return true;
                 }
             }
 
-            return out;
+            return false;
+        };
+
+        for (unsigned int row = 0u; row < out.rows; ++row)
+        {
+            const std::size_t top_line_index = 1u + static_cast<std::size_t>(row) * 2u;
+            const std::size_t bottom_line_index = top_line_index + 1u;
+            const std::size_t north_border_index = static_cast<std::size_t>(row) * 2u;
+
+            if (bottom_line_index >= lines.size() || north_border_index >= lines.size())
+            {
+                break;
+            }
+
+            const std::string_view top_line = lines[top_line_index];
+            const std::string_view bottom_line = lines[bottom_line_index];
+            const std::string_view north_border = lines[north_border_index];
+
+            for (unsigned int col = 0u; col < out.columns; ++col)
+            {
+                const std::size_t left = plus_positions[col];
+                const std::size_t right = plus_positions[col + 1u];
+
+                maze_cell_walls cell_data{};
+                cell_data.north = has_horizontal_wall(north_border, left + 1u, right);
+                cell_data.south = has_horizontal_wall(bottom_line, left + 1u, right);
+
+                const std::size_t west_idx = left;
+                const std::size_t east_idx = right;
+                cell_data.west = (west_idx < top_line.size()) ? (top_line[west_idx] == '|') : true;
+                cell_data.east = (east_idx < top_line.size()) ? (top_line[east_idx] == '|') : true;
+
+                const auto idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(out.columns) + static_cast<std::size_t>(col);
+                out.cells[idx] = cell_data;
+            }
         }
-        return {};
+
+        return out;
     }
 
     struct dynamic_ball
@@ -229,6 +368,13 @@ namespace
                 {
                     sfml_window.draw(maze_sprite);
                 }
+                else
+                {
+                    for (const auto &wall_shape : maze_wall_shapes)
+                    {
+                        sfml_window.draw(wall_shape);
+                    }
+                }
                 for (const auto &ball : physics_balls)
                 {
                     sfml_window.draw(ball.drawable);
@@ -248,6 +394,10 @@ namespace
                     {
                         sfml_window.draw(*help_text);
                     }
+                    if (network_status_text.has_value())
+                    {
+                        sfml_window.draw(*network_status_text);
+                    }
                 }
 
                 sfml_window.display();
@@ -263,12 +413,14 @@ namespace
         sf::Texture maze_texture;
         sf::Sprite maze_sprite;
         bool has_maze_texture{false};
+        std::vector<sf::RectangleShape> maze_wall_shapes; // fallback rendering for network mazes (no texture)
 
         sf::Font sfml_font;
         bool should_show_info{true};
         std::optional<sf::Text> apply_timing_text;
         std::optional<sf::Text> build_text;
         std::optional<sf::Text> help_text;
+        std::optional<sf::Text> network_status_text;
 
         double last_apply_maze_in_ms{0.0};
 
@@ -313,7 +465,7 @@ namespace
             build_text->setOutlineColor(sf::Color(15, 15, 15));
             build_text->setOutlineThickness(1.5f);
 
-            help_text.emplace(sfml_font, "H: hide/show help", 18u);
+            help_text.emplace(sfml_font, "H: hide/show help\nN: fetch maze via network", 18u);
             help_text->setPosition({10.f, 34.f});
             help_text->setFillColor(sf::Color(245, 245, 235));
             help_text->setOutlineColor(sf::Color(15, 15, 15));
@@ -341,6 +493,22 @@ namespace
             const float x = 10.0f;
             const float y = static_cast<float>(sfml_window.getSize().y) - bounds.size.y - 12.0f;
             apply_timing_text->setPosition({x, y});
+        }
+
+        void set_network_status(const std::string &message)
+        {
+            if (!network_status_text)
+            {
+                network_status_text.emplace(sfml_font, message, 16u);
+                network_status_text->setFillColor(sf::Color(235, 235, 120));
+                network_status_text->setOutlineColor(sf::Color(15, 15, 15));
+                network_status_text->setOutlineThickness(1.2f);
+                network_status_text->setPosition({10.f, -58.f + static_cast<float>(sfml_window.getSize().y)});
+            }
+            else
+            {
+                network_status_text->setString(message);
+            }
         }
 
         void create_world()
@@ -378,6 +546,11 @@ namespace
 
         void add_wall_body_from_rect(const float x, const float y, const float w, const float h)
         {
+            if (w <= 0.0f || h <= 0.0f)
+            {
+                return;
+            }
+
             b2BodyDef body_def = b2DefaultBodyDef();
             body_def.type = b2_staticBody;
             body_def.position = px_to_m(x + w * 0.5f, y + h * 0.5f);
@@ -446,6 +619,13 @@ namespace
                 return;
             }
 
+            if (current_maze_struct->rows == 0u || current_maze_struct->columns == 0u)
+            {
+                world_scale_x = 1.0f;
+                world_scale_y = 1.0f;
+                return;
+            }
+
             const float world_w = static_cast<float>(current_maze_struct->columns) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE);
             const float world_h = static_cast<float>(current_maze_struct->rows) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE);
 
@@ -503,6 +683,159 @@ namespace
             create_world_boundaries();
         }
 
+        // Fallback renderer for network-fetched mazes, which have no PNG texture --
+        // draws the same wall rectangles used for physics bodies, scaled to screen space.
+        void build_wall_shapes_from_topology()
+        {
+            maze_wall_shapes.clear();
+            if (!current_maze_struct.has_value())
+            {
+                return;
+            }
+
+            const auto push_rect = [this](const float x, const float y, const float w, const float h)
+            {
+                if (w <= 0.f || h <= 0.f)
+                {
+                    return;
+                }
+                sf::RectangleShape shape({w * world_scale_x, h * world_scale_y});
+                shape.setPosition({x * world_scale_x, y * world_scale_y});
+                shape.setFillColor(sf::Color(235, 235, 225));
+                maze_wall_shapes.push_back(shape);
+            };
+
+            for (unsigned int row = 0u; row < current_maze_struct->rows; ++row)
+            {
+                for (unsigned int col = 0u; col < current_maze_struct->columns; ++col)
+                {
+                    const float cx = static_cast<float>(col) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE) + MAZE_WALL_SIZE;
+                    const float cy = static_cast<float>(row) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE) + MAZE_WALL_SIZE;
+
+                    const auto *cell = current_maze_struct->at(row, col);
+                    if (!cell)
+                    {
+                        continue;
+                    }
+
+                    if (col == 0u && cell->west)
+                    {
+                        push_rect(cx - MAZE_WALL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
+                    }
+                    if (row == 0u && cell->north)
+                    {
+                        push_rect(cx, cy - MAZE_WALL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
+                    }
+                    if (cell->east)
+                    {
+                        push_rect(cx + MAZE_CELL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
+                    }
+                    if (cell->south)
+                    {
+                        push_rect(cx, cy + MAZE_CELL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
+                    }
+                }
+            }
+        }
+
+        // Spawns a batch of balls at randomized drop positions with a small random impulse.
+        void spawn_random_balls(const int count)
+        {
+            if (!current_maze_struct.has_value() || current_maze_struct->columns < 2u)
+            {
+                return;
+            }
+
+            for (int i = 0; i < count; ++i)
+            {
+                const float x = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (1.0f + static_cast<float>(RNG(0, static_cast<int>(current_maze_struct->columns - 2u))));
+                const float y = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (0.6f + static_cast<float>(RNG(0, 4)) * 0.35f);
+                // x/y above are virtual-space; convert to real window pixels for add_ball.
+                add_ball({x * world_scale_x, y * world_scale_y});
+
+                if (!physics_balls.empty())
+                {
+                    const b2Vec2 impulse{
+                        static_cast<float>(RNG(-4, 4)) * 0.22f,
+                        static_cast<float>(RNG(-1, 1)) * 0.15f};
+                    b2Body_ApplyLinearImpulseToCenter(physics_balls.back().body, impulse, true);
+                }
+            }
+        }
+
+        // Fetches a maze from maze_server (examples/Http) in a single request: the response
+        // carries the ASCII grid plus a base64-encoded PNG, so no local apply() call is needed.
+        void fetch_maze_from_network()
+        {
+            const std::string_view algo = NETWORK_ALGOS[static_cast<std::size_t>(RNG(0, static_cast<int>(NETWORK_ALGOS.size() - 1u)))];
+
+            const auto fetch_start = std::chrono::steady_clock::now();
+            const auto body = fetch_maze_over_http(NETWORK_HOST, NETWORK_PORT, MAZE_ROWS, MAZE_COLS, algo);
+            const auto fetch_end = std::chrono::steady_clock::now();
+            last_apply_maze_in_ms = std::chrono::duration<double, std::milli>(fetch_end - fetch_start).count();
+
+            if (!body.has_value() || body->empty())
+            {
+                set_network_status(fmt::format("Network fetch failed ({}:{})", NETWORK_HOST, NETWORK_PORT));
+                return;
+            }
+
+            // First line is a metadata header; the delimiter separates the ASCII grid from
+            // the base64-encoded PNG that follows it.
+            const auto first_nl = body->find('\n');
+            if (first_nl == std::string::npos)
+            {
+                set_network_status("Network fetch returned a malformed response.");
+                return;
+            }
+
+            const std::string_view after_metadata = std::string_view{*body}.substr(first_nl + 1u);
+            const auto delimiter_pos = after_metadata.find(NETWORK_IMAGE_DELIMITER);
+            const std::string_view grid_text = after_metadata.substr(0u, delimiter_pos);
+
+            auto parsed_topology = build_topology_from_grid(grid_text);
+            if (parsed_topology.rows == 0u || parsed_topology.columns < 2u)
+            {
+                set_network_status("Network fetch returned an invalid maze.");
+                return;
+            }
+
+            create_world();
+            current_maze_struct = std::move(parsed_topology);
+            build_geometry_and_physics();
+
+            has_maze_texture = false;
+            maze_wall_shapes.clear();
+            if (delimiter_pos != std::string_view::npos)
+            {
+                const std::string_view image_base64 = after_metadata.substr(delimiter_pos + NETWORK_IMAGE_DELIMITER.size());
+                const std::string image_bytes = mazes::bytes::decode(image_base64);
+                if (!image_bytes.empty() &&
+                    maze_texture.loadFromMemory(image_bytes.data(), image_bytes.size()))
+                {
+                    const auto image_size = maze_texture.getSize();
+                    const auto window_size = sfml_window.getSize();
+                    maze_sprite = sf::Sprite{maze_texture};
+                    maze_sprite.setScale({static_cast<float>(window_size.x) / static_cast<float>(image_size.x),
+                                          static_cast<float>(window_size.y) / static_cast<float>(image_size.y)});
+                    maze_sprite.setPosition({0.0f, 0.0f});
+                    has_maze_texture = true;
+                }
+            }
+
+            if (!has_maze_texture)
+            {
+                // Fall back to drawing wall rectangles when no usable image was received.
+                build_wall_shapes_from_topology();
+            }
+
+            update_apply_timing_overlay();
+            set_network_status(fmt::format("Network maze: {} ({}:{})", algo, NETWORK_HOST, NETWORK_PORT));
+
+            spawn_random_balls(24);
+        }
+
+
         void rebuild_maze()
         {
             create_world();
@@ -513,31 +846,61 @@ namespace
                 throw std::runtime_error("AmazingSFML failed to initialize runtime app.");
             }
 
-            std::string request;
-            request.reserve(128);
-            request = "--rows=" + std::to_string(MAZE_ROWS) +
-                      " --columns=" + std::to_string(MAZE_COLS) +
-                      " --levels=1" +
-                      " --algo=" + std::string{mazes::to_sv_from_algo(RNG(0, 1) == 0 ? mazes::algo::DFS : mazes::algo::BINARY_TREE)} +
-                      " --seed=" + std::to_string(RNG(1u, 4'200'000u)) +
-                      " --output=" + MAZE_TEMP_IMAGE_PATH.string() +
-                      " --distances=[0:-1]";
+            const mazes::algo selected_algo = (RNG(0, 1) == 0) ? mazes::algo::DFS : mazes::algo::BINARY_TREE;
+            const unsigned int selected_seed = RNG(1u, 4'200'000u);
 
-            std::cout << fmt::format("AmazingSFML: Requesting maze generation with: {}\n", request);
+            // Avoid stale file reads when generation fails.
+            std::error_code ec;
+            std::filesystem::remove(MAZE_TEMP_IMAGE_PATH, ec);
+            std::filesystem::remove(MAZE_TEMP_TEXT_PATH, ec);
+
+            std::string image_request;
+            image_request.reserve(160);
+            image_request = "--rows=" + std::to_string(MAZE_ROWS) +
+                            " --columns=" + std::to_string(MAZE_COLS) +
+                            " --levels=1" +
+                            " --algo=" + std::string{mazes::to_sv_from_algo(selected_algo)} +
+                            " --seed=" + std::to_string(selected_seed) +
+                            " --output=" + MAZE_TEMP_IMAGE_PATH.string() +
+                            " --distances=[0:-1]";
+
+            std::string text_request;
+            text_request.reserve(160);
+            text_request = "--rows=" + std::to_string(MAZE_ROWS) +
+                           " --columns=" + std::to_string(MAZE_COLS) +
+                           " --levels=1" +
+                           " --algo=" + std::string{mazes::to_sv_from_algo(selected_algo)} +
+                           " --seed=" + std::to_string(selected_seed) +
+                           " --output=" + MAZE_TEMP_TEXT_PATH.string() +
+                           " --distances=[0:-1]";
 
             const auto apply_start = std::chrono::steady_clock::now();
-            const auto result = app->apply(request);
+            const auto image_result = app->apply(image_request);
+            const auto text_result = app->apply(text_request);
             const auto apply_end = std::chrono::steady_clock::now();
             last_apply_maze_in_ms = std::chrono::duration<double, std::milli>(apply_end - apply_start).count();
-            update_apply_timing_overlay();
 
-            if (result.empty())
+            fmt::print("AmazingSFML: Requesting maze generation with: {}\n", image_request);
+            fmt::print("AmazingSFML: Requesting topology generation with: {}\n", text_request);
+            fmt::print("Maze generation took {:.4f} ms\n", last_apply_maze_in_ms);
+
+            if (image_result.empty() || text_result.empty())
             {
-                throw std::runtime_error("AmazingSFML failed to generate maze data.");
+                throw std::runtime_error("AmazingSFML failed to regenerate maze resources.");
             }
 
-            auto *generated_grid = app->get_last_grid();
-            if (!generated_grid)
+            update_apply_timing_overlay();
+
+            std::ifstream text_file{MAZE_TEMP_TEXT_PATH, std::ios::binary};
+            if (!text_file.is_open())
+            {
+                throw std::runtime_error("AmazingSFML failed to open generated maze text file.");
+            }
+
+            std::ostringstream text_stream;
+            text_stream << text_file.rdbuf();
+            const std::string generated_grid = text_stream.str();
+            if (generated_grid.empty())
             {
                 throw std::runtime_error("AmazingSFML failed to retrieve generated grid.");
             }
@@ -560,28 +923,20 @@ namespace
             maze_sprite.setScale({maze_scale_x, maze_scale_y});
             maze_sprite.setPosition({0.0f, 0.0f});
             has_maze_texture = true;
+            maze_wall_shapes.clear();
+            network_status_text.reset();
 
             // Keep topology in logical maze cells (rows/columns). Resizing to pixel
             // dimensions creates hundreds of thousands of cells and can OOM at launch.
-            current_maze_struct = build_topology_from_grid(*generated_grid);
+            current_maze_struct = build_topology_from_grid(generated_grid);
+            if (!current_maze_struct.has_value() || current_maze_struct->rows == 0u || current_maze_struct->columns < 2u)
+            {
+                throw std::runtime_error("AmazingSFML parsed an invalid topology from generated grid text.");
+            }
 
             build_geometry_and_physics();
 
-            for (int i = 0; i < 24; ++i)
-            {
-                const float x = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (1.0f + static_cast<float>(RNG(0, static_cast<int>(current_maze_struct->columns - 2u))));
-                const float y = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (0.6f + static_cast<float>(RNG(0, 4)) * 0.35f);
-                // x/y above are virtual-space; convert to real window pixels for add_ball.
-                add_ball({x * world_scale_x, y * world_scale_y});
-
-                if (!physics_balls.empty())
-                {
-                    const b2Vec2 impulse{
-                        static_cast<float>(RNG(-4, 4)) * 0.22f,
-                        static_cast<float>(RNG(-1, 1)) * 0.15f};
-                    b2Body_ApplyLinearImpulseToCenter(physics_balls.back().body, impulse, true);
-                }
-            }
+            spawn_random_balls(24);
         }
 
         void handle_events()
@@ -606,6 +961,10 @@ namespace
                     else if (key->code == sf::Keyboard::Key::H)
                     {
                         should_show_info = !should_show_info;
+                    }
+                    else if (key->code == sf::Keyboard::Key::N)
+                    {
+                        fetch_maze_from_network();
                     }
                 }
 

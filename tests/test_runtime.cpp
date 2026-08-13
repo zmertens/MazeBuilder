@@ -13,8 +13,8 @@
 #include <vector>
 
 #include <MazeBuilder/runtime_app.h>
+#include <MazeBuilder/progress.h>
 
-#include "progress.h"
 #include "test_output_dir.h"
 
 #include <fmt/format.h>
