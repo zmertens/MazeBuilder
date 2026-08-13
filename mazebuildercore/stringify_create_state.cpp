@@ -1,6 +1,7 @@
 #include <MazeBuilder/stringify_create_state.h>
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/state_utils.h>
@@ -8,6 +9,7 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <string>
 
@@ -16,6 +18,7 @@ using namespace mazes;
 stringify_create_state::stringify_create_state(const runtime_app::context &ctx, runtime_stack *rs)
     : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
 {
+    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
 void stringify_create_state::draw() const noexcept
@@ -23,77 +26,66 @@ void stringify_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool stringify_create_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
 {
-    m_result = "Maze generated";
-    bool skip_ascii_render = false;
+    if (!processed_text_mapper)
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    const auto parsed_args = state_utils::get_args(get_context());
+
     std::string output_target;
-
-    if (args.has_value())
+    if (const auto parsed = parsed_args ? parsed_args->get() : std::nullopt; parsed.has_value())
     {
-        if (const auto parsed = args->get(); parsed.has_value())
+        if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
         {
-            if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
-            {
-                output_target = it->second;
-                skip_ascii_render = (output_target == "sfml");
-            }
+            output_target = it->second;
         }
     }
 
-    if (!skip_ascii_render && args.has_value() && grid_mapper)
+    unsigned int rows = configurator::MAX_ROWS;
+    unsigned int cols = configurator::MAX_COLUMNS;
+    unsigned int levels = 1u;
+    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
+
+    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
+
+    configurator cfg{};
+    cfg.ensure_rows(rows)
+        .ensure_columns(cols)
+        .ensure_levels(levels)
+        .ensure_distances(state_utils::has_distances(parsed_args));
+
+    const auto result = std::string{this->create(cfg, *rng_ptr)};
+
+    if (!result.empty() && io_utils::is_an_absolute_path(output_target))
     {
-        unsigned int rows = configurator::MAX_ROWS;
-        unsigned int cols = configurator::MAX_COLUMNS;
-        unsigned int levels = 1u;
-        state_utils::parse_dimensions(args, rows, cols, levels);
-
-        randomizer fallback_rng{};
-        auto* rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
-
-        configurator cfg{};
-        cfg.ensure_rows(rows)
-            .ensure_columns(cols)
-            .ensure_levels(levels)
-            .ensure_distances(state_utils::has_distances(args));
-        m_result = std::string{this->create(cfg, *rng_ptr)};
-
-        if (!m_result.empty() && !output_target.empty() && output_target != "stdout")
+        if (!io_utils::write_file(output_target, result))
         {
-            const auto normalized_output = io_utils::normalize_path(output_target);
-            if (io_utils::write_file(normalized_output, m_result))
-            {
-                m_result = "Wrote maze to " + normalized_output;
-            }
-            else
-            {
-                m_result = "Failed to write maze to " + normalized_output;
-            }
+            global_async_logger().log_message("Failed to write maze to " + output_target);
         }
     }
 
-    if (processed_text_mapper)
+    try
     {
-        try
+        auto &processing_str = processed_text_mapper->get(processed_text_identifier::PROCESSING);
+        if (!processing_str.is_processed())
         {
-            auto &finished = processed_text_mapper->get(processed_text_identifier::FINISHED);
-            finished.set_dirty(m_result);
-            finished.set_processed(m_result);
+            processing_str.set_processed(result);
         }
-        catch (...)
-        {
-        }
+    }
+    catch (...)
+    {
     }
 
     request_stack_pop();
     return false;
 }
 
-std::string_view stringify_create_state::create(const configurator &config, randomizer &rng) noexcept
+std::string_view stringify_create_state::create(const configurator &config, [[maybe_unused]] randomizer &rng) noexcept
 {
-    m_result = "Maze generated";
-    [[maybe_unused]] auto noise = rng(0, 1);
-
     auto render_ascii_maze = [](const grid_interface &grid, const grid_operations &grid_ops,
                                 const unsigned int rows, const unsigned int cols) -> std::string
     {
@@ -168,11 +160,11 @@ std::string_view stringify_create_state::create(const configurator &config, rand
     try
     {
         auto &grid_ref = grid_mapper->get(grid_id);
-        m_result = render_ascii_maze(grid_ref, grid_ref.operations(), config.rows(), config.columns());
+        m_result = render_ascii_maze(std::cref(grid_ref), std::cref(grid_ref.operations()), config.rows(), config.columns());
+        return m_result;
     }
     catch (...)
     {
+        return {};
     }
-
-    return m_result;
 }

@@ -11,13 +11,13 @@
 #include "craft.h"
 
 // Run the SDL app
-static constexpr auto window_w = 1200, window_h = 800;
+static constexpr auto WINDOW_WIDTH = 1200, WINDOW_HEIGHT = 800;
 
-const auto title{"Maze Builder - " + mazes::buildinfo::VERSION + " - " + mazes::buildinfo::COMMIT_SHA};
+const auto TITLE{"Maze Builder " + mazes::buildinfo::VERSION + " - " + mazes::buildinfo::COMMIT_SHA};
 
 // Avoid function-local static initialization on wasm main thread.
 // Eager init sidesteps __cxa_guard_acquire/pthread_cond_wait warnings.
-std::shared_ptr<craft> g_voxel_engine = std::make_shared<craft>(title, window_w, window_h);
+std::shared_ptr<craft> VOXEL_ENGINE = std::make_shared<craft>(TITLE, WINDOW_WIDTH, WINDOW_HEIGHT);
 
 // Setup for Emscripten/WebAssembly
 // Bind a getter method from C++ so that it can be accessed in the frontend with JS
@@ -26,10 +26,10 @@ std::shared_ptr<craft> g_voxel_engine = std::make_shared<craft>(title, window_w,
 
 std::shared_ptr<craft> get()
 {
-    return g_voxel_engine;
+    return VOXEL_ENGINE;
 }
 
-EMSCRIPTEN_BINDINGS (craft_module)
+EMSCRIPTEN_BINDINGS(craft_module)
 {
     // Module.get() → returns the shared_ptr to the singleton engine instance.
     // Always call this first in onRuntimeInitialized before touching any other API.
@@ -37,9 +37,9 @@ EMSCRIPTEN_BINDINGS (craft_module)
 
     emscripten::class_<craft>("craft")
         .smart_ptr<std::shared_ptr<craft>>("std::shared_ptr<craft>")
-        // craft(title, width, height) – construction is handled by the global g_voxel_engine;
+        // craft(TITLE, width, height) – construction is handled by the global VOXEL_ENGINE;
         // JS should use Module.get() rather than constructing a second instance.
-        .constructor<const std::string&, int, int>()
+        .constructor<const std::string &, int, int>()
 
         // ── Legacy synchronous download path ─────────────────────────────────
         // inst.artifacts() → full Wavefront OBJ string; may block if called before ready.
@@ -81,12 +81,12 @@ int main()
     {
         mazes::randomizer rng;
 
-        if (!g_voxel_engine->run(nullptr, std::ref(rng)))
+        if (!VOXEL_ENGINE->run(nullptr, std::ref(rng)))
         {
-            throw std::runtime_error("ERROR: Running SDL app failed.");
+            throw std::runtime_error("Running Voxels app failed.");
         }
     }
-    catch (std::exception& ex)
+    catch (std::exception &ex)
     {
         std::cerr << ex.what() << std::endl;
     }

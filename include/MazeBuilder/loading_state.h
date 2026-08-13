@@ -11,7 +11,6 @@
 /// @namespace mazes
 namespace mazes
 {
-    class args;
     class runtime_stack;
 
     /// @brief State for loading and pre-generating mazes
@@ -24,18 +23,17 @@ namespace mazes
         void draw() const noexcept override;
 
         /// @brief Updates the state of the loading process
-        /// @param args Optional arguments for the update
         /// @param delta_time Time elapsed since the last update
         /// @return True if the update was successful, false otherwise
-        bool update(const std::optional<args>& args, double delta_time) noexcept override;
+        bool update(double delta_time) noexcept override;
 
     private:
         /// @brief Loads the necessary resources for the loading state
-        /// @param args Optional arguments for resource loading
-        void load_resources(const std::optional<args>& args) const noexcept;
+        void load_resources() const noexcept;
 
         grid_manager* grid_mapper;
         processed_text_manager* processed_text_mapper;
+        args_manager* args_mapper;
 
         std::once_flag resource_loaded_flag;
         bool has_finished{false};

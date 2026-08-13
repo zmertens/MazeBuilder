@@ -12,7 +12,6 @@
 /// @namespace mazes
 namespace mazes
 {
-    class args;
     class configurator;
     class randomizer;
     class runtime_stack;
@@ -29,10 +28,9 @@ namespace mazes
         void draw() const noexcept override;
 
         /// @brief Update the state with the given arguments and elapsed time
-        /// @param args The optional arguments to pass to the state's update function
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        bool update(const std::optional<args> &args, double delta_time) noexcept override;
+        bool update(double delta_time) noexcept override;
 
     private:
         /// @brief Implementation of the sidewinder maze creation algorithm
@@ -46,7 +44,7 @@ namespace mazes
 
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
-        grid_identifier m_grid_id;
+        grid_identifier current_grid_id;
         bool m_use_distances;
         int m_distances_start;
         int m_distances_end;

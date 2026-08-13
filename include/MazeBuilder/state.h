@@ -10,7 +10,6 @@
 /// @namespace mazes
 namespace mazes
 {
-    class args;
     class runtime_stack;
 
     /// @brief struct representing a state in the runtime stack
@@ -39,11 +38,10 @@ namespace mazes
 
         virtual void draw() const noexcept = 0;
 
-        /// @brief Update the state with the given arguments and elapsed time
-        /// @param args The optional arguments to pass to the state's update function
+        /// @brief Update the state with the elapsed time
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        virtual bool update(const std::optional<args>& args, double delta_time) noexcept = 0;
+        virtual bool update(double delta_time) noexcept = 0;
 
     protected:
         void request_stack_push(ID state_id) const noexcept;

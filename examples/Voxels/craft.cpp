@@ -697,7 +697,7 @@ struct craft::craft_impl
                 const float btn_w = std::clamp(std::round(60.f * fs), 80.f, 170.f);
 
                 // ── Title bar row ──────────────────────────────────────────────
-                ImGui::TextColored(HEADER_COL, "  MazeBuilder");
+                ImGui::TextColored(HEADER_COL, "  MazeBuilder Options");
                 ImGui::SameLine(display.x - (btn_w * 2.f + sty.ItemSpacing.x + sty.WindowPadding.x));
                 ImGui::Separator();
 
@@ -710,9 +710,6 @@ struct craft::craft_impl
                 // Quick Options box
                 bool last_show_maze_preview_2d_enabled{c.show_maze_preview_2d_enabled()};
                 bool last_show_stats_window{c.show_stats_window()};
-                ImGui::Spacing();
-                ImGui::TextColored(HEADER_COL, "Options");
-                ImGui::Separator();
                 ImGui::Checkbox("Preview Enabled", &last_show_maze_preview_2d_enabled);
                 ImGui::Checkbox("Show Stats Overlay", &last_show_stats_window);
                 ImGui::Separator();

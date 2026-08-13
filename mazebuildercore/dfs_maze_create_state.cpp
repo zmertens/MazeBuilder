@@ -24,6 +24,7 @@ using namespace mazes;
 dfs_maze_create_state::dfs_maze_create_state(const runtime_app::context& ctx, runtime_stack* rs)
     : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
 {
+    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
 std::string_view dfs_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
@@ -36,36 +37,36 @@ void dfs_maze_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& args,
-                                   [[maybe_unused]] double delta_time) noexcept
+bool dfs_maze_create_state::update([[maybe_unused]] double delta_time) noexcept
 {
-    if (!args.has_value() || !grid_mapper || !processed_text_mapper)
+    if (!grid_mapper || !processed_text_mapper)
     {
         request_stack_pop();
         return false;
     }
 
+    const auto parsed_args = state_utils::get_args(get_context());
+
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    state_utils::parse_dimensions(args, rows, cols, levels);
+    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
 
-    m_use_distances = state_utils::has_distances(args);
-    m_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-    const auto distance_settings = state_utils::parse_distance_settings(args);
+    m_use_distances = state_utils::has_distances(parsed_args);
+    current_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    const auto distance_settings = state_utils::parse_distance_settings(parsed_args);
     m_distances_start = distance_settings.start;
     m_distances_end = distance_settings.end;
 
-    try { grid_mapper->get(m_grid_id).operations().resize(rows, cols, levels); }
+    try { grid_mapper->get(current_grid_id).operations().resize(rows, cols, levels); }
     catch (...)
     {
         request_stack_pop();
         return false;
     }
 
-    randomizer fallback_rng{};
-    auto* rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
+    auto* rng_ptr = state_utils::get_rng_or_default(get_context());
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -76,20 +77,17 @@ bool dfs_maze_create_state::update([[maybe_unused]] const std::optional<args>& a
         .ensure_distances_end(m_distances_end)
         .ensure_algo_id(algo::DFS);
 
-    if (const auto result = create(cfg, *rng_ptr); !result.empty())
+    const auto result = create(cfg, *rng_ptr);
+
+    if (auto *last_grid_id = get_context().get_last_grid_id())
     {
-        try
-        {
-            request_stack_pop();
-            request_stack_push(state_utils::output_state_for(args));
-        }
-        catch (...)
-        {
-        }
+        *last_grid_id = current_grid_id;
     }
-    else
+
+    request_stack_pop();
+    if (!result.empty())
     {
-        request_stack_pop();
+        request_stack_push(state_utils::output_state_for(parsed_args));
     }
 
     return false;
@@ -102,7 +100,7 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
     if (!grid_mapper) return {};
     try
     {
-        auto& grid_ref = grid_mapper->get(m_grid_id);
+        auto& grid_ref = grid_mapper->get(current_grid_id);
         auto& grid_ops = grid_ref.operations();
 
         // Start in the first cell of level 0
@@ -145,7 +143,7 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
             }
         }
 
-        if (m_use_distances && m_grid_id == grid_identifier::DISTANCE)
+        if (m_use_distances && current_grid_id == grid_identifier::DISTANCE)
         {
             if (auto* distance_grid_ref = dynamic_cast<distance_grid*>(&grid_ref))
             {

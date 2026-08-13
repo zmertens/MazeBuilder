@@ -7,16 +7,19 @@
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/state_utils.h>
 
-#include <any>
+#include <optional>
+#include <variant>
 
 #include <fmt/format.h>
 
 using namespace mazes;
 
 parsing_state::parsing_state(const runtime_app::context &ctx, runtime_stack *rs)
-    : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+    : state(ctx, rs), args_mapper{ctx.get_args_manager()}, processed_text_mapper{ctx.get_text_manager()}
 {
+    state_utils::validate_mappers(args_mapper, processed_text_mapper);
 }
 
 std::optional<args> parsing_state::convert(const std::string_view arguments) const noexcept
@@ -26,7 +29,6 @@ std::optional<args> parsing_state::convert(const std::string_view arguments) con
         return std::nullopt;
     }
 
-    // parse() fills the args object; we return by move to avoid inline ~impl destruction
     std::optional<args> result{std::in_place};
     if (!result->parse(std::string{arguments}))
     {
@@ -40,31 +42,59 @@ void parsing_state::draw() const noexcept
     // No visual output for now
 }
 
-bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
 {
-    // runtime_app already parses input before entering the state machine.
-    // Reuse the parsed args and only fall back to raw input conversion when needed.
-    std::optional<mazes::args> parsed_args = args;
+    if (!args_mapper || !processed_text_mapper)
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    processed_text *unknown_text = nullptr;
+    try
+    {
+        unknown_text = &processed_text_mapper->get(processed_text_identifier::UNKNOWN);
+    }
+    catch (...)
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    const auto unknown_processed = unknown_text->get();
+    const auto *raw_input = std::get_if<std::string>(&unknown_processed);
+    if (!raw_input || raw_input->empty())
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    auto parsed_args = convert(*raw_input);
+
+    // Consumed; clear so a subsequent apply() call can supply fresh input.
+    unknown_text->set_processed(std::monostate{});
 
     if (!parsed_args.has_value())
     {
-        if (const auto *raw_input = get_context().get_raw_input(); raw_input && !raw_input->empty())
-        {
-            parsed_args = convert(*raw_input);
-        }
+        request_stack_pop();
+        return false;
     }
 
-    if (!parsed_args.has_value() || !processed_text_mapper)
+    try
+    {
+        args_mapper->get(args_identifier::RAW) = *parsed_args;
+        args_mapper->get(args_identifier::PARSED) = *parsed_args;
+    }
+    catch (...)
     {
         request_stack_pop();
-        return true;
+        return false;
     }
 
-    // Determine which maze algorithm state to run first. The create state
-    // will push the appropriate output state when generation is done.
+    // Determine which maze algorithm state to run first.
     state::ID next_state = state::ID::BINARY_TREE;
 
-    if (auto parsed = parsed_args->get(); parsed.has_value())
+    if (const auto parsed = parsed_args->get(); parsed.has_value())
     {
         if (const auto it = parsed->find(mazes::args::ALGO_ID_WORD_STR); it != parsed->cend())
         {

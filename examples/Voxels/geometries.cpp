@@ -108,12 +108,12 @@ void geometries::make_cube(
     int left, int right, int top, int bottom, int front, int back,
     float x, float y, float z, float n, int w) noexcept
 {
-    int wleft = item::blocks[w][0];
-    int wright = item::blocks[w][1];
-    int wtop = item::blocks[w][2];
-    int wbottom = item::blocks[w][3];
-    int wfront = item::blocks[w][4];
-    int wback = item::blocks[w][5];
+    int wleft = item::BLOCKS[w][0];
+    int wright = item::BLOCKS[w][1];
+    int wtop = item::BLOCKS[w][2];
+    int wbottom = item::BLOCKS[w][3];
+    int wfront = item::BLOCKS[w][4];
+    int wback = item::BLOCKS[w][5];
     make_cube_faces(
         data, ao, light,
         left, right, top, bottom, front, back,
@@ -149,8 +149,8 @@ void geometries::make_plant(
     float s = 0.0625;
     float a = 0 + 1 / 2048.0;
     float b = s - 1 / 2048.0;
-    float du = (item::plants[w] % 16) * s;
-    float dv = (item::plants[w] / 16) * s;
+    float du = (item::PLANTS[w] % 16) * s;
+    float dv = (item::PLANTS[w] / 16) * s;
     for (int i = 0; i < 4; i++)
     {
         for (int v = 0; v < 6; v++)

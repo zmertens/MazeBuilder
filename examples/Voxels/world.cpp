@@ -2513,7 +2513,7 @@ void world::render_hover_info() const noexcept
     const auto font_tex = world_textures.get(TextureIdentifier::BITMAP_FONT).gl_texture;
 
     // Block type
-    SDL_snprintf(info_buffer, sizeof(info_buffer), "Block: %s", player::get_block_name(block_type));
+    SDL_snprintf(info_buffer, sizeof(info_buffer), "Block: %s", player::get_block_name(item::get_block_type(block_type)));
     render_text(font_tex, 0, x_offset, y_base - line_height * 2, 10.0f, info_buffer);
 
     // Coordinates

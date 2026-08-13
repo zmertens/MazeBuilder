@@ -16,6 +16,7 @@
 
 #include "db.h"
 #include "geometries.h"
+#include "item.h"
 #include "voxels_map.h"
 
 class texture;
@@ -484,7 +485,7 @@ private:
     [[nodiscard]] std::string get_artifact_export_result() noexcept;
 
     // CAD Helper Functions
-    [[nodiscard]] static const char *get_block_name(int block_type) noexcept;
+    [[nodiscard]] static const char *get_block_name(item::BlockType block_type) noexcept;
     [[nodiscard]] static const char *get_face_name(int face) noexcept;
     void cycle_ortho_view() noexcept;
     void toggle_grid_overlay() noexcept;

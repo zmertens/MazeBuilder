@@ -3,7 +3,6 @@
 
 #include <filesystem>
 #include <ostream>
-#include <string>
 #include <string_view>
 
 /// @file io_utils.h
@@ -20,23 +19,27 @@ namespace mazes
         /// @param data
         /// @param delimiter Delimiter to use between data entries
         /// @return True if the write was successful, false otherwise
-        static bool write(std::ostream& oss, const std::string& data, std::string_view delimiter = "\n") noexcept;
+        static bool write(std::ostream &oss, std::string_view data, std::string_view delimiter = "\n") noexcept;
 
         /// @brief Write to a file
         /// @param filename Full file path
         /// @param data Data to write
         /// @return True if the write was successful, false otherwise
-        static bool write_file(const std::string& filename, const std::string& data) noexcept;
+        static bool write_file(std::string_view filename, std::string_view data) noexcept;
 
-        /// @brief Expand a leading '~' to the current user's home directory.
-        /// @param path Path to normalize
-        /// @return Path with '~' expanded when applicable
-        static std::string normalize_path(const std::string& path) noexcept;
+        /// @brief Check if a path is an absolute path
+        /// @param path Path to check
+        static bool is_an_absolute_path(std::string_view path) noexcept;
+
+        /// @brief Check if a path is valid
+        /// @param path
+        /// @return
+        static bool is_valid_path(std::string_view path) noexcept;
 
         /// @brief Get the directory path from a full file path
         /// @param filepath Full file path
         /// @return Directory path
-        static std::string get_full_directory_path(const std::string& filepath) noexcept;
+        static std::string_view get_full_directory_path(std::string_view filepath) noexcept;
     }; // io_utils
 }
 

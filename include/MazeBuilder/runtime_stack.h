@@ -38,9 +38,8 @@ namespace mazes
 
         /// @brief Visit each state top-to-bottom, calling update(args, elapsed) until one returns false.
         ///        Applies pending stack changes after the pass.
-        /// @param args The optional arguments to pass to each state's update function
         /// @param elapsed The elapsed time since the last update
-        void visit_states(const std::optional<args>& args, double elapsed) noexcept;
+        void visit_states(double elapsed) noexcept;
 
         /// @brief Checks if the runtime stack is empty
         /// @return True if the stack is empty, false otherwise

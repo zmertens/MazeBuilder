@@ -2,21 +2,25 @@
 
 #include <filesystem>
 #include <fstream>
-#include <cstdlib>
 
 using namespace mazes;
 
 // delimiter = "\n"
-bool io_utils::write(std::ostream& oss, const std::string& data, std::string_view delimiter) noexcept
+bool io_utils::write(std::ostream &oss, std::string_view data, std::string_view delimiter) noexcept
 {
     oss << data << delimiter;
 
     return oss.good();
 }
 
-bool io_utils::write_file(const std::string& filename, const std::string& data) noexcept
+bool io_utils::write_file(std::string_view filename, std::string_view data) noexcept
 {
-    std::filesystem::path data_path{normalize_path(filename)};
+    if (!is_an_absolute_path(filename))
+    {
+        return false;
+    }
+
+    std::filesystem::path data_path{filename};
 
     std::ofstream out_writer{data_path};
 
@@ -32,35 +36,29 @@ bool io_utils::write_file(const std::string& filename, const std::string& data) 
     return out_writer.good();
 }
 
-std::string io_utils::normalize_path(const std::string& path) noexcept
+bool io_utils::is_valid_path(std::string_view path) noexcept
 {
-    if (path.empty() || path.front() != '~')
+    try
     {
-        return path;
+        std::filesystem::path p{path};
+        return !p.empty();
     }
-
-    const char* home = std::getenv("HOME");
-    if (!home || *home == '\0')
+    catch (const std::exception &)
     {
-        return path;
+        return false;
     }
-
-    if (path.size() == 1)
-    {
-        return std::string{home};
-    }
-
-    if (path[1] == '/')
-    {
-        return std::string{home} + path.substr(1);
-    }
-
-    return path;
 }
 
-std::string io_utils::get_full_directory_path(const std::string& filepath) noexcept
+bool io_utils::is_an_absolute_path(std::string_view path) noexcept
+{
+    std::filesystem::path p(path);
+
+    return p.is_absolute();
+}
+
+std::string_view io_utils::get_full_directory_path(std::string_view filepath) noexcept
 {
     const std::filesystem::path p(filepath);
 
-    return p.parent_path().string();
+    return std::string_view{p.parent_path().string()};
 }

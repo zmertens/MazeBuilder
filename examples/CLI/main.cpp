@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <ranges>
 #include <string>
 #include <unordered_map>
@@ -19,7 +20,8 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
-#include <MazeBuilder/string_utils.h>
+
+#include <fmt/format.h>
 
 class command_line_parser : public mazes::singleton_base<command_line_parser>
 {
@@ -41,8 +43,7 @@ public:
 
     std::string version() noexcept
     {
-        return mazes::string_utils::concat(mazes::string_utils::concat("v", mazes::buildinfo::VERSION),
-                                           " - " + mazes::buildinfo::COMMIT_SHA);
+        return fmt::format("v{} - {}", mazes::buildinfo::VERSION, mazes::buildinfo::COMMIT_SHA);
     }
 
     void append_algos_and_set() noexcept
@@ -76,24 +77,29 @@ public:
     std::string help() noexcept
     {
         return "mazebuildercli " + version() + "\n\n" +
-               "Generates mazes and converts to various formats\n\n"
+               "Generates and converts mazes into simple data formats\n\n"
                "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
                "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
                "Example: mazebuildercli -r 20 -c 20 -a sidewinder -o maze.png\n\n"
                "** Commands are case-sensitive! **\n\n"
                "\t-a, --algo         algorithm to apply to maze links\n"
-               "\t                     [" + help_parts.at(HelpPartsIndex::ALGOS) + "]\n"
-               "\t-c, --columns      columns [max: " + std::to_string(mazes::configurator::MAX_COLUMNS) + "]\n"
-               "\t-d, --distances    show distances with optional [start, end] inclusive\n"
-               "\t                     example: '-d [0:10]'\n"
-               "\t-h, --help         display this help message\n"
-               "\t-j, --json         run with arguments in JSON format\n"
-               "\t-l, --levels       levels [max: " + std::to_string(mazes::configurator::MAX_LEVELS) + "]\n"
-               "\t-m, --mask         load mask from text file\n"
-               "\t-s, --seed         seed for the number generator\n"
-               "\t-r, --rows         rows [max: " + std::to_string(mazes::configurator::MAX_ROWS) + "]\n"
-               "\t-o, --output       output format [" + help_parts.at(HelpPartsIndex::OUTPUT_FORMATS) + "]\n"
-               "\t-v, --version      display program version\n";
+               "\t                     [" +
+               help_parts.at(HelpPartsIndex::ALGOS) + "]\n"
+                                                      "\t-c, --columns      columns [max: " +
+               std::to_string(mazes::configurator::MAX_COLUMNS) + "]\n"
+                                                                  "\t-d, --distances    show distances with optional [start, end] inclusive\n"
+                                                                  "\t                     example: '-d [0:10]'\n"
+                                                                  "\t-h, --help         display this help message\n"
+                                                                  "\t-j, --json         run with arguments in JSON format\n"
+                                                                  "\t-l, --levels       levels [max: " +
+               std::to_string(mazes::configurator::MAX_LEVELS) + "]\n"
+                                                                 "\t-m, --mask         load mask from text file\n"
+                                                                 "\t-s, --seed         seed for the number generator\n"
+                                                                 "\t-r, --rows         rows [max: " +
+               std::to_string(mazes::configurator::MAX_ROWS) + "]\n"
+                                                               "\t-o, --output       output format [" +
+               help_parts.at(HelpPartsIndex::OUTPUT_FORMATS) + "]\n"
+                                                               "\t-v, --version      display program version\n";
     }
 
     std::string run(const std::string &arguments) noexcept
@@ -138,66 +144,57 @@ int main(const int argc, char *argv[])
     return EXIT_SUCCESS;
 #endif
 
-    auto find_str = [](const std::vector<std::string> &vec, const std::string &target) -> bool
+    // Return true on first match, false otherwise
+    auto check_for_matches = [](const std::vector<std::string> &vec, const auto &...args) -> bool
     {
-        return std::find(vec.cbegin(), vec.cend(), target) != vec.cend();
+        return ((std::find(vec.cbegin(), vec.cend(), args) != vec.cend()) || ...);
     };
 
     auto &&maze = mazes::runtime_app::instance();
 
     auto &&logger = mazes::global_async_logger();
+    std::mutex mtx;
     std::vector<std::string> logs;
     logs.reserve(100);
-    logger.set_sink([&logs](std::string_view msg)
-    {
-        logs.emplace_back(msg);
-        std::cerr << msg << std::endl;
-    });
+    logger.set_sink([&logs, &mtx](auto msg)
+                    {
+                        std::lock_guard<std::mutex> lock(mtx);
+                        logs.emplace_back(msg); });
 
     // Copy command arguments and skip the program name
     const std::vector<std::string> args_vec{argv + 1, argv + argc};
 
-    try
-    {
-        if (args_vec.empty() || find_str(args_vec, mazes::args::HELP_FLAG_STR) 
-            || find_str(args_vec, mazes::args::HELP_OPTION_STR))
-        {
-            logger.log_message(parser->help());
-        }
-        if (find_str(args_vec, mazes::args::VERSION_FLAG_STR) || find_str(args_vec, mazes::args::VERSION_OPTION_STR))
-        {
-            logger.log_message(parser->version());
-        }
-        else
-        {
-            std::string concatenated_args;
-            for (const auto &arg : args_vec)
-            {
-                concatenated_args += arg + " ";
-            }
+    static constexpr auto HELP_FLAG{"-h"};
+    static constexpr auto HELP_OPTION{"--help"};
+    static constexpr auto VERSION_FLAG{"-v"};
+    static constexpr auto VERSION_OPTION{"--version"};
 
-            if (auto &&results = maze->apply(concatenated_args); !results.empty())
-            {
-                logger.log_message(std::string{results});
-            }
-            else
-            {
-                logger.log_message("No output generated from the provided arguments.");
-            }
+    if (args_vec.empty() || check_for_matches(std::cref(args_vec), HELP_FLAG, HELP_OPTION))
+    {
+        logger.log_message(parser->help());
+    }
+    else if (check_for_matches(std::cref(args_vec), VERSION_FLAG, VERSION_OPTION))
+    {
+        logger.log_message(parser->version());
+    }
+    else
+    {
+        std::string concatenated_args{};
+        std::ranges::for_each(args_vec, [&concatenated_args](auto arg)
+                              { concatenated_args += arg + " "; });
+
+        if (auto results = maze->apply(concatenated_args); !results.empty())
+        {
+            logger.log_message(std::string{results});
         }
     }
-    catch (const std::exception &ex)
-    {
-        logger.log_message(ex.what());
-        return EXIT_FAILURE;
-    }
 
-    std::for_each(logs.cbegin(), logs.cend(), [](const std::string &msg)
-    {
-        std::cerr << mazes::string_utils::format("{}", msg) << std::endl;
-    });
-
+    // Ensure the async logger worker has delivered all queued messages
+    // into the in-memory sink before we consume and print them.
     logger.flush();
+
+    std::for_each(logs.cbegin(), logs.cend(), [](auto msg)
+                  { fmt::print("{}\n", msg); });
 
     return EXIT_SUCCESS;
 } // main

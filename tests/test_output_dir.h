@@ -9,7 +9,7 @@ struct test_output_dir
     std::filesystem::path path;
 
     explicit test_output_dir(std::string_view name)
-        : path(std::filesystem::temp_directory_path() / "MazeBuilder" / name)
+        : path(std::filesystem::temp_directory_path() / "MB" / name)
     {
         std::filesystem::remove_all(path);
         std::filesystem::create_directories(path);

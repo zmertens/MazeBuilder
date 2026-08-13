@@ -12,7 +12,6 @@
 /// @file bt_maze_create_state.h
 namespace mazes
 {
-    class args;
     class configurator;
     class randomizer;
     class runtime_stack;
@@ -43,7 +42,7 @@ namespace mazes
         /// @param args Optional arguments for the update
         /// @param delta_time Time elapsed since the last update
         /// @return True if the state was updated successfully, false otherwise
-        bool update(const std::optional<args>& args, double delta_time) noexcept override;
+        bool update(double delta_time) noexcept override;
 
     private:
         /// @brief Implementation of the binary tree maze creation algorithm
@@ -57,7 +56,7 @@ namespace mazes
 
         grid_manager* grid_mapper;
         processed_text_manager* processed_text_mapper;
-        grid_identifier m_grid_id;
+        grid_identifier current_grid_id;
         bool m_use_distances;
         int m_distances_start;
         int m_distances_end;

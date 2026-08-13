@@ -67,11 +67,11 @@ namespace mazes
                 return *this;
             }
 
-            [[nodiscard]] const std::string *get_raw_input() const noexcept { return _raw_input; }
+            [[nodiscard]] grid_identifier *get_last_grid_id() const noexcept { return _last_grid_id; }
 
-            context &with_raw_input(const std::string &raw_input) noexcept
+            context &with_last_grid_id(grid_identifier &id) noexcept
             {
-                _raw_input = &raw_input;
+                _last_grid_id = &id;
                 return *this;
             }
 
@@ -80,7 +80,7 @@ namespace mazes
             grid_manager *_grid_manager{};
             processed_text_manager *_text_manager{};
             randomizer *_rng{};
-            const std::string *_raw_input{};
+            grid_identifier *_last_grid_id{};
         };
 
         // Constructor / Destructor
@@ -88,9 +88,9 @@ namespace mazes
         ~runtime_app() override;
 
         /// @brief Applies the given unformatted string view to the runtime application
-        /// @param unformatted_sv The unformatted string view to be processed
+        /// @param unformatted_args The unformatted string view to be processed
         /// @return A string view representing the result of the application
-        [[nodiscard]] std::string_view apply(std::string_view unformatted_sv) noexcept override;
+        [[nodiscard]] std::string_view apply(std::string_view unformatted_args) noexcept override;
 
         /// @brief Returns the last generated grid used by apply(), if available.
         [[nodiscard]] grid_interface *get_last_grid() noexcept;
@@ -104,20 +104,23 @@ namespace mazes
         ///        first ready result from processed_text_mapper.
         /// @param arguments The optional arguments to pass to each state's update function
         /// @return A string view representing the result of the state updates
-        [[nodiscard]] std::string_view visit_states(const std::optional<args> &arguments) noexcept;
+        [[nodiscard]] std::string_view visit_states(std::string_view sv = {}) noexcept;
 
-        args_manager m_args_mapper;
-        grid_manager m_grid_mapper;
-        processed_text_manager m_processed_text_mapper;
-        randomizer m_rng;
+        args_manager args_mapper;
+        grid_manager grid_mapper;
+        processed_text_manager processed_text_mapper;
 
-        async_logger m_logger;
-        std::mutex m_logging_mtx;
-        std::vector<std::string> m_received_logs;
+        randomizer rng;
 
-        std::string m_last_result;
-        std::string m_current_input;
-        grid_identifier m_last_grid_id{grid_identifier::BASIC};
+        grid_identifier last_grid_id{grid_identifier::BASIC};
+
+        async_logger logger;
+
+        std::mutex logging_mtx;
+        std::vector<std::string> received_logs;
+
+        std::string last_result;
+
         std::unique_ptr<runtime_stack> runtime_stack_ptr;
     };
 } // namespace mazes

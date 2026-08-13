@@ -3,36 +3,37 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
-#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/state_utils.h>
 
 #include <sstream>
 #include <tuple>
 #include <vector>
 
+#include <fmt/format.h>
+
 using namespace mazes;
 
 wavefront_object_create_state::wavefront_object_create_state(const runtime_app::context &ctx, runtime_stack *rs)
     : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+    , current_grid_id{grid_identifier::BASIC}, m_result{}
 {
+    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
 std::string_view wavefront_object_create_state::create(const configurator &config, randomizer &rng) noexcept
 {
-    if (!grid_mapper)
-    {
-        return {};
-    }
-
     try
     {
-        auto &grid_ref = grid_mapper->get(m_grid_id);
+        m_result.clear();
+
+        auto &grid_ref = grid_mapper->get(current_grid_id);
         auto &grid_ops = grid_ref.operations();
 
-        constexpr float wall_height = 1.0f;
-        constexpr float level_gap = 2.0f;
+        constexpr float WALL_HEIGHT = 1.0f;
+        constexpr float LEVEL_GAP = 2.0f;
         float wall_thickness = rng.get_float(0.05f, 0.1f);
 
         std::vector<std::array<float, 3>> vertices;
@@ -63,18 +64,18 @@ std::string_view wavefront_object_create_state::create(const configurator &confi
         auto append_horizontal_wall = [&](float x0, float z, float x1, float y_base)
         {
             append_box(x0, y_base, z - wall_thickness * 0.5f,
-                       x1, y_base + wall_height, z + wall_thickness * 0.5f);
+                       x1, y_base + WALL_HEIGHT, z + wall_thickness * 0.5f);
         };
 
         auto append_vertical_wall = [&](float x, float z0, float z1, float y_base)
         {
             append_box(x - wall_thickness * 0.5f, y_base, z0,
-                       x + wall_thickness * 0.5f, y_base + wall_height, z1);
+                       x + wall_thickness * 0.5f, y_base + WALL_HEIGHT, z1);
         };
 
         for (unsigned int lv = 0; lv < config.levels(); ++lv)
         {
-            const float y_base = static_cast<float>(lv) * level_gap;
+            const float y_base = static_cast<float>(lv) * LEVEL_GAP;
 
             for (unsigned int row = 0; row < config.rows(); ++row)
             {
@@ -152,25 +153,26 @@ void wavefront_object_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool wavefront_object_create_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool wavefront_object_create_state::update([[maybe_unused]] double delta_time) noexcept
 {
-    m_result.clear();
-
-    if (!args.has_value() || !grid_mapper || !processed_text_mapper)
+    if (!processed_text_mapper)
     {
         request_stack_pop();
         return false;
     }
 
+    const auto parsed_args = state_utils::get_args(get_context());
+
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    state_utils::parse_dimensions(args, rows, cols, levels);
+    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
 
-    m_grid_id = state_utils::has_distances(args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    const auto selected_grid_id = state_utils::has_distances(parsed_args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    current_grid_id = selected_grid_id;
 
-    std::string output_target;
-    if (const auto parsed = args->get(); parsed.has_value())
+    std::string output_target = "stdout";
+    if (const auto parsed = parsed_args ? parsed_args->get() : std::nullopt; parsed.has_value())
     {
         if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
         {
@@ -178,37 +180,36 @@ bool wavefront_object_create_state::update(const std::optional<args> &args, [[ma
         }
     }
 
-    randomizer fallback_rng{};
-    auto *rng_ptr = state_utils::get_rng_or_default(get_context(), fallback_rng);
+    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
 
     configurator cfg{};
     cfg.ensure_rows(rows)
         .ensure_columns(cols)
         .ensure_levels(levels)
-        .ensure_distances(m_grid_id == grid_identifier::DISTANCE);
+        .ensure_distances(selected_grid_id == grid_identifier::DISTANCE);
 
-    m_result = std::string{create(std::cref(cfg), *rng_ptr)};
+    const std::string obj_result{create(cfg, *rng_ptr)};
 
-    if (!m_result.empty() && !output_target.empty())
+    std::string final_result = obj_result;
+    if (!obj_result.empty() && io_utils::is_an_absolute_path(output_target))
     {
-        const auto normalized_output = io_utils::normalize_path(output_target);
-        if (io_utils::write_file(normalized_output, m_result))
+        if (io_utils::write_file(output_target, obj_result))
         {
-            m_result = "Wrote maze to " + normalized_output;
+            final_result = fmt::format("Wrote maze to {}", output_target);
         }
         else
         {
-            m_result = "Failed to write maze to " + normalized_output;
+            final_result = fmt::format("Failed to write maze to {}", output_target);
         }
+        global_async_logger().log_message(final_result);
     }
 
     if (processed_text_mapper)
     {
         try
         {
-            auto &finished = processed_text_mapper->get(processed_text_identifier::FINISHED);
-            finished.set_dirty(m_result);
-            finished.set_processed(m_result);
+            auto &processing = processed_text_mapper->get(processed_text_identifier::PROCESSING);
+            processing.set_processed(final_result);
         }
         catch (...)
         {

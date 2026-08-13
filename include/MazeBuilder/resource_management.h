@@ -35,11 +35,6 @@ namespace mazes
             insert_resource(id, std::move(resource));
         }
 
-        /// @brief Loads a resource from a string
-        /// @param id
-        /// @param txt
-        void load(Identifier id, std::string_view txt);
-
         /// @brief Retrieves a resource by its identifier
         /// @param id
         /// @return
@@ -67,21 +62,6 @@ namespace mazes
 
         std::unordered_map<Identifier, std::unique_ptr<Resource>> m_resources_map;
     };
-
-    template <typename Resource, typename Identifier>
-    void resource_management<Resource, Identifier>::load(Identifier id, std::string_view txt)
-    {
-        // Create and load resource
-        auto resource = std::make_unique<Resource>();
-
-        if (!resource->set(txt))
-        {
-            throw std::runtime_error("Failed to load resource");
-        }
-
-        // If loading successful, insert resource to map
-        insert_resource(id, std::move(resource));
-    }
 
     /// @brief Non-const version of get() to retrieve a resource by its identifier
     /// @tparam Resource

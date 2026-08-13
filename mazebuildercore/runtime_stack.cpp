@@ -64,15 +64,19 @@ bool runtime_stack::is_empty() const noexcept
     return m_states.empty() && m_pending.empty();
 }
 
-void runtime_stack::visit_states(const std::optional<args>& args, double elapsed) noexcept
+void runtime_stack::visit_states(double elapsed) noexcept
 {
+    apply_pending_changes();
     for (auto it = m_states.rbegin(); it != m_states.rend(); ++it)
     {
-        if (!(*it)->update(args, elapsed))
+        if (!(*it))
+        {
+            continue;
+        }
+
+        if (!(*it)->update(elapsed))
         {
             break;
         }
     }
-
-    apply_pending_changes();
 }

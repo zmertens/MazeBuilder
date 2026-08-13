@@ -4,6 +4,7 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
+#include <iostream>
 #include <mutex>
 #include <stop_token>
 #include <string>
@@ -27,24 +28,26 @@ namespace mazes
         using sink_type = std::function<void(std::string_view)>;
 
         async_logger()
-            : sink_([](std::string_view msg)
+            : msg_sink([](auto msg)
               {
                   fmt::print("{}\n", msg);
               })
         {
+
 #if !defined(__EMSCRIPTEN__)
-            worker_ = std::jthread([this](const std::stop_token& st)
+            log_worker = std::jthread([this](const std::stop_token& st)
             {
                 run(st);
             });
 #endif
+            // constructor ends
         }
 
         explicit async_logger(sink_type sink)
-            : sink_(std::move(sink))
+            : msg_sink(std::move(sink))
         {
 #if !defined(__EMSCRIPTEN__)
-            worker_ = std::jthread([this](const std::stop_token& st)
+            log_worker = std::jthread([this](const std::stop_token& st)
             {
                 run(st);
             });
@@ -110,11 +113,11 @@ namespace mazes
 
             if (should_join)
             {
-                worker_.request_stop();
+                log_worker.request_stop();
                 cv_.notify_all();
-                if (worker_.joinable())
+                if (log_worker.joinable())
                 {
-                    worker_.join();
+                    log_worker.join();
                 }
             }
 #endif
@@ -125,7 +128,7 @@ namespace mazes
         void set_sink(sink_type sink)
         {
             std::lock_guard lock(mtx_);
-            sink_ = std::move(sink);
+            msg_sink = std::move(sink);
         }
 
     private:
@@ -137,7 +140,7 @@ namespace mazes
             sink_type sink;
             {
                 std::lock_guard lock(mtx_);
-                sink = sink_;
+                sink = msg_sink;
             }
             if (sink)
             {
@@ -181,7 +184,7 @@ namespace mazes
 
                     message = std::move(queue_.front());
                     queue_.pop_front();
-                    sink = sink_;
+                    sink = msg_sink;
                 }
 
                 try
@@ -217,12 +220,12 @@ namespace mazes
 #endif
 
         mutable std::mutex mtx_;
-        sink_type sink_;
+        sink_type msg_sink;
     #if !defined(__EMSCRIPTEN__)
         std::condition_variable cv_;
         std::condition_variable drained_cv_;
         std::deque<std::string> queue_;
-        std::jthread worker_;
+        std::jthread log_worker;
         std::size_t pending_{0};
         bool stopped_{false};
     #endif

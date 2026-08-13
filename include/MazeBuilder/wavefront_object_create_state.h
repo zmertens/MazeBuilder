@@ -1,5 +1,5 @@
-#ifndef WAVEFRONT_OBJECT_CREATE_H
-#define WAVEFRONT_OBJECT_CREATE_H
+#ifndef WAVEFRONT_OBJECT_CREATE_STATE_H
+#define WAVEFRONT_OBJECT_CREATE_STATE_H
 
 #include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
@@ -12,7 +12,6 @@
 /// @namespace mazes
 namespace mazes
 {
-    class args;
     class configurator;
     class randomizer;
     class runtime_stack;
@@ -25,28 +24,24 @@ namespace mazes
         explicit wavefront_object_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
         /// @brief Create a maze using the Wavefront Object algorithm
-        /// @param a
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
+        /// @param config The configurator containing the maze configuration
+        /// @param rng The randomizer to use for generating random values
         /// @return
         std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
         void draw() const noexcept override;
 
-        /// @brief Update the state with the given arguments and elapsed time
-        /// @param args The optional arguments to pass to the state's update function
+        /// @brief Update the state with the elapsed time
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        bool update(const std::optional<args> &args, double delta_time) noexcept override;
+        bool update(double delta_time) noexcept override;
 
     private:
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
-        grid_identifier m_grid_id{grid_identifier::BASIC};
+        grid_identifier current_grid_id{grid_identifier::BASIC};
         std::string m_result;
     };
 } // namespace mazes
 
-#endif // WAVEFRONT_OBJECT_CREATE_H
+#endif // WAVEFRONT_OBJECT_CREATE_STATE_H

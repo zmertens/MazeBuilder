@@ -13,7 +13,6 @@
 /// @file pixels_create_state.h
 namespace mazes
 {
-    class args;
     class configurator;
     class randomizer;
     class runtime_stack;
@@ -40,15 +39,14 @@ namespace mazes
         void draw() const noexcept override;
 
         /// @brief Updates the state of the maze creation process
-        /// @param args Optional arguments for the update
         /// @param delta_time Time elapsed since the last update
         /// @return True if the update was successful, false otherwise
-        [[nodiscard]] bool update(const std::optional<args> &args, double delta_time) noexcept override;
+        [[nodiscard]] bool update(double delta_time) noexcept override;
 
     private:
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
-        grid_identifier m_grid_id{grid_identifier::BASIC};
+        grid_identifier current_grid_id{grid_identifier::BASIC};
         std::string m_result;
         int m_image_width{0};
         int m_image_height{0};

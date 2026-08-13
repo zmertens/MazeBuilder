@@ -10,12 +10,11 @@
 
 #include <MazeBuilder/string_utils.h>
 
+using namespace mazes;
+using namespace std;
+
 TEST_CASE("string_utils template split functions", "[string_utils template_split]")
 {
-
-    using namespace mazes;
-    using namespace std;
-
     SECTION("Template split with vector of chars and char separator")
     {
 
@@ -357,113 +356,5 @@ TEST_CASE("string_utils template split practical examples", "[string_utils pract
             REQUIRE_FALSE(algo.empty());
             REQUIRE(algo.find_first_not_of("abcdefghijklmnopqrstuvwxyz_") == string::npos);
         }
-    }
-}
-
-TEST_CASE("string_utils format wrapper functions", "[string_utils_format]")
-{
-
-    using namespace mazes;
-    using namespace std;
-
-    SECTION("Format with single int argument")
-    {
-        string result = string_utils::format("{}", 42);
-        REQUIRE(result == "42");
-    }
-
-    SECTION("Format with single float argument")
-    {
-        string result = string_utils::format("{:.2f}", 3.14159f);
-        REQUIRE(result == "3.14");
-    }
-
-    SECTION("Format with two int arguments")
-    {
-        string result = string_utils::format("{}, {}", 10, 20);
-        REQUIRE(result == "10, 20");
-    }
-
-    SECTION("Format with int and float arguments")
-    {
-        string result = string_utils::format("Value: {}, Rate: {:.1f}", 100, 2.5f);
-        REQUIRE(result == "Value: 100, Rate: 2.5");
-    }
-
-    SECTION("Format with two float arguments")
-    {
-        string result = string_utils::format("x: {:.1f}, y: {:.1f}", 1.2f, 3.4f);
-        REQUIRE(result == "x: 1.2, y: 3.4");
-    }
-
-    SECTION("Format with string_view format string")
-    {
-        string_view format_str = "Number: {}";
-        string result = string_utils::format(format_str, 999);
-        REQUIRE(result == "Number: 999");
-    }
-
-    SECTION("Format with const char* format string")
-    {
-        const char *format_str = "Float: {:.3f}";
-        string result = string_utils::format(format_str, 2.71828f);
-        REQUIRE(result == "Float: 2.718");
-    }
-
-    SECTION("Format with complex format string")
-    {
-        string result = string_utils::format("Coords: ({}, {}), Distance: {:.2f}", 5, 10, 7.07f);
-        REQUIRE(result == "Coords: (5, 10), Distance: 7.07");
-    }
-
-    SECTION("Format with zero arguments")
-    {
-        string result = string_utils::format("Hello World"sv);
-        REQUIRE(result == "Hello World");
-    }
-
-    SECTION("Format with lvalue references")
-    {
-        int x = 42;
-        float y = 3.14f;
-        string result = string_utils::format("x={}, y={:.1f}", x, y);
-        REQUIRE(result == "x=42, y=3.1");
-    }
-}
-
-TEST_CASE("string_utils format wrapper edge cases", "[string_utils_format_edge]")
-{
-
-    using namespace mazes;
-    using namespace std;
-
-    SECTION("Format with empty format string")
-    {
-        string result = string_utils::format(""sv);
-        REQUIRE(result == "");
-    }
-
-    SECTION("Format with special characters")
-    {
-        string result = string_utils::format("Special: {}", 123);
-        REQUIRE(result == "Special: 123");
-    }
-
-    SECTION("Format with negative numbers")
-    {
-        string result = string_utils::format("{}, {:.1f}", -42, -3.14f);
-        REQUIRE(result == "-42, -3.1");
-    }
-
-    SECTION("Format with zero values")
-    {
-        string result = string_utils::format("{}, {:.1f}", 0, 0.0f);
-        REQUIRE(result == "0, 0.0");
-    }
-
-    SECTION("Format with large numbers")
-    {
-        string result = string_utils::format("{}, {:.0f}", 1000000, 1234567.89f);
-        REQUIRE(result == "1000000, 1234568");
     }
 }

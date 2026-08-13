@@ -3,69 +3,69 @@
 #include <cmath>
 #include <SDL3/SDL_stdinc.h>
 
-std::array<int, item::TOTAL_ITEMS> item::items = {
+std::array<int, item::TOTAL_ITEMS> item::ITEMS = {
     // items the user can build
-    GRASS,
-    SAND,
-    STONE,
-    BRICK,
-    WOOD,
-    CEMENT,
-    DIRT,
-    PLANK,
-    SNOW,
-    GLASS,
-    COBBLE,
-    LIGHT_STONE,
-    DARK_STONE,
-    CHEST,
-    LEAVES,
-    TALL_GRASS,
-    YELLOW_FLOWER,
-    RED_FLOWER,
-    PURPLE_FLOWER,
-    SUN_FLOWER,
-    WHITE_FLOWER,
-    BLUE_FLOWER,
-    SDL_LOGO,
-    SFML_LOGO,
-    CACTUS_1,
-    CACTUS_2,
-    COLOR_00,
-    COLOR_01,
-    COLOR_02,
-    COLOR_03,
-    COLOR_04,
-    COLOR_05,
-    COLOR_06,
-    COLOR_07,
-    COLOR_08,
-    COLOR_09,
-    COLOR_10,
-    COLOR_11,
-    COLOR_12,
-    COLOR_13,
-    COLOR_14,
-    COLOR_15,
-    COLOR_16,
-    COLOR_17,
-    COLOR_18,
-    COLOR_19,
-    COLOR_20,
-    COLOR_21,
-    COLOR_22,
-    COLOR_23,
-    COLOR_24,
-    COLOR_25,
-    COLOR_26,
-    COLOR_27,
-    COLOR_28,
-    COLOR_29,
-    COLOR_30,
-    COLOR_31
+    static_cast<int>(item::BlockType::GRASS),
+    static_cast<int>(item::BlockType::SAND),
+    static_cast<int>(item::BlockType::STONE),
+    static_cast<int>(item::BlockType::BRICK),
+    static_cast<int>(item::BlockType::WOOD),
+    static_cast<int>(item::BlockType::CEMENT),
+    static_cast<int>(item::BlockType::DIRT),
+    static_cast<int>(item::BlockType::PLANK),
+    static_cast<int>(item::BlockType::SNOW),
+    static_cast<int>(item::BlockType::GLASS),
+    static_cast<int>(item::BlockType::COBBLE),
+    static_cast<int>(item::BlockType::LIGHT_STONE),
+    static_cast<int>(item::BlockType::DARK_STONE),
+    static_cast<int>(item::BlockType::CHEST),
+    static_cast<int>(item::BlockType::LEAVES),
+    static_cast<int>(item::BlockType::TALL_GRASS),
+    static_cast<int>(item::BlockType::YELLOW_FLOWER),
+    static_cast<int>(item::BlockType::RED_FLOWER),
+    static_cast<int>(item::BlockType::PURPLE_FLOWER),
+    static_cast<int>(item::BlockType::SUN_FLOWER),
+    static_cast<int>(item::BlockType::WHITE_FLOWER),
+    static_cast<int>(item::BlockType::BLUE_FLOWER),
+    static_cast<int>(item::BlockType::SDL_LOGO),
+    static_cast<int>(item::BlockType::SFML_LOGO),
+    static_cast<int>(item::BlockType::CACTUS_1),
+    static_cast<int>(item::BlockType::CACTUS_2),
+    static_cast<int>(item::BlockType::COLOR_00),
+    static_cast<int>(item::BlockType::COLOR_01),
+    static_cast<int>(item::BlockType::COLOR_02),
+    static_cast<int>(item::BlockType::COLOR_03),
+    static_cast<int>(item::BlockType::COLOR_04),
+    static_cast<int>(item::BlockType::COLOR_05),
+    static_cast<int>(item::BlockType::COLOR_06),
+    static_cast<int>(item::BlockType::COLOR_07),
+    static_cast<int>(item::BlockType::COLOR_08),
+    static_cast<int>(item::BlockType::COLOR_09),
+    static_cast<int>(item::BlockType::COLOR_10),
+    static_cast<int>(item::BlockType::COLOR_11),
+    static_cast<int>(item::BlockType::COLOR_12),
+    static_cast<int>(item::BlockType::COLOR_13),
+    static_cast<int>(item::BlockType::COLOR_14),
+    static_cast<int>(item::BlockType::COLOR_15),
+    static_cast<int>(item::BlockType::COLOR_16),
+    static_cast<int>(item::BlockType::COLOR_17),
+    static_cast<int>(item::BlockType::COLOR_18),
+    static_cast<int>(item::BlockType::COLOR_19),
+    static_cast<int>(item::BlockType::COLOR_20),
+    static_cast<int>(item::BlockType::COLOR_21),
+    static_cast<int>(item::BlockType::COLOR_22),
+    static_cast<int>(item::BlockType::COLOR_23),
+    static_cast<int>(item::BlockType::COLOR_24),
+    static_cast<int>(item::BlockType::COLOR_25),
+    static_cast<int>(item::BlockType::COLOR_26),
+    static_cast<int>(item::BlockType::COLOR_27),
+    static_cast<int>(item::BlockType::COLOR_28),
+    static_cast<int>(item::BlockType::COLOR_29),
+    static_cast<int>(item::BlockType::COLOR_30),
+    static_cast<int>(item::BlockType::COLOR_31)
 };
 
-std::array<std::array<int, item::BLOCK_FACE_COUNT>, item::TOTAL_BLOCKS> item::blocks = {
+std::array<std::array<int, item::BLOCK_FACE_COUNT>, item::TOTAL_BLOCKS> item::BLOCKS = {
     // w => (left, right, top, bottom, front, back) tiles
     0, 0, 0, 0, 0, 0, // 0 - empty
     16, 16, 32, 0, 16, 16, // 1 - grass
@@ -133,7 +133,7 @@ std::array<std::array<int, item::BLOCK_FACE_COUNT>, item::TOTAL_BLOCKS> item::bl
     207, 207, 207, 207, 207, 207, // 63
 };
 
-std::array<int, item::TOTAL_PLANTS> item::plants = {
+std::array<int, item::TOTAL_PLANTS> item::PLANTS = {
     // w => tile
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // 0 - 16
     48, // 17 - tall grass
@@ -153,15 +153,15 @@ bool item::is_plant(const int w) noexcept
 {
     switch (w)
     {
-    case TALL_GRASS:
-    case YELLOW_FLOWER:
-    case RED_FLOWER:
-    case PURPLE_FLOWER:
-    case SUN_FLOWER:
-    case WHITE_FLOWER:
-    case BLUE_FLOWER:
-    case CACTUS_1:
-    case CACTUS_2:
+    case static_cast<int>(item::BlockType::TALL_GRASS):
+    case static_cast<int>(item::BlockType::YELLOW_FLOWER):
+    case static_cast<int>(item::BlockType::RED_FLOWER):
+    case static_cast<int>(item::BlockType::PURPLE_FLOWER):
+    case static_cast<int>(item::BlockType::SUN_FLOWER):
+    case static_cast<int>(item::BlockType::WHITE_FLOWER):
+    case static_cast<int>(item::BlockType::BLUE_FLOWER):
+    case static_cast<int>(item::BlockType::CACTUS_1):
+    case static_cast<int>(item::BlockType::CACTUS_2):
         return true;
     default:
         return false;
@@ -177,8 +177,8 @@ bool item::is_obstacle(int w) noexcept
     }
     switch (w)
     {
-    case EMPTY:
-    case CLOUD:
+    case static_cast<int>(item::BlockType::EMPTY):
+    case static_cast<int>(item::BlockType::CLOUD):
         return false;
     default:
         return true;
@@ -187,7 +187,7 @@ bool item::is_obstacle(int w) noexcept
 
 bool item::is_transparent(int w) noexcept
 {
-    if (w == EMPTY)
+    if (w == static_cast<int>(item::BlockType::EMPTY))
     {
         return true;
     }
@@ -198,9 +198,9 @@ bool item::is_transparent(int w) noexcept
     }
     switch (w)
     {
-    case EMPTY:
-    case GLASS:
-    case LEAVES:
+    case static_cast<int>(item::BlockType::EMPTY):
+    case static_cast<int>(item::BlockType::GLASS):
+    case static_cast<int>(item::BlockType::LEAVES):
         return true;
     default:
         return false;
@@ -211,10 +211,15 @@ bool item::is_destructable(const int w) noexcept
 {
     switch (w)
     {
-    case EMPTY:
-    case CLOUD:
+    case static_cast<int>(item::BlockType::EMPTY):
+    case static_cast<int>(item::BlockType::CLOUD):
         return false;
     default:
         return true;
     }
+}
+
+item::BlockType item::get_block_type(int w) noexcept
+{
+    return static_cast<item::BlockType>(w);
 }

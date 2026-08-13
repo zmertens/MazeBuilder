@@ -50,11 +50,9 @@ namespace mazes
             return OUTPUT_FORMAT_LABELS_LOWERCASE[4];
         case output_format::STDOUT:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[5];
-        case output_format::TOTAL:
-            break;
+        default:
+            throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
         }
-
-        throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
     }
 
     /// @brief Convert a string to an output_format enum
@@ -62,9 +60,9 @@ namespace mazes
     /// @return
     inline output_format to_output_format_from_sv(const std::string_view sv)
     {
-        if (const auto it = std::ranges::find(OUTPUT_FORMAT_LABELS_LOWERCASE, sv); it != OUTPUT_FORMAT_LABELS_LOWERCASE.end())
+        if (const auto it = std::ranges::find(OUTPUT_FORMAT_LABELS_LOWERCASE, sv); it != OUTPUT_FORMAT_LABELS_LOWERCASE.cend())
         {
-            const auto index = static_cast<size_t>(std::distance(OUTPUT_FORMAT_LABELS_LOWERCASE.begin(), it));
+            const auto index = static_cast<size_t>(std::distance(OUTPUT_FORMAT_LABELS_LOWERCASE.cbegin(), it));
             switch (index)
             {
             case 0:

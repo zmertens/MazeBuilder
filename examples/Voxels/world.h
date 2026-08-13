@@ -243,6 +243,7 @@ public:
     command_queue &get_command_queue() noexcept;
 
     void invalidate_preview() noexcept;
+    
 private:
     void destroy_world();
 

@@ -12,6 +12,8 @@
 #include <optional>
 #include <string>
 
+#include <fmt/format.h>
+
 namespace mazes::state_utils
 {
     inline void parse_dimensions(const std::optional<args> &args, unsigned int &rows, unsigned int &cols,
@@ -76,7 +78,7 @@ namespace mazes::state_utils
         {
             settings.enabled = parsed->find(mazes::args::DISTANCES_WORD_STR) != parsed->cend();
 
-            if (const auto it = parsed->find(mazes::args::DISTANCES_START_STR); it != parsed->cend())
+            if (const auto it = parsed->find(mazes::args::DISTANCES_START_VAL_STR); it != parsed->cend())
             {
                 try
                 {
@@ -86,7 +88,7 @@ namespace mazes::state_utils
                 {
                 }
             }
-            if (const auto it = parsed->find(mazes::args::DISTANCES_END_STR); it != parsed->cend())
+            if (const auto it = parsed->find(mazes::args::DISTANCES_END_VAL_STR); it != parsed->cend())
             {
                 try
                 {
@@ -150,14 +152,40 @@ namespace mazes::state_utils
         return state::ID::STRINGIFYING;
     }
 
-    inline randomizer *get_rng_or_default(const runtime_app::context &ctx, randomizer &fallback_rng) noexcept
+    inline std::optional<args> get_args(const runtime_app::context &ctx) noexcept
+    {
+        if (auto *args_mapper = ctx.get_args_manager())
+        {
+            try
+            {
+                return args_mapper->get(args_identifier::PARSED);
+            }
+            catch (...)
+            {
+            }
+        }
+        return std::nullopt;
+    }
+
+    inline randomizer *get_rng_or_default(const runtime_app::context &ctx) noexcept
     {
         if (auto *rng = ctx.get_rng())
         {
             return rng;
         }
 
+        // Thread-local storage keeps the fallback lifetime valid for callers.
+        static thread_local randomizer fallback_rng{};
         return &fallback_rng;
+    }
+
+    template <typename... Mappers>
+    inline void validate_mappers(Mappers &&...mapper) noexcept
+    {
+        if (!((mapper != nullptr) && ...))
+        {
+            global_async_logger().log("mappers are null");
+        }
     }
 } // namespace mazes::state_utils
 

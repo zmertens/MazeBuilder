@@ -22,7 +22,8 @@
 
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/randomizer.h>
-#include <MazeBuilder/string_utils.h>
+
+#include <fmt/format.h>
 
 namespace
 {
@@ -476,16 +477,16 @@ void player::set_buffer(const std::uint32_t value) noexcept
 
 std::int32_t player::get_item() const noexcept
 {
-    if (this->current_item_index >= 0 && this->current_item_index < item::items.size())
+    if (this->current_item_index >= 0 && this->current_item_index < item::ITEMS.size())
     {
-        return item::items.at(this->current_item_index);
+        return item::ITEMS.at(this->current_item_index);
     }
     return -1;
 }
 
 void player::set_item(const std::int32_t value) noexcept
 {
-    if (value >= 0 && value < item::items.size())
+    if (value >= 0 && value < item::ITEMS.size())
     {
         this->current_item_index = value;
     }
@@ -527,7 +528,7 @@ std::string player::get_local_time() const noexcept
     // Convert 0 to 12 for midnight/noon
     hour = hour ? hour : 12;
 
-    return std::string{mazes::string_utils::format("{}:{:02d}{}", hour, minute, am_pm)};
+    return fmt::format("{}:{:02d}{}", hour, minute, am_pm);
 }
 
 void player::initialize_actions()
@@ -796,8 +797,8 @@ void player::on_middle_click() noexcept
     const position *s = &this->pos;
     int hx, hy, hz;
     const int hw = current_voxel_world->hit_test(0, s->x, s->y, s->z, s->rx, s->ry, &hx, &hy, &hz);
-    if (const auto it = std::ranges::find(item::items, hw); it != item::items.end())
-        current_item_index = static_cast<std::int32_t>(it - item::items.begin());
+    if (const auto it = std::ranges::find(item::ITEMS, hw); it != item::ITEMS.end())
+        current_item_index = static_cast<std::int32_t>(it - item::ITEMS.begin());
 }
 
 void player::on_tag_sign() const noexcept
@@ -1025,71 +1026,72 @@ std::string player::get_artifact_export_result() noexcept
 // CAD Helper Functions (Tier 1)
 // ============================================================================
 
-const char *player::get_block_name(const int block_type) noexcept
+const char *player::get_block_name(item::BlockType block_type) noexcept
 {
+    using BlockType = item::BlockType;
     switch (block_type)
     {
-    case EMPTY:
+    case BlockType::EMPTY:
         return "Empty";
-    case GRASS:
+    case BlockType::GRASS:
         return "Grass";
-    case SAND:
+    case BlockType::SAND:
         return "Sand";
-    case STONE:
+    case BlockType::STONE:
         return "Stone";
-    case BRICK:
+    case BlockType::BRICK:
         return "Brick";
-    case WOOD:
+    case BlockType::WOOD:
         return "Wood";
-    case CEMENT:
+    case BlockType::CEMENT:
         return "Cement";
-    case DIRT:
+    case BlockType::DIRT:
         return "Dirt";
-    case PLANK:
+    case BlockType::PLANK:
         return "Plank";
-    case SNOW:
+    case BlockType::SNOW:
         return "Snow";
-    case GLASS:
+    case BlockType::GLASS:
         return "Glass";
-    case COBBLE:
+    case BlockType::COBBLE:
         return "Cobblestone";
-    case LIGHT_STONE:
+    case BlockType::LIGHT_STONE:
         return "Light Stone";
-    case DARK_STONE:
+    case BlockType::DARK_STONE:
         return "Dark Stone";
-    case CHEST:
+    case BlockType::CHEST:
         return "Chest";
-    case LEAVES:
+    case BlockType::LEAVES:
         return "Leaves";
-    case CLOUD:
+    case BlockType::CLOUD:
         return "Cloud";
-    case TALL_GRASS:
+    case BlockType::TALL_GRASS:
         return "Tall Grass";
-    case YELLOW_FLOWER:
+    case BlockType::YELLOW_FLOWER:
         return "Yellow Flower";
-    case RED_FLOWER:
+    case BlockType::RED_FLOWER:
         return "Red Flower";
-    case PURPLE_FLOWER:
+    case BlockType::PURPLE_FLOWER:
         return "Purple Flower";
-    case SUN_FLOWER:
+    case BlockType::SUN_FLOWER:
         return "Sun Flower";
-    case WHITE_FLOWER:
+    case BlockType::WHITE_FLOWER:
         return "White Flower";
-    case BLUE_FLOWER:
+    case BlockType::BLUE_FLOWER:
         return "Blue Flower";
-    case SDL_LOGO:
+    case BlockType::SDL_LOGO:
         return "SDL Logo";
-    case SFML_LOGO:
+    case BlockType::SFML_LOGO:
         return "SFML Logo";
-    case CACTUS_1:
+    case BlockType::CACTUS_1:
         return "Cactus 1";
-    case CACTUS_2:
+    case BlockType::CACTUS_2:
         return "Cactus 2";
     default:
-        if (block_type >= COLOR_00 && block_type <= COLOR_31)
+        if (block_type >= BlockType::COLOR_00 && block_type <= BlockType::COLOR_31)
         {
             static char color_name[32];
-            SDL_snprintf(color_name, sizeof(color_name), "Color %02d", block_type - COLOR_00);
+            SDL_snprintf(color_name, sizeof(color_name), "Color %02d", static_cast<int>(block_type) - static_cast<int>(BlockType::COLOR_00));
             return color_name;
         }
         return "Unknown";

@@ -12,7 +12,8 @@
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
-#include <MazeBuilder/string_utils.h>
+
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <array>
@@ -46,7 +47,7 @@ namespace
     constexpr unsigned int MAZE_COLS = WINDOW_WIDTH / MAZE_CELL_SIZE;
     constexpr float MAZE_WALL_SIZE = 4.f;
     constexpr float MAZE_PIXELS_PER_METER = MAZE_CELL_SIZE;
-    constexpr float BALL_RADIUS_PIXELS = 6.f;
+    constexpr float BALL_RADIUS_PIXELS = static_cast<float>(MAZE_CELL_SIZE) / 4.f;
 
     struct maze_cell_walls
     {
@@ -276,6 +277,12 @@ namespace
         std::vector<b2BodyId> physics_wall_bodies;
         std::vector<dynamic_ball> physics_balls;
 
+        // Physics geometry is built in its own "virtual" pixel space (MAZE_CELL_SIZE
+        // based); these scale factors map that space onto the actual window so ball
+        // rendering and mouse picking line up with the maze texture drawn on screen.
+        float world_scale_x{1.0f};
+        float world_scale_y{1.0f};
+
         void load_font()
         {
             const std::array<std::filesystem::path, 6> CANDIDATES{
@@ -356,6 +363,19 @@ namespace
             return {x / MAZE_PIXELS_PER_METER, y / MAZE_PIXELS_PER_METER};
         }
 
+        // Converts a real window pixel (e.g. mouse position) into physics meters,
+        // undoing the virtual-to-window stretch applied at render time.
+        [[nodiscard]] b2Vec2 screen_px_to_world_m(const float x, const float y) const
+        {
+            return px_to_m(x / world_scale_x, y / world_scale_y);
+        }
+
+        // Converts a physics position (meters) into a real window pixel position.
+        [[nodiscard]] sf::Vector2f world_m_to_screen_px(const b2Vec2 p) const
+        {
+            return {p.x * MAZE_PIXELS_PER_METER * world_scale_x, p.y * MAZE_PIXELS_PER_METER * world_scale_y};
+        }
+
         void add_wall_body_from_rect(const float x, const float y, const float w, const float h)
         {
             b2BodyDef body_def = b2DefaultBodyDef();
@@ -374,7 +394,7 @@ namespace
         {
             b2BodyDef body_def = b2DefaultBodyDef();
             body_def.type = b2_dynamicBody;
-            body_def.position = px_to_m(position.x, position.y);
+            body_def.position = screen_px_to_world_m(position.x, position.y);
             body_def.linearDamping = 0.08f;
             body_def.angularDamping = 0.10f;
             b2BodyId body = b2CreateBody(world_with_physics, &body_def);
@@ -398,7 +418,7 @@ namespace
 
         [[nodiscard]] std::optional<std::size_t> find_ball_at(const sf::Vector2f pos_pixels) const
         {
-            const b2Vec2 target = px_to_m(pos_pixels.x, pos_pixels.y);
+            const b2Vec2 target = screen_px_to_world_m(pos_pixels.x, pos_pixels.y);
             float best_dist_sq = 1e9f;
             std::optional<std::size_t> best_index;
 
@@ -428,6 +448,9 @@ namespace
 
             const float world_w = static_cast<float>(current_maze_struct->columns) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE);
             const float world_h = static_cast<float>(current_maze_struct->rows) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE);
+
+            world_scale_x = world_w > 0.0f ? static_cast<float>(WINDOW_WIDTH) / world_w : 1.0f;
+            world_scale_y = world_h > 0.0f ? static_cast<float>(WINDOW_HEIGHT) / world_h : 1.0f;
 
             add_wall_body_from_rect(-MAZE_WALL_SIZE, -MAZE_WALL_SIZE, world_w + MAZE_WALL_SIZE * 2.f, MAZE_WALL_SIZE);
             add_wall_body_from_rect(-MAZE_WALL_SIZE, world_h, world_w + MAZE_WALL_SIZE * 2.f, MAZE_WALL_SIZE);
@@ -500,7 +523,7 @@ namespace
                       " --output=" + MAZE_TEMP_IMAGE_PATH.string() +
                       " --distances=[0:-1]";
 
-            std::cout << mazes::string_utils::format("AmazingSFML: Requesting maze generation with: {}\n", request);
+            std::cout << fmt::format("AmazingSFML: Requesting maze generation with: {}\n", request);
 
             const auto apply_start = std::chrono::steady_clock::now();
             const auto result = app->apply(request);
@@ -548,7 +571,8 @@ namespace
             {
                 const float x = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (1.0f + static_cast<float>(RNG(0, static_cast<int>(current_maze_struct->columns - 2u))));
                 const float y = (MAZE_CELL_SIZE + MAZE_WALL_SIZE) * (0.6f + static_cast<float>(RNG(0, 4)) * 0.35f);
-                add_ball({x, y});
+                // x/y above are virtual-space; convert to real window pixels for add_ball.
+                add_ball({x * world_scale_x, y * world_scale_y});
 
                 if (!physics_balls.empty())
                 {
@@ -605,7 +629,7 @@ namespace
                         if (const auto idx = find_ball_at(pos))
                         {
                             const b2Vec2 p = b2Body_GetPosition(physics_balls[*idx].body);
-                            const b2Vec2 target = px_to_m(pos.x, pos.y);
+                            const b2Vec2 target = screen_px_to_world_m(pos.x, pos.y);
                             const b2Vec2 impulse = {(target.x - p.x) * 3.0f, (target.y - p.y) * 3.0f};
                             b2Body_ApplyLinearImpulseToCenter(physics_balls[*idx].body, impulse, true);
                         }
@@ -622,7 +646,7 @@ namespace
                     if (grabbed_ball_index)
                     {
                         const sf::Vector2f pos{static_cast<float>(moved->position.x), static_cast<float>(moved->position.y)};
-                        const b2Vec2 p = px_to_m(pos.x, pos.y);
+                        const b2Vec2 p = screen_px_to_world_m(pos.x, pos.y);
                         b2Body_SetTransform(physics_balls[*grabbed_ball_index].body, p, b2Rot_identity);
                         b2Body_SetLinearVelocity(physics_balls[*grabbed_ball_index].body, {0.0f, 0.0f});
                     }
@@ -643,7 +667,8 @@ namespace
             for (auto &ball : physics_balls)
             {
                 const b2Vec2 p = b2Body_GetPosition(ball.body);
-                ball.drawable.setPosition({p.x * MAZE_PIXELS_PER_METER, p.y * MAZE_PIXELS_PER_METER});
+                ball.drawable.setPosition(world_m_to_screen_px(p));
+                ball.drawable.setScale({world_scale_x, world_scale_y});
             }
         }
     };

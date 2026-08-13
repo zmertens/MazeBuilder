@@ -16,42 +16,6 @@ namespace mazes
     /// @related https://github.com/PacktPublishing/CPP-20-STL-Cookbook/blob/main/chap11/split.cpp
     class string_utils
     {
-    public:
-        /// @brief Combine and return two strings
-        /// @param a The first string
-        /// @param b The second string
-        /// @return The concatenated string
-        static std::string concat(const std::string& a, const std::string& b) noexcept;
-
-        /// @brief Check if a string contains a substring
-        /// @param str The string to search in
-        /// @param substr The substring to search for
-        /// @return True if substr is found in str, false otherwise
-        static bool contains(const std::string& str, const std::string& substr) noexcept;
-
-        /// @brief Extract file extension from a filename
-        /// @param filename The filename to process
-        /// @return The file extension, excluding the dot, or empty string if no extension
-        static std::string get_file_extension(const std::string& filename) noexcept;
-
-        /// @brief Check if a string ends with a specific suffix
-        /// @param str The string to check
-        /// @param suffix The suffix to check for
-        /// @return True if str ends with suffix, false otherwise
-        static bool ends_with(const std::string& str, const std::string& suffix) noexcept;
-
-        /// @brief Find a character in a string_view
-        /// @param sv The string_view to search in
-        /// @param c The character to search for
-        /// @return True if c is found in sv, false otherwise
-        static bool find(std::string_view sv, char c) noexcept;
-
-        /// @brief Find the first occurrence of any character from a set in a string view
-        /// @param s The string view to search in
-        /// @param chars The set of characters to search for
-        /// @return A string view starting from the first occurrence of any character in chars, or the end of s if none found
-        static std::string_view find_first_of(const std::string_view& s, const std::string_view& chars) noexcept;
-
     private:
         // Helper trait to detect if a type has push_back method - local to this function
         template <typename T, typename = void>
@@ -60,19 +24,18 @@ namespace mazes
         };
 
         template <typename T>
-        struct has_push_back<T, std::void_t<decltype(std::declval<T>().push_back(std::declval<typename T::value_type>())
-                             )>> : std::true_type
+        struct has_push_back<T, std::void_t<decltype(std::declval<T>().push_back(std::declval<typename T::value_type>()))>> : std::true_type
         {
         };
 
         /// @brief Default equality predicate for split functions
-        static constexpr auto eq = []<typename T0, typename T1>(const T0& el, const T1& sep) -> bool
+        static constexpr auto eq = [](const auto &el, const auto &sep) -> bool
         {
             using std::is_convertible_v;
             using std::is_same_v;
 
-            using ElType = std::decay_t<T0>;
-            using SepType = std::decay_t<T1>;
+            using ElType = decltype(el);
+            using SepType = decltype(sep);
 
             if constexpr (is_same_v<ElType, SepType>)
             {
@@ -93,6 +56,24 @@ namespace mazes
         };
 
     public:
+        /// @brief Combine and return two strings
+        /// @param a The first string
+        /// @param b The second string
+        /// @return A representation of the concatenated string
+        static std::string_view concat(const std::string &a, const std::string &b) noexcept;
+
+        /// @brief Check if a string contains a substring
+        /// @param str The string to search in
+        /// @param substr The substring to search for
+        /// @return True if substr is found in str, false otherwise
+        static bool contains(const std::string &str, const std::string &substr) noexcept;
+
+        /// @brief Check if a string ends with a specific suffix
+        /// @param str The string to check
+        /// @param suffix The suffix to check for
+        /// @return True if str ends with suffix, false otherwise
+        static bool ends_with(const std::string &str, const std::string &suffix) noexcept;
+
         /// @brief Splits a range into slices based on a separator and stores the results in a destination container.
         /// @tparam It Type of the iterator for the input range.
         /// @tparam Oc Type of the output container that will store the slices.
@@ -105,7 +86,7 @@ namespace mazes
         /// @param f Predicate function that determines if an element matches the separator.
         /// @return Iterator pointing to the position after the last processed element, or end_it if the entire range was processed.
         template <typename It, typename Oc, typename V, typename Pred>
-        static It split(It it, const It end_it, Oc& dest, const V& sep, Pred f)
+        static It split(It it, const It end_it, Oc &dest, const V &sep, Pred f)
         {
             using std::is_same_v;
             using std::string;
@@ -163,7 +144,7 @@ namespace mazes
         /// @param sep Separator value
         /// @return Iterator to end position
         template <typename It, typename Oc, typename V>
-        static It split(It it, const It end_it, Oc& dest, const V& sep)
+        static It split(It it, const It end_it, Oc &dest, const V &sep)
         {
             return split(it, end_it, dest, sep, eq);
         }
@@ -177,7 +158,7 @@ namespace mazes
         /// @param sep Separator value
         /// @return Reference to output container
         template <typename Cin, typename Cout, typename V>
-        static Cout& strsplit(const Cin& str, Cout& dest, const V& sep)
+        static Cout &strsplit(const Cin &str, Cout &dest, const V &sep)
         {
             split(str.begin(), str.end(), dest, sep, eq);
             return dest;
@@ -188,7 +169,7 @@ namespace mazes
         /// @param c The character to check for whitespace.
         /// @return True if the character is a whitespace character; otherwise, false.
         template <typename T>
-        static bool is_whitespace(const T& c)
+        static bool is_whitespace(const T &c)
         {
             using std::is_same_v;
             using std::string_view;
@@ -205,44 +186,23 @@ namespace mazes
             {
                 // For other types, do individual comparisons
                 return c == static_cast<T>(' ') ||
-                    c == static_cast<T>('\t') ||
-                    c == static_cast<T>('\r') ||
-                    c == static_cast<T>('\n') ||
-                    c == static_cast<T>('\v') ||
-                    c == static_cast<T>('\f');
+                       c == static_cast<T>('\t') ||
+                       c == static_cast<T>('\r') ||
+                       c == static_cast<T>('\n') ||
+                       c == static_cast<T>('\v') ||
+                       c == static_cast<T>('\f');
             }
         }
 
         /// @brief Removes consecutive whitespace characters from a string, leaving only single whitespace between non-whitespace characters.
         /// @param s The input string from which to strip consecutive whitespace.
         /// @return A new string with consecutive whitespace characters replaced by a single whitespace.
-        static std::string strip_whitespace(const std::string& s)
+        static std::string_view strip_whitespace(const std::string &s)
         {
-            using std::string;
-            using std::unique;
-
-            string outputString{s};
-
-            const auto its = unique(outputString.begin(), outputString.end(),
-                                    [](const auto& a, const auto& b)
-                                    {
-                                        return is_whitespace(a) && is_whitespace(b);
-                                    });
-
-            outputString.erase(its, outputString.end());
-
-            outputString.shrink_to_fit();
-
-            return outputString;
+            std::string_view output_str{s};
+            output_str.remove_prefix(std::min(output_str.find_first_not_of(" \t\r\n\v\f"), output_str.size()));
+            return output_str;
         }
-
-        /// @brief Simple wrapper for fmt::format using runtime format strings (string_view)
-        /// @tparam Args Types of the arguments to format
-        /// @param format_str Format string as string_view
-        /// @param args Arguments to format
-        /// @return Formatted string
-        template <typename... Args>
-        static std::string format(std::string_view format_str, const Args&... args) noexcept;
     }; // class
 } // namespace
 

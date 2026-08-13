@@ -323,7 +323,7 @@ TEST_CASE("Args mask combined with other options", "[args][mask][combined]")
 {
     args args_handler;
 
-    REQUIRE(args_handler.parse("-m mask.txt -a dfs -r 10 -c 10"));
+    REQUIRE(args_handler.parse("-m mask.txt -a dfs -r 10 -c 10"s));
 
     const auto mask_val = args_handler.get(args::MASK_WORD_STR);
     REQUIRE(mask_val.has_value());
