@@ -1,6 +1,7 @@
 #include "geometries.h"
 
 #include <array>
+#include <mutex>
 
 #include <SDL3/SDL.h>
 
@@ -448,15 +449,25 @@ std::optional<maze_preview_frame> geometries::generate_maze_preview(const mazes:
                    " --seed=" + std::to_string(config.seed()) +
                    " --output=stdout";
 
-    [[maybe_unused]] const auto maze_result = app->apply(maze_request);
-
-    const auto grid = app->get_finished_text();
-    if (grid.empty())
+    // runtime_app is a shared singleton whose apply()/get_finished_text() mutate and read
+    // an internal buffer; this can be called concurrently from player's async preview task
+    // and other call sites (e.g. the menu Builder tab), so serialize the request/response pair.
+    static std::mutex runtime_app_mutex;
+    mazes::topology topo;
     {
-        return std::nullopt;
+        std::lock_guard<std::mutex> lock{runtime_app_mutex};
+
+        [[maybe_unused]] const auto maze_result = app->apply(maze_request);
+
+        const auto grid = app->get_finished_text();
+        if (grid.empty())
+        {
+            return std::nullopt;
+        }
+
+        topo = mazes::topology::parse(grid);
     }
 
-    const auto topo = mazes::topology::parse(grid);
     if (topo.rows == 0u || topo.columns == 0u)
     {
         return std::nullopt;

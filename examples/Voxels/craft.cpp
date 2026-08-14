@@ -23,6 +23,7 @@
 #include <SDL3/SDL.h>
 
 #include "db.h"
+#include "geometries.h"
 #include "resource_manager.h"
 #include "font.h"
 #include "player.h"
@@ -34,6 +35,7 @@
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
@@ -170,7 +172,7 @@ struct craft::craft_impl
             auto it = std::ranges::find_if(reversed, [](const auto &state_ptr)
                                            { return dynamic_cast<Pointer>(state_ptr.get()) != nullptr; });
 
-            if (it != std::ranges::end(reversed))
+            if (it != std::ranges::cend(reversed))
             {
                 return dynamic_cast<Pointer>(it->get());
             }
@@ -180,6 +182,7 @@ struct craft::craft_impl
 
         void update(const float delta_time, mazes::randomizer &rng) noexcept
         {
+            apply_pending_changes();
             for (auto it = active_stack.rbegin(); it != active_stack.rend(); ++it)
             {
                 if (!(*it)->update(delta_time, std::ref(rng)))
@@ -187,8 +190,6 @@ struct craft::craft_impl
                     break;
                 }
             }
-
-            apply_pending_changes();
         }
 
         void draw() const noexcept
@@ -569,7 +570,7 @@ struct craft::craft_impl
     {
         std::vector<FontIdentifier> selectable_fonts;
         std::list<std::string> algo_list;
-        mutable std::string cached_artifacts;   // Cache for expensive artifacts generation
+        mutable std::string cached_artifacts;            // Cache for expensive artifacts generation
         mutable bool artifact_export_in_progress{false}; // Track if async export was started
 
     public:
@@ -857,6 +858,95 @@ struct craft::craft_impl
                         }
                         ImGui::SliderInt("Seed", &seed, 0, 1000000);
                         ImGui::EndChild();
+
+                        ImGui::Spacing();
+
+                        // ── Preview box ────────────────────────────────────────
+                        // Non-interactive top-down layout preview, regenerated whenever the
+                        // dimensions/algorithm/seed above change. This is the same layout that
+                        // 'Make New World' will build, so it doubles as a WYSIWYG-before-commit check.
+                        {
+                            static std::uint32_t preview_gl_texture = 0;
+                            static int preview_tex_w = 0;
+                            static int preview_tex_h = 0;
+                            static bool preview_generated = false;
+                            static int cached_rows = -1;
+                            static int cached_columns = -1;
+                            static int cached_seed = -1;
+                            static std::string cached_algo;
+
+                            const bool config_dirty = !preview_generated ||
+                                                      cached_rows != rows || cached_columns != columns ||
+                                                      cached_seed != seed || cached_algo != selected_algo;
+
+                            if (config_dirty)
+                            {
+                                const auto preview_config = mazes::configurator{}
+                                                                .algo_id(mazes::to_algo_from_sv(selected_algo))
+                                                                .rows(static_cast<unsigned int>(rows))
+                                                                .columns(static_cast<unsigned int>(columns))
+                                                                .levels(1u)
+                                                                .seed(static_cast<unsigned int>(seed));
+
+                                if (const auto frame = geometries::generate_maze_preview(preview_config); frame.has_value())
+                                {
+                                    if (preview_gl_texture == 0 || preview_tex_w != frame->width || preview_tex_h != frame->height)
+                                    {
+                                        if (preview_gl_texture != 0)
+                                        {
+                                            glDeleteTextures(1, &preview_gl_texture);
+                                        }
+                                        glGenTextures(1, &preview_gl_texture);
+                                        glBindTexture(GL_TEXTURE_2D, preview_gl_texture);
+                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame->width, frame->height, 0,
+                                                     GL_RGBA, GL_UNSIGNED_BYTE, frame->pixel_data.data());
+                                        preview_tex_w = frame->width;
+                                        preview_tex_h = frame->height;
+                                    }
+                                    else
+                                    {
+                                        glBindTexture(GL_TEXTURE_2D, preview_gl_texture);
+                                        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame->width, frame->height,
+                                                        GL_RGBA, GL_UNSIGNED_BYTE, frame->pixel_data.data());
+                                    }
+                                    glBindTexture(GL_TEXTURE_2D, 0);
+
+                                    cached_rows = rows;
+                                    cached_columns = columns;
+                                    cached_seed = seed;
+                                    cached_algo = selected_algo;
+                                    preview_generated = true;
+                                }
+                            }
+
+                            ImGui::BeginChild("##builderpreview", ImVec2(0.f, 190.f), ImGuiChildFlags_Borders);
+                            ImGui::TextColored(HEADER_COL, "Preview (non-interactive)");
+                            ImGui::Separator();
+                            if (preview_generated && preview_gl_texture != 0 && preview_tex_w > 0 && preview_tex_h > 0)
+                            {
+                                const float avail_w = ImGui::GetContentRegionAvail().x;
+                                const float aspect = static_cast<float>(preview_tex_w) / static_cast<float>(preview_tex_h);
+                                constexpr float max_h = 140.f;
+                                float disp_w = avail_w;
+                                float disp_h = disp_w / aspect;
+                                if (disp_h > max_h)
+                                {
+                                    disp_h = max_h;
+                                    disp_w = disp_h * aspect;
+                                }
+                                ImGui::Image(static_cast<ImTextureID>(preview_gl_texture), ImVec2(disp_w, disp_h));
+                                ImGui::TextDisabled("This layout is used when you press 'Make New World'");
+                            }
+                            else
+                            {
+                                ImGui::TextDisabled("Adjust Rows/Columns/Algorithm/Seed above to preview the layout");
+                            }
+                            ImGui::EndChild();
+                        }
 
                         ImGui::Spacing();
 
@@ -1290,6 +1380,7 @@ struct craft::craft_impl
         register_states();
 
         crafting_states->push_state(StateIdentifier::EDITOR);
+        crafting_states->push_state(StateIdentifier::MENU);
         crafting_states->push_state(StateIdentifier::LOADING);
     }
 
