@@ -2,6 +2,7 @@
 #define PROGRESS_H
 
 #include <chrono>
+#include <functional>
 #include <mutex>
 #include <utility>
 #include <type_traits>
@@ -41,13 +42,13 @@ namespace mazes
             progress p;
             p.start();
 
-            if constexpr (std::is_void_v<std::invoke_result_t<F, Args...>>)
+            if constexpr (std::is_void_v<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>)
             {
                 std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
             }
             else
             {
-                auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+                const auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
                 if (!result)
                 {
                     return Duration::zero();

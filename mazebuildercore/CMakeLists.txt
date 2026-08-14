@@ -27,8 +27,9 @@ set(MAZE_BUILDER_CORE_SRCS
     runtime_stack.cpp
     state.cpp
     stringify_create_state.cpp
-    string_utils.cpp
+    string_utils.cpp    
     sw_maze_create_state.cpp
+    topology.cpp
     wavefront_object_create_state.cpp)
 
 if(MAZE_BUILDER_COVERAGE)

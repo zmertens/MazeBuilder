@@ -317,23 +317,24 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         REQUIRE_FALSE(m.value().empty());
     }
 
-    SECTION("Quick benchmark on parsing")
+#if defined(MAZE_BENCHMARK)
+    SECTION("Parsing benchmarks")
     {
         vector<string> args_vec = {args::JSON_FLAG_STR, VALID_JSON_STR_2};
 
-        auto benchmark = [&args_handler, &args_vec](auto iterations = 10) -> void
+        static constexpr auto ITERATIONS = 1'000;
+        auto benchmark = [&args_handler, &args_vec](auto iterations) -> void
         {
-            for (auto i = 0; i < iterations; ++i)
-            {
-                REQUIRE(args_handler.parse(args_vec));
-            }
+            std::ranges::for_each(std::views::iota(0, iterations), [&args_handler, &args_vec](auto)
+                                  { REQUIRE(args_handler.parse(args_vec)); });
         };
-        auto time = progress<>::duration(benchmark, 10);
+        auto time = mazes::progress<>::duration(benchmark, ITERATIONS);
 
-        fmt::print("Benchmark: Parsed JSON string in {} microseconds for iterations: {}\n",
-            std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(time).count()),
-            std::to_string(10));
+        fmt::print("Benchmark: Parsed JSON string in {:.3f} milliseconds for iterations: {}\n",
+                   mazes::progress<>::to_double_from_duration(time),
+                   std::to_string(ITERATIONS));
     }
+#endif // MAZE_BENCHMARK
 }
 
 TEST_CASE("Args can handle a JSON file input", "[json_file_input]")

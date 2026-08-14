@@ -9,9 +9,9 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/buildinfo.h>
 #include <MazeBuilder/bytes.h>
-#include <MazeBuilder/cell.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/topology.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 
@@ -107,151 +107,6 @@ namespace
         }
 
         return response.substr(response.size() < header_end + 4u ? response.size() : header_end + 4u);
-    }
-
-    struct maze_cell_walls
-    {
-        bool north{true};
-        bool south{true};
-        bool east{true};
-        bool west{true};
-    };
-
-    struct maze_topology
-    {
-        unsigned int rows{0};
-        unsigned int columns{0};
-        std::vector<maze_cell_walls> cells;
-
-        [[nodiscard]] const maze_cell_walls *at(const unsigned int row, const unsigned int col) const noexcept
-        {
-            if (row >= rows || col >= columns)
-            {
-                return nullptr;
-            }
-
-            const auto idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(columns) + static_cast<std::size_t>(col);
-            return &cells[idx];
-        }
-    };
-
-    maze_topology build_topology_from_grid(const std::string_view txt)
-    {
-        if (txt.empty())
-        {
-            return {};
-        }
-
-        std::vector<std::string_view> lines;
-        lines.reserve(static_cast<std::size_t>(std::count(txt.begin(), txt.end(), '\n')) + 1u);
-
-        std::size_t start = 0u;
-        while (start <= txt.size())
-        {
-            const std::size_t end = txt.find('\n', start);
-            std::string_view line = (end == std::string_view::npos)
-                                        ? txt.substr(start)
-                                        : txt.substr(start, end - start);
-
-            if (!line.empty() && line.back() == '\r')
-            {
-                line.remove_suffix(1u);
-            }
-
-            if (!line.empty())
-            {
-                lines.push_back(line);
-            }
-
-            if (end == std::string_view::npos)
-            {
-                break;
-            }
-            start = end + 1u;
-        }
-
-        if (lines.empty() || lines.at(0).size() < 3u)
-        {
-            return {};
-        }
-
-        const std::string_view top_border = lines.front();
-        std::vector<std::size_t> plus_positions;
-        plus_positions.reserve(top_border.size());
-        for (std::size_t i = 0u; i < top_border.size(); ++i)
-        {
-            if (top_border[i] == '+')
-            {
-                plus_positions.push_back(i);
-            }
-        }
-
-        if (plus_positions.size() < 2u)
-        {
-            return {};
-        }
-
-        const auto rows_count = static_cast<unsigned int>((lines.size() - 1u) / 2u);
-        const auto cols_count = static_cast<unsigned int>(plus_positions.size() - 1u);
-
-        maze_topology out{};
-        out.rows = rows_count;
-        out.columns = cols_count;
-        out.cells.resize(static_cast<std::size_t>(out.rows) * static_cast<std::size_t>(out.columns));
-
-        auto has_horizontal_wall = [](const std::string_view border, const std::size_t from, const std::size_t to) -> bool
-        {
-            if (from >= border.size() || to > border.size() || from >= to)
-            {
-                return false;
-            }
-
-            for (std::size_t i = from; i < to; ++i)
-            {
-                if (border[i] == '-')
-                {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        for (unsigned int row = 0u; row < out.rows; ++row)
-        {
-            const std::size_t top_line_index = 1u + static_cast<std::size_t>(row) * 2u;
-            const std::size_t bottom_line_index = top_line_index + 1u;
-            const std::size_t north_border_index = static_cast<std::size_t>(row) * 2u;
-
-            if (bottom_line_index >= lines.size() || north_border_index >= lines.size())
-            {
-                break;
-            }
-
-            const std::string_view top_line = lines[top_line_index];
-            const std::string_view bottom_line = lines[bottom_line_index];
-            const std::string_view north_border = lines[north_border_index];
-
-            for (unsigned int col = 0u; col < out.columns; ++col)
-            {
-                const std::size_t left = plus_positions[col];
-                const std::size_t right = plus_positions[col + 1u];
-
-                maze_cell_walls cell_data{};
-                cell_data.north = has_horizontal_wall(north_border, left + 1u, right);
-                cell_data.south = has_horizontal_wall(bottom_line, left + 1u, right);
-
-                const std::size_t west_idx = left;
-                const std::size_t east_idx = right;
-                cell_data.west = (west_idx < top_line.size()) ? (top_line[west_idx] == '|') : true;
-                cell_data.east = (east_idx < top_line.size()) ? (top_line[east_idx] == '|') : true;
-
-                const auto idx = static_cast<std::size_t>(row) * static_cast<std::size_t>(out.columns) + static_cast<std::size_t>(col);
-                out.cells[idx] = cell_data;
-            }
-        }
-
-        return out;
     }
 
     struct dynamic_ball
@@ -409,7 +264,7 @@ namespace
     private:
         const sf::Color current_wall_color;
         sf::RenderWindow sfml_window;
-        std::optional<maze_topology> current_maze_struct;
+        std::optional<mazes::topology> current_maze_struct;
         sf::Texture maze_texture;
         sf::Sprite maze_sprite;
         bool has_maze_texture{false};
@@ -652,28 +507,28 @@ namespace
                     const float cx = static_cast<float>(col) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE) + MAZE_WALL_SIZE;
                     const float cy = static_cast<float>(row) * (MAZE_CELL_SIZE + MAZE_WALL_SIZE) + MAZE_WALL_SIZE;
 
-                    const auto *cell = current_maze_struct->at(row, col);
-                    if (!cell)
+                    const auto *cw = current_maze_struct->at(row, col);
+                    if (!cw)
                     {
                         continue;
                     }
 
                     // Left/top boundaries come from the first row/column.
-                    if (col == 0u && cell->west)
+                    if (col == 0u && cw->west())
                     {
                         add_wall_body_from_rect(cx - MAZE_WALL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
                     }
-                    if (row == 0u && cell->north)
+                    if (row == 0u && cw->north())
                     {
                         add_wall_body_from_rect(cx, cy - MAZE_WALL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
                     }
 
-                    if (cell->east)
+                    if (cw->east())
                     {
                         add_wall_body_from_rect(cx + MAZE_CELL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
                     }
 
-                    if (cell->south)
+                    if (cw->south())
                     {
                         add_wall_body_from_rect(cx, cy + MAZE_CELL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
                     }
@@ -718,19 +573,19 @@ namespace
                         continue;
                     }
 
-                    if (col == 0u && cell->west)
+                    if (col == 0u && cell->west())
                     {
                         push_rect(cx - MAZE_WALL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
                     }
-                    if (row == 0u && cell->north)
+                    if (row == 0u && cell->north())
                     {
                         push_rect(cx, cy - MAZE_WALL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
                     }
-                    if (cell->east)
+                    if (cell->east())
                     {
                         push_rect(cx + MAZE_CELL_SIZE, cy, MAZE_WALL_SIZE, MAZE_CELL_SIZE);
                     }
-                    if (cell->south)
+                    if (cell->south())
                     {
                         push_rect(cx, cy + MAZE_CELL_SIZE, MAZE_CELL_SIZE, MAZE_WALL_SIZE);
                     }
@@ -793,7 +648,7 @@ namespace
             const auto delimiter_pos = after_metadata.find(NETWORK_IMAGE_DELIMITER);
             const std::string_view grid_text = after_metadata.substr(0u, delimiter_pos);
 
-            auto parsed_topology = build_topology_from_grid(grid_text);
+            auto parsed_topology = mazes::topology::parse(grid_text);
             if (parsed_topology.rows == 0u || parsed_topology.columns < 2u)
             {
                 set_network_status("Network fetch returned an invalid maze.");
@@ -928,7 +783,7 @@ namespace
 
             // Keep topology in logical maze cells (rows/columns). Resizing to pixel
             // dimensions creates hundreds of thousands of cells and can OOM at launch.
-            current_maze_struct = build_topology_from_grid(generated_grid);
+            current_maze_struct = mazes::topology::parse(generated_grid);
             if (!current_maze_struct.has_value() || current_maze_struct->rows == 0u || current_maze_struct->columns < 2u)
             {
                 throw std::runtime_error("AmazingSFML parsed an invalid topology from generated grid text.");

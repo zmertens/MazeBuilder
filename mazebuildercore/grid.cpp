@@ -155,7 +155,7 @@ std::string grid::get_file() const noexcept
     return this->m_file;
 }
 
-std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, const direction dir) const noexcept
+std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, const Direction dir) const noexcept
 {
     if (!c)
     {
@@ -176,25 +176,25 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const& c, const d
 
     switch (dir)
     {
-    case direction::NORTH:
+    case Direction::NORTH:
         if (row > 0)
         {
             neighbor_index = level * (rows * columns) + (row - 1) * columns + col;
         }
         break;
-    case direction::SOUTH:
+    case Direction::SOUTH:
         if (row < static_cast<int>(rows) - 1)
         {
             neighbor_index = level * (rows * columns) + (row + 1) * columns + col;
         }
         break;
-    case direction::EAST:
+    case Direction::EAST:
         if (col < static_cast<int>(columns) - 1)
         {
             neighbor_index = level * (rows * columns) + row * columns + (col + 1);
         }
         break;
-    case direction::WEST:
+    case Direction::WEST:
         if (col > 0)
         {
             neighbor_index = level * (rows * columns) + row * columns + (col - 1);
@@ -216,19 +216,19 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> con
     }
 
     // Get neighbors in all four directions
-    if (const auto north = get_neighbor(c, direction::NORTH))
+    if (const auto north = get_neighbor(c, Direction::NORTH))
     {
         neighbors.push_back(north);
     }
-    if (const auto south = get_neighbor(c, direction::SOUTH))
+    if (const auto south = get_neighbor(c, Direction::SOUTH))
     {
         neighbors.push_back(south);
     }
-    if (const auto east = get_neighbor(c, direction::EAST))
+    if (const auto east = get_neighbor(c, Direction::EAST))
     {
         neighbors.push_back(east);
     }
-    if (const auto west = get_neighbor(c, direction::WEST))
+    if (const auto west = get_neighbor(c, Direction::WEST))
     {
         neighbors.push_back(west);
     }
@@ -236,7 +236,7 @@ std::vector<std::shared_ptr<cell>> grid::get_neighbors(std::shared_ptr<cell> con
     return neighbors;
 }
 
-void grid::set_neighbor(const std::shared_ptr<cell>& c, direction dir, std::shared_ptr<cell> const& neighbor) noexcept
+void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, std::shared_ptr<cell> const& neighbor) noexcept
 {
     if (!c)
     {
@@ -263,22 +263,22 @@ void grid::set_neighbor(const std::shared_ptr<cell>& c, direction dir, std::shar
 // Convenience methods for accessing neighbors
 std::shared_ptr<cell> grid::get_north(const std::shared_ptr<cell>& c) const noexcept
 {
-    return get_neighbor(c, direction::NORTH);
+    return get_neighbor(c, Direction::NORTH);
 }
 
 std::shared_ptr<cell> grid::get_south(const std::shared_ptr<cell>& c) const noexcept
 {
-    return get_neighbor(c, direction::SOUTH);
+    return get_neighbor(c, Direction::SOUTH);
 }
 
 std::shared_ptr<cell> grid::get_east(const std::shared_ptr<cell>& c) const noexcept
 {
-    return get_neighbor(c, direction::EAST);
+    return get_neighbor(c, Direction::EAST);
 }
 
 std::shared_ptr<cell> grid::get_west(const std::shared_ptr<cell>& c) const noexcept
 {
-    return get_neighbor(c, direction::WEST);
+    return get_neighbor(c, Direction::WEST);
 }
 
 /// @brief Get the vertices for wavefront object file generation

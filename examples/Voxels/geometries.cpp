@@ -13,6 +13,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/topology.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
 #include <MazeBuilder/string_utils.h>
@@ -455,79 +456,82 @@ std::optional<maze_preview_frame> geometries::generate_maze_preview(const mazes:
         return std::nullopt;
     }
 
-    // const auto &grid_ops = mazes::parse_grid_operations(grid);
-    // const auto [width, height] = calculate_pixel_dimensions(config.rows(), config.columns());
-    // std::vector<std::uint8_t> pixel_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
+    const auto topo = mazes::topology::parse(grid);
+    if (topo.rows == 0u || topo.columns == 0u)
+    {
+        return std::nullopt;
+    }
 
-    // const std::array<std::uint8_t, 4> wall_color{24u, 28u, 34u, 255u};
-    // const std::array<std::uint8_t, 4> floor_color{244u, 241u, 232u, 255u};
+    const auto [width, height] = calculate_pixel_dimensions(config.rows(), config.columns());
+    std::vector<std::uint8_t> pixel_data(static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u);
 
-    // auto set_pixel = [&](int x, int y, const std::array<std::uint8_t, 4> &color)
-    // {
-    //     if (x >= 0 && y >= 0 && x < width && y < height)
-    //     {
-    //         const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4u;
-    //         pixel_data[offset + 0] = color[0];
-    //         pixel_data[offset + 1] = color[1];
-    //         pixel_data[offset + 2] = color[2];
-    //         pixel_data[offset + 3] = color[3];
-    //     }
-    // };
+    const std::array<std::uint8_t, 4> wall_color{24u, 28u, 34u, 255u};
+    const std::array<std::uint8_t, 4> floor_color{244u, 241u, 232u, 255u};
 
-    // auto fill_rect = [&](int x0, int y0, int w, int h, const std::array<std::uint8_t, 4> &color)
-    // {
-    //     for (int y = y0; y < y0 + h; ++y)
-    //     {
-    //         for (int x = x0; x < x0 + w; ++x)
-    //         {
-    //             set_pixel(x, y, color);
-    //         }
-    //     }
-    // };
+    auto set_pixel = [&](int x, int y, const std::array<std::uint8_t, 4> &color)
+    {
+        if (x >= 0 && y >= 0 && x < width && y < height)
+        {
+            const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(width) + static_cast<std::size_t>(x)) * 4u;
+            pixel_data[offset + 0] = color[0];
+            pixel_data[offset + 1] = color[1];
+            pixel_data[offset + 2] = color[2];
+            pixel_data[offset + 3] = color[3];
+        }
+    };
 
-    // for (int y = 0; y < height; ++y)
-    // {
-    //     for (int x = 0; x < width; ++x)
-    //     {
-    //         set_pixel(x, y, wall_color);
-    //     }
-    // }
+    auto fill_rect = [&](int x0, int y0, int w, int h, const std::array<std::uint8_t, 4> &color)
+    {
+        for (int y = y0; y < y0 + h; ++y)
+        {
+            for (int x = x0; x < x0 + w; ++x)
+            {
+                set_pixel(x, y, color);
+            }
+        }
+    };
 
-    // for (unsigned int row = 0; row < config.rows(); ++row)
-    // {
-    //     for (unsigned int col = 0; col < config.columns(); ++col)
-    //     {
-    //         const auto index = static_cast<int>(row * config.columns() + col);
-    //         const auto current = grid_ops.search(index);
-    //         if (!current)
-    //         {
-    //             continue;
-    //         }
+    for (int y = 0; y < height; ++y)
+    {
+        for (int x = 0; x < width; ++x)
+        {
+            set_pixel(x, y, wall_color);
+        }
+    }
 
-    //         const int px = PIXELS_WALL_SIZE + static_cast<int>(col) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
-    //         const int py = PIXELS_WALL_SIZE + static_cast<int>(row) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
+    for (unsigned int row = 0; row < config.rows(); ++row)
+    {
+        for (unsigned int col = 0; col < config.columns(); ++col)
+        {
+            const auto *walls = topo.at(row, col);
+            if (!walls)
+            {
+                continue;
+            }
 
-    //         fill_rect(px, py, PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, floor_color);
+            const int px = PIXELS_WALL_SIZE + static_cast<int>(col) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
+            const int py = PIXELS_WALL_SIZE + static_cast<int>(row) * (PIXELS_CELL_SIZE + PIXELS_WALL_SIZE);
 
-    //         if (const auto east = grid_ops.get_east(current); east && current->is_linked(east))
-    //         {
-    //             fill_rect(px + PIXELS_CELL_SIZE, py, PIXELS_WALL_SIZE, PIXELS_CELL_SIZE, floor_color);
-    //         }
+            fill_rect(px, py, PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, floor_color);
 
-    //         if (const auto south = grid_ops.get_south(current); south && current->is_linked(south))
-    //         {
-    //             fill_rect(px, py + PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, PIXELS_WALL_SIZE, floor_color);
-    //         }
-    //     }
-    // }
+            if (!walls->east())
+            {
+                fill_rect(px + PIXELS_CELL_SIZE, py, PIXELS_WALL_SIZE, PIXELS_CELL_SIZE, floor_color);
+            }
 
-    // maze_preview_frame frame;
-    // frame.pixel_data = std::move(pixel_data);
-    // frame.width = width;
-    // frame.height = height;
-    // frame.scale = 1;
-    // return frame;
-    return {};
+            if (!walls->south())
+            {
+                fill_rect(px, py + PIXELS_CELL_SIZE, PIXELS_CELL_SIZE, PIXELS_WALL_SIZE, floor_color);
+            }
+        }
+    }
+
+    maze_preview_frame frame;
+    frame.pixel_data = std::move(pixel_data);
+    frame.width = width;
+    frame.height = height;
+    frame.scale = 1;
+    return frame;
 }
 
 void geometries::create_voxel_world(const std::function<void(voxels_map *, int, int, int, int)> &setter,

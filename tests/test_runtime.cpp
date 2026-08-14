@@ -28,18 +28,23 @@ TEST_CASE("E2E benchmarking with runtime", "[benchmark]")
     // No whitespace inside the JSON literal: apply() tokenizes on whitespace, which would split this into garbage tokens.
     constexpr std::string_view input = "--json=`{\"rows\":\"100\",\"columns\":\"100\",\"levels\":\"10\",\"seed\":\"3\",\"algo\":\"dfs\"}`";
 
-        constexpr auto ITERATIONS = 1;
+    auto printer = [](auto&& time, auto iterations) {
+            fmt::print("Benchmark: runtime apply took {:.4f} milliseconds for iterations: {}\n",
+               mazes::progress<>::to_double_from_duration(time),
+               std::to_string(iterations));
+    };
+
+    constexpr auto ITERATIONS = 1'000;
 
     auto benchmark = [](auto sv, auto iterations) -> void
     {
         std::ranges::for_each(std::views::iota(0, iterations), [sv](auto)
                               { REQUIRE_FALSE(inst->apply(sv).empty()); });
     };
-    auto time = progress<>::duration(benchmark, input, ITERATIONS);
-
-    fmt::print("Benchmark: runtime apply took {} microseconds for iterations: {}\n",
-               std::to_string(std::chrono::duration_cast<std::chrono::microseconds>(time).count()),
-               std::to_string(ITERATIONS));
+    auto time = mazes::progress<>::duration(benchmark, input, 1);
+    printer(time, 1);
+    time = mazes::progress<>::duration(benchmark, input, ITERATIONS);
+    printer(time, ITERATIONS);
 }
 
 #endif // MAZE_BENCHMARK
