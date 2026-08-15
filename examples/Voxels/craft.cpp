@@ -41,6 +41,7 @@
 #include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <functional>
 #include <list>
@@ -51,6 +52,10 @@
 
 namespace
 {
+    static auto craft_using_gl_id{0u};
+    static auto craft_preview_target_width{0};
+    static auto craft_preview_target_height{0};
+
     enum class StackAction : unsigned int
     {
         PUSH = 0,
@@ -180,16 +185,20 @@ struct craft::craft_impl
             return nullptr;
         }
 
+        // True when 's' is the topmost (active) state - update() now visits every state
+        // unconditionally (background states keep ticking, e.g. so a Builder-tab preview
+        // stays alive), so states must self-check this before doing "I'm in control" work
+        // like grabbing mouse capture or processing realtime input.
+        [[nodiscard]] bool is_top(const state *s) const noexcept
+        {
+            return !active_stack.empty() && active_stack.back().get() == s;
+        }
+
         void update(const float delta_time, mazes::randomizer &rng) noexcept
         {
             apply_pending_changes();
-            for (auto it = active_stack.rbegin(); it != active_stack.rend(); ++it)
-            {
-                if (!(*it)->update(delta_time, std::ref(rng)))
-                {
-                    break;
-                }
-            }
+            std::ranges::for_each(active_stack.rbegin(), active_stack.rend(), [&](const auto &state_ptr)
+                                  { state_ptr->update(delta_time, std::ref(rng)); });
         }
 
         void draw() const noexcept
@@ -243,7 +252,6 @@ struct craft::craft_impl
                     break;
                 }
             }
-
             pending_changes_list.clear();
         }
 
@@ -264,128 +272,10 @@ struct craft::craft_impl
         }
     }; // state_stack
 
-    class loading_state;
-
-    // Handles main gameplay workflow (building, editing, and rendering the voxel world)
-    class editor_state final : public state
-    {
-        player &active_player;
-        std::optional<world> current_voxel_world;
-
-    public:
-        explicit editor_state(state_stack &stack, const context &_context)
-            : state{stack, _context}, active_player{*_context.active_player}
-        {
-        }
-
-        ~editor_state() override
-        {
-            if (current_voxel_world.has_value())
-            {
-                current_voxel_world.reset();
-            }
-        }
-
-        void draw() const noexcept override
-        {
-            if (current_voxel_world.has_value())
-            {
-                current_voxel_world->draw();
-            }
-        }
-
-        bool update(const float delta_time, mazes::randomizer &rng) noexcept override
-        {
-            auto &&ctx = get_context();
-            // Initialize world only after loading state has finished
-            if (!current_voxel_world.has_value())
-            {
-                if (const auto *loading = get_stack().peek_state<loading_state *>())
-                {
-                    if (loading->is_finished())
-                    {
-                        current_voxel_world.emplace(ctx.ctx_window, *ctx.ctx_fonts,
-                                                    &active_player, *ctx.ctx_shaders, *ctx.ctx_textures,
-                                                    ctx.ctx_sdl);
-
-                        current_voxel_world.value().init();
-
-                        // Enable mouse capture for editor
-                        SDL_SetWindowRelativeMouseMode(get_context().ctx_window, true);
-
-                        SDL_Log("Editor: World initialized after loading completed\n");
-                    }
-                }
-                // Loading state might already be popped, initialize if it's not in the stack
-                else
-                {
-                    current_voxel_world.emplace(ctx.ctx_window,
-                                                *ctx.ctx_fonts, &active_player,
-                                                *ctx.ctx_shaders, *ctx.ctx_textures,
-                                                ctx.ctx_sdl);
-
-                    // Enable mouse capture for editor
-                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, true);
-
-                    SDL_Log("Editor: World initialized (loading state not found)\n");
-                }
-            }
-
-            if (current_voxel_world.has_value())
-            {
-                // Re-enable mouse capture when returning from menu
-                if (!SDL_GetWindowRelativeMouseMode(ctx.ctx_window))
-                {
-                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, true);
-                }
-
-                active_player.update(delta_time, std::ref(rng));
-                current_voxel_world->update(delta_time, std::ref(rng));
-
-                auto &commands = current_voxel_world->get_command_queue();
-                active_player.handle_realtime_input(std::ref(commands));
-            }
-
-            return true;
-        }
-
-        bool handle_event(SDL_Event &event) noexcept override
-        {
-            auto &&ctx = get_context();
-            switch (event.type)
-            {
-            case SDL_EVENT_QUIT:
-                SDL_Log("Editor: Received SDL_QUIT event - clearing stack\n");
-                active_player.set_active(false);
-                return false;
-
-            case SDL_EVENT_KEY_DOWN:
-                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
-                {
-                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, false);
-                    request_stack_push(StateIdentifier::MENU);
-                    return false;
-                }
-                break;
-
-            default:
-                break;
-            }
-
-            if (current_voxel_world.has_value())
-            {
-                auto &commands = current_voxel_world->get_command_queue();
-                active_player.handle_event(event, std::ref(commands));
-                current_voxel_world->handle_event(event);
-            }
-
-            return true;
-        } // handle_event
-    }; // editor_state
-
     class loading_state final : public state
     {
         // Static once_flag to ensure load_resources is called only once across all instances
+        std::atomic<bool> resources_loaded{false};
         static std::once_flag LOAD_RESOURCES_ONCE_FLAG;
 
         void load_resources() const noexcept
@@ -488,9 +378,6 @@ struct craft::craft_impl
                     bitmap_font_path.data(), window_icon_path.data(), signs_path.data(), sky_path.data());
 #endif
         } // load_resources
-
-        bool m_has_finished{false};
-
     public:
         explicit loading_state(state_stack &_stack, const context &_context)
             : state(_stack, _context)
@@ -530,7 +417,7 @@ struct craft::craft_impl
 
                 ImGui::Spacing();
 
-                const char *status_text = m_has_finished ? "Complete!" : "Please wait...";
+                const char *status_text = resources_loaded ? "Complete!" : "Please wait...";
                 const float status_width = ImGui::CalcTextSize(status_text).x;
                 ImGui::SetCursorPosX((ImGui::GetWindowSize().x - status_width) * 0.5f);
                 ImGui::TextColored(ImVec4(0.933f, 1.0f, 0.8f, 1.0f), "%s", status_text);
@@ -542,12 +429,11 @@ struct craft::craft_impl
 
         bool update(const float delta_time, mazes::randomizer &rng) noexcept override
         {
-            if (!m_has_finished)
-            {
-                std::call_once(LOAD_RESOURCES_ONCE_FLAG, [this]()
-                               { load_resources(); });
+            std::call_once(LOAD_RESOURCES_ONCE_FLAG, [this]()
+                           { load_resources(); resources_loaded = true; });
 
-                m_has_finished = true;
+            if (resources_loaded)
+            {
                 request_stack_pop();
             }
 
@@ -559,32 +445,145 @@ struct craft::craft_impl
             return true;
         }
 
-        [[nodiscard]] bool is_finished() const noexcept
+        bool resources_have_loaded() const noexcept
         {
-            return m_has_finished;
+            return resources_loaded;
         }
-    };
+    }; // loading_state
+
+    // Handles main gameplay workflow (building, editing, and rendering the voxel world)
+    class editor_state final : public state
+    {
+        player &active_player;
+        std::optional<world> current_voxel_world;
+
+    public:
+        explicit editor_state(state_stack &stack, const context &_context)
+            : state{stack, _context}, active_player{*_context.active_player}
+        {
+        }
+
+        void draw_preview3D(int fbo, int width, int height) const noexcept
+        {
+            if (current_voxel_world.has_value())
+            {
+                current_voxel_world->draw_preview(fbo, width, height);
+            }
+        }
+
+        void draw() const noexcept override
+        {
+            if (current_voxel_world.has_value())
+            {
+                current_voxel_world->draw();
+            }
+        }
+
+        void rebuild_world() noexcept
+        {
+            if (current_voxel_world.has_value())
+            {
+                current_voxel_world.reset();
+            }
+        }
+
+        bool update(const float delta_time, mazes::randomizer &rng) noexcept override
+        {
+            auto &&ctx = get_context();
+            auto &&stk = get_stack();
+            const bool is_active_state = stk.is_top(this);
+
+            // Initialize world only after loading state has finished
+            if (!current_voxel_world.has_value())
+            {
+                if (auto *s = stk.peek_state<loading_state *>(); s && s->resources_have_loaded())
+                {
+                    current_voxel_world.emplace(ctx.ctx_window, *ctx.ctx_fonts,
+                                                &active_player, *ctx.ctx_shaders, *ctx.ctx_textures,
+                                                ctx.ctx_sdl);
+
+                    current_voxel_world.value().init();
+
+                    // Only grab the mouse when this state is actually in control.
+                    if (is_active_state)
+                    {
+                        SDL_SetWindowRelativeMouseMode(get_context().ctx_window, true);
+                    }
+
+                    SDL_Log("Editor: World initialized after loading completed\n");
+                }
+            }
+
+            if (current_voxel_world.has_value())
+            {
+                // Keep the world/daylight/chunk streaming alive in the background (so the
+                // Builder-tab live preview stays current), but only touch mouse capture and
+                // realtime input when this state is actually the one in control.
+                current_voxel_world->update(delta_time, std::ref(rng));
+
+                if (is_active_state)
+                {
+                    if (!SDL_GetWindowRelativeMouseMode(ctx.ctx_window))
+                    {
+                        SDL_SetWindowRelativeMouseMode(ctx.ctx_window, true);
+                    }
+
+                    active_player.update(delta_time, std::ref(rng));
+
+                    auto &commands = current_voxel_world->get_command_queue();
+                    active_player.handle_realtime_input(std::ref(commands));
+                }
+            }
+
+            return true;
+        }
+
+        bool handle_event(SDL_Event &event) noexcept override
+        {
+            auto &&ctx = get_context();
+            switch (event.type)
+            {
+            case SDL_EVENT_QUIT:
+                SDL_Log("Editor: Received SDL_QUIT event - clearing stack\n");
+                active_player.set_active(false);
+                return false;
+
+            case SDL_EVENT_KEY_DOWN:
+                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+                {
+                    SDL_SetWindowRelativeMouseMode(ctx.ctx_window, false);
+                    request_stack_push(StateIdentifier::MENU);
+                    return false;
+                }
+                break;
+
+            default:
+                break;
+            }
+
+            if (current_voxel_world.has_value())
+            {
+                auto &commands = current_voxel_world->get_command_queue();
+                active_player.handle_event(event, std::ref(commands));
+                current_voxel_world->handle_event(event);
+            }
+
+            return true;
+        } // handle_event
+    }; // editor_state
 
     // Handles GUI options
     class menu_state final : public state
     {
-        std::vector<FontIdentifier> selectable_fonts;
         std::list<std::string> algo_list;
-        mutable std::string cached_artifacts;            // Cache for expensive artifacts generation
-        mutable bool artifact_export_in_progress{false}; // Track if async export was started
+        mutable std::string cached_artifacts;
+        mutable bool artifact_export_in_progress{false};
+        mutable bool rebuild_world_requested{false};
 
     public:
         explicit menu_state(state_stack &stack, const context &context)
             : state{stack, context}
         {
-            selectable_fonts.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
-            std::ranges::for_each(
-                std::views::iota(0, static_cast<int>(FontIdentifier::TOTAL)),
-                [this](const int id)
-                {
-                    selectable_fonts.push_back(static_cast<FontIdentifier>(id));
-                    return true;
-                });
             algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::BINARY_TREE)});
             algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::DFS)});
             algo_list.emplace_back(std::string{mazes::to_sv_from_algo(mazes::algo::SIDEWINDER)});
@@ -645,10 +644,6 @@ struct craft::craft_impl
                     return "Unknown";
                 }
             };
-
-            // Apply the per-player font scale
-            ImGui::GetIO().FontGlobalScale = c.gui_font_scale();
-            ImGui::PushFont(ctx.ctx_fonts->get(selectable_fonts.at(selected_font_index)).get());
 
             // Forest-green theme – 19 colour pushes.
             ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.016f, 0.047f, 0.024f, 0.97f));
@@ -714,7 +709,7 @@ struct craft::craft_impl
                 ImGui::Checkbox("Preview Enabled", &last_show_maze_preview_2d_enabled);
                 ImGui::Checkbox("Show Stats Overlay", &last_show_stats_window);
                 ImGui::Separator();
-                if (ImGui::Button("Resume", ImVec2(btn_w * 2.f, 0.f)))
+                if (ImGui::Button("Enter World", ImVec2(btn_w * 2.f, 0.f)))
                 {
                     c.show_maze_preview_2d_enabled(last_show_maze_preview_2d_enabled);
                     c.show_stats_window(last_show_stats_window);
@@ -805,18 +800,123 @@ struct craft::craft_impl
                     // ── Builder tab ───────────────────────────────────────────
                     if (ImGui::BeginTabItem("Builder"))
                     {
-                        auto &&maze_config = c.maze();
+                        ImGui::Separator();
 
+                        auto *editor = get_stack().peek_state<editor_state *>();
+
+                        int win_w = 0, win_h = 0;
+                        SDL_GetWindowSizeInPixels(ctx.ctx_window, &win_w, &win_h);
+                        auto target_h = win_h / 2;
+
+                        ImGui::BeginChild("##builderpreview", ImVec2(0.f, target_h));
+
+                        static std::uint32_t live_fbo = 0;
+                        static std::uint32_t live_color_tex = 0;
+                        static std::uint32_t live_depth_rbo = 0;
+                        static int live_w = 0;
+                        static int live_h = 0;
+
+                        auto target_w = (win_h > 0)
+                                            ? std::max(1, static_cast<int>(target_h * (static_cast<float>(win_w) / static_cast<float>(win_h))))
+                                            : target_h;
+
+                        if (live_fbo != 0)
+                        {
+                            glDeleteFramebuffers(1, &live_fbo);
+                            glDeleteTextures(1, &live_color_tex);
+                            glDeleteRenderbuffers(1, &live_depth_rbo);
+                        }
+
+                        glGenTextures(1, &live_color_tex);
+                        glBindTexture(GL_TEXTURE_2D, live_color_tex);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, target_w, target_h, 0,
+                                     GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+                        glBindTexture(GL_TEXTURE_2D, 0);
+
+                        glGenRenderbuffers(1, &live_depth_rbo);
+                        glBindRenderbuffer(GL_RENDERBUFFER, live_depth_rbo);
+                        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, target_w, target_h);
+                        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+
+                        glGenFramebuffers(1, &live_fbo);
+                        glBindFramebuffer(GL_FRAMEBUFFER, live_fbo);
+                        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, live_color_tex, 0);
+                        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, live_depth_rbo);
+                        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+                        live_w = target_w;
+                        live_h = target_h;
+
+                        editor->draw_preview3D(live_fbo, live_w, live_h);
+
+                        const float aspect = static_cast<float>(live_w) / static_cast<float>(live_h);
+                        float disp_w = ImGui::GetContentRegionAvail().x;
+                        float disp_h = disp_w / aspect;
+                        if (const auto avail_h = ImGui::GetContentRegionAvail().y; disp_h > avail_h)
+                        {
+                            disp_h = avail_h;
+                            disp_w = disp_h * aspect;
+                        }
+                        // Flip V: FBO textures are bottom-up relative to ImGui's top-down UVs.
+                        ImGui::Image(static_cast<ImTextureID>(live_color_tex), ImVec2(disp_w, disp_h),
+                                     ImVec2(0.f, 1.f), ImVec2(1.f, 0.f));
+                        ImGui::EndChild();
+
+                        ImGui::Separator();
                         ImGui::Spacing();
+                        ImGui::Spacing();
+
                         if (ImGui::Button("Make New World", ImVec2(btn_w * 2.f, 0.f)))
                         {
-                            db_flush();
-                            request_stack_clear();
-                            request_stack_push(StateIdentifier::EDITOR);
-                            request_stack_push(StateIdentifier::LOADING);
+                            rebuild_world_requested = true;
                         }
+
+                        ImGui::Spacing();
+                        ImGui::Spacing();
+                        ImGui::Separator();
+
+                        // ── Sign Message box ──────────────────────────────────
+                        ImGui::BeginChild("##tag", ImVec2(0.f, box_oh + fhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Sign Message");
+                        static char tag_buffer[256] = "";
+                        static bool tag_init = false;
+                        std::string current_tag = c.tag();
+                        if (!tag_init || SDL_strcmp(tag_buffer, current_tag.data()) != 0)
+                        {
+                            SDL_strlcpy(tag_buffer, current_tag.data(), SDL_arraysize(tag_buffer));
+                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
+                            tag_init = true;
+                        }
+                        if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
+                        {
+                            c.tag(std::string{tag_buffer});
+                        }
+                        ImGui::EndChild();
+
                         ImGui::Spacing();
 
+                        // ── Terrain Settings box ──────────────────────────────
+                        ImGui::BeginChild("##terrain", ImVec2(0.f, box_oh + 2.f * lhs), ImGuiChildFlags_Borders);
+                        ImGui::TextColored(HEADER_COL, "Terrain Settings");
+                        ImGui::Separator();
+
+                        auto has_heightmap_changed{c.show_heightmap()};
+                        ImGui::Checkbox("Build with Mountains (requires new world)", &has_heightmap_changed);
+                        if (has_heightmap_changed != c.show_heightmap())
+                        {
+                            c.show_heightmap(has_heightmap_changed);
+                        }
+
+                        ImGui::EndChild();
+
+                        ImGui::Separator();
+                        ImGui::Spacing();
+
+                        auto &&maze_config = c.maze();
                         static std::string selected_algo;
                         selected_algo = std::string{mazes::to_sv_from_algo(maze_config.algo_id())};
                         static int rows = static_cast<int>(maze_config.rows());
@@ -856,136 +956,10 @@ struct craft::craft_impl
                             }
                             ImGui::EndCombo();
                         }
-                        ImGui::SliderInt("Seed", &seed, 0, 1000000);
+                        ImGui::SliderInt("Seed", &seed, 0, 1'000'000);
                         ImGui::EndChild();
 
-                        ImGui::Spacing();
-
-                        // ── Preview box ────────────────────────────────────────
-                        // Non-interactive top-down layout preview, regenerated whenever the
-                        // dimensions/algorithm/seed above change. This is the same layout that
-                        // 'Make New World' will build, so it doubles as a WYSIWYG-before-commit check.
-                        {
-                            static std::uint32_t preview_gl_texture = 0;
-                            static int preview_tex_w = 0;
-                            static int preview_tex_h = 0;
-                            static bool preview_generated = false;
-                            static int cached_rows = -1;
-                            static int cached_columns = -1;
-                            static int cached_seed = -1;
-                            static std::string cached_algo;
-
-                            const bool config_dirty = !preview_generated ||
-                                                      cached_rows != rows || cached_columns != columns ||
-                                                      cached_seed != seed || cached_algo != selected_algo;
-
-                            if (config_dirty)
-                            {
-                                const auto preview_config = mazes::configurator{}
-                                                                .algo_id(mazes::to_algo_from_sv(selected_algo))
-                                                                .rows(static_cast<unsigned int>(rows))
-                                                                .columns(static_cast<unsigned int>(columns))
-                                                                .levels(1u)
-                                                                .seed(static_cast<unsigned int>(seed));
-
-                                if (const auto frame = geometries::generate_maze_preview(preview_config); frame.has_value())
-                                {
-                                    if (preview_gl_texture == 0 || preview_tex_w != frame->width || preview_tex_h != frame->height)
-                                    {
-                                        if (preview_gl_texture != 0)
-                                        {
-                                            glDeleteTextures(1, &preview_gl_texture);
-                                        }
-                                        glGenTextures(1, &preview_gl_texture);
-                                        glBindTexture(GL_TEXTURE_2D, preview_gl_texture);
-                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-                                        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-                                        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, frame->width, frame->height, 0,
-                                                     GL_RGBA, GL_UNSIGNED_BYTE, frame->pixel_data.data());
-                                        preview_tex_w = frame->width;
-                                        preview_tex_h = frame->height;
-                                    }
-                                    else
-                                    {
-                                        glBindTexture(GL_TEXTURE_2D, preview_gl_texture);
-                                        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame->width, frame->height,
-                                                        GL_RGBA, GL_UNSIGNED_BYTE, frame->pixel_data.data());
-                                    }
-                                    glBindTexture(GL_TEXTURE_2D, 0);
-
-                                    cached_rows = rows;
-                                    cached_columns = columns;
-                                    cached_seed = seed;
-                                    cached_algo = selected_algo;
-                                    preview_generated = true;
-                                }
-                            }
-
-                            ImGui::BeginChild("##builderpreview", ImVec2(0.f, 190.f), ImGuiChildFlags_Borders);
-                            ImGui::TextColored(HEADER_COL, "Preview (non-interactive)");
-                            ImGui::Separator();
-                            if (preview_generated && preview_gl_texture != 0 && preview_tex_w > 0 && preview_tex_h > 0)
-                            {
-                                const float avail_w = ImGui::GetContentRegionAvail().x;
-                                const float aspect = static_cast<float>(preview_tex_w) / static_cast<float>(preview_tex_h);
-                                constexpr float max_h = 140.f;
-                                float disp_w = avail_w;
-                                float disp_h = disp_w / aspect;
-                                if (disp_h > max_h)
-                                {
-                                    disp_h = max_h;
-                                    disp_w = disp_h * aspect;
-                                }
-                                ImGui::Image(static_cast<ImTextureID>(preview_gl_texture), ImVec2(disp_w, disp_h));
-                                ImGui::TextDisabled("This layout is used when you press 'Make New World'");
-                            }
-                            else
-                            {
-                                ImGui::TextDisabled("Adjust Rows/Columns/Algorithm/Seed above to preview the layout");
-                            }
-                            ImGui::EndChild();
-                        }
-
-                        ImGui::Spacing();
-
-                        // ── Sign Message box ──────────────────────────────────
-                        ImGui::BeginChild("##tag", ImVec2(0.f, box_oh + fhs), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "Sign Message");
                         ImGui::Separator();
-                        static char tag_buffer[256] = "";
-                        static bool tag_init = false;
-                        std::string current_tag = c.tag();
-                        if (!tag_init || SDL_strcmp(tag_buffer, current_tag.data()) != 0)
-                        {
-                            SDL_strlcpy(tag_buffer, current_tag.data(), SDL_arraysize(tag_buffer));
-                            tag_buffer[SDL_arraysize(tag_buffer) - 1] = '\0';
-                            tag_init = true;
-                        }
-                        if (ImGui::InputText("##PlayerTag", tag_buffer, std::size(tag_buffer)))
-                        {
-                            c.tag(std::string{tag_buffer});
-                        }
-                        ImGui::EndChild();
-
-                        ImGui::Spacing();
-
-                        // ── Terrain Settings box ──────────────────────────────
-                        ImGui::BeginChild("##terrain", ImVec2(0.f, box_oh + 2.f * lhs), ImGuiChildFlags_Borders);
-                        ImGui::TextColored(HEADER_COL, "Terrain Settings");
-                        ImGui::Separator();
-
-                        auto has_heightmap_changed{c.show_heightmap()};
-                        ImGui::Checkbox("Build with Mountains (requires new world)", &has_heightmap_changed);
-                        if (has_heightmap_changed != c.show_heightmap())
-                        {
-                            c.show_heightmap(has_heightmap_changed);
-                        }
-
-                        ImGui::EndChild();
-
-                        ImGui::Spacing();
 
                         // ── Instructions box ──────────────────────────────────
                         ImGui::BeginChild("##instruct", ImVec2(0.f, box_oh + 4.f * lhs), ImGuiChildFlags_Borders);
@@ -1088,13 +1062,13 @@ struct craft::craft_impl
                             ImGui::Spacing();
                             if (ImGui::BeginListBox("##FontList", ImVec2(-1.f, listbox_h)))
                             {
-                                for (std::size_t i = 0; i < selectable_fonts.size(); ++i)
+                                for (std::size_t i = 0; i < craft::craft_impl::SELECTABLE_FONTS.size(); ++i)
                                 {
-                                    const bool is_sel = (selected_font_index == static_cast<int>(i));
+                                    const bool is_sel = (p->get_font_index() == static_cast<int>(i));
                                     const auto &font_name = craft_impl::LOADING_FONTS_WITH_NAMES.at(
-                                        static_cast<std::size_t>(selectable_fonts.at(i)));
+                                        static_cast<std::size_t>(craft::craft_impl::SELECTABLE_FONTS.at(i)));
                                     if (ImGui::Selectable(font_name.data(), is_sel))
-                                        selected_font_index = static_cast<int>(i);
+                                        p->set_font_index(static_cast<int>(i));
                                     if (is_sel)
                                         ImGui::SetItemDefaultFocus();
                                 }
@@ -1310,11 +1284,16 @@ struct craft::craft_impl
             ImGui::End(); // ##menu
 
             ImGui::PopStyleColor(19); // 19 colours pushed above
-            ImGui::PopFont();
         }
 
         bool update(float delta_time, mazes::randomizer &rng) noexcept override
         {
+            if (rebuild_world_requested)
+            {
+                rebuild_world_requested = false;
+
+                return true;
+            }
             return false;
         }
 
@@ -1341,14 +1320,20 @@ struct craft::craft_impl
 
             return false;
         }
+
+        bool is_ready_to_rebuild_world() const noexcept
+        {
+            return rebuild_world_requested;
+        }
     }; // menu_state
 
     const std::string &INIT_WINDOW_TITLE;
     const int INIT_WINDOW_WIDTH, INIT_WINDOW_HEIGHT;
 
-    std::unique_ptr<state_stack> crafting_states;
-
     static std::vector<std::string_view> LOADING_FONTS_WITH_NAMES;
+    static std::vector<FontIdentifier> SELECTABLE_FONTS;
+
+    std::unique_ptr<state_stack> crafting_states;
 
     font_manager active_fonts;
     shader_manager world_shaders;
@@ -1358,9 +1343,9 @@ struct craft::craft_impl
 
     sdl_gl_helper simple_direct_medialayer;
 
-    mutable double m_fps_update_timer{0.0};
-    mutable int m_smoothed_fps{0};
-    mutable float m_smoothed_frame_time{0.0f};
+    mutable double fps_timer{0.0};
+    mutable int smoothed_fps_counter{0};
+    mutable float fps_timer_smoothed{0.0f};
 
     craft_impl(const std::string &title, const int w, const int h)
         : INIT_WINDOW_TITLE(title), INIT_WINDOW_WIDTH(w), INIT_WINDOW_HEIGHT(h)
@@ -1382,6 +1367,15 @@ struct craft::craft_impl
         crafting_states->push_state(StateIdentifier::EDITOR);
         crafting_states->push_state(StateIdentifier::MENU);
         crafting_states->push_state(StateIdentifier::LOADING);
+
+        SELECTABLE_FONTS.reserve(static_cast<std::size_t>(FontIdentifier::TOTAL));
+        std::ranges::for_each(
+            std::views::iota(0, static_cast<int>(FontIdentifier::TOTAL)),
+            [this](const int id)
+            {
+                SELECTABLE_FONTS.push_back(static_cast<FontIdentifier>(id));
+                return true;
+            });
     }
 
     void register_states() const noexcept
@@ -1463,21 +1457,8 @@ struct craft::craft_impl
 #endif
     }
 
-    void render_FPS(const double elapsed) const noexcept
+    void render_FPS() const noexcept
     {
-        // Calculate instantaneous FPS and frame time
-        const auto fps = static_cast<int>(1000.0 / elapsed);
-        const auto frame_time = static_cast<float>(elapsed);
-
-        // Update smoothed values periodically for display
-        m_fps_update_timer += elapsed;
-        if (constexpr double FPS_UPDATE_INTERVAL = 250.0; m_fps_update_timer >= FPS_UPDATE_INTERVAL)
-        {
-            m_smoothed_fps = fps;
-            m_smoothed_frame_time = frame_time;
-            m_fps_update_timer = 0.0;
-        }
-
         ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 10.0f, 10.0f), ImGuiCond_Always,
                                 ImVec2(1.0f, 0.0f));
 
@@ -1492,9 +1473,9 @@ struct craft::craft_impl
 
         if (this->active_player._configs.show_stats_window() && ImGui::Begin("FPS Overlay", nullptr, windowFlags))
         {
-            ImGui::Text("FPS: %d", m_smoothed_fps);
-            ImGui::Text("Frame Time: %.2f ms", m_smoothed_frame_time);
-            ImGui::Text("local time: %s\n", this->active_player.get_local_time().data());
+            ImGui::Text("FPS: %d", smoothed_fps_counter);
+            ImGui::Text("ms / frame: %.2f ms", fps_timer_smoothed);
+            ImGui::Text("Local time: %s\n", this->active_player.get_local_time().data());
             ImGui::End();
         }
     }
@@ -1546,10 +1527,22 @@ struct craft::craft_impl
 
     void update(const float delta_time, mazes::randomizer &rng) const noexcept
     {
+        // Calculate instantaneous FPS and frame time
+        const auto FPS = static_cast<int>(1.0 / (delta_time / 1000.0));
+        const auto frame_time = delta_time;
+
+        // Update smoothed values periodically for display
+        fps_timer += delta_time;
+        if (constexpr double FPS_UPDATE_INTERVAL = 250.0; fps_timer >= FPS_UPDATE_INTERVAL)
+        {
+            smoothed_fps_counter = FPS;
+            fps_timer_smoothed = frame_time;
+            fps_timer = 0.0;
+        }
         crafting_states->update(delta_time, std::ref(rng));
     }
 
-    void render(const double elapsed) const noexcept
+    void render() const noexcept
     {
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1557,11 +1550,15 @@ struct craft::craft_impl
         ImGui_ImplSDL3_NewFrame();
         ImGui_ImplOpenGL3_NewFrame();
         ImGui::NewFrame();
+        // Apply the per-player font scale
+        ImGui::GetIO().FontGlobalScale = active_player._configs.gui_font_scale();
+        ImGui::PushFont(active_fonts.get(craft::craft_impl::SELECTABLE_FONTS.at(active_player.get_font_index())).get());
 
         crafting_states->draw();
 
-        render_FPS(elapsed);
+        render_FPS();
 
+        ImGui::PopFont();
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -1575,6 +1572,7 @@ std::vector<std::string_view> craft::craft_impl::LOADING_FONTS_WITH_NAMES{
     "Cousine Regular",
     "Limelight Regular",
     "Nunito Sans"};
+std::vector<FontIdentifier> craft::craft_impl::SELECTABLE_FONTS;
 
 craft::craft(const std::string &title, const int w, const int h)
     : crafting_impl{std::make_unique<craft_impl>(cref(title), w, h)}
@@ -1653,7 +1651,7 @@ bool craft::run([[maybe_unused]] mazes::grid_interface *g, mazes::randomizer &rn
             this->crafting_impl->update(FIXED_TIME_STEP, std::ref(rng));
         }
 
-        this->crafting_impl->render(elapsed);
+        this->crafting_impl->render();
 
         time_step = time_step >= 1000.0 ? 0.0 : time_step;
     } // EVENT LOOP

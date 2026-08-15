@@ -407,7 +407,7 @@ private:
         std::optional<bool> opt_show_maze_preview_2d_enabled{true};
         std::optional<bool> opt_show_maze_preview_ghost{true};
         std::optional<bool> opt_show_stats_window{true};
-        std::optional<bool> opt_use_bloom_effect{false};
+        std::optional<bool> opt_use_bloom_effect{true};
         std::optional<bool> opt_vsync{false};
 
         std::optional<CADTool> opt_cad_tool{CADTool::NONE};
@@ -494,6 +494,9 @@ private:
     void record_measurement_point(int x, int y, int z) noexcept;
     void clear_measurement() noexcept;
 
+    void set_font_index(std::int32_t index) noexcept;
+    [[nodiscard]] std::int32_t get_font_index() const noexcept;
+
 private:
     void initialize_actions();
     static bool is_realtime_action(PlayerAction action) noexcept;
@@ -522,6 +525,7 @@ private:
     std::uint32_t player_buffer;
 
     std::int32_t current_item_index;
+    std::int32_t selected_font_index;
 
     world *current_voxel_world;
 

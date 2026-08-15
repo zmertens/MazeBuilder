@@ -22,6 +22,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -216,10 +217,6 @@ world::world(SDL_Window *window, font_manager &fonts,
 
 world::~world()
 {
-    if (active_player)
-    {
-        active_player->set_world(nullptr);
-    }
     destroy_world();
 }
 
@@ -655,23 +652,64 @@ void world::draw() const noexcept
     m_bloom.execute(bloom_str);
 }
 
+void world::draw_preview(const std::uint32_t target_fbo, const int target_width, const int target_height) const noexcept
+{
+    if (target_fbo == 0 || target_width <= 0 || target_height <= 0)
+    {
+        return;
+    }
+
+    CHECK_GL_ERR();
+
+    // Preserve caller's framebuffer/viewport (ImGui renders right after this).
+    GLint previous_fbo = 0;
+    glGetIntegerv(GL_FRAMEBUFFER_BINDING, &previous_fbo);
+    std::array<GLint, 4> previous_viewport{};
+    glGetIntegerv(GL_VIEWPORT, previous_viewport.data());
+
+    glBindFramebuffer(GL_FRAMEBUFFER, target_fbo);
+    glViewport(0, 0, target_width, target_height);
+
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glClearColor(0.53f, 0.81f, 0.92f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    const auto atlas_texture = world_textures.get(TextureIdentifier::ATLAS).gl_texture;
+    const auto sky_texture = world_textures.get(TextureIdentifier::SKY).gl_texture;
+
+    // No bloom/MRT here — direct forward rendering straight into the caller's FBO.
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    render_sky(world_sky_gl_buffer, sky_texture);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+
+    [[maybe_unused]] const auto triangle_faces = render_chunks(atlas_texture);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, static_cast<GLuint>(previous_fbo));
+    glViewport(previous_viewport[0], previous_viewport[1], previous_viewport[2], previous_viewport[3]);
+}
+
 command_queue &world::get_command_queue() noexcept
 {
     return commands_during_world_events;
 }
 
-void world::invalidate_preview() noexcept
-{
-    current_preview_data = {};
-}
-
 void world::destroy_world()
 {
+    db_flush();
     m_bloom.destroy();
-    // Cleanup worker threads and chunks
-    cleanup_worker_threads();
     delete_all_chunks();
-    sdl_gl_helper::del_buffer(active_player->get_buffer());
+    if (active_player)
+    {
+        active_player->set_world(nullptr);
+        sdl_gl_helper::del_buffer(active_player->get_buffer());
+        active_player = nullptr;
+    }
+    cleanup_worker_threads();
 }
 
 void world::handle_event(const SDL_Event &event) noexcept
@@ -822,16 +860,21 @@ bool world::worker_run(worker *w) const noexcept
 {
     while (true)
     {
-        while (w->state != WorkerState::BUSY && !w->should_stop)
-        {
-            std::unique_lock<std::mutex> my_lock(w->mtx);
-            w->cnd.wait(my_lock);
-        }
+        std::unique_lock<std::mutex> my_lock(w->mtx);
+        // Predicate form: re-checks under the lock, so a should_stop/BUSY transition that
+        // happens between the caller's notify_one() and this wait() is never missed
+        // (a bare wait() here could lose that wakeup and hang forever - e.g. on rebuild).
+        w->cnd.wait(my_lock, [w]
+                    { return w->state == WorkerState::BUSY || w->should_stop; });
+
         if (w->should_stop)
         {
             break;
         }
+
         worker_item *worker_item = &w->item;
+        my_lock.unlock();
+
         if (worker_item->load)
         {
             this->load_chunk(worker_item);
@@ -839,9 +882,8 @@ bool world::worker_run(worker *w) const noexcept
 
         this->compute_chunk(worker_item);
 
-        w->mtx.lock();
+        std::lock_guard<std::mutex> done_lock(w->mtx);
         w->state = WorkerState::DONE;
-        w->mtx.unlock();
     }
     return true;
 } // worker_run
@@ -879,10 +921,12 @@ void world::cleanup_worker_threads() noexcept
         // Emscripten: blocking join on the main browser thread deadlocks the JS
         // event loop. Threads self-exit via should_stop; skip join there.
         w->thrd.join();
-        SDL_Log("worker thread %d finished!", w->index);
+        SDL_LogDebug(SDL_LOG_CATEGORY_APPLICATION, "worker thread %d finished!", w->index);
 #else
         if (w->thrd.joinable())
+        {
             w->thrd.detach();
+        }
 #endif
     }
 

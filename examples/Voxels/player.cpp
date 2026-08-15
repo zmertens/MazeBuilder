@@ -128,15 +128,7 @@ constexpr auto ORTHO_MIN_SCALE = 8;
 constexpr auto ORTHO_MAX_SCALE = 96;
 
 player::player()
-    : _is_active{true}
-    , _is_on_ground{false}
-    , _is_flying{false}
-    , _is_auto_running{false}
-    , my_name{"zm"}
-    , player_buffer{}
-    , current_item_index{0}
-    , current_voxel_world{nullptr}
-    , generate_maze_task{geometries::generate_maze_preview}
+    : _is_active{true}, _is_on_ground{false}, _is_flying{false}, _is_auto_running{false}, my_name{"zm"}, player_buffer{}, current_item_index{0}, selected_font_index{0}, current_voxel_world{nullptr}, generate_maze_task{geometries::generate_maze_preview}
 {
     // Movement key bindings
     assign_key(PlayerAction::MOVE_LEFT, SDL_SCANCODE_A);
@@ -166,11 +158,11 @@ player::player()
     c.invert_mouse(false);
     c.tag("put maze here");
     c.maze(mazes::configurator{}
-        .algo_id(mazes::algo::DFS)
-        .rows(10)
-        .columns(10)
-        .levels(3)
-        .seed(42u));
+               .algo_id(mazes::algo::DFS)
+               .rows(10)
+               .columns(10)
+               .levels(3)
+               .seed(42u));
 
     initialize_actions();
 
@@ -219,12 +211,7 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
             }
         }
 
-        // The cached maze preview is tied to the selected build item.
-        // Invalidate it so B cannot reuse stale preview state after a hotbar change.
-        if (current_voxel_world)
-        {
-            current_voxel_world->invalidate_preview();
-        }
+        current_voxel_world->current_preview_data = {};
         auto_preview_pending = true;
     }
     if (event.type == SDL_EVENT_KEY_DOWN)
@@ -308,7 +295,7 @@ void player::handle_event(const SDL_Event &event, command_queue &commands) noexc
     }
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
-      if (event.button.button == SDL_BUTTON_RIGHT)
+        if (event.button.button == SDL_BUTTON_RIGHT)
         {
             if (const auto binding = player_commands.find(PlayerAction::BUILD_BLOCK);
                 binding != player_commands.cend() && binding->second.action)
@@ -367,6 +354,16 @@ void player::update(float delta_time, mazes::randomizer &rng) noexcept
 
 void player::draw() const noexcept
 {
+}
+
+void player::set_font_index(std::int32_t index) noexcept
+{
+    selected_font_index = index;
+}
+
+std::int32_t player::get_font_index() const noexcept
+{
+    return selected_font_index;
 }
 
 void player::handle_realtime_input(command_queue &commands)
@@ -846,7 +843,7 @@ bool player::request_preview_generation() noexcept
         pending_maze_preview_2d = generate_maze_task(_configs.maze());
 #else
         preview_maze_2d_fut = std::async(std::launch::async, [this, maze_config = _configs.maze()]()
-                                      { return generate_maze_task(maze_config); });
+                                         { return generate_maze_task(maze_config); });
 #endif
         return true;
     }
@@ -993,7 +990,7 @@ void player::start_async_artifact_export() noexcept
 
     // Offload only the CPU-bound OBJ conversion to a background thread
     artifact_export_fut = std::async(std::launch::async, [blocks = std::move(blocks)]() -> std::string
-                                          {
+                                     {
         SDL_Log("Async export: Converting %zu blocks to OBJ format...\n", blocks.size());
         return blocks_to_wavefront_obj(blocks); });
 }

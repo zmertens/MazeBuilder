@@ -240,10 +240,13 @@ public:
 
     void draw() const noexcept;
 
-    command_queue &get_command_queue() noexcept;
+    // Renders a simplified (no bloom, no HUD/wireframe/ghost overlays) snapshot of the
+    // world's current camera view into a caller-owned FBO, for a non-interactive picture-
+    // in-picture preview (e.g. the menu's Builder tab). Restores the previously bound
+    // framebuffer/viewport before returning.
+    void draw_preview(std::uint32_t target_fbo, int target_width, int target_height) const noexcept;
 
-    void invalidate_preview() noexcept;
-    
+    command_queue &get_command_queue() noexcept;
 private:
     void destroy_world();
 
