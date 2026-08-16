@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/colored_grid.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/grid.h>
@@ -39,10 +40,9 @@ bool loading_state::update([[maybe_unused]] double delta_time) noexcept
 
         has_finished = true;
         request_stack_pop();
-        request_stack_push(state::ID::PARSING);
     }
 
-    return true;
+    return false;
 }
 
 void loading_state::load_resources() const noexcept
@@ -60,4 +60,20 @@ void loading_state::load_resources() const noexcept
     processed_text_mapper->load<processed_text>(processed_text_identifier::FINISHED);
     processed_text_mapper->load<processed_text>(processed_text_identifier::PROCESSING);
     processed_text_mapper->load<processed_text>(processed_text_identifier::UNKNOWN);
+}
+
+void loading_state::set_text_to_unknown(const std::string_view txt) noexcept
+{
+    if (processed_text_mapper)
+    {
+        try
+        {
+            auto &unknown_text = processed_text_mapper->get(processed_text_identifier::UNKNOWN);
+            unknown_text.set(txt);
+        }
+        catch (...)
+        {
+            async_logger().log("Failed to set text to UNKNOWN in loading_state.");
+        }
+    }
 }

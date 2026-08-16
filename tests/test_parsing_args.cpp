@@ -262,10 +262,7 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         vector<string> args_vec = {args::JSON_FLAG_STR, VALID_JSON_STR_1};
         REQUIRE(args_handler.parse(args_vec));
 
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-
-        const auto &m_val = m.value();
+        const auto &m_val = args_handler.front();
         REQUIRE(check_key_exists(m_val, args::JSON_FLAG_STR));
         REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
         REQUIRE(check_key_exists(m_val, args::JSON_OPTION_STR));
@@ -289,11 +286,8 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         vector<string> args_vec = {args::JSON_OPTION_STR + string("=") + VALID_JSON_STR_2_FIXED};
         REQUIRE(args_handler.parse(args_vec));
 
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-
         // Test all forms of access for JSON
-        const auto &m_val = m.value();
+        const auto &m_val = args_handler.front();
         REQUIRE(check_key_exists(m_val, args::JSON_FLAG_STR));
         REQUIRE_FALSE(m_val.at(args::JSON_FLAG_STR).empty());
         REQUIRE(check_key_exists(m_val, args::JSON_OPTION_STR));
@@ -312,9 +306,8 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         vector<string> args_vec = {args::JSON_FLAG_STR, INVALID_JSON_STR_1};
         REQUIRE_FALSE(args_handler.parse(args_vec));
 
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-        REQUIRE_FALSE(m.value().empty());
+        const auto &m = args_handler.front();
+        REQUIRE_FALSE(m.empty());
     }
 
 #if defined(MAZE_BENCHMARK)
@@ -348,11 +341,8 @@ TEST_CASE("Args can handle a JSON file input", "[json_file_input]")
 
         REQUIRE(args_handler.parse(valid_json_file_input, false));
 
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-
         // Test fields are indexed (from first object in array for backward compatibility)
-        const auto &m_val = m.value();
+        const auto &m_val = args_handler.front();
         REQUIRE_FALSE(m_val.empty());
 
         REQUIRE(m_val.find(args::COLUMN_WORD_STR) != m_val.cend());
@@ -378,9 +368,7 @@ TEST_CASE("Args can handle JSON array files", "[json_array_input]")
         REQUIRE(args_handler.parse(valid_json_file_input, false));
 
         // Args no longer exposes an array accessor; get() returns the first object.
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-        const auto &m_val = m.value();
+        const auto &m_val = args_handler.front();
         REQUIRE_FALSE(m_val.empty());
 
         // Should have all the argument variations from the first object.
@@ -424,10 +412,7 @@ TEST_CASE("Args parse with argc/argv", "[parse_argc_argv]")
 
     REQUIRE(args_handler.parse(ARGC_7, test_argv, true));
 
-    const auto &m = args_handler.get();
-    REQUIRE(m.has_value());
-
-    const auto &m_val = m.value();
+    const auto &m_val = args_handler.front();
     REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
     REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_sv_from_algo(algo::BINARY_TREE));
@@ -445,10 +430,7 @@ TEST_CASE("Args parse with string input", "[parse_string_input]")
 
     REQUIRE(args_handler.parse(cref(VALID_ARGS_STR), true));
 
-    const auto &m = args_handler.get();
-    REQUIRE(m.has_value());
-
-    const auto &m_val = m.value();
+    const auto &m_val = args_handler.front();
     REQUIRE(m_val.at(args::ROW_WORD_STR) == to_string(configurator::MAX_ROWS - 1));
     REQUIRE(m_val.at(args::COLUMN_WORD_STR) == to_string(configurator::MAX_COLUMNS - 1));
     REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == to_sv_from_algo(algo::BINARY_TREE));
@@ -1050,9 +1032,7 @@ TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_
         REQUIRE(args_handler.parse(cref(valid_json_file_input)));
 
         // Test single map functionality (backward compatibility)
-        const auto &m = args_handler.get();
-        REQUIRE(m.has_value());
-        const auto &m_val = m.value();
+        const auto &m_val = args_handler.front();
         REQUIRE_FALSE(m_val.empty());
 
         // Should have all the argument variations

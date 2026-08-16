@@ -1,3 +1,5 @@
+// State machine workflow: (load once) -> parse -> generate via algo -> output
+
 #include <MazeBuilder/runtime_app.h>
 
 #include <MazeBuilder/bt_maze_create_state.h>
@@ -55,14 +57,12 @@ runtime_app::runtime_app()
                   std::lock_guard lock(logging_mtx);
                   received_logs.emplace_back(msg);
               }})},
-    logging_mtx{}, received_logs{}, last_result_buffer{}, runtime_stack_ptr{std::make_unique<runtime_stack>(
-                                          context{}.with_args_manager(args_mapper).with_grid_manager(grid_mapper).with_text_manager(processed_text_mapper).with_rng(rng))}
+      logging_mtx{}, received_logs{}, last_result_buffer{}, runtime_stack_ptr{std::make_unique<runtime_stack>(
+                                                                context{}.with_args_manager(args_mapper).with_grid_manager(grid_mapper).with_text_manager(processed_text_mapper).with_rng(rng))}
 {
-
     register_states();
-
     runtime_stack_ptr->push_state(state::ID::LOADING);
-    (void)visit_states();
+    runtime_stack_ptr->visit_states(0.0);
 }
 
 runtime_app::~runtime_app() = default;
@@ -82,35 +82,37 @@ void runtime_app::register_states() const noexcept
 
 std::string_view runtime_app::apply(const std::string_view unformatted_args) noexcept
 {
+#if defined(MAZE_DEBUG)
+    logger.log_message(fmt::format("runtime received unformatted args: '{}'\n", unformatted_args));
+#endif
+
     try
     {
-        if (auto &txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !txt.is_processed())
+        if (auto &unknown_txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !unknown_txt.is_processed())
         {
-            txt.set(unformatted_args);
+            unknown_txt.set(unformatted_args);
 
-            auto sv = visit_states(unformatted_args);
+            runtime_stack_ptr->push_state(state::ID::PARSING);
+
+            visit_states();
 
             // Clear so the next apply() call can supply fresh input.
-            txt.set_processed(std::monostate{});
+            unknown_txt.set_processed(std::monostate{});
 
-            if (!sv.empty())
-            {
-                processed_text_mapper.get(processed_text_identifier::FINISHED).set_processed(sv);
-                // Only return on e2e success
-                return sv;
-            }
+            // Only return on e2e success
+            return get_finished_text();
         }
     }
     catch (...)
     {
-        return visit_states(unformatted_args);
+        logger.log("No processed text found for identifier UNKNOWN.");
     }
 
     return {};
 }
 
-// Empty string_view on default
-std::string_view runtime_app::visit_states(std::string_view sv) noexcept
+// Empty string on default
+void runtime_app::visit_states() noexcept
 {
     last_result_buffer.clear();
 
@@ -119,15 +121,7 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
         received_logs.clear();
     }
 
-    if (!sv.empty())
-    {
-        runtime_stack_ptr->push_state(state::ID::PARSING);
-
-        if (auto &txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !txt.is_processed())
-        {
-            txt.set(sv);
-        }
-    }
+    const auto count = runtime_stack_ptr->count();
 
     double accumulator{0.0};
     // Drive the state machine until the stack is empty
@@ -140,7 +134,7 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
 
 #if defined(MAZE_DEBUG)
 
-    logger.log_message(fmt::format("runtime visited states in: {:.6f} ms\n", accumulator));
+    logger.log_message(fmt::format("runtime visited {} states in: {:.6f} ms\n", count, accumulator));
 #endif
 
     accumulator = 0.0;
@@ -152,7 +146,6 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
             if (const auto processed = txt.get(); !std::holds_alternative<std::monostate>(processed))
             {
                 last_result_buffer = processed_text::to_string(processed);
-                return last_result_buffer;
             }
         }
     }
@@ -164,8 +157,6 @@ std::string_view runtime_app::visit_states(std::string_view sv) noexcept
     {
         logger.log("No processed text found for identifier PROCESSING.");
     }
-
-    return {};
 }
 
 std::string_view runtime_app::get_finished_text() noexcept

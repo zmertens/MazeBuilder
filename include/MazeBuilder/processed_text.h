@@ -1,6 +1,7 @@
 #ifndef PROCESSED_TEXT_H
 #define PROCESSED_TEXT_H
 
+#include <string>
 #include <type_traits>
 #include <variant>
 
@@ -21,7 +22,22 @@ namespace mazes
 
         /// @brief Sets the processed artifact
         /// @param anything The artifact to set as processed
-        void set_processed(artifacts anything) noexcept { buffer = std::move(anything); }
+        void set_processed(artifacts anything) noexcept
+        {
+            if (const auto *sv = std::get_if<std::string_view>(&anything); sv != nullptr)
+            {
+                buffer = std::string{*sv};
+                return;
+            }
+
+            if (const auto *cstr = std::get_if<char *>(&anything); cstr != nullptr)
+            {
+                buffer = *cstr ? std::string{*cstr} : std::string{};
+                return;
+            }
+
+            buffer = std::move(anything);
+        }
 
         /// @brief Sets the processed artifact from a string view
         /// @param sv The string view to set as processed

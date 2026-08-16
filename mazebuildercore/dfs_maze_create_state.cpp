@@ -45,17 +45,17 @@ bool dfs_maze_create_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    const auto parsed_args = state_utils::get_args(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
+    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
 
-    m_use_distances = state_utils::has_distances(parsed_args);
+    m_use_distances = state_utils::has_distances(std::cref(parsed_args));
     current_grid_id = m_use_distances ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-    const auto distance_settings = state_utils::parse_distance_settings(parsed_args);
+    const auto distance_settings = state_utils::parse_distance_settings(std::cref(parsed_args));
     m_distances_start = distance_settings.start;
     m_distances_end = distance_settings.end;
 
@@ -82,6 +82,14 @@ bool dfs_maze_create_state::update([[maybe_unused]] double delta_time) noexcept
     request_stack_pop();
     if (!result.empty())
     {
+        try
+        {
+            auto &processing_str = processed_text_mapper->get(processed_text_identifier::FINISHED);
+            processing_str.set(result);
+        }
+        catch (...)
+        {
+        }
         request_stack_push(state_utils::output_state_for(parsed_args));
     }
 

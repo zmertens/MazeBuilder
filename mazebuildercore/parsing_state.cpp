@@ -9,6 +9,7 @@
 #include <MazeBuilder/runtime_stack.h>
 #include <MazeBuilder/state_utils.h>
 
+#include <array>
 #include <optional>
 #include <variant>
 
@@ -50,10 +51,10 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    processed_text *unknown_text = nullptr;
+    args *parsed_args = nullptr;
     try
     {
-        unknown_text = &processed_text_mapper->get(processed_text_identifier::UNKNOWN);
+        parsed_args = &args_mapper->get(args_identifier::PARSED);
     }
     catch (...)
     {
@@ -61,69 +62,77 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    const auto unknown_processed = unknown_text->get();
-    const auto *raw_input = std::get_if<std::string>(&unknown_processed);
-    if (!raw_input || raw_input->empty())
+    if (parsed_args->count() == 0)
     {
-        request_stack_pop();
-        return false;
-    }
-
-    auto parsed_args = convert(*raw_input);
-
-    // Consumed; clear so a subsequent apply() call can supply fresh input.
-    unknown_text->set_processed(std::monostate{});
-
-    if (!parsed_args.has_value())
-    {
-        request_stack_pop();
-        return false;
-    }
-
-    try
-    {
-        args_mapper->get(args_identifier::RAW) = *parsed_args;
-        args_mapper->get(args_identifier::PARSED) = *parsed_args;
-    }
-    catch (...)
-    {
-        request_stack_pop();
-        return false;
-    }
-
-    // Determine which maze algorithm state to run first.
-    state::ID next_state = state::ID::BINARY_TREE;
-
-    if (const auto parsed = parsed_args->get(); parsed.has_value())
-    {
-        if (const auto it = parsed->find(mazes::args::ALGO_ID_WORD_STR); it != parsed->cend())
+        processed_text *unknown_text = nullptr;
+        try
         {
-            try
-            {
-                switch (to_algo_from_sv(it->second))
-                {
-                case algo::BINARY_TREE:
-                    next_state = state::ID::BINARY_TREE;
-                    break;
-                case algo::DFS:
-                    next_state = state::ID::DFS;
-                    break;
-                case algo::SIDEWINDER:
-                    next_state = state::ID::SIDEWINDER;
-                    break;
-                default:
-                    next_state = state::ID::BINARY_TREE;
-                    break;
-                }
-            }
-            catch (...)
-            {
-                next_state = state::ID::BINARY_TREE;
-            }
+            unknown_text = &processed_text_mapper->get(processed_text_identifier::UNKNOWN);
+        }
+        catch (...)
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        const auto unknown_processed = unknown_text->get();
+        const auto *raw_input = std::get_if<std::string>(&unknown_processed);
+        if (!raw_input || raw_input->empty())
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        auto parsed_input = convert(*raw_input);
+
+        // Consumed; clear so a subsequent apply() call can supply fresh input.
+        unknown_text->set_processed(std::monostate{});
+
+        if (!parsed_input.has_value())
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        try
+        {
+            args_mapper->get(args_identifier::RAW) = *parsed_input;
+            *parsed_args = std::move(*parsed_input);
+        }
+        catch (...)
+        {
+            request_stack_pop();
+            return false;
         }
     }
 
+    const auto current_args = parsed_args->front();
     request_stack_pop();
-    request_stack_push(next_state);
-    return false;
+    if (const auto it = current_args.find(mazes::args::ALGO_ID_WORD_STR); it != current_args.cend())
+    {
+        try
+        {
+            switch (to_algo_from_sv(it->second))
+            {
+            case algo::BINARY_TREE:
+                request_stack_push(state::ID::BINARY_TREE);
+                break;
+            case algo::DFS:
+                request_stack_push(state::ID::DFS);
+                break;
+            case algo::SIDEWINDER:
+                request_stack_push(state::ID::SIDEWINDER);
+                break;
+            default:
+                request_stack_push(state::ID::BINARY_TREE);
+                break;
+            }
+        }
+        catch (...)
+        {
+            request_stack_push(state::ID::BINARY_TREE);
+        }
+    }
+
+    return false; // @TODO - true?
 }

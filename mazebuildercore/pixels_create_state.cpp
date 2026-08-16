@@ -7,12 +7,12 @@
 #include <MazeBuilder/distances.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
-#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/state_utils.h>
 
 #include <algorithm>
 #include <array>
@@ -119,39 +119,53 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    const auto parsed_args = state_utils::get_args(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
+    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
 
-    current_grid_id = state_utils::has_distances(parsed_args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    current_grid_id = state_utils::has_distances(std::cref(parsed_args)) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
 
     algo maze_algo = algo::BINARY_TREE;
     std::string output_target;
-    if (const auto parsed = parsed_args ? parsed_args->get() : std::nullopt; parsed.has_value())
+    if (const auto it = parsed_args.find(mazes::args::ALGO_ID_WORD_STR); it != parsed_args.cend())
     {
-        if (const auto it = parsed->find(mazes::args::ALGO_ID_WORD_STR); it != parsed->cend())
-        {
-            maze_algo = mazes::to_algo_from_sv(it->second);
-        }
+        maze_algo = mazes::to_algo_from_sv(it->second);
+    }
 
-        if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
-        {
-            output_target = it->second;
-        }
+    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
+    {
+        output_target = it->second;
+    }
 
-        if (const auto it = parsed->find(mazes::args::SEED_WORD_STR); it != parsed->cend())
+    if (const auto it = parsed_args.find(mazes::args::SEED_WORD_STR); it != parsed_args.cend())
+    {
+        try
         {
-            try
-            {
-                m_palette_seed = std::stoull(it->second);
-            }
-            catch (...)
-            {
-                m_palette_seed.reset();
-            }
+            m_palette_seed = std::stoull(it->second);
+        }
+        catch (...)
+        {
+            m_palette_seed.reset();
+        }
+    }
+
+    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
+    {
+        output_target = it->second;
+    }
+
+    if (const auto it = parsed_args.find(mazes::args::SEED_WORD_STR); it != parsed_args.cend())
+    {
+        try
+        {
+            m_palette_seed = std::stoull(it->second);
+        }
+        catch (...)
+        {
+            m_palette_seed.reset();
         }
     }
 
@@ -161,7 +175,11 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
     cfg.ensure_rows(rows)
         .ensure_columns(cols)
         .ensure_levels(levels)
+        // @TODO fix this to use the output format from the args, but for now we just default to PNG
+        .ensure_output_format_id(mazes::output_format::PNG)
         .ensure_distances(current_grid_id == grid_identifier::DISTANCE)
+        .ensure_distances_start(0)
+        .ensure_distances_end(-1)
         .ensure_algo_id(maze_algo);
 
     m_result = std::string{create(cfg, *rng_ptr)};
@@ -179,18 +197,22 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
             std::string normalized = extension;
             std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
                            { return static_cast<char>(std::tolower(ch)); });
-
-        if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
+            if (!normalized.empty() && normalized.front() == '.')
             {
-                if (normalized == ".png")
+                normalized.erase(normalized.begin());
+            }
+
+            if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
+            {
+                if (normalized == "png")
                 {
                     write_ok = stbi_write_png(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), m_image_width * 4) != 0;
                 }
-                else if (normalized == ".bmp")
+                else if (normalized == "bmp")
                 {
                     write_ok = stbi_write_bmp(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data()) != 0;
                 }
-                else if (normalized == ".jpg" || normalized == ".jpeg")
+                else if (normalized == "jpg" || normalized == "jpeg")
                 {
                     write_ok = stbi_write_jpg(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), 95) != 0;
                 }
@@ -207,8 +229,8 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
     {
         try
         {
-            auto &processing = processed_text_mapper->get(processed_text_identifier::PROCESSING);
-            processing.set_processed(m_result);
+            auto &processing = processed_text_mapper->get(processed_text_identifier::FINISHED);
+            processing.set(m_result);
         }
         catch (...)
         {
@@ -216,6 +238,10 @@ bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
     }
 
     request_stack_pop();
+    if (state_utils::advance_args(get_context()))
+    {
+        request_stack_push(state::ID::PARSING);
+    }
     return false;
 }
 
@@ -274,17 +300,17 @@ std::string_view pixels_create_state::create(const configurator &config,
 
         const float base_hue = static_cast<float>((*palette_rng)(0, 359));
         const rgba_t wall_color = hsv_to_rgba(base_hue,
-                              static_cast<float>((*palette_rng)(58, 92)) / 100.0f,
-                              static_cast<float>((*palette_rng)(28, 62)) / 100.0f);
+                                              static_cast<float>((*palette_rng)(58, 92)) / 100.0f,
+                                              static_cast<float>((*palette_rng)(28, 62)) / 100.0f);
         const rgba_t base_floor_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(70, 170)), 360.0f),
-                                static_cast<float>((*palette_rng)(8, 28)) / 100.0f,
-                                static_cast<float>((*palette_rng)(88, 98)) / 100.0f);
+                                                    static_cast<float>((*palette_rng)(8, 28)) / 100.0f,
+                                                    static_cast<float>((*palette_rng)(88, 98)) / 100.0f);
         const rgba_t distance_near_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(10, 60)), 360.0f),
-                                   static_cast<float>((*palette_rng)(30, 60)) / 100.0f,
-                                   static_cast<float>((*palette_rng)(92, 100)) / 100.0f);
+                                                       static_cast<float>((*palette_rng)(30, 60)) / 100.0f,
+                                                       static_cast<float>((*palette_rng)(92, 100)) / 100.0f);
         const rgba_t distance_far_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(180, 260)), 360.0f),
-                                  static_cast<float>((*palette_rng)(45, 78)) / 100.0f,
-                                  static_cast<float>((*palette_rng)(55, 80)) / 100.0f);
+                                                      static_cast<float>((*palette_rng)(45, 78)) / 100.0f,
+                                                      static_cast<float>((*palette_rng)(55, 80)) / 100.0f);
 
         for (int y = 0; y < m_image_height; ++y)
         {
@@ -314,9 +340,9 @@ std::string_view pixels_create_state::create(const configurator &config,
                 {
                     const float t = max_distance > 0 ? static_cast<float>((*distance_map)[index]) / static_cast<float>(max_distance) : 0.0f;
                     floor_color = {
-                    lerp_u8(distance_near_color[0], distance_far_color[0], t),
-                    lerp_u8(distance_near_color[1], distance_far_color[1], t),
-                    lerp_u8(distance_near_color[2], distance_far_color[2], t),
+                        lerp_u8(distance_near_color[0], distance_far_color[0], t),
+                        lerp_u8(distance_near_color[1], distance_far_color[1], t),
+                        lerp_u8(distance_near_color[2], distance_far_color[2], t),
                         255u};
                 }
 
@@ -338,9 +364,9 @@ std::string_view pixels_create_state::create(const configurator &config,
         }
 
         grid_ops.set_pixels(pixels);
-        
+
 #if defined(MAZE_DEBUG)
-    global_async_logger().log("Generated image: {}\n", m_result);
+        global_async_logger().log("Generated image: {}\n", m_result);
 #endif
 
         return m_result;

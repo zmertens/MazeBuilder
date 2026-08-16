@@ -120,11 +120,22 @@ namespace mazes
         /// @return The value if found, std::nullopt otherwise
         [[nodiscard]] std::optional<std::string> get(const std::string &key) const noexcept;
 
-        /// @brief Get entire args map (from front)
+        /// @brief Get args from front
         /// @return The internal arguments map or empty map if not valid
-        [[nodiscard]] std::optional<std::unordered_map<std::string, std::string>> get() const noexcept;
+        [[nodiscard]] std::unordered_map<std::string, std::string> front() const noexcept;
+
+        /// @brief Remove the first parsed argument map
+        /// @return True if an argument map was removed
+        bool pop_front() const noexcept;
+
+        /// @brief Get entire args map
+        /// @return The internal arguments map or empty map if not valid
+        [[nodiscard]] std::vector<std::unordered_map<std::string, std::string>> get() const noexcept;
+
+        /// @brief Get the number of argument maps
+        /// @return The number of argument maps
+        [[nodiscard]] std::size_t count() const noexcept;
     private:
-        // Private implementation class (PIMPL idiom)
         class impl;
         std::unique_ptr<impl> pimpl;
     };

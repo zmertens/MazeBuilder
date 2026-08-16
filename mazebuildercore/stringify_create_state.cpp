@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
+#include <MazeBuilder/barriers.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/state_utils.h>
@@ -34,12 +35,12 @@ bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    const auto parsed_args = state_utils::get_args(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     std::string output_target;
-    if (const auto parsed = parsed_args ? parsed_args->get() : std::nullopt; parsed.has_value())
+    if (!parsed_args.empty())
     {
-        if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
+        if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
         {
             output_target = it->second;
         }
@@ -48,7 +49,7 @@ bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
+    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
 
     auto *rng_ptr = state_utils::get_rng_or_default(get_context());
 
@@ -56,7 +57,11 @@ bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
     cfg.ensure_rows(rows)
         .ensure_columns(cols)
         .ensure_levels(levels)
-        .ensure_distances(state_utils::has_distances(parsed_args));
+        .ensure_distances(state_utils::has_distances(std::cref(parsed_args)));
+
+    const auto output_format = output_format_or_default(std::filesystem::path{output_target}.extension().string(),
+                                                        output_format::PLAIN_TEXT);
+    cfg.ensure_output_format_id(output_format);
 
     const auto result = std::string{this->create(cfg, *rng_ptr)};
 
@@ -70,17 +75,18 @@ bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
 
     try
     {
-        auto &processing_str = processed_text_mapper->get(processed_text_identifier::PROCESSING);
-        if (!processing_str.is_processed())
-        {
-            processing_str.set_processed(result);
-        }
+        auto &processing_str = processed_text_mapper->get(processed_text_identifier::FINISHED);
+        processing_str.set(result);
     }
     catch (...)
     {
     }
 
     request_stack_pop();
+    if (state_utils::advance_args(get_context()))
+    {
+        request_stack_push(state::ID::PARSING);
+    }
     return false;
 }
 
@@ -119,23 +125,28 @@ std::string_view stringify_create_state::create(const configurator &config, [[ma
             }
         }
 
-        const std::string horizontal_wall(cell_width, '-');
+        constexpr char H_WALL = static_cast<char>(Barrier::HORIZONTAL);
+        constexpr char V_WALL = static_cast<char>(Barrier::VERTICAL);
+        constexpr char CORNER = static_cast<char>(Barrier::CORNER);
+
+        const std::string horizontal_wall(cell_width, H_WALL);
         const std::string horizontal_gap(cell_width, ' ');
 
         std::string result;
         result.reserve((rows + 1u) * (cols * (cell_width + 1u) + 2u));
 
-        result += "+";
+        result += CORNER;
         for (unsigned int c = 0; c < cols; ++c)
         {
             result += horizontal_wall;
-            result += "+";
+            result += CORNER;
         }
-        result += "\n";
+        result += '\n';
 
         for (unsigned int r = 0; r < rows; ++r)
         {
-            std::string top = "|", bottom = "+";
+            std::string top = std::string(1, V_WALL);
+            std::string bottom = std::string(1, CORNER);
             for (unsigned int c = 0; c < cols; ++c)
             {
                 const auto cp = grid_ops.search(static_cast<int>(r * cols + c));
@@ -143,8 +154,9 @@ std::string_view stringify_create_state::create(const configurator &config, [[ma
                 const auto s = cp ? grid_ops.get_south(cp) : nullptr;
 
                 top += cp ? pad_content(grid.contents_of(cp), cell_width) : pad_content(" ", cell_width);
-                top += (cp && e && cp->is_linked(e)) ? " " : "|";
-                bottom += (cp && s && cp->is_linked(s)) ? horizontal_gap + "+" : horizontal_wall + "+";
+                top += (cp && e && cp->is_linked(e)) ? ' ' : V_WALL;
+                bottom += (cp && s && cp->is_linked(s)) ? horizontal_gap : horizontal_wall;
+                bottom += CORNER;
             }
 
             result += top;

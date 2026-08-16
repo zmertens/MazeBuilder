@@ -48,7 +48,52 @@ namespace
     bool is_valid_numeric_value(std::string_view value) noexcept
     {
         return !value.empty() && std::ranges::all_of(value, [](unsigned char c)
-                                                       { return std::isdigit(c) != 0; });
+                                                     { return std::isdigit(c) != 0; });
+    }
+
+    std::filesystem::path resolve_json_file_path(std::string_view candidate)
+    {
+        const std::filesystem::path raw_path{std::string(candidate)};
+        if (raw_path.empty() || std::filesystem::exists(raw_path))
+        {
+            return raw_path;
+        }
+
+        const auto cwd = std::filesystem::current_path();
+        const std::vector<std::filesystem::path> search_roots = {
+            cwd,
+            cwd / "tests",
+            cwd.parent_path(),
+            cwd.parent_path() / "tests",
+            cwd.parent_path().parent_path(),
+            cwd.parent_path().parent_path() / "tests",
+            std::filesystem::path{candidate}.has_parent_path() ? std::filesystem::path{candidate}.parent_path() : cwd};
+
+        for (const auto &root : search_roots)
+        {
+            const auto candidate_path = root / raw_path;
+            if (std::filesystem::exists(candidate_path))
+            {
+                return candidate_path;
+            }
+        }
+
+        if (raw_path.has_parent_path())
+        {
+            return raw_path;
+        }
+
+        const std::filesystem::path file_name = raw_path.filename();
+        for (const auto &root : search_roots)
+        {
+            const auto candidate_path = root / file_name;
+            if (std::filesystem::exists(candidate_path))
+            {
+                return candidate_path;
+            }
+        }
+
+        return raw_path;
     }
 
     // Flags that may stand alone (no following value) even though unrecognized.
@@ -60,6 +105,7 @@ namespace
 
     enum class TokenType
     {
+        BACKTICK_QUOTE,
         PROGRAM,
         // -r, -c, etc.
         SHORT_FLAG,
@@ -208,15 +254,16 @@ namespace
                     first_token = false;
                 }
 
-                // Post-processing: if we parsed JSON, delegate to JSON handler
                 bool json_ok = true;
                 if (auto it = word_map.find(args::JSON_WORD_STR); it != word_map.cend())
                 {
                     json_ok = process_json(it->second);
                 }
+                else if (auto it2 = word_map.find(args::JSON_FLAG_STR); it2 != word_map.cend())
+                {
+                    json_ok = process_json(it2->second);
+                }
 
-                // Preserve whatever was parsed so far (even on JSON failure) for inspection,
-                // unless process_json already replaced parsed_results (JSON array case).
                 if (parsed_results.empty())
                 {
                     parsed_results.push_back(std::move(word_map));
@@ -315,6 +362,7 @@ namespace
                 {
                     try
                     {
+                        // trigger an exception if the value is not a valid algo
                         (void)to_algo_from_sv(value);
                     }
                     catch (...)
@@ -325,6 +373,11 @@ namespace
                 else if (word_key != args::JSON_WORD_STR && !is_numeric_word(word_key))
                 {
                     return false;
+                }
+                else if (word_key == args::JSON_WORD_STR)
+                {
+                    // Remove backtick in front
+                    value = value.substr(1, value.size() - 2);
                 }
 
                 store_value(word_key, value);
@@ -545,124 +598,111 @@ namespace
         // Process JSON input (file or string)
         bool process_json(const std::string &json_input)
         {
-            try
+            // Strip whitespace and check format
+            auto trimmed = std::string{string_utils::strip_whitespace(json_input)};
+            auto trimmed2 = std::string{string_utils::strip_backticks(trimmed)};
+            const auto resolved_json_path = resolve_json_file_path(trimmed2);
+            const auto is_array = !trimmed2.empty() && trimmed2.front() == '[' && trimmed2.back() == ']';
+            const auto is_file = !trimmed2.empty() && std::filesystem::exists(resolved_json_path);
+
+            json_helper jh{};
+            std::vector<std::unordered_map<std::string, std::string>> parsed_json;
+            if (!is_array && !is_file)
             {
-                // Strip whitespace and check format
-                auto trimmed = std::string{string_utils::strip_whitespace(json_input)};
-
-                json_helper jh{};
-
-                // JSON string (backtick-enclosed)
-                if (trimmed.starts_with('`') && trimmed.ends_with('`'))
+                if (std::unordered_map<std::string, std::string> single_obj; jh.from(std::cref(trimmed2), single_obj))
                 {
-                    auto clean_json = trimmed.substr(1, trimmed.size() - 2);
-
-                    std::unordered_map<std::string, std::string> parsed_json;
-                    if (!jh.from(clean_json, parsed_json))
-                    {
-                        return false;
-                    }
-
                     // Merge JSON values into current map
-                    for (const auto &[k, v] : parsed_json)
+                    for (const auto &[k, v] : single_obj)
                     {
                         auto word_key = normalize_key(k);
                         store_value(word_key, v);
                     }
 
-                    return true;
-                }
-
-                // JSON file
-                std::filesystem::path resolved_path{json_input};
-
-                if (!std::filesystem::exists(resolved_path))
-                {
-                    throw std::runtime_error("File not found: " + json_input);
-                }
-
-                auto resolved_str = resolved_path.string();
-
-                // Try loading as array first
-                std::vector<std::unordered_map<std::string, std::string>> parsed_array;
-                if (jh.load_array(resolved_str, parsed_array))
-                {
-                    parsed_results.clear();
-
-                    for (const auto &json_obj : parsed_array)
+                    if (!single_obj.empty())
                     {
-                        ArgMap map;
+                        ArgMap arg_map = single_obj;
+                        arg_map[args::JSON_FLAG_STR] = json_input;
+                        arg_map[args::JSON_OPTION_STR] = json_input;
+                        arg_map[args::JSON_WORD_STR] = json_input;
+                        parsed_results.push_back(std::move(arg_map));
+                    }
+                }
+            }
+            else if (is_file)
+            {
+                std::unordered_map<std::string, std::string> single_obj;
+                if (jh.load(resolved_json_path.string(), single_obj))
+                {
+                    for (const auto &[k, v] : single_obj)
+                    {
+                        auto word_key = normalize_key(k);
+                        store_value(word_key, v);
+                    }
+
+                    if (!single_obj.empty())
+                    {
+                        ArgMap arg_map = single_obj;
+                        arg_map[args::JSON_FLAG_STR] = json_input;
+                        arg_map[args::JSON_OPTION_STR] = json_input;
+                        arg_map[args::JSON_WORD_STR] = json_input;
+                        parsed_results.push_back(std::move(arg_map));
+                    }
+                }
+                else if (jh.load_array(resolved_json_path.string(), parsed_json))
+                {
+                    for (const auto &json_obj : parsed_json)
+                    {
+                        ArgMap arg_map;
                         for (const auto &[k, v] : json_obj)
                         {
-                            auto word_key = normalize_key(k);
-
-                            // Use aliasing for known keys
-                            static const std::unordered_map<
-                                std::string_view, std::tuple<std::string_view, std::string_view, std::string_view>>
-                                aliases = {
-                                    {args::ROW_WORD_STR,
-                                     {args::ROW_FLAG_STR, args::ROW_OPTION_STR, args::ROW_WORD_STR}},
-                                    {args::COLUMN_WORD_STR,
-                                     {args::COLUMN_FLAG_STR, args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR}},
-                                    {args::LEVEL_WORD_STR,
-                                     {args::LEVEL_FLAG_STR, args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR}},
-                                    {args::SEED_WORD_STR,
-                                     {args::SEED_FLAG_STR, args::SEED_OPTION_STR, args::SEED_WORD_STR}},
-                                    {args::ALGO_ID_WORD_STR,
-                                     {args::ALGO_ID_FLAG_STR, args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR}},
-                                    {args::OUTPUT_ID_WORD_STR,
-                                     {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR}},
-                                    {args::DISTANCES_WORD_STR,
-                                     {args::DISTANCES_FLAG_STR, args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR}}};
-
-                            if (auto it = aliases.find(word_key); it != aliases.cend())
-                            {
-                                const auto &[flag, option, word] = it->second;
-                                if (!flag.empty())
-                                {
-                                    map[std::string{flag}] = v;
-                                }
-                                if (!option.empty())
-                                {
-                                    map[std::string{option}] = v;
-                                }
-                                map[std::string{word}] = v;
-                            }
-                            else
-                            {
-                                map[std::string{k}] = v;
-                            }
+                            const auto word_key = normalize_key(k);
+                            arg_map[std::string(word_key)] = v;
+                            store_value(word_key, v);
                         }
 
-                        // Add JSON keys
-                        map[args::JSON_FLAG_STR] = json_input;
-                        map[args::JSON_OPTION_STR] = json_input;
-                        map[args::JSON_WORD_STR] = json_input;
+                        arg_map[args::JSON_FLAG_STR] = json_input;
+                        arg_map[args::JSON_OPTION_STR] = json_input;
+                        arg_map[args::JSON_WORD_STR] = json_input;
 
-                        parsed_results.push_back(std::move(map));
+                        parsed_results.push_back(std::move(arg_map));
                     }
-
-                    return true;
                 }
+            }
 
-                // Try loading as single object
-                if (std::unordered_map<std::string, std::string> parsed_json; jh.load(std::cref(resolved_str), std::ref(parsed_json)))
+            // Exit early if JSON object was parsed successfully
+            if (!parsed_results.empty())
+            {
+                return true;
+            }
+
+            // Maybe JSON array of objects
+            if (!is_file && jh.from_array(std::cref(trimmed2), std::ref(parsed_json)))
+            {
+                for (const auto &json_obj : parsed_json)
                 {
-                    for (const auto &[k, v] : parsed_json)
+                    ArgMap arg_map;
+                    for (const auto &[k, v] : json_obj)
                     {
-                        auto word_key = normalize_key(k);
+                        const auto word_key = normalize_key(k);
+                        arg_map[std::string(word_key)] = v;
                         store_value(word_key, v);
                     }
-                    return true;
-                }
 
-                return false;
+                    arg_map[args::JSON_FLAG_STR] = json_input;
+                    arg_map[args::JSON_OPTION_STR] = json_input;
+                    arg_map[args::JSON_WORD_STR] = json_input;
+
+                    parsed_results.push_back(std::move(arg_map));
+                }
             }
-            catch (const std::exception &e)
+
+            // Verify if we parsed something
+            if (!parsed_results.empty())
             {
-                global_async_logger().log("JSON processing error: {}", e.what());
-                return false;
+                return true;
             }
+
+            return false;
         }
     };
 } // anonymous namespace
@@ -806,12 +846,43 @@ std::optional<std::string> args::get(const std::string &key) const noexcept
     return std::nullopt;
 }
 
-std::optional<std::unordered_map<std::string, std::string>> args::get() const noexcept
+std::unordered_map<std::string, std::string> args::front() const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {
-        return std::nullopt;
+        return {};
     }
 
     return pimpl->arguments.front();
+}
+
+bool args::pop_front() const noexcept
+{
+    if (!pimpl || pimpl->arguments.empty())
+    {
+        return false;
+    }
+
+    pimpl->arguments.erase(pimpl->arguments.begin());
+    return true;
+}
+
+std::vector<std::unordered_map<std::string, std::string>> args::get() const noexcept
+{
+    if (!pimpl || pimpl->arguments.empty())
+    {
+        return {};
+    }
+
+    return pimpl->arguments;
+}
+
+[[nodiscard]] std::size_t args::count() const noexcept
+{
+    if (!pimpl)
+    {
+        return 0;
+    }
+
+    return pimpl->arguments.size();
 }

@@ -7,7 +7,7 @@
 
 using namespace mazes;
 
-runtime_stack::runtime_stack(const runtime_app::context& ctx)
+runtime_stack::runtime_stack(const runtime_app::context &ctx)
     : runtime_context(ctx)
 {
 }
@@ -29,7 +29,7 @@ void runtime_stack::clear_states() noexcept
 
 void runtime_stack::apply_pending_changes() noexcept
 {
-    for (const auto& change : m_pending)
+    for (const auto &change : m_pending)
     {
         switch (change.action)
         {
@@ -64,19 +64,30 @@ bool runtime_stack::is_empty() const noexcept
     return m_states.empty() && m_pending.empty();
 }
 
+std::size_t runtime_stack::count() const noexcept
+{
+    return m_states.size();
+}
+
 void runtime_stack::visit_states(double elapsed) noexcept
 {
     apply_pending_changes();
-    for (auto it = m_states.rbegin(); it != m_states.rend(); ++it)
+
+    while (!m_states.empty())
     {
-        if (!(*it))
+        auto *top_state = m_states.back().get();
+        if (top_state == nullptr)
         {
+            m_states.pop_back();
             continue;
         }
 
-        if (!(*it)->update(elapsed))
+        const bool should_continue = top_state->update(elapsed);
+        apply_pending_changes();
+
+        if (!should_continue)
         {
-            break;
+            continue;
         }
     }
 }

@@ -90,12 +90,9 @@ namespace mazes
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories
         void register_states() const noexcept;
 
-        /// @brief Iterate over the stack (top-to-bottom), call update(args) on each state
-        ///        until one returns false, apply pending changes, then extract the
-        ///        first ready result from processed_text_mapper.
-        /// @param arguments The optional arguments to pass to each state's update function
-        /// @return A string view representing the result of the state updates
-        [[nodiscard]] std::string_view visit_states(std::string_view sv = {}) noexcept;
+        /// @brief Iterate over the stack (top-to-bottom), call update(double) on each state
+        ///        until one returns false, then extract the first ready result from processed_text_mapper.
+        void visit_states() noexcept;
 
         args_manager args_mapper;
         grid_manager grid_mapper;

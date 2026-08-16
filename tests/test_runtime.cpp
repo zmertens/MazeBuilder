@@ -82,6 +82,23 @@ TEST_CASE("OBJ output writes file through apply", "[apply][obj]")
     file.close();
 }
 
+TEST_CASE("JSON array output processes each object", "[apply][json][array]")
+{
+    test_output_dir output_dir{"test_runtime_json_array"};
+    const auto first_output_path = (output_dir.path / "first.txt").generic_string();
+    const auto second_output_path = (output_dir.path / "second.txt").generic_string();
+
+    const std::string input = "--json=`[{\"rows\":\"2\",\"columns\":\"3\",\"algo\":\"dfs\",\"output\":\"" +
+                              first_output_path + "\"},{\"rows\":\"4\",\"columns\":\"5\",\"algo\":\"sidewinder\",\"output\":\"" +
+                              second_output_path + "\"}]`";
+
+    const std::string result{inst->apply(input)};
+
+    REQUIRE(std::filesystem::exists(first_output_path));
+    REQUIRE(std::filesystem::exists(second_output_path));
+    REQUIRE_FALSE(result.empty());
+}
+
 TEST_CASE("PNG output writes file through apply", "[apply][png]")
 {
     test_output_dir output_dir{"test_runtime_png"};

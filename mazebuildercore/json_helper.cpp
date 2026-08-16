@@ -1,5 +1,7 @@
 #include <MazeBuilder/json_helper.h>
 
+#include <MazeBuilder/async_logger.h>
+
 #include <nlohmann/json.hpp>
 
 #include <fstream>
@@ -67,12 +69,21 @@ public:
 
             return true;
         }
+        catch (const nlohmann::json::parse_error& e)
+        {
+            global_async_logger().log("JSON parse error: {}\n", e.what());
+            return false;
+        }
         catch (...)
         {
             return false;
         }
     }
 
+    /// @brief Load a JSON file into a map
+    /// @param filename Path to the JSON file
+    /// @param m Map to populate with parsed key-value pairs
+    /// @return success or failure on parse
     static bool load(const std::string& filename, std::unordered_map<std::string, std::string>& m) noexcept
     {
         if (const std::filesystem::path fp{filename}; !std::filesystem::exists(fp))
@@ -126,6 +137,11 @@ public:
             }
 
             return true;
+        }
+        catch (const nlohmann::json::parse_error& e)
+        {
+            global_async_logger().log("JSON parse error: {}\n", e.what());
+            return false;
         }
         catch (...)
         {

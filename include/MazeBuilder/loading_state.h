@@ -27,6 +27,7 @@ namespace mazes
         /// @return True if the update was successful, false otherwise
         bool update(double delta_time) noexcept override;
 
+        void set_text_to_unknown(const std::string_view txt) noexcept;
     private:
         /// @brief Loads the necessary resources for the loading state
         void load_resources() const noexcept;

@@ -55,6 +55,59 @@ namespace mazes
         }
     }
 
+    inline output_format output_format_or_default(const std::string_view sv,
+                                                 const output_format fallback = output_format::PLAIN_TEXT) noexcept
+    {
+        if (sv.empty())
+        {
+            return fallback;
+        }
+
+        std::string normalized;
+        normalized.reserve(sv.size());
+        for (const char ch : sv)
+        {
+            normalized.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(ch))));
+        }
+
+        if (normalized.starts_with('.'))
+        {
+            normalized.erase(0, 1);
+        }
+
+        if (normalized.empty() || normalized == "stdout")
+        {
+            return output_format::STDOUT;
+        }
+
+        if (normalized == "txt" || normalized == "text")
+        {
+            return output_format::PLAIN_TEXT;
+        }
+
+        if (normalized == "png")
+        {
+            return output_format::PNG;
+        }
+
+        if (normalized == "jpg" || normalized == "jpeg")
+        {
+            return output_format::JPEG;
+        }
+
+        if (normalized == "json")
+        {
+            return output_format::JSON;
+        }
+
+        if (normalized == "obj")
+        {
+            return output_format::OBJ;
+        }
+
+        return fallback;
+    }
+
     /// @brief Convert a string to an output_format enum
     /// @param sv
     /// @return

@@ -203,6 +203,31 @@ namespace mazes
             output_str.remove_prefix(std::min(output_str.find_first_not_of(" \t\r\n\v\f"), output_str.size()));
             return output_str;
         }
+
+        static std::string_view strip_backticks(const std::string &s)
+        {
+            std::string_view output_str{s};
+            output_str.remove_prefix(std::min(output_str.find_first_not_of("\\`"), output_str.size()));
+            output_str.remove_suffix(std::min(output_str.size() - output_str.find_last_not_of("\\`") - 1, output_str.size()));
+            return output_str;
+        }
+
+        static std::string replace_all(const std::string &s, const std::string &from, const std::string &to)
+        {
+            if (from.empty())
+            {
+                return s;
+            }
+
+            std::string result{s};
+            size_t start_pos = 0;
+            while ((start_pos = result.find(from, start_pos)) != std::string::npos)
+            {
+                result.replace(start_pos, from.length(), to);
+                start_pos += to.length(); // Move past the replaced part
+            }
+            return result;
+        }
     }; // class
 } // namespace
 

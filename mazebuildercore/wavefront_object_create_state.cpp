@@ -161,20 +161,20 @@ bool wavefront_object_create_state::update([[maybe_unused]] double delta_time) n
         return false;
     }
 
-    const auto parsed_args = state_utils::get_args(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
-    state_utils::parse_dimensions(parsed_args, rows, cols, levels);
+    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
 
-    const auto selected_grid_id = state_utils::has_distances(parsed_args) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+    const auto selected_grid_id = state_utils::has_distances(std::cref(parsed_args)) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
     current_grid_id = selected_grid_id;
 
     std::string output_target = "stdout";
-    if (const auto parsed = parsed_args ? parsed_args->get() : std::nullopt; parsed.has_value())
+    if (!parsed_args.empty())
     {
-        if (const auto it = parsed->find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed->cend())
+        if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
         {
             output_target = it->second;
         }
@@ -208,7 +208,7 @@ bool wavefront_object_create_state::update([[maybe_unused]] double delta_time) n
     {
         try
         {
-            auto &processing = processed_text_mapper->get(processed_text_identifier::PROCESSING);
+            auto &processing = processed_text_mapper->get(processed_text_identifier::FINISHED);
             processing.set_processed(final_result);
         }
         catch (...)
@@ -217,5 +217,9 @@ bool wavefront_object_create_state::update([[maybe_unused]] double delta_time) n
     }
 
     request_stack_pop();
+    if (state_utils::advance_args(get_context()))
+    {
+        request_stack_push(state::ID::PARSING);
+    }
     return false;
 }

@@ -45,6 +45,8 @@ namespace mazes
         /// @return True if the stack is empty, false otherwise
         [[nodiscard]] bool is_empty() const noexcept;
 
+        [[nodiscard]] std::size_t count() const noexcept;
+
         /// @brief Register a factory for a concrete state type.
         ///        The factory is called with (runtime_context, this).
         template <typename T>

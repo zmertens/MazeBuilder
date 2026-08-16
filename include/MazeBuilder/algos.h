@@ -9,6 +9,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 /// @namespace mazes
 /// @file algos.h
@@ -40,6 +41,16 @@ namespace mazes
             throw std::invalid_argument("Invalid algo: " + std::to_string(static_cast<unsigned int>(a)));
         }
         return ALGOS_LABELS_LOWERCASE.at(static_cast<size_t>(a));
+    }
+
+    inline std::vector<std::string_view> algos_to_vec() noexcept
+    {
+        std::vector<std::string_view> result;
+        for (const auto &label : ALGOS_LABELS_LOWERCASE)
+        {
+            result.push_back(label);
+        }
+        return result;
     }
 
     /// @brief Convert a string_view to an algo enum
