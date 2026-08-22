@@ -64,7 +64,7 @@ The library is organized around a few core concepts reflected in the Doxygen com
 | `-c`, `--columns` | Maze columns, clamped to `1..100` |
 | `-l`, `--levels` | Maze levels, clamped to `1..10` |
 | `-s`, `--seed` | Random seed |
-| `-a`, `--algo` | Maze algorithm: `binary_tree`, `sidewinder`, `dfs` |
+| `-a`, `--algo` | Maze algorithm: `binary_tree`, `sidewinder`, `dfs`, `prims` |
 | `-d`, `--distances` | Show distances, optionally with slice notation like `[0:10]` |
 | `-m`, `--mask` | Load a text mask file |
 | `-j`, `--json` | Load arguments from JSON |
@@ -148,7 +148,7 @@ mazebuildercli -m example_mask.txt -a dfs -d -o stdout
 mazebuildercli --mask=example_mask.txt --algo=sidewinder --output=masked_sidewinder.txt
 ```
 
-The masked maze feature works with all supported algorithms (`binary_tree`, `sidewinder`, `dfs`) and output formats.
+The masked maze feature works with all supported algorithms (`binary_tree`, `sidewinder`, `dfs`, `prims`) and output formats.
 
 ## JSON input
 

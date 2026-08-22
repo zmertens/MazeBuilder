@@ -25,6 +25,7 @@ set(MAZE_BUILDER_CORE_SRCS
     masked_maze_and_create_state.cpp
     parsing_state.cpp
     pixels_create_state.cpp
+    prims_maze_create_state.cpp
     randomizer.cpp
     runtime_app.cpp
     runtime_stack.cpp

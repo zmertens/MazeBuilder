@@ -78,7 +78,7 @@ public:
             "Generates and converts mazes into simple data formats\n\n"
             "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
             "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
-            "Example: mazebuildercli -r 20 -c 20 -a sidewinder -o maze.png\n\n"
+            "Example: mazebuildercli -r 20 -c 15 -s1 -o stdout -a prims\n\n"
             "** Commands are case-sensitive! **\n\n"
             "\t-a, --algo         algorithm to apply to maze links\n"
             "\t                     [" +

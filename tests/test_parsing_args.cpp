@@ -669,6 +669,13 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]")
         REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), "sidewinder"));
     }
 
+    SECTION("App with algorithm prims")
+    {
+        vector<string> args_vec = {"app", "-aprims"};
+        REQUIRE(args_handler.parse(args_vec, true));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::ALGO_ID_FLAG_STR), "prims"));
+    }
+
     SECTION("App with long options using equals")
     {
         vector<string> args_vec = {"app", "--rows=10", "--columns=10", "--seed=2"};

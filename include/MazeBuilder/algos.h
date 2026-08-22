@@ -21,14 +21,16 @@ namespace mazes
         BINARY_TREE = 0,
         SIDEWINDER = 1,
         DFS = 2,
-        TOTAL = 3
+        PRIMS = 3,
+        TOTAL = 4
     };
 
     /// @brief Array of string_view labels for the algo enum, in lowercase
     constexpr std::array<std::string_view, static_cast<size_t>(algo::TOTAL)> ALGOS_LABELS_LOWERCASE = {
         "binary_tree",
         "sidewinder",
-        "dfs" };
+        "dfs",
+        "prims" };
 
     /// @brief Convert the algo enum to a string_view
     /// @param a

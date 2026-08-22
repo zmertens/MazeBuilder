@@ -1,5 +1,4 @@
 #include <catch2/catch_test_macros.hpp>
-
 #include <MazeBuilder/runtime_app.h>
 
 #include "test_output_dir.h"
@@ -211,5 +210,24 @@ TEST_CASE("Masked maze with long form arguments", "[masked_maze][long_args]")
     const auto result = app->apply("--mask=" + mask_file + " --algo=binary_tree --output=stdout");
 
     REQUIRE_FALSE(result.empty());
+    std::filesystem::remove(mask_file);
+}
+
+TEST_CASE("Masked maze with prims algorithm", "[masked_maze][prims]")
+{
+    test_output_dir output_dir{ "masked_maze_prims" };
+    const std::string mask_file = output_dir.path.string() + "/test_prims_mask.txt";
+    create_simple_mask_file(mask_file);
+
+    REQUIRE(std::filesystem::exists(mask_file));
+
+    REQUIRE(app != nullptr);
+
+    const auto result = app->apply("-m " + mask_file + " -a prims -o stdout");
+
+    REQUIRE_FALSE(result.empty());
+    REQUIRE(result.find("Error") == std::string::npos);
+    REQUIRE(result.find("+") != std::string::npos);
+
     std::filesystem::remove(mask_file);
 }

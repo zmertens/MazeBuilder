@@ -175,6 +175,104 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
             }
             break;
         }
+
+        case algo::PRIMS:
+        {
+            std::vector<std::shared_ptr<cell>> open_cells;
+            open_cells.reserve(rows * cols);
+            for (unsigned int row = 0; row < rows; ++row)
+            {
+                for (unsigned int col = 0; col < cols; ++col)
+                {
+                    if (!loaded_mask(row, col))
+                    {
+                        continue;
+                    }
+
+                    if (auto c = grid_ops.search(static_cast<int>(row * cols + col)))
+                    {
+                        open_cells.push_back(c);
+                    }
+                }
+            }
+
+            if (open_cells.empty())
+            {
+                m_result = "Error: No available cells in mask";
+                return m_result;
+            }
+
+            std::unordered_set<int> in_maze;
+            std::unordered_set<int> frontier_ids;
+            std::vector<std::shared_ptr<cell>> frontier;
+
+            auto add_frontier_neighbors = [&](const std::shared_ptr<cell>& c)
+                {
+                    for (const auto& n : grid_ops.get_neighbors(c))
+                    {
+                        if (!n)
+                        {
+                            continue;
+                        }
+
+                        const auto idx = n->get_index();
+                        const auto nr = static_cast<unsigned int>(idx / cols);
+                        const auto nc = static_cast<unsigned int>(idx % cols);
+                        if (!loaded_mask(nr, nc))
+                        {
+                            continue;
+                        }
+
+                        if (!in_maze.contains(idx) && frontier_ids.insert(idx).second)
+                        {
+                            frontier.push_back(n);
+                        }
+                    }
+                };
+
+            auto start = open_cells.at(static_cast<std::size_t>(rng(0, static_cast<int>(open_cells.size()) - 1)));
+            in_maze.insert(start->get_index());
+            add_frontier_neighbors(start);
+
+            while (!frontier.empty())
+            {
+                const auto frontier_pos = static_cast<std::size_t>(rng(0, static_cast<int>(frontier.size()) - 1));
+                auto current = frontier.at(frontier_pos);
+
+                frontier.at(frontier_pos) = frontier.back();
+                frontier.pop_back();
+                frontier_ids.erase(current->get_index());
+
+                std::vector<std::shared_ptr<cell>> neighbors_in_maze;
+                for (const auto& n : grid_ops.get_neighbors(current))
+                {
+                    if (!n)
+                    {
+                        continue;
+                    }
+
+                    const auto idx = n->get_index();
+                    const auto nr = static_cast<unsigned int>(idx / cols);
+                    const auto nc = static_cast<unsigned int>(idx % cols);
+                    if (loaded_mask(nr, nc) && in_maze.contains(idx))
+                    {
+                        neighbors_in_maze.push_back(n);
+                    }
+                }
+
+                if (neighbors_in_maze.empty())
+                {
+                    continue;
+                }
+
+                auto chosen = neighbors_in_maze.at(static_cast<std::size_t>(rng(0, static_cast<int>(neighbors_in_maze.size()) - 1)));
+                lab::link(current, chosen, true);
+                in_maze.insert(current->get_index());
+
+                add_frontier_neighbors(current);
+            }
+            break;
+        }
         default:
             m_result = "Error: Unsupported algorithm for masked maze";
             return m_result;
@@ -199,3 +297,4 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
         return "Unknown error creating masked maze";
     }
 }
+

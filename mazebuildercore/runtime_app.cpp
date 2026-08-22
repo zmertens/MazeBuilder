@@ -9,6 +9,7 @@
 #include <MazeBuilder/masked_maze_and_create_state.h>
 #include <MazeBuilder/parsing_state.h>
 #include <MazeBuilder/pixels_create_state.h>
+#include <MazeBuilder/prims_maze_create_state.h>
 #include <MazeBuilder/processed_text.h>
 #include <MazeBuilder/progress.h>
 #include <MazeBuilder/randomizer.h>
@@ -83,6 +84,7 @@ void runtime_app::register_states() const noexcept
     runtime_stack_ptr->register_state<bt_maze_create_state>(state::ID::LINK_WITH_BINARY_TREE);
     runtime_stack_ptr->register_state<dfs_maze_create_state>(state::ID::LINK_WITH_DFS);
     runtime_stack_ptr->register_state<sw_maze_create_state>(state::ID::LINK_WITH_SIDEWINDER);
+    runtime_stack_ptr->register_state<prims_maze_create_state>(state::ID::LINK_WITH_PRIMS);
     runtime_stack_ptr->register_state<masked_maze_and_create_state>(state::ID::LINK_WITH_MASKED);
     runtime_stack_ptr->register_state<pixels_create_state>(state::ID::WRITE_TO_IMAGE);
     runtime_stack_ptr->register_state<stringify_create_state>(state::ID::WRITE_TO_STRING);

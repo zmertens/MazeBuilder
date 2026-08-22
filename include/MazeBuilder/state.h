@@ -21,13 +21,14 @@ namespace mazes
             LINK_WITH_BINARY_TREE = 1,
             LINK_WITH_DFS = 2,
             LINK_WITH_SIDEWINDER = 3,
-            LOAD = 4,
-            PARSE = 5,
-            WRITE_TO_IMAGE = 6,
-            WRITE_TO_STRING = 7,
-            WRITE_TO_WF_OBJ = 8,
-            LINK_WITH_MASKED = 9,
-            TOTAL = 10
+            LINK_WITH_PRIMS = 4,
+            LOAD = 5,
+            PARSE = 6,
+            WRITE_TO_IMAGE = 7,
+            WRITE_TO_STRING = 8,
+            WRITE_TO_WF_OBJ = 9,
+            LINK_WITH_MASKED = 10,
+            TOTAL = 11
         };
 
         explicit state(const runtime_app::context& c, runtime_stack* rs)

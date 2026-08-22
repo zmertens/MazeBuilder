@@ -128,6 +128,9 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
             case algo::SIDEWINDER:
                 request_stack_push(state::ID::LINK_WITH_SIDEWINDER);
                 break;
+            case algo::PRIMS:
+                request_stack_push(state::ID::LINK_WITH_PRIMS);
+                break;
             default:
                 global_async_logger().log(fmt::format("Parsing update - Unrecognized algo '{}'", it->second));
                 break;

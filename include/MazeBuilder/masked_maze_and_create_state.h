@@ -16,7 +16,7 @@ namespace mazes
 {
     /// @brief State for creating a maze with a mask applied
     /// @details This state loads a mask from file and creates a maze using the specified
-    ///          algorithm (binary_tree, sidewinder, or dfs) on a masked_grid.
+    ///          algorithm (binary_tree, sidewinder, dfs, or prims) on a masked_grid.
     ///          Masked cells are excluded from the maze generation process.
     class masked_maze_and_create_state final : public link_maze_and_create_state
     {
