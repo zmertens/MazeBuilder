@@ -84,7 +84,7 @@ namespace mazes
         [[nodiscard]] std::string_view apply(std::string_view unformatted_args) noexcept override;
 
         /// @brief Returns the last generated grid used by apply(), if available.
-        [[nodiscard]] std::string_view get_finished_text() noexcept;
+        [[nodiscard]] std::string get_finished_text() noexcept;
 
     private:
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories
@@ -99,8 +99,6 @@ namespace mazes
         processed_text_manager processed_text_mapper;
 
         randomizer rng;
-
-        async_logger logger;
 
         std::mutex logging_mtx;
         std::vector<std::string> received_logs;

@@ -10,6 +10,7 @@
 
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/output_formats.h>
+#include <MazeBuilder/string_utils.h>
 
 #include "test_output_dir.h"
 
@@ -44,8 +45,8 @@ TEST_CASE("io_utils can process bad file names", "[bad filenames]")
 
     for (auto bf : more_filenames)
     {
-        auto bf_substr = bf.substr(bf.find_last_of('.') + 1);
-        REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(bf_substr), std::invalid_argument);
+        const auto ext{ string_utils::file_extension(bf) };
+        REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(ext), std::invalid_argument);
     }
 }
 

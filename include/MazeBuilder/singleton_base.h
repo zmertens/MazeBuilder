@@ -14,16 +14,16 @@ namespace mazes
     {
     public:
         // Deleted copy constructor and assignment operator to prevent copying
-        singleton_base(const singleton_base&) = delete;
-        singleton_base& operator=(const singleton_base&) = delete;
+        singleton_base(const singleton_base &) = delete;
+        singleton_base &operator=(const singleton_base &) = delete;
 
         // Deleted move constructor and assignment operator to prevent moving
-        singleton_base(singleton_base&&) = delete;
-        singleton_base& operator=(singleton_base&&) = delete;
+        singleton_base(singleton_base &&) = delete;
+        singleton_base &operator=(singleton_base &&) = delete;
 
         // Static method to access the singleton instance
         template <typename... Args>
-        static std::shared_ptr<T>& instance(Args&&... args) noexcept
+        static std::shared_ptr<T> &instance(Args &&...args) noexcept
         {
             static std::shared_ptr<T> instance = std::make_shared<T>(std::forward<Args>(args)...);
             return instance;

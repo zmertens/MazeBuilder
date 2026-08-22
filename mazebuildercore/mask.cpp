@@ -9,7 +9,7 @@ using namespace mazes;
 
 mask::mask(const unsigned int rows, const unsigned int columns)
     : m_rows(rows), m_columns(columns),
-      m_bits(rows, std::vector<bool>(columns, true))
+    m_bits(rows, std::vector<bool>(columns, true))
 {
 }
 
@@ -53,7 +53,7 @@ std::pair<unsigned int, unsigned int> mask::random_location(randomizer& rng) con
         const auto row = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_rows) - 1));
         if (const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_columns) - 1)); m_bits[row][col])
         {
-            return {row, col};
+            return { row, col };
         }
     }
 }
@@ -65,15 +65,15 @@ mask mask::from_txt(const std::string& filename)
     fs::path resolved = filename;
 
     auto open_file = [](const fs::path& path) -> std::ifstream
-    {
-        return std::ifstream(path);
-    };
+        {
+            return std::ifstream(path);
+        };
 
     std::ifstream file = open_file(resolved);
     if (!file.is_open())
     {
         // Fallback for test/data files executed from repository root.
-        static constexpr const char* fallback_dirs[] = {"tests", "scripts"};
+        static constexpr const char* fallback_dirs[] = { "tests", "scripts" };
         for (const char* dir : fallback_dirs)
         {
             fs::path candidate = fs::path(dir) / filename;

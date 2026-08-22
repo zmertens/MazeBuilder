@@ -29,10 +29,10 @@ namespace mazes
         void set_west(bool has_wall) noexcept { west_wall.second = has_wall; }
 
     private:
-        std::pair<Direction, bool> north_wall{Direction::NORTH, true};
-        std::pair<Direction, bool> south_wall{Direction::SOUTH, true};
-        std::pair<Direction, bool> east_wall{Direction::EAST, true};
-        std::pair<Direction, bool> west_wall{Direction::WEST, true};
+        std::pair<Direction, bool> north_wall{ Direction::NORTH, true };
+        std::pair<Direction, bool> south_wall{ Direction::SOUTH, true };
+        std::pair<Direction, bool> east_wall{ Direction::EAST, true };
+        std::pair<Direction, bool> west_wall{ Direction::WEST, true };
 
         static constexpr std::size_t NUM_WALLS = 4u;
     };
@@ -42,15 +42,15 @@ namespace mazes
     class topology
     {
     public:
-        unsigned int rows{0};
-        unsigned int columns{0};
+        unsigned int rows{ 0 };
+        unsigned int columns{ 0 };
         std::vector<cell_walls> cells;
 
         /// @brief Get the walls for a cell, or nullptr if out of bounds
         /// @param row
         /// @param col
         /// @return
-        [[nodiscard]] const cell_walls *at(unsigned int row, unsigned int col) const noexcept;
+        [[nodiscard]] const cell_walls* at(unsigned int row, unsigned int col) const noexcept;
 
         /// @brief Parse an ASCII box-drawing maze grid (as produced by the stringify/text output format)
         /// into per-cell wall data

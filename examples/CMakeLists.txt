@@ -1,35 +1,19 @@
-
 if(MAZE_BUILDER_EXAMPLES)
 
     # Some third-party deps (for example ogg pulled by SFML audio) still declare
     # very old cmake_minimum_required values. Keep compatibility enabled for them.
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum policy version for legacy third-party dependencies" FORCE)
 
-    set(DEAR_IMGUI_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_demo.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_draw.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_tables.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_widgets.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdl3.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3.cpp
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdlrenderer3.cpp)
+    set(BOX2D_REPO_URL https://github.com/erincatto/box2d.git)
+    set(BOX2D_VERSION v3.1.1)
+    set(SFML_REPO_URL https://github.com/SFML/SFML.git)
+    set(SFML_VERSION 3.1.0)
 
-    set(DEAR_IMGUI_HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imconfig.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imgui_internal.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_rectpack.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_textedit.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/imstb_truetype.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_sdl3.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/../deps/dearimgui/backends/imgui_impl_opengl3_loader.h)
+    message(INFO ": Fetching Box2D from ${BOX2D_REPO_URL}")
+    message(INFO ": Fetching SFML from ${SFML_REPO_URL}")
 
     if(EMSCRIPTEN)
-        message(INFO ": Building examples for the Web!")
-
-        option(MAZE_EMSCRIPTEN_PTHREADS "Enable pthreads for Emscripten builds (requires SharedArrayBuffer + COOP/COEP)" OFF)
+        message(INFO " - Building examples for the Web!")
 
         # Check if CMAKE_TOOLCHAIN_FILE is set, throw a fatal error if not
         if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
@@ -39,13 +23,6 @@ if(MAZE_BUILDER_EXAMPLES)
         # Set baseline WebAssembly flags for all Emscripten targets.
         set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -matomics -mbulk-memory")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -matomics -mbulk-memory")
-
-        if(MAZE_EMSCRIPTEN_PTHREADS)
-            set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
-            set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-            set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pthread")
-            set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -pthread")
-        endif()
 
         # Fix for Emscripten/WebAssembly type detection issues in Ogg/Vorbis
         set(SIZEOF_SHORT 2 CACHE INTERNAL "Size of short")
@@ -65,26 +42,16 @@ if(MAZE_BUILDER_EXAMPLES)
         # Create a fake Threads target for Emscripten.
         if(NOT TARGET Threads::Threads)
             add_library(Threads::Threads INTERFACE IMPORTED)
-            if(MAZE_EMSCRIPTEN_PTHREADS)
-                set_property(TARGET Threads::Threads PROPERTY INTERFACE_COMPILE_OPTIONS "-pthread")
-                set_property(TARGET Threads::Threads PROPERTY INTERFACE_LINK_LIBRARIES "-pthread")
-            endif()
         endif()
 
         # Set variables that FindThreads would normally set
         set(Threads_FOUND TRUE)
-        if(MAZE_EMSCRIPTEN_PTHREADS)
+        if(EMSCRIPTEN)
             set(CMAKE_THREAD_LIBS_INIT "-pthread")
             set(CMAKE_USE_PTHREADS_INIT TRUE)
         else()
             set(CMAKE_THREAD_LIBS_INIT "")
             set(CMAKE_USE_PTHREADS_INIT FALSE)
-        endif()
-
-        if(MAZE_EMSCRIPTEN_PTHREADS)
-            list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory;-pthread>")
-        else()
-            list(APPEND BASE_COMPILE_FLAGS "$<$<CXX_COMPILER_ID:Emscripten>:-matomics;-mbulk-memory>")
         endif()
 
         include(FetchGitRepo)
@@ -93,25 +60,17 @@ if(MAZE_BUILDER_EXAMPLES)
         # Emscripten does not expose x86 SSE by default; disable Box2D SIMD so
         # compat/emmintrin.h is not pulled in during C compilation.
         set(BOX2D_DISABLE_SIMD ON CACHE BOOL "Disable Box2D SIMD for Emscripten builds" FORCE)
-        FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.1)
+        FetchGitRepo(box2d ${BOX2D_REPO_URL} ${BOX2D_VERSION})
         # Add Box2D include directory if not already included by find_package
         if(TARGET box2d)
             set_property(TARGET box2d PROPERTY COMPILE_WARNING_AS_ERROR OFF)
             get_target_property(BOX2D_INCLUDE_DIRS box2d INTERFACE_INCLUDE_DIRECTORIES)
         endif()
 
-        # Get SDL
-        set(SDL_SHARED FALSE CACHE BOOL "Build a SDL shared library (if available)")
-        set(SDL_STATIC TRUE CACHE BOOL "Build a SDL static library (if available)")
-        FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git release-3.2.10)
-        set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-
         # Get SFML with Emscripten-specific settings
-        set(SFML_REPO_URL "https://github.com/zmertens/SFML.git")
-        message(STATUS "Fetching SFML from ${SFML_REPO_URL}")
         # SFML audio brings in legacy ogg/vorbis CMake projects and is not needed
         # for the current web examples.
-        set(SFML_BUILD_AUDIO OFF)
+        set(SFML_BUILD_AUDIO ON)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS OFF)
         set(SFML_BUILD_WINDOW OFF)
@@ -121,9 +80,9 @@ if(MAZE_BUILDER_EXAMPLES)
         # Disable problematic audio dependencies for Web builds
         set(SFML_USE_DRM OFF CACHE BOOL "Use DRM for audio")
         set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries")
-        FetchGitRepo(SFML ${SFML_REPO_URL} almostv3)
+        FetchGitRepo(SFML ${SFML_REPO_URL} ${SFML_VERSION})
 
-    else(EMSCRIPTEN)
+    else()
         message(INFO ": Building examples for the Desktop!")
 
         # Find threads normally for desktop builds
@@ -132,11 +91,7 @@ if(MAZE_BUILDER_EXAMPLES)
         include(FetchGitRepo)
 
         # Add Box2D dependency
-        find_package(box2d QUIET)
-        if(NOT box2d_FOUND)
-            message(STATUS "Getting Box2D via FetchContent")
-            FetchGitRepo(box2d https://github.com/erincatto/box2d.git v3.1.1)
-        endif()
+        FetchGitRepo(box2d ${BOX2D_REPO_URL} ${BOX2D_VERSION})
 
         # Add Box2D include directory if not already included by find_package
         if(TARGET box2d)
@@ -144,28 +99,41 @@ if(MAZE_BUILDER_EXAMPLES)
             get_target_property(BOX2D_INCLUDE_DIRS box2d INTERFACE_INCLUDE_DIRECTORIES)
         endif()
 
-        # Get SDL
-        find_package(SDL3 QUIET)
-        if(NOT SDL3_FOUND)
-            message(STATUS "Getting SDL via FetchContent")
-            set(SDL_SHARED TRUE CACHE BOOL "Build a SDL shared library (if available)")
-            set(SDL_STATIC FALSE CACHE BOOL "Build a SDL static library (if available)")
-            FetchGitRepo(SDL https://github.com/libsdl-org/SDL.git release-3.2.10)
-            set_property(DIRECTORY "${CMAKE_BINARY_DIR}/_deps/sdl-src" PROPERTY EXCLUDE_FROM_ALL TRUE)
-        endif()
-
         # Get SFML from web and build dependencies locally
-        set(SFML_BUILD_AUDIO OFF)
+        set(SFML_BUILD_AUDIO ON)
         set(SFML_BUILD_NETWORK ON)
         set(SFML_BUILD_GRAPHICS ON)
         set(SFML_BUILD_WINDOW ON)
         set(SFML_USE_SYSTEM_DEPS OFF)
         set(BUILD_SHARED_LIBS OFF)
-        FetchGitRepo(SFML https://github.com/SFML/SFML.git 3.0.2)
+        FetchGitRepo(SFML ${SFML_REPO_URL} ${SFML_VERSION})
+
+        if(TARGET sfml-graphics AND TARGET SheenBidi)
+            add_dependencies(sfml-graphics SheenBidi)
+        endif()
+
+        if(TARGET sfml-graphics)
+            foreach(_sfml_graphics_dep harfbuzz freetype)
+                if(TARGET ${_sfml_graphics_dep})
+                    add_dependencies(sfml-graphics ${_sfml_graphics_dep})
+                endif()
+            endforeach()
+        endif()
+
+        if(TARGET sfml-network AND TARGET libssh2_static)
+            add_dependencies(sfml-network libssh2_static)
+        endif()
+
+        if(TARGET sfml-network)
+            foreach(_sfml_network_dep mbedtls mbedcrypto mbedx509)
+                if(TARGET ${_sfml_network_dep})
+                    add_dependencies(sfml-network ${_sfml_network_dep})
+                endif()
+            endforeach()
+        endif()
     endif(EMSCRIPTEN)
 
-    add_subdirectory(Voxels)
     add_subdirectory(CLI)
     add_subdirectory(Http)
-    add_subdirectory(AmazingSFML)
+    add_subdirectory(Amazing)
 endif()

@@ -2,31 +2,63 @@
 #define STATE_UTILS_H
 
 #include <MazeBuilder/args.h>
+#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/output_formats.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/state.h>
+#include <MazeBuilder/string_utils.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <optional>
+#include <ranges>
 #include <string>
 #include <unordered_map>
 
-#include <fmt/format.h>
-
+/// @brief Namespace containing utility functions for maze builder states
+/// @file state_utils.h
 namespace mazes::state_utils
 {
-    inline void parse_dimensions(const std::unordered_map<std::string, std::string> &args, unsigned int &rows, unsigned int &cols,
-                                 unsigned int &levels) noexcept
+    namespace details
+    {
+        inline state::ID to_state_from_output_format(output_format of) noexcept
+        {
+            switch (of)
+            {
+            case output_format::JPG:
+            case output_format::JPEG:
+            case output_format::PNG:
+                return state::ID::WRITE_TO_IMAGE;
+            case output_format::PLAIN_TEXT:
+            case output_format::PLAIN_TEXT_ALT:
+            case output_format::JSON:
+            case output_format::STDOUT:
+                return state::ID::WRITE_TO_STRING;
+            case output_format::OBJ:
+                return state::ID::WRITE_TO_WF_OBJ;
+            default:
+                return state::ID::EMPTY;
+            }
+        }
+    }
+
+    /// @brief Parses the maze dimensions from the given arguments.
+    /// @param args The arguments containing the dimension information.
+    /// @param rows Reference to store the number of rows.
+    /// @param cols Reference to store the number of columns.
+    /// @param levels Reference to store the number of levels.
+    inline void parse_dimensions(const std::unordered_map<std::string, std::string>& args, unsigned int& rows, unsigned int& cols,
+        unsigned int& levels) noexcept
     {
         if (const auto it = args.find(mazes::args::ROW_WORD_STR); it != args.cend())
         {
             try
             {
                 rows = static_cast<unsigned int>(std::stoul(it->second));
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
@@ -35,8 +67,7 @@ namespace mazes::state_utils
             try
             {
                 cols = static_cast<unsigned int>(std::stoul(it->second));
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
@@ -45,32 +76,26 @@ namespace mazes::state_utils
             try
             {
                 levels = static_cast<unsigned int>(std::stoul(it->second));
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
     }
 
-    inline bool has_distances(const std::unordered_map<std::string, std::string> &args) noexcept
-    {
-        if (!args.empty())
-        {
-            return args.find(mazes::args::DISTANCES_WORD_STR) != args.cend();
-        }
-        return false;
-    }
-
+    /// @brief Struct to hold distance settings parsed from arguments
     struct distance_settings final
     {
-        bool enabled{false};
-        int start{configurator::DEFAULT_DISTANCES_START};
-        int end{configurator::DEFAULT_DISTANCES_END};
+        bool enabled{ false };
+        int start{ configurator::DEFAULT_DISTANCES_START };
+        int end{ configurator::DEFAULT_DISTANCES_END };
     };
 
-    inline distance_settings parse_distance_settings(const std::unordered_map<std::string, std::string> &args) noexcept
+    /// @brief Parses the distance settings from the given arguments.
+    /// @param args The arguments containing the distance settings.
+    /// @return A distance_settings struct populated with the parsed values.
+    inline distance_settings parse_distance_settings(const std::unordered_map<std::string, std::string>& args) noexcept
     {
-        distance_settings settings{};;
+        distance_settings settings{};
 
         settings.enabled = args.find(mazes::args::DISTANCES_WORD_STR) != args.cend();
 
@@ -79,8 +104,7 @@ namespace mazes::state_utils
             try
             {
                 settings.start = std::stoi(it->second);
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
@@ -89,8 +113,7 @@ namespace mazes::state_utils
             try
             {
                 settings.end = std::stoi(it->second);
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
@@ -98,92 +121,68 @@ namespace mazes::state_utils
         return settings;
     }
 
-    inline state::ID output_state_for(const std::unordered_map<std::string, std::string> &args) noexcept
+    /// @brief Checks if the "distances" argument is present in the given arguments.
+/// @details This function checks if the "distances" argument is present in the provided
+/// @param args
+/// @return
+    inline bool has_distances(const std::unordered_map<std::string, std::string>& args) noexcept
     {
-        if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend())
-        {
-            const std::string output = it->second;
-            if (output.empty() || output == "stdout")
-            {
-                return state::ID::STRINGIFYING;
-            }
-
-            const auto ext = std::filesystem::path{output}.extension().string();
-            if (ext.empty())
-            {
-                return state::ID::STRINGIFYING;
-            }
-
-            auto normalized = ext;
-            if (!normalized.empty() && normalized.front() == '.')
-            {
-                normalized.erase(normalized.begin());
-            }
-
-            if (normalized == "txt" || normalized == "stdout")
-            {
-                return state::ID::STRINGIFYING;
-            }
-
-            if (normalized == "json")
-            {
-                return state::ID::PARSING;
-            }
-
-            if (normalized == "obj")
-            {
-                return state::ID::WAVEFRONT_OBJECTIFY;
-            }
-
-            if (normalized == "png" || normalized == "jpg" || normalized == "jpeg" || normalized == "bmp")
-            {
-                return state::ID::PIXELIZING;
-            }
-        }
-
-        return state::ID::STRINGIFYING;
+        return parse_distance_settings(args).enabled;
     }
 
-    inline std::unordered_map<std::string, std::string> get_args_at_front(const runtime_app::context &ctx) noexcept
+    /// @brief Determines the output state based on the given arguments.
+    /// @param args The arguments containing the output information.
+    /// @return The corresponding state::ID for the output.
+    inline state::ID output_state_for(const std::unordered_map<std::string, std::string>& args) noexcept
     {
-        if (auto *args_mapper = ctx.get_args_manager())
+        state::ID output_state = state::ID::EMPTY;
+        if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend())
+        {
+            const auto& output = string_utils::file_extension(it->second);
+            output_state = details::to_state_from_output_format(output_format_or_default(output));
+        }
+
+        return output_state;
+    }
+
+    inline std::unordered_map<std::string, std::string> get_args_at_front(const runtime_app::context& ctx) noexcept
+    {
+        if (auto* args_mapper = ctx.get_args_manager())
         {
             try
             {
-                auto &&parsed_args = args_mapper->get(args_identifier::PARSED).front();
+                auto&& parsed_args = args_mapper->get(args_identifier::PARSED).front();
 
                 if (parsed_args.empty())
                 {
                     parsed_args = args_mapper->get(args_identifier::RAW).front();
                 }
                 return parsed_args;
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
         return {};
     }
 
-    inline bool advance_args(const runtime_app::context &ctx) noexcept
+    inline bool advance_args(const runtime_app::context& ctx) noexcept
     {
-        if (auto *args_mapper = ctx.get_args_manager())
+        if (auto* args_mapper = ctx.get_args_manager())
         {
             try
             {
-                auto &parsed_args = args_mapper->get(args_identifier::PARSED);
+                auto& parsed_args = args_mapper->get(args_identifier::PARSED);
                 return parsed_args.pop_front() && parsed_args.count() > 0;
-            }
-            catch (...)
+            } catch (...)
             {
             }
         }
         return false;
     }
 
-    inline randomizer *get_rng_or_default(const runtime_app::context &ctx) noexcept
+    inline randomizer* get_rng_or_default(const runtime_app::context& ctx) noexcept
     {
-        if (auto *rng = ctx.get_rng())
+        if (auto* rng = ctx.get_rng())
         {
             return rng;
         }
@@ -191,6 +190,21 @@ namespace mazes::state_utils
         // Thread-local storage keeps the fallback lifetime valid for callers.
         static thread_local randomizer fallback_rng{};
         return &fallback_rng;
+    }
+
+    // Reseeds rng from the parsed "seed" arg so repeated apply() calls with the same
+    // seed reproduce identical topology; the rng is otherwise shared and keeps advancing.
+    inline void reseed_from_args(const std::unordered_map<std::string, std::string>& args, randomizer& rng) noexcept
+    {
+        if (const auto it = args.find(mazes::args::SEED_WORD_STR); it != args.cend())
+        {
+            try
+            {
+                rng.seed(std::stoull(it->second));
+            } catch (...)
+            {
+            }
+        }
     }
 
     template <typename... Mappers>
@@ -201,6 +215,27 @@ namespace mazes::state_utils
             global_async_logger().log("mappers are null");
         }
     }
+
+    /// @brief Resets the grid's topology (links) before each generation.
+    /// @details resize() always clears cell links even when dimensions are unchanged;
+    /// without this, repeated maze generation at the same size (e.g. rebuilding on
+    /// keypress) would keep linking new random walls on top of the previous maze's
+    /// links, so the maze gradually loses walls / becomes fully open over time.
+    /// @param ops Pointer to the grid operations.
+    /// @param rows Desired number of rows.
+    /// @param cols Desired number of columns.
+    /// @param levels Desired number of levels.
+    inline void check_before_resize(grid_operations* ops, unsigned int rows, unsigned int cols, unsigned int levels) noexcept
+    {
+        if (ops == nullptr)
+        {
+            global_async_logger().log("grid_operations pointer is null");
+            return;
+        }
+
+        ops->resize(rows, cols, levels);
+    }
+
 } // namespace mazes::state_utils
 
 #endif // STATE_UTILS_H

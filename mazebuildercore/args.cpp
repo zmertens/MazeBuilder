@@ -34,7 +34,7 @@ namespace
         static const std::unordered_set<std::string_view> known = {
             args::ROW_WORD_STR, args::COLUMN_WORD_STR, args::LEVEL_WORD_STR, args::SEED_WORD_STR,
             args::ALGO_ID_WORD_STR, args::OUTPUT_ID_WORD_STR, args::JSON_WORD_STR,
-            args::DISTANCES_WORD_STR, args::MASK_WORD_STR};
+            args::DISTANCES_WORD_STR, args::MASK_WORD_STR };
         return known.contains(word_key);
     }
 
@@ -42,18 +42,18 @@ namespace
     bool is_numeric_word(std::string_view word_key) noexcept
     {
         return word_key == args::ROW_WORD_STR || word_key == args::COLUMN_WORD_STR ||
-               word_key == args::LEVEL_WORD_STR || word_key == args::SEED_WORD_STR;
+            word_key == args::LEVEL_WORD_STR || word_key == args::SEED_WORD_STR;
     }
 
     bool is_valid_numeric_value(std::string_view value) noexcept
     {
         return !value.empty() && std::ranges::all_of(value, [](unsigned char c)
-                                                     { return std::isdigit(c) != 0; });
+            { return std::isdigit(c) != 0; });
     }
 
     std::filesystem::path resolve_json_file_path(std::string_view candidate)
     {
-        const std::filesystem::path raw_path{std::string(candidate)};
+        const std::filesystem::path raw_path{ std::string(candidate) };
         if (raw_path.empty() || std::filesystem::exists(raw_path))
         {
             return raw_path;
@@ -67,9 +67,9 @@ namespace
             cwd.parent_path() / "tests",
             cwd.parent_path().parent_path(),
             cwd.parent_path().parent_path() / "tests",
-            std::filesystem::path{candidate}.has_parent_path() ? std::filesystem::path{candidate}.parent_path() : cwd};
+            std::filesystem::path{candidate}.has_parent_path() ? std::filesystem::path{candidate}.parent_path() : cwd };
 
-        for (const auto &root : search_roots)
+        for (const auto& root : search_roots)
         {
             const auto candidate_path = root / raw_path;
             if (std::filesystem::exists(candidate_path))
@@ -84,7 +84,7 @@ namespace
         }
 
         const std::filesystem::path file_name = raw_path.filename();
-        for (const auto &root : search_roots)
+        for (const auto& root : search_roots)
         {
             const auto candidate_path = root / file_name;
             if (std::filesystem::exists(candidate_path))
@@ -100,7 +100,7 @@ namespace
     bool is_standalone_flag(std::string_view word_key) noexcept
     {
         return word_key == args::DISTANCES_WORD_STR || word_key == "-h" || word_key == "--help" ||
-               word_key == "-v" || word_key == "--version";
+            word_key == "-v" || word_key == "--version";
     }
 
     enum class TokenType
@@ -127,7 +127,7 @@ namespace
     class tiny_tokenizer
     {
     public:
-        explicit tiny_tokenizer(const std::vector<std::string> &args, const bool skip_first = false)
+        explicit tiny_tokenizer(const std::vector<std::string>& args, const bool skip_first = false)
             : current_args(args), token_idx(skip_first ? 1 : 0), has_program_name(skip_first)
         {
         }
@@ -136,38 +136,36 @@ namespace
         {
             if (token_idx >= current_args.size())
             {
-                return token{.type = TokenType::END_OF_INPUT, .text = ""};
+                return token{ .type = TokenType::END_OF_INPUT, .text = "" };
             }
 
-            const auto &arg = current_args.at(token_idx++);
+            const auto& arg = current_args.at(token_idx++);
 
             // Check for slice notation: must be well-formed [..:..]
             // Properly formatted slices have '[' at start, ']' at end, and exactly one ':' in between
             // Minimum valid slice is [:]  (size 3)
             if (std::regex_match(arg, SLICE_REGEX))
             {
-                return token{.type = TokenType::SLICE_NOTATION, .text = arg};
+                return token{ .type = TokenType::SLICE_NOTATION, .text = arg };
             }
 
             // Check for long option
             if (!arg.empty() && arg.starts_with("--"))
             {
-                return token{.type = TokenType::LONG_OPTION, .text = arg};
-            }
-            else if (arg.starts_with("-") && arg.size() >= 2)
+                return token{ .type = TokenType::LONG_OPTION, .text = arg };
+            } else if (arg.starts_with("-") && arg.size() >= 2)
             {
                 if (std::isalpha(static_cast<std::uint16_t>(arg.at(1))))
                 {
-                    return token{.type = TokenType::SHORT_FLAG, .text = arg};
+                    return token{ .type = TokenType::SHORT_FLAG, .text = arg };
                 }
-            }
-            else if (token_idx == 1 && has_program_name)
+            } else if (token_idx == 1 && has_program_name)
             {
                 // First argument is program name (if has_program_name is true)
-                return token{.type = TokenType::PROGRAM, .text = arg};
+                return token{ .type = TokenType::PROGRAM, .text = arg };
             }
 
-            return token{.type = TokenType::VALUE, .text = arg};
+            return token{ .type = TokenType::VALUE, .text = arg };
         }
 
         [[nodiscard]] bool has_more() const { return token_idx < current_args.size(); }
@@ -181,7 +179,7 @@ namespace
         }
 
     private:
-        const std::vector<std::string> &current_args;
+        const std::vector<std::string>& current_args;
         size_t token_idx;
         bool has_program_name;
     };
@@ -195,9 +193,9 @@ namespace
 
         tiny_parser() = default;
 
-        bool parse(const std::vector<std::string> &args, bool has_program_name)
+        bool parse(const std::vector<std::string>& args, bool has_program_name)
         {
-            tiny_tokenizer tokenizer{args, has_program_name};
+            tiny_tokenizer tokenizer{ args, has_program_name };
             parsed_results.clear();
             word_map.clear();
 
@@ -233,15 +231,13 @@ namespace
                         {
                             return false;
                         }
-                    }
-                    else if (token.type == TokenType::LONG_OPTION)
+                    } else if (token.type == TokenType::LONG_OPTION)
                     {
                         if (!parse_long_option(token, tokenizer))
                         {
                             return false;
                         }
-                    }
-                    else if (token.type == TokenType::VALUE)
+                    } else if (token.type == TokenType::VALUE)
                     {
                         // A bare/malformed value is only tolerated as an implicit leading
                         // program name when the caller did not already declare one.
@@ -258,8 +254,7 @@ namespace
                 if (auto it = word_map.find(args::JSON_WORD_STR); it != word_map.cend())
                 {
                     json_ok = process_json(it->second);
-                }
-                else if (auto it2 = word_map.find(args::JSON_FLAG_STR); it2 != word_map.cend())
+                } else if (auto it2 = word_map.find(args::JSON_FLAG_STR); it2 != word_map.cend())
                 {
                     json_ok = process_json(it2->second);
                 }
@@ -270,15 +265,14 @@ namespace
                 }
 
                 return json_ok && !parsed_results.empty() && !parsed_results.front().empty();
-            }
-            catch (const std::exception &e)
+            } catch (const std::exception& e)
             {
                 global_async_logger().log("Parse error: {}\n", e.what());
                 return false;
             }
         }
 
-        [[nodiscard]] const std::vector<ArgMap> &results() const { return parsed_results; }
+        [[nodiscard]] const std::vector<ArgMap>& results() const { return parsed_results; }
 
     private:
         ArgMap word_map;
@@ -289,7 +283,7 @@ namespace
         {
             // Map of word-form keys to their flag and option aliases
             static const std::unordered_map<std::string_view, std::tuple<
-                                                                  std::string_view, std::string_view, std::string_view>>
+                std::string_view, std::string_view, std::string_view>>
                 aliases = {
                     {args::ROW_WORD_STR, {args::ROW_FLAG_STR, args::ROW_OPTION_STR, args::ROW_WORD_STR}},
                     {args::COLUMN_WORD_STR, {args::COLUMN_FLAG_STR, args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR}},
@@ -301,7 +295,7 @@ namespace
                     {args::JSON_WORD_STR, {args::JSON_FLAG_STR, args::JSON_OPTION_STR, args::JSON_WORD_STR}},
                     {args::DISTANCES_WORD_STR,
                      {args::DISTANCES_FLAG_STR, args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR}},
-                    {args::MASK_WORD_STR, {args::MASK_FLAG_STR, args::MASK_OPTION_STR, args::MASK_WORD_STR}}};
+                    {args::MASK_WORD_STR, {args::MASK_FLAG_STR, args::MASK_OPTION_STR, args::MASK_WORD_STR}} };
 
             std::string_view word_key = key;
 
@@ -309,7 +303,7 @@ namespace
             auto it = aliases.find(word_key);
             if (it != aliases.cend())
             {
-                const auto &[flag, option, word] = it->second;
+                const auto& [flag, option, word] = it->second;
                 if (!flag.empty())
                 {
                     word_map[std::string(flag)] = value;
@@ -319,8 +313,7 @@ namespace
                     word_map[std::string(option)] = value;
                 }
                 word_map[std::string(word)] = value;
-            }
-            else
+            } else
             {
                 // No alias, just store as-is
                 word_map[std::string(key)] = value;
@@ -331,7 +324,24 @@ namespace
         static std::string_view normalize_key(std::string_view key)
         {
             static const std::unordered_map<std::string_view, std::string_view> normalization = {
-                {args::ROW_FLAG_STR, args::ROW_WORD_STR}, {args::ROW_OPTION_STR, args::ROW_WORD_STR}, {args::COLUMN_FLAG_STR, args::COLUMN_WORD_STR}, {args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR}, {args::LEVEL_FLAG_STR, args::LEVEL_WORD_STR}, {args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR}, {args::SEED_FLAG_STR, args::SEED_WORD_STR}, {args::SEED_OPTION_STR, args::SEED_WORD_STR}, {args::ALGO_ID_FLAG_STR, args::ALGO_ID_WORD_STR}, {args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR}, {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_WORD_STR}, {args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR}, {args::JSON_FLAG_STR, args::JSON_WORD_STR}, {args::JSON_OPTION_STR, args::JSON_WORD_STR}, {args::DISTANCES_FLAG_STR, args::DISTANCES_WORD_STR}, {args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR}, {args::MASK_FLAG_STR, args::MASK_WORD_STR}, {args::MASK_OPTION_STR, args::MASK_WORD_STR}};
+                {args::ROW_FLAG_STR, args::ROW_WORD_STR},
+                {args::ROW_OPTION_STR, args::ROW_WORD_STR},
+                {args::COLUMN_FLAG_STR, args::COLUMN_WORD_STR},
+                {args::COLUMN_OPTION_STR, args::COLUMN_WORD_STR},
+                {args::LEVEL_FLAG_STR, args::LEVEL_WORD_STR},
+                {args::LEVEL_OPTION_STR, args::LEVEL_WORD_STR},
+                {args::SEED_FLAG_STR, args::SEED_WORD_STR},
+                {args::SEED_OPTION_STR, args::SEED_WORD_STR},
+                {args::ALGO_ID_FLAG_STR, args::ALGO_ID_WORD_STR},
+                {args::ALGO_ID_OPTION_STR, args::ALGO_ID_WORD_STR},
+                {args::OUTPUT_ID_FLAG_STR, args::OUTPUT_ID_WORD_STR},
+                {args::OUTPUT_ID_OPTION_STR, args::OUTPUT_ID_WORD_STR},
+                {args::JSON_FLAG_STR, args::JSON_WORD_STR},
+                {args::JSON_OPTION_STR, args::JSON_WORD_STR},
+                {args::DISTANCES_FLAG_STR, args::DISTANCES_WORD_STR},
+                {args::DISTANCES_OPTION_STR, args::DISTANCES_WORD_STR},
+                {args::MASK_FLAG_STR, args::MASK_WORD_STR},
+                {args::MASK_OPTION_STR, args::MASK_WORD_STR} };
 
             if (auto it = normalization.find(key); it != normalization.cend())
             {
@@ -340,7 +350,7 @@ namespace
             return key;
         }
 
-        bool parse_short_flag(const token &token, tiny_tokenizer &tokenizer)
+        bool parse_short_flag(const token& token, tiny_tokenizer& tokenizer)
         {
             std::string flag = token.text;
 
@@ -357,24 +367,30 @@ namespace
                     return parse_distances_value(word_key, std::string(value));
                 }
 
-                // Only algo, numeric, and json (file path) flags support a value glued directly onto the flag letter.
+                // Value is glued onto the argument option
                 if (word_key == args::ALGO_ID_WORD_STR)
                 {
                     try
                     {
                         // trigger an exception if the value is not a valid algo
                         (void)to_algo_from_sv(value);
-                    }
-                    catch (...)
+                    } catch (...)
                     {
                         return false;
                     }
-                }
-                else if (word_key != args::JSON_WORD_STR && !is_numeric_word(word_key))
+                } else if (word_key == args::OUTPUT_ID_WORD_STR)
+                {
+                    try
+                    {
+                        (void)to_output_format_from_sv(value);
+                    } catch (...)
+                    {
+                        return false;
+                    }
+                } else if (word_key != args::JSON_WORD_STR && !is_numeric_word(word_key))
                 {
                     return false;
-                }
-                else if (word_key == args::JSON_WORD_STR)
+                } else if (word_key == args::JSON_WORD_STR)
                 {
                     // Remove backtick in front
                     value = value.substr(1, value.size() - 2);
@@ -415,8 +431,7 @@ namespace
                 if (value_token.type == TokenType::SLICE_NOTATION)
                 {
                     return parse_distances_value(word_key, value_token.text);
-                }
-                else if (value_token.type == TokenType::VALUE)
+                } else if (value_token.type == TokenType::VALUE)
                 {
                     // Distances with non-slice value is invalid
 #ifdef MAZE_DEBUG
@@ -451,7 +466,7 @@ namespace
         }
 
         // Parse long option: --help, --rows=10, --rows 10
-        bool parse_long_option(const token &token, tiny_tokenizer &tokenizer)
+        bool parse_long_option(const token& token, tiny_tokenizer& tokenizer)
         {
             std::string option = token.text;
 
@@ -474,8 +489,7 @@ namespace
                     if (value.starts_with('['))
                     {
                         return parse_distances_value(word_key, std::string(value));
-                    }
-                    else
+                    } else
                     {
                         // Distances with non-slice value is invalid
 #ifdef MAZE_DEBUG
@@ -557,7 +571,7 @@ namespace
         }
 
         // Parse distances value with slice notation [start:end]
-        bool parse_distances_value(const std::string_view key, const std::string &value)
+        bool parse_distances_value(const std::string_view key, const std::string& value)
         {
             static const std::regex slice_pattern(R"(\[(\d*):(-?\d*)\])");
 
@@ -596,11 +610,11 @@ namespace
         }
 
         // Process JSON input (file or string)
-        bool process_json(const std::string &json_input)
+        bool process_json(const std::string& json_input)
         {
             // Strip whitespace and check format
-            auto trimmed = std::string{string_utils::strip_whitespace(json_input)};
-            auto trimmed2 = std::string{string_utils::strip_backticks(trimmed)};
+            auto trimmed = std::string{ string_utils::strip_whitespace(json_input) };
+            auto trimmed2 = std::string{ string_utils::strip_backticks(trimmed) };
             const auto resolved_json_path = resolve_json_file_path(trimmed2);
             const auto is_array = !trimmed2.empty() && trimmed2.front() == '[' && trimmed2.back() == ']';
             const auto is_file = !trimmed2.empty() && std::filesystem::exists(resolved_json_path);
@@ -612,7 +626,7 @@ namespace
                 if (std::unordered_map<std::string, std::string> single_obj; jh.from(std::cref(trimmed2), single_obj))
                 {
                     // Merge JSON values into current map
-                    for (const auto &[k, v] : single_obj)
+                    for (const auto& [k, v] : single_obj)
                     {
                         auto word_key = normalize_key(k);
                         store_value(word_key, v);
@@ -627,13 +641,12 @@ namespace
                         parsed_results.push_back(std::move(arg_map));
                     }
                 }
-            }
-            else if (is_file)
+            } else if (is_file)
             {
                 std::unordered_map<std::string, std::string> single_obj;
                 if (jh.load(resolved_json_path.string(), single_obj))
                 {
-                    for (const auto &[k, v] : single_obj)
+                    for (const auto& [k, v] : single_obj)
                     {
                         auto word_key = normalize_key(k);
                         store_value(word_key, v);
@@ -647,13 +660,12 @@ namespace
                         arg_map[args::JSON_WORD_STR] = json_input;
                         parsed_results.push_back(std::move(arg_map));
                     }
-                }
-                else if (jh.load_array(resolved_json_path.string(), parsed_json))
+                } else if (jh.load_array(resolved_json_path.string(), parsed_json))
                 {
-                    for (const auto &json_obj : parsed_json)
+                    for (const auto& json_obj : parsed_json)
                     {
                         ArgMap arg_map;
-                        for (const auto &[k, v] : json_obj)
+                        for (const auto& [k, v] : json_obj)
                         {
                             const auto word_key = normalize_key(k);
                             arg_map[std::string(word_key)] = v;
@@ -678,10 +690,10 @@ namespace
             // Maybe JSON array of objects
             if (!is_file && jh.from_array(std::cref(trimmed2), std::ref(parsed_json)))
             {
-                for (const auto &json_obj : parsed_json)
+                for (const auto& json_obj : parsed_json)
                 {
                     ArgMap arg_map;
-                    for (const auto &[k, v] : json_obj)
+                    for (const auto& [k, v] : json_obj)
                     {
                         const auto word_key = normalize_key(k);
                         arg_map[std::string(word_key)] = v;
@@ -714,7 +726,7 @@ public:
 
     std::vector<std::unordered_map<std::string, std::string>> arguments;
 
-    bool parse(const std::vector<std::string> &args_vec, const bool has_program_name)
+    bool parse(const std::vector<std::string>& args_vec, const bool has_program_name)
     {
         static tiny_parser parser;
         const bool success = parser.parse(args_vec, has_program_name);
@@ -735,17 +747,17 @@ public:
     }
 };
 
-args::args() noexcept : pimpl{std::make_unique<impl>()}
+args::args() noexcept : pimpl{ std::make_unique<impl>() }
 {
 }
 
 args::~args() = default;
 
-args::args(args &&other) noexcept = default;
+args::args(args&& other) noexcept = default;
 
-args &args::operator=(args &&other) noexcept = default;
+args& args::operator=(args&& other) noexcept = default;
 
-args::args(const args &other) : pimpl{std::make_unique<impl>()}
+args::args(const args& other) : pimpl{ std::make_unique<impl>() }
 {
     if (other.pimpl)
     {
@@ -753,7 +765,7 @@ args::args(const args &other) : pimpl{std::make_unique<impl>()}
     }
 }
 
-args &args::operator=(const args &other)
+args& args::operator=(const args& other)
 {
     if (this != &other && other.pimpl)
     {
@@ -763,7 +775,7 @@ args &args::operator=(const args &other)
     return *this;
 }
 
-bool args::parse(const std::vector<std::string> &arguments, const bool has_program_name_as_first_arg) const noexcept
+bool args::parse(const std::vector<std::string>& arguments, const bool has_program_name_as_first_arg) const noexcept
 {
     if (arguments.empty())
     {
@@ -773,14 +785,13 @@ bool args::parse(const std::vector<std::string> &arguments, const bool has_progr
     try
     {
         return pimpl->parse(arguments, has_program_name_as_first_arg);
-    }
-    catch (...)
+    } catch (...)
     {
         return false;
     }
 }
 
-bool args::parse(const std::string &arguments, const bool has_program_name_as_first_arg) const noexcept
+bool args::parse(const std::string& arguments, const bool has_program_name_as_first_arg) const noexcept
 {
     if (arguments.empty())
     {
@@ -800,7 +811,7 @@ bool args::parse(const std::string &arguments, const bool has_program_name_as_fi
     return parse(tokens, has_program_name_as_first_arg);
 }
 
-bool args::parse(int argc, char **argv, const bool has_program_name_as_first_arg) const noexcept
+bool args::parse(int argc, char** argv, const bool has_program_name_as_first_arg) const noexcept
 {
     if (argc <= 0 || !argv)
     {
@@ -829,7 +840,7 @@ void args::clear() const noexcept
     }
 }
 
-std::optional<std::string> args::get(const std::string &key) const noexcept
+std::optional<std::string> args::get(const std::string& key) const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {
@@ -837,7 +848,7 @@ std::optional<std::string> args::get(const std::string &key) const noexcept
     }
 
     // Search in first map (command-line args or first JSON object)
-    const auto &map = pimpl->arguments.front();
+    const auto& map = pimpl->arguments.front();
     if (const auto it = map.find(key); it != map.cend())
     {
         return it->second;

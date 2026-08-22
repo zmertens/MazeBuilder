@@ -71,15 +71,6 @@ namespace mazes
             return *this;
         }
 
-        /// @brief Set the block ID
-        /// @param block_id The block ID
-        /// @return A reference to this configurator
-        configurator& ensure_block_id(const int block_id) noexcept
-        {
-            m_block_id = block_id;
-            return *this;
-        }
-
         /// @brief Set the random seed
         /// @param seed The random seed
         /// @return A reference to this configurator
@@ -116,60 +107,6 @@ namespace mazes
             return *this;
         }
 
-        /// @brief Set the output_format ID
-        /// @param output_format The output_format ID
-        /// @return A reference to this configurator
-        configurator& ensure_output_format_id(const output_format output_format) noexcept
-        {
-            m_output_format_id = output_format;
-            return *this;
-        }
-
-        /// @brief Set the output filename
-        /// @param filename The filename
-        /// @return A reference to this configurator
-        configurator& ensure_output_format_filename(const std::string& filename) noexcept
-        {
-            m_output_filename = filename.empty() ? std::make_optional("out.txt") : std::make_optional(filename);
-            return *this;
-        }
-
-        /// @brief Set the mask filename
-        /// @param filename The mask file path (.txt)
-        /// @return A reference to this configurator
-        configurator& ensure_mask_filename(const std::string& filename) noexcept
-        {
-            m_mask_filename = filename.empty() ? std::make_optional("mask.txt") : std::make_optional(filename);
-            return *this;
-        }
-
-        /// @brief Set the help flag
-        /// @param help True to display help information
-        /// @return A reference to this configurator
-        configurator& set_help(bool help) noexcept
-        {
-            m_help = help;
-            return *this;
-        }
-
-        /// @brief Set the version flag
-        /// @param version True to display version information
-        /// @return A reference to this configurator
-        configurator& set_version(bool version) noexcept
-        {
-            m_version = version;
-            return *this;
-        }
-
-        /// @brief Set whether step snapshots should be shown during generation
-        /// @param show_steps True to emit periodic maze snapshots
-        /// @return A reference to this configurator
-        configurator& show_steps(bool show_steps) noexcept
-        {
-            m_show_steps = show_steps;
-            return *this;
-        }
-
         // Shorthand setter overloads (non-const, take a value; getters are const with no params)
         configurator& rows(const unsigned int r) noexcept { return ensure_rows(r); }
         configurator& columns(const unsigned int c) noexcept { return ensure_columns(c); }
@@ -193,13 +130,6 @@ namespace mazes
         /// @return The algorithm used for maze generation
         [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(static_cast<algo>(0)); }
 
-        /// @brief Get the mask filename
-        /// @return The mask filename (empty string if not set)
-        [[nodiscard]] std::string mask_filename() const noexcept { return m_mask_filename.value_or(std::string{}); }
-
-        /// @brief Get the block ID
-        /// @return The block ID
-        [[nodiscard]] int block_ID() const noexcept { return m_block_id.value_or(0); }
 
         /// @brief Get the random seed
         /// @return The random seed
@@ -220,18 +150,21 @@ namespace mazes
         /// @return The ending cell index for distance calculation
         [[nodiscard]] int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
 
-        /// @brief Get the output_format ID
-        /// @return The output_format ID
-        [[nodiscard]] output_format output_format_id() const noexcept
+        /// @brief Set the mask file path
+        /// @param mask_file_path Path to the mask file
+        /// @return A reference to this configurator
+        configurator& ensure_mask_file(const std::string& mask_file_path) noexcept
         {
-            return m_output_format_id.value_or(output_format::STDOUT);
+            m_mask_file = mask_file_path;
+            return *this;
         }
 
-        [[nodiscard]] bool help() const noexcept { return m_help.value_or(false); };
-
-        [[nodiscard]] bool version() const noexcept { return m_version.value_or(false); };
-
-        [[nodiscard]] bool show_steps() const noexcept { return m_show_steps.value_or(false); };
+        /// @brief Get the mask file path
+        /// @return The mask file path, or empty string if not set
+        [[nodiscard]] std::string mask_file() const noexcept
+        {
+            return m_mask_file.value_or("");
+        }
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
@@ -270,8 +203,6 @@ namespace mazes
 
         std::optional<algo> m_algo_id;
 
-        std::optional<int> m_block_id;
-
         std::optional<unsigned int> m_seed;
 
         std::optional<bool> m_distances;
@@ -280,19 +211,7 @@ namespace mazes
 
         std::optional<int> m_distances_end;
 
-        std::optional<output_format> m_output_format_id;
-
-        std::optional<std::string> m_config_file;
-
-        std::optional<std::string> m_mask_filename;
-
-        std::optional<std::string> m_output_filename;
-
-        std::optional<bool> m_help;
-
-        std::optional<bool> m_version;
-
-        std::optional<bool> m_show_steps;
+        std::optional<std::string> m_mask_file;
     };
 } // namespace
 

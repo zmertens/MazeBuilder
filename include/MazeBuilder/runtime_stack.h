@@ -22,7 +22,7 @@ namespace mazes
     class runtime_stack final
     {
     public:
-        enum class operation : unsigned int
+        enum class Operation : unsigned int
         {
             PUSH = 0,
             POP = 1,
@@ -53,9 +53,9 @@ namespace mazes
         void register_state(state::ID state_id)
         {
             m_factories.insert_or_assign(state_id, [this]()
-            {
-                return std::make_unique<T>(runtime_context, this);
-            });
+                {
+                    return std::make_unique<T>(runtime_context, this);
+                });
         }
 
         /// @brief Find the topmost state that matches the pointer type T.
@@ -65,9 +65,9 @@ namespace mazes
             auto reversed = m_states | std::views::reverse;
 
             auto it = std::ranges::find_if(reversed, [](const auto& sp)
-            {
-                return dynamic_cast<Pointer>(sp.get()) != nullptr;
-            });
+                {
+                    return dynamic_cast<Pointer>(sp.get()) != nullptr;
+                });
 
             if (it != std::ranges::cend(reversed))
             {
@@ -80,12 +80,12 @@ namespace mazes
     private:
         struct pending_change
         {
-            explicit pending_change(operation action, state::ID id = state::ID::TOTAL)
+            explicit pending_change(Operation action, state::ID id = state::ID::TOTAL)
                 : action(action), state_id(id)
             {
             }
 
-            operation action;
+            Operation action;
             state::ID state_id;
         };
 
@@ -107,7 +107,7 @@ namespace mazes
                 return found->second();
             }
 
-            throw std::runtime_error("runtime_stack::create_state - No factory for state ID: " +
+            throw std::runtime_error("Create state failed. No factory for state ID: " +
                 std::to_string(static_cast<unsigned int>(state_id)));
         }
 
@@ -115,9 +115,9 @@ namespace mazes
         std::vector<pending_change> m_pending;
         runtime_app::context runtime_context;
         std::unordered_map<state::ID,
-                           std::function<std::unique_ptr<state>()>,
-                           state_id_hash>
-        m_factories;
+            std::function<std::unique_ptr<state>()>,
+            state_id_hash>
+            m_factories;
     };
 } // namespace mazes
 

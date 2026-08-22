@@ -9,6 +9,9 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 
+#include "test_output_dir.h"
+
+#include <fstream>
 #include <memory>
 #include <string>
 
@@ -122,6 +125,9 @@ TEST_CASE("Mask random_location returns a valid cell", "[mask][random_location]"
 
 TEST_CASE("Mask loaded from text file", "[mask][from_txt]")
 {
+    test_output_dir output_dir{ "test_mask_output" };
+    
+    // Create mask.txt in the temporary directory
     // mask.txt contents:
     // X....
     // .XXX.
@@ -130,7 +136,12 @@ TEST_CASE("Mask loaded from text file", "[mask][from_txt]")
     // ....X
     //
     // Available cells: 5x5 = 25, blocked = 1+3+1+3+1 = 9, available = 16
-    const mask m = mask::from_txt("mask.txt");
+    const std::string mask_content = "X....\n.XXX.\n.X...\n.XXX.\n....X\n";
+    std::ofstream mask_file(output_dir.path / "mask.txt");
+    mask_file << mask_content;
+    mask_file.close();
+    
+    const mask m = mask::from_txt(std::string{(output_dir.path / "mask.txt").string()});
 
     REQUIRE(m.rows() == 5u);
     REQUIRE(m.columns() == 5u);

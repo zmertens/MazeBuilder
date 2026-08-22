@@ -24,15 +24,15 @@ topology topology::parse(const std::string_view txt) noexcept
     }
 
     std::vector<std::string_view> lines;
-    lines.reserve(static_cast<std::size_t>(std::count(txt.begin(), txt.end(), '\n')) + 1u);
+    lines.reserve(static_cast<std::size_t>(std::count(txt.cbegin(), txt.cend(), '\n')) + 1u);
 
     std::size_t start = 0u;
     while (start <= txt.size())
     {
         const std::size_t end = txt.find('\n', start);
         std::string_view line = (end == std::string_view::npos)
-                                    ? txt.substr(start)
-                                    : txt.substr(start, end - start);
+            ? txt.substr(start)
+            : txt.substr(start, end - start);
 
         if (!line.empty() && line.back() == '\r')
         {
@@ -81,22 +81,22 @@ topology topology::parse(const std::string_view txt) noexcept
     out.cells.resize(static_cast<std::size_t>(out.rows) * static_cast<std::size_t>(out.columns));
 
     auto has_horizontal_wall = [](const std::string_view border, const std::size_t from, const std::size_t to) -> bool
-    {
-        if (from >= border.size() || to > border.size() || from >= to)
         {
-            return false;
-        }
-
-        for (std::size_t i = from; i < to; ++i)
-        {
-            if (border[i] == '-')
+            if (from >= border.size() || to > border.size() || from >= to)
             {
-                return true;
+                return false;
             }
-        }
 
-        return false;
-    };
+            for (std::size_t i = from; i < to; ++i)
+            {
+                if (border[i] == '-')
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        };
 
     for (unsigned int row = 0u; row < out.rows; ++row)
     {

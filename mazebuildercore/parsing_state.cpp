@@ -17,8 +17,8 @@
 
 using namespace mazes;
 
-parsing_state::parsing_state(const runtime_app::context &ctx, runtime_stack *rs)
-    : state(ctx, rs), args_mapper{ctx.get_args_manager()}, processed_text_mapper{ctx.get_text_manager()}
+parsing_state::parsing_state(const runtime_app::context& ctx, runtime_stack* rs)
+    : state(ctx, rs), args_mapper{ ctx.get_args_manager() }, processed_text_mapper{ ctx.get_text_manager() }
 {
     state_utils::validate_mappers(args_mapper, processed_text_mapper);
 }
@@ -30,8 +30,8 @@ std::optional<args> parsing_state::convert(const std::string_view arguments) con
         return std::nullopt;
     }
 
-    std::optional<args> result{std::in_place};
-    if (!result->parse(std::string{arguments}))
+    std::optional<args> result{ std::in_place };
+    if (!result->parse(std::string{ arguments }))
     {
         result.reset();
     }
@@ -51,12 +51,11 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    args *parsed_args = nullptr;
+    args* parsed_args = nullptr;
     try
     {
         parsed_args = &args_mapper->get(args_identifier::PARSED);
-    }
-    catch (...)
+    } catch (...)
     {
         request_stack_pop();
         return false;
@@ -64,19 +63,18 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
 
     if (parsed_args->count() == 0)
     {
-        processed_text *unknown_text = nullptr;
+        processed_text* unknown_text = nullptr;
         try
         {
             unknown_text = &processed_text_mapper->get(processed_text_identifier::UNKNOWN);
-        }
-        catch (...)
+        } catch (...)
         {
             request_stack_pop();
             return false;
         }
 
         const auto unknown_processed = unknown_text->get();
-        const auto *raw_input = std::get_if<std::string>(&unknown_processed);
+        const auto* raw_input = std::get_if<std::string>(&unknown_processed);
         if (!raw_input || raw_input->empty())
         {
             request_stack_pop();
@@ -98,8 +96,7 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
         {
             args_mapper->get(args_identifier::RAW) = *parsed_input;
             *parsed_args = std::move(*parsed_input);
-        }
-        catch (...)
+        } catch (...)
         {
             request_stack_pop();
             return false;
@@ -108,31 +105,38 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
 
     const auto current_args = parsed_args->front();
     request_stack_pop();
-    if (const auto it = current_args.find(mazes::args::ALGO_ID_WORD_STR); it != current_args.cend())
+
+    const auto mask_it = current_args.find(mazes::args::MASK_WORD_STR);
+    const bool has_mask = mask_it != current_args.cend() && !mask_it->second.empty();
+
+    if (has_mask)
+    {
+        request_stack_push(state::ID::LINK_WITH_MASKED);
+    }
+    else if (const auto it = current_args.find(mazes::args::ALGO_ID_WORD_STR); it != current_args.cend())
     {
         try
         {
             switch (to_algo_from_sv(it->second))
             {
             case algo::BINARY_TREE:
-                request_stack_push(state::ID::BINARY_TREE);
+                request_stack_push(state::ID::LINK_WITH_BINARY_TREE);
                 break;
             case algo::DFS:
-                request_stack_push(state::ID::DFS);
+                request_stack_push(state::ID::LINK_WITH_DFS);
                 break;
             case algo::SIDEWINDER:
-                request_stack_push(state::ID::SIDEWINDER);
+                request_stack_push(state::ID::LINK_WITH_SIDEWINDER);
                 break;
             default:
-                request_stack_push(state::ID::BINARY_TREE);
+                global_async_logger().log(fmt::format("Parsing update - Unrecognized algo '{}'", it->second));
                 break;
             }
-        }
-        catch (...)
+        } catch (...)
         {
-            request_stack_push(state::ID::BINARY_TREE);
+            global_async_logger().log(fmt::format("Parsing update - Exception: Invalid algo '{}'", it->second));
         }
     }
 
-    return false; // @TODO - true?
+    return true;
 }

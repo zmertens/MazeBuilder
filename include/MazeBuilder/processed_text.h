@@ -2,6 +2,7 @@
 #define PROCESSED_TEXT_H
 
 #include <string>
+#include <string_view>
 #include <type_traits>
 #include <variant>
 

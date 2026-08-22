@@ -1,54 +1,45 @@
 #ifndef SW_MAZE_CREATE_STATE_H
 #define SW_MAZE_CREATE_STATE_H
 
-#include <MazeBuilder/create_contract.h>
-#include <MazeBuilder/resource_identifiers.h>
-#include <MazeBuilder/state.h>
+#include <MazeBuilder/algos.h>
+#include <MazeBuilder/link_maze_and_create_state.h>
 
 #include <string_view>
-#include <string>
+
+class randomizer;
+class runtime_stack;
 
 /// @file sw_maze_create_state.h
 /// @namespace mazes
 namespace mazes
 {
-    class configurator;
-    class randomizer;
-    class runtime_stack;
-    struct context;
-
     /// @brief State for creating a maze using the sidewinder algorithm
-    class sw_maze_create_state final : public create_contract, public state
+    class sw_maze_create_state final : public link_maze_and_create_state
     {
     public:
-        explicit sw_maze_create_state(const runtime_app::context &ctx, runtime_stack *rs);
+        /// @brief Construct a new sidewinder maze creation state
+        /// @param ctx The runtime context
+        /// @param rs The runtime stack to allow pushing/popping states
+        explicit sw_maze_create_state(const runtime_app::context& ctx, runtime_stack* rs);
 
-        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
-
-        void draw() const noexcept override;
-
-        /// @brief Update the state with the given arguments and elapsed time
-        /// @param delta_time The elapsed time since the last update
-        /// @return True if the state should continue updating, false otherwise
-        bool update(double delta_time) noexcept override;
+        /// @brief Create a maze using the sidewinder algorithm
+        /// @param config The maze configuration
+        /// @param rng The randomizer for the algorithm
+        /// @return A string view with the result message
+        std::string_view create(const configurator& config, randomizer& rng) noexcept override;
 
     private:
-        /// @brief Implementation of the sidewinder maze creation algorithm
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
-        /// @return
-        std::string_view create_sw_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-                                        randomizer &rng) noexcept;
+        /// @brief Get the algorithm ID for the sidewinder algorithm
+        [[nodiscard]] algo get_algo_id() const noexcept override;
 
-        grid_manager *grid_mapper;
-        processed_text_manager *processed_text_mapper;
-        grid_identifier current_grid_id;
-        bool m_use_distances;
-        int m_distances_start;
-        int m_distances_end;
-        std::string m_result;
+        /// @brief Implementation of the sidewinder maze creation algorithm
+        /// @param rows The number of rows in the maze
+        /// @param cols The number of columns in the maze
+        /// @param levels The number of levels in the maze
+        /// @param rng The randomizer for the algorithm
+        /// @return A string view with the result message
+        std::string_view create_sw_maze(unsigned int rows, unsigned int cols, unsigned int levels,
+            randomizer& rng) noexcept;
     };
 } // namespace mazes
 

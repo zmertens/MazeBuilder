@@ -1,6 +1,5 @@
 #include <MazeBuilder/pixels_create_state.h>
 
-#include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
@@ -11,8 +10,8 @@
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
-#include <MazeBuilder/runtime_stack.h>
 #include <MazeBuilder/state_utils.h>
+#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <array>
@@ -22,10 +21,6 @@
 #include <filesystem>
 #include <string>
 #include <vector>
-
-#define STB_IMAGE_WRITE_STATIC
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
 
 using namespace mazes;
 
@@ -60,193 +55,69 @@ namespace
         {
             r1 = c;
             g1 = x;
-        }
-        else if (h_prime < 2.0f)
+        } else if (h_prime < 2.0f)
         {
             r1 = x;
             g1 = c;
-        }
-        else if (h_prime < 3.0f)
+        } else if (h_prime < 3.0f)
         {
             g1 = c;
             b1 = x;
-        }
-        else if (h_prime < 4.0f)
+        } else if (h_prime < 4.0f)
         {
             g1 = x;
             b1 = c;
-        }
-        else if (h_prime < 5.0f)
+        } else if (h_prime < 5.0f)
         {
             r1 = x;
             b1 = c;
-        }
-        else
+        } else
         {
             r1 = c;
             b1 = x;
         }
 
         const auto to_byte = [](const float channel) -> std::uint8_t
-        {
-            const int value_255 = static_cast<int>((channel * 255.0f) + 0.5f);
-            return static_cast<std::uint8_t>(std::clamp(value_255, 0, 255));
-        };
-
-        return {to_byte(r1 + m), to_byte(g1 + m), to_byte(b1 + m), 255u};
-    }
-}
-
-pixels_create_state::pixels_create_state(const runtime_app::context &ctx, runtime_stack *stack)
-    : state(ctx, stack), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
-{
-    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
-}
-
-void pixels_create_state::draw() const noexcept
-{
-    // Implementation of the draw function
-}
-
-bool pixels_create_state::update([[maybe_unused]] double delta_time) noexcept
-{
-    m_result.clear();
-    m_palette_seed.reset();
-
-    if (!grid_mapper || !processed_text_mapper)
-    {
-        request_stack_pop();
-        return false;
-    }
-
-    const auto &parsed_args = state_utils::get_args_at_front(get_context());
-
-    unsigned int rows = configurator::MAX_ROWS;
-    unsigned int cols = configurator::MAX_COLUMNS;
-    unsigned int levels = 1u;
-    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
-
-    current_grid_id = state_utils::has_distances(std::cref(parsed_args)) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-
-    algo maze_algo = algo::BINARY_TREE;
-    std::string output_target;
-    if (const auto it = parsed_args.find(mazes::args::ALGO_ID_WORD_STR); it != parsed_args.cend())
-    {
-        maze_algo = mazes::to_algo_from_sv(it->second);
-    }
-
-    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
-    {
-        output_target = it->second;
-    }
-
-    if (const auto it = parsed_args.find(mazes::args::SEED_WORD_STR); it != parsed_args.cend())
-    {
-        try
-        {
-            m_palette_seed = std::stoull(it->second);
-        }
-        catch (...)
-        {
-            m_palette_seed.reset();
-        }
-    }
-
-    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
-    {
-        output_target = it->second;
-    }
-
-    if (const auto it = parsed_args.find(mazes::args::SEED_WORD_STR); it != parsed_args.cend())
-    {
-        try
-        {
-            m_palette_seed = std::stoull(it->second);
-        }
-        catch (...)
-        {
-            m_palette_seed.reset();
-        }
-    }
-
-    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
-
-    configurator cfg{};
-    cfg.ensure_rows(rows)
-        .ensure_columns(cols)
-        .ensure_levels(levels)
-        // @TODO fix this to use the output format from the args, but for now we just default to PNG
-        .ensure_output_format_id(mazes::output_format::PNG)
-        .ensure_distances(current_grid_id == grid_identifier::DISTANCE)
-        .ensure_distances_start(0)
-        .ensure_distances_end(-1)
-        .ensure_algo_id(maze_algo);
-
-    m_result = std::string{create(cfg, *rng_ptr)};
-
-    if (!m_result.empty() && !output_target.empty() && output_target != "stdout")
-    {
-        bool write_ok = false;
-
-        try
-        {
-            auto &grid_ref = grid_mapper->get(current_grid_id);
-            const auto pixels = grid_ref.operations().get_pixels();
-            const auto extension = std::filesystem::path{output_target}.extension().string();
-
-            std::string normalized = extension;
-            std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
-                           { return static_cast<char>(std::tolower(ch)); });
-            if (!normalized.empty() && normalized.front() == '.')
             {
-                normalized.erase(normalized.begin());
-            }
+                const int value_255 = static_cast<int>((channel * 255.0f) + 0.5f);
+                return static_cast<std::uint8_t>(std::clamp(value_255, 0, 255));
+            };
 
-            if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
-            {
-                if (normalized == "png")
-                {
-                    write_ok = stbi_write_png(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), m_image_width * 4) != 0;
-                }
-                else if (normalized == "bmp")
-                {
-                    write_ok = stbi_write_bmp(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data()) != 0;
-                }
-                else if (normalized == "jpg" || normalized == "jpeg")
-                {
-                    write_ok = stbi_write_jpg(output_target.c_str(), m_image_width, m_image_height, 4, pixels.data(), 95) != 0;
-                }
-            }
-        }
-        catch (...)
-        {
-        }
-
-        m_result = write_ok ? "Wrote maze to " + output_target : "Failed to write maze to " + output_target;
+        return { to_byte(r1 + m), to_byte(g1 + m), to_byte(b1 + m), 255u };
     }
-
-    if (processed_text_mapper)
-    {
-        try
-        {
-            auto &processing = processed_text_mapper->get(processed_text_identifier::FINISHED);
-            processing.set(m_result);
-        }
-        catch (...)
-        {
-        }
-    }
-
-    request_stack_pop();
-    if (state_utils::advance_args(get_context()))
-    {
-        request_stack_push(state::ID::PARSING);
-    }
-    return false;
 }
 
-std::string_view pixels_create_state::create(const configurator &config,
-                                             randomizer &rng) noexcept
+pixels_create_state::pixels_create_state(const runtime_app::context& ctx, runtime_stack* stack)
+    : write_to_output_state(ctx, stack)
+{
+}
+
+bool pixels_create_state::write_output(const std::string& output_target, [[maybe_unused]] const std::string& output_content) noexcept
+{
+    try
+    {
+        auto& grid_ref = grid_mapper->get(current_grid_id);
+        const auto pixels = grid_ref.operations().get_pixels();
+
+        if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
+        {
+            const auto out = to_output_format_from_sv(string_utils::file_extension(output_target));
+            switch (out)
+            {
+            case output_format::PNG: return io_utils::write_png(output_target, pixels, m_image_width, m_image_height);
+            case output_format::JPG: return io_utils::write_jpg(output_target, pixels, m_image_width, m_image_height);
+            default: return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
+            };
+        }
+    } catch (...)
+    {
+    }
+
+    return true;
+}
+
+std::string_view pixels_create_state::create(const configurator& config,
+    randomizer& rng) noexcept
 {
     if (!grid_mapper)
     {
@@ -257,41 +128,36 @@ std::string_view pixels_create_state::create(const configurator &config,
     {
         m_result = "Maze generated";
 
-        auto &grid_ref = grid_mapper->get(current_grid_id);
-        auto &grid_ops = grid_ref.operations();
+        auto& grid_ref = grid_mapper->get(current_grid_id);
+        auto& grid_ops = grid_ref.operations();
 
         m_image_width = static_cast<int>(config.columns()) * cell_size_px + (static_cast<int>(config.columns()) + 1) * wall_size_px;
         m_image_height = static_cast<int>(config.rows()) * cell_size_px + (static_cast<int>(config.rows()) + 1) * wall_size_px;
 
         std::vector<std::uint8_t> pixels(static_cast<std::size_t>(m_image_width) * static_cast<std::size_t>(m_image_height) * 4u, 0u);
 
-        auto set_pixel = [&](const int x, const int y, const rgba_t &rgba)
-        {
-            if (x < 0 || y < 0 || x >= m_image_width || y >= m_image_height)
+        auto set_pixel = [&](const int x, const int y, const rgba_t& rgba)
             {
-                return;
-            }
+                const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_image_width) + static_cast<std::size_t>(x)) * 4u;
+                pixels[offset + 0u] = rgba[0];
+                pixels[offset + 1u] = rgba[1];
+                pixels[offset + 2u] = rgba[2];
+                pixels[offset + 3u] = rgba[3];
+            };
 
-            const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_image_width) + static_cast<std::size_t>(x)) * 4u;
-            pixels[offset + 0u] = rgba[0];
-            pixels[offset + 1u] = rgba[1];
-            pixels[offset + 2u] = rgba[2];
-            pixels[offset + 3u] = rgba[3];
-        };
-
-        auto fill_rect = [&](const int x0, const int y0, const int width, const int height, const rgba_t &rgba)
-        {
-            for (int y = y0; y < y0 + height; ++y)
+        auto fill_rect = [&](const int x0, const int y0, const int width, const int height, const rgba_t& rgba)
             {
-                for (int x = x0; x < x0 + width; ++x)
+                for (int y = y0; y < y0 + height; ++y)
                 {
-                    set_pixel(x, y, rgba);
+                    for (int x = x0; x < x0 + width; ++x)
+                    {
+                        set_pixel(x, y, rgba);
+                    }
                 }
-            }
-        };
+            };
 
         randomizer deterministic_palette_rng{};
-        randomizer *palette_rng = &rng;
+        randomizer* palette_rng = &rng;
         if (m_palette_seed.has_value())
         {
             deterministic_palette_rng.seed(*m_palette_seed);
@@ -300,17 +166,17 @@ std::string_view pixels_create_state::create(const configurator &config,
 
         const float base_hue = static_cast<float>((*palette_rng)(0, 359));
         const rgba_t wall_color = hsv_to_rgba(base_hue,
-                                              static_cast<float>((*palette_rng)(58, 92)) / 100.0f,
-                                              static_cast<float>((*palette_rng)(28, 62)) / 100.0f);
+            static_cast<float>((*palette_rng)(58, 92)) / 100.0f,
+            static_cast<float>((*palette_rng)(28, 62)) / 100.0f);
         const rgba_t base_floor_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(70, 170)), 360.0f),
-                                                    static_cast<float>((*palette_rng)(8, 28)) / 100.0f,
-                                                    static_cast<float>((*palette_rng)(88, 98)) / 100.0f);
+            static_cast<float>((*palette_rng)(8, 28)) / 100.0f,
+            static_cast<float>((*palette_rng)(88, 98)) / 100.0f);
         const rgba_t distance_near_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(10, 60)), 360.0f),
-                                                       static_cast<float>((*palette_rng)(30, 60)) / 100.0f,
-                                                       static_cast<float>((*palette_rng)(92, 100)) / 100.0f);
+            static_cast<float>((*palette_rng)(30, 60)) / 100.0f,
+            static_cast<float>((*palette_rng)(92, 100)) / 100.0f);
         const rgba_t distance_far_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(180, 260)), 360.0f),
-                                                      static_cast<float>((*palette_rng)(45, 78)) / 100.0f,
-                                                      static_cast<float>((*palette_rng)(55, 80)) / 100.0f);
+            static_cast<float>((*palette_rng)(45, 78)) / 100.0f,
+            static_cast<float>((*palette_rng)(55, 80)) / 100.0f);
 
         for (int y = 0; y < m_image_height; ++y)
         {
@@ -320,7 +186,7 @@ std::string_view pixels_create_state::create(const configurator &config,
             }
         }
 
-        const auto *distance_grid_ref = dynamic_cast<const distance_grid *>(&grid_ref);
+        const auto* distance_grid_ref = dynamic_cast<const distance_grid*>(&grid_ref);
         const auto distance_map = distance_grid_ref ? distance_grid_ref->get_distances() : std::shared_ptr<distances>{};
         const auto max_distance = distance_map ? distance_map->max().second : 0;
 
@@ -343,7 +209,7 @@ std::string_view pixels_create_state::create(const configurator &config,
                         lerp_u8(distance_near_color[0], distance_far_color[0], t),
                         lerp_u8(distance_near_color[1], distance_far_color[1], t),
                         lerp_u8(distance_near_color[2], distance_far_color[2], t),
-                        255u};
+                        255u };
                 }
 
                 const int px = wall_size_px + static_cast<int>(col) * (cell_size_px + wall_size_px);
@@ -365,13 +231,10 @@ std::string_view pixels_create_state::create(const configurator &config,
 
         grid_ops.set_pixels(pixels);
 
-#if defined(MAZE_DEBUG)
-        global_async_logger().log("Generated image: {}\n", m_result);
-#endif
+        global_async_logger().log(m_result);
 
         return m_result;
-    }
-    catch (...)
+    } catch (...)
     {
         return {};
     }

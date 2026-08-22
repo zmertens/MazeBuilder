@@ -6,6 +6,7 @@ message(INFO ": Configuring ${PROJECT_NAME} v${MAZE_BUILDER_VERSION}")
 
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
+    async_logger.cpp
     bytes.cpp
     bt_maze_create_state.cpp
     dfs_maze_create_state.cpp
@@ -17,9 +18,11 @@ set(MAZE_BUILDER_CORE_SRCS
     io_utils.cpp
     json_helper.cpp
     lab.cpp
+    link_maze_and_create_state.cpp
     loading_state.cpp
     mask.cpp
     masked_grid.cpp
+    masked_maze_and_create_state.cpp
     parsing_state.cpp
     pixels_create_state.cpp
     randomizer.cpp
@@ -30,7 +33,8 @@ set(MAZE_BUILDER_CORE_SRCS
     string_utils.cpp    
     sw_maze_create_state.cpp
     topology.cpp
-    wavefront_object_create_state.cpp)
+    wavefront_object_create_state.cpp
+    write_to_output_state.cpp)
 
 if(MAZE_BUILDER_COVERAGE)
     message(STATUS "Building ${PROJECT_NAME} with code coverage")
@@ -76,7 +80,7 @@ message(INFO ": Fetching fmt library...")
 # fmt version 12.1.0
 FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 407c905e45ad75fc29bf0f9bb7c5c2fd3475976f)
 # Configure fmt options before making it available
-set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
+set(FMT_INSTALL ON CACHE BOOL "" FORCE)
 set(FMT_TEST OFF CACHE BOOL "" FORCE)
 set(FMT_DOC OFF CACHE BOOL "" FORCE)
 
@@ -138,23 +142,47 @@ target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj
 
 # Installation
 include(GNUInstallDirs)
-#install(TARGETS ${MAZE_BUILDER_LIB_OUT} ${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_static
-#  EXPORT MazeBuilderLibrary
-#  ARCHIVE COMPONENT development
-#  LIBRARY COMPONENT runtime
-#  FILE_SET HEADERS COMPONENT runtime
-#)
 
-#if (UNIX)
-#    install(CODE "execute_process(COMMAND ldconfig)" COMPONENT runtime)
-#endif()
+set(_maze_builder_install_targets ${MAZE_BUILDER_LIB_OUT}_obj ${MAZE_BUILDER_LIB_OUT}_static)
+if(NOT EMSCRIPTEN)
+    list(APPEND _maze_builder_install_targets ${MAZE_BUILDER_LIB_OUT}_shared)
+endif()
 
-#install(EXPORT MazeBuilderLibrary
-#  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
-#  NAMESPACE MazeBuilder::
-#  COMPONENT runtime
-#)
+install(TARGETS ${_maze_builder_install_targets}
+  EXPORT MazeBuilderLibrary
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT development
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
+  OBJECTS DESTINATION ${CMAKE_INSTALL_LIBDIR}/objects COMPONENT development
+)
 
-#install(FILES "MazeBuilderConfig.cmake"
-#  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
-#)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/MazeBuilder
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  COMPONENT runtime
+)
+
+if (UNIX)
+    install(CODE "execute_process(COMMAND ldconfig)" COMPONENT runtime)
+endif()
+
+install(EXPORT MazeBuilderLibrary
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  NAMESPACE MazeBuilder::
+  COMPONENT runtime
+)
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/MazeBuilderConfig.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  COMPONENT runtime
+)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/MazeBuilderConfigVersion.cmake"
+  VERSION ${MAZE_BUILDER_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/MazeBuilderConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  COMPONENT runtime
+)

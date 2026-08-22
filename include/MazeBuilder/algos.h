@@ -28,8 +28,7 @@ namespace mazes
     constexpr std::array<std::string_view, static_cast<size_t>(algo::TOTAL)> ALGOS_LABELS_LOWERCASE = {
         "binary_tree",
         "sidewinder",
-        "dfs"
-    };
+        "dfs" };
 
     /// @brief Convert the algo enum to a string_view
     /// @param a
@@ -43,16 +42,6 @@ namespace mazes
         return ALGOS_LABELS_LOWERCASE.at(static_cast<size_t>(a));
     }
 
-    inline std::vector<std::string_view> algos_to_vec() noexcept
-    {
-        std::vector<std::string_view> result;
-        for (const auto &label : ALGOS_LABELS_LOWERCASE)
-        {
-            result.push_back(label);
-        }
-        return result;
-    }
-
     /// @brief Convert a string_view to an algo enum
     /// @param a
     /// @return algo
@@ -62,7 +51,7 @@ namespace mazes
         {
             return static_cast<algo>(std::distance(ALGOS_LABELS_LOWERCASE.begin(), it));
         }
-        throw std::invalid_argument("Invalid algo: " + std::string{a});
+        throw std::invalid_argument("Invalid algo: " + std::string{ a });
     }
 } // namespace mazes
 

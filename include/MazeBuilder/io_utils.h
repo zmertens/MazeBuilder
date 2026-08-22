@@ -21,7 +21,7 @@ namespace mazes
         /// @param data
         /// @param delimiter Delimiter to use between data entries
         /// @return True if the write was successful, false otherwise
-        static bool write(std::ostream &oss, std::string_view data, std::string_view delimiter = "\n") noexcept;
+        static bool write(std::ostream& oss, std::string_view data, std::string_view delimiter = "\n") noexcept;
 
         /// @brief Write to a file
         /// @param filename Full file path
@@ -41,12 +41,37 @@ namespace mazes
         /// @brief Get the directory path from a full file path
         /// @param filepath Full file path
         /// @return Directory path
-        static std::string_view get_full_directory_path(std::string_view filepath) noexcept;
+        static std::string parent_path(std::string_view filepath) noexcept;
 
         /// @brief Read an entire file into memory
         /// @param file_path Full file path
         /// @return The file contents as bytes, or an empty vector on failure
-        static std::vector<std::uint8_t> read_file_to_bytes(const std::filesystem::path &file_path) noexcept;
+        static std::vector<std::uint8_t> read_file_to_bytes(const std::filesystem::path& file_path) noexcept;
+
+        /// @brief Writes pixel data to a PNG image file.
+        /// @param file_path The filesystem path where the PNG file will be written.
+        /// @param pixels A vector containing the pixel data as 8-bit unsigned integers.
+        /// @param width The width of the image in pixels.
+        /// @param height The height of the image in pixels.
+        /// @return True if the PNG file was successfully written, false otherwise.
+        static bool write_png(const std::filesystem::path& file_path, const std::vector<std::uint8_t>& pixels, int width, int height) noexcept;
+
+        /// @brief Writes image data to a JPEG file.
+        /// @param file_path The file system path where the JPEG file will be written.
+        /// @param pixels A vector containing the pixel data in RGB or RGBA format.
+        /// @param width The width of the image in pixels.
+        /// @param height The height of the image in pixels.
+        /// @param quality The JPEG compression quality (0-100, default is 95). Higher values produce better quality but larger files.
+        /// @return True if the JPEG file was successfully written, false otherwise.
+        static bool write_jpg(const std::filesystem::path& file_path, const std::vector<std::uint8_t>& pixels, int width, int height, int quality = 95) noexcept;
+
+        /// @brief Writes a BMP image file from pixel data.
+        /// @param file_path The path where the BMP file will be written.
+        /// @param pixels A vector containing the pixel data to write.
+        /// @param width The width of the image in pixels.
+        /// @param height The height of the image in pixels.
+        /// @return Returns true if the BMP file was successfully written, false otherwise.
+        static bool write_bmp(const std::filesystem::path& file_path, const std::vector<std::uint8_t>& pixels, int width, int height) noexcept;
     }; // io_utils
 }
 

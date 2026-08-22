@@ -28,9 +28,9 @@ grid::grid(const std::tuple<unsigned int, unsigned int, unsigned int>& dimens)
 
     m_cells.reserve(total_cells);
 
-    for (std::size_t i{0}; i < total_cells; ++i)
+    for (std::size_t i{ 0 }; i < total_cells; ++i)
     {
-        m_cells.emplace(static_cast<int32_t>(i), std::make_shared<cell>(static_cast<int32_t>(i)));
+        m_cells.push_back(std::make_shared<cell>(static_cast<int32_t>(i)));
     }
 }
 
@@ -99,10 +99,9 @@ std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() cons
 
 std::shared_ptr<cell> grid::search(int index) const noexcept
 {
-    // First check if cell already exists
-    if (const auto cell_it = m_cells.find(index); cell_it != m_cells.cend())
+    if (index >= 0 && static_cast<std::size_t>(index) < m_cells.size())
     {
-        return cell_it->second;
+        return m_cells[static_cast<std::size_t>(index)];
     }
 
     return nullptr;
@@ -248,8 +247,7 @@ void grid::set_neighbor(const std::shared_ptr<cell>& c, Direction dir, std::shar
     if (neighbor)
     {
         m_topology[c->get_index()][dir] = neighbor->get_index();
-    }
-    else
+    } else
     {
         // Remove the neighbor relationship
         auto cell_it = m_topology.find(c->get_index());
@@ -339,8 +337,7 @@ void grid::resize(unsigned int rows, unsigned int cols, unsigned int levels) noe
     m_cells.reserve(total);
     for (size_t i = 0; i < total; ++i)
     {
-        m_cells.emplace(static_cast<int32_t>(i),
-                        std::make_shared<cell>(static_cast<int32_t>(i)));
+        m_cells.push_back(std::make_shared<cell>(static_cast<int32_t>(i)));
     }
 }
 

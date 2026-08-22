@@ -35,6 +35,12 @@ Ask for help:
 mazebuildercli --help
 ```
 
+Generate a masked maze:
+
+```sh
+mazebuildercli -m example_mask.txt -a binary_tree -o masked_maze.png
+```
+
 **Commands are case-sensitive.**
 
 ## What the library provides
@@ -102,6 +108,39 @@ Output routing is based on `--output`; file extensions select the renderer autom
 |                             |                 |           |
 +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 ```
+
+### Masked maze example
+
+Masked mazes allow you to create mazes with specific shapes or patterns by using a text file where `X` represents blocked cells and any other character (typically `.` or space) represents available cells:
+
+**Example mask file (`example_mask.txt`):**
+```text
+XXXXXXXXXXXXXXXX
+X..............X
+X..XXXX..XXXX..X
+X..X.......X...X
+X..X.......X...X
+X..XXXX..XXXX..X
+X..............X
+XXXXXXXXXXXXXXXX
+```
+
+**Generate a masked maze:**
+```sh
+mazebuildercli -m example_mask.txt -a binary_tree -o masked_output.png
+```
+
+**With distances:**
+```sh
+mazebuildercli -m example_mask.txt -a dfs -d -o stdout
+```
+
+**With sidewinder algorithm:**
+```sh
+mazebuildercli --mask=example_mask.txt --algo=sidewinder --output=masked_sidewinder.txt
+```
+
+The masked maze feature works with all supported algorithms (`binary_tree`, `sidewinder`, `dfs`) and output formats.
 
 ## JSON input
 
@@ -173,13 +212,13 @@ See `examples/Http/README.md` for quick-start usage.
 
 The voxel example is the main web-oriented target. The examples CMake files include Emscripten-specific configuration, optional pthread support, and a helper server script for the required browser headers.
 
-![Maze Preview 1](https://imgur.com/vB006Ok.jpg)
+![1](https://imgur.com/vB006Ok.jpg)
 
-![Maze Preview 3](https://imgur.com/CvMsCZs.jpg)
+![2](https://imgur.com/CvMsCZs.jpg)
 
-![](https://media2.giphy.com/media/v1.Y2lkPTc5MGI3NjExMjEwNzU4aTBjamE0aDhtN281YW11N2QxYWhxM2F2eGU3a3RpdGg5NCZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/VOT4sVJVxgK2RXADkZ/giphy.gif)
+![3](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
 
-[Check out the live Web app on itch.io!](https://flipsandale.itch.io/maze-builder)
+[Check out the live Web app !](https://maze-builder-frontend.netlify.app)
 
 ## Build and test
 
@@ -250,7 +289,7 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
-![Sample](scripts/sample_icon.bmp)
+![Sample](examples/Amazing/icon.bmp)
 
 ## Documentation
 

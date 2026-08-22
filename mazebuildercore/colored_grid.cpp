@@ -17,11 +17,11 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{std::make_unique<grid>(width, length, levels)}, m_distances{std::make_shared<distances>(0)}
+    : m_grid{ std::make_unique<grid>(width, length, levels) }, m_distances{ std::make_shared<distances>(0) }
 {
 }
 
-std::string colored_grid::contents_of(const std::shared_ptr<cell> &c) const noexcept
+std::string colored_grid::contents_of(const std::shared_ptr<cell>& c) const noexcept
 {
     if (m_distances)
     {
@@ -40,7 +40,7 @@ void colored_grid::initialize_distance_coloring(int start_index, int goal_index)
     m_distances = distances::path_to(m_grid.get(), start_index, goal_index);
 }
 
-std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell> &c) const noexcept
+std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c) const noexcept
 {
     using namespace std;
 
@@ -77,12 +77,12 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell> &c)
 }
 
 // Delegate to embedded grid
-grid_operations &colored_grid::operations() noexcept
+grid_operations& colored_grid::operations() noexcept
 {
     return m_grid->operations();
 }
 
-const grid_operations &colored_grid::operations() const noexcept
+const grid_operations& colored_grid::operations() const noexcept
 {
     return m_grid->operations();
 }

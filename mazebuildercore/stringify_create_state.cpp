@@ -1,181 +1,113 @@
 #include <MazeBuilder/stringify_create_state.h>
 
-#include <MazeBuilder/args.h>
-#include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/barriers.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/io_utils.h>
-#include <MazeBuilder/state_utils.h>
-#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
-#include <MazeBuilder/string_utils.h>
 
 #include <string>
 
 using namespace mazes;
 
-stringify_create_state::stringify_create_state(const runtime_app::context &ctx, runtime_stack *rs)
-    : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+stringify_create_state::stringify_create_state(const runtime_app::context& ctx, runtime_stack* rs)
+    : write_to_output_state(ctx, rs)
 {
-    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
-void stringify_create_state::draw() const noexcept
+bool stringify_create_state::write_output(const std::string& output_target, const std::string& output_content) noexcept
 {
-    // Implementation of the draw function
+    return io_utils::write_file(output_target, output_content);
 }
 
-bool stringify_create_state::update([[maybe_unused]] double delta_time) noexcept
+std::string_view stringify_create_state::create(const configurator& config, [[maybe_unused]] randomizer& rng) noexcept
 {
-    if (!processed_text_mapper)
-    {
-        request_stack_pop();
-        return false;
-    }
-
-    const auto &parsed_args = state_utils::get_args_at_front(get_context());
-
-    std::string output_target;
-    if (!parsed_args.empty())
-    {
-        if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
+    auto render_ascii_maze = [](const grid_interface& grid, const grid_operations& grid_ops,
+        const unsigned int rows, const unsigned int cols) -> std::string
         {
-            output_target = it->second;
-        }
-    }
-
-    unsigned int rows = configurator::MAX_ROWS;
-    unsigned int cols = configurator::MAX_COLUMNS;
-    unsigned int levels = 1u;
-    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
-
-    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
-
-    configurator cfg{};
-    cfg.ensure_rows(rows)
-        .ensure_columns(cols)
-        .ensure_levels(levels)
-        .ensure_distances(state_utils::has_distances(std::cref(parsed_args)));
-
-    const auto output_format = output_format_or_default(std::filesystem::path{output_target}.extension().string(),
-                                                        output_format::PLAIN_TEXT);
-    cfg.ensure_output_format_id(output_format);
-
-    const auto result = std::string{this->create(cfg, *rng_ptr)};
-
-    if (!result.empty() && !output_target.empty() && output_target != "stdout")
-    {
-        if (!io_utils::write_file(output_target, result))
-        {
-            global_async_logger().log_message("Failed to write maze to " + output_target);
-        }
-    }
-
-    try
-    {
-        auto &processing_str = processed_text_mapper->get(processed_text_identifier::FINISHED);
-        processing_str.set(result);
-    }
-    catch (...)
-    {
-    }
-
-    request_stack_pop();
-    if (state_utils::advance_args(get_context()))
-    {
-        request_stack_push(state::ID::PARSING);
-    }
-    return false;
-}
-
-std::string_view stringify_create_state::create(const configurator &config, [[maybe_unused]] randomizer &rng) noexcept
-{
-    auto render_ascii_maze = [](const grid_interface &grid, const grid_operations &grid_ops,
-                                const unsigned int rows, const unsigned int cols) -> std::string
-    {
-        auto pad_content = [](std::string content, const std::size_t cell_width) -> std::string
-        {
-            if (content.length() >= cell_width)
-            {
-                return content;
-            }
-
-            const auto remaining = cell_width - content.length();
-            const auto left_pad = remaining / 2u;
-            const auto right_pad = remaining - left_pad;
-
-            content.insert(content.begin(), left_pad, ' ');
-            content.append(right_pad, ' ');
-
-            return content;
-        };
-
-        // Keep the classic compact maze by default, but widen when cell text requires it.
-        std::size_t cell_width = 3u;
-        for (unsigned int r = 0; r < rows; ++r)
-        {
-            for (unsigned int c = 0; c < cols; ++c)
-            {
-                if (const auto cp = grid_ops.search(static_cast<int>(r * cols + c)); cp)
+            auto pad_content = [](std::string content, const std::size_t cell_width) -> std::string
                 {
-                    cell_width = std::max(cell_width, grid.contents_of(cp).length());
+                    if (content.length() >= cell_width)
+                    {
+                        return content;
+                    }
+
+                    const auto remaining = cell_width - content.length();
+                    const auto left_pad = remaining / 2u;
+                    const auto right_pad = remaining - left_pad;
+
+                    content.insert(content.begin(), left_pad, ' ');
+                    content.append(right_pad, ' ');
+
+                    return content;
+                };
+
+            // Keep the classic compact maze by default, but widen when cell text requires it.
+            std::size_t cell_width = 3u;
+            for (unsigned int r = 0; r < rows; ++r)
+            {
+                for (unsigned int c = 0; c < cols; ++c)
+                {
+                    if (const auto cp = grid_ops.search(static_cast<int>(r * cols + c)); cp)
+                    {
+                        cell_width = std::max(cell_width, grid.contents_of(cp).length());
+                    }
                 }
             }
-        }
 
-        constexpr char H_WALL = static_cast<char>(Barrier::HORIZONTAL);
-        constexpr char V_WALL = static_cast<char>(Barrier::VERTICAL);
-        constexpr char CORNER = static_cast<char>(Barrier::CORNER);
+            constexpr char H_WALL = static_cast<char>(Barrier::HORIZONTAL);
+            constexpr char V_WALL = static_cast<char>(Barrier::VERTICAL);
+            constexpr char CORNER = static_cast<char>(Barrier::CORNER);
 
-        const std::string horizontal_wall(cell_width, H_WALL);
-        const std::string horizontal_gap(cell_width, ' ');
+            const std::string horizontal_wall(cell_width, H_WALL);
+            const std::string horizontal_gap(cell_width, ' ');
 
-        std::string result;
-        result.reserve((rows + 1u) * (cols * (cell_width + 1u) + 2u));
+            std::string result;
+            result.reserve((rows + 1u) * (cols * (cell_width + 1u) + 2u));
 
-        result += CORNER;
-        for (unsigned int c = 0; c < cols; ++c)
-        {
-            result += horizontal_wall;
             result += CORNER;
-        }
-        result += '\n';
-
-        for (unsigned int r = 0; r < rows; ++r)
-        {
-            std::string top = std::string(1, V_WALL);
-            std::string bottom = std::string(1, CORNER);
             for (unsigned int c = 0; c < cols; ++c)
             {
-                const auto cp = grid_ops.search(static_cast<int>(r * cols + c));
-                const auto e = cp ? grid_ops.get_east(cp) : nullptr;
-                const auto s = cp ? grid_ops.get_south(cp) : nullptr;
+                result += horizontal_wall;
+                result += CORNER;
+            }
+            result += '\n';
 
-                top += cp ? pad_content(grid.contents_of(cp), cell_width) : pad_content(" ", cell_width);
-                top += (cp && e && cp->is_linked(e)) ? ' ' : V_WALL;
-                bottom += (cp && s && cp->is_linked(s)) ? horizontal_gap : horizontal_wall;
-                bottom += CORNER;
+            for (unsigned int r = 0; r < rows; ++r)
+            {
+                std::string top = std::string(1, V_WALL);
+                std::string bottom = std::string(1, CORNER);
+                for (unsigned int c = 0; c < cols; ++c)
+                {
+                    const auto cp = grid_ops.search(static_cast<int>(r * cols + c));
+                    const auto e = cp ? grid_ops.get_east(cp) : nullptr;
+                    const auto s = cp ? grid_ops.get_south(cp) : nullptr;
+
+                    top += cp ? pad_content(grid.contents_of(cp), cell_width) : pad_content(" ", cell_width);
+                    top += (cp && e && cp->is_linked(e)) ? ' ' : V_WALL;
+                    bottom += (cp && s && cp->is_linked(s)) ? horizontal_gap : horizontal_wall;
+                    bottom += CORNER;
+                }
+
+                result += top;
+                result += '\n';
+                result += bottom;
+                result += '\n';
             }
 
-            result += top;
-            result += '\n';
-            result += bottom;
-            result += '\n';
-        }
-
-        return result;
-    };
+            return result;
+        };
 
     const auto grid_id = config.distances() ? grid_identifier::DISTANCE : grid_identifier::BASIC;
     try
     {
-        auto &grid_ref = grid_mapper->get(grid_id);
+        auto& grid_ref = grid_mapper->get(grid_id);
         m_result = render_ascii_maze(std::cref(grid_ref), std::cref(grid_ref.operations()), config.rows(), config.columns());
         return m_result;
-    }
-    catch (...)
+    } catch (...)
     {
         return {};
     }

@@ -19,13 +19,13 @@ public:
     /// @return the string in JSON format
     static std::string dump_s(const std::unordered_map<std::string, std::string>& m, const int pretty_print = 4) noexcept
     {
-        const nlohmann::json my_json{m};
+        const nlohmann::json my_json{ m };
 
         return my_json.dump(pretty_print);
     }
 
     static std::string dump_s(const std::vector<std::unordered_map<std::string, std::string>>& arr,
-                              const int pretty_print = 4) noexcept
+        const int pretty_print = 4) noexcept
     {
         nlohmann::json array_json = nlohmann::json::array();
 
@@ -38,8 +38,7 @@ public:
                 {
                     // Try to parse the value as JSON
                     obj[key] = nlohmann::json::parse(value_str);
-                }
-                catch (...)
+                } catch (...)
                 {
                     // If parsing fails, store as string
                     obj[key] = value_str;
@@ -68,13 +67,11 @@ public:
             }
 
             return true;
-        }
-        catch (const nlohmann::json::parse_error& e)
+        } catch (const nlohmann::json::parse_error& e)
         {
             global_async_logger().log("JSON parse error: {}\n", e.what());
             return false;
-        }
-        catch (...)
+        } catch (...)
         {
             return false;
         }
@@ -86,18 +83,18 @@ public:
     /// @return success or failure on parse
     static bool load(const std::string& filename, std::unordered_map<std::string, std::string>& m) noexcept
     {
-        if (const std::filesystem::path fp{filename}; !std::filesystem::exists(fp))
+        if (const std::filesystem::path fp{ filename }; !std::filesystem::exists(fp))
         {
             return false;
         }
 
-        std::ifstream ifs{filename};
+        std::ifstream ifs{ filename };
         if (!ifs.is_open())
         {
             return false;
         }
 
-        const std::string s{std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>()};
+        const std::string s{ std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>() };
         return from(s, m);
     }
 
@@ -137,13 +134,11 @@ public:
             }
 
             return true;
-        }
-        catch (const nlohmann::json::parse_error& e)
+        } catch (const nlohmann::json::parse_error& e)
         {
             global_async_logger().log("JSON parse error: {}\n", e.what());
             return false;
-        }
-        catch (...)
+        } catch (...)
         {
             return false;
         }
@@ -154,25 +149,25 @@ public:
     /// @param vm Vector of maps to populate with parsed objects
     /// @return success or failure on load/parse
     static bool load_array(const std::string& filename,
-                    std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
+        std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
     {
-        if (const std::filesystem::path fp{filename}; !std::filesystem::exists(fp))
+        if (const std::filesystem::path fp{ filename }; !std::filesystem::exists(fp))
         {
             return false;
         }
 
-        std::ifstream ifs{filename};
+        std::ifstream ifs{ filename };
         if (!ifs.is_open())
         {
             return false;
         }
 
-        const std::string s{std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>()};
+        const std::string s{ std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>() };
         return from_array(s, vm);
     }
 };
 
-json_helper::json_helper() : impl{std::make_unique<json_helper_impl>()}
+json_helper::json_helper() : impl{ std::make_unique<json_helper_impl>() }
 {
 }
 
@@ -208,7 +203,7 @@ std::string json_helper::from(const std::unordered_map<std::string, std::string>
 /// @param pretty_print 4
 /// @return
 std::string json_helper::from(const std::vector<std::unordered_map<std::string, std::string>>& arr,
-                              const int pretty_print) noexcept
+    const int pretty_print) noexcept
 {
     return json_helper_impl::dump_s(std::cref(arr), pretty_print);
 }
@@ -224,13 +219,13 @@ bool json_helper::load(const std::string& filename, std::unordered_map<std::stri
 }
 
 bool json_helper::from_array(const std::string& s,
-                             std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
+    std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
 {
     return json_helper_impl::from_array(std::cref(s), std::ref(vm));
 }
 
 bool json_helper::load_array(const std::string& filename,
-                             std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
+    std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept
 {
     return json_helper_impl::load_array(std::cref(filename), std::ref(vm));
 }

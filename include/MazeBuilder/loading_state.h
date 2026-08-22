@@ -2,17 +2,18 @@
 #define LOADING_STATE_H
 
 #include <MazeBuilder/resource_identifiers.h>
+#include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
 
 #include <mutex>
 #include <optional>
 
+class runtime_stack;
+
 /// @file loading_state.h
 /// @namespace mazes
 namespace mazes
 {
-    class runtime_stack;
-
     /// @brief State for loading and pre-generating mazes
     class loading_state final : public state
     {
@@ -37,7 +38,7 @@ namespace mazes
         args_manager* args_mapper;
 
         std::once_flag resource_loaded_flag;
-        bool has_finished{false};
+        bool has_finished{ false };
     };
 } // namespace mazes
 

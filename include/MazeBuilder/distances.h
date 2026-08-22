@@ -58,7 +58,7 @@ namespace mazes
         /// @param goal_index The index of the goal cell.
         /// @return A shared pointer to a distances object representing the path.
         static std::shared_ptr<distances> path_to(grid_interface* g, std::int32_t start_index,
-                                                  std::int32_t goal_index) noexcept;
+            std::int32_t goal_index) noexcept;
 
     private:
         std::unordered_map<std::int32_t, int> m_cells;

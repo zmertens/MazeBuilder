@@ -39,14 +39,14 @@ namespace mazes
         /// @param pretty_print Number of spaces to use for indenting the JSON string
         /// @return JSON string representation of the map
         static std::string from(const std::unordered_map<std::string, std::string>& map,
-                                int pretty_print = 4) noexcept;
+            int pretty_print = 4) noexcept;
 
         /// @brief Get the contents of a vector of maps as a JSON string
         /// @param arr
         /// @param pretty_print Number of spaces to use for indenting the JSON string
         /// @return JSON string representation of the vector of maps
         static std::string from(const std::vector<std::unordered_map<std::string, std::string>>& arr,
-                                int pretty_print = 4) noexcept;
+            int pretty_print = 4) noexcept;
 
         /// @brief Parse and set a JSON string into a C++ map
         /// @param s
@@ -65,14 +65,14 @@ namespace mazes
         /// @param vm Vector of maps to populate with parsed objects
         /// @return success or failure on parse
         static bool from_array(const std::string& s,
-                               std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept;
+            std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept;
 
         /// @brief Load a JSON array file into a vector of maps
         /// @param filename Path to JSON file containing an array of objects
         /// @param vm Vector of maps to populate with parsed objects
         /// @return success or failure on load/parse
         static bool load_array(const std::string& filename,
-                               std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept;
+            std::vector<std::unordered_map<std::string, std::string>>& vm) noexcept;
 
     private:
         /// @brief Forward declaration of the implementation class

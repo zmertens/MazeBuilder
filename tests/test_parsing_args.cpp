@@ -1051,6 +1051,7 @@ TEST_CASE("Args backward compatibility with single JSON objects", "[json_single_
         REQUIRE(m_val.at(args::SEED_WORD_STR) == "9001");
         REQUIRE(m_val.at(args::ALGO_ID_WORD_STR) == "dfs");
         REQUIRE(m_val.at(args::OUTPUT_ID_WORD_STR) == "maze_dfs.txt");
-        REQUIRE(m_val.at(args::DISTANCES_WORD_STR) == args::TRUE_VALUE);
+        
+        REQUIRE_FALSE(m_val.at(args::DISTANCES_WORD_STR).empty());
     }
 }

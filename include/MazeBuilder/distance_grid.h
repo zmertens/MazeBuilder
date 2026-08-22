@@ -40,7 +40,7 @@ namespace mazes
         /// @param c
         /// @return
         [[nodiscard]] std::uint32_t
-        background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
+            background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
 
         // Delegate to embedded grid
         [[nodiscard]] grid_operations& operations() noexcept override;

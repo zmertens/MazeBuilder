@@ -6,27 +6,28 @@
 #include <functional>
 #include <optional>
 
+class runtime_stack;
+
 /// @file state.h
 /// @namespace mazes
 namespace mazes
 {
-    class runtime_stack;
-
     /// @brief struct representing a state in the runtime stack
     struct state
     {
         enum class ID : unsigned int
         {
-            BINARY_TREE = 0,
-            DFS = 1,
-            EMPTY = 2,
-            LOADING = 3,
-            PARSING = 4,
-            PIXELIZING = 5,
-            SIDEWINDER = 6,
-            STRINGIFYING = 7,
-            WAVEFRONT_OBJECTIFY = 8,
-            TOTAL = 9
+            EMPTY = 0,
+            LINK_WITH_BINARY_TREE = 1,
+            LINK_WITH_DFS = 2,
+            LINK_WITH_SIDEWINDER = 3,
+            LOAD = 4,
+            PARSE = 5,
+            WRITE_TO_IMAGE = 6,
+            WRITE_TO_STRING = 7,
+            WRITE_TO_WF_OBJ = 8,
+            LINK_WITH_MASKED = 9,
+            TOTAL = 10
         };
 
         explicit state(const runtime_app::context& c, runtime_stack* rs)

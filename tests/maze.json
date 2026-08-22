@@ -5,5 +5,5 @@
   "seed": 9001,
   "algo": "dfs",
   "output": "maze_dfs.txt",
-  "distances": true
+  "distances": "[:]"
 }
