@@ -5,8 +5,7 @@ Maze Builder is a C++ maze generation library with a CLI and several example app
 This repository contains:
 
 - **Core library**: reusable maze data structures, generation algorithms, and output pipelines in `include/MazeBuilder`
-- **CLI**: `mazebuildercli` for generating mazes from command-line or JSON input
-- **Examples**: HTTP, SFML, and voxel demos in `examples`
+- **Examples**: There's a CLI example, and an entire game built with SFML in `examples`
 - **Scripts**: asset and local-serving helpers in `scripts`
 
 ## Quick start
@@ -113,17 +112,26 @@ Output routing is based on `--output`; file extensions select the renderer autom
 
 Masked mazes allow you to create mazes with specific shapes or patterns by using a text file where `X` represents blocked cells and any other character (typically `.` or space) represents available cells:
 
-**Example mask file (`example_mask.txt`):**
+**Example mask file (`example_masked_maze.txt`):**
 ```text
-XXXXXXXXXXXXXXXX
-X..............X
-X..XXXX..XXXX..X
-X..X.......X...X
-X..X.......X...X
-X..XXXX..XXXX..X
-X..............X
-XXXXXXXXXXXXXXXX
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+X............................XXX
+X..XXXX..XXXX..X..........X..XXX
+X..X.......X...X..........X..XXX
+X..X.......X...X..........X..XXX
+X..XXXX..XXXX..X.............XXX
+X..............X........X....XXX
+XXXXXX.........X.............XXX
+X..............X.....XX......XXX
+X..XXXX..XXXX..X.............XXX
+X..X.......X...X.............XXX
+X..X.......X...X.............XXX
+X..XXXX..XXXX.......XX.......XXX
+X..............X.............XXX
+XXXXXXXXXXXXXXXX.............XXX
 ```
+
+![](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43#C4aJMZh)
 
 **Generate a masked maze:**
 ```sh
@@ -197,7 +205,6 @@ This same runtime facade is used by the CLI and example applications.
 | `mazebuildercli` | `examples/CLI` | Command-line maze generation |
 | `mazebuilderhttp` | `examples/Http` | Local HTTP server example |
 | `amazingsfml` | `examples/AmazingSFML` | 2D SFML visualization |
-| `mazebuildervoxels` | `examples/Voxels` | 3D voxel/web demo |
 
 ### HTTP example
 
@@ -207,18 +214,6 @@ The HTTP example runs a local server with a maze endpoint:
 - `GET /mazes?rows=12&columns=10&algo=dfs`
 
 See `examples/Http/README.md` for quick-start usage.
-
-### Web and voxel example
-
-The voxel example is the main web-oriented target. The examples CMake files include Emscripten-specific configuration, optional pthread support, and a helper server script for the required browser headers.
-
-![1](https://imgur.com/vB006Ok.jpg)
-
-![2](https://imgur.com/CvMsCZs.jpg)
-
-![3](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
-
-[Check out the live Web app !](https://maze-builder-frontend.netlify.app)
 
 ## Build and test
 
@@ -291,21 +286,9 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 ![Sample](examples/Amazing/icon.bmp)
 
-## Documentation
+## More Screenshots
 
-The Doxygen build uses this README as its main page.
-
-Generate docs from the repository root:
-
-```sh
-cmake -S . -B build-docs -DMAZE_BUILDER_DOCS:BOOL=1 && cmake --build build-docs
-```
-
-See also:
-
-- `docs/README.md`
-- `examples/Http/README.md`
-- `scripts/README.md`
+![](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
 
 ## Helpful resources on mazes
 
