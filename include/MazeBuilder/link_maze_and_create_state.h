@@ -48,7 +48,7 @@ namespace mazes
         /// @param config The configuration containing maze parameters
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        [[nodiscard]] virtual std::string_view create(const configurator& config, randomizer& rng) noexcept = 0;
+        [[nodiscard]] std::string_view create(const configurator& config, randomizer& rng) noexcept override = 0;
 
         grid_manager* grid_mapper;
         processed_text_manager* processed_text_mapper;
