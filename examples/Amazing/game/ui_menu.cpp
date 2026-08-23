@@ -82,7 +82,7 @@ namespace amazing::game
 
     std::string ui_menu::action_label(const std::size_t index)
     {
-        constexpr std::array<const char*, 3> LABELS{ "Start", "Rebuild Maze", "Quit" };
+        constexpr std::array<const char*, 3> LABELS{ "Start", "Quit", "About"};
         return LABELS[index < LABELS.size() ? index : 0u];
     }
 }

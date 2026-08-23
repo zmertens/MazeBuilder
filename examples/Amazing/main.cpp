@@ -46,7 +46,7 @@
 
 static const std::filesystem::path TEMP_IMAGE_PATH{ std::filesystem::temp_directory_path() / "amazing_maze.png" };
 static const std::filesystem::path TEMP_TEXT_PATH{ std::filesystem::temp_directory_path() / "amazing_maze.txt" };
-static const std::string APP_NAME = "Amazing " + mazes::buildinfo::VERSION;
+static const std::string APP_NAME = "Amazing - " + mazes::buildinfo::VERSION;
 
 static mazes::randomizer RNG{};
 
@@ -306,16 +306,6 @@ public:
                         sfml_window.draw(*network_status_text);
                     }
                 }
-
-                if (app_state.is_transition())
-                {
-                    sf::Text transition_text{ sfml_font, "Rebuilding level...", 26u };
-                    transition_text.setFillColor(sf::Color(245, 245, 235));
-                    transition_text.setOutlineColor(sf::Color(15, 15, 15));
-                    transition_text.setOutlineThickness(1.5f);
-                    transition_text.setPosition({ 16.0f, 16.0f });
-                    sfml_window.draw(transition_text);
-                }
             }
 
             sfml_window.display();
@@ -550,7 +540,7 @@ private:
         build_text->setOutlineColor(sf::Color(15, 15, 15));
         build_text->setOutlineThickness(1.5f);
 
-        help_text.emplace(sfml_font, "Left click: turn left (auto-move)\nH: hide/show help\nN: fetch maze via network\nMenu: Up/Down + Enter", 18u);
+        help_text.emplace(sfml_font, "Left click: turn left (auto-move)\nH: hide/show help\nN: fetch maze via network\n", 18u);
         help_text->setPosition({ 10.f, 58.f });
         help_text->setFillColor(sf::Color(245, 245, 235));
         help_text->setOutlineColor(sf::Color(15, 15, 15));

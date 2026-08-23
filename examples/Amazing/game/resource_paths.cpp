@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/json_helper.h>
 
+#include <functional>
 #include <stdexcept>
 #include <utility>
 
@@ -10,7 +11,7 @@ namespace amazing::game
     bool resource_paths::load_from_file(const std::string& filename) noexcept
     {
         std::unordered_map<std::string, std::string> loaded_paths;
-        if (!mazes::json_helper::load(filename, loaded_paths))
+        if (!mazes::json_helper::load(filename, std::ref(loaded_paths)))
         {
             return false;
         }

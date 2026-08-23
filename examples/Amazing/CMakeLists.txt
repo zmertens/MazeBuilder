@@ -7,7 +7,6 @@ set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/game/ui_menu.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/game/animation.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/game/player_controller.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/collision_system.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/game/audio_system.cpp)
 
 if(NOT EMSCRIPTEN)
