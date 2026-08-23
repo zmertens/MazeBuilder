@@ -6,8 +6,8 @@ if(MAZE_BUILDER_EXAMPLES)
 
     set(BOX2D_REPO_URL https://github.com/erincatto/box2d.git)
     set(BOX2D_VERSION v3.1.1)
-    set(SFML_REPO_URL https://github.com/SFML/SFML.git)
-    set(SFML_VERSION 3.1.0)
+    set(SFML_REPO_URL https://github.com/zmertens/SFML.git)
+    set(SFML_VERSION almostv3)
 
     message(INFO ": Fetching Box2D from ${BOX2D_REPO_URL}")
     message(INFO ": Fetching SFML from ${SFML_REPO_URL}")

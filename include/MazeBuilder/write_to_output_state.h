@@ -28,7 +28,7 @@ namespace mazes
         /// @param stack The runtime stack to allow pushing/popping states
         explicit write_to_output_state(const runtime_app::context& ctx, runtime_stack* stack);
 
-        virtual ~write_to_output_state() = default;
+        ~write_to_output_state() override;
 
         /// @brief Update the state with the given arguments and delta time
         /// Common logic for parsing arguments, creating output, and writing to file

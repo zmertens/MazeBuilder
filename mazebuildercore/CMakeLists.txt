@@ -109,8 +109,6 @@ if(NOT TARGET fmt::fmt)
     endif()
 endif()
 
-find_package(Threads REQUIRED)
-
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT ${MAZE_BUILDER_CORE_LIB})
 
@@ -124,7 +122,7 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFA
 # Add STB as a system include to suppress warnings
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt Threads::Threads)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
@@ -134,12 +132,12 @@ add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_obj)
 # Shared build
 if(NOT EMSCRIPTEN)
     add_library(${MAZE_BUILDER_LIB_OUT}_shared SHARED)
-    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt Threads::Threads)
+    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 endif()
 
 # Static build
 add_library(${MAZE_BUILDER_LIB_OUT}_static STATIC)
-target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt Threads::Threads)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 
 # Installation
 include(GNUInstallDirs)

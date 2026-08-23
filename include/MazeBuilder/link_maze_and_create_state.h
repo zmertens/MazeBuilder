@@ -29,7 +29,7 @@ namespace mazes
         /// @param stack The runtime stack to allow pushing/popping states
         explicit link_maze_and_create_state(const runtime_app::context& ctx, runtime_stack* stack);
 
-        virtual ~link_maze_and_create_state() = default;
+        ~link_maze_and_create_state() override;
 
         /// @brief Update the state with the given arguments and delta time
         /// Common logic for parsing arguments, setting up configuration, and handling output

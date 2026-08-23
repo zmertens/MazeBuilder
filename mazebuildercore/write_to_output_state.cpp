@@ -20,6 +20,8 @@ write_to_output_state::write_to_output_state(const runtime_app::context& ctx, ru
     state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
+write_to_output_state::~write_to_output_state() = default;
+
 void write_to_output_state::draw() const noexcept
 {
     // Implementation of the draw function

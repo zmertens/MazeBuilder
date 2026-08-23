@@ -25,6 +25,8 @@ link_maze_and_create_state::link_maze_and_create_state(const runtime_app::contex
     state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
 
+link_maze_and_create_state::~link_maze_and_create_state() = default;
+
 void link_maze_and_create_state::draw() const noexcept
 {
     // Implementation of the draw function
