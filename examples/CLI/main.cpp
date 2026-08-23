@@ -9,56 +9,102 @@
 #include <filesystem>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <ranges>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/buildinfo.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
-#include <MazeBuilder/string_utils.h>
 
 class command_line_parser : public mazes::singleton_base<command_line_parser>
 {
+    enum class HelpPartsIndex : unsigned int
+    {
+        ALGOS = 0,
+        OUTPUT_FORMATS = 1,
+        TOTAL = 2
+    };
+
+    std::unordered_map<HelpPartsIndex, std::string> help_parts;
+
 public:
+    command_line_parser() noexcept
+    {
+        append_algos_and_set();
+        append_outputs_and_set();
+    }
+
     std::string version() noexcept
     {
-        return mazes::string_utils::concat(mazes::string_utils::concat("v", mazes::buildinfo::Version),
-                                           " - " + mazes::buildinfo::CommitSHA);
+        return "v" + std::string{ mazes::buildinfo::VERSION } + " - " + std::string{ mazes::buildinfo::COMMIT_SHA };
+    }
+
+    void append_algos_and_set() noexcept
+    {
+        std::string result;
+        for (auto algo = 0; algo < static_cast<unsigned int>(mazes::algo::TOTAL); ++algo)
+        {
+            if (!result.empty())
+            {
+                result += ", ";
+            }
+            result += std::string{ mazes::to_sv_from_algo(static_cast<mazes::algo>(algo)) };
+        }
+        help_parts.insert_or_assign(HelpPartsIndex::ALGOS, result);
+    }
+
+    void append_outputs_and_set() noexcept
+    {
+        std::string result;
+        for (auto output = 0; output < static_cast<unsigned int>(mazes::output_format::TOTAL); ++output)
+        {
+            if (!result.empty())
+            {
+                result += ", ";
+            }
+            result += std::string{ mazes::to_sv_from_output_format(static_cast<mazes::output_format>(output)) };
+        }
+        help_parts.insert_or_assign(HelpPartsIndex::OUTPUT_FORMATS, result);
     }
 
     std::string help() noexcept
     {
         return "mazebuildercli " + version() + "\n\n" +
-               "Generates mazes and converts to various formats\n\n"
-               "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
-               "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
-               "Example: mazebuildercli -r 20 -c 20 -a sidewinder -o maze.png\n\n"
-               "** Commands are case-sensitive! **\n\n"
-               "\t-a, --algo         algorithm to generate maze links\n"
-               "\t                     [binary_tree, dfs, sidewinder]\n"
-               "\t-c, --columns      columns [max: 100]\n"
-               "\t-d, --distances    show distances with optional [start, end] inclusive\n"
-               "\t                     example: '-d [0:10]'\n"
-               "\t-h, --help         display this help message\n"
-               "\t-H, --image-height output image height in pixels (reserved)\n"
-               "\t-j, --json         run with arguments in JSON format\n"
-               "\t-l, --levels       levels [max: 10]\n"
-               "\t-m, --mask         load mask from text file\n"
-               "\t    --show-steps   emit step snapshots during generation\n"
-               "\t-s, --seed         seed for the number generator\n"
-               "\t-r, --rows         rows [max: 100]\n"
-               "\t-W, --image-width  output image width in pixels (reserved)\n"
-               "\t-o, --output       output format [json, obj, txt, png, jpg, jpeg, bmp, sfml, stdout]\n"
-               "\t-v, --version      display program version\n";
+            "Generates and converts mazes into simple data formats\n\n"
+            "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
+            "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
+            "Example: mazebuildercli -r 20 -c 15 -s1 -o stdout -a prims\n\n"
+            "** Commands are case-sensitive! **\n\n"
+            "\t-a, --algo         algorithm to apply to maze links\n"
+            "\t                     [" +
+            help_parts.at(HelpPartsIndex::ALGOS) + "]\n"
+            "\t-c, --columns      columns [max: " +
+            std::to_string(mazes::configurator::MAX_COLUMNS) + "]\n"
+            "\t-d, --distances    show distances with optional [start, end] inclusive\n"
+            "\t                     example: '-d [0:10]'\n"
+            "\t-h, --help         display this help message\n"
+            "\t-j, --json         run with arguments in JSON format\n"
+            "\t-l, --levels       levels [max: " +
+            std::to_string(mazes::configurator::MAX_LEVELS) + "]\n"
+            "\t-m, --mask         load mask from text file\n"
+            "\t-s, --seed         seed for the number generator\n"
+            "\t-r, --rows         rows [max: " +
+            std::to_string(mazes::configurator::MAX_ROWS) + "]\n"
+            "\t-o, --output       output format [" +
+            help_parts.at(HelpPartsIndex::OUTPUT_FORMATS) + "]\n"
+            "\t-v, --version      display program version\n";
     }
 
-    std::string run(const std::string &arguments) noexcept
+    std::string run(const std::string& arguments) noexcept
     {
-        if (auto app = mazes::runtime_app::instance())
+        if (auto maze = mazes::runtime_app::instance())
         {
-            return std::string{app->apply(arguments)};
+            return std::string{ maze->apply(arguments) };
         }
         return {};
     }
@@ -89,104 +135,62 @@ EMSCRIPTEN_BINDINGS(cli_module)
 
 #endif // EMSCRIPTEN_BINDINGS
 
-int main(const int argc, char *argv[])
+int main(const int argc, char* argv[])
 {
 #if defined(__EMSCRIPTEN__)
 
     return EXIT_SUCCESS;
 #endif
 
-    auto find_str = [](const std::vector<std::string> &vec, const std::string &target) -> bool
-    {
-        return std::find(vec.cbegin(), vec.cend(), target) != vec.cend();
-    };
-
-    auto find_output_target = [](const std::vector<std::string> &vec) -> std::string
-    {
-        for (std::size_t i = 0; i < vec.size(); ++i)
+    // Return true on first match, false otherwise
+    auto check_for_matches = [](const std::vector<std::string>& vec, const auto &...args) -> bool
         {
-            const auto &arg = vec[i];
-            if (arg == "-o" || arg == "--output")
-            {
-                if (i + 1 < vec.size())
-                {
-                    return vec[i + 1];
-                }
-                break;
-            }
+            return ((std::find(vec.cbegin(), vec.cend(), args) != vec.cend()) || ...);
+        };
 
-            if (arg.rfind("--output=", 0) == 0)
-            {
-                return arg.substr(std::string{"--output="}.size());
-            }
-        }
+    auto&& maze = mazes::runtime_app::instance();
 
-        return {};
-    };
-
-    auto should_echo_results = [](std::string_view output_target) -> bool
-    {
-        if (output_target.empty() || output_target == "stdout" || output_target == "sfml")
+    auto&& logger = mazes::global_async_logger();
+    std::mutex mtx;
+    std::vector<std::string> logs;
+    logs.reserve(100);
+    logger.set_sink([&logs, &mtx](auto msg)
         {
-            return true;
-        }
-
-        return std::filesystem::path{output_target}.extension().empty();
-    };
-
-    auto &&app = mazes::runtime_app::instance();
-    auto &&logger = mazes::global_async_logger();
+            std::lock_guard<std::mutex> lock(mtx);
+            logs.emplace_back(msg); });
 
     // Copy command arguments and skip the program name
-    const std::vector<std::string> args_vec{argv + 1, argv + argc};
+    const std::vector<std::string> args_vec{ argv + 1, argv + argc };
 
-    try
+    static constexpr auto HELP_FLAG{ "-h" };
+    static constexpr auto HELP_OPTION{ "--help" };
+    static constexpr auto VERSION_FLAG{ "-v" };
+    static constexpr auto VERSION_OPTION{ "--version" };
+
+    if (args_vec.empty() || check_for_matches(std::cref(args_vec), HELP_FLAG, HELP_OPTION))
     {
-        if (const auto my_cli = mazes::singleton_base<command_line_parser>::instance())
-        {
-            if (args_vec.empty() || find_str(args_vec, "-h") || find_str(args_vec, "--help"))
-            {
-                logger.log_message(my_cli->help());
-            }
-            else if (find_str(args_vec, "-v") || find_str(args_vec, "--version"))
-            {
-                logger.log_message(my_cli->version());
-            }
-            else
-            {
-                std::string concatenated_args;
-                for (const auto &arg : args_vec)
-                {
-                    concatenated_args += arg + " ";
-                }
+        logger.log_message(parser->help());
+    } else if (check_for_matches(std::cref(args_vec), VERSION_FLAG, VERSION_OPTION))
+    {
+        logger.log_message(parser->version());
+    } else
+    {
+        std::string concatenated_args{};
+        std::ranges::for_each(args_vec, [&concatenated_args](auto arg)
+            { concatenated_args += arg + " "; });
 
-                const std::string output_target = find_output_target(args_vec);
-
-                if (auto &&results = app->apply(concatenated_args); !results.empty())
-                {
-                    if (should_echo_results(output_target) || !output_target.empty())
-                    {
-                        logger.log_message(std::string{results});
-                    }
-                }
-                else
-                {
-                    logger.log_message("No output generated from the provided arguments.");
-                }
-            }
-        }
-        else
+        if (const auto results = maze->apply(concatenated_args); !results.empty())
         {
-            logger.log_message("Failed to create CLI instance.");
+            logger.log_message(std::string{ results });
         }
     }
-    catch (const std::exception &ex)
-    {
-        logger.log_message(ex.what());
-        return EXIT_FAILURE;
-    }
 
+    // Ensure the async logger worker has delivered all queued messages
+    // into the in-memory sink before we consume and print them.
     logger.flush();
+
+    std::for_each(logs.cbegin(), logs.cend(), [](auto msg)
+        { std::cout << msg << "\n"; });
 
     return EXIT_SUCCESS;
 } // main

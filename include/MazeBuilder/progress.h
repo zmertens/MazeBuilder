@@ -2,18 +2,21 @@
 #define PROGRESS_H
 
 #include <chrono>
+#include <functional>
 #include <mutex>
 #include <utility>
+#include <type_traits>
 
 /// @file progress.h
 /// @namespace mazes
 namespace mazes
 {
+
     /// @class progress
     /// @brief Simple clock for elapsed events
     /// @details This class is used to track the elapsed time between two events
     /// @details Thread safe with mutexes
-    template <typename Time = std::chrono::microseconds, typename Clock = std::chrono::high_resolution_clock>
+    template <typename Time = std::chrono::milliseconds, typename Clock = std::chrono::high_resolution_clock>
     class progress
     {
         mutable std::mutex mtx;
@@ -34,18 +37,18 @@ namespace mazes
         /// @param ...args The arguments to pass to the callable object
         /// @return The duration of the callable object
         template <typename F, typename... Args, typename Duration = Time>
-        static Duration duration(F&& f, Args&&... args)
+        static Duration duration(F &&f, Args &&...args)
         {
             progress p;
             p.start();
 
-            if constexpr (std::is_void_v<std::invoke_result_t<F, Args...>>)
+            if constexpr (std::is_void_v<std::invoke_result_t<std::decay_t<F>, std::decay_t<Args>...>>)
             {
                 std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
             }
             else
             {
-                auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+                const auto result = std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
                 if (!result)
                 {
                     return Duration::zero();
@@ -79,7 +82,13 @@ namespace mazes
             end_time = Clock::now();
             return static_cast<T>(std::chrono::duration_cast<Time>(end_time - start_time).count());
         }
+
+        static double to_double_from_duration(const std::chrono::duration<double> &duration) noexcept
+        {
+            return duration.count();
+        }
     }; // progress
+
 } // namespace mazes
 
 #endif // PROGRESS_H

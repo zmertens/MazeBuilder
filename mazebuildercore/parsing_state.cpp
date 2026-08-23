@@ -7,16 +7,20 @@
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/runtime_stack.h>
+#include <MazeBuilder/state_utils.h>
 
-#include <any>
+#include <array>
+#include <optional>
+#include <variant>
 
 #include <fmt/format.h>
 
 using namespace mazes;
 
-parsing_state::parsing_state(const runtime_app::context &ctx, runtime_stack *rs)
-    : state(ctx, rs), grid_mapper{ctx.get_grid_manager()}, processed_text_mapper{ctx.get_text_manager()}
+parsing_state::parsing_state(const runtime_app::context& ctx, runtime_stack* rs)
+    : state(ctx, rs), args_mapper{ ctx.get_args_manager() }, processed_text_mapper{ ctx.get_text_manager() }
 {
+    state_utils::validate_mappers(args_mapper, processed_text_mapper);
 }
 
 std::optional<args> parsing_state::convert(const std::string_view arguments) const noexcept
@@ -26,9 +30,8 @@ std::optional<args> parsing_state::convert(const std::string_view arguments) con
         return std::nullopt;
     }
 
-    // parse() fills the args object; we return by move to avoid inline ~impl destruction
-    std::optional<args> result{std::in_place};
-    if (!result->parse(std::string{arguments}))
+    std::optional<args> result{ std::in_place };
+    if (!result->parse(std::string{ arguments }))
     {
         result.reset();
     }
@@ -40,70 +43,103 @@ void parsing_state::draw() const noexcept
     // No visual output for now
 }
 
-bool parsing_state::update(const std::optional<args> &args, [[maybe_unused]] double delta_time) noexcept
+bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
 {
-    // runtime_app already parses input before entering the state machine.
-    // Reuse the parsed args and only fall back to raw input conversion when needed.
-    std::optional<mazes::args> parsed_args = args;
-
-    if (!parsed_args.has_value())
-    {
-        if (const auto *raw_input = get_context().get_raw_input(); raw_input && !raw_input->empty())
-        {
-            parsed_args = convert(*raw_input);
-        }
-    }
-
-    if (!parsed_args.has_value() || !processed_text_mapper)
+    if (!args_mapper || !processed_text_mapper)
     {
         request_stack_pop();
-        return true;
+        return false;
     }
 
-    // Determine which algo to run and push the matching create state on top of the stack
-    state::ID next_state = state::ID::BTING; // default
-
-    if (auto parsed = parsed_args->get(); parsed.has_value())
+    args* parsed_args = nullptr;
+    try
     {
-        auto it = parsed->find(args::ALGO_ID_WORD_STR);
-        if (it != parsed->end())
+        parsed_args = &args_mapper->get(args_identifier::PARSED);
+    } catch (...)
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    if (parsed_args->count() == 0)
+    {
+        processed_text* unknown_text = nullptr;
+        try
         {
-            try
-            {
-                const algo a = to_algo_from_sv(it->second);
-                switch (a)
-                {
-                case algo::BINARY_TREE:
-                    next_state = state::ID::BTING;
-                    break;
-                case algo::DFS:
-                    next_state = state::ID::DFSING;
-                    break;
-                case algo::PIXELS:
-                    next_state = state::ID::PIXELIZING;
-                    break;
-                case algo::SIDEWINDER:
-                    next_state = state::ID::SIDEWINDERING;
-                    break;
-                case algo::STRINGIFY:
-                    next_state = state::ID::STRINGIFYING;
-                    break;
-                case algo::WAVEFRONT_OBJECT:
-                    next_state = state::ID::WAVEFRONT_OBJECTIFYING;
-                    break;
-                default:
-                    next_state = state::ID::BTING;
-                    break;
-                }
-            }
-            catch (...)
-            {
-                /* unknown algo → fallback to BT */
-            }
+            unknown_text = &processed_text_mapper->get(processed_text_identifier::UNKNOWN);
+        } catch (...)
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        const auto unknown_processed = unknown_text->get();
+        const auto* raw_input = std::get_if<std::string>(&unknown_processed);
+        if (!raw_input || raw_input->empty())
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        auto parsed_input = convert(*raw_input);
+
+        // Consumed; clear so a subsequent apply() call can supply fresh input.
+        unknown_text->set_processed(std::monostate{});
+
+        if (!parsed_input.has_value())
+        {
+            request_stack_pop();
+            return false;
+        }
+
+        try
+        {
+            args_mapper->get(args_identifier::RAW) = *parsed_input;
+            *parsed_args = std::move(*parsed_input);
+        } catch (...)
+        {
+            request_stack_pop();
+            return false;
         }
     }
 
+    const auto current_args = parsed_args->front();
     request_stack_pop();
-    request_stack_push(next_state);
-    return false;
+
+    const auto mask_it = current_args.find(mazes::args::MASK_WORD_STR);
+    const bool has_mask = mask_it != current_args.cend() && !mask_it->second.empty();
+
+    if (has_mask)
+    {
+        request_stack_push(state::ID::LINK_WITH_MASKED);
+    }
+    else if (const auto it = current_args.find(mazes::args::ALGO_ID_WORD_STR); it != current_args.cend())
+    {
+        try
+        {
+            switch (to_algo_from_sv(it->second))
+            {
+            case algo::BINARY_TREE:
+                request_stack_push(state::ID::LINK_WITH_BINARY_TREE);
+                break;
+            case algo::DFS:
+                request_stack_push(state::ID::LINK_WITH_DFS);
+                break;
+            case algo::SIDEWINDER:
+                request_stack_push(state::ID::LINK_WITH_SIDEWINDER);
+                break;
+            case algo::PRIMS:
+                request_stack_push(state::ID::LINK_WITH_PRIMS);
+                break;
+            default:
+                global_async_logger().log(fmt::format("Parsing update - Unrecognized algo '{}'", it->second));
+                break;
+            }
+        } catch (...)
+        {
+            global_async_logger().log(fmt::format("Parsing update - Exception: Invalid algo '{}'", it->second));
+        }
+    }
+
+    return true;
 }

@@ -9,6 +9,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 /// @namespace mazes
 /// @file algos.h
@@ -20,10 +21,8 @@ namespace mazes
         BINARY_TREE = 0,
         SIDEWINDER = 1,
         DFS = 2,
-        PIXELS = 3,
-        STRINGIFY = 4,
-        WAVEFRONT_OBJECT = 5,
-        TOTAL = 6
+        PRIMS = 3,
+        TOTAL = 4
     };
 
     /// @brief Array of string_view labels for the algo enum, in lowercase
@@ -31,10 +30,7 @@ namespace mazes
         "binary_tree",
         "sidewinder",
         "dfs",
-        "pixels",
-        "stringify",
-        "wavefront_object"
-    };
+        "prims" };
 
     /// @brief Convert the algo enum to a string_view
     /// @param a
@@ -57,7 +53,7 @@ namespace mazes
         {
             return static_cast<algo>(std::distance(ALGOS_LABELS_LOWERCASE.begin(), it));
         }
-        throw std::invalid_argument("Invalid algo: " + std::string{a});
+        throw std::invalid_argument("Invalid algo: " + std::string{ a });
     }
 } // namespace mazes
 

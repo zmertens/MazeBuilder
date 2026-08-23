@@ -20,7 +20,7 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{std::make_unique<grid>(width, length, levels)}
+    : m_grid{ std::make_unique<grid>(width, length, levels) }
 {
 }
 
@@ -149,8 +149,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
                 queue.push_back(neighbor_index);
             }
         }
-    }
-    catch (const std::exception&)
+    } catch (const std::exception&)
     {
     }
 }

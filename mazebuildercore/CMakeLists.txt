@@ -6,6 +6,7 @@ message(INFO ": Configuring ${PROJECT_NAME} v${MAZE_BUILDER_VERSION}")
 
 set(MAZE_BUILDER_CORE_SRCS
     args.cpp
+    async_logger.cpp
     bytes.cpp
     bt_maze_create_state.cpp
     dfs_maze_create_state.cpp
@@ -17,19 +18,24 @@ set(MAZE_BUILDER_CORE_SRCS
     io_utils.cpp
     json_helper.cpp
     lab.cpp
+    link_maze_and_create_state.cpp
     loading_state.cpp
     mask.cpp
     masked_grid.cpp
+    masked_maze_and_create_state.cpp
     parsing_state.cpp
     pixels_create_state.cpp
+    prims_maze_create_state.cpp
     randomizer.cpp
     runtime_app.cpp
     runtime_stack.cpp
     state.cpp
     stringify_create_state.cpp
-    string_utils.cpp
+    string_utils.cpp    
     sw_maze_create_state.cpp
-    wavefront_object_create_state.cpp)
+    topology.cpp
+    wavefront_object_create_state.cpp
+    write_to_output_state.cpp)
 
 if(MAZE_BUILDER_COVERAGE)
     message(STATUS "Building ${PROJECT_NAME} with code coverage")
@@ -75,12 +81,33 @@ message(INFO ": Fetching fmt library...")
 # fmt version 12.1.0
 FetchContent_Declare(fmt GIT_REPOSITORY https://github.com/fmtlib/fmt.git GIT_TAG 407c905e45ad75fc29bf0f9bb7c5c2fd3475976f)
 # Configure fmt options before making it available
-set(FMT_INSTALL OFF CACHE BOOL "" FORCE)
+set(FMT_INSTALL ON CACHE BOOL "" FORCE)
 set(FMT_TEST OFF CACHE BOOL "" FORCE)
 set(FMT_DOC OFF CACHE BOOL "" FORCE)
+
+set(_fmt_source_dir "${CMAKE_BINARY_DIR}/_deps/fmt-src")
+if(EXISTS "${_fmt_source_dir}" AND NOT EXISTS "${_fmt_source_dir}/CMakeLists.txt")
+    message(STATUS "Detected stale empty fmt cache, forcing FetchContent re-clone")
+    file(REMOVE_RECURSE "${_fmt_source_dir}")
+    file(REMOVE
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/fmt-gitclone-lastrun.txt"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/download.stamp"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/update.stamp"
+        "${CMAKE_BINARY_DIR}/CMakeFiles/fc-stamp/fmt/patch.stamp")
+endif()
+
 FetchContent_MakeAvailable(fmt)
 
-find_package(Threads REQUIRED)
+# Normalize fmt target name across package variants.
+if(NOT TARGET fmt::fmt)
+    if(TARGET fmt)
+        add_library(fmt::fmt ALIAS fmt)
+    elseif(TARGET fmt-header-only)
+        add_library(fmt::fmt ALIAS fmt-header-only)
+    else()
+        message(FATAL_ERROR "fmt dependency target was not created. If using an existing build directory, clear stale fmt cache under _deps (fmt-src/fmt-build/fmt-tmp) and reconfigure.")
+    endif()
+endif()
 
 # Setup object library
 set(MAZE_BUILDER_LIB_OUT ${MAZE_BUILDER_CORE_LIB})
@@ -95,7 +122,7 @@ target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE $<INSTALL_INTERFA
 # Add STB as a system include to suppress warnings
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj SYSTEM PRIVATE $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/deps/stb>)
 target_include_directories(${MAZE_BUILDER_LIB_OUT}_obj PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
-target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt Threads::Threads)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
@@ -105,32 +132,56 @@ add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_obj)
 # Shared build
 if(NOT EMSCRIPTEN)
     add_library(${MAZE_BUILDER_LIB_OUT}_shared SHARED)
-    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt Threads::Threads)
+    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 endif()
 
 # Static build
 add_library(${MAZE_BUILDER_LIB_OUT}_static STATIC)
-target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt Threads::Threads)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
 
 # Installation
 include(GNUInstallDirs)
-#install(TARGETS ${MAZE_BUILDER_LIB_OUT} ${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_static
-#  EXPORT MazeBuilderLibrary
-#  ARCHIVE COMPONENT development
-#  LIBRARY COMPONENT runtime
-#  FILE_SET HEADERS COMPONENT runtime
-#)
 
-#if (UNIX)
-#    install(CODE "execute_process(COMMAND ldconfig)" COMPONENT runtime)
-#endif()
+set(_maze_builder_install_targets ${MAZE_BUILDER_LIB_OUT}_obj ${MAZE_BUILDER_LIB_OUT}_static)
+if(NOT EMSCRIPTEN)
+    list(APPEND _maze_builder_install_targets ${MAZE_BUILDER_LIB_OUT}_shared)
+endif()
 
-#install(EXPORT MazeBuilderLibrary
-#  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
-#  NAMESPACE MazeBuilder::
-#  COMPONENT runtime
-#)
+install(TARGETS ${_maze_builder_install_targets}
+  EXPORT MazeBuilderLibrary
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT development
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} COMPONENT runtime
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT runtime
+  OBJECTS DESTINATION ${CMAKE_INSTALL_LIBDIR}/objects COMPONENT development
+)
 
-#install(FILES "MazeBuilderConfig.cmake"
-#  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
-#)
+install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/MazeBuilder
+  DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  COMPONENT runtime
+)
+
+if (UNIX)
+    install(CODE "execute_process(COMMAND ldconfig)" COMPONENT runtime)
+endif()
+
+install(EXPORT MazeBuilderLibrary
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  NAMESPACE MazeBuilder::
+  COMPONENT runtime
+)
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/MazeBuilderConfig.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  COMPONENT runtime
+)
+
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/MazeBuilderConfigVersion.cmake"
+  VERSION ${MAZE_BUILDER_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/MazeBuilderConfigVersion.cmake"
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/MazeBuilder/cmake
+  COMPONENT runtime
+)

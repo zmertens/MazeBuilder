@@ -67,20 +67,11 @@ namespace mazes
                 return *this;
             }
 
-            [[nodiscard]] const std::string *get_raw_input() const noexcept { return _raw_input; }
-
-            context &with_raw_input(const std::string &raw_input) noexcept
-            {
-                _raw_input = &raw_input;
-                return *this;
-            }
-
         private:
             args_manager *_args{};
             grid_manager *_grid_manager{};
             processed_text_manager *_text_manager{};
             randomizer *_rng{};
-            const std::string *_raw_input{};
         };
 
         // Constructor / Destructor
@@ -88,36 +79,31 @@ namespace mazes
         ~runtime_app() override;
 
         /// @brief Applies the given unformatted string view to the runtime application
-        /// @param unformatted_sv The unformatted string view to be processed
+        /// @param unformatted_args The unformatted string view to be processed
         /// @return A string view representing the result of the application
-        [[nodiscard]] std::string_view apply(std::string_view unformatted_sv) noexcept override;
+        [[nodiscard]] std::string_view apply(std::string_view unformatted_args) noexcept override;
 
         /// @brief Returns the last generated grid used by apply(), if available.
-        [[nodiscard]] const grid_interface *get_last_grid() const noexcept;
+        [[nodiscard]] std::string get_finished_text() noexcept;
 
     private:
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories
         void register_states() const noexcept;
 
-        /// @brief Iterate over the stack (top-to-bottom), call update(args) on each state
-        ///        until one returns false, apply pending changes, then extract the
-        ///        first ready result from processed_text_mapper.
-        /// @param arguments The optional arguments to pass to each state's update function
-        /// @return A string view representing the result of the state updates
-        [[nodiscard]] std::string_view visit_states(const std::optional<args> &arguments) noexcept;
+        /// @brief Iterate over the stack (top-to-bottom), call update(double) on each state
+        ///        until one returns false, then extract the first ready result from processed_text_mapper.
+        void visit_states() noexcept;
 
-        args_manager m_args_mapper;
-        grid_manager m_grid_mapper;
-        processed_text_manager m_processed_text_mapper;
-        randomizer m_rng;
+        args_manager args_mapper;
+        grid_manager grid_mapper;
+        processed_text_manager processed_text_mapper;
 
-        async_logger m_logger;
-        std::mutex m_logging_mtx;
-        std::vector<std::string> m_received_logs;
+        randomizer rng;
 
-        std::string m_last_result;
-        std::string m_current_input;
-        grid_identifier m_last_grid_id{grid_identifier::BASIC};
+        std::mutex logging_mtx;
+        std::vector<std::string> received_logs;
+        std::string last_result_buffer;
+
         std::unique_ptr<runtime_stack> runtime_stack_ptr;
     };
 } // namespace mazes

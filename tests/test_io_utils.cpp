@@ -10,6 +10,9 @@
 
 #include <MazeBuilder/io_utils.h>
 #include <MazeBuilder/output_formats.h>
+#include <MazeBuilder/string_utils.h>
+
+#include "test_output_dir.h"
 
 using namespace std;
 using namespace mazes;
@@ -17,51 +20,51 @@ using namespace mazes;
 TEST_CASE("io_utils can process good text file names", "[good text filenames]")
 {
     io_utils my_writer;
+    test_output_dir output_dir{"test_io_utils_good"};
 
     // Good file names that the io_utils can determine what type to write per the extension
     vector<string> good_filenames{"1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg"};
 
     for (const auto &gf : good_filenames)
     {
-        REQUIRE(my_writer.write_file(gf, "data"));
+        REQUIRE(my_writer.write_file((output_dir.path / gf).string(), "data"));
     }
 }
 
 TEST_CASE("io_utils can process bad file names", "[bad filenames]")
 {
     io_utils my_writer;
+    test_output_dir output_dir{"test_io_utils_bad"};
 
     vector<string> more_filenames{"1-text", "2.plain_text", "3plain_txt", "4.objected", "5.objobj", "6obj", "a.ping", "pong"};
 
     for (const auto &more : more_filenames)
     {
-        REQUIRE(my_writer.write_file(more, "data"));
+        REQUIRE(my_writer.write_file((output_dir.path / more).string(), "data"));
     }
 
     for (auto bf : more_filenames)
     {
-        auto bf_substr = bf.substr(bf.find_last_of('.') + 1);
-        REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(bf_substr), std::invalid_argument);
+        const auto ext{ string_utils::file_extension(bf) };
+        REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(ext), std::invalid_argument);
     }
 }
 
 TEST_CASE("io_utils writes data to file successfully", "[io_utils writes]")
 {
     mazes::io_utils w;
-    std::string filename = "test_file.txt";
+    test_output_dir output_dir{"test_io_utils_write"};
+    const std::filesystem::path filename = output_dir.path / "test_file.txt";
     std::string data = "Hello, world!";
 
-    REQUIRE_NOTHROW(w.write_file(filename, data));
+    REQUIRE_NOTHROW(w.write_file(filename.string(), data));
 
     // Verify the file contents
     std::ifstream f1(filename);
     REQUIRE(f1.is_open());
     std::string f1_content((std::istreambuf_iterator<char>(f1)), std::istreambuf_iterator<char>());
     REQUIRE(f1_content == data);
-
-    // Clean up
     f1.close();
-    std::remove(filename.c_str());
 }
 
 TEST_CASE("io_utils writes data to stdout successfully", "[io_utils to stdout]")

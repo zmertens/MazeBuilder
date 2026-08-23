@@ -10,7 +10,6 @@
 #include <optional>
 #include <string>
 #include <tuple>
-#include <unordered_map>
 #include <vector>
 
 /// @file grid.h
@@ -31,8 +30,8 @@ namespace mazes
         explicit grid(unsigned int rows = 1u, unsigned int columns = 1u, unsigned int levels = 1u);
 
         /// @brief Construct a grid using a tuple of unsigned integers
-        /// @param dimens
-        explicit grid(const std::tuple<unsigned int, unsigned int, unsigned int>& dimens);
+        /// @param dimensions
+        explicit grid(const std::tuple<unsigned int, unsigned int, unsigned int>& dimensions);
 
         /// @brief Copy constructor
         /// @param other
@@ -81,7 +80,7 @@ namespace mazes
         /// @param c
         /// @param dir
         /// @return
-        std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c, direction dir) const noexcept override;
+        std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c, Direction dir) const noexcept override;
 
         /// @brief Get all the neighbors by the cell
         /// @param c
@@ -93,8 +92,8 @@ namespace mazes
         /// @param dir
         /// @param neighbor
         /// @return
-        void set_neighbor(const std::shared_ptr<cell>& c, direction dir,
-                          std::shared_ptr<cell> const& neighbor) noexcept override;
+        void set_neighbor(const std::shared_ptr<cell>& c, Direction dir,
+            std::shared_ptr<cell> const& neighbor) noexcept override;
 
         // Convenience methods for accessing neighbors
         std::shared_ptr<cell> get_north(const std::shared_ptr<cell>& c) const noexcept override;
@@ -153,14 +152,14 @@ namespace mazes
         void resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept override;
 
     private:
-        std::unordered_map<int, std::shared_ptr<cell>> m_cells;
+        std::vector<std::shared_ptr<cell>> m_cells;
 
         std::tuple<unsigned int, unsigned int, unsigned int> m_dimensions;
 
         // Store topology - which cell is neighbor to which in what direction
         // Key: cell index, Value: map of direction to neighbor cell index
         mutable std::mutex m_topology_mutex;
-        std::unordered_map<int, std::unordered_map<direction, int>> m_topology;
+        std::unordered_map<int, std::unordered_map<Direction, int>> m_topology;
 
         // Arbitrary data
         std::string m_file;

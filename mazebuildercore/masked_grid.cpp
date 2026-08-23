@@ -9,7 +9,7 @@ using namespace mazes;
 
 masked_grid::masked_grid(mask m)
     : grid(m.rows(), m.columns()),
-      m_mask(std::move(m))
+    m_mask(std::move(m))
 {
 }
 

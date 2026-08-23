@@ -8,7 +8,7 @@
 namespace mazes
 {
     /// @brief Character representations of walls and barriers in the maze
-    enum class barrier : char
+    enum class Barrier : char
     {
         HORIZONTAL = '-',
 
@@ -20,7 +20,7 @@ namespace mazes
     };
 
     /// @brief Directional neighbors for grid topology
-    enum class direction : int
+    enum class Direction : int
     {
         NORTH = 0,
         SOUTH = 1,

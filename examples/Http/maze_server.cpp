@@ -1,6 +1,9 @@
 #include "maze_server.h"
 
 #include <MazeBuilder/algos.h>
+#include <MazeBuilder/bytes.h>
+#include <MazeBuilder/io_utils.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/singleton_base.h>
 
@@ -12,6 +15,8 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+
+const std::filesystem::path maze_server::MAZE_TEMP_IMAGE_PATH{std::filesystem::temp_directory_path() / "maze_server.png"};
 
 maze_server::maze_server(unsigned short port)
     : m_port(port)
@@ -101,6 +106,7 @@ maze_server::query_params maze_server::parse_query_string(const std::string &qs)
             {
                 p.algo = value;
             }
+            p.use_distances = true; // default to true for now
         }
         catch (...)
         { /* keep defaults for malformed values */
@@ -166,25 +172,62 @@ std::string maze_server::generate_maze_text(const query_params &p)
         throw std::runtime_error("Maze runtime is unavailable.");
     }
 
-    std::ostringstream request;
-    request << "--rows=" << p.rows
-            << " --columns=" << p.columns
-            << " --levels=1"
-            << " --algo=" << p.algo
-            << " --output=txt";
+    mazes::randomizer rng{};
+    const auto seed = rng(1u, 100u);
 
-    const auto generated = app->apply(request.str());
+    // apply() dispatches to exactly one output state based on --output's extension:
+    // PIXELIZING (png/bmp/jpg) returns a "Wrote maze to ..." confirmation, not the grid,
+    // while STRINGIFYING (stdout/txt) returns the ASCII grid. Two calls (same seed) are
+    // required to get both the grid text and the rendered image.
+    std::ostringstream text_request;
+    text_request << "--rows=" << p.rows
+                 << " --columns=" << p.columns
+                 << " --levels=1"
+                 << " --algo=" << p.algo
+                 << " --seed=" << seed
+                 << " --distances=[0:-1]"
+                 << " --output=stdout";
+
+    // runtime_app::apply() returns a string_view into the app's internal buffer, which
+    // gets overwritten by the next apply() call -- copy it into an owned string now,
+    // before requesting the image, or "generated" would dangle/get corrupted below.
+    const std::string generated{app->apply(text_request.str())};
     if (generated.empty())
     {
         throw std::runtime_error("Maze generation failed.");
     }
 
-    // First line: metadata; remaining lines: ASCII maze
+    std::ostringstream image_request;
+    image_request << "--rows=" << p.rows
+                  << " --columns=" << p.columns
+                  << " --levels=1"
+                  << " --algo=" << p.algo
+                  << " --seed=" << seed
+                  << " --distances=[0:-1]"
+                  << " --output=" << MAZE_TEMP_IMAGE_PATH.string();
+
+    if (app->apply(image_request.str()).empty())
+    {
+        throw std::runtime_error("Maze image generation failed.");
+    }
+
+    const auto image_bytes = mazes::io_utils::read_file_to_bytes(MAZE_TEMP_IMAGE_PATH);
+    if (image_bytes.empty())
+    {
+        throw std::runtime_error("Maze image could not be read.");
+    }
+
+    const std::string image_base64 = mazes::bytes::encode(mazes::bytes::bytes_to_string(image_bytes));
+
+
+    // First line: metadata; then the ASCII maze; then a delimiter followed by the
+    // base64-encoded PNG so the response stays plain-text/binary-safe in one round trip.
     std::ostringstream oss;
     oss << "rows=" << p.rows
         << " columns=" << p.columns
-        << " algo=" << p.algo << "\n"
-        << generated;
+        << " algo=" << p.algo
+        << " use_distances=" << p.use_distances << "\n"
+        << generated << maze_server::IMAGE_DELIMITER << image_base64;
     return oss.str();
 }
 

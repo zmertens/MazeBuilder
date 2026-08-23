@@ -1,25 +1,21 @@
 #ifndef BT_MAZE_CREATE_STATE
 #define BT_MAZE_CREATE_STATE
 
-#include <MazeBuilder/create_contract.h>
-#include <MazeBuilder/resource_identifiers.h>
-#include <MazeBuilder/state.h>
+#include <MazeBuilder/algos.h>
+#include <MazeBuilder/link_maze_and_create_state.h>
 
 #include <string_view>
-#include <string>
+
+class configurator;
+class randomizer;
+class runtime_stack;
 
 /// @namespace mazes
 /// @file bt_maze_create_state.h
 namespace mazes
 {
-    class args;
-    class configurator;
-    class randomizer;
-    class runtime_stack;
-    struct context;
-
     /// @brief State for creating a maze using the binary tree algorithm
-    class bt_maze_create_state final : public create_contract, public state
+    class bt_maze_create_state final : public link_maze_and_create_state
     {
     public:
         /// @brief Construct a new binary tree maze creation state
@@ -28,40 +24,23 @@ namespace mazes
         explicit bt_maze_create_state(const runtime_app::context& ctx, runtime_stack* stack);
 
         /// @brief Create a binary tree maze with the given parameters
-        /// @param a
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
-        /// @return
+        /// @param config The maze configuration
+        /// @param rng The randomizer for the algorithm
+        /// @return A string view with the result message
         std::string_view create(const configurator& config, randomizer& rng) noexcept override;
 
-        /// @brief @TODO -> pre-print mazes as a visualization technique
-        void draw() const noexcept override;
-
-        /// @brief Update the state with the given arguments and delta time
-        /// @param args Optional arguments for the update
-        /// @param delta_time Time elapsed since the last update
-        /// @return True if the state was updated successfully, false otherwise
-        bool update(const std::optional<args>& args, double delta_time) noexcept override;
-
     private:
-        /// @brief Implementation of the binary tree maze creation algorithm
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        /// @param rng
-        /// @return
-        std::string_view create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-                                        randomizer& rng) noexcept;
+        /// @brief Get the algorithm ID for the binary tree algorithm
+        [[nodiscard]] algo get_algo_id() const noexcept override;
 
-        grid_manager* grid_mapper;
-        processed_text_manager* processed_text_mapper;
-        grid_identifier m_grid_id;
-        bool m_use_distances;
-        int m_distances_start;
-        int m_distances_end;
-        std::string m_result;
+        /// @brief Implementation of the binary tree maze creation algorithm
+        /// @param rows The number of rows in the maze
+        /// @param cols The number of columns in the maze
+        /// @param levels The number of levels in the maze
+        /// @param rng The randomizer for the algorithm
+        /// @return A string view with the result message
+        std::string_view create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels,
+            randomizer& rng) noexcept;
     };
 } // namespace mazes
 

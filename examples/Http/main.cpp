@@ -15,16 +15,12 @@
 static void print_usage(const char* prog)
 {
     std::cout <<
-"MazeBuilder HTTP Example -- local server + SFML client\n\n"
+"MazeBuilder HTTP Example -- local server\n\n"
 "Usage:\n"
-"  <prog> --server [--port <N>]\n"
-"  <prog> --client [--host <host>] [--port <N>]\n\n"
+"  <prog> --server [--port <N>]\n\n"
 "Server mode\n"
 "  Listens for HTTP GET and returns generated mazes as plain text.\n"
 "  Default port: 8080\n\n"
-"Client mode\n"
-"  Opens an SFML window, queries the server, renders the maze visually.\n"
-"  Default: localhost:8080\n\n"
 "Server endpoint\n"
 "  GET /mazes\n"
 "  GET /mazes?rows=12&columns=10&algo=dfs\n\n"
@@ -32,15 +28,8 @@ static void print_usage(const char* prog)
 "  rows     number of rows    (default 10, clamped 1-100)\n"
 "  columns  number of columns (default 10, clamped 1-100)\n"
 "  algo     binary_tree | sidewinder | dfs  (default binary_tree)\n\n"
-"Client keyboard controls\n"
-"  G / Enter   fetch a new maze\n"
-"  Tab         cycle algorithms\n"
-"  + / =       grow maze (+2 per dim)\n"
-"  - / _       shrink maze (-2 per dim)\n"
-"  Q / Esc     quit\n\n"
 "Examples\n"
-"  mazebuilderhttp --server\n"
-"  mazebuilderhttp --client\n"
+"  mazebuilderhttp --server --port 8050\n"
 "  curl \"http://localhost:8080/mazes?rows=15&columns=12&algo=dfs\"\n\n";
 }
 

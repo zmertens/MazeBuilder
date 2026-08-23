@@ -9,15 +9,16 @@ namespace mazes
 
     enum class args_identifier : unsigned int
     {
-        COMMON = 0,
-        TOTAL = 1
+        PARSED = 0,
+        RAW = 1,
+        TOTAL = 2
     };
 
     enum class processed_text_identifier : unsigned int
     {
         FINISHED = 0,
-        GARBAGE = 1,
-        PROCESSING = 2,
+        PROCESSING = 1,
+        UNKNOWN = 2,
         TOTAL = 3
     };
 

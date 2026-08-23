@@ -50,7 +50,7 @@ std::pair<std::int32_t, int> distances::max() const noexcept
         }
     }
 
-    return {max_index, max_distance};
+    return { max_index, max_distance };
 }
 
 void distances::collect_keys(std::vector<std::int32_t>& indices) const noexcept
@@ -63,7 +63,7 @@ void distances::collect_keys(std::vector<std::int32_t>& indices) const noexcept
 }
 
 std::shared_ptr<distances> distances::path_to(grid_interface* g, const std::int32_t start_index,
-                                              const std::int32_t goal_index) noexcept
+    const std::int32_t goal_index) noexcept
 {
     auto path = std::make_shared<distances>(start_index);
 

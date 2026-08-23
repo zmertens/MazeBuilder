@@ -9,7 +9,7 @@ using namespace mazes;
 /// @brief
 /// @param index 0
 cell::cell(const std::int32_t index)
-    : m_index{index}
+    : m_index{ index }
 {
 }
 
@@ -88,13 +88,13 @@ bool cell::has_key(const std::shared_ptr<cell>& c)
     std::lock_guard lock(m_links_mutex);
 
     return std::ranges::any_of(m_links, [&c](const auto& pair)
-    {
-        if (auto shared_cell = pair.first.lock())
         {
-            return shared_cell == c;
-        }
-        return false;
-    });
+            if (auto shared_cell = pair.first.lock())
+            {
+                return shared_cell == c;
+            }
+            return false;
+        });
 }
 
 void cell::cleanup_links()
@@ -137,8 +137,7 @@ void cell::add_link(const std::shared_ptr<cell>& other)
         if (it->first.expired())
         {
             it = m_links.erase(it);
-        }
-        else
+        } else
         {
             ++it;
         }
@@ -161,8 +160,7 @@ void cell::remove_link(const std::shared_ptr<cell>& other)
         if (it->first.expired())
         {
             it = m_links.erase(it);
-        }
-        else
+        } else
         {
             ++it;
         }

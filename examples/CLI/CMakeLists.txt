@@ -7,7 +7,7 @@ set(CLI_SOURCES
 
 if(EMSCRIPTEN)
 
-    message(INFO ": Building ${EXE_NAME} for the Web!")
+    message(INFO " - Building ${EXE_NAME} for the Web!")
 
     # Set the output file
     add_executable(${EXE_NAME} ${CLI_SOURCES})
@@ -24,12 +24,21 @@ if(EMSCRIPTEN)
 
 else()
 
-    message(INFO ": Building ${EXE_NAME} for the Desktop!")
+    message(INFO " - Building ${EXE_NAME} for the Desktop!")
 
     add_executable(${EXE_NAME} ${CLI_SOURCES})
     target_link_libraries(${EXE_NAME} ${MAZE_BUILDER_CORE_LIB}_static)
     target_compile_features(${EXE_NAME} PRIVATE cxx_std_20)
     target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
     target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
+
+    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/example_mask.txt"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/example_mask.txt"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/example_masked_maze.txt"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/example_masked_maze.txt"
+        VERBATIM)
 
 endif()

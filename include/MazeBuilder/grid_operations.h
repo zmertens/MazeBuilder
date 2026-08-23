@@ -40,7 +40,7 @@ namespace mazes
         /// @param dir
         /// @return
         [[nodiscard]] virtual std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c,
-                                                                 direction dir) const noexcept = 0;
+                                                                 Direction dir) const noexcept = 0;
 
         /// @brief Get all the neighbors by the cell
         /// @param c
@@ -53,7 +53,7 @@ namespace mazes
         /// @param dir
         /// @param neighbor
         /// @return
-        virtual void set_neighbor(const std::shared_ptr<cell>& c, direction dir,
+        virtual void set_neighbor(const std::shared_ptr<cell>& c, Direction dir,
                                   std::shared_ptr<cell> const& neighbor) noexcept = 0;
 
         // Convenience methods for accessing neighbors

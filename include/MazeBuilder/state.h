@@ -6,28 +6,29 @@
 #include <functional>
 #include <optional>
 
+class runtime_stack;
+
 /// @file state.h
 /// @namespace mazes
 namespace mazes
 {
-    class args;
-    class runtime_stack;
-
     /// @brief struct representing a state in the runtime stack
     struct state
     {
         enum class ID : unsigned int
         {
-            BTING = 0,
-            DFSING = 1,
-            EMPTY = 2,
-            LOADING = 3,
-            PARSING = 4,
-            PIXELIZING = 5,
-            SIDEWINDERING = 6,
-            STRINGIFYING = 7,
-            WAVEFRONT_OBJECTIFYING = 8,
-            TOTAL = 9
+            EMPTY = 0,
+            LINK_WITH_BINARY_TREE = 1,
+            LINK_WITH_DFS = 2,
+            LINK_WITH_SIDEWINDER = 3,
+            LINK_WITH_PRIMS = 4,
+            LOAD = 5,
+            PARSE = 6,
+            WRITE_TO_IMAGE = 7,
+            WRITE_TO_STRING = 8,
+            WRITE_TO_WF_OBJ = 9,
+            LINK_WITH_MASKED = 10,
+            TOTAL = 11
         };
 
         explicit state(const runtime_app::context& c, runtime_stack* rs)
@@ -39,11 +40,10 @@ namespace mazes
 
         virtual void draw() const noexcept = 0;
 
-        /// @brief Update the state with the given arguments and elapsed time
-        /// @param args The optional arguments to pass to the state's update function
+        /// @brief Update the state with the elapsed time
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        virtual bool update(const std::optional<args>& args, double delta_time) noexcept = 0;
+        virtual bool update(double delta_time) noexcept = 0;
 
     protected:
         void request_stack_push(ID state_id) const noexcept;

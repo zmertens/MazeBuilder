@@ -17,9 +17,9 @@ class randomizer::randomizer_impl
 public:
     randomizer_impl()
 #if defined(__EMSCRIPTEN__)
-        : rng_device{5489u}
+        : rng_device{ 5489u }
 #else
-        : rng_device{std::random_device{}()}
+        : rng_device{ std::random_device{}() }
 #endif
     {
     }
@@ -29,12 +29,11 @@ public:
     {
         if constexpr (std::is_integral_v<Number>)
         {
-            std::uniform_int_distribution<Number> dist{low, high};
+            std::uniform_int_distribution<Number> dist{ low, high };
             return dist(rng_device);
-        }
-        else
+        } else
         {
-            std::uniform_real_distribution<Number> dist{low, high};
+            std::uniform_real_distribution<Number> dist{ low, high };
             return dist(rng_device);
         }
     }
@@ -85,13 +84,13 @@ public:
 };
 
 // Default constructor
-randomizer::randomizer() : m_impl{std::make_unique<randomizer_impl>()}
+randomizer::randomizer() : m_impl{ std::make_unique<randomizer_impl>() }
 {
 }
 
 // Copy constructor
 randomizer::randomizer(const randomizer& other)
-    : m_impl{std::make_unique<randomizer_impl>(*other.m_impl)}
+    : m_impl{ std::make_unique<randomizer_impl>(*other.m_impl) }
 {
 }
 
@@ -111,7 +110,7 @@ randomizer& randomizer::operator=(const randomizer& other)
 
 // Move constructor
 randomizer::randomizer(randomizer&& other) noexcept
-    : m_impl{std::move(other.m_impl)}
+    : m_impl{ std::move(other.m_impl) }
 {
 }
 
