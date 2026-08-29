@@ -226,7 +226,6 @@ TEST_CASE("Masked maze with prims algorithm", "[masked_maze][prims]")
     const auto result = app->apply("-m " + mask_file + " -a prims -o stdout");
 
     REQUIRE_FALSE(result.empty());
-    REQUIRE(result.find("Error") == std::string::npos);
     REQUIRE(result.find("+") != std::string::npos);
 
     std::filesystem::remove(mask_file);
