@@ -276,6 +276,7 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 - **Asset conversion**: `from_png_to_bmp.py`, `invert_image_colors.py`
 - **Local web serving**: `secure_http_server.py`
 - **Make an icon**: `make_icon.rb`
+- **Test the CLI**: `test_cli.js`
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 

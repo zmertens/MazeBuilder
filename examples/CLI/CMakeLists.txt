@@ -22,6 +22,12 @@ if(EMSCRIPTEN)
     target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map>")
     target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
 
+    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/scripts/test_cli.js"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/test_cli.js"
+        VERBATIM)
+
 else()
 
     message(INFO ": Building ${EXE_NAME} for the Desktop!")
@@ -32,10 +38,10 @@ else()
     target_include_directories(${EXE_NAME} PUBLIC $<INSTALL_INTERFACE:include> $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>)
     target_compile_definitions(${EXE_NAME} PRIVATE "$<$<OR:$<STREQUAL:$<CONFIG>,Debug>,$<STREQUAL:$<CONFIG>,RelWithDebInfo>>:${MAZE_DEBUG_DEF}>")
 
-    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/mask1.txt"
-            "$<TARGET_FILE_DIR:${EXE_NAME}>/mask1.txt"
-        VERBATIM)
-
 endif()
+
+add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/mask1.txt"
+        "$<TARGET_FILE_DIR:${EXE_NAME}>/mask1.txt"
+    VERBATIM)
