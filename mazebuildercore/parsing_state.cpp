@@ -140,6 +140,10 @@ bool parsing_state::update([[maybe_unused]] double delta_time) noexcept
             global_async_logger().log(fmt::format("Parsing update - Exception: Invalid algo '{}'", it->second));
         }
     }
+    else
+    {
+        request_stack_push(state::ID::LINK_WITH_BINARY_TREE);
+    }
 
     return true;
 }

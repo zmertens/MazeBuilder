@@ -74,16 +74,21 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
 
     m_result = std::string{create(cfg, *rng_ptr)};
 
-    // Attempt to write output if result is not empty
+    // Attempt to write output if result is not empty. If no explicit target was set,
+    // default to emitting the maze text to stdout for the console CLI.
     if (!m_result.empty())
     {
-        if (bool write_success = write_output(output_target, m_result); !write_success)
+        const bool default_stdout_output = output_target.empty();
+        if (!default_stdout_output)
         {
-            global_async_logger().log_message("Failed to write maze to " + output_target);
+            if (bool write_success = write_output(output_target, m_result); !write_success)
+            {
+                global_async_logger().log_message("Failed to write maze to " + output_target);
+            }
         }
 
         const auto extension = string_utils::file_extension(output_target);
-        if (!output_target.empty() && output_format_or_default(extension) != output_format::STDOUT)
+        if (default_stdout_output || output_format_or_default(extension) != output_format::STDOUT)
         {
             global_async_logger().log(m_result);
         }
