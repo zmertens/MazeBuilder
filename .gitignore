@@ -31,9 +31,10 @@ scripts/*.JPG
 scripts/*.JPEG
 scripts/*.bmp
 !scripts/sample_icon.bmp
-!scripts/sample_maze.png
+!scripts/sample_maze.jpg
 !scripts/BreakingWallsMask.png
-!scripts/mask.txt
+!scripts/mask_output.jpg
+!scripts/mask_output_distances.jpg
 
 # Ruby
 Gemfile.lock

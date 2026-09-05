@@ -5,7 +5,7 @@ set(HTTP_SOURCES
     main.cpp
     maze_server.cpp)
 
-message(STATUS "Http: building '${HTTP_EXE}' for desktop")
+message(INFO ": Building '${HTTP_EXE}' for desktop")
 
 add_executable(${HTTP_EXE} ${HTTP_SOURCES})
 

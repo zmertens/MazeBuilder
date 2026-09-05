@@ -5,18 +5,17 @@ Maze Builder is a C++ maze generation library with a CLI and several example app
 This repository contains:
 
 - **Core library**: reusable maze data structures, generation algorithms, and output pipelines in `include/MazeBuilder`
-- **Examples**: There's a CLI example, and an entire game built with SFML in `examples`
-- **Scripts**: asset and local-serving helpers in `scripts`
+- **Examples**: There's a CLI example, and an entire game built with SFML in `examples/Amazing`
 
 ## Quick start
 
-Generate a 25x25 maze as text:
+Generate a 25x25 maze with depth-first algorithm and print to stdout:
 
 ```sh
 mazebuildercli -r 25 -c 25 -a dfs -o stdout
 ```
 
-Write a Wavefront object:
+Construct a maze in 3D and generate a Wavefront Object file:
 
 ```sh
 mazebuildercli --rows=25 --columns=25 --seed=42 --algo=binary_tree --output=bt.obj
@@ -44,7 +43,7 @@ mazebuildercli -m example_mask.txt -a binary_tree -o masked_maze.png
 
 ## What the library provides
 
-The library is organized around a few core concepts reflected in the Doxygen comments:
+The library is organized around a few core concepts:
 
 - **`cell`**: an indexed maze cell with links to neighboring cells
 - **`lab`**: helper operations for linking and unlinking cells
@@ -68,7 +67,6 @@ The library is organized around a few core concepts reflected in the Doxygen com
 | `-d`, `--distances` | Show distances, optionally with slice notation like `[0:10]` |
 | `-m`, `--mask` | Load a text mask file |
 | `-j`, `--json` | Load arguments from JSON |
-| `--show-steps` | Emit intermediate generation snapshots |
 | `-o`, `--output` | Route output by target name or file extension |
 
 ### Output formats
@@ -112,7 +110,7 @@ Output routing is based on `--output`; file extensions select the renderer autom
 
 Masked mazes allow you to create mazes with specific shapes or patterns by using a text file where `X` represents blocked cells and any other character (typically `.` or space) represents available cells:
 
-**Example mask file (`example_masked_maze.txt`):**
+**Example mask file:**
 ```text
 XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 X............................XXX
@@ -131,24 +129,20 @@ X..............X.............XXX
 XXXXXXXXXXXXXXXX.............XXX
 ```
 
-![](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43#C4aJMZh)
-
 **Generate a masked maze:**
 ```sh
-mazebuildercli -m example_mask.txt -a binary_tree -o masked_output.png
+mazebuildercli -m mask1.txt -o output.jpg --seed=1
 ```
+
+![mask output](scripts/mask_output.jpg)
 
 **With distances:**
 ```sh
-mazebuildercli -m example_mask.txt -a dfs -d -o stdout
+mazebuildercli -m mask1.txt -d[40:] -o output2.jpg --seed=1
 ```
 
-**With sidewinder algorithm:**
-```sh
-mazebuildercli --mask=example_mask.txt --algo=sidewinder --output=masked_sidewinder.txt
-```
+![mask output distances](scripts/mask_output_distances.jpg)
 
-The masked maze feature works with all supported algorithms (`binary_tree`, `sidewinder`, `dfs`, `prims`) and output formats.
 
 ## JSON input
 
@@ -186,6 +180,8 @@ Array-style JSON files can be used to store multiple configurations. This is cov
 The simplest integration point is `mazes::runtime_app`, which accepts a command-like string and returns the generated artifact:
 
 ```cpp
+#include <MazeBuilder/runtime_app.h>
+
 std::string maze(const std::string& arguments) noexcept
 {
     if (auto app = mazes::runtime_app::instance())
@@ -204,7 +200,7 @@ This same runtime facade is used by the CLI and example applications.
 |---|---|---|
 | `mazebuildercli` | `examples/CLI` | Command-line maze generation |
 | `mazebuilderhttp` | `examples/Http` | Local HTTP server example |
-| `amazingsfml` | `examples/AmazingSFML` | 2D SFML visualization |
+| `amazing` | `examples/Amazing` | 2D visualization |
 
 ### HTTP example
 
@@ -231,16 +227,16 @@ See `examples/Http/README.md` for quick-start usage.
 
 ### Build commands
 
-Configure with [Ninja](https://ninja-build.org/):
+Using presets with [Ninja](https://ninja-build.org/):
 
 ```sh
-cmake -G"Ninja Multi-Config" -S . -B build-examples -DMAZE_BUILDER_EXAMPLES:BOOL=ON
+cmake ---preset ninja-examples
 ```
 
 Build:
 
 ```sh
-cmake --build build-examples --config Release
+cmake --build build-ninja --config Release
 ```
 
 By default, both a shared and static library are produced.
@@ -279,18 +275,18 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 - **Asset conversion**: `from_png_to_bmp.py`, `invert_image_colors.py`
 - **Local web serving**: `secure_http_server.py`
-- **Benchmarking**: `benchmark.bat`
-- **Algorithm prototype/reference**: `make_icon.rb`
+- **Make an icon**: `make_icon.rb`
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
-![Sample](examples/Amazing/icon.bmp)
+![Icon](examples/Amazing/icon.bmp)
 
-## More Screenshots
+## Screenshots
 
-![](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
+![](scripts/sample_maze.jpg)
 
-## Helpful resources on mazes
+
+## Other Learning Resources
 
 - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
 - [codebox maze generator](https://codebox.net/pages/maze-generator/online)
