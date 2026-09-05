@@ -82,7 +82,8 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
             global_async_logger().log_message("Failed to write maze to " + output_target);
         }
 
-        if (!output_target.empty() && output_format_or_default(output_target) != output_format::STDOUT)
+        const auto extension = string_utils::file_extension(output_target);
+        if (!output_target.empty() && output_format_or_default(extension) != output_format::STDOUT)
         {
             global_async_logger().log(m_result);
         }

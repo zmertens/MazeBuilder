@@ -27,12 +27,6 @@ if(EMSCRIPTEN)
             "${CMAKE_SOURCE_DIR}/scripts/test_cli.js"
             "$<TARGET_FILE_DIR:${EXE_NAME}>/test_cli.js"
         VERBATIM)
-
-    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${CMAKE_CURRENT_SOURCE_DIR}/mask1.txt"
-            "$<TARGET_FILE_DIR:${EXE_NAME}>/mask1.txt"
-        VERBATIM)
 else()
 
     message(INFO ": Building ${EXE_NAME} for the Desktop!")

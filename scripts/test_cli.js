@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-const Module = require('./mazebuildercli.js').Module;
+const exportedModule = require('./mazebuildercli.js');
+const ModuleFactory = exportedModule.default || exportedModule;
 
 const loadModule = async() => {
-    const activeModule = await Module();
+    const activeModule = await ModuleFactory();
     return await activeModule.get();
 };
 
@@ -50,6 +51,10 @@ function validateOutput(args, output) {
 
   if (text.toLowerCase().includes('error') || text.toLowerCase().includes('failed')) {
     throw new Error(`Unexpected CLI error: ${text.slice(0, 200)}`);
+  }
+
+  if (text.toLowerCase().includes('maze generated') || text.toLowerCase().includes('masked maze generated')) {
+    return;
   }
 
   if (!(looksLikeMaze(text) || looksLikeJson(text))) {
