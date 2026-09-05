@@ -29,6 +29,10 @@ function looksLikeJson(text) {
   return /^[\[{]/.test(text.trim());
 }
 
+function looksLikeObj(text) {
+    return /^# MazeBuilder Wavefront OBJ\n.+/.test(text);
+}
+
 function validateOutput(args, output) {
   const text = normalizeText(output);
   if (!text) {
@@ -57,8 +61,8 @@ function validateOutput(args, output) {
     return;
   }
 
-  if (!(looksLikeMaze(text) || looksLikeJson(text))) {
-    throw new Error(`Unexpected CLI output, not maze text or JSON: ${text.slice(0, 200)}`);
+  if (!(looksLikeMaze(text) || looksLikeJson(text) || looksLikeObj(text))) {
+    throw new Error(`Unexpected CLI output, not maze text, JSON, or OBJ: ${text.slice(0, 200)}`);
   }
 }
 
