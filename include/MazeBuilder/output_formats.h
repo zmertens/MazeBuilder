@@ -68,7 +68,19 @@ namespace mazes
     /// @return
     inline output_format to_output_format_from_sv(const std::string_view sv)
     {
-        if (const auto it = std::ranges::find(OUTPUT_FORMAT_LABELS_LOWERCASE, sv); it != OUTPUT_FORMAT_LABELS_LOWERCASE.cend())
+        if (sv.empty())
+        {
+            throw std::invalid_argument("Invalid output_format: empty");
+        }
+
+        std::string normalized{};
+        normalized.reserve(sv.size());
+        for (const unsigned char ch : sv)
+        {
+            normalized.push_back(static_cast<char>(std::tolower(ch)));
+        }
+
+        if (const auto it = std::ranges::find(OUTPUT_FORMAT_LABELS_LOWERCASE, normalized); it != OUTPUT_FORMAT_LABELS_LOWERCASE.cend())
         {
             const auto index = static_cast<size_t>(std::distance(OUTPUT_FORMAT_LABELS_LOWERCASE.cbegin(), it));
             switch (index)
@@ -105,6 +117,11 @@ namespace mazes
     inline output_format output_format_or_default(const std::string_view sv,
                                                   const output_format fallback = output_format::PLAIN_TEXT) noexcept
     {
+        if (sv.empty())
+        {
+            return fallback;
+        }
+
         try
         {
             return to_output_format_from_sv(sv);

@@ -18,7 +18,7 @@ if(EMSCRIPTEN)
     target_link_options(${EXE_NAME} PRIVATE --emit-tsd "$<TARGET_FILE_DIR:${EXE_NAME}>/${EXE_NAME}.d.ts")
     target_link_libraries(${EXE_NAME} ${MAZE_BUILDER_CORE_LIB}_static)
     target_include_directories(${EXE_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/include)
-    target_link_options(${EXE_NAME} PRIVATE "SHELL: -s WASM=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1")
+    target_link_options(${EXE_NAME} PRIVATE "SHELL: -s WASM=1 -s MODULARIZE=1 -s EXPORT_ES6=1 -s INITIAL_MEMORY=33554432 -s ALLOW_MEMORY_GROWTH=1 -s NODERAWFS=1 -s NO_DISABLE_EXCEPTION_CATCHING=1")
     target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Debug>:SHELL:-s STACK_OVERFLOW_CHECK=2 -s ASSERTIONS=2 -gsource-map>")
     target_link_options(${EXE_NAME} PRIVATE "$<$<CONFIG:Release>:SHELL:-O3>")
 
@@ -28,6 +28,11 @@ if(EMSCRIPTEN)
             "$<TARGET_FILE_DIR:${EXE_NAME}>/test_cli.js"
         VERBATIM)
 
+    add_custom_command(TARGET ${EXE_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/mask1.txt"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/mask1.txt"
+        VERBATIM)
 else()
 
     message(INFO ": Building ${EXE_NAME} for the Desktop!")

@@ -1,44 +1,19 @@
 #!/usr/bin/env node
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
-const { pathToFileURL } = require('node:url');
+const Module = require('./mazebuildercli.js').Module;
+
+const loadModule = async() => {
+    const activeModule = await Module();
+    return await activeModule.get();
+};
+
+let cli = null;
+
+loadModule().then(module => cli = module);
 
 function normalizeText(value) {
   return String(value ?? '').replace(/\r/g, '').trim();
-}
-
-function findWasmModulePath(startDir) {
-  const roots = new Set(
-    [process.cwd(), startDir, path.resolve(startDir, '..')].filter(Boolean)
-  );
-
-  for (const root of roots) {
-    const candidates = [
-      path.join(root, 'mazebuildercli.js')
-    ];
-
-    const found = candidates.find((candidate) => fs.existsSync(candidate));
-    if (found) {
-      return found;
-    }
-  }
-
-  return null;
-}
-
-function findWasmBinary(modulePath) {
-  const dir = path.dirname(modulePath);
-  const candidates = [
-    path.join(dir, 'mazebuildercli.wasm')
-  ];
-
-  const direct = candidates.find((candidate) => fs.existsSync(candidate));
-  if (direct) {
-    return direct;
-  }
-  return null;
 }
 
 function looksLikeHelp(text) {
@@ -84,42 +59,13 @@ function validateOutput(args, output) {
 
 async function main() {
   const args = process.argv.slice(2);
-  const modulePath = findWasmModulePath(__dirname);
 
-  if (!modulePath) {
-    throw new Error('Could not find the generated mazebuildercli.js bundle. Build the Emscripten CLI target first.');
+  if (!cli) {
+    cli = await loadModule();
   }
 
-  const wasmPath = findWasmBinary(modulePath);
-  if (!wasmPath) {
-    throw new Error(`Found ${modulePath}, but no matching .wasm file was found nearby. Build the Emscripten CLI target so the bundle is generated.`);
-  }
-
-  const imported = await import(pathToFileURL(modulePath).href);
-  const factory = imported.default || imported;
-
-  const instance = await factory({
-    print: (message = '') => {
-      process.stdout.write(`${String(message)}\n`);
-    },
-    printErr: (message = '') => {
-      process.stderr.write(`${String(message)}\n`);
-    },
-    locateFile: (filename) => {
-      if (filename && /\.wasm$/i.test(filename)) {
-        return wasmPath;
-      }
-      return path.resolve(path.dirname(modulePath), filename);
-    },
-  });
-
-  if (!instance || typeof instance.get !== 'function') {
-    throw new Error('WASM module did not expose the expected get() API.');
-  }
-
-  const cli = instance.get();
-  if (!cli || typeof cli.run !== 'function') {
-    throw new Error('WASM module did not return a usable CLI instance.');
+  if (!cli) {
+    throw new Error('Failed to load the WASM module.');
   }
 
   const commandString = args.join(' ');
