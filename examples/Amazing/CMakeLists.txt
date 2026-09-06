@@ -43,8 +43,8 @@ if(NOT EMSCRIPTEN)
             "${CMAKE_CURRENT_SOURCE_DIR}/launch.bat"
             "$<TARGET_FILE_DIR:${EXE_NAME}>/launch.bat"
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/roguelike"
-            "$<TARGET_FILE_DIR:${EXE_NAME}>/roguelike"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/resources"
         VERBATIM)
 
     # On Windows, copy the SFML shared libraries next to the executable
