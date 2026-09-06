@@ -897,9 +897,15 @@ private:
             return;
         }
 
-        const mazes::algo selected_algo = (RNG(0, 1) == 0) ? mazes::algo::DFS : mazes::algo::BINARY_TREE;
-        const unsigned int selected_seed = RNG(1u, 4'200'000u);
-        prefetched_level = generate_level_assets(selected_algo, selected_seed);
+        try
+        {
+            const mazes::algo selected_algo = (RNG(0, 1) == 0) ? mazes::algo::DFS : mazes::algo::BINARY_TREE;
+            const unsigned int selected_seed = RNG(1u, 4'200'000u);
+            prefetched_level = generate_level_assets(selected_algo, selected_seed);
+        } catch (const std::exception&)
+        {
+            prefetched_level.reset();
+        }
     }
 
     void create_world()
@@ -1020,9 +1026,10 @@ private:
             const float dy = target.y - p.y;
             const float d2 = dx * dx + dy * dy;
             const auto max_pick_radius_m = (dynamic_ball::BALL_RADIUS_IN_PIXELS * 2.2f) / amazing_sfml_app::PIXELS_PER_METER;
-            if (auto clamped_d2 = std::clamp(d2, 0.0f, max_pick_radius_m * max_pick_radius_m); clamped_d2 < best_dist_sq)
+            const float max_pick_dist_sq = max_pick_radius_m * max_pick_radius_m;
+            if (d2 <= max_pick_dist_sq && d2 < best_dist_sq)
             {
-                best_dist_sq = clamped_d2;
+                best_dist_sq = d2;
                 best_index = i;
             }
         }
@@ -1368,6 +1375,10 @@ private:
                     if (const auto idx = find_ball_at(pos))
                     {
                         throw_ball_at_character(*idx, 2.8f);
+                    } else
+                    {
+                        player_controller.on_left_click();
+                        update_player_sprite(0.0f);
                     }
                 } else if (mouse->button == sf::Mouse::Button::Right)
                 {
