@@ -30,12 +30,14 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <ranges>
 #include <sstream>
 #include <stdexcept>
@@ -244,6 +246,12 @@ public:
 
             if (app_state.is_playing())
             {
+                if (should_prefetch_level)
+                {
+                    prefetch_next_level();
+                    should_prefetch_level = false;
+                }
+
                 accumulator += frame_dt;
                 accumulator = std::min(accumulator, 0.25f);
                 while (accumulator >= FIXED_DELTA)
@@ -313,6 +321,12 @@ public:
     }
 
 private:
+    struct generated_level
+    {
+        sf::Image maze_image;
+        mazes::topology topology;
+    };
+
     const sf::Color current_wall_color;
     sf::RenderWindow sfml_window;
     std::optional<mazes::topology> current_maze_struct;
@@ -348,8 +362,15 @@ private:
     b2WorldId world_with_physics{ b2_nullWorldId };
     b2BodyId player_body{ b2_nullBodyId };
     std::optional<std::size_t> grabbed_ball_index;
+    std::optional<sf::Vector2f> grabbed_ball_start_position;
     std::vector<b2BodyId> physics_wall_bodies;
     std::vector<dynamic_ball> physics_balls;
+
+    std::optional<generated_level> prefetched_level;
+    bool should_prefetch_level{ false };
+    std::vector<sf::Vector2f> active_solution_path;
+    std::size_t active_solution_waypoint_index{ 0u };
+    bool level_complete_pending{ false };
 
     // Physics geometry is built in its own "virtual" pixel space (maze::CELL_SIZE
     // based); these scale factors map that space onto the actual window so ball
@@ -534,13 +555,13 @@ private:
 
     void init_help_text()
     {
-        build_text.emplace(sfml_font, "B: rebuild maze (transition)\nEsc: open menu\n", 18u);
+        build_text.emplace(sfml_font, "B: rebuild maze queue\nEsc: open menu\n", 18u);
         build_text->setPosition({ 10.f, 10.f });
         build_text->setFillColor(sf::Color(245, 245, 235));
         build_text->setOutlineColor(sf::Color(15, 15, 15));
         build_text->setOutlineThickness(1.5f);
 
-        help_text.emplace(sfml_font, "Left click: turn left (auto-move)\nH: hide/show help\nN: fetch maze via network\n", 18u);
+        help_text.emplace(sfml_font, "Left click ball: throw at character\nRight drag ball: fling\nH: hide/show help\nN: fetch maze via network\n", 18u);
         help_text->setPosition({ 10.f, 58.f });
         help_text->setFillColor(sf::Color(245, 245, 235));
         help_text->setOutlineColor(sf::Color(15, 15, 15));
@@ -584,6 +605,309 @@ private:
         }
     }
 
+    void throw_ball_at_character(const std::size_t ball_index, const float impulse_scale)
+    {
+        if (ball_index >= physics_balls.size() || !B2_IS_NON_NULL(player_body))
+        {
+            return;
+        }
+
+        const b2Vec2 ball_position = b2Body_GetPosition(physics_balls[ball_index].body);
+        const b2Vec2 player_position = b2Body_GetPosition(player_body);
+        const float dx = player_position.x - ball_position.x;
+        const float dy = player_position.y - ball_position.y;
+        const float len_sq = dx * dx + dy * dy;
+        if (len_sq <= 1e-6f)
+        {
+            return;
+        }
+
+        const float inv_len = 1.0f / std::sqrt(len_sq);
+        const b2Vec2 impulse{ dx * inv_len * impulse_scale, dy * inv_len * impulse_scale };
+        b2Body_ApplyLinearImpulseToCenter(physics_balls[ball_index].body, impulse, true);
+    }
+
+    void rebuild_solution_path()
+    {
+        active_solution_path.clear();
+        active_solution_waypoint_index = 0u;
+        level_complete_pending = false;
+
+        if (!current_maze_struct.has_value() || current_maze_struct->rows == 0u || current_maze_struct->columns == 0u)
+        {
+            return;
+        }
+
+        const unsigned int rows = current_maze_struct->rows;
+        const unsigned int columns = current_maze_struct->columns;
+        const auto to_index = [columns](const unsigned int row, const unsigned int col)
+            {
+                return static_cast<std::size_t>(row) * static_cast<std::size_t>(columns) + static_cast<std::size_t>(col);
+            };
+
+        const std::size_t total_cells = static_cast<std::size_t>(rows) * static_cast<std::size_t>(columns);
+        std::vector<int> parents(total_cells, -1);
+        std::queue<std::pair<unsigned int, unsigned int>> pending{};
+
+        pending.push({ 0u, 0u });
+        parents[to_index(0u, 0u)] = 0;
+
+        while (!pending.empty())
+        {
+            const auto [row, col] = pending.front();
+            pending.pop();
+
+            if (row == rows - 1u && col == columns - 1u)
+            {
+                break;
+            }
+
+            const auto* cell = current_maze_struct->at(row, col);
+            if (!cell)
+            {
+                continue;
+            }
+
+            const auto try_visit = [&](const unsigned int next_row, const unsigned int next_col)
+                {
+                    const std::size_t next_index = to_index(next_row, next_col);
+                    if (parents[next_index] != -1)
+                    {
+                        return;
+                    }
+
+                    parents[next_index] = static_cast<int>(to_index(row, col));
+                    pending.push({ next_row, next_col });
+                };
+
+            if (row > 0u && !cell->north())
+            {
+                try_visit(row - 1u, col);
+            }
+            if (col + 1u < columns && !cell->east())
+            {
+                try_visit(row, col + 1u);
+            }
+            if (row + 1u < rows && !cell->south())
+            {
+                try_visit(row + 1u, col);
+            }
+            if (col > 0u && !cell->west())
+            {
+                try_visit(row, col - 1u);
+            }
+        }
+
+        const std::size_t goal_index = to_index(rows - 1u, columns - 1u);
+        if (parents[goal_index] == -1)
+        {
+            return;
+        }
+
+        std::deque<std::size_t> reverse_path_indices;
+        std::size_t walk_index = goal_index;
+        reverse_path_indices.push_front(walk_index);
+        while (walk_index != 0u)
+        {
+            walk_index = static_cast<std::size_t>(parents[walk_index]);
+            reverse_path_indices.push_front(walk_index);
+        }
+
+        active_solution_path.reserve(reverse_path_indices.size());
+        for (const std::size_t index : reverse_path_indices)
+        {
+            const auto row = static_cast<unsigned int>(index / columns);
+            const auto col = static_cast<unsigned int>(index % columns);
+            const float x = layout_wall_thickness + static_cast<float>(col) * layout_pitch() + layout_cell_size * 0.5f;
+            const float y = layout_wall_thickness + static_cast<float>(row) * layout_pitch() + layout_cell_size * 0.5f;
+            active_solution_path.push_back({ x, y });
+        }
+    }
+
+    void advance_to_prefetched_level()
+    {
+        if (!prefetched_level.has_value())
+        {
+            rebuild_maze();
+            return;
+        }
+
+        generated_level next_level = std::move(*prefetched_level);
+        prefetched_level.reset();
+
+        create_world();
+        current_maze_struct = std::move(next_level.topology);
+
+        if (maze_texture.loadFromImage(next_level.maze_image))
+        {
+            maze_sprite = sf::Sprite{ maze_texture };
+            has_maze_texture = true;
+            maze_wall_shapes.clear();
+            update_screen_layout();
+        } else
+        {
+            has_maze_texture = false;
+            maze_wall_shapes.clear();
+            update_screen_layout();
+            build_wall_shapes_from_topology();
+        }
+
+        build_geometry_and_physics();
+        create_player_body();
+        spawn_random_balls(dynamic_ball::NUM_BALLS);
+        player_controller.reset();
+        walk_animation.reset();
+        rebuild_solution_path();
+        update_player_sprite(0.0f);
+        should_prefetch_level = true;
+    }
+
+    void update_auto_solver()
+    {
+        if (!B2_IS_NON_NULL(player_body))
+        {
+            return;
+        }
+
+        if (active_solution_path.empty())
+        {
+            player_controller.set_move_direction({ 0.0f, 0.0f });
+            return;
+        }
+
+        const b2Vec2 player_position_m = b2Body_GetPosition(player_body);
+        const sf::Vector2f player_position_px{
+            player_position_m.x * amazing_sfml_app::PIXELS_PER_METER,
+            player_position_m.y * amazing_sfml_app::PIXELS_PER_METER };
+
+        constexpr float WAYPOINT_REACHED_DISTANCE = 2.4f;
+        while (active_solution_waypoint_index < active_solution_path.size())
+        {
+            const sf::Vector2f target = active_solution_path[active_solution_waypoint_index];
+            const float dx = target.x - player_position_px.x;
+            const float dy = target.y - player_position_px.y;
+            if ((dx * dx + dy * dy) > WAYPOINT_REACHED_DISTANCE * WAYPOINT_REACHED_DISTANCE)
+            {
+                break;
+            }
+            ++active_solution_waypoint_index;
+        }
+
+        if (active_solution_waypoint_index >= active_solution_path.size())
+        {
+            player_controller.set_move_direction({ 0.0f, 0.0f });
+            if (!level_complete_pending)
+            {
+                level_complete_pending = true;
+                advance_to_prefetched_level();
+            }
+            return;
+        }
+
+        const sf::Vector2f target = active_solution_path[active_solution_waypoint_index];
+        player_controller.set_move_direction({ target.x - player_position_px.x, target.y - player_position_px.y });
+    }
+
+    [[nodiscard]] generated_level generate_level_assets(const mazes::algo selected_algo, const unsigned int selected_seed)
+    {
+        const auto app = mazes::singleton_base<mazes::runtime_app>::instance();
+        if (!app)
+        {
+            throw std::runtime_error("Amazing failed to initialize runtime app.");
+        }
+
+        auto mz{ mazes::configurator{}.ensure_algo_id(selected_algo).rows(maze::CELL_SIZE).columns(maze::CELL_SIZE).seed(selected_seed) };
+        const auto image_path = mazes::string_utils::replace_all(TEMP_IMAGE_PATH.string(), "\\", "/");
+        const auto text_path = mazes::string_utils::replace_all(TEMP_TEXT_PATH.string(), "\\", "/");
+
+        const std::string image_request = "-j`{\"rows\":" +
+            std::to_string(mz.rows()) +
+            ",\"columns\":" + std::to_string(mz.columns()) +
+            ",\"levels\":1"
+            ",\"algo\":\"" +
+            std::string{ mazes::to_sv_from_algo(selected_algo) } +
+            "\",\"seed\":" + std::to_string(selected_seed) +
+            ",\"output\":\"" + image_path +
+            "\",\"distances\":\"[0:-1]\"}`";
+
+        const std::string text_request = "-j`{\"rows\":" +
+            std::to_string(mz.rows()) +
+            ",\"columns\":" + std::to_string(mz.columns()) +
+            ",\"levels\":1"
+            ",\"algo\":\"" +
+            std::string{ mazes::to_sv_from_algo(selected_algo) } +
+            "\",\"seed\":" + std::to_string(selected_seed) +
+            ",\"output\":\"" + text_path +
+            "\",\"distances\":\"[0:-1]\"}`";
+
+        const auto apply_start = std::chrono::steady_clock::now();
+        const std::string image_result{ app->apply(image_request) };
+        const std::string text_result{ app->apply(text_request) };
+        const auto apply_end = std::chrono::steady_clock::now();
+        how_long_last_apply_took = std::chrono::duration<double, std::milli>(apply_end - apply_start).count();
+
+        fmt::print("Amazing: Requesting maze generation with: {}\n", image_request);
+        fmt::print("Amazing: Requesting topology generation with: {}\n", text_request);
+        fmt::print("Maze generation took {:.4f} ms\n", how_long_last_apply_took);
+
+        if (image_result.empty() || text_result.empty())
+        {
+            throw std::runtime_error("Amazing failed to regenerate maze resources.");
+        }
+
+        std::ifstream text_file{ text_path, std::ios::binary };
+        if (!text_file.is_open())
+        {
+            throw std::runtime_error("Amazing failed to open generated maze text file.");
+        }
+
+        std::ostringstream text_stream;
+        text_stream << text_file.rdbuf();
+        const std::string generated_grid = text_stream.str();
+        if (generated_grid.empty())
+        {
+            throw std::runtime_error("Amazing failed to retrieve generated grid.");
+        }
+
+        sf::Image image;
+        if (!image.loadFromFile(image_path))
+        {
+            throw std::runtime_error("Amazing failed to load generated maze image.");
+        }
+
+        const auto image_size = image.getSize();
+        if (image_size.x == 0u || image_size.y == 0u)
+        {
+            throw std::runtime_error("Amazing generated an invalid maze image.");
+        }
+
+        mazes::topology topology = mazes::topology::parse(generated_grid);
+        if (topology.rows == 0u || topology.columns < 2u)
+        {
+            throw std::runtime_error("Amazing parsed an invalid topology from generated grid text.");
+        }
+
+        return generated_level{ std::move(image), std::move(topology) };
+    }
+
+    void prefetch_next_level()
+    {
+        if (prefetched_level.has_value())
+        {
+            return;
+        }
+
+        try
+        {
+            const mazes::algo selected_algo = (RNG(0, 1) == 0) ? mazes::algo::DFS : mazes::algo::BINARY_TREE;
+            const unsigned int selected_seed = RNG(1u, 4'200'000u);
+            prefetched_level = generate_level_assets(selected_algo, selected_seed);
+        } catch (const std::exception&)
+        {
+            prefetched_level.reset();
+        }
+    }
+
     void create_world()
     {
         if (B2_IS_NON_NULL(world_with_physics))
@@ -598,6 +922,7 @@ private:
         physics_wall_bodies.clear();
         physics_balls.clear();
         grabbed_ball_index.reset();
+        grabbed_ball_start_position.reset();
     }
 
     static b2Vec2 px_to_m(const float x, const float y)
@@ -701,9 +1026,10 @@ private:
             const float dy = target.y - p.y;
             const float d2 = dx * dx + dy * dy;
             const auto max_pick_radius_m = (dynamic_ball::BALL_RADIUS_IN_PIXELS * 2.2f) / amazing_sfml_app::PIXELS_PER_METER;
-            if (auto clamped_d2 = std::clamp(d2, 0.0f, max_pick_radius_m * max_pick_radius_m); clamped_d2 < best_dist_sq)
+            const float max_pick_dist_sq = max_pick_radius_m * max_pick_radius_m;
+            if (d2 <= max_pick_dist_sq && d2 < best_dist_sq)
             {
-                best_dist_sq = clamped_d2;
+                best_dist_sq = d2;
                 best_index = i;
             }
         }
@@ -931,19 +1257,13 @@ private:
         spawn_random_balls(dynamic_ball::NUM_BALLS);
         player_controller.reset();
         walk_animation.reset();
+        rebuild_solution_path();
         update_player_sprite(0.0f);
+        should_prefetch_level = true;
     }
 
     void rebuild_maze()
     {
-        create_world();
-
-        const auto app = mazes::singleton_base<mazes::runtime_app>::instance();
-        if (!app)
-        {
-            throw std::runtime_error("Amazing failed to initialize runtime app.");
-        }
-
         const mazes::algo selected_algo = (RNG(0, 1) == 0) ? mazes::algo::DFS : mazes::algo::BINARY_TREE;
         const unsigned int selected_seed = RNG(1u, 4'200'000u);
 
@@ -952,76 +1272,13 @@ private:
         std::filesystem::remove(TEMP_IMAGE_PATH, ec);
         std::filesystem::remove(TEMP_TEXT_PATH, ec);
 
-        auto mz{ mazes::configurator{}.ensure_algo_id(selected_algo).rows(maze::CELL_SIZE).columns(maze::CELL_SIZE).seed(selected_seed) };
+        generated_level level = generate_level_assets(selected_algo, selected_seed);
 
-        const auto image_path = mazes::string_utils::replace_all(TEMP_IMAGE_PATH.string(), "\\", "/");
-        const auto text_path = mazes::string_utils::replace_all(TEMP_TEXT_PATH.string(), "\\", "/");
-
-        // parsing_state only ever consumes the FIRST object of a JSON array, so image and
-        // text must be requested via two separate apply() calls (same seed) or the text
-        // file goes stale while only the image keeps regenerating.
-        const std::string image_request = "-j`{\"rows\":" +
-            std::to_string(mz.rows()) +
-            ",\"columns\":" + std::to_string(mz.columns()) +
-            ",\"levels\":1"
-            ",\"algo\":\"" +
-            std::string{ mazes::to_sv_from_algo(selected_algo) } +
-            "\",\"seed\":" + std::to_string(selected_seed) +
-            ",\"output\":\"" + image_path +
-            "\",\"distances\":\"[0:-1]\"}`";
-
-        const std::string text_request = "-j`{\"rows\":" +
-            std::to_string(mz.rows()) +
-            ",\"columns\":" + std::to_string(mz.columns()) +
-            ",\"levels\":1"
-            ",\"algo\":\"" +
-            std::string{ mazes::to_sv_from_algo(selected_algo) } +
-            "\",\"seed\":" + std::to_string(selected_seed) +
-            ",\"output\":\"" + text_path +
-            "\",\"distances\":\"[0:-1]\"}`";
-
-        const auto apply_start = std::chrono::steady_clock::now();
-        // Copy each result immediately: apply() returns a view into the app's shared
-        // internal buffer, which the second call below overwrites.
-        const std::string image_result{ app->apply(image_request) };
-        const std::string text_result{ app->apply(text_request) };
-        const auto apply_end = std::chrono::steady_clock::now();
-        how_long_last_apply_took = std::chrono::duration<double, std::milli>(apply_end - apply_start).count();
-
-        fmt::print("Amazing: Requesting maze generation with: {}\n", image_request);
-        fmt::print("Amazing: Requesting topology generation with: {}\n", text_request);
-        fmt::print("Maze generation took {:.4f} ms\n", how_long_last_apply_took);
-
-        if (image_result.empty() || text_result.empty())
-        {
-            throw std::runtime_error("Amazing failed to regenerate maze resources.");
-        }
-
-        update_apply_timing_overlay();
-
-        std::ifstream text_file{ text_path, std::ios::binary };
-        if (!text_file.is_open())
-        {
-            throw std::runtime_error("Amazing failed to open generated maze text file.");
-        }
-
-        std::ostringstream text_stream;
-        text_stream << text_file.rdbuf();
-        const std::string generated_grid = text_stream.str();
-        if (generated_grid.empty())
-        {
-            throw std::runtime_error("Amazing failed to retrieve generated grid.");
-        }
-
-        if (!maze_texture.loadFromFile(image_path))
+        create_world();
+        current_maze_struct = std::move(level.topology);
+        if (!maze_texture.loadFromImage(level.maze_image))
         {
             throw std::runtime_error("Amazing failed to load generated maze image.");
-        }
-
-        const auto image_size = maze_texture.getSize();
-        if (image_size.x == 0u || image_size.y == 0u)
-        {
-            throw std::runtime_error("Amazing generated an invalid maze image.");
         }
 
         maze_sprite = sf::Sprite{ maze_texture };
@@ -1029,23 +1286,19 @@ private:
         maze_wall_shapes.clear();
         network_status_text.reset();
 
-        // Keep topology in logical maze cells (rows/columns). Resizing to pixel
-        // dimensions creates hundreds of thousands of cells and can OOM at launch.
-        current_maze_struct = mazes::topology::parse(generated_grid);
-        if (!current_maze_struct.has_value() || current_maze_struct->rows == 0u || current_maze_struct->columns < 2u)
-        {
-            throw std::runtime_error("Amazing parsed an invalid topology from generated grid text.");
-        }
-
         update_screen_layout();
-
         build_geometry_and_physics();
-
         create_player_body();
         spawn_random_balls(dynamic_ball::NUM_BALLS);
         player_controller.reset();
         walk_animation.reset();
+        rebuild_solution_path();
         update_player_sprite(0.0f);
+        update_apply_timing_overlay();
+
+        prefetched_level.reset();
+        prefetch_next_level();
+        should_prefetch_level = false;
     }
 
     void handle_events()
@@ -1119,23 +1372,47 @@ private:
                 const sf::Vector2f pos{ static_cast<float>(mouse->position.x), static_cast<float>(mouse->position.y) };
                 if (mouse->button == sf::Mouse::Button::Left)
                 {
-                    player_controller.on_left_click();
-                    update_player_sprite(0.0f);
+                    if (const auto idx = find_ball_at(pos))
+                    {
+                        throw_ball_at_character(*idx, 2.8f);
+                    } else
+                    {
+                        player_controller.on_left_click();
+                        update_player_sprite(0.0f);
+                    }
                 } else if (mouse->button == sf::Mouse::Button::Right)
                 {
                     if (const auto idx = find_ball_at(pos))
                     {
-                        const b2Vec2 p = b2Body_GetPosition(physics_balls[*idx].body);
-                        const b2Vec2 target = screen_px_to_world_m(pos.x, pos.y);
-                        const b2Vec2 impulse = { (target.x - p.x) * 3.0f, (target.y - p.y) * 3.0f };
-                        b2Body_ApplyLinearImpulseToCenter(physics_balls[*idx].body, impulse, true);
+                        grabbed_ball_index = *idx;
+                        grabbed_ball_start_position = pos;
                     }
                 }
             }
 
-            if (event->is<sf::Event::MouseButtonReleased>())
+            if (const auto* released = event->getIf<sf::Event::MouseButtonReleased>())
             {
+                if (released->button == sf::Mouse::Button::Right && grabbed_ball_index.has_value())
+                {
+                    const sf::Vector2f release_position{ static_cast<float>(released->position.x), static_cast<float>(released->position.y) };
+                    const sf::Vector2f start = grabbed_ball_start_position.value_or(release_position);
+                    const sf::Vector2f delta = release_position - start;
+                    const b2Vec2 delta_world = screen_px_to_world_m(delta.x, delta.y);
+                    const float fling_strength = std::sqrt(delta_world.x * delta_world.x + delta_world.y * delta_world.y);
+
+                    if (fling_strength > 0.02f)
+                    {
+                        constexpr float FLING_IMPULSE_SCALE = 3.4f;
+                        const b2Vec2 impulse{ delta_world.x * FLING_IMPULSE_SCALE, delta_world.y * FLING_IMPULSE_SCALE };
+                        b2Body_ApplyLinearImpulseToCenter(physics_balls[*grabbed_ball_index].body, impulse, true);
+                    } else
+                    {
+                        throw_ball_at_character(*grabbed_ball_index, 3.3f);
+                    }
+                }
+
                 grabbed_ball_index.reset();
+                grabbed_ball_start_position.reset();
             }
 
             if (const auto* moved = event->getIf<sf::Event::MouseMoved>())
@@ -1167,9 +1444,17 @@ private:
         {
             if (B2_IS_NON_NULL(player_body))
             {
+                update_auto_solver();
                 const sf::Vector2f facing = player_controller.facing_direction();
-                constexpr float PLAYER_SPEED_MPS = 0.55f;
-                b2Body_SetLinearVelocity(player_body, { facing.x * PLAYER_SPEED_MPS, facing.y * PLAYER_SPEED_MPS });
+                constexpr float PLAYER_SPEED_MPS = 3.25f;
+                constexpr float VELOCITY_BLEND = 0.24f;
+                const b2Vec2 current_velocity = b2Body_GetLinearVelocity(player_body);
+                const float move_speed = player_controller.is_moving() ? PLAYER_SPEED_MPS : 0.0f;
+                const b2Vec2 target_velocity{ facing.x * move_speed, facing.y * move_speed };
+                const b2Vec2 blended_velocity{
+                    current_velocity.x + (target_velocity.x - current_velocity.x) * VELOCITY_BLEND,
+                    current_velocity.y + (target_velocity.y - current_velocity.y) * VELOCITY_BLEND };
+                b2Body_SetLinearVelocity(player_body, blended_velocity);
                 b2Body_SetAwake(player_body, true);
             }
 

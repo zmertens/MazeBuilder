@@ -11,11 +11,11 @@
 
 using namespace mazes;
 
-write_to_output_state::write_to_output_state(const runtime_app::context& ctx, runtime_stack* stack)
+write_to_output_state::write_to_output_state(const runtime_app::context &ctx, runtime_stack *stack)
     : state(ctx, stack),
-    grid_mapper{ ctx.get_grid_manager() },
-    processed_text_mapper{ ctx.get_text_manager() },
-    current_grid_id{ grid_identifier::BASIC }
+      grid_mapper{ctx.get_grid_manager()},
+      processed_text_mapper{ctx.get_text_manager()},
+      current_grid_id{grid_identifier::BASIC}
 {
     state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
@@ -37,7 +37,7 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
         return false;
     }
 
-    const auto& parsed_args = state_utils::get_args_at_front(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
@@ -64,7 +64,7 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
         output_target = it->second;
     }
 
-    auto* rng_ptr = state_utils::get_rng_or_default(get_context());
+    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -72,23 +72,36 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
         .ensure_levels(levels)
         .ensure_distances(current_grid_id == grid_identifier::DISTANCE);
 
-    m_result = std::string{ create(cfg, *rng_ptr) };
+    m_result = std::string{create(cfg, *rng_ptr)};
 
-    // Attempt to write output if result is not empty
+    // Attempt to write output if result is not empty. If no explicit target was set,
+    // default to emitting the maze text to stdout for the console CLI.
     if (!m_result.empty())
     {
-        if (bool write_success = write_output(output_target, m_result); !write_success)
+        const bool default_stdout_output = output_target.empty();
+        if (!default_stdout_output)
         {
-            global_async_logger().log_message("Failed to write maze to " + output_target);
+            if (bool write_success = write_output(output_target, m_result); !write_success)
+            {
+                global_async_logger().log_message("Failed to write maze to " + output_target);
+            }
         }
 
-        if (!output_target.empty() && output_format_or_default(output_target) != output_format::STDOUT)
+        const auto extension = string_utils::file_extension(output_target);
+        if (default_stdout_output || output_format_or_default(extension) != output_format::STDOUT)
         {
             global_async_logger().log(m_result);
         }
     }
 
-    processed_text_mapper->get(processed_text_identifier::FINISHED).set(m_result);
+    try
+    {
+        processed_text_mapper->get(processed_text_identifier::FINISHED).set(m_result);
+    }
+    catch (...)
+    {
+        global_async_logger().log_message("Failed to update processed text with the finished result.");
+    }
 
     request_stack_pop();
     if (state_utils::advance_args(get_context()))

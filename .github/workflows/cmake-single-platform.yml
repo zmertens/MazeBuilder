@@ -46,7 +46,7 @@ jobs:
 
     # Configure CMake with Emscripten toolchain
     - name: Configure CMake for Emscripten
-      run: cmake --preset wasmjs-examples
+      run: cmake -S . -B build-wasmjs -DCMAKE_TOOLCHAIN_FILE=${{github.workspace}}/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake -DMAZE_BUILDER_EXAMPLES=1
 
     # Build with Emscripten
     - name: Build with Emscripten

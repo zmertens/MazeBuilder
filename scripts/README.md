@@ -1,26 +1,29 @@
-# MazeBuilder scripts
+# Scripts
 
-## `scripts/make_icon.rb`
+## `make_icon.rb`
 
-This script implements varios maze algorithms like Recursive Backtracker, Sidewinder, Wilsons, and a couple others.
-It defines classes such as `Cell`, `Grid`, `Distances`, for describing parts of a maze.
-It also includes methods for rendering the maze as a PNG image with shortest paths highlighted with a start and end cell.
-**It's really useful for making an app icon.**
-
-### Run
-
-`ruby make_icon.rb`
+It's really useful for making an app icon.
 
 ### Installation
 
 `bundle install`
 
-## `scripts/invert_image_colors.py`
+### Run
+
+`ruby make_icon.rb`
+
+
+## `invert_image_colors.py`
 
 Invert the colors of an image with several options.
 
 ### Prerequisites
 The script requires Python with Pillow and NumPy libraries installed.
+
+Setup a virtual env:
+  * `python -m venv .venv`
+  * `source .venv/bin/activate`
+  * `pip install numpy pillow`
 
 ### Features
 
@@ -37,7 +40,7 @@ The script requires Python with Pillow and NumPy libraries installed.
 - **HSV**: Excellent for creative color manipulation
 - **Luminance**: Useful when you want to maintain color relationships but invert brightness
 
-## `scripts/from_png_to_bmp.py`
+## `from_png_to_bmp.py`
 
 Converts PNG images to BMP format while preserving image dimensions and properly handling transparency.
 
@@ -61,10 +64,12 @@ The script provides clear error messages for:
 - Write permission issues
 - Corrupted image files
 
-## `scripts/benchmark.bat`
-
-Run the app and time it.
-
-## `scripts/secure_http_server.py`
+## `secure_http_server.py`
 
 Provides a secure local HTTP server for testing.
+
+## `test_cli.js`
+
+This script is copied automatically in Web builds to the CLI binary directory.
+
+Run it with: `node test_cli.js <mazebuilder args>`

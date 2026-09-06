@@ -135,11 +135,15 @@ namespace mazes::state_utils
     /// @return The corresponding state::ID for the output.
     inline state::ID output_state_for(const std::unordered_map<std::string, std::string>& args) noexcept
     {
-        state::ID output_state = state::ID::EMPTY;
-        if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend())
+        state::ID output_state = state::ID::WRITE_TO_STRING;
+        if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend() && !it->second.empty())
         {
             const auto& output = string_utils::file_extension(it->second);
             output_state = details::to_state_from_output_format(output_format_or_default(output));
+            if (output_state == state::ID::EMPTY)
+            {
+                output_state = state::ID::WRITE_TO_STRING;
+            }
         }
 
         return output_state;

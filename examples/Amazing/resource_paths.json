@@ -1,25 +1,27 @@
 {
   "icon": "icon.bmp",
 
-  "interaction": "roguelike/interaction.ogg",
-  "loading_game_theme": "roguelike/loading.ogg",
+  "interaction": "resources/interaction.ogg",
+  "loading_game_theme": "resources/loading.ogg",
 	
-  "blur_frag": "roguelike/blur.frag",
-  "wave_vert": "roguelike/wave.vert",
-  "pixelate_frag": "roguelike/pixelate.frag",
-  "billboard_frag": "roguelike/billboard.frag",
-  "billboard_vert": "roguelike/billboard.vert",
-  "billboard_geom": "roguelike/billboard.geom",
+  "blur_frag": "resources/blur.frag",
+  "wave_vert": "resources/wave.vert",
+  "pixelate_frag": "resources/pixelate.frag",
+  "billboard_frag": "resources/billboard.frag",
+  "billboard_vert": "resources/billboard.vert",
+  "billboard_geom": "resources/billboard.geom",
   
-  "character_beige_climb_a": "roguelike/character_beige_climb_a.png",
-  "character_beige_climb_b": "roguelike/character_beige_climb_b.png",
-  "character_beige_duck": "roguelike/character_beige_duck.png",
-  "character_beige_front": "roguelike/character_beige_front.png",
-  "character_beige_hit": "roguelike/character_beige_hit.png",
-  "character_beige_idle": "roguelike/character_beige_idle.png",
-  "character_beige_jump": "roguelike/character_beige_jump.png",
-  "character_beige_walk_a": "roguelike/character_beige_walk_a.png",
-  "character_beige_walk_b": "roguelike/character_beige_walk_b.png",
+  "character_beige_climb_a": "resources/character_beige_climb_a.png",
+  "character_beige_climb_b": "resources/character_beige_climb_b.png",
+  "character_beige_duck": "resources/character_beige_duck.png",
+  "character_beige_front": "resources/character_beige_front.png",
+  "character_beige_hit": "resources/character_beige_hit.png",
+  "character_beige_idle": "resources/character_beige_idle.png",
+  "character_beige_jump": "resources/character_beige_jump.png",
+  "character_beige_walk_a": "resources/character_beige_walk_a.png",
+  "character_beige_walk_b": "resources/character_beige_walk_b.png",
   
-  "roguelike_menu": "roguelike/roguelike.png"
+  "roguelike_menu": "resources/sample_maze.jpg",
+
+  "synth_theme": "resources/Cinematic Synth Soundtrack - Track #3.wav"
 }
