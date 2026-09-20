@@ -281,7 +281,7 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
-![Icon](examples/Amazing/icon.bmp)
+![Icon](examples/Amazing/resources/icon.bmp)
 
 ## Other Learning Resources
 
