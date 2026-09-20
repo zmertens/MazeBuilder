@@ -1,0 +1,20 @@
+{
+  "icon": "resources/icon.bmp",
+
+  "interaction": "resources/interaction.ogg",
+  "loading_game_theme": "resources/loading.ogg",
+	
+  "blur_frag": "resources/blur.frag",
+  "wave_vert": "resources/wave.vert",
+  "pixelate_frag": "resources/pixelate.frag",
+  "billboard_frag": "resources/billboard.frag",
+  "billboard_vert": "resources/billboard.vert",
+  "billboard_geom": "resources/billboard.geom",
+  "billboard_bonus_frag": "resources/billboard_bonus.frag",
+  "radial_fog_frag": "resources/radial_fog.frag",
+  "bloom_threshold_frag": "resources/bloom_threshold.frag",
+  
+  "roguelike_menu": "resources/sample_maze.jpg",
+
+  "synth_theme": "resources/Cinematic Synth Soundtrack - Track #3.wav"
+}

@@ -181,12 +181,13 @@ The simplest integration point is `mazes::runtime_app`, which accepts a command-
 
 ```cpp
 #include <MazeBuilder/runtime_app.h>
+#include <string_view>
 
-std::string maze(const std::string& arguments) noexcept
+std::string_view maze(std::string_view arguments) noexcept
 {
     if (auto app = mazes::runtime_app::instance())
     {
-        return std::string{app->apply(arguments)};
+        return app->apply(arguments);
     }
     return {};
 }
@@ -220,10 +221,10 @@ See `examples/Http/README.md` for quick-start usage.
 | CMake Option | Default | Description |
 |--------------|---------|-------------|
 | `MAZE_BUILDER_EXAMPLES` | `OFF` | Build the example applications |
-| `MAZE_BUILDER_COVERAGE` | `OFF` | Enable coverage flags and add the `run_cppcheck` target |
-| `MAZE_BUILDER_TESTS` | `OFF` | Build tests with `Catch2` |
+| `MAZE_BUILDER_COVERAGE` | `OFF` | Enable coverage flags and add the run_cppcheck target |
+| `MAZE_BUILDER_TESTS` | `OFF` | Build tests with Catch2 |
 | `MAZE_BUILDER_DOCS` | `OFF` | Build Doxygen documentation |
-| `MAZE_BUILDER_MEMCHECK` | `OFF` | Enable `Valgrind` / `Memcheck` support |
+| `MAZE_BUILDER_MEMCHECK` | `OFF` | Enable Valgrind / `Memcheck` support |
 
 ### Build commands
 
@@ -263,7 +264,7 @@ ctest --test-dir build-tests --verbose -C Debug
 
 ### Configure for the Web
 
-Configure the examples for the Web with [Emscripten](https://emscripten.org/):
+Configure the CLI and HTTP examples for the Web with [Emscripten](https://emscripten.org/):
 
 ```sh
 cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${EMSDK_ROOT}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
@@ -280,14 +281,10 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
-![Icon](examples/Amazing/icon.bmp)
-
-## Screenshots
-
-![](scripts/sample_maze.jpg)
-
+![Icon](examples/Amazing/resources/icon.bmp)
 
 ## Other Learning Resources
 
 - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
 - [codebox maze generator](https://codebox.net/pages/maze-generator/online)
+- [My gallery of mazes](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)

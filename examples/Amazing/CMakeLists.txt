@@ -2,12 +2,7 @@ set(EXE_NAME "amazing")
 
 set(EXE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/resource_paths.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/game_state.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/ui_menu.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/animation.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/player_controller.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/game/audio_system.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils.cpp)
 
 if(NOT EMSCRIPTEN)
     message(INFO " - Building desktop executable '${EXE_NAME}'")
@@ -37,8 +32,8 @@ if(NOT EMSCRIPTEN)
     # Copy resources
     add_custom_command(TARGET ${EXE_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
-            "${CMAKE_CURRENT_SOURCE_DIR}/resource_paths.json"
-            "$<TARGET_FILE_DIR:${EXE_NAME}>/resource_paths.json"
+            "${CMAKE_CURRENT_SOURCE_DIR}/amazing_mazes.json"
+            "$<TARGET_FILE_DIR:${EXE_NAME}>/amazing_mazes.json"
         COMMAND ${CMAKE_COMMAND} -E copy
             "${CMAKE_CURRENT_SOURCE_DIR}/launch.bat"
             "$<TARGET_FILE_DIR:${EXE_NAME}>/launch.bat"
