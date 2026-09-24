@@ -99,6 +99,15 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
 
     try
     {
+        try
+        {
+            args_mapper.get(args_identifier::RAW).clear();
+            args_mapper.get(args_identifier::PARSED).clear();
+        }
+        catch (...)
+        {
+        }
+
         if (auto& unknown_txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !unknown_txt.is_processed())
         {
             unknown_txt.set(unformatted_args);
