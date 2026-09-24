@@ -1,8 +1,6 @@
 #include <MazeBuilder/mask.h>
 #include <MazeBuilder/string_utils.h>
 
-#include <algorithm>
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -105,11 +103,7 @@ namespace
         {
             return true;
         }
-
-        return std::all_of(source.begin(), source.end(), [](const char ch)
-        {
-            return ch == 'X' || ch == '.' || std::isspace(static_cast<unsigned char>(ch)) != 0;
-        });
+        return false;
     }
 }
 

@@ -104,7 +104,7 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
             args_mapper.get(args_identifier::RAW).clear();
             args_mapper.get(args_identifier::PARSED).clear();
         }
-        catch (...)
+        catch (const std::out_of_range&)
         {
         }
 
