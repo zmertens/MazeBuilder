@@ -79,6 +79,7 @@ public:
             "Example: mazebuildercli -r 14 -c 10 -a binary_tree -o stdout\n\n"
             "Example: mazebuildercli --rows=5 --columns=6 --algo=dfs --output=maze.obj\n\n"
             "Example: mazebuildercli -r 20 -c 15 -s1 -o stdout -a prims\n\n"
+            "Example: mazebuildercli --mask=\"`X....\\n.XXX.\\n....X`\" --algo=dfs --output=stdout\n\n"
             "** Commands are case-sensitive! **\n\n"
             "\t-a, --algo         algorithm to apply to maze links\n"
             "\t                     [" +
@@ -91,7 +92,7 @@ public:
             "\t-j, --json         run with arguments in JSON format\n"
             "\t-l, --levels       levels [max: " +
             std::to_string(mazes::configurator::MAX_LEVELS) + "]\n"
-            "\t-m, --mask         load mask from text file\n"
+            "\t-m, --mask         load mask from text file or inline string\n"
             "\t-s, --seed         seed for the number generator\n"
             "\t-r, --rows         rows [max: " +
             std::to_string(mazes::configurator::MAX_ROWS) + "]\n"

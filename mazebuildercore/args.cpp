@@ -387,7 +387,8 @@ namespace
                     {
                         return false;
                     }
-                } else if (word_key != args::JSON_WORD_STR && !is_numeric_word(word_key))
+                } else if (word_key != args::JSON_WORD_STR && word_key != args::MASK_WORD_STR &&
+                    !is_numeric_word(word_key))
                 {
                     return false;
                 } else if (word_key == args::JSON_WORD_STR)

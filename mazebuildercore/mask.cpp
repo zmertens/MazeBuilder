@@ -1,9 +1,117 @@
 #include <MazeBuilder/mask.h>
+#include <MazeBuilder/string_utils.h>
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <fstream>
+#include <optional>
+#include <sstream>
 #include <stdexcept>
 #include <string>
+
+namespace
+{
+    namespace fs = std::filesystem;
+
+    std::optional<fs::path> resolve_mask_file_path(const std::string_view filename)
+    {
+        if (filename.empty())
+        {
+            return std::nullopt;
+        }
+
+        fs::path resolved{ filename };
+        if (fs::exists(resolved))
+        {
+            return resolved;
+        }
+
+        static constexpr const char* fallback_dirs[] = { "tests", "scripts" };
+        for (const char* dir : fallback_dirs)
+        {
+            fs::path candidate = fs::path(dir) / std::string(filename);
+            if (fs::exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    std::vector<std::string> read_mask_lines(std::istream& input)
+    {
+        std::vector<std::string> lines;
+        std::string line;
+        while (std::getline(input, line))
+        {
+            while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
+            {
+                line.pop_back();
+            }
+
+            if (!line.empty())
+            {
+                lines.push_back(line);
+            }
+        }
+        return lines;
+    }
+
+    mazes::mask build_mask_from_lines(const std::vector<std::string>& lines, const std::string& source_name)
+    {
+        if (lines.empty())
+        {
+            throw std::runtime_error(source_name.empty() ? "Mask input is empty" : source_name);
+        }
+
+        const auto rows = static_cast<unsigned int>(lines.size());
+
+        std::size_t max_cols = 0;
+        for (const auto& l : lines)
+        {
+            if (l.size() > max_cols)
+            {
+                max_cols = l.size();
+            }
+        }
+
+        const auto columns = static_cast<unsigned int>(max_cols);
+        mazes::mask m(rows, columns);
+        for (unsigned int row = 0; row < rows; ++row)
+        {
+            for (unsigned int col = 0; col < static_cast<unsigned int>(lines[row].size()); ++col)
+            {
+                m.set(row, col, lines[row][col] != 'X');
+            }
+        }
+
+        return m;
+    }
+
+    bool looks_like_inline_mask(std::string_view source)
+    {
+        if (source.empty())
+        {
+            return false;
+        }
+
+        if ((source.front() == '`' && source.back() == '`') ||
+            source.find('\n') != std::string_view::npos ||
+            source.find('\r') != std::string_view::npos ||
+            source.find("\\n") != std::string_view::npos ||
+            source.find("\\r") != std::string_view::npos)
+        {
+            return true;
+        }
+
+        return std::all_of(source.begin(), source.end(), [](const char ch)
+        {
+            return ch == 'X' || ch == '.' || std::isspace(static_cast<unsigned char>(ch)) != 0;
+        });
+    }
+}
 
 using namespace mazes;
 
@@ -60,76 +168,55 @@ std::pair<unsigned int, unsigned int> mask::random_location(randomizer& rng) con
 
 mask mask::from_txt(const std::string& filename)
 {
-    namespace fs = std::filesystem;
-
-    fs::path resolved = filename;
-
-    auto open_file = [](const fs::path& path) -> std::ifstream
-        {
-            return std::ifstream(path);
-        };
-
-    std::ifstream file = open_file(resolved);
-    if (!file.is_open())
-    {
-        // Fallback for test/data files executed from repository root.
-        static constexpr const char* fallback_dirs[] = { "tests", "scripts" };
-        for (const char* dir : fallback_dirs)
-        {
-            fs::path candidate = fs::path(dir) / filename;
-            file = open_file(candidate);
-            if (file.is_open())
-            {
-                resolved = std::move(candidate);
-                break;
-            }
-        }
-    }
-
-    if (!file.is_open())
+    const auto resolved = resolve_mask_file_path(filename);
+    if (!resolved.has_value())
     {
         throw std::runtime_error("Could not open mask file: " + filename);
     }
 
-    std::vector<std::string> lines;
-    std::string line;
-    while (std::getline(file, line))
+    std::ifstream file(*resolved);
+    const auto lines = read_mask_lines(file);
+    return build_mask_from_lines(lines, "Mask file is empty: " + filename);
+}
+
+mask mask::from_string(std::string_view text)
+{
+    if (text.empty())
     {
-        // Strip trailing carriage return and spaces (std::getline already strips \n)
-        while (!line.empty() && (line.back() == '\r' || line.back() == ' '))
-        {
-            line.pop_back();
-        }
-        if (!line.empty())
-        {
-            lines.push_back(line);
-        }
+        throw std::runtime_error("Mask string is empty");
     }
 
-    if (lines.empty())
+    std::string normalized{ text };
+    if (normalized.size() >= 2 && normalized.front() == '`' && normalized.back() == '`')
     {
-        throw std::runtime_error("Mask file is empty: " + filename);
+        normalized = normalized.substr(1, normalized.size() - 2);
     }
 
-    const auto rows = static_cast<unsigned int>(lines.size());
+    normalized = string_utils::replace_all(normalized, "\\r\\n", "\n");
+    normalized = string_utils::replace_all(normalized, "\\n", "\n");
+    normalized = string_utils::replace_all(normalized, "\\r", "\n");
 
-    // Use the maximum line length as the column count for potentially ragged input
-    std::size_t max_cols = 0;
-    for (const auto& l : lines)
-    {
-        if (l.size() > max_cols) max_cols = l.size();
-    }
-    const auto columns = static_cast<unsigned int>(max_cols);
+    std::istringstream input{ normalized };
+    const auto lines = read_mask_lines(input);
+    return build_mask_from_lines(lines, "Mask string is empty");
+}
 
-    // Cells in shorter rows that are missing default to available (true)
-    mask m(rows, columns);
-    for (unsigned int row = 0; row < rows; ++row)
+mask mask::from_source(const std::string_view source)
+{
+    if (source.empty())
     {
-        for (unsigned int col = 0; col < static_cast<unsigned int>(lines[row].size()); ++col)
-        {
-            m.set(row, col, lines[row][col] != 'X');
-        }
+        throw std::runtime_error("Mask input is empty");
     }
 
-    return m;
+    if (const auto resolved = resolve_mask_file_path(source); resolved.has_value())
+    {
+        return from_txt(std::string{ source });
+    }
+
+    if (looks_like_inline_mask(source))
+    {
+        return from_string(source);
+    }
+
+    throw std::runtime_error("Could not open mask file: " + std::string(source));
 }

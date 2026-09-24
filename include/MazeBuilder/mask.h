@@ -4,6 +4,7 @@
 #include <MazeBuilder/randomizer.h>
 
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -67,6 +68,19 @@ namespace mazes
         /// @throws std::runtime_error if the file cannot be opened or is empty
         /// @note Lines of different lengths are supported; shorter rows default to available
         static mask from_txt(const std::string& filename);
+
+        /// @brief Load a mask from an inline string
+        /// @param text Mask text ('X' = blocked, other = available)
+        /// @return A mask loaded from the string
+        /// @throws std::runtime_error if the string is empty or invalid
+        /// @note Supports embedded newlines and escaped newline sequences such as "\n"
+        static mask from_string(std::string_view text);
+
+        /// @brief Load a mask from either a file path or an inline string
+        /// @param source File path or inline mask string
+        /// @return A mask loaded from the given source
+        /// @throws std::runtime_error if the source cannot be resolved
+        static mask from_source(std::string_view source);
 
     private:
         unsigned int m_rows;

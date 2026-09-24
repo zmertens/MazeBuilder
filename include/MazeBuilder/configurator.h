@@ -150,21 +150,33 @@ namespace mazes
         /// @return The ending cell index for distance calculation
         [[nodiscard]] int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
 
+        /// @brief Set the mask source
+        /// @param mask_source File path or inline mask string
+        /// @return A reference to this configurator
+        configurator& ensure_mask_source(const std::string& mask_source) noexcept
+        {
+            m_mask_source = mask_source;
+            return *this;
+        }
+
         /// @brief Set the mask file path
         /// @param mask_file_path Path to the mask file
         /// @return A reference to this configurator
         configurator& ensure_mask_file(const std::string& mask_file_path) noexcept
         {
-            m_mask_file = mask_file_path;
-            return *this;
+            return ensure_mask_source(mask_file_path);
+        }
+
+        /// @brief Get the mask source
+        /// @return The mask source, or empty string if not set
+        [[nodiscard]] std::string mask_source() const noexcept
+        {
+            return m_mask_source.value_or("");
         }
 
         /// @brief Get the mask file path
-        /// @return The mask file path, or empty string if not set
-        [[nodiscard]] std::string mask_file() const noexcept
-        {
-            return m_mask_file.value_or("");
-        }
+        /// @return The configured mask source, or empty string if not set
+        [[nodiscard]] std::string mask_file() const noexcept { return mask_source(); }
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
@@ -211,7 +223,7 @@ namespace mazes
 
         std::optional<int> m_distances_end;
 
-        std::optional<std::string> m_mask_file;
+        std::optional<std::string> m_mask_source;
     };
 } // namespace
 

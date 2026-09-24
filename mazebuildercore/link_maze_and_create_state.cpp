@@ -46,15 +46,15 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
     unsigned int cols = configurator::MAX_COLUMNS;
     unsigned int levels = 1u;
 
-    std::string mask_file;
+    std::string mask_source;
     if (const auto mask_it = parsed_args.find(mazes::args::MASK_WORD_STR); mask_it != parsed_args.cend())
     {
-        mask_file = mask_it->second;
-        if (!mask_file.empty())
+        mask_source = mask_it->second;
+        if (!mask_source.empty())
         {
             try
             {
-                auto temp_mask = mask::from_txt(mask_file);
+                auto temp_mask = mask::from_source(mask_source);
                 rows = temp_mask.rows();
                 cols = temp_mask.columns();
             }
@@ -64,7 +64,7 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
         }
     }
 
-    if (mask_file.empty())
+    if (mask_source.empty())
     {
         state_utils::parse_dimensions(std::cref(parsed_args), std::ref(rows), std::ref(cols), std::ref(levels));
     }
@@ -101,7 +101,7 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
         .ensure_distances_start(m_distances_start)
         .ensure_distances_end(m_distances_end)
         .ensure_algo_id(selected_algo)
-        .ensure_mask_file(mask_file);
+        .ensure_mask_source(mask_source);
 
     request_stack_pop();
 
