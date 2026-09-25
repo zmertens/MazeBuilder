@@ -190,6 +190,17 @@ TEST_CASE("Mask loaded from inline mask source", "[mask][from_source]")
     REQUIRE(m.count() == 16);
 }
 
+TEST_CASE("Single-row mask loaded from quoted inline mask source", "[mask][from_source][single_row]")
+{
+    const auto formatted = std::string{ format_maze_from_mask("X....") };
+    const mask m = mask::from_source(formatted);
+
+    REQUIRE(m.rows() == 1u);
+    REQUIRE(m.columns() == 5u);
+    REQUIRE_FALSE(m(0u, 0u));
+    REQUIRE(m(0u, 1u));
+}
+
 // ---------------------------------------------------------------------------
 // Masked grid tests
 // ---------------------------------------------------------------------------
@@ -379,6 +390,11 @@ TEST_CASE("Args parse --mask flag", "[args][mask]")
         REQUIRE(val.has_value());
         REQUIRE(val.value() == formatted);
         REQUIRE(args_handler.get(args::ALGO_ID_WORD_STR).value_or("") == "prims");
+    }
+
+    SECTION("Validation still applies for split --rows= form")
+    {
+        REQUIRE_FALSE(args_handler.parse(std::vector<std::string>{"--rows=", "abc"}));
     }
 }
 

@@ -104,6 +104,8 @@ namespace
         }
 
         if ((source.front() == '`' && source.back() == '`') ||
+            (source.front() == '"' && source.back() == '"') ||
+            (source.front() == '\'' && source.back() == '\'') ||
             source.find('\n') != std::string_view::npos ||
             source.find('\r') != std::string_view::npos ||
             source.find("\\n") != std::string_view::npos ||

@@ -497,6 +497,16 @@ namespace
                         return false;
                     }
 
+                    if (word_key == args::DISTANCES_WORD_STR)
+                    {
+                        return false;
+                    }
+
+                    if (is_numeric_word(word_key) && !is_valid_numeric_value(text))
+                    {
+                        return false;
+                    }
+
                     store_value(word_key, text);
                     return true;
                 }
