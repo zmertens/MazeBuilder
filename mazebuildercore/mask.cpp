@@ -12,6 +12,14 @@ namespace
 {
     namespace fs = std::filesystem;
 
+    void strip_wrapping_pair(std::string& text, const char open, const char close)
+    {
+        if (text.size() >= 2 && text.front() == open && text.back() == close)
+        {
+            text = text.substr(1, text.size() - 2);
+        }
+    }
+
     std::optional<fs::path> resolve_mask_file_path(const std::string_view filename)
     {
         if (filename.empty())
@@ -181,10 +189,9 @@ mask mask::from_string(std::string_view text)
     }
 
     std::string normalized{ text };
-    if (normalized.size() >= 2 && normalized.front() == '`' && normalized.back() == '`')
-    {
-        normalized = normalized.substr(1, normalized.size() - 2);
-    }
+    strip_wrapping_pair(normalized, '"', '"');
+    strip_wrapping_pair(normalized, '\'', '\'');
+    strip_wrapping_pair(normalized, '`', '`');
 
     normalized = string_utils::replace_all(normalized, "\\r\\n", "\n");
     normalized = string_utils::replace_all(normalized, "\\n", "\n");

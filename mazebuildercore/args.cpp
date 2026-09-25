@@ -475,13 +475,30 @@ namespace
             if (const auto eq_pos = option.find('='); eq_pos != std::string::npos)
             {
                 const std::string_view key(option.data(), eq_pos);
-                const std::string_view value(option.data() + eq_pos + 1, option.size() - eq_pos - 1);
-
                 const auto word_key = normalize_key(key);
 
                 if (!is_known_word(word_key))
                 {
                     return false;
+                }
+
+                const auto value = option.substr(eq_pos + 1);
+                if (value.empty())
+                {
+                    if (!tokenizer.has_more())
+                    {
+                        return false;
+                    }
+
+                    auto [type, text] = tokenizer.next();
+                    if (type != TokenType::VALUE)
+                    {
+                        tokenizer.unread();
+                        return false;
+                    }
+
+                    store_value(word_key, text);
+                    return true;
                 }
 
                 // Special case: --distances=[...]

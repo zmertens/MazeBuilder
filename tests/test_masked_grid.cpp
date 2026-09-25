@@ -353,7 +353,7 @@ TEST_CASE("Args parse --mask flag", "[args][mask]")
         REQUIRE(val.value() == "mask.txt");
     }
 
-    SECTION("Inline short form -m`...`")
+    SECTION("Inline short form -m\"...\"")
     {
         const auto formatted = std::string{ format_maze_from_mask("X....\n.XXX.\n....X") };
         REQUIRE(args_handler.parse("-m" + formatted));
@@ -362,13 +362,23 @@ TEST_CASE("Args parse --mask flag", "[args][mask]")
         REQUIRE(val.value() == formatted);
     }
 
-    SECTION("Inline long form --mask=`...`")
+    SECTION("Inline long form --mask=\"...\"")
     {
         const auto formatted = std::string{ format_maze_from_mask("X....\n.XXX.\n....X") };
         REQUIRE(args_handler.parse("--mask=" + formatted));
         const auto val = args_handler.get(args::MASK_WORD_STR);
         REQUIRE(val.has_value());
         REQUIRE(val.value() == formatted);
+    }
+
+    SECTION("Inline long form --mask= with next token")
+    {
+        const auto formatted = std::string{ format_maze_from_mask("XXXX\nX..X\nX.XX\nXX.X\n") };
+        REQUIRE(args_handler.parse(std::vector<std::string>{"--mask=", formatted, "-aprims"}));
+        const auto val = args_handler.get(args::MASK_WORD_STR);
+        REQUIRE(val.has_value());
+        REQUIRE(val.value() == formatted);
+        REQUIRE(args_handler.get(args::ALGO_ID_WORD_STR).value_or("") == "prims");
     }
 }
 
