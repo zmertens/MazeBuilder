@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+#include <MazeBuilder/format_maze_from_mask.h>
 #include <MazeBuilder/runtime_app.h>
 
 #include "test_output_dir.h"
@@ -211,6 +212,42 @@ TEST_CASE("Masked maze with long form arguments", "[masked_maze][long_args]")
 
     REQUIRE_FALSE(result.empty());
     std::filesystem::remove(mask_file);
+}
+
+TEST_CASE("Masked maze with inline mask via short form", "[masked_maze][inline][short]")
+{
+    REQUIRE(app);
+
+    const auto formatted_mask = std::string{ format_maze_from_mask(
+        "...........\n"
+        "..XXX......\n"
+        "..X.X......\n"
+        "..XXX......\n"
+        "...........\n") };
+
+    const auto result = app->apply("-m" + formatted_mask + " -a dfs -o stdout");
+
+    REQUIRE_FALSE(result.empty());
+    REQUIRE(result.find("Error") == std::string::npos);
+    REQUIRE(result.find("+") != std::string::npos);
+}
+
+TEST_CASE("Masked maze with inline mask via long form", "[masked_maze][inline][long]")
+{
+    REQUIRE(app);
+
+    const auto formatted_mask = std::string{ format_maze_from_mask(
+        "XXXXXXXXXXXXXXXX\n"
+        "X..............X\n"
+        "X..XXXX..XXXX..X\n"
+        "X..X.......X...X\n"
+        "XXXXXXXXXXXXXXXX\n") };
+
+    const auto result = app->apply("--mask=" + formatted_mask + " --algo=sidewinder --output=stdout");
+
+    REQUIRE_FALSE(result.empty());
+    REQUIRE(result.find("Error") == std::string::npos);
+    REQUIRE(result.find("+") != std::string::npos);
 }
 
 TEST_CASE("Masked maze with prims algorithm", "[masked_maze][prims]")

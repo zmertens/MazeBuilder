@@ -30,13 +30,15 @@ algo masked_maze_and_create_state::get_algo_id() const noexcept
 
 std::string_view masked_maze_and_create_state::create(const configurator& config, randomizer& rng) noexcept
 {
-    const auto mask_file = config.mask_file();
-    if (mask_file.empty())
-        return "Error: No mask file specified";
-    return create_masked_maze(mask_file, config.algo_id(), rng);
+    const auto mask_source = config.mask_source();
+    if (mask_source.empty())
+    {
+        return "Error: No mask source specified";
+    }
+    return create_masked_maze(mask_source, config.algo_id(), rng);
 }
 
-std::string_view masked_maze_and_create_state::create_masked_maze(const std::string& mask_file,
+std::string_view masked_maze_and_create_state::create_masked_maze(const std::string& mask_source,
     algo algorithm, randomizer& rng) noexcept
 {
     if (!grid_mapper)
@@ -44,13 +46,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
 
     try
     {
-        if (!std::filesystem::exists(mask_file))
-        {
-            m_result = "Error: Mask file not found: " + mask_file;
-            return m_result;
-        }
-
-        auto loaded_mask = mask::from_txt(mask_file);
+        auto loaded_mask = mask::from_source(mask_source);
         const auto rows = loaded_mask.rows();
         const auto cols = loaded_mask.columns();
 
@@ -284,7 +280,9 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                 dg->calculate_distances(m_distances_start, m_distances_end);
         }
 
-        m_result = "Masked maze generated from " + mask_file;
+        m_result = std::filesystem::exists(mask_source)
+            ? "Masked maze generated from " + mask_source
+            : "Masked maze generated from inline mask";
         return m_result;
     }
     catch (const std::exception& e)
@@ -297,4 +295,3 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
         return "Unknown error creating masked maze";
     }
 }
-
