@@ -232,8 +232,6 @@ std::string_view pixels_create_state::create(const configurator& config,
 
         grid_ops.set_pixels(pixels);
 
-        global_async_logger().log(m_result);
-
         return m_result;
     } catch (...)
     {

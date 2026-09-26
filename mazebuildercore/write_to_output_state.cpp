@@ -3,6 +3,7 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
@@ -61,7 +62,7 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
     std::string output_target;
     if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
     {
-        output_target = it->second;
+        output_target = it->second == to_sv_from_output_format(output_format::STDOUT) ? "" : it->second;
     }
 
     auto *rng_ptr = state_utils::get_rng_or_default(get_context());
@@ -74,8 +75,6 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
 
     m_result = std::string{create(cfg, *rng_ptr)};
 
-    // Attempt to write output if result is not empty. If no explicit target was set,
-    // default to emitting the maze text to stdout for the console CLI.
     if (!m_result.empty())
     {
         const bool default_stdout_output = output_target.empty();
@@ -85,12 +84,10 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
             {
                 global_async_logger().log_message("Failed to write maze to " + output_target);
             }
-        }
-
-        const auto extension = string_utils::file_extension(output_target);
-        if (default_stdout_output || output_format_or_default(extension) != output_format::STDOUT)
-        {
-            global_async_logger().log(m_result);
+            else
+            {
+                global_async_logger().log_message("Successfully wrote maze to " + output_target);
+            }
         }
     }
 

@@ -75,7 +75,7 @@ void loading_state::set_text_to_unknown(const std::string_view txt) noexcept
             unknown_text.set(txt);
         } catch (...)
         {
-            async_logger().log("Failed to set text to UNKNOWN in loading_state.");
+            global_async_logger().log("Failed to set text to UNKNOWN in loading_state.");
         }
     }
 }
