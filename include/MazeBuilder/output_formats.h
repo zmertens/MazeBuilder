@@ -16,18 +16,20 @@ namespace mazes
     {
         JPG = 0,
         JPEG = 1,
-        PLAIN_TEXT = 2,
-        PLAIN_TEXT_ALT = 3,
-        PNG = 4,
-        JSON = 5,
-        OBJ = 6,
-        STDOUT = 7,
-        TOTAL = 8
+        BMP = 2,
+        PLAIN_TEXT = 3,
+        PLAIN_TEXT_ALT = 4,
+        PNG = 5,
+        JSON = 6,
+        OBJ = 7,
+        STDOUT = 8,
+        TOTAL = 9
     };
 
     constexpr std::array<std::string_view, static_cast<size_t>(output_format::TOTAL)> OUTPUT_FORMAT_LABELS_LOWERCASE = {
         "jpg",
         "jpeg",
+        "bmp",
         "text",
         "txt",
         "png",
@@ -46,18 +48,20 @@ namespace mazes
             return OUTPUT_FORMAT_LABELS_LOWERCASE[0];
         case output_format::JPEG:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[1];
-        case output_format::PLAIN_TEXT:
+        case output_format::BMP:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[2];
-        case output_format::PLAIN_TEXT_ALT:
+        case output_format::PLAIN_TEXT:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[3];
-        case output_format::PNG:
+        case output_format::PLAIN_TEXT_ALT:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[4];
-        case output_format::JSON:
+        case output_format::PNG:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[5];
-        case output_format::OBJ:
+        case output_format::JSON:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[6];
-        case output_format::STDOUT:
+        case output_format::OBJ:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[7];
+        case output_format::STDOUT:
+            return OUTPUT_FORMAT_LABELS_LOWERCASE[8];
         default:
             throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
         }
@@ -90,18 +94,20 @@ namespace mazes
             case 1:
                 return output_format::JPEG;
             case 2:
-                return output_format::PLAIN_TEXT;
+                return output_format::BMP;
             case 3:
-                return output_format::PLAIN_TEXT_ALT;
+                return output_format::PLAIN_TEXT;
             case 4:
-                return output_format::PNG;
+                return output_format::PLAIN_TEXT_ALT;
             case 5:
-                return output_format::JSON;
+                return output_format::PNG;
             case 6:
-                return output_format::OBJ;
+                return output_format::JSON;
             case 7:
-                return output_format::STDOUT;
+                return output_format::OBJ;
             case 8:
+                return output_format::STDOUT;
+            case 9:
                 return output_format::TOTAL;
             default:
                 break;

@@ -30,6 +30,7 @@ namespace mazes::state_utils
             {
             case output_format::JPG:
             case output_format::JPEG:
+            case output_format::BMP:
             case output_format::PNG:
                 return state::ID::WRITE_TO_IMAGE;
             case output_format::PLAIN_TEXT:

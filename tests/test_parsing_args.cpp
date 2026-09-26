@@ -799,6 +799,13 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]")
         REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.json"));
     }
 
+    SECTION("Output short inline with bmp path")
+    {
+        vector<string> args_vec = {"app", "-omaze.bmp"};
+        REQUIRE(args_handler.parse(args_vec, true));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "maze.bmp"));
+    }
+
     SECTION("Output long with json")
     {
         vector<string> args_vec = {"app", "--output=json"};

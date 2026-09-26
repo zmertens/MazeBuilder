@@ -382,7 +382,9 @@ namespace
                 {
                     try
                     {
-                        (void)to_output_format_from_sv(value);
+                        const auto extension = string_utils::file_extension(value);
+                        const auto output_type = extension.empty() ? std::string{ value } : extension;
+                        (void)to_output_format_from_sv(output_type);
                     } catch (...)
                     {
                         return false;

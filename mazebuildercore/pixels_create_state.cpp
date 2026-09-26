@@ -106,6 +106,7 @@ bool pixels_create_state::write_output(const std::string& output_target, [[maybe
             {
             case output_format::PNG: return io_utils::write_png(output_target, pixels, m_image_width, m_image_height);
             case output_format::JPG: return io_utils::write_jpg(output_target, pixels, m_image_width, m_image_height);
+            case output_format::BMP: return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
             default: return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
             };
         }

@@ -23,7 +23,7 @@ TEST_CASE("io_utils can process good text file names", "[good text filenames]")
     test_output_dir output_dir{"test_io_utils_good"};
 
     // Good file names that the io_utils can determine what type to write per the extension
-    vector<string> good_filenames{"1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg"};
+    vector<string> good_filenames{"1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg", "maze.bmp"};
 
     for (const auto &gf : good_filenames)
     {
