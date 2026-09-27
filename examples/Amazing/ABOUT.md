@@ -32,6 +32,10 @@ The game follows a simple state pattern:
 
 ## Scoring and Competition
 
+The objective of the game is to touch or point and hold a starting point,
+and without lifting the pointer, drag and swipe across a playfield of cells
+and increment points.
+
 Gameplay happens by pointing at a cell on screen,
 and clicking the mouse, joystick button, or finger down on that point,
 and swiping to another cell.

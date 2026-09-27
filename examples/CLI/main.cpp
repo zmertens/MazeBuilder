@@ -186,8 +186,10 @@ int main(const int argc, char* argv[])
         }
     }
 
-    // Ensure the async logger worker has delivered all queued messages
-    // into the in-memory sink before we consume and print them.
+#if defined(MAZE_DEBUG)
+    maze->dump_logs();
+#endif
+
     logger.flush();
 
     std::for_each(logs.cbegin(), logs.cend(), [](auto msg)

@@ -53,4 +53,16 @@ if(NOT EMSCRIPTEN)
                 VERBATIM)
         endforeach()
     endif()
+
+    install(TARGETS ${EXE_NAME}
+        RUNTIME DESTINATION bin/Amazing)
+
+    install(FILES
+        ${CMAKE_CURRENT_SOURCE_DIR}/amazing_mazes.json
+        ${CMAKE_CURRENT_SOURCE_DIR}/launch.bat
+        DESTINATION bin/Amazing)
+
+    install(DIRECTORY
+        ${CMAKE_CURRENT_SOURCE_DIR}/resources/
+        DESTINATION bin/Amazing/resources)
 endif()

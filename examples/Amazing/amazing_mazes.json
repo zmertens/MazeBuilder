@@ -6,6 +6,7 @@
 	
   "blur_frag": "resources/blur.frag",
   "wave_vert": "resources/wave.vert",
+  "parallax_frag": "resources/parallax.frag",
   "pixelate_frag": "resources/pixelate.frag",
   "billboard_frag": "resources/billboard.frag",
   "billboard_vert": "resources/billboard.vert",

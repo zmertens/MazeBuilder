@@ -45,6 +45,13 @@
 
 static const std::string APP_NAME = "Amazing - " + mazes::buildinfo::VERSION;
 
+static constexpr bool DEBUGGING = 
+#if defined(MAZE_DEBUG)
+    true;
+#else
+    false;
+#endif
+
 enum class AppState
 {
     MENU,
@@ -62,7 +69,7 @@ constexpr bool IS_APP_RUNNING(AppState state = AppState::MENU)
 
 static std::vector<decltype(CURRENT_APP_STATE)> APP_STATE_HISTORY{};
 
-static void switch_app_state(const AppState next_state)
+static void SWITCH_APP_STATE(const AppState next_state)
 {
     APP_STATE_HISTORY.push_back(CURRENT_APP_STATE);
     CURRENT_APP_STATE = next_state;
@@ -81,14 +88,16 @@ namespace resource_keys
     constexpr std::string_view ICON{"icon"};
     constexpr std::string_view FONT{"font"};
 
-    constexpr std::string_view BLUR_FRAG{"blur_frag"};
-    constexpr std::string_view RADIAL_FOG_FRAG{"radial_fog_frag"};
-    constexpr std::string_view BLOOM_THRESHOLD_FRAG{"bloom_threshold_frag"};
-    constexpr std::string_view PIXELATE_FRAG{"pixelate_frag"};
+    // Shaders
     constexpr std::string_view BILLBOARD_FRAG{"billboard_frag"};
     constexpr std::string_view BILLBOARD_BONUS_FRAG{"billboard_bonus_frag"};
     constexpr std::string_view BILLBOARD_VERT{"billboard_vert"};
     constexpr std::string_view BILLBOARD_GEOM{"billboard_geom"};
+    constexpr std::string_view BLOOM_THRESHOLD_FRAG{"bloom_threshold_frag"};
+    constexpr std::string_view BLUR_FRAG{"blur_frag"};
+    constexpr std::string_view PARALLAX_FRAG{"parallax_frag"};
+    constexpr std::string_view PIXELATE_FRAG{"pixelate_frag"};
+    constexpr std::string_view RADIAL_FOG_FRAG{"radial_fog_frag"};
     constexpr std::string_view WAVE_VERT{"wave_vert"};
 
     constexpr std::string_view CHARACTER_IDLE{"character_beige_idle"};
@@ -103,8 +112,6 @@ static const std::filesystem::path TEMP_TEXT_PATH{std::filesystem::temp_director
 static const std::filesystem::path RESOURCE_PATH{std::filesystem::current_path() / (std::string(FILE_NAMING_CONVENTION) + ".json")};
 
 static mazes::randomizer RNG{};
-
-auto *LOADER_INST = &utils::async_loader::instance();
 
 struct scene_props : public sf::RenderWindow
 {
@@ -168,50 +175,18 @@ float dynamic_ball::ball_radius_px = static_cast<float>(scene_props::determine_c
 class amazing_sfml_app
 {
 public:
-    static void run_self_tests()
-    {
-        const auto tmp_dir = std::filesystem::temp_directory_path() / "mazebuilder_async_loader_test";
-        std::filesystem::remove_all(tmp_dir);
-        std::filesystem::create_directories(tmp_dir / "resources");
-
-        const auto json_path = tmp_dir / "amazing_mazes.json";
-        std::ofstream resource_file{json_path};
-        resource_file << "{\n"
-                      << "  \"icon\": \"resources/icon.bmp\",\n"
-                      << "  \"font\": \"resources/font.ttf\"\n"
-                      << "}\n";
-        resource_file.close();
-
-        std::ofstream icon_file{tmp_dir / "resources" / "icon.bmp"};
-        icon_file << "icon";
-        std::ofstream font_file{tmp_dir / "resources" / "font.ttf"};
-        font_file << "font";
-
-        const auto resources = utils::async_loader::load_resource_map(json_path);
-        if (resources.count(std::string{resource_keys::ICON}) != 1u || resources.count(std::string{resource_keys::FONT}) != 1u)
-        {
-            throw std::runtime_error("Resource loader smoke test failed: missing keys");
-        }
-
-        const auto icon = utils::async_loader::resolve_resource_path(resource_keys::ICON, json_path);
-        if (!icon || *icon != (tmp_dir / "resources" / "icon.bmp"))
-        {
-            throw std::runtime_error("Resource loader smoke test failed: incorrect icon path");
-        }
-
-        std::filesystem::remove_all(tmp_dir);
-    }
-
     amazing_sfml_app()
         : scene{std::make_unique<scene_props>()}
-
     {
-        load_resource_paths();
-        try_set_window_icon();
+        loaded_resources = utils::async_loader::load_required_resource_map(RESOURCE_PATH);
+        (void)utils::async_loader::try_set_window_icon(*scene, loaded_resources, resource_keys::ICON, RESOURCE_PATH);
 
         scene->setFramerateLimit(120u);
         scene->setPosition({100, 100});
-        load_font();
+        if (!utils::async_loader::try_load_font(sfml_font, loaded_resources, resource_keys::FONT, RESOURCE_PATH))
+        {
+            throw std::runtime_error("Amazing cannot find a renderable font.");
+        }
         init_help_text();
     }
 
@@ -285,6 +260,7 @@ public:
         while (scene->isOpen())
         {
             const float frame_dt = clock.restart().asSeconds();
+            gameplay_background_seconds += frame_dt;
             handle_events();
             update_state_overlay();
             update_focus_hold(frame_dt);
@@ -306,15 +282,31 @@ public:
                     accumulator -= FIXED_DELTA;
                 }
 
-                update_number_balls(FIXED_DELTA);
-                sync_ball_drawables();
+                utils::physics_ops::update_number_balls(physics_balls, FIXED_DELTA);
+                utils::physics_ops::sync_ball_drawables(
+                    physics_balls,
+                    scene->pixels_per_meter,
+                    world_scale_x,
+                    world_scale_y);
+                
+                static constexpr auto ACCUM_PRINT_INTERVAL{0.5f};
+                if (DEBUGGING)
+                {
+                    static float accum_print_timer = 0.0f;
+                    accum_print_timer += frame_dt;
+                    if (accum_print_timer >= ACCUM_PRINT_INTERVAL)
+                    {
+                        fmt::println("accumulator: {}", accumulator);
+                        accum_print_timer = 0.0f;
+                    }
+                }
             }
             else
             {
                 accumulator = 0.0f;
             }
 
-            update_bonus_particles(frame_dt);
+            utils::physics_ops::update_bonus_particles(bonus_particles, frame_dt);
             ensure_scene_surface_ready();
             if (!scene_surface_ready)
             {
@@ -327,7 +319,7 @@ public:
 
             if (IS_APP_RUNNING(AppState::TUTORIAL) || IS_APP_RUNNING(AppState::PLAYING))
             {
-                draw_tutorial_scene(scene_surface, IS_APP_RUNNING(AppState::TUTORIAL));
+                draw_tutorial_scene(scene_surface, false);
             }
             else if (IS_APP_RUNNING(AppState::TRANSITION))
             {
@@ -343,26 +335,14 @@ public:
 
             if (IS_APP_RUNNING(AppState::PLAYING) || IS_APP_RUNNING(AppState::TRANSITION))
             {
-                draw_bonus_balls(scene_surface);
-                draw_bonus_particles(scene_surface);
-            }
-
-            if (should_show_info)
-            {
-                if (state_label_text.has_value())
-                {
-                    scene_surface.draw(*state_label_text);
-                }
-                if (IS_APP_RUNNING(AppState::PLAYING) && score_text.has_value())
-                {
-                    scene_surface.draw(*score_text);
-                }
+                utils::physics_ops::draw_bonus_particles(bonus_particles, scene_surface);
             }
 
             scene_surface.display();
 
             scene->clear(sf::Color{0, 0, 0, 255});
             draw_post_processed_scene();
+            draw_unprocessed_overlay();
 
             scene->display();
         }
@@ -413,6 +393,7 @@ private:
     bool bloom_surface_ready{false};
     sf::Shader fog_shader;
     bool fog_shader_loaded{false};
+    float gameplay_background_seconds{0.0f};
     sf::Shader bloom_threshold_shader;
     bool bloom_threshold_shader_loaded{false};
     sf::Shader bloom_shader;
@@ -423,6 +404,10 @@ private:
 
     bool focus_hold_active{false};
     float focus_hold_seconds{0.0f};
+    sf::Vector2f spotlight_position_px{
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.x) * 0.5f,
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.y) * 0.5f};
+    std::optional<unsigned int> active_touch_finger;
 
     struct bonus_particle
     {
@@ -447,10 +432,6 @@ private:
         return layout_cell_size + layout_wall_thickness;
     }
 
-    void update_screen_layout()
-    {
-    }
-
     void update_focus_hold(const float dt)
     {
         if (focus_hold_active)
@@ -466,6 +447,13 @@ private:
     [[nodiscard]] float focus_hold_ratio() const noexcept
     {
         return std::clamp(focus_hold_seconds / 1.5f, 0.0f, 1.0f);
+    }
+
+    void set_spotlight_position(const sf::Vector2i position)
+    {
+        const auto size = scene->getSize();
+        spotlight_position_px.x = std::clamp(static_cast<float>(position.x), 0.0f, static_cast<float>(std::max(1u, size.x)));
+        spotlight_position_px.y = std::clamp(static_cast<float>(position.y), 0.0f, static_cast<float>(std::max(1u, size.y)));
     }
 
     void ensure_scene_surface_ready()
@@ -515,9 +503,13 @@ private:
         {
             const float reveal = focus_hold_ratio();
             const auto size = scene->getSize();
-            const sf::Vector2i mouse = sf::Mouse::getPosition(*scene);
-            const float nx = std::clamp(static_cast<float>(mouse.x) / static_cast<float>(std::max(1u, size.x)), 0.0f, 1.0f);
-            const float ny = std::clamp(static_cast<float>(mouse.y) / static_cast<float>(std::max(1u, size.y)), 0.0f, 1.0f);
+            if (active_touch_finger.has_value() && sf::Touch::isDown(*active_touch_finger))
+            {
+                set_spotlight_position(sf::Touch::getPosition(*active_touch_finger, *scene));
+            }
+
+            const float nx = std::clamp(spotlight_position_px.x / static_cast<float>(std::max(1u, size.x)), 0.0f, 1.0f);
+            const float ny = std::clamp(1.0f - (spotlight_position_px.y / static_cast<float>(std::max(1u, size.y))), 0.0f, 1.0f);
 
             const float clear_radius = 0.08f + reveal * 0.30f;
             const float feather = 0.14f - reveal * 0.04f;
@@ -565,293 +557,109 @@ private:
         }
     }
 
-    void emit_bonus_particles(const sf::Vector2f origin)
+    void draw_unprocessed_overlay()
     {
-        constexpr std::size_t PARTICLE_COUNT = 18u;
-        for (std::size_t i = 0; i < PARTICLE_COUNT; ++i)
+        if (IS_APP_RUNNING(AppState::PLAYING) || IS_APP_RUNNING(AppState::TRANSITION))
         {
-            const float angle = static_cast<float>(RNG.get_int(0, 359)) * 3.14159265f / 180.0f;
-            const float speed = static_cast<float>(RNG.get_int(45, 155));
-            bonus_particle p{
-                sf::CircleShape{static_cast<float>(RNG.get_int(2, 5))},
-                {std::cos(angle) * speed, std::sin(angle) * speed},
-                static_cast<float>(RNG.get_int(35, 90)) / 100.0f};
-            p.drawable.setOrigin({p.drawable.getRadius(), p.drawable.getRadius()});
-            p.drawable.setPosition(origin);
-            p.drawable.setFillColor(sf::Color(255, 219, 88, 210));
-            p.drawable.setOutlineThickness(0.6f);
-            p.drawable.setOutlineColor(sf::Color(255, 248, 196));
-            bonus_particles.push_back(p);
-        }
-    }
-
-    void update_bonus_particles(const float dt)
-    {
-        for (auto &particle : bonus_particles)
-        {
-            particle.life_seconds -= dt;
-            particle.drawable.move(particle.velocity * dt);
-            particle.velocity *= 0.94f;
-            const auto fill = particle.drawable.getFillColor();
-            const auto alpha = static_cast<std::uint8_t>(std::clamp(particle.life_seconds, 0.0f, 1.0f) * 220.0f);
-            particle.drawable.setFillColor(sf::Color(fill.r, fill.g, fill.b, alpha));
+            utils::physics_ops::draw_bonus_balls(physics_balls, *scene);
         }
 
-        bonus_particles.erase(std::remove_if(bonus_particles.begin(), bonus_particles.end(), [](const bonus_particle &particle)
-                                             { return particle.life_seconds <= 0.0f; }),
-                             bonus_particles.end());
-    }
-
-    void draw_bonus_particles(sf::RenderTarget &target)
-    {
-        for (const auto &particle : bonus_particles)
+        if (IS_APP_RUNNING(AppState::TUTORIAL) || IS_APP_RUNNING(AppState::PLAYING))
         {
-            target.draw(particle.drawable);
-        }
-    }
-
-    void draw_bonus_balls(sf::RenderTarget &target)
-    {
-        for (const auto &ball : physics_balls)
-        {
-            if (ball.collected && ball.lifetime_seconds <= 0.0f)
+            if (tutorial_prompt_text.has_value())
             {
-                continue;
-            }
-
-            target.draw(ball.drawable);
-        }
-    }
-
-    [[nodiscard]] static std::optional<std::filesystem::path> find_existing_path(const std::filesystem::path &relative)
-    {
-        const std::array<std::filesystem::path, 3> candidates{
-            relative,
-            std::filesystem::current_path() / relative,
-            std::filesystem::current_path().parent_path() / relative};
-
-        for (const auto &candidate : candidates)
-        {
-            if (std::filesystem::exists(candidate))
-            {
-                return candidate;
+                tutorial_prompt_text->setPosition({14.f, static_cast<float>(scene->getSize().y) - 42.f});
+                scene->draw(*tutorial_prompt_text);
             }
         }
 
-        return std::nullopt;
-    }
-
-    [[nodiscard]] std::optional<std::filesystem::path> resolve_first_existing_resource(const std::initializer_list<std::string_view> keys) const
-    {
-        for (const auto key : keys)
-        {
-            if (const auto path = resolve_resource_path(key); path.has_value() && std::filesystem::exists(*path))
-            {
-                return path;
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    void load_resource_paths()
-    {
-        if (LOADER_INST == nullptr)
-        {
-            throw std::runtime_error("Amazing async loader instance was null");
-        }
-
-        if (!(*LOADER_INST))
-        {
-            throw std::runtime_error("Amazing async loader singleton was null");
-        }
-
-        (*LOADER_INST)->set_resource_path(RESOURCE_PATH);
-
-        if (!std::filesystem::exists(RESOURCE_PATH) || RESOURCE_PATH.extension() != ".json")
-        {
-            throw std::runtime_error("Amazing failed to load resource_paths.json");
-        }
-
-        (*LOADER_INST)->load([this](std::map<std::string, std::filesystem::path> &resource_map)
-                     { loaded_resources = resource_map; });
-
-        if (loaded_resources.empty())
-        {
-            loaded_resources = utils::async_loader::load_resource_map(RESOURCE_PATH);
-        }
-
-        if (loaded_resources.empty())
-        {
-            throw std::runtime_error("Amazing resource map loaded but was empty");
-        }
-    }
-
-    void ensure_shader_loaded()
-    {
-        if (scene->gameplay_shader_loaded)
+        if (!should_show_info)
         {
             return;
         }
 
-        const auto shader_path = resolve_first_existing_resource({resource_keys::BLUR_FRAG, resource_keys::PIXELATE_FRAG, resource_keys::BILLBOARD_FRAG});
-        if (!shader_path.has_value())
+        if (state_label_text.has_value())
         {
-            return;
+            scene->draw(*state_label_text);
         }
-
-        scene->gameplay_shader_loaded = scene->gameplay_shader.loadFromFile(shader_path->string(), sf::Shader::Type::Fragment);
-    }
-
-    void ensure_fog_shader_loaded()
-    {
-        if (fog_shader_loaded)
+        if (IS_APP_RUNNING(AppState::PLAYING) && score_text.has_value())
         {
-            return;
+            scene->draw(*score_text);
         }
-
-        const auto radial_fog_frag = resolve_resource_path(resource_keys::RADIAL_FOG_FRAG);
-        if (!radial_fog_frag.has_value())
-        {
-            return;
-        }
-
-        fog_shader_loaded = fog_shader.loadFromFile(radial_fog_frag->string(), sf::Shader::Type::Fragment);
-    }
-
-    void ensure_bloom_threshold_shader_loaded()
-    {
-        if (bloom_threshold_shader_loaded)
-        {
-            return;
-        }
-
-        const auto bloom_threshold_frag = resolve_resource_path(resource_keys::BLOOM_THRESHOLD_FRAG);
-        if (!bloom_threshold_frag.has_value())
-        {
-            return;
-        }
-
-        bloom_threshold_shader_loaded = bloom_threshold_shader.loadFromFile(bloom_threshold_frag->string(), sf::Shader::Type::Fragment);
-    }
-
-    void ensure_bloom_shader_loaded()
-    {
-        if (bloom_shader_loaded)
-        {
-            return;
-        }
-
-        const auto blur_frag = resolve_resource_path(resource_keys::BLUR_FRAG);
-        if (!blur_frag.has_value())
-        {
-            return;
-        }
-
-        bloom_shader_loaded = bloom_shader.loadFromFile(blur_frag->string(), sf::Shader::Type::Fragment);
-    }
-
-    void ensure_transition_shader_loaded()
-    {
-        if (scene->transition_shader_loaded)
-        {
-            return;
-        }
-
-        const auto wave_vert = resolve_resource_path(resource_keys::WAVE_VERT);
-        const auto pixelate_frag = resolve_resource_path(resource_keys::PIXELATE_FRAG);
-        if (!wave_vert.has_value() || !pixelate_frag.has_value())
-        {
-            return;
-        }
-
-        scene->transition_shader_loaded = scene->transition_shader.loadFromFile(
-            wave_vert->string(),
-            pixelate_frag->string());
-    }
-
-    void ensure_ball_billboard_shader_loaded()
-    {
-        if (ball_billboard_shader_loaded || !sf::Shader::isGeometryAvailable())
-        {
-            return;
-        }
-
-        const auto billboard_vert = resolve_resource_path(resource_keys::BILLBOARD_VERT);
-        const auto billboard_geom = resolve_resource_path(resource_keys::BILLBOARD_GEOM);
-        const auto billboard_frag = resolve_first_existing_resource({resource_keys::BILLBOARD_BONUS_FRAG, resource_keys::BILLBOARD_FRAG});
-        if (!billboard_vert.has_value() || !billboard_geom.has_value() || !billboard_frag.has_value())
-        {
-            return;
-        }
-
-        ball_billboard_shader_loaded = ball_billboard_shader.loadFromFile(
-            billboard_vert->string(),
-            billboard_geom->string(),
-            billboard_frag->string());
-    }
-
-    void ensure_sprite_loaded()
-    {
-        if (scene->gameplay_sprite_loaded)
-        {
-            return;
-        }
-
-        const auto sprite_path = resolve_first_existing_resource({resource_keys::CHARACTER_IDLE, resource_keys::MENU_SPRITE});
-        if (!sprite_path.has_value())
-        {
-            return;
-        }
-
-        if (!scene->gameplay_sprite_texture.loadFromFile(sprite_path->string()))
-        {
-            return;
-        }
-
-        scene->gameplay_sprite_loaded = true;
-    }
-
-    void ensure_interaction_sfx_loaded()
-    {
-        if (scene->interaction_sfx_loaded)
-        {
-            return;
-        }
-
-        const auto sfx_path = resolve_first_existing_resource({resource_keys::INTERACTION_SFX, resource_keys::SYNTH_THEME});
-        if (!sfx_path.has_value())
-        {
-            return;
-        }
-
-        if (!scene->interaction_sfx_buffer.loadFromFile(sfx_path->string()))
-        {
-            return;
-        }
-
-        scene->interaction_sfx.setBuffer(scene->interaction_sfx_buffer);
-        scene->interaction_sfx_loaded = true;
     }
 
     void ensure_playing_assets_ready()
     {
         // Keep startup quick: load heavy media the first time PLAYING needs it.
-        ensure_shader_loaded();
-        ensure_fog_shader_loaded();
-        ensure_bloom_threshold_shader_loaded();
-        ensure_bloom_shader_loaded();
-        ensure_transition_shader_loaded();
-        ensure_ball_billboard_shader_loaded();
-        ensure_sprite_loaded();
-        ensure_interaction_sfx_loaded();
+        (void)utils::async_loader::ensure_fragment_shader_loaded(
+            scene->gameplay_shader,
+            scene->gameplay_shader_loaded,
+            {resource_keys::PARALLAX_FRAG},
+            loaded_resources,
+            RESOURCE_PATH);
+
+        (void)utils::async_loader::ensure_fragment_shader_loaded(
+            fog_shader,
+            fog_shader_loaded,
+            {resource_keys::RADIAL_FOG_FRAG},
+            loaded_resources,
+            RESOURCE_PATH);
+
+        (void)utils::async_loader::ensure_fragment_shader_loaded(
+            bloom_threshold_shader,
+            bloom_threshold_shader_loaded,
+            {resource_keys::BLOOM_THRESHOLD_FRAG},
+            loaded_resources,
+            RESOURCE_PATH);
+
+        (void)utils::async_loader::ensure_fragment_shader_loaded(
+            bloom_shader,
+            bloom_shader_loaded,
+            {resource_keys::BLUR_FRAG},
+            loaded_resources,
+            RESOURCE_PATH);
+
+        (void)utils::async_loader::ensure_shader_loaded(
+            scene->transition_shader,
+            scene->transition_shader_loaded,
+            resource_keys::WAVE_VERT,
+            resource_keys::PIXELATE_FRAG,
+            loaded_resources,
+            RESOURCE_PATH);
+
+        if (sf::Shader::isGeometryAvailable())
+        {
+            (void)utils::async_loader::ensure_shader_loaded(
+                ball_billboard_shader,
+                ball_billboard_shader_loaded,
+                resource_keys::BILLBOARD_VERT,
+                resource_keys::BILLBOARD_GEOM,
+                {resource_keys::BILLBOARD_BONUS_FRAG, resource_keys::BILLBOARD_FRAG},
+                loaded_resources,
+                RESOURCE_PATH);
+        }
+
+        (void)utils::async_loader::ensure_texture_loaded(
+            scene->gameplay_sprite_texture,
+            scene->gameplay_sprite_loaded,
+            {resource_keys::CHARACTER_IDLE, resource_keys::MENU_SPRITE},
+            loaded_resources,
+            RESOURCE_PATH);
+
+        (void)utils::async_loader::ensure_sound_loaded(
+            scene->interaction_sfx_buffer,
+            scene->interaction_sfx,
+            scene->interaction_sfx_loaded,
+            {resource_keys::INTERACTION_SFX, resource_keys::SYNTH_THEME},
+            loaded_resources,
+            RESOURCE_PATH);
     }
 
     void begin_transition_to_playing()
     {
         transition_elapsed_seconds = 0.0f;
         ensure_playing_assets_ready();
-        switch_app_state(AppState::TRANSITION);
+        SWITCH_APP_STATE(AppState::TRANSITION);
     }
 
     void update_transition(const float dt)
@@ -860,7 +668,7 @@ private:
         if (transition_elapsed_seconds >= TRANSITION_DURATION_SECONDS)
         {
             transition_elapsed_seconds = 0.0f;
-            switch_app_state(AppState::PLAYING);
+            SWITCH_APP_STATE(AppState::PLAYING);
         }
     }
 
@@ -930,71 +738,37 @@ private:
         scene->gameplay_sprite.setScale({scale, scale});
         scene->gameplay_sprite.setPosition({20.0f, 120.0f});
 
-        if (scene->gameplay_shader_loaded)
-        {
-            sf::RenderStates states;
-            states.shader = &scene->gameplay_shader;
-            target.draw(scene->gameplay_sprite, states);
-            return;
-        }
-
         target.draw(scene->gameplay_sprite);
     }
 
-    [[nodiscard]] std::optional<std::filesystem::path> resolve_resource_path(const std::string_view key) const
+    void draw_gameplay_background(sf::RenderTarget &target)
     {
-        const auto it = loaded_resources.find(std::string{key});
-        if (it != loaded_resources.cend())
-        {
-            return it->second;
-        }
-
-        const auto fallback = utils::async_loader::resolve_resource_path(key, RESOURCE_PATH);
-        if (fallback.has_value())
-        {
-            return fallback;
-        }
-
-        return std::nullopt;
-    }
-
-    void try_set_window_icon()
-    {
-        const auto icon_path = resolve_resource_path(resource_keys::ICON);
-        if (!icon_path.has_value())
+        if (!scene->gameplay_shader_loaded)
         {
             return;
         }
 
-        sf::Image icon;
-        if (icon.loadFromFile(icon_path->string()))
-        {
-            scene->setIcon(icon.getSize(), icon.getPixelsPtr());
-        }
-    }
-
-    void load_font()
-    {
-        if (const auto font_path = resolve_resource_path(resource_keys::FONT); font_path.has_value() && sfml_font.openFromFile(font_path->string()))
+        const auto size = scene->getSize();
+        if (size.x == 0u || size.y == 0u)
         {
             return;
         }
 
-        const std::array<std::filesystem::path, 6> CANDIDATES{
-            "C:/Windows/Fonts/arial.ttf",
-            "C:/Windows/Fonts/consola.ttf",
-            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-            "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-            "/System/Library/Fonts/SFNS.ttf",
-            "/System/Library/Fonts/Supplemental/Arial.ttf"};
-
-        auto found = std::ranges::find_if(CANDIDATES, [this](const auto &path)
-                                          { return std::filesystem::exists(path) && sfml_font.openFromFile(path); });
-
-        if (found == CANDIDATES.cend())
+        scene->gameplay_shader.setUniform("iResolution", sf::Glsl::Vec2{static_cast<float>(size.x), static_cast<float>(size.y)});
+        scene->gameplay_shader.setUniform("iTime", gameplay_background_seconds);
+        float gameplay_offset = gameplay_background_seconds * 0.9f;
+        if (B2_IS_NON_NULL(player_body))
         {
-            throw std::runtime_error("Amazing cannot find a renderable font.");
+            gameplay_offset += b2Body_GetPosition(player_body).x * 0.5f;
         }
+        scene->gameplay_shader.setUniform("iOffset", gameplay_offset);
+
+        sf::RectangleShape backdrop{{static_cast<float>(size.x), static_cast<float>(size.y)}};
+        backdrop.setPosition({0.0f, 0.0f});
+
+        sf::RenderStates states;
+        states.shader = &scene->gameplay_shader;
+        target.draw(backdrop, states);
     }
 
     void init_help_text()
@@ -1390,6 +1164,8 @@ private:
         }
 
         const auto area_size = scene->getSize();
+        draw_gameplay_background(target);
+
         const float margin_x = 28.0f;
         const float margin_y = 60.0f;
         const float cell_w = (static_cast<float>(area_size.x) - margin_x * 2.0f) / static_cast<float>(tutorial_cols);
@@ -1405,8 +1181,8 @@ private:
                 sf::RectangleShape cell{{cell_w - 2.0f, cell_h - 2.0f}};
                 cell.setPosition({margin_x + static_cast<float>(col) * cell_w + 1.0f,
                                   margin_y + static_cast<float>(row) * cell_h + 1.0f});
-                cell.setFillColor(sf::Color(26, 32, 50));
-                cell.setOutlineColor(sf::Color(70, 82, 96));
+                cell.setFillColor(sf::Color(26, 32, 50, 182));
+                cell.setOutlineColor(sf::Color(70, 82, 96, 190));
                 cell.setOutlineThickness(1.0f);
                 tutorial_cells.push_back(cell);
             }
@@ -1425,8 +1201,8 @@ private:
             trail.setPosition({margin_x + static_cast<float>(col) * cell_w + 3.0f,
                                margin_y + static_cast<float>(row) * cell_h + 3.0f});
             const bool is_prize_cell = tutorial_cell_is_on_prize_path(index);
-            trail.setFillColor(is_prize_cell ? sf::Color(90, 164, 255, 170) : sf::Color(220, 58, 58, 200));
-            trail.setOutlineColor(is_prize_cell ? sf::Color(180, 220, 255) : sf::Color(255, 180, 180));
+            trail.setFillColor(is_prize_cell ? sf::Color(90, 164, 255, 120) : sf::Color(220, 58, 58, 150));
+            trail.setOutlineColor(is_prize_cell ? sf::Color(180, 220, 255, 205) : sf::Color(255, 180, 180, 205));
             trail.setOutlineThickness(1.3f);
             target.draw(trail);
         }
@@ -1441,16 +1217,16 @@ private:
         sf::RectangleShape glow_start{{cell_w - 4.0f, cell_h - 4.0f}};
         glow_start.setPosition({margin_x + static_cast<float>(start_col) * cell_w + 2.0f,
                                 margin_y + static_cast<float>(start_row) * cell_h + 2.0f});
-        glow_start.setFillColor(sf::Color(112, 124, 255, 220));
-        glow_start.setOutlineColor(sf::Color(170, 187, 255));
+        glow_start.setFillColor(sf::Color(112, 124, 255, 178));
+        glow_start.setOutlineColor(sf::Color(170, 187, 255, 205));
         glow_start.setOutlineThickness(1.5f);
         target.draw(glow_start);
 
         sf::RectangleShape glow_goal{{cell_w - 4.0f, cell_h - 4.0f}};
         glow_goal.setPosition({margin_x + static_cast<float>(goal_col) * cell_w + 2.0f,
                                margin_y + static_cast<float>(goal_row) * cell_h + 2.0f});
-        glow_goal.setFillColor(sf::Color(60, 180, 110, 220));
-        glow_goal.setOutlineColor(sf::Color(170, 255, 200));
+        glow_goal.setFillColor(sf::Color(60, 180, 110, 178));
+        glow_goal.setOutlineColor(sf::Color(170, 255, 200, 205));
         glow_goal.setOutlineThickness(1.5f);
         target.draw(glow_goal);
 
@@ -1468,7 +1244,7 @@ private:
             return;
         }
 
-        const auto ms = fmt::format("{:.2f}", how_long_last_apply_took);
+        const auto ms = fmt::format("{:.5f}", how_long_last_apply_took);
         fmt::println("Apply took {} ms\n", ms);
 
         const auto bounds = apply_timing_text->getLocalBounds();
@@ -1509,42 +1285,9 @@ private:
         state_label_text->setPosition({10.0f, 10.0f});
     }
 
-    void throw_ball_at_character(const std::size_t ball_index, const float impulse_scale)
-    {
-        if (ball_index >= physics_balls.size() || !B2_IS_NON_NULL(player_body))
-        {
-            return;
-        }
-
-        const b2Vec2 ball_position = b2Body_GetPosition(physics_balls[ball_index].body);
-        const b2Vec2 player_position = b2Body_GetPosition(player_body);
-        const float dx = player_position.x - ball_position.x;
-        const float dy = player_position.y - ball_position.y;
-        const float len_sq = dx * dx + dy * dy;
-        if (len_sq <= 1e-6f)
-        {
-            return;
-        }
-
-        const float inv_len = 1.0f / std::sqrt(len_sq);
-        const b2Vec2 impulse{dx * inv_len * impulse_scale, dy * inv_len * impulse_scale};
-        b2Body_ApplyLinearImpulseToCenter(physics_balls[ball_index].body, impulse, true);
-    }
-
-    void rebuild_solution_path()
-    {
-    }
-
     void create_world()
     {
-        if (B2_IS_NON_NULL(world_with_physics))
-        {
-            b2DestroyWorld(world_with_physics);
-        }
-
-        b2WorldDef def = b2DefaultWorldDef();
-        def.gravity = {0.0f, 0.0f};
-        world_with_physics = b2CreateWorld(&def);
+        world_with_physics = utils::physics_ops::recreate_world(world_with_physics);
         player_body = b2_nullBodyId;
         physics_wall_bodies.clear();
         physics_balls.clear();
@@ -1552,48 +1295,16 @@ private:
         grabbed_ball_start_position.reset();
     }
 
-    b2Vec2 px_to_m(const float x, const float y) const
-    {
-        return {x / scene->pixels_per_meter, y / scene->pixels_per_meter};
-    }
-
-    // Converts a real window pixel (e.g. mouse position) into physics meters,
-    // undoing the virtual-to-window stretch applied at render time.
-    [[nodiscard]] b2Vec2 screen_px_to_world_m(const float x, const float y) const
-    {
-        return px_to_m(x / world_scale_x, y / world_scale_y);
-    }
-
-    // Converts a physics position (meters) into a real window pixel position.
-    [[nodiscard]] sf::Vector2f world_m_to_screen_px(const b2Vec2 p) const
-    {
-        return {p.x * scene->pixels_per_meter * world_scale_x, p.y * scene->pixels_per_meter * world_scale_y};
-    }
-
-    void add_wall_body_from_rect(const float x, const float y, const float w, const float h)
-    {
-        if (w <= 0.0f || h <= 0.0f)
-        {
-            return;
-        }
-
-        b2BodyDef body_def = b2DefaultBodyDef();
-        body_def.type = b2_staticBody;
-        body_def.position = px_to_m(x + w * 0.5f, y + h * 0.5f);
-        b2BodyId body = b2CreateBody(world_with_physics, &body_def);
-
-        b2ShapeDef shape_def = b2DefaultShapeDef();
-        const b2Polygon box = b2MakeBox((w * 0.5f) / scene->pixels_per_meter, (h * 0.5f) / scene->pixels_per_meter);
-        b2CreatePolygonShape(body, &shape_def, &box);
-
-        physics_wall_bodies.push_back(body);
-    }
-
     void add_ball(const sf::Vector2f position)
     {
         b2BodyDef body_def = b2DefaultBodyDef();
         body_def.type = b2_dynamicBody;
-        body_def.position = screen_px_to_world_m(position.x, position.y);
+        body_def.position = utils::physics_ops::screen_px_to_world_m(
+            position.x,
+            position.y,
+            scene->pixels_per_meter,
+            world_scale_x,
+            world_scale_y);
         body_def.linearDamping = 0.08f;
         body_def.angularDamping = 0.10f;
         b2BodyId body = b2CreateBody(world_with_physics, &body_def);
@@ -1607,10 +1318,10 @@ private:
 
         dynamic_ball ball{sfml_font};
         ball.body = body;
-        ball.value = random_value_ball();
+        ball.value = utils::physics_ops::random_value_ball(RNG);
         ball.drawable.setString(std::to_string(ball.value));
         ball.drawable.setCharacterSize(static_cast<unsigned int>(dynamic_ball::ball_radius_px * 2.2f));
-        ball.drawable.setFillColor(value_ball_tint(ball.value));
+        ball.drawable.setFillColor(utils::physics_ops::value_ball_tint(ball.value));
         ball.drawable.setOutlineColor(sf::Color(35, 26, 18));
         ball.drawable.setOutlineThickness(1.5f);
         ball.drawable.setStyle(sf::Text::Style::Bold);
@@ -1618,55 +1329,6 @@ private:
                                  static_cast<float>(ball.drawable.getCharacterSize()) * 0.5f});
         ball.drawable.setPosition(position);
         physics_balls.push_back(ball);
-    }
-
-    [[nodiscard]] std::optional<std::size_t> find_ball_at(const sf::Vector2f pos_pixels) const
-    {
-        const b2Vec2 target = screen_px_to_world_m(pos_pixels.x, pos_pixels.y);
-        float best_dist_sq = 1e9f;
-        std::optional<std::size_t> best_index;
-
-        for (std::size_t i = 0; i < physics_balls.size(); ++i)
-        {
-            if (physics_balls[i].collected)
-            {
-                continue;
-            }
-
-            const b2Vec2 p = b2Body_GetPosition(physics_balls[i].body);
-            const float dx = target.x - p.x;
-            const float dy = target.y - p.y;
-            const float d2 = dx * dx + dy * dy;
-            const auto max_pick_radius_m = (dynamic_ball::ball_radius_px * 2.2f) / scene->pixels_per_meter;
-            const float max_pick_dist_sq = max_pick_radius_m * max_pick_radius_m;
-            if (d2 <= max_pick_dist_sq && d2 < best_dist_sq)
-            {
-                best_dist_sq = d2;
-                best_index = i;
-            }
-        }
-
-        return best_index;
-    }
-
-    [[nodiscard]] static int random_value_ball() noexcept
-    {
-        const bool negative = RNG.get_int(0, 9) == 0;
-        const int magnitude = RNG.get_int(1, 9);
-        return negative ? -magnitude : magnitude;
-    }
-
-    [[nodiscard]] static sf::Color value_ball_tint(const int value) noexcept
-    {
-        if (value > 0)
-        {
-            return sf::Color(255, 210, 92);
-        }
-        if (value < 0)
-        {
-            return sf::Color(255, 112, 120);
-        }
-        return sf::Color(220, 224, 255);
     }
 
     void apply_number_ball_effect(std::size_t index, const sf::Vector2f pointer_pos, const sf::Vector2f swipe_delta)
@@ -1730,7 +1392,7 @@ private:
 
         ball.collected = true;
         ball.lifetime_seconds = static_cast<float>(RNG.get_int(300, 500)) / 100.0f;
-        const auto base = value_ball_tint(ball.value);
+        const auto base = utils::physics_ops::value_ball_tint(ball.value);
         auto color = base;
         color.a = 255u;
         ball.drawable.setFillColor(color);
@@ -1747,38 +1409,7 @@ private:
             scene->interaction_sfx.play();
         }
 
-        emit_bonus_particles(ball_pos);
-    }
-
-    void update_number_balls(const float dt)
-    {
-        for (auto it = physics_balls.begin(); it != physics_balls.end();)
-        {
-            auto &ball = *it;
-            if (!ball.collected)
-            {
-                ++it;
-                continue;
-            }
-
-            ball.lifetime_seconds -= dt;
-            if (ball.lifetime_seconds <= 0.0f)
-            {
-                if (B2_IS_NON_NULL(ball.body))
-                {
-                    b2DestroyBody(ball.body);
-                    ball.body = b2_nullBodyId;
-                }
-                it = physics_balls.erase(it);
-                continue;
-            }
-
-            auto color = ball.drawable.getFillColor();
-            const float fa = std::clamp(ball.lifetime_seconds / 5.0f, 0.0f, 1.0f);
-            color.a = static_cast<std::uint8_t>(std::clamp(255.0f * fa, 0.0f, 255.0f));
-            ball.drawable.setFillColor(color);
-            ++it;
-        }
+        utils::physics_ops::emit_bonus_particles(bonus_particles, RNG, ball_pos);
     }
 
     void create_world_boundaries()
@@ -1793,10 +1424,22 @@ private:
         const float height = static_cast<float>(size.y);
         const float t = std::max(8.0f, layout_wall_thickness * 2.0f);
 
-        add_wall_body_from_rect(0.0f, 0.0f, width, t);
-        add_wall_body_from_rect(0.0f, height - t, width, t);
-        add_wall_body_from_rect(0.0f, 0.0f, t, height);
-        add_wall_body_from_rect(width - t, 0.0f, t, height);
+        if (const auto top = utils::physics_ops::add_wall_body_from_rect(world_with_physics, scene->pixels_per_meter, 0.0f, 0.0f, width, t); top.has_value())
+        {
+            physics_wall_bodies.push_back(*top);
+        }
+        if (const auto bottom = utils::physics_ops::add_wall_body_from_rect(world_with_physics, scene->pixels_per_meter, 0.0f, height - t, width, t); bottom.has_value())
+        {
+            physics_wall_bodies.push_back(*bottom);
+        }
+        if (const auto left = utils::physics_ops::add_wall_body_from_rect(world_with_physics, scene->pixels_per_meter, 0.0f, 0.0f, t, height); left.has_value())
+        {
+            physics_wall_bodies.push_back(*left);
+        }
+        if (const auto right = utils::physics_ops::add_wall_body_from_rect(world_with_physics, scene->pixels_per_meter, width - t, 0.0f, t, height); right.has_value())
+        {
+            physics_wall_bodies.push_back(*right);
+        }
     }
 
     void build_geometry_and_physics()
@@ -1834,7 +1477,11 @@ private:
             b2Body_ApplyLinearImpulseToCenter(ball.body, {std::cos(angle) * impulse, std::sin(angle) * impulse}, true);
         }
 
-        sync_ball_drawables();
+        utils::physics_ops::sync_ball_drawables(
+            physics_balls,
+            scene->pixels_per_meter,
+            world_scale_x,
+            world_scale_y);
     }
 
     void handle_events()
@@ -1848,10 +1495,22 @@ private:
 
             if (const auto *mouse = event->getIf<sf::Event::MouseButtonPressed>())
             {
+                if (!active_touch_finger.has_value())
+                {
+                    set_spotlight_position(mouse->position);
+                }
+
                 const auto pos = scene->mapPixelToCoords({mouse->position.x, mouse->position.y});
                 if (IS_APP_RUNNING(AppState::PLAYING) && mouse->button == sf::Mouse::Button::Left)
                 {
-                    if (const auto ball_index = find_ball_at(pos); ball_index.has_value())
+                    if (const auto ball_index = utils::physics_ops::find_ball_at(
+                            physics_balls,
+                            pos,
+                            scene->pixels_per_meter,
+                            world_scale_x,
+                            world_scale_y,
+                            dynamic_ball::ball_radius_px * 2.2f);
+                        ball_index.has_value())
                     {
                         apply_number_ball_effect(*ball_index, pos, {0.0f, 0.0f});
                         continue;
@@ -1863,6 +1522,11 @@ private:
 
             if (const auto *mouse = event->getIf<sf::Event::MouseMoved>())
             {
+                if (!active_touch_finger.has_value())
+                {
+                    set_spotlight_position(mouse->position);
+                }
+
                 const auto pos = scene->mapPixelToCoords({mouse->position.x, mouse->position.y});
                 if (IS_APP_RUNNING(AppState::PLAYING))
                 {
@@ -1885,6 +1549,36 @@ private:
                     }
                 }
                 continue_path_drag_if_active(*mouse);
+            }
+
+            if (const auto *touch = event->getIf<sf::Event::TouchBegan>())
+            {
+                if (!active_touch_finger.has_value())
+                {
+                    active_touch_finger = touch->finger;
+                }
+
+                if (active_touch_finger == touch->finger)
+                {
+                    set_spotlight_position(touch->position);
+                }
+            }
+
+            if (const auto *touch = event->getIf<sf::Event::TouchMoved>())
+            {
+                if (active_touch_finger == touch->finger)
+                {
+                    set_spotlight_position(touch->position);
+                }
+            }
+
+            if (const auto *touch = event->getIf<sf::Event::TouchEnded>())
+            {
+                if (active_touch_finger == touch->finger)
+                {
+                    set_spotlight_position(touch->position);
+                    active_touch_finger.reset();
+                }
             }
 
             if (const auto *mouse = event->getIf<sf::Event::MouseButtonReleased>())
@@ -1925,7 +1619,9 @@ private:
                 const float new_width = static_cast<float>(resized->size.x);
                 const float new_height = static_cast<float>(resized->size.y);
                 scene->setView(sf::View{{new_width * 0.5f, new_height * 0.5f}, {new_width, new_height}});
-                update_screen_layout();
+                set_spotlight_position(sf::Vector2i{
+                    static_cast<int>(std::lround(spotlight_position_px.x)),
+                    static_cast<int>(std::lround(spotlight_position_px.y))});
                 update_apply_timing_overlay();
                 update_score_overlay();
             }
@@ -1955,33 +1651,16 @@ private:
         }
     }
 
-    void sync_ball_drawables()
-    {
-        std::ranges::for_each(physics_balls, [this](dynamic_ball &ball)
-                              {
-                if (!B2_IS_NON_NULL(ball.body))
-                {
-                    return;
-                }
-                const b2Vec2 p = b2Body_GetPosition(ball.body);
-                ball.drawable.setPosition(world_m_to_screen_px(p));
-                ball.drawable.setScale({ world_scale_x, world_scale_y }); });
-    }
-
-    [[nodiscard]] static float player_radius_in_pixels() noexcept
-    {
-        return dynamic_ball::ball_radius_px * 2.22f;
-    }
 };
 
 int main()
 {
     try
     {
-#if defined(MAZE_DEBUG)
-
-        amazing_sfml_app::run_self_tests();
-#endif
+        if (DEBUGGING)
+        {
+            fmt::println("{} running in debug mode\n", APP_NAME);
+        }
 
         amazing_sfml_app app{};
         app.run();

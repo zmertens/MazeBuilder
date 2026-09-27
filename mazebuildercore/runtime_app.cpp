@@ -120,6 +120,10 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
             unknown_txt.set_processed(std::monostate{});
 
             last_result_buffer = get_finished_text();
+
+#if defined(MAZE_DEBUG)
+            global_async_logger().log(fmt::format("runtime finished text:\n{}", get_finished_text()));
+#endif
             return last_result_buffer;
         }
     } catch (...)
@@ -152,7 +156,6 @@ void runtime_app::visit_states() noexcept
 #if defined(MAZE_DEBUG)
 
     global_async_logger().log(fmt::format("runtime visited states in: {:.6f} ms\n", accumulator));
-    global_async_logger().log(fmt::format("runtime finished text:\n{}", get_finished_text()));
 #endif
 }
 
@@ -163,4 +166,16 @@ std::string runtime_app::get_finished_text() noexcept
     }
 
     return {};
+}
+
+void runtime_app::dump_logs() noexcept
+{
+    // Ensure the async logger worker has delivered all queued messages
+    // into the in-memory sink before we consume and print them.
+    global_async_logger().flush();
+    std::lock_guard<std::mutex> lock(logging_mtx);
+    for (const auto& log : received_logs)
+    {
+        global_async_logger().log(log);
+    }
 }
