@@ -481,7 +481,8 @@ private:
     std::size_t tutorial_cols{8u};
     std::size_t tutorial_start_cell{0u};
     std::size_t tutorial_goal_cell{1u};
-    std::string tutorial_prompt{"Tutorial: hold a blue square and trace to the green square."};
+    std::vector<std::size_t> tutorial_yellow_goal_cells{};
+    std::string tutorial_prompt{"Tutorial: hold a blue square and chase the green square. Each hit turns yellow and spawns a new green one."};
     tutorial_stage tutorial_ai_stage{tutorial_stage::BLUE_INTRO};
     float tutorial_ai_timer{0.0f};
     std::size_t tutorial_ai_step{0u};
@@ -1282,7 +1283,8 @@ private:
         return index != tutorial_goal_cell &&
                !tutorial_contains(tutorial_blue_cells, index) &&
                !tutorial_contains(tutorial_hidden_blue_cells, index) &&
-               !tutorial_contains(tutorial_hidden_red_cells, index);
+               !tutorial_contains(tutorial_hidden_red_cells, index) &&
+               !tutorial_cell_is_yellow(index);
     }
 
     [[nodiscard]] std::optional<std::size_t> tutorial_pick_free_cell() const
@@ -1333,6 +1335,11 @@ private:
         return tutorial_contains(tutorial_hidden_red_cells, index);
     }
 
+    [[nodiscard]] bool tutorial_cell_is_yellow(const std::size_t index) const noexcept
+    {
+        return tutorial_contains(tutorial_yellow_goal_cells, index);
+    }
+
     /// @brief Seed the grid: pressable blue squares, a green goal and the hidden blue/red squares
     void reset_tutorial_scene()
     {
@@ -1350,6 +1357,7 @@ private:
         tutorial_blue_cells.clear();
         tutorial_hidden_blue_cells.clear();
         tutorial_hidden_red_cells.clear();
+        tutorial_yellow_goal_cells.clear();
         tutorial_drag_active = false;
         tutorial_run_blue_found = 0;
         tutorial_run_red_hit = 0;
@@ -1536,7 +1544,7 @@ private:
         {
             tutorial_run_reached_goal = true;
             tutorial_activate_green_cell();
-            return true;
+            return false;
         }
 
         if (tutorial_cell_is_hidden_blue(index) && !tutorial_contains(tutorial_found_blue_cells, index))
@@ -1570,13 +1578,23 @@ private:
         return false;
     }
 
-    /// @brief Green squares seed a fresh blue square so play continues without a reset
+    /// @brief Green squares turn yellow and seed a fresh green square so play continues without a reset
     void tutorial_activate_green_cell()
     {
+        const auto completed_goal = tutorial_goal_cell;
+        tutorial_yellow_goal_cells.push_back(completed_goal);
+
         tutorial_spawn_blue_cell();
         tutorial_spawn_hidden_blue_cell();
 
-        utils::physics_ops::emit_bonus_particles(bonus_particles, RNG, tutorial_cell_center(tutorial_goal_cell));
+        if (const auto next_goal = tutorial_pick_free_cell(); next_goal.has_value())
+        {
+            tutorial_goal_cell = *next_goal;
+        }
+
+        set_tutorial_prompt("Green square hit: it turned yellow. Keep tracing to the next green square.");
+
+        utils::physics_ops::emit_bonus_particles(bonus_particles, RNG, tutorial_cell_center(completed_goal));
         if (scene->interaction_sfx_loaded)
         {
             scene->interaction_sfx.play();
@@ -1938,6 +1956,16 @@ private:
             anchor.setOutlineColor(sf::Color(170, 187, 255, 215));
             anchor.setOutlineThickness(1.5f);
             target.draw(anchor);
+        }
+
+        for (const auto index : tutorial_yellow_goal_cells)
+        {
+            sf::RectangleShape consumed_goal{};
+            place_cell(consumed_goal, index, 2.0f);
+            consumed_goal.setFillColor(sf::Color(220, 202, 68, 190));
+            consumed_goal.setOutlineColor(sf::Color(255, 238, 140, 220));
+            consumed_goal.setOutlineThickness(1.5f);
+            target.draw(consumed_goal);
         }
 
         sf::RectangleShape glow_goal{};
