@@ -83,6 +83,11 @@ namespace utils
             std::string_view key,
             bool fallback) noexcept;
 
+        static float config_float(
+            const std::map<std::string, std::string> &config_values,
+            std::string_view key,
+            float fallback) noexcept;
+
         static bool try_set_window_icon(
             sf::RenderWindow &window,
             const std::map<std::string, std::filesystem::path> &loaded_resources,
@@ -140,9 +145,62 @@ namespace utils
         static std::filesystem::path resource_path;
     };
 
-    class physics_ops : public mazes::singleton_base<physics_ops>
+    /// @class view_ops
+    /// @brief Window-free math helpers backing the pan / zoom / rotate camera
+    /// @details Keeping the gesture math here (instead of inline in the app) means it can be
+    ///          exercised without a display, mirroring the @ref physics_ops style.
+    class view_ops : public mazes::singleton_base<view_ops>
     {
-        friend class mazes::singleton_base<physics_ops>;
+        friend class mazes::singleton_base<view_ops>;
+
+    public:
+        static constexpr float PI = 3.14159265358979323846f;
+
+        /// @brief Euclidean distance between two points
+        static float distance(const sf::Vector2f &lhs, const sf::Vector2f &rhs) noexcept;
+
+        /// @brief Midpoint between two points, used as the pinch anchor
+        static sf::Vector2f midpoint(const sf::Vector2f &lhs, const sf::Vector2f &rhs) noexcept;
+
+        /// @brief Angle in degrees of the vector running from @p from to @p to
+        static float angle_degrees(const sf::Vector2f &from, const sf::Vector2f &to) noexcept;
+
+        /// @brief Wrap an angle into the (-180, 180] range
+        static float normalize_degrees(float degrees) noexcept;
+
+        /// @brief Shortest signed rotation taking @p from to @p to
+        static float shortest_delta_degrees(float from, float to) noexcept;
+
+        /// @brief Ratio between two pinch spans, guarded against degenerate spans
+        /// @return 1.0f when either span is too small to be meaningful
+        static float pinch_scale(float previous_distance, float current_distance) noexcept;
+
+        static float clamp_zoom(float zoom, float minimum, float maximum) noexcept;
+
+        /// @brief Shift a view center so the board point under an anchor stays put while zooming
+        /// @param center Current view center, in board coordinates
+        /// @param anchor_before Board point under the pointer before the zoom was applied
+        /// @param anchor_after Board point under the same pointer after the zoom was applied
+        static sf::Vector2f anchored_center(
+            const sf::Vector2f &center,
+            const sf::Vector2f &anchor_before,
+            const sf::Vector2f &anchor_after) noexcept;
+
+        /// @brief Keep the view center within the board extent plus a margin
+        static sf::Vector2f clamp_center(
+            const sf::Vector2f &center,
+            const sf::Vector2f &board_size,
+            float margin) noexcept;
+
+        /// @brief Whether a rotation delta is large enough to escape the twist dead zone
+        static bool exceeds_dead_zone(float delta_degrees, float dead_zone_degrees) noexcept;
+
+    private:
+        view_ops() = default;
+    };
+
+    class physics_ops : public mazes::singleton_base<physics_ops>
+    {        friend class mazes::singleton_base<physics_ops>;
 
     public:
         static b2WorldId recreate_world(b2WorldId existing_world) noexcept;

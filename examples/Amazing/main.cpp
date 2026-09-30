@@ -124,6 +124,11 @@ namespace config_keys
     constexpr std::string_view SHADER_THRESHOLD_FOG{"shader_threshold_fog"};
     constexpr std::string_view SHADER_THRESHOLD_BLOOM{"shader_threshold_bloom"};
     constexpr std::string_view SHADER_THRESHOLD_PARALLAX{"shader_threshold_parallax"};
+    constexpr std::string_view ZOOM_MIN{"zoom_min"};
+    constexpr std::string_view ZOOM_MAX{"zoom_max"};
+    constexpr std::string_view ZOOM_WHEEL_STEP{"zoom_wheel_step"};
+    constexpr std::string_view ROTATION_ENABLED{"rotation_enabled"};
+    constexpr std::string_view ROTATION_DEAD_ZONE_DEGREES{"rotation_dead_zone_degrees"};
 }
 
 static const std::filesystem::path TEMP_IMAGE_PATH{std::filesystem::temp_directory_path() / (std::string(FILE_NAMING_CONVENTION) + ".png")};
@@ -203,7 +208,36 @@ public:
         int bloom_threshold{25};
         int parallax_threshold{45};
         bool mobile_support{true};
+        float zoom_min{0.45f};
+        float zoom_max{3.0f};
+        float zoom_wheel_step{1.12f};
+        bool rotation_enabled{true};
+        float rotation_dead_zone_degrees{3.0f};
     };
+
+    /// @brief Pan / zoom / rotate state for the board
+    /// @details Applied to the board render texture only. The window keeps a 1:1 pixel view so
+    ///          the post-process sprite, the fog spotlight and the HUD stay screen aligned.
+    struct board_camera
+    {
+        sf::Vector2f center{0.0f, 0.0f};
+        sf::Vector2f base_size{1.0f, 1.0f};
+        float zoom{1.0f};
+        float rotation_degrees{0.0f};
+
+        [[nodiscard]] sf::View to_view() const
+        {
+            const float safe_zoom = zoom > 1.0e-3f ? zoom : 1.0e-3f;
+            sf::View view{center, {base_size.x / safe_zoom, base_size.y / safe_zoom}};
+            view.setRotation(sf::degrees(rotation_degrees));
+            return view;
+        }
+    };
+
+    /// @brief Degrees applied per Q/E press or per Ctrl+wheel notch
+    static constexpr float ROTATION_STEP_DEGREES{5.0f};
+    /// @brief Window pixels panned per arrow key press
+    static constexpr float PAN_STEP_PIXELS{40.0f};
 
     amazing_sfml_app()
         : scene{std::make_unique<scene_props>()}
@@ -352,13 +386,22 @@ public:
             }
 
             scene_surface.clear(sf::Color{0, 0, 0, 255});
+            scene_surface.setView(scene_surface.getDefaultView());
 
-            if (IS_APP_RUNNING(AppState::TUTORIAL) || IS_APP_RUNNING(AppState::PLAYING))
+            const bool draws_board = IS_APP_RUNNING(AppState::TUTORIAL) ||
+                                     IS_APP_RUNNING(AppState::PLAYING) ||
+                                     IS_APP_RUNNING(AppState::TRANSITION);
+
+            // The backdrop is screen sized, so it stays on the default view and always covers
+            // the surface no matter how far the board camera is zoomed or rotated.
+            if (draws_board && parallax_effect_unlocked())
             {
-                draw_tutorial_scene(scene_surface, false);
+                draw_gameplay_background(scene_surface);
             }
-            else if (IS_APP_RUNNING(AppState::TRANSITION))
+
+            if (draws_board)
             {
+                scene_surface.setView(board_view());
                 draw_tutorial_scene(scene_surface, false);
             }
             else if (IS_APP_RUNNING(AppState::MENU))
@@ -374,6 +417,7 @@ public:
                 utils::physics_ops::draw_bonus_particles(bonus_particles, scene_surface);
             }
 
+            scene_surface.setView(scene_surface.getDefaultView());
             scene_surface.display();
 
             scene->clear(sf::Color{0, 0, 0, 255});
@@ -390,6 +434,10 @@ private:
     sf::Sprite screen_sprite{screen_texture};
     std::map<std::string, std::filesystem::path> loaded_resources{};
     gameplay_tuning tuning{};
+    board_camera camera{};
+    sf::Vector2f board_world_size{
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.x),
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.y)};
 
     void load_gameplay_tuning()
     {
@@ -400,6 +448,12 @@ private:
         tuning.bloom_threshold = utils::async_loader::config_int(config_values, config_keys::SHADER_THRESHOLD_BLOOM, tuning.bloom_threshold);
         tuning.parallax_threshold = utils::async_loader::config_int(config_values, config_keys::SHADER_THRESHOLD_PARALLAX, tuning.parallax_threshold);
         tuning.mobile_support = utils::async_loader::config_bool(config_values, config_keys::MOBILE_SUPPORT, tuning.mobile_support);
+
+        tuning.zoom_min = std::max(0.05f, utils::async_loader::config_float(config_values, config_keys::ZOOM_MIN, tuning.zoom_min));
+        tuning.zoom_max = std::max(tuning.zoom_min, utils::async_loader::config_float(config_values, config_keys::ZOOM_MAX, tuning.zoom_max));
+        tuning.zoom_wheel_step = std::clamp(utils::async_loader::config_float(config_values, config_keys::ZOOM_WHEEL_STEP, tuning.zoom_wheel_step), 1.01f, 4.0f);
+        tuning.rotation_enabled = utils::async_loader::config_bool(config_values, config_keys::ROTATION_ENABLED, tuning.rotation_enabled);
+        tuning.rotation_dead_zone_degrees = std::max(0.0f, utils::async_loader::config_float(config_values, config_keys::ROTATION_DEAD_ZONE_DEGREES, tuning.rotation_dead_zone_degrees));
     }
 
     sf::Font sfml_font;
@@ -465,7 +519,20 @@ private:
     sf::Vector2f spotlight_position_px{
         static_cast<float>(scene_props::INIT_WINDOW_SIZE.x) * 0.5f,
         static_cast<float>(scene_props::INIT_WINDOW_SIZE.y) * 0.5f};
+    /// @brief The finger currently drawing the scoring trace, if any
     std::optional<unsigned int> active_touch_finger;
+    /// @brief Every finger currently down, keyed by finger index
+    std::map<unsigned int, sf::Vector2i> active_touches;
+    /// @brief True while two or more fingers are driving the camera instead of the trace
+    bool gesture_active{false};
+    /// @brief Blocks drawing after a gesture until every finger has lifted
+    bool gesture_lockout{false};
+    bool gesture_rotation_latched{false};
+    float gesture_prev_distance{0.0f};
+    float gesture_prev_angle_degrees{0.0f};
+    sf::Vector2f gesture_prev_midpoint{};
+    /// @brief Last pixel seen while panning with the right or middle mouse button
+    std::optional<sf::Vector2i> mouse_pan_origin;
 
     struct bonus_particle
     {
@@ -531,6 +598,162 @@ private:
 
         scene_surface_ready = scene_surface.resize(size);
         bloom_surface_ready = bloom_surface.resize(size);
+        refresh_camera_base_size();
+    }
+
+    /// @brief Recompute the unzoomed view extent from the surface, preserving pan/zoom/rotation
+    void refresh_camera_base_size()
+    {
+        const auto size = scene->getSize();
+        camera.base_size = {static_cast<float>(std::max(1u, size.x)), static_cast<float>(std::max(1u, size.y))};
+    }
+
+    /// @brief Reset the board world extent and recenter the camera on it
+    void reset_board_world_space()
+    {
+        const auto size = scene->getSize();
+        board_world_size = {static_cast<float>(std::max(1u, size.x)), static_cast<float>(std::max(1u, size.y))};
+        refresh_camera_base_size();
+        reset_camera();
+    }
+
+    void reset_camera()
+    {
+        camera.center = {board_world_size.x * 0.5f, board_world_size.y * 0.5f};
+        camera.zoom = 1.0f;
+        camera.rotation_degrees = 0.0f;
+        update_score_overlay();
+    }
+
+    [[nodiscard]] sf::View board_view() const
+    {
+        return camera.to_view();
+    }
+
+    /// @brief Window pixel -> board coordinate, inverting pan, zoom and rotation in one step
+    [[nodiscard]] sf::Vector2f pixel_to_board(const sf::Vector2i pixel) const
+    {
+        return scene_surface.mapPixelToCoords(pixel, board_view());
+    }
+
+    /// @brief Board coordinate -> window pixel, the inverse of @ref pixel_to_board
+    [[nodiscard]] sf::Vector2i board_to_pixel(const sf::Vector2f board_position) const
+    {
+        return scene_surface.mapCoordsToPixel(board_position, board_view());
+    }
+
+    /// @brief Apply a zoom factor while keeping the board point under @p anchor_pixel stationary
+    void apply_zoom_at(const float factor, const sf::Vector2i anchor_pixel)
+    {
+        if (!std::isfinite(factor) || factor <= 0.0f)
+        {
+            return;
+        }
+
+        const float target = utils::view_ops::clamp_zoom(camera.zoom * factor, tuning.zoom_min, tuning.zoom_max);
+        if (std::abs(target - camera.zoom) < 1.0e-5f)
+        {
+            return;
+        }
+
+        const auto anchor_before = pixel_to_board(anchor_pixel);
+        camera.zoom = target;
+        const auto anchor_after = pixel_to_board(anchor_pixel);
+        set_camera_center(utils::view_ops::anchored_center(camera.center, anchor_before, anchor_after));
+    }
+
+    void apply_rotation(const float delta_degrees)
+    {
+        if (!tuning.rotation_enabled || !std::isfinite(delta_degrees))
+        {
+            return;
+        }
+
+        camera.rotation_degrees = utils::view_ops::normalize_degrees(camera.rotation_degrees + delta_degrees);
+        update_score_overlay();
+    }
+
+    void set_camera_center(const sf::Vector2f center)
+    {
+        const float margin = std::max(board_world_size.x, board_world_size.y) * 0.5f;
+        camera.center = utils::view_ops::clamp_center(center, board_world_size, margin);
+    }
+
+    /// @brief Pan by a window-pixel delta, converted into board space through the current view
+    void pan_by_pixels(const sf::Vector2f pixel_delta)
+    {
+        const auto origin = pixel_to_board({0, 0});
+        const auto shifted = pixel_to_board({static_cast<int>(std::lround(pixel_delta.x)),
+                                             static_cast<int>(std::lround(pixel_delta.y))});
+        set_camera_center({camera.center.x - (shifted.x - origin.x), camera.center.y - (shifted.y - origin.y)});
+    }
+
+    /// @brief Latch the two-finger baseline so the first gesture frame produces no jump
+    void begin_camera_gesture()
+    {
+        if (active_touches.size() < 2u)
+        {
+            return;
+        }
+
+        cancel_path_drag();
+        active_touch_finger.reset();
+        gesture_active = true;
+        gesture_lockout = true;
+        gesture_rotation_latched = false;
+
+        const auto [a, b] = first_two_touch_points();
+        gesture_prev_distance = utils::view_ops::distance(a, b);
+        gesture_prev_angle_degrees = utils::view_ops::angle_degrees(a, b);
+        gesture_prev_midpoint = utils::view_ops::midpoint(a, b);
+    }
+
+    /// @brief Fold pinch zoom, twist rotation and midpoint panning into one gesture step
+    void update_camera_gesture()
+    {
+        if (!gesture_active || active_touches.size() < 2u)
+        {
+            return;
+        }
+
+        const auto [a, b] = first_two_touch_points();
+        const float dist = utils::view_ops::distance(a, b);
+        const float angle = utils::view_ops::angle_degrees(a, b);
+        const auto mid = utils::view_ops::midpoint(a, b);
+
+        const auto anchor = sf::Vector2i{static_cast<int>(std::lround(mid.x)), static_cast<int>(std::lround(mid.y))};
+        const float scale = utils::view_ops::pinch_scale(gesture_prev_distance, dist);
+        if (scale > 0.0f)
+        {
+            apply_zoom_at(scale, anchor);
+        }
+
+        const float angle_delta = utils::view_ops::shortest_delta_degrees(gesture_prev_angle_degrees, angle);
+        if (tuning.rotation_enabled)
+        {
+            // A dead zone keeps an ordinary pinch from leaving the board slightly crooked; once the
+            // user clearly twists past it the gesture latches and tracks every subsequent delta.
+            if (gesture_rotation_latched || utils::view_ops::exceeds_dead_zone(angle_delta, tuning.rotation_dead_zone_degrees))
+            {
+                gesture_rotation_latched = true;
+                apply_rotation(angle_delta);
+            }
+        }
+
+        pan_by_pixels({mid.x - gesture_prev_midpoint.x, mid.y - gesture_prev_midpoint.y});
+
+        gesture_prev_distance = dist;
+        gesture_prev_angle_degrees = angle;
+        gesture_prev_midpoint = mid;
+    }
+
+    [[nodiscard]] std::pair<sf::Vector2f, sf::Vector2f> first_two_touch_points() const
+    {
+        auto it = active_touches.cbegin();
+        const sf::Vector2f a{static_cast<float>(it->second.x), static_cast<float>(it->second.y)};
+        ++it;
+        const sf::Vector2f b{static_cast<float>(it->second.x), static_cast<float>(it->second.y)};
+        return {a, b};
     }
 
     void draw_post_processed_scene()
@@ -957,13 +1180,15 @@ private:
         float cell_h;
     };
 
+    /// @brief Cell geometry in the fixed board world space
+    /// @details Deriving this from @ref board_world_size instead of the live window means zooming
+    ///          and rotating move the camera rather than reflowing the grid.
     [[nodiscard]] tutorial_grid_metrics tutorial_metrics() const
     {
-        const auto area_size = scene->getSize();
         constexpr float margin_x = 28.0f;
         constexpr float margin_y = 60.0f;
-        const float cell_w = (static_cast<float>(area_size.x) - margin_x * 2.0f) / static_cast<float>(tutorial_cols);
-        const float cell_h = (static_cast<float>(area_size.y) - margin_y * 2.0f) / static_cast<float>(tutorial_rows);
+        const float cell_w = (board_world_size.x - margin_x * 2.0f) / static_cast<float>(tutorial_cols);
+        const float cell_h = (board_world_size.y - margin_y * 2.0f) / static_cast<float>(tutorial_rows);
         return {margin_x, margin_y, std::max(1.0f, cell_w), std::max(1.0f, cell_h)};
     }
 
@@ -1108,6 +1333,7 @@ private:
     void reset_tutorial_scene()
     {
         constexpr std::array<std::string_view, 4> algos_as_str{"dfs", "binary_tree", "sidewinder", "prims"};
+        reset_board_world_space();
         tutorial_rows = static_cast<std::size_t>(std::clamp<int>(8 + RNG.get_int(0, 4), 8, 14));
         tutorial_cols = static_cast<std::size_t>(std::clamp<int>(8 + RNG.get_int(0, 4), 8, 14));
         const auto cells = tutorial_cell_count();
@@ -1257,9 +1483,31 @@ private:
         return tutorial_run_reached_goal && tutorial_run_red_hit == 0 && tutorial_run_blue_found > 0;
     }
 
-    [[nodiscard]] static bool should_process_path_drag() noexcept
+    /// @brief Drawing is suppressed while a multi-touch camera gesture owns the pointer stream
+    [[nodiscard]] bool should_process_path_drag() const noexcept
     {
+        if (gesture_active || gesture_lockout)
+        {
+            return false;
+        }
+
         return IS_APP_RUNNING(AppState::TUTORIAL) || IS_APP_RUNNING(AppState::PLAYING);
+    }
+
+    /// @brief Drop an in-progress trace without scoring it, used when a gesture takes over
+    void cancel_path_drag()
+    {
+        if (!tutorial_drag_active)
+        {
+            return;
+        }
+
+        tutorial_drag_active = false;
+        tutorial_drag_path.clear();
+        tutorial_run_blue_found = 0;
+        tutorial_run_red_hit = 0;
+        tutorial_run_reached_goal = false;
+        set_tutorial_prompt("Camera gesture active: lift all fingers to trace again.");
     }
 
     void set_tutorial_prompt(std::string prompt)
@@ -1364,8 +1612,7 @@ private:
             return;
         }
 
-        const auto pos = scene->mapPixelToCoords(position);
-        const auto pressed = tutorial_cell_from_pixel(pos);
+        const auto pressed = tutorial_cell_from_pixel(pixel_to_board(position));
         if (!pressed.has_value() || !tutorial_contains(tutorial_blue_cells, *pressed))
         {
             return;
@@ -1388,7 +1635,7 @@ private:
             return;
         }
 
-        update_tutorial_drag_path(scene->mapPixelToCoords(position));
+        update_tutorial_drag_path(pixel_to_board(position));
     }
 
     void end_path_drag_at(const sf::Vector2i position)
@@ -1398,7 +1645,7 @@ private:
             return;
         }
 
-        update_tutorial_drag_path(scene->mapPixelToCoords(position));
+        update_tutorial_drag_path(pixel_to_board(position));
         finish_tutorial_drag();
     }
 
@@ -1525,9 +1772,7 @@ private:
             {
                 tutorial_drag_path.push_back(index);
             }
-            set_spotlight_position(sf::Vector2i{
-                static_cast<int>(std::lround(tutorial_cell_center(index).x)),
-                static_cast<int>(std::lround(tutorial_cell_center(index).y))});
+            set_spotlight_position(board_to_pixel(tutorial_cell_center(index)));
 
             if (tutorial_cell_is_hidden_blue(index))
             {
@@ -1598,17 +1843,12 @@ private:
         draw_tutorial_scene(*scene, show_guidance_text);
     }
 
+    /// @brief Draw the board content. The caller is responsible for applying the camera view.
     void draw_tutorial_scene(sf::RenderTarget &target, const bool show_guidance_text = true)
     {
         if (!tutorial_prompt_text.has_value())
         {
             return;
-        }
-
-        const auto area_size = scene->getSize();
-        if (parallax_effect_unlocked())
-        {
-            draw_gameplay_background(target);
         }
 
         const auto metrics = tutorial_metrics();
@@ -1705,7 +1945,7 @@ private:
 
         if (show_guidance_text)
         {
-            tutorial_prompt_text->setPosition({14.f, static_cast<float>(area_size.y) - 42.f});
+            tutorial_prompt_text->setPosition({14.f, board_world_size.y - 42.f});
             target.draw(*tutorial_prompt_text);
         }
     }
@@ -1976,7 +2216,7 @@ private:
                     set_spotlight_position(mouse->position);
                 }
 
-                const auto pos = scene->mapPixelToCoords({mouse->position.x, mouse->position.y});
+                const auto pos = pixel_to_board(mouse->position);
                 if (IS_APP_RUNNING(AppState::PLAYING) && mouse->button == sf::Mouse::Button::Left)
                 {
                     if (const auto ball_index = utils::physics_ops::find_ball_at(
@@ -1993,6 +2233,12 @@ private:
                     }
                 }
 
+                if (mouse->button == sf::Mouse::Button::Right || mouse->button == sf::Mouse::Button::Middle)
+                {
+                    mouse_pan_origin = mouse->position;
+                    continue;
+                }
+
                 begin_path_drag_if_possible(*mouse);
             }
 
@@ -2003,7 +2249,15 @@ private:
                     set_spotlight_position(mouse->position);
                 }
 
-                const auto pos = scene->mapPixelToCoords({mouse->position.x, mouse->position.y});
+                if (mouse_pan_origin.has_value())
+                {
+                    pan_by_pixels({static_cast<float>(mouse->position.x - mouse_pan_origin->x),
+                                   static_cast<float>(mouse->position.y - mouse_pan_origin->y)});
+                    mouse_pan_origin = mouse->position;
+                    continue;
+                }
+
+                const auto pos = pixel_to_board(mouse->position);
                 if (IS_APP_RUNNING(AppState::PLAYING))
                 {
                     static sf::Vector2f last_pointer_pos{};
@@ -2029,13 +2283,15 @@ private:
 
             if (const auto *touch = event->getIf<sf::Event::TouchBegan>())
             {
-                if (!active_touch_finger.has_value())
+                active_touches[touch->finger] = touch->position;
+
+                if (active_touches.size() >= 2u)
+                {
+                    begin_camera_gesture();
+                }
+                else if (!gesture_lockout && !active_touch_finger.has_value())
                 {
                     active_touch_finger = touch->finger;
-                }
-
-                if (active_touch_finger == touch->finger)
-                {
                     set_spotlight_position(touch->position);
                     if (tuning.mobile_support)
                     {
@@ -2046,7 +2302,16 @@ private:
 
             if (const auto *touch = event->getIf<sf::Event::TouchMoved>())
             {
-                if (active_touch_finger == touch->finger)
+                if (active_touches.find(touch->finger) != active_touches.end())
+                {
+                    active_touches[touch->finger] = touch->position;
+                }
+
+                if (gesture_active)
+                {
+                    update_camera_gesture();
+                }
+                else if (active_touch_finger == touch->finger)
                 {
                     set_spotlight_position(touch->position);
                     if (tuning.mobile_support)
@@ -2058,6 +2323,21 @@ private:
 
             if (const auto *touch = event->getIf<sf::Event::TouchEnded>())
             {
+                active_touches.erase(touch->finger);
+
+                if (active_touches.size() < 2u)
+                {
+                    // Never fall back into drawing mid-gesture: a lifted pinch would otherwise
+                    // leave the remaining finger tracing a stray scoring line.
+                    gesture_active = false;
+                    gesture_rotation_latched = false;
+                }
+
+                if (active_touches.empty())
+                {
+                    gesture_lockout = false;
+                }
+
                 if (active_touch_finger == touch->finger)
                 {
                     set_spotlight_position(touch->position);
@@ -2069,8 +2349,32 @@ private:
                 }
             }
 
+            if (const auto *wheel = event->getIf<sf::Event::MouseWheelScrolled>())
+            {
+                if (wheel->wheel == sf::Mouse::Wheel::Vertical)
+                {
+                    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LControl) ||
+                        sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RControl))
+                    {
+                        apply_rotation(wheel->delta * ROTATION_STEP_DEGREES);
+                    }
+                    else
+                    {
+                        // Anchoring at the cursor keeps the square under the pointer fixed,
+                        // otherwise the board appears to drift away as the user scrolls.
+                        apply_zoom_at(std::pow(tuning.zoom_wheel_step, -wheel->delta), wheel->position);
+                    }
+                    update_score_overlay();
+                }
+            }
+
             if (const auto *mouse = event->getIf<sf::Event::MouseButtonReleased>())
             {
+                if (mouse->button == sf::Mouse::Button::Right || mouse->button == sf::Mouse::Button::Middle)
+                {
+                    mouse_pan_origin.reset();
+                }
+
                 end_path_drag_if_active(*mouse);
             }
 
@@ -2092,6 +2396,34 @@ private:
                 {
                     focus_hold_active = true;
                 }
+                else if (key->code == sf::Keyboard::Key::Q)
+                {
+                    apply_rotation(-ROTATION_STEP_DEGREES);
+                }
+                else if (key->code == sf::Keyboard::Key::E)
+                {
+                    apply_rotation(ROTATION_STEP_DEGREES);
+                }
+                else if (key->code == sf::Keyboard::Key::R)
+                {
+                    reset_camera();
+                }
+                else if (key->code == sf::Keyboard::Key::Left)
+                {
+                    pan_by_pixels({PAN_STEP_PIXELS, 0.0f});
+                }
+                else if (key->code == sf::Keyboard::Key::Right)
+                {
+                    pan_by_pixels({-PAN_STEP_PIXELS, 0.0f});
+                }
+                else if (key->code == sf::Keyboard::Key::Up)
+                {
+                    pan_by_pixels({0.0f, PAN_STEP_PIXELS});
+                }
+                else if (key->code == sf::Keyboard::Key::Down)
+                {
+                    pan_by_pixels({0.0f, -PAN_STEP_PIXELS});
+                }
             }
 
             if (const auto *key = event->getIf<sf::Event::KeyReleased>())
@@ -2107,6 +2439,9 @@ private:
                 const float new_width = static_cast<float>(resized->size.x);
                 const float new_height = static_cast<float>(resized->size.y);
                 scene->setView(sf::View{{new_width * 0.5f, new_height * 0.5f}, {new_width, new_height}});
+                // The window stays 1:1 for the post-process sprite and HUD; the board view is
+                // rebuilt separately so pan, zoom and rotation survive the resize.
+                ensure_scene_surface_ready();
                 set_spotlight_position(sf::Vector2i{
                     static_cast<int>(std::lround(spotlight_position_px.x)),
                     static_cast<int>(std::lround(spotlight_position_px.y))});
