@@ -52,6 +52,33 @@ Mobile support mode is enabled through the `mobile_support` flag in
 exact same press, drag and release code path as the mouse, which keeps the
 gameplay portable to an Android build later on.
 
+## Moving the Camera
+
+The board is drawn into an off-screen render texture, and an `sf::View` is
+applied to that texture only. The window itself keeps a 1:1 pixel view, so the
+post-process sprite, the fog spotlight and the HUD stay screen aligned no
+matter how the board is panned, zoomed or rotated.
+
+  * **Zoom** - mouse wheel, or a two-finger pinch. Zoom is anchored at the
+    cursor or the finger midpoint, so the square under the pointer stays put.
+  * **Rotate** - `Q` / `E`, `Ctrl` + wheel, or a two-finger twist. The twist
+    gesture uses a dead zone so an ordinary pinch does not leave the board
+    crooked.
+  * **Pan** - arrow keys, a right- or middle-button drag, or two-finger
+    translation.
+  * **Reset** - `R` returns the camera to centred, unzoomed and unrotated.
+
+When a second finger lands, any in-progress trace is cancelled without scoring
+and the gesture takes over. Drawing does not resume until every finger lifts,
+so a released pinch cannot turn into a stray scoring line.
+
+Camera limits are configured in `amazing_mazes.json`:
+
+  * `zoom_min` / `zoom_max` - cumulative zoom clamp
+  * `zoom_wheel_step` - zoom factor applied per wheel notch
+  * `rotation_enabled` - master switch for all rotation input
+  * `rotation_dead_zone_degrees` - twist threshold before rotation latches
+
 ## Modern Graphics and Effects with Shaders
 
 Graphical effects are unlocked by accumulating positive points. The thresholds

@@ -1069,7 +1069,9 @@ private:
             fmt::format(
                 "Hold on a blue square and drag to green (touch or mouse)\n"
                 "Hidden blue: +{}   Hidden red: -{}\nGreen square spawns a new blue square\n"
-                "Hold Space: focus through fog\nH: hide/show help\n",
+                "Hold Space: focus through fog\nH: hide/show help\n"
+                "Wheel / pinch: zoom   Ctrl+wheel, Q/E or two-finger twist: rotate\n"
+                "Arrows or right-drag: pan   R: reset camera\n",
                 tuning.hidden_blue_reward,
                 tuning.hidden_red_penalty),
             18u);
@@ -1113,10 +1115,12 @@ private:
         }
 
         score_text->setString(fmt::format(
-            "Score: {}  Streak: {}  FX: {}",
+            "Score: {}  Streak: {}  FX: {}  Zoom: {}%  Rot: {}deg",
             playing_score,
             playing_streak,
-            unlocked_effects_label()));
+            unlocked_effects_label(),
+            static_cast<int>(std::lround(camera.zoom * 100.0f)),
+            static_cast<int>(std::lround(camera.rotation_degrees))));
         const auto bounds = score_text->getLocalBounds();
         const float x = static_cast<float>(scene->getSize().x) - bounds.size.x - 16.0f;
         score_text->setPosition({x, 10.0f});
