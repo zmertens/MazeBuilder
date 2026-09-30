@@ -27,41 +27,43 @@ The game follows a simple state pattern:
     - Resets and restarts the game
     - Signifies configuration events to select a level
   * TUTORIAL
-    - Provides guided messaging with respect to gameplay progression
-    - Disables scoring system, persistence of scores
+    - An "AI" driven demo: the app traces the grid by itself and narrates the rules
+    - Stage 1 introduces the hidden blue squares and the positive points they award
+    - Stage 2 introduces the hidden red squares and their penalty
+    - Stage 3 explains which shader effects unlock at which score threshold
+    - Hands control back to the player and transitions into PLAYING
 
 ## Scoring and Competition
 
-The objective of the game is to touch or point and hold a starting point,
-and without lifting the pointer, drag and swipe across a playfield of cells
-and increment points.
+The objective of the game is to touch or point and hold a blue square,
+and without lifting the pointer, drag a continuous line across the grid
+towards the green square.
 
-Gameplay happens by pointing at a cell on screen,
-and clicking the mouse, joystick button, or finger down on that point,
-and swiping to another cell.
-Once the pointer is released then that swiped or drawn portion of cells is rendered
-in color and revealed.
+Hidden squares are revealed by the traced line from any direction:
 
-Numbers are added/subtracted by swiping parts of a randomly-select path.
-Natural goal-orientation towards positive (green) numbers
-gives the appearance of progress. Subtracting numbers (red)
-will mean slower progress; there isn't a notion of "negative progress".
+  * A hidden blue square awards `hidden_blue_reward` points (5 by default)
+  * A hidden red square costs `hidden_red_penalty` points (2 by default)
 
-Receiving a configurable number less than zero puts the game in a tutorial mode.
-The player can choose to skip and receive a lump sum of positive numbers, or play tutorial mode.
+Activating the green square generates a new blue square randomly in the grid,
+so play continues without resetting the scene.
 
-Tutorial mode will, by default, clearly shown and mark the randomly-generated path,
-and instruct the user where to swipe. The tutorial will show and explain briefly positive and negative numbers.
-
-Once the player feels comfortable with the basic mechanics they can move back into PLAYING mode.
+Mobile support mode is enabled through the `mobile_support` flag in
+`amazing_mazes.json`. With it enabled, touch began/moved/ended events drive the
+exact same press, drag and release code path as the mouse, which keeps the
+gameplay portable to an Android build later on.
 
 ## Modern Graphics and Effects with Shaders
+
+Graphical effects are unlocked by accumulating positive points. The thresholds
+are configured in `amazing_mazes.json`:
+
+  * `shader_threshold_fog` - radial fog "fog of war" spotlight
+  * `shader_threshold_bloom` - bloom threshold plus blur glow pass
+  * `shader_threshold_parallax` - animated parallax background
 
 Chunk-based rendering system with continuous level generation via Maze Builder.
 
 Particles to give a central focal point to the player's current pointer, 
 and represent movement between start/stop positions.
-
-Bloom filter for ambience, and blur filter as a "fog of war" effect.
 
 Transitions thru gameplay with grayscale on scene creation, as a means of hidding the best path out, and the pointer movement has the effect of interpolating into shaders like pixelation and wave.

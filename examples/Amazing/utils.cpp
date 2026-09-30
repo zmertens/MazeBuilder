@@ -146,6 +146,70 @@ std::map<std::string, std::filesystem::path> async_loader::load_required_resourc
     return resource_map;
 }
 
+std::map<std::string, std::string> async_loader::load_config_values(
+    const std::filesystem::path &resource_json)
+{
+    if (resource_json.empty() || !std::filesystem::exists(resource_json))
+    {
+        LOGGER.log("Config map \'" + resource_json.string() + "\' was not found.");
+        return {};
+    }
+
+    std::unordered_map<std::string, std::string> raw;
+    if (!mazes::json_helper::load(resource_json.string(), raw))
+    {
+        LOGGER.log("Failed to parse config map \'" + resource_json.string() + "\'");
+        return {};
+    }
+
+    return {raw.cbegin(), raw.cend()};
+}
+
+int async_loader::config_int(
+    const std::map<std::string, std::string> &config_values,
+    const std::string_view key,
+    const int fallback) noexcept
+{
+    const auto it = config_values.find(std::string{key});
+    if (it == config_values.cend())
+    {
+        return fallback;
+    }
+
+    try
+    {
+        return std::stoi(it->second);
+    }
+    catch (const std::exception &)
+    {
+        return fallback;
+    }
+}
+
+bool async_loader::config_bool(
+    const std::map<std::string, std::string> &config_values,
+    const std::string_view key,
+    const bool fallback) noexcept
+{
+    const auto it = config_values.find(std::string{key});
+    if (it == config_values.cend())
+    {
+        return fallback;
+    }
+
+    const auto &value = it->second;
+    if (value == "true" || value == "1")
+    {
+        return true;
+    }
+    if (value == "false" || value == "0")
+    {
+        return false;
+    }
+
+    return fallback;
+}
+
 bool async_loader::try_set_window_icon(
     sf::RenderWindow &window,
     const std::map<std::string, std::filesystem::path> &loaded_resources,

@@ -17,5 +17,12 @@
   
   "roguelike_menu": "resources/sample_maze.jpg",
 
-  "synth_theme": "resources/Cinematic Synth Soundtrack - Track #3.wav"
+  "synth_theme": "resources/Cinematic Synth Soundtrack - Track #3.wav",
+
+  "mobile_support": true,
+  "hidden_blue_reward": 5,
+  "hidden_red_penalty": 2,
+  "shader_threshold_fog": 10,
+  "shader_threshold_bloom": 25,
+  "shader_threshold_parallax": 45
 }

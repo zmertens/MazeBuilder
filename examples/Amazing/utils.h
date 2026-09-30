@@ -67,6 +67,22 @@ namespace utils
         static std::map<std::string, std::filesystem::path> load_required_resource_map(
             const std::filesystem::path &resource_json = get_resource_path());
 
+        /// @brief Load the raw (unresolved) key/value pairs of the resource json
+        /// @details Resource paths are resolved by @ref load_resource_map; gameplay tuning
+        ///          values such as score thresholds live in the same file and are read as-is.
+        static std::map<std::string, std::string> load_config_values(
+            const std::filesystem::path &resource_json = get_resource_path());
+
+        static int config_int(
+            const std::map<std::string, std::string> &config_values,
+            std::string_view key,
+            int fallback) noexcept;
+
+        static bool config_bool(
+            const std::map<std::string, std::string> &config_values,
+            std::string_view key,
+            bool fallback) noexcept;
+
         static bool try_set_window_icon(
             sf::RenderWindow &window,
             const std::map<std::string, std::filesystem::path> &loaded_resources,
