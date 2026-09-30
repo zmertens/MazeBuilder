@@ -129,6 +129,7 @@ namespace config_keys
     constexpr std::string_view ZOOM_WHEEL_STEP{"zoom_wheel_step"};
     constexpr std::string_view ROTATION_ENABLED{"rotation_enabled"};
     constexpr std::string_view ROTATION_DEAD_ZONE_DEGREES{"rotation_dead_zone_degrees"};
+    constexpr std::string_view APPLY_INTERVAL_PER_POINTS{"apply_interval_per_points"};
 }
 
 static const std::filesystem::path TEMP_IMAGE_PATH{std::filesystem::temp_directory_path() / (std::string(FILE_NAMING_CONVENTION) + ".png")};
@@ -213,6 +214,7 @@ public:
         float zoom_wheel_step{1.12f};
         bool rotation_enabled{true};
         float rotation_dead_zone_degrees{3.0f};
+        int apply_interval_per_points{50};
     };
 
     /// @brief Pan / zoom / rotate state for the board
@@ -238,6 +240,12 @@ public:
     static constexpr float ROTATION_STEP_DEGREES{5.0f};
     /// @brief Window pixels panned per arrow key press
     static constexpr float PAN_STEP_PIXELS{40.0f};
+    /// @brief Window-edge band, in pixels, that triggers automatic side-scroll panning
+    static constexpr float EDGE_PAN_MARGIN_PX{72.0f};
+    /// @brief Automatic edge-pan speed at full pointer-in-margin depth
+    static constexpr float EDGE_PAN_SPEED_PX_PER_SEC{260.0f};
+    /// @brief Points awarded when a chased green square turns yellow
+    static constexpr int YELLOW_SQUARE_REWARD_POINTS{10};
 
     amazing_sfml_app()
         : scene{std::make_unique<scene_props>()}
@@ -342,6 +350,7 @@ public:
 
             if (IS_APP_RUNNING(AppState::PLAYING))
             {
+                update_edge_auto_pan(frame_dt);
                 ensure_playing_assets_ready();
 
                 accumulator += frame_dt;
@@ -454,6 +463,8 @@ private:
         tuning.zoom_wheel_step = std::clamp(utils::async_loader::config_float(config_values, config_keys::ZOOM_WHEEL_STEP, tuning.zoom_wheel_step), 1.01f, 4.0f);
         tuning.rotation_enabled = utils::async_loader::config_bool(config_values, config_keys::ROTATION_ENABLED, tuning.rotation_enabled);
         tuning.rotation_dead_zone_degrees = std::max(0.0f, utils::async_loader::config_float(config_values, config_keys::ROTATION_DEAD_ZONE_DEGREES, tuning.rotation_dead_zone_degrees));
+        // Magnitude only: a negative value in config is just as valid as a positive one.
+        tuning.apply_interval_per_points = utils::async_loader::config_int(config_values, config_keys::APPLY_INTERVAL_PER_POINTS, tuning.apply_interval_per_points);
     }
 
     sf::Font sfml_font;
@@ -471,6 +482,7 @@ private:
     std::vector<std::size_t> tutorial_prize_path{};
     std::vector<std::size_t> tutorial_blue_cells{};
     std::vector<std::size_t> tutorial_hidden_blue_cells{};
+    std::vector<std::size_t> tutorial_scored_blue_cells{};
     std::vector<std::size_t> tutorial_hidden_red_cells{};
     std::vector<std::size_t> tutorial_found_blue_cells{};
     bool tutorial_drag_active{false};
@@ -488,6 +500,7 @@ private:
     std::size_t tutorial_ai_step{0u};
     int playing_score{0};
     int playing_streak{0};
+    int points_since_last_apply{0};
     float transition_elapsed_seconds{0.0f};
     static constexpr float TRANSITION_DURATION_SECONDS = 1.35f;
 
@@ -518,6 +531,10 @@ private:
     bool focus_hold_active{false};
     float focus_hold_seconds{0.0f};
     sf::Vector2f spotlight_position_px{
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.x) * 0.5f,
+        static_cast<float>(scene_props::INIT_WINDOW_SIZE.y) * 0.5f};
+    /// @brief Last known pointer position in window pixels, driving automatic edge panning
+    sf::Vector2f last_pointer_window_pos{
         static_cast<float>(scene_props::INIT_WINDOW_SIZE.x) * 0.5f,
         static_cast<float>(scene_props::INIT_WINDOW_SIZE.y) * 0.5f};
     /// @brief The finger currently drawing the scoring trace, if any
@@ -687,6 +704,44 @@ private:
         const auto shifted = pixel_to_board({static_cast<int>(std::lround(pixel_delta.x)),
                                              static_cast<int>(std::lround(pixel_delta.y))});
         set_camera_center({camera.center.x - (shifted.x - origin.x), camera.center.y - (shifted.y - origin.y)});
+    }
+
+    /// @brief How far a pointer coordinate sits inside the edge-pan margin, signed toward that edge
+    [[nodiscard]] static float edge_pan_factor(const float position, const float extent) noexcept
+    {
+        if (position < EDGE_PAN_MARGIN_PX)
+        {
+            return -(EDGE_PAN_MARGIN_PX - position) / EDGE_PAN_MARGIN_PX;
+        }
+        if (position > extent - EDGE_PAN_MARGIN_PX)
+        {
+            return (position - (extent - EDGE_PAN_MARGIN_PX)) / EDGE_PAN_MARGIN_PX;
+        }
+        return 0.0f;
+    }
+
+    /// @brief Infinite-side-scroller style pan: hovering near a window edge keeps panning that way
+    void update_edge_auto_pan(const float dt)
+    {
+        if (!IS_APP_RUNNING(AppState::PLAYING) || gesture_active || mouse_pan_origin.has_value())
+        {
+            return;
+        }
+
+        const auto size = scene->getSize();
+        if (size.x == 0u || size.y == 0u)
+        {
+            return;
+        }
+
+        const float fx = std::clamp(edge_pan_factor(last_pointer_window_pos.x, static_cast<float>(size.x)), -1.0f, 1.0f);
+        const float fy = std::clamp(edge_pan_factor(last_pointer_window_pos.y, static_cast<float>(size.y)), -1.0f, 1.0f);
+        if (fx == 0.0f && fy == 0.0f)
+        {
+            return;
+        }
+
+        pan_by_pixels({-fx * EDGE_PAN_SPEED_PX_PER_SEC * dt, -fy * EDGE_PAN_SPEED_PX_PER_SEC * dt});
     }
 
     /// @brief Latch the two-finger baseline so the first gesture frame produces no jump
@@ -1356,6 +1411,7 @@ private:
         tutorial_found_blue_cells.clear();
         tutorial_blue_cells.clear();
         tutorial_hidden_blue_cells.clear();
+        tutorial_scored_blue_cells.clear();
         tutorial_hidden_red_cells.clear();
         tutorial_yellow_goal_cells.clear();
         tutorial_drag_active = false;
@@ -1531,6 +1587,98 @@ private:
         }
     }
 
+    /// @brief Apply a score delta, refresh the HUD, and grow the board if the interval is crossed
+    void award_points(const int delta)
+    {
+        playing_score += delta;
+        points_since_last_apply += delta;
+        update_score_overlay();
+        maybe_expand_board_from_points();
+    }
+
+    /// @brief Consume accumulated point swings and expand the board once the interval is crossed
+    void maybe_expand_board_from_points()
+    {
+        const int interval_magnitude = std::abs(tuning.apply_interval_per_points);
+        if (interval_magnitude <= 0)
+        {
+            return;
+        }
+
+        while (std::abs(points_since_last_apply) >= interval_magnitude)
+        {
+            const int sign = points_since_last_apply >= 0 ? 1 : -1;
+            points_since_last_apply -= sign * interval_magnitude;
+            if (!expand_game_board())
+            {
+                break;
+            }
+        }
+    }
+
+    /// @brief Grow the grid in place (no zoom), remap existing cells, and seed fresh hidden content
+    /// @return false when the grid is already at its maximum size
+    bool expand_game_board()
+    {
+        constexpr std::size_t ROWS_GROWTH = 2u;
+        constexpr std::size_t COLS_GROWTH = 2u;
+        constexpr std::size_t MAX_ROWS = 40u;
+        constexpr std::size_t MAX_COLS = 40u;
+
+        const auto old_rows = tutorial_rows;
+        const auto old_cols = tutorial_cols;
+        const auto new_rows = std::min<std::size_t>(MAX_ROWS, old_rows + ROWS_GROWTH);
+        const auto new_cols = std::min<std::size_t>(MAX_COLS, old_cols + COLS_GROWTH);
+        if (new_rows == old_rows && new_cols == old_cols)
+        {
+            return false;
+        }
+
+        // Row-major indices shift when the column count changes; remap every stored cell in place.
+        const auto remap = [old_cols, new_cols](const std::size_t old_index) noexcept
+        {
+            return (old_index / old_cols) * new_cols + (old_index % old_cols);
+        };
+        const auto remap_all = [&remap](std::vector<std::size_t> &cells)
+        {
+            for (auto &index : cells)
+            {
+                index = remap(index);
+            }
+        };
+
+        remap_all(tutorial_blue_cells);
+        remap_all(tutorial_hidden_blue_cells);
+        remap_all(tutorial_scored_blue_cells);
+        remap_all(tutorial_hidden_red_cells);
+        remap_all(tutorial_found_blue_cells);
+        remap_all(tutorial_bad_cells);
+        remap_all(tutorial_yellow_goal_cells);
+        remap_all(tutorial_drag_path);
+        remap_all(tutorial_prize_path);
+        tutorial_start_cell = remap(tutorial_start_cell);
+        tutorial_goal_cell = remap(tutorial_goal_cell);
+        tutorial_ai_step = 0u;
+
+        // Cell pitch stays roughly constant: the world grows in lockstep with the grid dimensions.
+        board_world_size = {
+            board_world_size.x * (static_cast<float>(new_cols) / static_cast<float>(old_cols)),
+            board_world_size.y * (static_cast<float>(new_rows) / static_cast<float>(old_rows))};
+        tutorial_rows = new_rows;
+        tutorial_cols = new_cols;
+
+        tutorial_spawn_hidden_blue_cell();
+        tutorial_spawn_hidden_blue_cell();
+        if (const auto hazard = tutorial_pick_free_cell(); hazard.has_value())
+        {
+            tutorial_hidden_red_cells.push_back(*hazard);
+        }
+        tutorial_prize_path = build_tutorial_prize_path();
+
+        set_tutorial_prompt("The board expanded! New space unlocked - explore the fresh paths.");
+        return true;
+    }
+
     /// @brief Award or penalize the square the traced line just entered
     /// @return true when the traced line reached the green square and the run is finished
     bool tutorial_reveal_cell(const std::size_t index)
@@ -1550,12 +1698,18 @@ private:
         if (tutorial_cell_is_hidden_blue(index) && !tutorial_contains(tutorial_found_blue_cells, index))
         {
             tutorial_found_blue_cells.push_back(index);
-            std::erase(tutorial_hidden_blue_cells, index);
-            playing_score += tuning.hidden_blue_reward;
-            ++playing_streak;
             ++tutorial_run_blue_found;
-            update_score_overlay();
-            set_tutorial_prompt(fmt::format("Hidden blue found: +{} points. Keep holding toward the green square.", tuning.hidden_blue_reward));
+            if (!tutorial_contains(tutorial_scored_blue_cells, index))
+            {
+                tutorial_scored_blue_cells.push_back(index);
+                ++playing_streak;
+                award_points(tuning.hidden_blue_reward);
+                set_tutorial_prompt(fmt::format("Hidden blue found: +{} points. Keep holding toward the green square.", tuning.hidden_blue_reward));
+            }
+            else
+            {
+                set_tutorial_prompt("Known blue path revealed again. Keep holding toward the green square.");
+            }
             utils::physics_ops::emit_bonus_particles(bonus_particles, RNG, tutorial_cell_center(index));
             if (scene->interaction_sfx_loaded)
             {
@@ -1568,17 +1722,16 @@ private:
         {
             tutorial_bad_cells.push_back(index);
             std::erase(tutorial_hidden_red_cells, index);
-            playing_score -= tuning.hidden_red_penalty;
             playing_streak = 0;
             ++tutorial_run_red_hit;
-            update_score_overlay();
+            award_points(-tuning.hidden_red_penalty);
             set_tutorial_prompt(fmt::format("Hidden red highlighted: -{} points. Steer around them.", tuning.hidden_red_penalty));
         }
 
         return false;
     }
 
-    /// @brief Green squares turn yellow and seed a fresh green square so play continues without a reset
+    /// @brief Green squares turn yellow (10pts) and seed a fresh green square so play never resets
     void tutorial_activate_green_cell()
     {
         const auto completed_goal = tutorial_goal_cell;
@@ -1592,7 +1745,8 @@ private:
             tutorial_goal_cell = *next_goal;
         }
 
-        set_tutorial_prompt("Green square hit: it turned yellow. Keep tracing to the next green square.");
+        award_points(YELLOW_SQUARE_REWARD_POINTS);
+        set_tutorial_prompt(fmt::format("Yellow! +{} points. Keep tracing to the next green square.", YELLOW_SQUARE_REWARD_POINTS));
 
         utils::physics_ops::emit_bonus_particles(bonus_particles, RNG, tutorial_cell_center(completed_goal));
         if (scene->interaction_sfx_loaded)
@@ -1634,6 +1788,13 @@ private:
             return;
         }
 
+        if (IS_APP_RUNNING(AppState::TUTORIAL))
+        {
+            // Any touch on the board means the player is ready; hand off to endless mode at once.
+            begin_transition_to_playing();
+            return;
+        }
+
         const auto pressed = tutorial_cell_from_pixel(pixel_to_board(position));
         if (!pressed.has_value() || !tutorial_contains(tutorial_blue_cells, *pressed))
         {
@@ -1642,7 +1803,6 @@ private:
 
         tutorial_drag_active = true;
         tutorial_drag_path = {*pressed};
-        tutorial_bad_cells.clear();
         tutorial_found_blue_cells.clear();
         tutorial_run_blue_found = 0;
         tutorial_run_red_hit = 0;
@@ -1717,10 +1877,13 @@ private:
         }
 
         tutorial_drag_active = false;
+        const auto drag_origin = tutorial_drag_path.empty() ? std::optional<std::size_t>{} : std::optional<std::size_t>{tutorial_drag_path.front()};
 
         if (tutorial_drag_path_is_valid())
         {
             on_valid_drag_path_complete();
+            tutorial_found_blue_cells.clear();
+            tutorial_drag_path = drag_origin.has_value() ? std::vector<std::size_t>{*drag_origin} : std::vector<std::size_t>{};
             return;
         }
 
@@ -1733,7 +1896,7 @@ private:
         else if (tutorial_run_blue_found > 0)
         {
             set_tutorial_prompt(fmt::format(
-                "Released early: {} hidden blue banked. Finish on the green square next time.",
+                "Released early: {} blue path square(s) reset. Hold to keep revealing toward green.",
                 tutorial_run_blue_found));
         }
         else
@@ -1741,29 +1904,25 @@ private:
             set_tutorial_prompt("Press and hold a blue square, then trace to the green square.");
         }
 
-        tutorial_drag_path.clear();
+        tutorial_found_blue_cells.clear();
+        tutorial_drag_path = drag_origin.has_value() ? std::vector<std::size_t>{*drag_origin} : std::vector<std::size_t>{};
     }
 
     void on_valid_drag_path_complete()
     {
         const int streak_bonus = std::min(playing_streak, 10);
-        playing_score += streak_bonus;
-        update_score_overlay();
+        award_points(streak_bonus);
 
         set_tutorial_prompt(fmt::format(
             "Clean run: {} hidden blue, no red, +{} streak bonus. A new blue square is ready.",
             tutorial_run_blue_found,
             streak_bonus));
 
+        tutorial_found_blue_cells.clear();
         tutorial_drag_path.clear();
-
-        if (IS_APP_RUNNING(AppState::TUTORIAL))
-        {
-            begin_transition_to_playing();
-        }
     }
 
-    /// @brief "AI" driven tutorial: the demo traces the grid and narrates the rules
+    /// @brief "AI" driven tutorial: runs continuously at a gentle pace until the player touches the board
     void update_tutorial_ai(const float dt)
     {
         if (!IS_APP_RUNNING(AppState::TUTORIAL) || tutorial_drag_active)
@@ -1777,7 +1936,7 @@ private:
         {
         case tutorial_stage::BLUE_INTRO:
         {
-            if (tutorial_ai_timer < 0.65f)
+            if (tutorial_ai_timer < 0.85f)
             {
                 return;
             }
@@ -1811,7 +1970,7 @@ private:
         }
         case tutorial_stage::RED_INTRO:
         {
-            if (tutorial_ai_timer < 1.1f)
+            if (tutorial_ai_timer < 1.3f)
             {
                 return;
             }
@@ -1842,7 +2001,7 @@ private:
                 tuning.parallax_threshold));
             update_score_overlay();
 
-            if (tutorial_ai_timer >= 3.4f)
+            if (tutorial_ai_timer >= 4.0f)
             {
                 tutorial_ai_timer = 0.0f;
                 tutorial_ai_stage = tutorial_stage::HANDOFF;
@@ -1852,9 +2011,19 @@ private:
         case tutorial_stage::HANDOFF:
         {
             set_tutorial_prompt(tuning.mobile_support
-                                    ? "Your turn: press (or touch) a blue square and drag to green without lifting."
-                                    : "Your turn: hold the mouse on a blue square and drag to green without releasing.");
+                                    ? "Touch the board any time to jump into endless mode."
+                                    : "Click the board any time to jump into endless mode.");
             tutorial_drag_path.clear();
+
+            // Nobody has stepped in yet; loop the demo again instead of freezing on this stage.
+            if (tutorial_ai_timer >= 2.5f)
+            {
+                tutorial_ai_timer = 0.0f;
+                tutorial_ai_step = 0u;
+                tutorial_run_blue_found = 0;
+                tutorial_prize_path = build_tutorial_prize_path();
+                tutorial_ai_stage = tutorial_stage::BLUE_INTRO;
+            }
             return;
         }
         }
@@ -2097,7 +2266,6 @@ private:
         }
 
         const int score_delta = ball.value;
-        playing_score += score_delta;
         if (score_delta >= 0)
         {
             ++playing_streak;
@@ -2106,7 +2274,7 @@ private:
         {
             playing_streak = 0;
         }
-        update_score_overlay();
+        award_points(score_delta);
 
         const float swipe_mag = std::hypot(swipe_delta.x, swipe_delta.y);
         const b2Vec2 impulse_dir = [this, &ball, swipe_delta, swipe_mag]()
@@ -2243,6 +2411,7 @@ private:
 
             if (const auto *mouse = event->getIf<sf::Event::MouseButtonPressed>())
             {
+                last_pointer_window_pos = sf::Vector2f{mouse->position};
                 if (!active_touch_finger.has_value())
                 {
                     set_spotlight_position(mouse->position);
@@ -2276,6 +2445,7 @@ private:
 
             if (const auto *mouse = event->getIf<sf::Event::MouseMoved>())
             {
+                last_pointer_window_pos = sf::Vector2f{mouse->position};
                 if (!active_touch_finger.has_value())
                 {
                     set_spotlight_position(mouse->position);
@@ -2324,6 +2494,7 @@ private:
                 else if (!gesture_lockout && !active_touch_finger.has_value())
                 {
                     active_touch_finger = touch->finger;
+                    last_pointer_window_pos = sf::Vector2f{touch->position};
                     set_spotlight_position(touch->position);
                     if (tuning.mobile_support)
                     {
@@ -2345,6 +2516,7 @@ private:
                 }
                 else if (active_touch_finger == touch->finger)
                 {
+                    last_pointer_window_pos = sf::Vector2f{touch->position};
                     set_spotlight_position(touch->position);
                     if (tuning.mobile_support)
                     {
@@ -2514,7 +2686,7 @@ int main()
     {
         if (DEBUGGING)
         {
-            fmt::println("{} running in debug mode\n", APP_NAME);
+            fmt::println("{} running in debug mode", APP_NAME);
         }
 
         amazing_sfml_app app{};
@@ -2522,7 +2694,7 @@ int main()
     }
     catch (const std::exception &ex)
     {
-        fmt::print(stderr, "Unhandled exception: {}\n", ex.what());
+        fmt::println(stderr, "Unhandled exception: {}", ex.what());
     }
     return EXIT_SUCCESS;
 }

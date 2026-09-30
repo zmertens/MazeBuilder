@@ -27,11 +27,12 @@ The game follows a simple state pattern:
     - Resets and restarts the game
     - Signifies configuration events to select a level
   * TUTORIAL
-    - An "AI" driven demo: the app traces the grid by itself and narrates the rules
+    - An "AI" driven demo: the app traces the grid by itself and narrates the rules, looping
+      continuously at a gentle pace for as long as nobody steps in
     - Stage 1 introduces the hidden blue squares and the positive points they award
     - Stage 2 introduces the hidden red squares and their penalty
     - Stage 3 explains which shader effects unlock at which score threshold
-    - Hands control back to the player and transitions into PLAYING
+    - The moment the player touches or clicks the board, the demo stops and endless mode begins
 
 ## Scoring and Competition
 
@@ -44,8 +45,30 @@ Hidden squares are revealed by the traced line from any direction:
   * A hidden blue square awards `hidden_blue_reward` points (5 by default)
   * A hidden red square costs `hidden_red_penalty` points (2 by default)
 
-Activating the green square generates a new blue square randomly in the grid,
-so play continues without resetting the scene.
+The real objective, though, is collecting **yellow squares**. Reaching the
+green square turns it yellow, awards 10 points, and immediately spawns a new
+green square elsewhere in the grid so play never resets. The player "travels"
+across the board as yellow squares accumulate, chasing green squares one
+after another for continuous, rapid gameplay.
+
+### Expanding the Level
+
+`apply_interval_per_points` (in `amazing_mazes.json`) controls how many net
+points need to accumulate before the board expands. The magnitude is what
+matters, so the value may be written as positive or negative in the config.
+With the default of 50, roughly five yellow squares (10 points each) trigger
+an expansion. Each expansion:
+
+  * Grows the grid by a couple of rows and columns - new blocks to color and
+    draw paths towards green squares
+  * Keeps every existing square (blue, yellow, hidden blue/red) exactly where
+    it was; only the grid grows around it
+  * Seeds a fresh set of hidden blue/red squares and a new hidden path into
+    the newly opened space
+
+The board never zooms or rescales to fit the bigger grid - pinch-zoom is still
+a manual, explicit gesture. Instead, the camera pans to reveal the new space,
+the same way it does for ordinary panning (see below).
 
 Mobile support mode is enabled through the `mobile_support` flag in
 `amazing_mazes.json`. With it enabled, touch began/moved/ended events drive the
@@ -67,6 +90,12 @@ matter how the board is panned, zoomed or rotated.
   * **Pan** - arrow keys, a right- or middle-button drag, or two-finger
     translation.
   * **Reset** - `R` returns the camera to centred, unzoomed and unrotated.
+
+During endless play, the board also pans itself: whenever the pointer or an
+active touch sits near a window edge, the camera keeps sliding that direction,
+like an infinite side-scroller, using the exact same pan routine as a manual
+drag. This is automatic and continuous - no swipe gesture is required - and it
+stacks with, rather than replaces, the explicit pan controls above.
 
 When a second finger lands, any in-progress trace is cancelled without scoring
 and the gesture takes over. Drawing does not resume until every finger lifts,
