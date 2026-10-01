@@ -146,6 +146,92 @@ std::map<std::string, std::filesystem::path> async_loader::load_required_resourc
     return resource_map;
 }
 
+std::map<std::string, std::string> async_loader::load_config_values(
+    const std::filesystem::path &resource_json)
+{
+    if (resource_json.empty() || !std::filesystem::exists(resource_json))
+    {
+        LOGGER.log("Config map \'" + resource_json.string() + "\' was not found.");
+        return {};
+    }
+
+    std::unordered_map<std::string, std::string> raw;
+    if (!mazes::json_helper::load(resource_json.string(), raw))
+    {
+        LOGGER.log("Failed to parse config map \'" + resource_json.string() + "\'");
+        return {};
+    }
+
+    return {raw.cbegin(), raw.cend()};
+}
+
+int async_loader::config_int(
+    const std::map<std::string, std::string> &config_values,
+    const std::string_view key,
+    const int fallback) noexcept
+{
+    const auto it = config_values.find(std::string{key});
+    if (it == config_values.cend())
+    {
+        return fallback;
+    }
+
+    try
+    {
+        return std::stoi(it->second);
+    }
+    catch (const std::exception &)
+    {
+        return fallback;
+    }
+}
+
+bool async_loader::config_bool(
+    const std::map<std::string, std::string> &config_values,
+    const std::string_view key,
+    const bool fallback) noexcept
+{
+    const auto it = config_values.find(std::string{key});
+    if (it == config_values.cend())
+    {
+        return fallback;
+    }
+
+    const auto &value = it->second;
+    if (value == "true" || value == "1")
+    {
+        return true;
+    }
+    if (value == "false" || value == "0")
+    {
+        return false;
+    }
+
+    return fallback;
+}
+
+float async_loader::config_float(
+    const std::map<std::string, std::string> &config_values,
+    const std::string_view key,
+    const float fallback) noexcept
+{
+    const auto it = config_values.find(std::string{key});
+    if (it == config_values.cend())
+    {
+        return fallback;
+    }
+
+    try
+    {
+        const float parsed = std::stof(it->second);
+        return std::isfinite(parsed) ? parsed : fallback;
+    }
+    catch (const std::exception &)
+    {
+        return fallback;
+    }
+}
+
 bool async_loader::try_set_window_icon(
     sf::RenderWindow &window,
     const std::map<std::string, std::filesystem::path> &loaded_resources,
@@ -346,8 +432,95 @@ void async_loader::load(const std::function<void(std::map<std::string, std::file
     }
 }
 
-b2WorldId physics_ops::recreate_world(const b2WorldId existing_world) noexcept
+float view_ops::distance(const sf::Vector2f &lhs, const sf::Vector2f &rhs) noexcept
 {
+    return std::hypot(rhs.x - lhs.x, rhs.y - lhs.y);
+}
+
+sf::Vector2f view_ops::midpoint(const sf::Vector2f &lhs, const sf::Vector2f &rhs) noexcept
+{
+    return {(lhs.x + rhs.x) * 0.5f, (lhs.y + rhs.y) * 0.5f};
+}
+
+float view_ops::angle_degrees(const sf::Vector2f &from, const sf::Vector2f &to) noexcept
+{
+    return std::atan2(to.y - from.y, to.x - from.x) * 180.0f / PI;
+}
+
+float view_ops::normalize_degrees(float degrees) noexcept
+{
+    if (!std::isfinite(degrees))
+    {
+        return 0.0f;
+    }
+
+    degrees = std::fmod(degrees, 360.0f);
+    if (degrees <= -180.0f)
+    {
+        degrees += 360.0f;
+    }
+    else if (degrees > 180.0f)
+    {
+        degrees -= 360.0f;
+    }
+
+    return degrees;
+}
+
+float view_ops::shortest_delta_degrees(const float from, const float to) noexcept
+{
+    return normalize_degrees(to - from);
+}
+
+float view_ops::pinch_scale(const float previous_distance, const float current_distance) noexcept
+{
+    // A pinch that collapses to (nearly) a single point carries no usable scale information.
+    constexpr float MIN_SPAN_PX = 1.0f;
+    if (previous_distance < MIN_SPAN_PX || current_distance < MIN_SPAN_PX)
+    {
+        return 1.0f;
+    }
+
+    return current_distance / previous_distance;
+}
+
+float view_ops::clamp_zoom(const float zoom, const float minimum, const float maximum) noexcept
+{
+    if (!std::isfinite(zoom))
+    {
+        return minimum;
+    }
+
+    const float low = std::min(minimum, maximum);
+    const float high = std::max(minimum, maximum);
+    return std::clamp(zoom, low, high);
+}
+
+sf::Vector2f view_ops::anchored_center(
+    const sf::Vector2f &center,
+    const sf::Vector2f &anchor_before,
+    const sf::Vector2f &anchor_after) noexcept
+{
+    return {center.x + (anchor_before.x - anchor_after.x),
+            center.y + (anchor_before.y - anchor_after.y)};
+}
+
+sf::Vector2f view_ops::clamp_center(
+    const sf::Vector2f &center,
+    const sf::Vector2f &board_size,
+    const float margin) noexcept
+{
+    const float safe_margin = std::max(0.0f, margin);
+    return {std::clamp(center.x, -safe_margin, board_size.x + safe_margin),
+            std::clamp(center.y, -safe_margin, board_size.y + safe_margin)};
+}
+
+bool view_ops::exceeds_dead_zone(const float delta_degrees, const float dead_zone_degrees) noexcept
+{
+    return std::abs(delta_degrees) >= std::max(0.0f, dead_zone_degrees);
+}
+
+b2WorldId physics_ops::recreate_world(const b2WorldId existing_world) noexcept{
     if (B2_IS_NON_NULL(existing_world))
     {
         b2DestroyWorld(existing_world);
