@@ -24,7 +24,7 @@
   "hidden_red_penalty": 2,
   "shader_threshold_fog": 10,
   "shader_threshold_bloom": 25,
-  "shader_threshold_parallax": 45,
+  "shader_threshold_parallax": 0.9982,
   "apply_interval_per_points": 50,
 
   "zoom_min": 0.45,

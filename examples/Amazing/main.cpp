@@ -931,36 +931,43 @@ private:
 
     void ensure_playing_assets_ready()
     {
+        const auto SUCCESS_OR_PRINT = [](auto success) {
+            if (!success)
+            {
+                fmt::println(stderr, "Failed to load resource");
+            }
+        };
+
         // Keep startup quick: load heavy media the first time PLAYING needs it.
-        (void)utils::async_loader::ensure_fragment_shader_loaded(
+        auto success = utils::async_loader::ensure_fragment_shader_loaded(
             scene->gameplay_shader,
             scene->gameplay_shader_loaded,
             {resource_keys::PARALLAX_FRAG},
             loaded_resources,
             RESOURCE_PATH);
 
-        (void)utils::async_loader::ensure_fragment_shader_loaded(
+        success = utils::async_loader::ensure_fragment_shader_loaded(
             fog_shader,
             fog_shader_loaded,
             {resource_keys::RADIAL_FOG_FRAG},
             loaded_resources,
             RESOURCE_PATH);
 
-        (void)utils::async_loader::ensure_fragment_shader_loaded(
+        success = utils::async_loader::ensure_fragment_shader_loaded(
             bloom_threshold_shader,
             bloom_threshold_shader_loaded,
             {resource_keys::BLOOM_THRESHOLD_FRAG},
             loaded_resources,
             RESOURCE_PATH);
 
-        (void)utils::async_loader::ensure_fragment_shader_loaded(
+        success = utils::async_loader::ensure_fragment_shader_loaded(
             bloom_shader,
             bloom_shader_loaded,
             {resource_keys::BLUR_FRAG},
             loaded_resources,
             RESOURCE_PATH);
 
-        (void)utils::async_loader::ensure_shader_loaded(
+        success = utils::async_loader::ensure_shader_loaded(
             scene->transition_shader,
             scene->transition_shader_loaded,
             resource_keys::WAVE_VERT,
@@ -970,7 +977,7 @@ private:
 
         if (sf::Shader::isGeometryAvailable())
         {
-            (void)utils::async_loader::ensure_shader_loaded(
+            success = utils::async_loader::ensure_shader_loaded(
                 ball_billboard_shader,
                 ball_billboard_shader_loaded,
                 resource_keys::BILLBOARD_VERT,
@@ -980,14 +987,14 @@ private:
                 RESOURCE_PATH);
         }
 
-        (void)utils::async_loader::ensure_texture_loaded(
+        success = utils::async_loader::ensure_texture_loaded(
             scene->gameplay_sprite_texture,
             scene->gameplay_sprite_loaded,
             {resource_keys::CHARACTER_IDLE, resource_keys::MENU_SPRITE},
             loaded_resources,
             RESOURCE_PATH);
 
-        (void)utils::async_loader::ensure_sound_loaded(
+        success = utils::async_loader::ensure_sound_loaded(
             scene->interaction_sfx_buffer,
             scene->interaction_sfx,
             scene->interaction_sfx_loaded,
