@@ -71,15 +71,6 @@ namespace mazes
             return *this;
         }
 
-        /// @brief Set the random seed
-        /// @param seed The random seed
-        /// @return A reference to this configurator
-        configurator& ensure_seed(const unsigned int seed) noexcept
-        {
-            m_seed = seed;
-            return *this;
-        }
-
         /// @brief Set the distance calculation flag
         /// @param distances The distance calculation flag
         /// @return A reference to this configurator
@@ -112,7 +103,6 @@ namespace mazes
         configurator& columns(const unsigned int c) noexcept { return ensure_columns(c); }
         configurator& levels(const unsigned int l) noexcept { return ensure_levels(l); }
         configurator& algo_id(const algo a) noexcept { return ensure_algo_id(a); }
-        configurator& seed(const unsigned int s) noexcept { return ensure_seed(s); }
 
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
@@ -129,11 +119,6 @@ namespace mazes
         /// @brief Get the maze generation algorithm
         /// @return The algorithm used for maze generation
         [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(static_cast<algo>(0)); }
-
-
-        /// @brief Get the random seed
-        /// @return The random seed
-        [[nodiscard]] unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED_VALUE); }
 
         /// @brief Check if distances are calculated
         /// @return True if distances are calculated, false otherwise
@@ -214,8 +199,6 @@ namespace mazes
         std::optional<unsigned int> m_levels;
 
         std::optional<algo> m_algo_id;
-
-        std::optional<unsigned int> m_seed;
 
         std::optional<bool> m_distances;
 

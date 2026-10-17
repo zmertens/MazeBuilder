@@ -4,14 +4,13 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/link_maze_and_create_state.h>
 
-class configurator;
-class randomizer;
-class runtime_stack;
-
 /// @namespace mazes
 /// @file dfs_maze_create_state.h
 namespace mazes
 {
+    class args;
+    class randomizer;
+    class runtime_stack;
     /// @brief State for creating a maze using the depth-first search algorithm
     class dfs_maze_create_state final : public link_maze_and_create_state
     {
@@ -25,7 +24,7 @@ namespace mazes
         /// @param config The maze configuration
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
         /// @brief Get the algorithm ID for the depth-first search algorithm

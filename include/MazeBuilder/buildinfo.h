@@ -11,11 +11,11 @@ namespace mazes
     /// @brief Build information for the maze generation library
     struct buildinfo
     {
-        static inline const std::string COMMIT_SHA = "'fe8f368'";
+        static inline const std::string COMMIT_SHA = "'00b8089'";
 
-        static inline const std::string TIMESTAMP = "2026-10-17T15:01:44";
+        static inline const std::string TIMESTAMP = "2026-10-17T16:27:38";
         
-        static inline const std::string VERSION = "8.7.4";
+        static inline const std::string VERSION = "8.8.12";
     };
 
 }

@@ -22,14 +22,32 @@ using namespace mazes;
 
 write_to_output_state::write_to_output_state(const runtime_app::context &ctx, runtime_stack *stack)
     : state(ctx, stack),
+      args_mapper{ctx.get_args_manager()},
       grid_mapper{ctx.get_grid_manager()},
       processed_text_mapper{ctx.get_text_manager()},
       current_grid_id{grid_identifier::BASIC}
 {
-    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
+    state_utils::validate_mappers(args_mapper, grid_mapper, processed_text_mapper);
 }
 
 write_to_output_state::~write_to_output_state() = default;
+
+configurator write_to_output_state::make_config(const args &a) noexcept
+{
+    auto cfg = state_utils::build_configurator(a);
+    current_grid_id = cfg.distances() ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+
+    try
+    {
+        const auto [rows, cols, levels] = grid_mapper->get(current_grid_id).operations().get_dimensions();
+        cfg.ensure_rows(rows).ensure_columns(cols).ensure_levels(levels);
+    }
+    catch (...)
+    {
+    }
+
+    return cfg;
+}
 
 void write_to_output_state::draw() const noexcept
 {
@@ -38,49 +56,8 @@ void write_to_output_state::draw() const noexcept
 
 bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
-    if (!grid_mapper || !processed_text_mapper)
-    {
-        request_stack_pop();
-        return false;
-    }
-
-    const auto &parsed_args = state_utils::get_args_at_front(get_context());
-
-    unsigned int rows = configurator::MAX_ROWS;
-    unsigned int cols = configurator::MAX_COLUMNS;
-    unsigned int levels = 1u;
-
-    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
-
-    current_grid_id = state_utils::has_distances(std::cref(parsed_args)) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-
-    try
-    {
-        const auto [grid_rows, grid_cols, grid_levels] = grid_mapper->get(current_grid_id).operations().get_dimensions();
-        rows = grid_rows;
-        cols = grid_cols;
-        levels = grid_levels;
-    }
-    catch (...)
-    {
-    }
-
-    std::string output_target;
-    auto stdout_format = output_format::TOTAL;
-    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
-    {
-        // Bare keywords (stdout, obj, b64) print to stdout instead of writing a file.
-        stdout_format = stdout_format_from_sv(it->second);
-        output_target = stdout_format != output_format::TOTAL ? "" : it->second;
-    }
-
-    auto *rng_ptr = &rng;
-
-    configurator cfg{};
-    cfg.ensure_rows(rows)
-        .ensure_columns(cols)
-        .ensure_levels(levels)
-        .ensure_distances(current_grid_id == grid_identifier::DISTANCE);
+    const auto &parsed_args{args_mapper->get(args_identifier::PARSED)};
+    const auto parsed_args_front = parsed_args.front();
 
     // Concrete states mix in create_contract alongside this base
     auto *creator = dynamic_cast<create_contract *>(this);
@@ -90,8 +67,16 @@ bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delt
         return false;
     }
 
-    auto out{std::string{creator->create(cfg, *rng_ptr)}};
+    auto out = creator->create_as<std::string>(parsed_args, rng).value_or(std::string{});
 
+    std::string output_target;
+    auto stdout_format = output_format::TOTAL;
+    if (const auto it = parsed_args_front.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args_front.cend())
+    {
+        // Bare keywords (stdout, obj, b64) print to stdout instead of writing a file.
+        stdout_format = stdout_format_from_sv(it->second);
+        output_target = stdout_format != output_format::TOTAL ? "" : it->second;
+    }
     if (stdout_format == output_format::B64)
     {
         out = bytes::encode(out);

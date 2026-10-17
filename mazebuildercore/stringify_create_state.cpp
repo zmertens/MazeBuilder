@@ -25,8 +25,10 @@ bool stringify_create_state::write_output(const std::string& output_target, cons
     return io_utils::write_file(output_target, output_content);
 }
 
-std::string_view stringify_create_state::create(const configurator& config, [[maybe_unused]] randomizer& rng) noexcept
+std::any stringify_create_state::create(const args &a, randomizer &rng) noexcept
 {
+    const auto config = make_config(a);
+
     auto render_ascii_maze = [](const grid_interface& grid, const grid_operations& grid_ops,
         const unsigned int rows, const unsigned int cols, const unsigned int levels) -> std::string
         {

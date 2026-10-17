@@ -29,7 +29,7 @@ namespace mazes
         /// @param config The maze configuration
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        [[nodiscard]] std::string_view create(const configurator &config, randomizer &rng) noexcept override;
+        [[nodiscard]] std::any create(const args &a, randomizer &rng) noexcept override;
 
     protected:
         /// @brief Write pixel data to image file in appropriate format

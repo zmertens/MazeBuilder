@@ -1,5 +1,6 @@
 #include <MazeBuilder/bt_maze_create_state.h>
 
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/cell.h>
@@ -29,13 +30,14 @@ algo bt_maze_create_state::get_algo_id() const noexcept
     return algo::BINARY_TREE;
 }
 
-std::string_view bt_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::any bt_maze_create_state::create(const args &a, randomizer &rng) noexcept
 {
-    return create_bt_maze(config.rows(), config.columns(), config.levels(), rng);
+    const auto config = state_utils::build_configurator(a, get_algo_id());
+    return std::string{create_bt_maze(config.rows(), config.columns(), config.levels(), rng)};
 }
 
-std::string_view bt_maze_create_state::create_bt_maze([[maybe_unused]] unsigned int rows, [[maybe_unused]] unsigned int cols, [[maybe_unused]] unsigned int levels,
-    randomizer& rng) noexcept
+std::string_view bt_maze_create_state::create_bt_maze([[maybe_unused]] unsigned int rows, [[maybe_unused]] unsigned int cols,
+    [[maybe_unused]] unsigned int levels, randomizer& rng) noexcept
 {
     if (!grid_mapper)
         return {};

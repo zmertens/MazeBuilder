@@ -126,9 +126,10 @@ bool pixels_create_state::write_output(const std::string &output_target, [[maybe
     return true;
 }
 
-std::string_view pixels_create_state::create(const configurator &config,
-                                             randomizer &rng) noexcept
+std::any pixels_create_state::create(const args &a, randomizer &rng) noexcept
 {
+    const auto config = make_config(a);
+
     if (!grid_mapper)
     {
         return {};
@@ -242,7 +243,7 @@ std::string_view pixels_create_state::create(const configurator &config,
 
         grid_ops.set_pixels(pixels);
 
-        return "";
+        return std::string{};
     }
     catch (...)
     {

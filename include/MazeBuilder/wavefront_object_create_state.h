@@ -25,7 +25,7 @@ namespace mazes
         /// @param config The configurator containing the maze configuration
         /// @param rng The randomizer to use for generating random values
         /// @return A string view with the OBJ content
-        std::string_view create(const configurator& config, randomizer& rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
         /// @brief Owns the OBJ text that create() returns a view of

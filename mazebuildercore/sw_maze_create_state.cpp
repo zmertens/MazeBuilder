@@ -1,5 +1,6 @@
 #include <MazeBuilder/sw_maze_create_state.h>
 
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
@@ -25,9 +26,10 @@ algo sw_maze_create_state::get_algo_id() const noexcept
     return algo::SIDEWINDER;
 }
 
-std::string_view sw_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::any sw_maze_create_state::create(const args &a, randomizer& rng) noexcept
 {
-    return create_sw_maze(config.rows(), config.columns(), config.levels(), rng);
+    const auto config = state_utils::build_configurator(a, get_algo_id());
+    return std::string{create_sw_maze(config.rows(), config.columns(), config.levels(), rng)};
 }
 
 std::string_view sw_maze_create_state::create_sw_maze(const unsigned int rows, const unsigned int cols,

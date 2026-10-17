@@ -11,7 +11,7 @@
 /// @namespace mazes
 namespace mazes
 {
-    class configurator;
+    class args;
     class randomizer;
     class runtime_stack;
 
@@ -21,7 +21,7 @@ namespace mazes
     public:
         explicit stringify_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
-        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
         /// @brief Owns the rendered text that create() returns a view of

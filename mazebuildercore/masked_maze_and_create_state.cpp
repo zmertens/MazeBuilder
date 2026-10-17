@@ -1,4 +1,5 @@
 #include <MazeBuilder/masked_maze_and_create_state.h>
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
@@ -30,14 +31,15 @@ algo masked_maze_and_create_state::get_algo_id() const noexcept
     return algo::BINARY_TREE;
 }
 
-std::string_view masked_maze_and_create_state::create(const configurator &config, randomizer &rng) noexcept
+std::any masked_maze_and_create_state::create(const args &a, randomizer &rng) noexcept
 {
+    const auto config = state_utils::build_configurator(a, get_algo_id());
     const auto mask_source = config.mask_source();
     if (mask_source.empty())
     {
-        return "Error: No mask source specified";
+        return std::string{"Error: No mask source specified"};
     }
-    return create_masked_maze(mask_source, config.algo_id(), rng);
+    return std::string{create_masked_maze(mask_source, config.algo_id(), rng)};
 }
 
 std::string_view masked_maze_and_create_state::create_masked_maze(const std::string &mask_source,

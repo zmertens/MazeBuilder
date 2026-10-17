@@ -7,17 +7,18 @@
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
 
-#include <string_view>
+#include <any>
 #include <string>
-
-class configurator;
-class randomizer;
-class runtime_stack;
 
 /// @namespace mazes
 /// @file link_maze_and_create_state.h
 namespace mazes
 {
+    class args;
+    class configurator;
+    class randomizer;
+    class runtime_stack;
+
     /// @brief Base state for creating mazes using algorithms that link cells
     /// This state encapsulates the common setup and teardown logic for maze-generating
     /// algorithms like binary tree, depth-first search, and sidewinder
@@ -41,16 +42,17 @@ namespace mazes
         void draw() const noexcept override;
 
         /// @brief Create the maze using algorithm-specific logic
-        /// @param config The configuration containing maze parameters
+        /// @param a The parsed arguments containing maze parameters
         /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message
-        [[nodiscard]] std::string_view create(const configurator &config, randomizer &rng) noexcept override = 0;
+        /// @return A std::string result message, or an empty std::any on failure
+        [[nodiscard]] std::any create(const args &a, randomizer &rng) noexcept override = 0;
 
     protected:
         /// @brief Get the algorithm ID for this maze creation algorithm
         /// @return The algorithm ID to use in the configurator
         [[nodiscard]] virtual algo get_algo_id() const noexcept = 0;
 
+        args_manager *args_mapper;
         grid_manager *grid_mapper;
         processed_text_manager *processed_text_mapper;
         grid_identifier current_grid_id;
@@ -58,10 +60,6 @@ namespace mazes
         int m_distances_start;
         int m_distances_end;
         std::string m_result;
-
-    private:
-        /// @brief Common update logic for all link-based maze creation algorithms
-        void common_update(const configurator &cfg, randomizer &rng) noexcept;
     };
 } // namespace mazes
 

@@ -1,6 +1,8 @@
 #include <MazeBuilder/dfs_maze_create_state.h>
 
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/algos.h>
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
@@ -28,13 +30,14 @@ algo dfs_maze_create_state::get_algo_id() const noexcept
     return algo::DFS;
 }
 
-std::string_view dfs_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::any dfs_maze_create_state::create(const args &a, randomizer& rng) noexcept
 {
-    return create_dfs_maze(config.rows(), config.columns(), config.levels(), rng);
+    const auto config = state_utils::build_configurator(a, get_algo_id());
+    return std::string{create_dfs_maze(config.rows(), config.columns(), config.levels(), rng)};
 }
 
-std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-    randomizer& rng) noexcept
+std::string_view dfs_maze_create_state::create_dfs_maze(const unsigned int rows, const unsigned int cols,
+    const unsigned int levels, randomizer& rng) noexcept
 {
     if (!grid_mapper)
         return {};

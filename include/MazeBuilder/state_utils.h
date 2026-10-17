@@ -1,11 +1,13 @@
 #ifndef STATE_UTILS_H
 #define STATE_UTILS_H
 
+#include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/mask.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/state.h>
@@ -142,6 +144,70 @@ namespace mazes::state_utils
         return parse_distance_settings(args).enabled;
     }
 
+    /// @brief Builds a configurator from the front entry of the given arguments.
+    /// @details Shared by every state implementing create_contract so arg parsing lives in one place.
+    /// @param a The parsed arguments
+    /// @param default_algo The algorithm used when the arguments do not select one
+    /// @return A configurator populated with dimensions, distances, algorithm and mask source
+    [[nodiscard]] inline configurator build_configurator(const args &a, const algo default_algo = algo::DFS) noexcept
+    {
+        std::unordered_map<std::string, std::string> front;
+        try
+        {
+            front = a.front();
+        }
+        catch (...)
+        {
+        }
+
+        unsigned int rows = configurator::MAX_ROWS;
+        unsigned int cols = configurator::MAX_COLUMNS;
+        unsigned int levels = 1u;
+
+        std::string mask_source;
+        if (const auto it = front.find(mazes::args::MASK_WORD_STR); it != front.cend() && !it->second.empty())
+        {
+            mask_source = it->second;
+            try
+            {
+                const auto temp_mask = mask::from_source(mask_source);
+                rows = temp_mask.rows();
+                cols = temp_mask.columns();
+            }
+            catch (...)
+            {
+            }
+        }
+        else
+        {
+            parse_dimensions(front, rows, cols, levels);
+        }
+
+        const auto distances = parse_distance_settings(front);
+
+        auto selected_algo = default_algo;
+        if (const auto it = front.find(mazes::args::ALGO_ID_WORD_STR); it != front.cend())
+        {
+            try
+            {
+                selected_algo = to_algo_from_sv(it->second);
+            }
+            catch (...)
+            {
+            }
+        }
+
+        return configurator{}
+            .ensure_rows(rows)
+            .ensure_columns(cols)
+            .ensure_levels(levels)
+            .ensure_distances(distances.enabled)
+            .ensure_distances_start(distances.start)
+            .ensure_distances_end(distances.end)
+            .ensure_algo_id(selected_algo)
+            .ensure_mask_source(mask_source);
+    }
+
     /// @brief Determines the output state based on the given arguments.
     /// @param args The arguments containing the output information.
     /// @return The corresponding state::ID for the output.
@@ -162,27 +228,6 @@ namespace mazes::state_utils
         }
 
         return output_state;
-    }
-
-    inline std::unordered_map<std::string, std::string> get_args_at_front(const runtime_app::context &ctx) noexcept
-    {
-        if (auto *args_mapper = ctx.get_args_manager())
-        {
-            try
-            {
-                auto &&parsed_args = args_mapper->get(args_identifier::PARSED).front();
-
-                if (parsed_args.empty())
-                {
-                    parsed_args = args_mapper->get(args_identifier::RAW).front();
-                }
-                return parsed_args;
-            }
-            catch (...)
-            {
-            }
-        }
-        return {};
     }
 
     inline bool advance_args(const runtime_app::context &ctx) noexcept

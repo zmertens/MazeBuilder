@@ -30,8 +30,10 @@ bool wavefront_object_create_state::write_output(const std::string &output_targe
     return io_utils::write_file(output_target, output_content);
 }
 
-std::string_view wavefront_object_create_state::create(const configurator &config, randomizer &rng) noexcept
+std::any wavefront_object_create_state::create(const args &a, randomizer &rng) noexcept
 {
+    const auto config = make_config(a);
+
     try
     {
         auto &grid_ref = grid_mapper->get(current_grid_id);

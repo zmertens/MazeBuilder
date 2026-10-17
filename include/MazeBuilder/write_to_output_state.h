@@ -8,14 +8,15 @@
 #include <string>
 #include <string_view>
 
-class configurator;
-class randomizer;
-class runtime_stack;
-
 /// @namespace mazes
 /// @file write_to_output_state.h
 namespace mazes
 {
+    class args;
+    class configurator;
+    class randomizer;
+    class runtime_stack;
+
     /// @brief Base state for creating output from mazes (pixels, stringify, OBJ)
     /// This state encapsulates the common setup, creation, and output-writing logic
     /// for states that generate maze output in various formats.
@@ -27,7 +28,7 @@ namespace mazes
         /// @brief Construct a new write to output state
         /// @param ctx The runtime context
         /// @param stack The runtime stack to allow pushing/popping states
-        explicit write_to_output_state(const runtime_app::context& ctx, runtime_stack* stack);
+        explicit write_to_output_state(const runtime_app::context &ctx, runtime_stack *stack);
 
         ~write_to_output_state() override;
 
@@ -41,15 +42,20 @@ namespace mazes
         void draw() const noexcept override;
 
     protected:
+        /// @brief Builds the configuration for create(), sizing it to the current grid
+        /// @details Also selects current_grid_id from the distances argument
+        [[nodiscard]] configurator make_config(const args &a) noexcept;
+
         /// @brief Write the output to the target destination
         /// Subclasses should override this to handle format-specific writing
         /// @param output_target The target file path; never called for stdout keywords
         /// @param output_content The content to write
         /// @return True if write was successful, false otherwise
-        [[nodiscard]] virtual bool write_output(const std::string& output_target, const std::string& output_content) noexcept = 0;
+        [[nodiscard]] virtual bool write_output(const std::string &output_target, const std::string &output_content) noexcept = 0;
 
-        grid_manager* grid_mapper;
-        processed_text_manager* processed_text_mapper;
+        args_manager *args_mapper;
+        grid_manager *grid_mapper;
+        processed_text_manager *processed_text_mapper;
         grid_identifier current_grid_id;
         std::string m_result;
     };
