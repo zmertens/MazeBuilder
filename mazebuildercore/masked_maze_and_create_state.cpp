@@ -11,6 +11,7 @@
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
 #include <filesystem>
+#include <optional>
 #include <stack>
 #include <span>
 #include <string>
@@ -48,7 +49,16 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
     try
     {
         // Returned views must outlive this call, so only static strings are used
-        auto loaded_mask = mask::from_source(mask_source);
+        std::optional<mask> maybe_mask;
+        try
+        {
+            maybe_mask.emplace(mask::from_source(mask_source));
+        }
+        catch (const std::exception &)
+        {
+            return std::string_view{"Error: Could not load mask (file not found relative to the working directory, or empty)"};
+        }
+        auto &loaded_mask = *maybe_mask;
         const auto rows = loaded_mask.rows();
         const auto cols = loaded_mask.columns();
 

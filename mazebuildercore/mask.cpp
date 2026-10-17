@@ -17,7 +17,7 @@ namespace
 {
     namespace fs = std::filesystem;
 
-    void strip_wrapping_pair(std::string& text, const char open, const char close)
+    void strip_wrapping_pair(std::string &text, const char open, const char close)
     {
         if (text.size() >= 2 && text.front() == open && text.back() == close)
         {
@@ -32,14 +32,14 @@ namespace
             return std::nullopt;
         }
 
-        fs::path resolved{ filename };
+        fs::path resolved{filename};
         if (fs::exists(resolved))
         {
             return resolved;
         }
 
-        static constexpr const char* fallback_dirs[] = { "tests", "scripts" };
-        for (const char* dir : fallback_dirs)
+        static constexpr const char *fallback_dirs[] = {"tests", "scripts"};
+        for (const char *dir : fallback_dirs)
         {
             fs::path candidate = fs::path(dir) / std::string(filename);
             if (fs::exists(candidate))
@@ -51,7 +51,7 @@ namespace
         return std::nullopt;
     }
 
-    std::vector<std::string> read_mask_lines(std::istream& input)
+    std::vector<std::string> read_mask_lines(std::istream &input)
     {
         std::vector<std::string> lines;
         std::string line;
@@ -70,7 +70,7 @@ namespace
         return lines;
     }
 
-    mazes::mask build_mask_from_lines(const std::vector<std::string>& lines, const std::string& source_name)
+    mazes::mask build_mask_from_lines(const std::vector<std::string> &lines, const std::string &source_name)
     {
         if (lines.empty())
         {
@@ -80,7 +80,7 @@ namespace
         const auto rows = static_cast<unsigned int>(lines.size());
 
         std::size_t max_cols = 0;
-        for (const auto& l : lines)
+        for (const auto &l : lines)
         {
             if (l.size() > max_cols)
             {
@@ -121,23 +121,35 @@ namespace
         return false;
     }
 
-    // Test if all rows have the same first element as the first row's first element
-    bool test_all_rows_line_up(const std::vector<std::vector<bool>>& bits) noexcept
+    // Test if the border of the bits contains true values
+    constexpr bool test_border_exists(const std::vector<std::vector<bool>> &bits) noexcept
     {
-        std::bitset<8> test_bits;
-        
-        // Build test_bits based on the first element of each row in bits
-        std::ranges::for_each(bits, [&test_bits](const std::vector<bool>& row) {
-            if (!row.empty() && row[0])
-            {
-                test_bits.set(0);
-            }
-        });
+        // test the first row and last row are all true values
+        auto first_row_all_true = !bits.empty() && std::ranges::all_of(bits.front(), [](bool b)
+                                                                       { return b; });
+        auto last_row_all_true = !bits.empty() && std::ranges::all_of(bits.back(), [](bool b)
+                                                                      { return b; });
 
-        // Verify
-        return std::ranges::all_of(bits.begin(), bits.end(), [test_bits](const std::vector<bool>& row) {
-            return !row.empty() && row[0] == test_bits.test(0);
-        });
+        if (!first_row_all_true || !last_row_all_true)
+        {
+            return false;
+        }
+
+        // test the first and last columns
+        const auto first_col_all_true = std::ranges::all_of(bits, [](const std::vector<bool> &row)
+                                                            { return !row.empty() && row.front(); });
+        const auto last_col_all_true = std::ranges::all_of(bits, [](const std::vector<bool> &row)
+                                                           { return !row.empty() && row.back(); });
+
+        std::bitset<1> check_false_bits{"1"};
+        std::ranges::for_each(bits, [&check_false_bits](const std::vector<bool> &row)
+                              {
+                                  if (std::ranges::any_of(row, [](bool b) { return !b; }))
+                                  {
+                                      check_false_bits.set(0);
+                                  } });
+
+        return check_false_bits.test(0) && first_col_all_true && last_col_all_true;
     }
 }
 
@@ -146,6 +158,11 @@ using namespace mazes;
 mask::mask(const unsigned int rows, const unsigned int columns)
     : m_bits(rows, std::vector<bool>(columns, true))
 {
+
+#if defined(MAZE_DEBUG)
+
+    test_border_exists(std::cref(m_bits));
+#endif
 }
 
 bool mask::operator()(const unsigned int row, const unsigned int column) const noexcept
@@ -191,19 +208,19 @@ unsigned int mask::columns() const noexcept
     return m_bits.empty() ? 0 : m_bits.at(0).size();
 }
 
-std::pair<unsigned int, unsigned int> mask::random_location(randomizer& rng) const noexcept
+std::pair<unsigned int, unsigned int> mask::random_location(randomizer &rng) const noexcept
 {
     while (true)
     {
         const auto row = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(rows()) - 1));
         if (const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(columns()) - 1)); m_bits[row][col])
         {
-            return { row, col };
+            return {row, col};
         }
     }
 }
 
-mask mask::from_txt(const std::string& filename)
+mask mask::from_txt(const std::string &filename)
 {
     const auto resolved = resolve_mask_file_path(filename);
     if (!resolved.has_value())
@@ -223,7 +240,7 @@ mask mask::from_string(std::string_view text)
         throw std::runtime_error("Mask string is empty");
     }
 
-    std::string normalized{ text };
+    std::string normalized{text};
     strip_wrapping_pair(normalized, '"', '"');
     strip_wrapping_pair(normalized, '\'', '\'');
     strip_wrapping_pair(normalized, '`', '`');
@@ -232,7 +249,7 @@ mask mask::from_string(std::string_view text)
     normalized = string_utils::replace_all(normalized, "\\n", "\n");
     normalized = string_utils::replace_all(normalized, "\\r", "\n");
 
-    std::istringstream input{ normalized };
+    std::istringstream input{normalized};
     const auto lines = read_mask_lines(input);
     return build_mask_from_lines(lines, "Mask string is empty");
 }
@@ -246,7 +263,7 @@ mask mask::from_source(const std::string_view source)
 
     if (const auto resolved = resolve_mask_file_path(source); resolved.has_value())
     {
-        return from_txt(std::string{ source });
+        return from_txt(std::string{source});
     }
 
     if (looks_like_inline_mask(source))

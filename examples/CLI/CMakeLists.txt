@@ -43,4 +43,7 @@ add_custom_command(TARGET ${EXE_NAME} POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_CURRENT_SOURCE_DIR}/mask1.txt"
         "$<TARGET_FILE_DIR:${EXE_NAME}>/mask1.txt"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/mask_histogram.txt"
+        "$<TARGET_FILE_DIR:${EXE_NAME}>/mask_histogram.txt"
     VERBATIM)
