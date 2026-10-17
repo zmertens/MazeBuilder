@@ -11,6 +11,7 @@
 #include <MazeBuilder/grid_operations.h>
 
 #include <stack>
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -56,13 +57,14 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
         stk.push(start);
         visited.insert(start->get_index());
 
+        grid_operations::neighbor_buffer neighbor_buf;
         while (!stk.empty())
         {
             auto current = stk.top();
-            auto all_neighbors = grid_ops.get_neighbors(current);
+            const auto neighbor_count = grid_ops.collect_neighbors(current, neighbor_buf);
 
             std::vector<std::shared_ptr<cell>> unvisited;
-            for (auto& n : all_neighbors)
+            for (const auto& n : std::span(neighbor_buf).first(neighbor_count))
             {
                 if (n && !visited.contains(n->get_index()))
                 {

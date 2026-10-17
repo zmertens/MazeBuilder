@@ -27,6 +27,10 @@ namespace mazes
         std::string_view create(const configurator& config, randomizer& rng) noexcept override;
 
     private:
+        /// @brief Owns the OBJ text that create() returns a view of
+        std::string m_output;
+
+    protected:
         /// @brief Write OBJ content to output file
         [[nodiscard]] bool write_output(const std::string& output_target, const std::string& output_content) noexcept override;
     };

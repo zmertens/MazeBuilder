@@ -82,10 +82,10 @@ namespace mazes
         /// @return
         std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c, Direction dir) const noexcept override;
 
-        /// @brief Get all the neighbors by the cell
-        /// @param c
-        /// @return
-        std::vector<std::shared_ptr<cell>> get_neighbors(std::shared_ptr<cell> const& c) const noexcept override;
+        std::size_t collect_neighbors(std::shared_ptr<cell> const& c,
+                                  std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept override;
+
+        std::span<const std::shared_ptr<cell>> cells() const noexcept override;
 
         /// @brief Set neighbor for a cell in a given direction
         /// @param c
@@ -108,21 +108,10 @@ namespace mazes
 
         /// @brief Get the count of cells in the grid
         /// @return The number of cells in the grid
-        int num_cells() const noexcept override;
+        std::size_t num_cells() const noexcept override;
 
         /// @brief Cleanup cells by cleaning up links within cells
-        void clear_cells() noexcept override;
-
-        /// @brief Set a string value
-        /// @param str
-        void set_str(std::string const& str) noexcept override;
-
-        /// @brief Get a string value
-        std::string get_str() const noexcept override;
-
-        void set_file(std::string const& f) noexcept override;
-
-        std::string get_file() const noexcept override;
+        void clear_cells() noexcept;
 
         /// @brief Get the vertices
         /// @return A vector of vertices as tuples (x, y, z, w)

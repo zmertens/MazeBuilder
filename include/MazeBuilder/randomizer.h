@@ -1,6 +1,7 @@
 #ifndef RANDOMIZER_H
 #define RANDOMIZER_H
 
+#include <string_view>
 #include <vector>
 #include <memory>
 
@@ -44,12 +45,19 @@ namespace mazes
         /// @return A random integer between the specified range [low, high].
         int get_int(int low = 0, int high = 1) const noexcept;
 
-        /// @brief Generates a shuffled vector of all integers in the specified range
-        /// @param low The lower bound of the integer(s) (inclusive).
-        /// @param high The upper bound of the integer(s) (inclusive).
-        /// @param count The number of random integers to generate
-        /// @return A vector containing all integers in [low, high] in random order
-        [[nodiscard]] std::vector<int> get_vector_ints(int low = 0, int high = 1, int count = 1) const noexcept;
+        /// @brief Samples n integers (with replacement) from a uniform distribution over [low, high]
+        /// @param low The lower bound (inclusive).
+        /// @param high The upper bound (inclusive).
+        /// @param n The number of samples to draw
+        /// @return n samples, or an empty vector if low > high or n <= 0
+        [[nodiscard]] std::vector<int> sample_int_n(int low = 0, int high = 1, int n = 1) const;
+
+        /// @brief Samples n floats from a uniform distribution over [low, high)
+        /// @param low The lower bound (inclusive).
+        /// @param high The upper bound.
+        /// @param n The number of samples to draw
+        /// @return n samples, or an empty vector if low > high or n <= 0
+        [[nodiscard]] std::vector<float> sample_float_n(float low = 0.0f, float high = 1.0f, int n = 1) const;
 
         /// @brief Generates a random float within a specified range.
         /// @param low The lower bound of the float (inclusive).
@@ -60,6 +68,10 @@ namespace mazes
         /// @brief Seeds the random number generator with the given seed value.
         /// @param seed The seed value to initialize the random number generator.
         void seed(unsigned long long seed = 0) const noexcept;
+
+        /// @brief Seeds the random number generator with a string view.
+        /// @param sv The string view to initialize the random number generator.
+        void seed(std::string_view sv) const noexcept;
 
         /// @brief Gets a random integer within a specified range.
         /// @param low The lower bound of the integer (inclusive).

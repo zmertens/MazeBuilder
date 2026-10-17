@@ -8,6 +8,7 @@
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/randomizer.h>
 
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -57,9 +58,11 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
         std::unordered_set<int> frontier_ids;
         std::vector<std::shared_ptr<cell>> frontier;
 
+        grid_operations::neighbor_buffer neighbor_buf;
         auto add_frontier_neighbors = [&](const std::shared_ptr<cell>& c)
             {
-                for (const auto& n : grid_ops.get_neighbors(c))
+                const auto count = grid_ops.collect_neighbors(c, neighbor_buf);
+                for (const auto& n : std::span(neighbor_buf).first(count))
                 {
                     if (!n)
                     {
@@ -87,7 +90,8 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
             frontier_ids.erase(current->get_index());
 
             std::vector<std::shared_ptr<cell>> neighbors_in_maze;
-            for (const auto& n : grid_ops.get_neighbors(current))
+            const auto current_count = grid_ops.collect_neighbors(current, neighbor_buf);
+            for (const auto& n : std::span(neighbor_buf).first(current_count))
             {
                 if (n && in_maze.contains(n->get_index()))
                 {

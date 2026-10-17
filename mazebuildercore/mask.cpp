@@ -1,9 +1,14 @@
 #include <MazeBuilder/mask.h>
+
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/string_utils.h>
 
+#include <algorithm>
+#include <bitset>
 #include <filesystem>
 #include <fstream>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -115,19 +120,37 @@ namespace
         }
         return false;
     }
+
+    // Test if all rows have the same first element as the first row's first element
+    bool test_all_rows_line_up(const std::vector<std::vector<bool>>& bits) noexcept
+    {
+        std::bitset<8> test_bits;
+        
+        // Build test_bits based on the first element of each row in bits
+        std::ranges::for_each(bits, [&test_bits](const std::vector<bool>& row) {
+            if (!row.empty() && row[0])
+            {
+                test_bits.set(0);
+            }
+        });
+
+        // Verify
+        return std::ranges::all_of(bits.begin(), bits.end(), [test_bits](const std::vector<bool>& row) {
+            return !row.empty() && row[0] == test_bits.test(0);
+        });
+    }
 }
 
 using namespace mazes;
 
 mask::mask(const unsigned int rows, const unsigned int columns)
-    : m_rows(rows), m_columns(columns),
-    m_bits(rows, std::vector<bool>(columns, true))
+    : m_bits(rows, std::vector<bool>(columns, true))
 {
 }
 
 bool mask::operator()(const unsigned int row, const unsigned int column) const noexcept
 {
-    if (row >= m_rows || column >= m_columns)
+    if (row >= rows() || column >= columns())
     {
         return false;
     }
@@ -136,7 +159,7 @@ bool mask::operator()(const unsigned int row, const unsigned int column) const n
 
 void mask::set(const unsigned int row, const unsigned int column, const bool is_on) noexcept
 {
-    if (row < m_rows && column < m_columns)
+    if (row < rows() && column < columns())
     {
         m_bits[row][column] = is_on;
     }
@@ -145,9 +168,9 @@ void mask::set(const unsigned int row, const unsigned int column, const bool is_
 int mask::count() const noexcept
 {
     int total = 0;
-    for (unsigned int row = 0; row < m_rows; ++row)
+    for (unsigned int row = 0; row < rows(); ++row)
     {
-        for (unsigned int col = 0; col < m_columns; ++col)
+        for (unsigned int col = 0; col < columns(); ++col)
         {
             if (m_bits[row][col])
             {
@@ -158,12 +181,22 @@ int mask::count() const noexcept
     return total;
 }
 
+unsigned int mask::rows() const noexcept
+{
+    return m_bits.size();
+}
+
+unsigned int mask::columns() const noexcept
+{
+    return m_bits.empty() ? 0 : m_bits.at(0).size();
+}
+
 std::pair<unsigned int, unsigned int> mask::random_location(randomizer& rng) const noexcept
 {
     while (true)
     {
-        const auto row = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_rows) - 1));
-        if (const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(m_columns) - 1)); m_bits[row][col])
+        const auto row = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(rows()) - 1));
+        if (const auto col = static_cast<unsigned int>(rng.get_int(0, static_cast<int>(columns()) - 1)); m_bits[row][col])
         {
             return { row, col };
         }

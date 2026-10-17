@@ -7,9 +7,17 @@
 
 using namespace mazes;
 
+masked_grid::masked_grid(
+    unsigned int width,
+    unsigned int length,
+    unsigned int height
+) : grid(width, length, height), m_mask(width, length)
+{
+}
+
 masked_grid::masked_grid(mask m)
     : grid(m.rows(), m.columns()),
-    m_mask(std::move(m))
+      m_mask(std::move(m))
 {
 }
 
@@ -26,7 +34,7 @@ std::shared_ptr<cell> masked_grid::search(const int index) const noexcept
     return grid::search(index);
 }
 
-int masked_grid::num_cells() const noexcept
+std::size_t masked_grid::num_cells() const noexcept
 {
     return m_mask.count();
 }

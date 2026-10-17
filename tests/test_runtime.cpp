@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -19,7 +20,8 @@
 
 #include <fmt/format.h>
 
-namespace {
+namespace
+{
     std::shared_ptr<mazes::runtime_app> inst = mazes::runtime_app::instance();
 }
 
@@ -28,7 +30,7 @@ namespace {
 TEST_CASE("E2E benchmarking with runtime", "[benchmark]")
 {
     // No whitespace inside the JSON literal: apply() tokenizes on whitespace, which would split this into garbage tokens.
-    constexpr std::string_view input = "--json=`{\"rows\":\"100\",\"columns\":\"100\",\"levels\":\"10\",\"seed\":\"3\",\"algo\":\"dfs\"}`";
+    constexpr std::string_view input = "--json=`{\"rows\":\"100\",\"columns\":\"101\",\"levels\":\"10\",\"seed\":\"3\",\"algo\":\"dfs\"}`";
 
     auto printer = [](auto &&time, const auto iterations)
     {
@@ -70,7 +72,7 @@ TEST_CASE("OBJ output writes file through apply", "[apply][obj]")
     const std::string input = "-r10 -c12 --levels=1 -s42 -adfs -d -o " + output_path.string();
 
     const auto result = inst->apply(input);
-    
+
     REQUIRE_FALSE(result.empty());
 }
 

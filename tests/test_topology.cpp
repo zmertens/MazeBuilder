@@ -9,7 +9,8 @@
 
 using namespace mazes;
 
-namespace {
+namespace
+{
     std::shared_ptr<runtime_app> app = runtime_app::instance();
 }
 TEST_CASE("topology::parse handles an empty string", "[topology][parse]")

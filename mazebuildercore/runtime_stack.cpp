@@ -1,12 +1,13 @@
 #include <MazeBuilder/runtime_stack.h>
 
-#include <MazeBuilder/args.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 
+#include <functional>
 #include <ranges>
 
 // Fully qualify runtime_stack to avoid ambiguity
-mazes::runtime_stack::runtime_stack(const mazes::runtime_app::context& ctx)
+mazes::runtime_stack::runtime_stack(const mazes::runtime_app::context &ctx)
     : runtime_context(ctx)
 {
 }
@@ -28,7 +29,7 @@ void mazes::runtime_stack::clear_states() noexcept
 
 void mazes::runtime_stack::apply_pending_changes() noexcept
 {
-    for (const auto& change : m_pending)
+    for (const auto &change : m_pending)
     {
         switch (change.action)
         {
@@ -36,7 +37,8 @@ void mazes::runtime_stack::apply_pending_changes() noexcept
             try
             {
                 m_states.push_back(create_state(change.state_id));
-            } catch (...)
+            }
+            catch (...)
             {
             }
             break;
@@ -67,20 +69,20 @@ std::size_t mazes::runtime_stack::count() const noexcept
     return m_states.size();
 }
 
-void mazes::runtime_stack::visit_states(double elapsed) noexcept
+void mazes::runtime_stack::visit_states(randomizer &rng, double elapsed) noexcept
 {
     apply_pending_changes();
 
     while (!m_states.empty())
     {
-        auto* top_state = m_states.back().get();
+        auto *top_state = m_states.back().get();
         if (top_state == nullptr)
         {
             m_states.pop_back();
             continue;
         }
 
-        const bool should_continue = top_state->update(elapsed);
+        const bool should_continue = top_state->update(std::ref(rng), elapsed);
         apply_pending_changes();
 
         if (!should_continue)

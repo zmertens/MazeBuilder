@@ -13,14 +13,14 @@
 
 using namespace mazes;
 
-link_maze_and_create_state::link_maze_and_create_state(const runtime_app::context& ctx, runtime_stack* stack)
+link_maze_and_create_state::link_maze_and_create_state(const runtime_app::context &ctx, runtime_stack *stack)
     : state(ctx, stack),
-    grid_mapper{ ctx.get_grid_manager() },
-    processed_text_mapper{ ctx.get_text_manager() },
-    current_grid_id{ grid_identifier::BASIC },
-    m_use_distances{ false },
-    m_distances_start{ configurator::DEFAULT_DISTANCES_START },
-    m_distances_end{ configurator::DEFAULT_DISTANCES_END }
+      grid_mapper{ctx.get_grid_manager()},
+      processed_text_mapper{ctx.get_text_manager()},
+      current_grid_id{grid_identifier::BASIC},
+      m_use_distances{false},
+      m_distances_start{configurator::DEFAULT_DISTANCES_START},
+      m_distances_end{configurator::DEFAULT_DISTANCES_END}
 {
     state_utils::validate_mappers(grid_mapper, processed_text_mapper);
 }
@@ -32,7 +32,7 @@ void link_maze_and_create_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noexcept
+bool link_maze_and_create_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
     if (!grid_mapper || !processed_text_mapper)
     {
@@ -40,7 +40,7 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
         return false;
     }
 
-    const auto& parsed_args = state_utils::get_args_at_front(get_context());
+    const auto &parsed_args = state_utils::get_args_at_front(get_context());
 
     unsigned int rows = configurator::MAX_ROWS;
     unsigned int cols = configurator::MAX_COLUMNS;
@@ -78,7 +78,7 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
 
     state_utils::check_before_resize(&grid_mapper->get(current_grid_id).operations(), rows, cols, levels);
 
-    auto* rng_ptr = state_utils::get_rng_or_default(get_context());
+    auto *rng_ptr = &rng;
     state_utils::reseed_from_args(parsed_args, *rng_ptr);
 
     auto selected_algo = get_algo_id();
@@ -94,26 +94,20 @@ bool link_maze_and_create_state::update([[maybe_unused]] double delta_time) noex
     }
 
     configurator cfg = configurator{}
-        .ensure_rows(rows)
-        .ensure_columns(cols)
-        .ensure_levels(levels)
-        .ensure_distances(m_use_distances)
-        .ensure_distances_start(m_distances_start)
-        .ensure_distances_end(m_distances_end)
-        .ensure_algo_id(selected_algo)
-        .ensure_mask_source(mask_source);
+                           .ensure_rows(rows)
+                           .ensure_columns(cols)
+                           .ensure_levels(levels)
+                           .ensure_distances(m_use_distances)
+                           .ensure_distances_start(m_distances_start)
+                           .ensure_distances_end(m_distances_end)
+                           .ensure_algo_id(selected_algo)
+                           .ensure_mask_source(mask_source);
 
     request_stack_pop();
 
-    if (const auto result{ create(cfg, *rng_ptr) }; !result.empty())
+    if (const auto result{create(cfg, *rng_ptr)}; !result.empty())
     {
-        m_result = std::string{ result };
-        processed_text_mapper->get(processed_text_identifier::FINISHED).set(m_result);
-
-        if (!std::string_view{ m_result }.starts_with("Error"))
-        {
-            request_stack_push(state_utils::output_state_for(parsed_args));
-        }
+        processed_text_mapper->get(processed_text_identifier::PROCESSING).set(result);
     }
 
     return true;

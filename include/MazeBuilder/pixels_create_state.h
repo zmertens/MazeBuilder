@@ -30,10 +30,11 @@ namespace mazes
         /// @return A string view with the result message
         [[nodiscard]] std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
-    private:
+    protected:
         /// @brief Write pixel data to image file in appropriate format
         [[nodiscard]] bool write_output(const std::string& output_target, const std::string& output_content) noexcept override;
 
+    private:
         int m_image_width{0};
         int m_image_height{0};
         std::optional<unsigned long long> m_palette_seed;

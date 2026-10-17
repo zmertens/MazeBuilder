@@ -21,13 +21,13 @@ namespace mazes
         /// @brief Construct a new binary tree maze creation state
         /// @param ctx The runtime context
         /// @param stack The runtime stack to allow pushing/popping states
-        explicit bt_maze_create_state(const runtime_app::context& ctx, runtime_stack* stack);
+        explicit bt_maze_create_state(const runtime_app::context &ctx, runtime_stack *stack);
 
         /// @brief Create a binary tree maze with the given parameters
         /// @param config The maze configuration
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        std::string_view create(const configurator& config, randomizer& rng) noexcept override;
+        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
 
     private:
         /// @brief Get the algorithm ID for the binary tree algorithm
@@ -40,7 +40,7 @@ namespace mazes
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
         std::string_view create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-            randomizer& rng) noexcept;
+                                        randomizer &rng) noexcept;
     };
 } // namespace mazes
 

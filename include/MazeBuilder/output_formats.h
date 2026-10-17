@@ -1,7 +1,10 @@
 #ifndef OUTPUT_FORMATS_H
 #define OUTPUT_FORMATS_H
 
+#include <algorithm>
 #include <array>
+#include <cctype>
+#include <iterator>
 #include <ranges>
 #include <stdexcept>
 #include <string>
@@ -23,7 +26,8 @@ namespace mazes
         JSON = 6,
         OBJ = 7,
         STDOUT = 8,
-        TOTAL = 9
+        B64 = 9,
+        TOTAL = 10
     };
 
     constexpr std::array<std::string_view, static_cast<size_t>(output_format::TOTAL)> OUTPUT_FORMAT_LABELS_LOWERCASE = {
@@ -35,7 +39,8 @@ namespace mazes
         "png",
         "json",
         "obj",
-        "stdout"};
+        "stdout",
+        "b64"};
 
     /// @brief Convert an output_format enum to a string
     /// @param of
@@ -62,6 +67,8 @@ namespace mazes
             return OUTPUT_FORMAT_LABELS_LOWERCASE[7];
         case output_format::STDOUT:
             return OUTPUT_FORMAT_LABELS_LOWERCASE[8];
+        case output_format::B64:
+            return OUTPUT_FORMAT_LABELS_LOWERCASE[9];
         default:
             throw std::invalid_argument("Invalid output_format: " + std::to_string(static_cast<unsigned int>(of)));
         }
@@ -108,12 +115,40 @@ namespace mazes
             case 8:
                 return output_format::STDOUT;
             case 9:
-                return output_format::TOTAL;
+                return output_format::B64;
             default:
                 break;
             }
         }
         throw std::invalid_argument("Invalid output_format: " + std::string{sv});
+    }
+
+    /// @brief Check whether a bare format keyword (no file extension) targets stdout
+    /// @details "stdout" prints the regular string, "obj" a Wavefront OBJ, and "b64" a base64-encoded string
+    /// @param sv The output argument value
+    /// @return The matching output_format, or output_format::TOTAL if sv is not a stdout keyword
+    inline output_format stdout_format_from_sv(const std::string_view sv) noexcept
+    {
+        std::string normalized{};
+        normalized.reserve(sv.size());
+        for (const unsigned char ch : sv)
+        {
+            normalized.push_back(static_cast<char>(std::tolower(ch)));
+        }
+
+        if (normalized == OUTPUT_FORMAT_LABELS_LOWERCASE[static_cast<size_t>(output_format::STDOUT)])
+        {
+            return output_format::STDOUT;
+        }
+        if (normalized == OUTPUT_FORMAT_LABELS_LOWERCASE[static_cast<size_t>(output_format::OBJ)])
+        {
+            return output_format::OBJ;
+        }
+        if (normalized == OUTPUT_FORMAT_LABELS_LOWERCASE[static_cast<size_t>(output_format::B64)])
+        {
+            return output_format::B64;
+        }
+        return output_format::TOTAL;
     }
 
     /// @brief Converts a string to an output_format enum, or returns a fallback if invalid.

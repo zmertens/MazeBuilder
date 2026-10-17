@@ -32,8 +32,6 @@ std::string_view wavefront_object_create_state::create(const configurator& confi
 {
     try
     {
-        m_result.clear();
-
         auto& grid_ref = grid_mapper->get(current_grid_id);
         auto& grid_ops = grid_ref.operations();
 
@@ -143,9 +141,8 @@ std::string_view wavefront_object_create_state::create(const configurator& confi
             result << "f " << face[0] << ' ' << face[1] << ' ' << face[2] << ' ' << face[3] << "\n";
         }
 
-        m_result = result.str();
-        grid_ops.set_file(m_result);
-        return m_result;
+        m_output = result.str();
+        return m_output;
     } catch (...)
     {
         return {};

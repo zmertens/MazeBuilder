@@ -151,11 +151,11 @@ int main(const int argc, char* argv[])
 
     auto&& maze = mazes::runtime_app::instance();
 
-    auto&& logger = mazes::global_async_logger();
+    auto&& logger = mazes::async_logger::instance();
     std::mutex mtx;
     std::vector<std::string> logs;
     logs.reserve(100);
-    logger.set_sink([&logs, &mtx](auto msg)
+    logger->set_sink([&logs, &mtx](auto msg)
         {
             std::lock_guard<std::mutex> lock(mtx);
             logs.emplace_back(msg); });
@@ -170,10 +170,10 @@ int main(const int argc, char* argv[])
 
     if (args_vec.empty() || check_for_matches(std::cref(args_vec), HELP_FLAG, HELP_OPTION))
     {
-        logger.log_message(parser->help());
+        logger->log(parser->help());
     } else if (check_for_matches(std::cref(args_vec), VERSION_FLAG, VERSION_OPTION))
     {
-        logger.log_message(parser->version());
+        logger->log(parser->version());
     } else
     {
         std::string concatenated_args{};
@@ -182,7 +182,7 @@ int main(const int argc, char* argv[])
 
         if (const auto results = maze->apply(concatenated_args); !results.empty())
         {
-            logger.log_message(std::string{ results });
+            logger->log(std::string{ results });
         }
     }
 
@@ -190,7 +190,7 @@ int main(const int argc, char* argv[])
     maze->dump_logs();
 #endif
 
-    logger.flush();
+    logger->flush();
 
     std::for_each(logs.cbegin(), logs.cend(), [](auto msg)
         { std::cout << msg << "\n"; });

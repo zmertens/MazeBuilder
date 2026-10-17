@@ -105,8 +105,8 @@ std::string_view stringify_create_state::create(const configurator& config, [[ma
     try
     {
         auto& grid_ref = grid_mapper->get(grid_id);
-        m_result = render_ascii_maze(std::cref(grid_ref), std::cref(grid_ref.operations()), config.rows(), config.columns());
-        return m_result;
+        m_output = render_ascii_maze(std::cref(grid_ref), std::cref(grid_ref.operations()), config.rows(), config.columns());
+        return m_output;
     } catch (...)
     {
         return {};

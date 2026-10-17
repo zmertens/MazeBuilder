@@ -2,6 +2,7 @@
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
@@ -9,6 +10,12 @@
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_stack.h>
 #include <MazeBuilder/state_utils.h>
+
+#include <fmt/format.h>
+
+#include <string>
+#include <type_traits>
+#include <variant>
 
 using namespace mazes;
 
@@ -28,10 +35,8 @@ void write_to_output_state::draw() const noexcept
     // Implementation of the draw function
 }
 
-bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
+bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
-    m_result.clear();
-
     if (!grid_mapper || !processed_text_mapper)
     {
         request_stack_pop();
@@ -60,12 +65,15 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
     }
 
     std::string output_target;
+    auto stdout_format = output_format::TOTAL;
     if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
     {
-        output_target = it->second == to_sv_from_output_format(output_format::STDOUT) ? "" : it->second;
+        // Bare keywords (stdout, obj, b64) print to stdout instead of writing a file.
+        stdout_format = stdout_format_from_sv(it->second);
+        output_target = stdout_format != output_format::TOTAL ? "" : it->second;
     }
 
-    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
+    auto *rng_ptr = &rng;
 
     configurator cfg{};
     cfg.ensure_rows(rows)
@@ -73,38 +81,43 @@ bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
         .ensure_levels(levels)
         .ensure_distances(current_grid_id == grid_identifier::DISTANCE);
 
-    m_result = std::string{create(cfg, *rng_ptr)};
+    auto out{std::string{create(cfg, *rng_ptr)}};
 
-    if (!m_result.empty())
+    if (stdout_format == output_format::B64)
     {
-        const bool default_stdout_output = output_target.empty();
-        if (!default_stdout_output)
+        out = bytes::encode(out);
+    }
+
+    // Image states produce no text content but still write their pixels to the target
+    if (!output_target.empty())
+    {
+        if (write_output(output_target, out))
         {
-            if (bool write_success = write_output(output_target, m_result); !write_success)
+            async_logger::instance()->log("Successfully wrote maze to " + output_target);
+            if (out.empty())
             {
-                global_async_logger().log_message("Failed to write maze to " + output_target);
+                out = "Successfully wrote maze to " + output_target;
             }
-            else
-            {
-                global_async_logger().log_message("Successfully wrote maze to " + output_target);
-            }
+        }
+        else
+        {
+            async_logger::instance()->log("Failed to write maze to " + output_target);
         }
     }
 
-    try
-    {
-        processed_text_mapper->get(processed_text_identifier::FINISHED).set(m_result);
-    }
-    catch (...)
-    {
-        global_async_logger().log_message("Failed to update processed text with the finished result.");
-    }
+    processed_text_mapper->get(processed_text_identifier::FINISHED).set(out);
 
     request_stack_pop();
     if (state_utils::advance_args(get_context()))
     {
         request_stack_push(state::ID::PARSE);
     }
+
+#if defined(MAZE_DEBUG)
+
+    const auto processing_output{processed_text::to_string(processed_text_mapper->get(processed_text_identifier::PROCESSING).get())};
+    async_logger::instance()->log(fmt::format("Processing output:\n{}\n", processing_output));
+#endif
 
     return true;
 }

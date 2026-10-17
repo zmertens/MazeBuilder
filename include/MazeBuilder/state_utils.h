@@ -37,6 +37,7 @@ namespace mazes::state_utils
             case output_format::PLAIN_TEXT_ALT:
             case output_format::JSON:
             case output_format::STDOUT:
+            case output_format::B64:
                 return state::ID::WRITE_TO_STRING;
             case output_format::OBJ:
                 return state::ID::WRITE_TO_WF_OBJ;
@@ -139,7 +140,10 @@ namespace mazes::state_utils
         state::ID output_state = state::ID::WRITE_TO_STRING;
         if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend() && !it->second.empty())
         {
-            const auto& output = string_utils::file_extension(it->second);
+            const auto bare_format = stdout_format_from_sv(it->second);
+            const auto output = bare_format != output_format::TOTAL
+                ? std::string{to_sv_from_output_format(bare_format)}
+                : string_utils::file_extension(it->second);
             output_state = details::to_state_from_output_format(output_format_or_default(output));
             if (output_state == state::ID::EMPTY)
             {
@@ -185,18 +189,6 @@ namespace mazes::state_utils
         return false;
     }
 
-    inline randomizer* get_rng_or_default(const runtime_app::context& ctx) noexcept
-    {
-        if (auto* rng = ctx.get_rng())
-        {
-            return rng;
-        }
-
-        // Thread-local storage keeps the fallback lifetime valid for callers.
-        static thread_local randomizer fallback_rng{};
-        return &fallback_rng;
-    }
-
     // Reseeds rng from the parsed "seed" arg so repeated apply() calls with the same
     // seed reproduce identical topology; the rng is otherwise shared and keeps advancing.
     inline void reseed_from_args(const std::unordered_map<std::string, std::string>& args, randomizer& rng) noexcept
@@ -217,7 +209,7 @@ namespace mazes::state_utils
     {
         if (!((mapper != nullptr) && ...))
         {
-            global_async_logger().log("mappers are null");
+            async_logger::instance()->log("mappers are null");
         }
     }
 
@@ -234,7 +226,7 @@ namespace mazes::state_utils
     {
         if (ops == nullptr)
         {
-            global_async_logger().log("grid_operations pointer is null");
+            async_logger::instance()->log("grid_operations pointer is null");
             return;
         }
 

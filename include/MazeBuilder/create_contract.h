@@ -1,7 +1,6 @@
 #ifndef CREATE_CONTRACT_H
 #define CREATE_CONTRACT_H
 
-#include <MazeBuilder/algos.h>
 #include <string_view>
 
 /// @file create_contract.h

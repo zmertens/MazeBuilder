@@ -2,6 +2,8 @@
 
 #include <MazeBuilder/async_logger.h>
 
+#include <fmt/format.h>
+
 #include <chrono>
 #include <condition_variable>
 #include <mutex>
@@ -16,14 +18,15 @@ TEST_CASE("async_logger delivers queued messages", "[async_logger]")
     std::condition_variable cv;
     std::vector<std::string> received;
 
-    async_logger logger([&](std::string_view msg)
-                        {
-                            std::lock_guard<std::mutex> lock(mtx);
-                            received.emplace_back(msg);
-                            cv.notify_one();
-                        });
+    auto &logger = async_logger::instance();
+    logger->set_sink([&](std::string_view msg)
+                     {
+                         std::lock_guard<std::mutex> lock(mtx);
+                         received.emplace_back(msg);
+                         cv.notify_one();
+                     });
 
-    logger.log("maze {}", 42);
+    logger->log(fmt::format("maze {}", 42));
 
     std::unique_lock<std::mutex> lock(mtx);
     const bool ok = cv.wait_for(lock, std::chrono::milliseconds(500), [&]()
@@ -32,5 +35,6 @@ TEST_CASE("async_logger delivers queued messages", "[async_logger]")
     REQUIRE(ok);
     REQUIRE(received.front() == "maze 42");
 
-    logger.flush();
+    logger->flush();
+    logger->set_sink(nullptr);
 }

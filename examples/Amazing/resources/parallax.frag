@@ -10,6 +10,10 @@ precision highp float;
 uniform vec2 iResolution;
 uniform float iTime;
 uniform float iOffset;
+uniform sampler2D maze;
+uniform vec4 mazeRect;   // maze sprite bounds in pixels (x, y, w, h), y from top
+uniform vec3 wallColor;
+uniform float cellUv;    // one maze cell as a fraction of the texture width
 
 #define t iTime
 
@@ -45,6 +49,24 @@ vec2 field(in vec2 p)
 	return vec2(m.x,m.y);
 }
 
+// Average of the non-wall maze colors around this pixel
+vec3 sampleMaze(vec2 fragCoord)
+{
+	vec2 px = vec2(fragCoord.x, iResolution.y - fragCoord.y);
+	vec2 muv = (px - mazeRect.xy) / mazeRect.zw;
+	vec3 sum = vec3(0.);
+	float n = 0.;
+	for(int j=-2; j<=2; j++)
+	for(int i=-2; i<=2; i++)
+	{
+		vec3 c = texture2D(maze, clamp(muv + vec2(i,j)*cellUv, 0., 1.)).rgb;
+		float w = step(0.01, distance(c, wallColor));
+		sum += c*w;
+		n += w;
+	}
+	return n > 0. ? sum/n : vec3(1.);
+}
+
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
 	vec2 uv = fragCoord.xy / iResolution.xy-0.5;
@@ -78,6 +100,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
 	vec3 col3 = vec3(1.9,0.4,2.)*rz3*(sin(t*4.-(uv.y*10.+uv.x*2.))*0.5+0.5);
 	
 	col = max(max(col,col2),col3);
+	col *= 0.4 + 1.6*sampleMaze(fragCoord);
 	float vignette = smoothstep(1.2, 0.15, length(uv));
 	col *= mix(0.55, 1.15, vignette);
 	col += vec3(0.05, 0.03, 0.08);

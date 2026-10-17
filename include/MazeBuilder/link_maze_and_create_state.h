@@ -27,31 +27,32 @@ namespace mazes
         /// @brief Construct a new link maze and create state
         /// @param ctx The runtime context
         /// @param stack The runtime stack to allow pushing/popping states
-        explicit link_maze_and_create_state(const runtime_app::context& ctx, runtime_stack* stack);
+        explicit link_maze_and_create_state(const runtime_app::context &ctx, runtime_stack *stack);
 
         ~link_maze_and_create_state() override;
 
         /// @brief Update the state with the given arguments and delta time
         /// Common logic for parsing arguments, setting up configuration, and handling output
+        /// @param rng The randomizer for the algorithm
         /// @param delta_time Time elapsed since the last update
         /// @return False to indicate the state has completed (pops itself from the stack)
-        bool update(double delta_time) noexcept override final;
+        bool update(randomizer &rng, double delta_time) noexcept override final;
 
         void draw() const noexcept override;
+
+        /// @brief Create the maze using algorithm-specific logic
+        /// @param config The configuration containing maze parameters
+        /// @param rng The randomizer for the algorithm
+        /// @return A string view with the result message
+        [[nodiscard]] std::string_view create(const configurator &config, randomizer &rng) noexcept override = 0;
 
     protected:
         /// @brief Get the algorithm ID for this maze creation algorithm
         /// @return The algorithm ID to use in the configurator
         [[nodiscard]] virtual algo get_algo_id() const noexcept = 0;
 
-        /// @brief Create the maze using algorithm-specific logic
-        /// @param config The configuration containing maze parameters
-        /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message
-        [[nodiscard]] std::string_view create(const configurator& config, randomizer& rng) noexcept override = 0;
-
-        grid_manager* grid_mapper;
-        processed_text_manager* processed_text_mapper;
+        grid_manager *grid_mapper;
+        processed_text_manager *processed_text_mapper;
         grid_identifier current_grid_id;
         bool m_use_distances;
         int m_distances_start;
@@ -60,7 +61,7 @@ namespace mazes
 
     private:
         /// @brief Common update logic for all link-based maze creation algorithms
-        void common_update(const configurator& cfg, randomizer& rng) noexcept;
+        void common_update(const configurator &cfg, randomizer &rng) noexcept;
     };
 } // namespace mazes
 

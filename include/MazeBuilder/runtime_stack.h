@@ -1,6 +1,7 @@
 #ifndef RUNTIME_STACK_H
 #define RUNTIME_STACK_H
 
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
 
@@ -13,6 +14,8 @@
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+class randomizer;
 
 /// @file runtime_stack.h
 /// @namespace mazes
@@ -29,7 +32,7 @@ namespace mazes
             CLEAR = 2
         };
 
-        explicit runtime_stack(const runtime_app::context& ctx);
+        explicit runtime_stack(const runtime_app::context &ctx);
 
         // Stack operations (deferred — applied by apply_pending_changes)
         void push_state(state::ID state_id) noexcept;
@@ -38,8 +41,9 @@ namespace mazes
 
         /// @brief Visit each state top-to-bottom, calling update(args, elapsed) until one returns false.
         ///        Applies pending stack changes after the pass.
+        /// @param rng The randomizer instance to use for state updates
         /// @param elapsed The elapsed time since the last update
-        void visit_states(double elapsed) noexcept;
+        void visit_states(randomizer &rng, double elapsed) noexcept;
 
         /// @brief Checks if the runtime stack is empty
         /// @return True if the stack is empty, false otherwise
@@ -53,9 +57,7 @@ namespace mazes
         void register_state(state::ID state_id)
         {
             m_factories.insert_or_assign(state_id, [this]()
-                {
-                    return std::make_unique<T>(runtime_context, this);
-                });
+                                         { return std::make_unique<T>(runtime_context, this); });
         }
 
         /// @brief Find the topmost state that matches the pointer type T.
@@ -64,10 +66,8 @@ namespace mazes
         {
             auto reversed = m_states | std::views::reverse;
 
-            auto it = std::ranges::find_if(reversed, [](const auto& sp)
-                {
-                    return dynamic_cast<Pointer>(sp.get()) != nullptr;
-                });
+            auto it = std::ranges::find_if(reversed, [](const auto &sp)
+                                           { return dynamic_cast<Pointer>(sp.get()) != nullptr; });
 
             if (it != std::ranges::cend(reversed))
             {
@@ -102,21 +102,21 @@ namespace mazes
 
         [[nodiscard]] std::unique_ptr<state> create_state(state::ID state_id)
         {
-            if (const auto& found = m_factories.find(state_id); found != m_factories.cend())
+            if (const auto &found = m_factories.find(state_id); found != m_factories.cend())
             {
                 return found->second();
             }
 
             throw std::runtime_error("Create state failed. No factory for state ID: " +
-                std::to_string(static_cast<unsigned int>(state_id)));
+                                     std::to_string(static_cast<unsigned int>(state_id)));
         }
 
         std::vector<std::unique_ptr<state>> m_states;
         std::vector<pending_change> m_pending;
         runtime_app::context runtime_context;
         std::unordered_map<state::ID,
-            std::function<std::unique_ptr<state>()>,
-            state_id_hash>
+                           std::function<std::unique_ptr<state>()>,
+                           state_id_hash>
             m_factories;
     };
 } // namespace mazes

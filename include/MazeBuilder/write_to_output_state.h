@@ -19,7 +19,9 @@ namespace mazes
 {
     /// @brief Base state for creating output from mazes (pixels, stringify, OBJ)
     /// This state encapsulates the common setup, creation, and output-writing logic
-    /// for states that generate maze output in various formats
+    /// for states that generate maze output in various formats.
+    /// The output argument is either a file path (the extension selects the format) or a bare
+    /// keyword that prints to stdout: "stdout" (plain string), "obj" (Wavefront OBJ), "b64" (base64-encoded string)
     class write_to_output_state : public create_contract, public state
     {
     public:
@@ -32,22 +34,23 @@ namespace mazes
 
         /// @brief Update the state with the given arguments and delta time
         /// Common logic for parsing arguments, creating output, and writing to file
+        /// @param rng The randomizer for the algorithm
         /// @param delta_time Time elapsed since the last update
         /// @return False to indicate the state has completed (pops itself from the stack)
-        bool update(double delta_time) noexcept override final;
+        bool update(randomizer &rng, double delta_time) noexcept override final;
 
         void draw() const noexcept override;
 
-    protected:
         /// @brief Create the output using algorithm-specific logic
         /// @param config The configuration containing maze parameters
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message/content
         [[nodiscard]] virtual std::string_view create(const configurator& config, randomizer& rng) noexcept = 0;
 
+    protected:
         /// @brief Write the output to the target destination
         /// Subclasses should override this to handle format-specific writing
-        /// @param output_target The target file path or "stdout"
+        /// @param output_target The target file path; never called for stdout keywords
         /// @param output_content The content to write
         /// @return True if write was successful, false otherwise
         [[nodiscard]] virtual bool write_output(const std::string& output_target, const std::string& output_content) noexcept = 0;

@@ -127,8 +127,6 @@ std::string_view pixels_create_state::create(const configurator& config,
 
     try
     {
-        m_result = "Maze generated";
-
         auto& grid_ref = grid_mapper->get(current_grid_id);
         auto& grid_ops = grid_ref.operations();
 
@@ -165,19 +163,22 @@ std::string_view pixels_create_state::create(const configurator& config,
             palette_rng = &deterministic_palette_rng;
         }
 
-        const float base_hue = static_cast<float>((*palette_rng)(0, 359));
-        const rgba_t wall_color = hsv_to_rgba(base_hue,
-            static_cast<float>((*palette_rng)(58, 92)) / 100.0f,
-            static_cast<float>((*palette_rng)(28, 62)) / 100.0f);
-        const rgba_t base_floor_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(70, 170)), 360.0f),
-            static_cast<float>((*palette_rng)(8, 28)) / 100.0f,
-            static_cast<float>((*palette_rng)(88, 98)) / 100.0f);
-        const rgba_t distance_near_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(10, 60)), 360.0f),
-            static_cast<float>((*palette_rng)(30, 60)) / 100.0f,
-            static_cast<float>((*palette_rng)(92, 100)) / 100.0f);
-        const rgba_t distance_far_color = hsv_to_rgba(std::fmod(base_hue + static_cast<float>((*palette_rng)(180, 260)), 360.0f),
-            static_cast<float>((*palette_rng)(45, 78)) / 100.0f,
-            static_cast<float>((*palette_rng)(55, 80)) / 100.0f);
+        // One batch of unit samples feeds every palette parameter, each mapped into its own range
+        const auto unit = palette_rng->sample_float_n(0.0f, 1.0f, 12);
+        std::size_t next = 0;
+        const auto pick = [&unit, &next](const float lo, const float hi)
+            {
+                return std::lerp(lo, hi, unit[next++]);
+            };
+
+        const float base_hue = pick(0.0f, 360.0f);
+        const rgba_t wall_color = hsv_to_rgba(base_hue, pick(0.58f, 0.92f), pick(0.28f, 0.62f));
+        const float floor_hue = std::fmod(base_hue + pick(70.0f, 170.0f), 360.0f);
+        const rgba_t base_floor_color = hsv_to_rgba(floor_hue, pick(0.08f, 0.28f), pick(0.88f, 0.98f));
+        const float near_hue = std::fmod(base_hue + pick(10.0f, 60.0f), 360.0f);
+        const rgba_t distance_near_color = hsv_to_rgba(near_hue, pick(0.30f, 0.60f), pick(0.92f, 1.0f));
+        const float far_hue = std::fmod(base_hue + pick(180.0f, 260.0f), 360.0f);
+        const rgba_t distance_far_color = hsv_to_rgba(far_hue, pick(0.45f, 0.78f), pick(0.55f, 0.80f));
 
         for (int y = 0; y < m_image_height; ++y)
         {
@@ -232,7 +233,9 @@ std::string_view pixels_create_state::create(const configurator& config,
 
         grid_ops.set_pixels(pixels);
 
-        return m_result;
+        // @TODO - convert pixels into a byte string
+
+        return "";
     } catch (...)
     {
         return {};

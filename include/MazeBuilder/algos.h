@@ -30,7 +30,7 @@ namespace mazes
         "binary_tree",
         "sidewinder",
         "dfs",
-        "prims" };
+        "prims"};
 
     /// @brief Convert the algo enum to a string_view
     /// @param a
@@ -51,9 +51,9 @@ namespace mazes
     {
         if (const auto it = std::ranges::find(ALGOS_LABELS_LOWERCASE, a); it != ALGOS_LABELS_LOWERCASE.end())
         {
-            return static_cast<algo>(std::distance(ALGOS_LABELS_LOWERCASE.begin(), it));
+            return static_cast<algo>(std::distance(ALGOS_LABELS_LOWERCASE.cbegin(), it));
         }
-        throw std::invalid_argument("Invalid algo: " + std::string{ a });
+        throw std::invalid_argument("Invalid algo: " + std::string{a});
     }
 } // namespace mazes
 

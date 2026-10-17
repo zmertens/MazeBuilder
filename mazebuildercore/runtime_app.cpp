@@ -1,4 +1,4 @@
-// State machine workflow: (load once) -> parse -> generate via algo -> output
+// State machine workflow: (load once, lazily on first apply) -> parse -> generate via algo -> output
 
 #include <MazeBuilder/runtime_app.h>
 
@@ -40,38 +40,24 @@
 using namespace mazes;
 
 runtime_app::runtime_app()
-    : args_mapper{}
-    , grid_mapper{}
-    , processed_text_mapper{}
-    , rng{}
-    , logging_mtx{}
-    , received_logs{}
-    , last_result_buffer{}
-    , runtime_stack_ptr{ std::make_unique<runtime_stack>(context{}
-        .with_args_manager(args_mapper)
-        .with_grid_manager(grid_mapper)
-        .with_text_manager(processed_text_mapper)
-        .with_rng(rng)) }
+    : runtime_stack_ptr{std::make_unique<runtime_stack>(context{}
+                                                            .with_args_manager(args_mapper)
+                                                            .with_grid_manager(grid_mapper)
+                                                            .with_text_manager(processed_text_mapper))}
 {
-    global_async_logger().set_sink(
-        [](async_logger::sink_type sink)
+    async_logger::instance()->set_sink(
+        [this](std::string_view msg)
         {
-            return sink;
-        }(std::function<void(std::string)>{
-            [this](const auto msg)
-                {
-                    if (msg.empty())
-                    {
-                        return;
-                    }
+            if (msg.empty())
+            {
+                return;
+            }
 
-                    std::lock_guard lock(logging_mtx);
-                    received_logs.emplace_back(msg);
-                }}));
+            std::lock_guard lock(logging_mtx);
+            received_logs.emplace_back(msg);
+        });
 
-            register_states();
-            runtime_stack_ptr->push_state(state::ID::LOAD);
-            runtime_stack_ptr->visit_states(0.0);
+    register_states();
 }
 
 runtime_app::~runtime_app() = default;
@@ -94,44 +80,42 @@ void runtime_app::register_states() const noexcept
 std::string_view runtime_app::apply(const std::string_view unformatted_args) noexcept
 {
 #if defined(MAZE_DEBUG)
-    global_async_logger().log(fmt::format("runtime received unformatted args: {}\n", unformatted_args));
+    async_logger::instance()->log(fmt::format("runtime received unformatted args: {}\n", unformatted_args));
 #endif
 
-    try
+    // LOAD must populate the mappers before any input can be stored, so it
+    // runs first; the stack drains once (it pops itself) and is not re-pushed.
+    if (processed_text_mapper.is_empty())
     {
-        try
-        {
-            args_mapper.get(args_identifier::RAW).clear();
-            args_mapper.get(args_identifier::PARSED).clear();
-        }
-        catch (const std::out_of_range&)
-        {
-        }
-
-        if (auto& unknown_txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN); !unknown_txt.is_processed())
-        {
-            unknown_txt.set(unformatted_args);
-
-            runtime_stack_ptr->push_state(state::ID::PARSE);
-
-            visit_states();
-
-            // Clear so the next apply() call can supply fresh input.
-            unknown_txt.set_processed(std::monostate{});
-
-            last_result_buffer = get_finished_text();
-
-#if defined(MAZE_DEBUG)
-            global_async_logger().log(fmt::format("runtime finished text:\n{}", get_finished_text()));
-#endif
-            return last_result_buffer;
-        }
-    } catch (...)
-    {
-        global_async_logger().log("No processed text found.");
+        runtime_stack_ptr->push_state(state::ID::LOAD);
+        visit_states();
     }
 
-    return {};
+    auto &unknown_txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN);
+    if (unknown_txt.is_processed())
+    {
+        return {};
+    }
+
+    args_mapper.get(args_identifier::RAW).clear();
+    args_mapper.get(args_identifier::PARSED).clear();
+
+    unknown_txt.set(unformatted_args);
+    processed_text_mapper.get(processed_text_identifier::PROCESSING).set_processed(std::monostate{});
+
+    // PARSE pushes the algorithm/output states itself
+    runtime_stack_ptr->push_state(state::ID::PARSE);
+    visit_states();
+
+    // Clear so the next apply() call can supply fresh input.
+    unknown_txt.set_processed(std::monostate{});
+
+    last_result_buffer = get_finished_text();
+
+#if defined(MAZE_DEBUG)
+    async_logger::instance()->log(fmt::format("runtime finished text:\n{}", last_result_buffer));
+#endif
+    return last_result_buffer;
 }
 
 // Empty string on default
@@ -144,24 +128,26 @@ void runtime_app::visit_states() noexcept
         received_logs.clear();
     }
 
-    double accumulator{ 0.0 };
+    double accumulator{0.0};
+    randomizer rng{};
     // Drive the state machine until the stack is empty
     while (!runtime_stack_ptr->is_empty())
     {
-        const auto diff = progress<>::duration([&accumulator, this]
-            { return runtime_stack_ptr->visit_states(accumulator); });
+        const auto diff = progress<>::duration([&accumulator, &rng, this]
+                                               { return runtime_stack_ptr->visit_states(std::ref(rng), accumulator); });
         accumulator += progress<>::to_double_from_duration(diff);
     }
 
 #if defined(MAZE_DEBUG)
 
-    global_async_logger().log(fmt::format("runtime visited states in: {:.6f} ms\n", accumulator));
+    async_logger::instance()->log(fmt::format("runtime visited states in: {:.6f} ms\n", accumulator));
 #endif
 }
 
 std::string runtime_app::get_finished_text() noexcept
 {
-    if (const auto& txt{ processed_text_mapper.get(processed_text_identifier::FINISHED) }; txt.is_processed()) {
+    if (const auto &txt{processed_text_mapper.get(processed_text_identifier::FINISHED)}; txt.is_processed())
+    {
         return processed_text::to_string(txt.get());
     }
 
@@ -172,10 +158,10 @@ void runtime_app::dump_logs() noexcept
 {
     // Ensure the async logger worker has delivered all queued messages
     // into the in-memory sink before we consume and print them.
-    global_async_logger().flush();
+    async_logger::instance()->flush();
     std::lock_guard<std::mutex> lock(logging_mtx);
-    for (const auto& log : received_logs)
+    for (const auto &log : received_logs)
     {
-        global_async_logger().log(log);
+        async_logger::instance()->log(log);
     }
 }

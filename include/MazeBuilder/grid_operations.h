@@ -5,7 +5,10 @@
 #include <MazeBuilder/cell.h>
 
 #include <cstdint>
+#include <array>
+#include <iterator>
 #include <memory>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -22,7 +25,7 @@ namespace mazes
         /// @param ops
         /// @return
         [[nodiscard]]
-        static bool is_valid_ops(const grid_operations* ops) noexcept
+        static bool is_valid_ops(const grid_operations *ops) noexcept
         {
             return ops != nullptr;
         }
@@ -32,35 +35,55 @@ namespace mazes
 
         /// @brief Retrieves the dimensions as a tuple of three unsigned integers.
         /// @return A tuple containing three unsigned integers representing the dimensions.
-        [[nodiscard]] virtual std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> get_dimensions() const noexcept =
-        0;
+        [[nodiscard]] virtual std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> get_dimensions() const noexcept = 0;
 
         /// @brief Get neighbor by the cell's respective location
         /// @param c
         /// @param dir
         /// @return
-        [[nodiscard]] virtual std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const& c,
+        [[nodiscard]] virtual std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const &c,
                                                                  Direction dir) const noexcept = 0;
 
-        /// @brief Get all the neighbors by the cell
+        /// @brief Maximum number of neighbors a cell can have
+        static constexpr std::size_t MAX_NEIGHBORS = 4;
+
+        /// @brief Reusable neighbor buffer type for collect_neighbors
+        using neighbor_buffer = std::array<std::shared_ptr<cell>, MAX_NEIGHBORS>;
+
+        /// @brief Fill a caller-provided buffer with the neighbors of a cell, avoiding allocation
         /// @param c
-        /// @return
-        [[nodiscard]] virtual std::vector<std::shared_ptr<cell>> get_neighbors(
-            std::shared_ptr<cell> const& c) const noexcept = 0;
+        /// @param out Buffer to fill (reusable across calls)
+        /// @return The number of neighbors written to out
+        [[nodiscard]] virtual std::size_t collect_neighbors(std::shared_ptr<cell> const &c,
+                                                        std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept = 0;
+
+        /// @brief Get all the neighbors by the cell
+        /// @deprecated Allocates on every call; use the buffer overload instead
+        [[deprecated("use collect_neighbors(c, buffer), which does not allocate")]] [[nodiscard]]
+        std::vector<std::shared_ptr<cell>> collect_neighbors(std::shared_ptr<cell> const &c) const noexcept
+        {
+            neighbor_buffer buf;
+            const auto n = collect_neighbors(c, std::span<std::shared_ptr<cell>, MAX_NEIGHBORS>{buf});
+            return {std::make_move_iterator(buf.begin()), std::make_move_iterator(buf.begin() + n)};
+        }
+
+        /// @brief Zero-copy view of all cells, in index order (level-major, then row, then column)
+        /// @note The span is invalidated by resize()
+        [[nodiscard]] virtual std::span<const std::shared_ptr<cell>> cells() const noexcept = 0;
 
         /// @brief Set neighbor for a cell in a given direction
         /// @param c
         /// @param dir
         /// @param neighbor
         /// @return
-        virtual void set_neighbor(const std::shared_ptr<cell>& c, Direction dir,
-                                  std::shared_ptr<cell> const& neighbor) noexcept = 0;
+        virtual void set_neighbor(const std::shared_ptr<cell> &c, Direction dir,
+                                  std::shared_ptr<cell> const &neighbor) noexcept = 0;
 
         // Convenience methods for accessing neighbors
-        [[nodiscard]] virtual std::shared_ptr<cell> get_north(const std::shared_ptr<cell>& c) const noexcept = 0;
-        [[nodiscard]] virtual std::shared_ptr<cell> get_south(const std::shared_ptr<cell>& c) const noexcept = 0;
-        [[nodiscard]] virtual std::shared_ptr<cell> get_east(const std::shared_ptr<cell>& c) const noexcept = 0;
-        [[nodiscard]] virtual std::shared_ptr<cell> get_west(const std::shared_ptr<cell>& c) const noexcept = 0;
+        [[nodiscard]] virtual std::shared_ptr<cell> get_north(const std::shared_ptr<cell> &c) const noexcept = 0;
+        [[nodiscard]] virtual std::shared_ptr<cell> get_south(const std::shared_ptr<cell> &c) const noexcept = 0;
+        [[nodiscard]] virtual std::shared_ptr<cell> get_east(const std::shared_ptr<cell> &c) const noexcept = 0;
+        [[nodiscard]] virtual std::shared_ptr<cell> get_west(const std::shared_ptr<cell> &c) const noexcept = 0;
 
         /// @brief Search for a cell by index
         /// @param index
@@ -69,26 +92,7 @@ namespace mazes
 
         /// @brief Get the count of cells in the grid
         /// @return The number of cells in the grid
-        [[nodiscard]] virtual int num_cells() const noexcept = 0;
-
-        /// @brief Cleanup cells by cleaning up links within cells
-        virtual void clear_cells() noexcept = 0;
-
-        /// @brief Set a string value
-        /// @param str
-        virtual void set_str(std::string const& str) noexcept = 0;
-
-        /// @brief Get a string value
-        /// @return
-        [[nodiscard]] virtual std::string get_str() const noexcept = 0;
-
-        /// @brief Set the file name
-        /// @param f
-        virtual void set_file(std::string const& f) noexcept = 0;
-
-        /// @brief Get the file name
-        /// @return
-        [[nodiscard]] virtual std::string get_file() const noexcept = 0;
+        [[nodiscard]] virtual std::size_t num_cells() const noexcept = 0;
 
         /// @brief Get the vertices
         /// @return A vector of vertices as tuples (x, y, z, w)
@@ -98,8 +102,7 @@ namespace mazes
         /// @brief Set the vertices
         /// @param vertices A vector of vertices as tuples (x, y, z, w)
         virtual void set_vertices(
-            const std::vector<std::tuple<std::int32_t, std::int32_t, std::int32_t, std::int32_t>>& vertices) noexcept =
-        0;
+            const std::vector<std::tuple<std::int32_t, std::int32_t, std::int32_t, std::int32_t>> &vertices) noexcept = 0;
 
         /// @brief Get the faces
         /// @return A vector of faces, where each face is a vector of vertex indices
@@ -107,7 +110,7 @@ namespace mazes
 
         /// @brief Set the faces
         /// @param faces A vector of faces, where each face is a vector of vertex indices
-        virtual void set_faces(const std::vector<std::vector<std::uint32_t>>& faces) noexcept = 0;
+        virtual void set_faces(const std::vector<std::vector<std::uint32_t>> &faces) noexcept = 0;
 
         /// @brief Get the pixel data for image generation
         /// @return A vector of RGBA pixel data
@@ -115,7 +118,7 @@ namespace mazes
 
         /// @brief Set the pixel data for image generation
         /// @param pixels A vector of RGBA pixel data
-        virtual void set_pixels(const std::vector<std::uint8_t>& pixels) noexcept = 0;
+        virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept = 0;
 
         /// @brief Resize the grid to new dimensions, clearing all existing cells and topology.
         /// @param rows New row count  @param cols New column count  @param levels New level count
