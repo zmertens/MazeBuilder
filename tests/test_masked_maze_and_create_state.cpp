@@ -1,6 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <MazeBuilder/format_maze_from_mask.h>
 #include <MazeBuilder/runtime_app.h>
 
 #include "test_output_dir.h"
