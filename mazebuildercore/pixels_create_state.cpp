@@ -242,8 +242,6 @@ std::string_view pixels_create_state::create(const configurator &config,
 
         grid_ops.set_pixels(pixels);
 
-        // @TODO - convert pixels into a byte string
-
         return "";
     }
     catch (...)

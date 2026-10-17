@@ -1,7 +1,6 @@
 #ifndef WRITE_TO_OUTPUT_STATE_H
 #define WRITE_TO_OUTPUT_STATE_H
 
-#include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
@@ -22,7 +21,7 @@ namespace mazes
     /// for states that generate maze output in various formats.
     /// The output argument is either a file path (the extension selects the format) or a bare
     /// keyword that prints to stdout: "stdout" (plain string), "obj" (Wavefront OBJ), "b64" (base64-encoded string)
-    class write_to_output_state : public create_contract, public state
+    class write_to_output_state : public state
     {
     public:
         /// @brief Construct a new write to output state
@@ -40,12 +39,6 @@ namespace mazes
         bool update(randomizer &rng, double delta_time) noexcept override final;
 
         void draw() const noexcept override;
-
-        /// @brief Create the output using algorithm-specific logic
-        /// @param config The configuration containing maze parameters
-        /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message/content
-        [[nodiscard]] virtual std::string_view create(const configurator& config, randomizer& rng) noexcept = 0;
 
     protected:
         /// @brief Write the output to the target destination

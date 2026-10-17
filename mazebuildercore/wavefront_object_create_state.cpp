@@ -4,6 +4,7 @@
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/io_utils.h>
+#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
@@ -14,26 +15,27 @@
 
 using namespace mazes;
 
-wavefront_object_create_state::wavefront_object_create_state(const runtime_app::context& ctx, runtime_stack* rs)
+wavefront_object_create_state::wavefront_object_create_state(const runtime_app::context &ctx, runtime_stack *rs)
     : write_to_output_state(ctx, rs)
 {
 }
 
-bool wavefront_object_create_state::write_output(const std::string& output_target, const std::string& output_content) noexcept
+bool wavefront_object_create_state::write_output(const std::string &output_target, const std::string &output_content) noexcept
 {
-    if (output_target.empty() || output_target == "stdout")
+    if (output_target.empty()
+    || output_target == to_sv_from_output_format(output_format::STDOUT))
     {
-        return true; // stdout is considered successful
+        return true;
     }
     return io_utils::write_file(output_target, output_content);
 }
 
-std::string_view wavefront_object_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::string_view wavefront_object_create_state::create(const configurator &config, randomizer &rng) noexcept
 {
     try
     {
-        auto& grid_ref = grid_mapper->get(current_grid_id);
-        auto& grid_ops = grid_ref.operations();
+        auto &grid_ref = grid_mapper->get(current_grid_id);
+        auto &grid_ops = grid_ref.operations();
 
         constexpr float WALL_HEIGHT = 1.0f;
         constexpr float LEVEL_GAP = 2.0f;
@@ -43,38 +45,38 @@ std::string_view wavefront_object_create_state::create(const configurator& confi
         std::vector<std::array<unsigned int, 4>> faces;
 
         auto append_box = [&](float x0, float y0, float z0, float x1, float y1, float z1)
-            {
-                // OBJ indices are 1-based, not 0-based.
-                const auto base = static_cast<unsigned int>(vertices.size()) + 1u;
+        {
+            // OBJ indices are 1-based, not 0-based.
+            const auto base = static_cast<unsigned int>(vertices.size()) + 1u;
 
-                vertices.push_back({ x0, y0, z0 });
-                vertices.push_back({ x1, y0, z0 });
-                vertices.push_back({ x1, y1, z0 });
-                vertices.push_back({ x0, y1, z0 });
-                vertices.push_back({ x0, y0, z1 });
-                vertices.push_back({ x1, y0, z1 });
-                vertices.push_back({ x1, y1, z1 });
-                vertices.push_back({ x0, y1, z1 });
+            vertices.push_back({x0, y0, z0});
+            vertices.push_back({x1, y0, z0});
+            vertices.push_back({x1, y1, z0});
+            vertices.push_back({x0, y1, z0});
+            vertices.push_back({x0, y0, z1});
+            vertices.push_back({x1, y0, z1});
+            vertices.push_back({x1, y1, z1});
+            vertices.push_back({x0, y1, z1});
 
-                faces.push_back({ base + 4u, base + 5u, base + 6u, base + 7u });
-                faces.push_back({ base + 1u, base + 0u, base + 3u, base + 2u });
-                faces.push_back({ base + 3u, base + 7u, base + 6u, base + 2u });
-                faces.push_back({ base + 0u, base + 1u, base + 5u, base + 4u });
-                faces.push_back({ base + 1u, base + 2u, base + 6u, base + 5u });
-                faces.push_back({ base + 0u, base + 4u, base + 7u, base + 3u });
-            };
+            faces.push_back({base + 4u, base + 5u, base + 6u, base + 7u});
+            faces.push_back({base + 1u, base + 0u, base + 3u, base + 2u});
+            faces.push_back({base + 3u, base + 7u, base + 6u, base + 2u});
+            faces.push_back({base + 0u, base + 1u, base + 5u, base + 4u});
+            faces.push_back({base + 1u, base + 2u, base + 6u, base + 5u});
+            faces.push_back({base + 0u, base + 4u, base + 7u, base + 3u});
+        };
 
         auto append_horizontal_wall = [&](float x0, float z, float x1, float y_base)
-            {
-                append_box(x0, y_base, z - wall_thickness * 0.5f,
-                    x1, y_base + WALL_HEIGHT, z + wall_thickness * 0.5f);
-            };
+        {
+            append_box(x0, y_base, z - wall_thickness * 0.5f,
+                       x1, y_base + WALL_HEIGHT, z + wall_thickness * 0.5f);
+        };
 
         auto append_vertical_wall = [&](float x, float z0, float z1, float y_base)
-            {
-                append_box(x - wall_thickness * 0.5f, y_base, z0,
-                    x + wall_thickness * 0.5f, y_base + WALL_HEIGHT, z1);
-            };
+        {
+            append_box(x - wall_thickness * 0.5f, y_base, z0,
+                       x + wall_thickness * 0.5f, y_base + WALL_HEIGHT, z1);
+        };
 
         for (unsigned int lv = 0; lv < config.levels(); ++lv)
         {
@@ -95,7 +97,7 @@ std::string_view wavefront_object_create_state::create(const configurator& confi
                     const float x1 = static_cast<float>(col + 1u);
                     const float z0 = static_cast<float>(row);
                     const float z1 = static_cast<float>(row + 1u);
-
+                    
                     const auto north = grid_ops.get_north(current);
                     const auto south = grid_ops.get_south(current);
                     const auto east = grid_ops.get_east(current);
@@ -130,20 +132,21 @@ std::string_view wavefront_object_create_state::create(const configurator& confi
         result << "# MazeBuilder Wavefront OBJ\n";
         result << "# rows=" << config.rows() << " columns=" << config.columns() << " levels=" << config.levels() << "\n\n";
 
-        for (const auto& vertex : vertices)
+        for (const auto &vertex : vertices)
         {
             result << "v " << vertex[0] << ' ' << vertex[1] << ' ' << vertex[2] << "\n";
         }
 
         result << "\n";
-        for (const auto& face : faces)
+        for (const auto &face : faces)
         {
             result << "f " << face[0] << ' ' << face[1] << ' ' << face[2] << ' ' << face[3] << "\n";
         }
 
         m_output = result.str();
         return m_output;
-    } catch (...)
+    }
+    catch (...)
     {
         return {};
     }

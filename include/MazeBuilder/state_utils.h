@@ -52,15 +52,16 @@ namespace mazes::state_utils
     /// @param rows Reference to store the number of rows.
     /// @param cols Reference to store the number of columns.
     /// @param levels Reference to store the number of levels.
-    inline void parse_dimensions(const std::unordered_map<std::string, std::string>& args, unsigned int& rows, unsigned int& cols,
-        unsigned int& levels) noexcept
+    inline void parse_dimensions(const std::unordered_map<std::string, std::string> &args, unsigned int &rows, unsigned int &cols,
+                                 unsigned int &levels) noexcept
     {
         if (const auto it = args.find(mazes::args::ROW_WORD_STR); it != args.cend())
         {
             try
             {
                 rows = static_cast<unsigned int>(std::stoul(it->second));
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -69,7 +70,8 @@ namespace mazes::state_utils
             try
             {
                 cols = static_cast<unsigned int>(std::stoul(it->second));
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -78,7 +80,8 @@ namespace mazes::state_utils
             try
             {
                 levels = static_cast<unsigned int>(std::stoul(it->second));
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -92,15 +95,15 @@ namespace mazes::state_utils
     /// @brief Struct to hold distance settings parsed from arguments
     struct distance_settings final
     {
-        bool enabled{ false };
-        int start{ configurator::DEFAULT_DISTANCES_START };
-        int end{ configurator::DEFAULT_DISTANCES_END };
+        bool enabled{false};
+        int start{configurator::DEFAULT_DISTANCES_START};
+        int end{configurator::DEFAULT_DISTANCES_END};
     };
 
     /// @brief Parses the distance settings from the given arguments.
     /// @param args The arguments containing the distance settings.
     /// @return A distance_settings struct populated with the parsed values.
-    inline distance_settings parse_distance_settings(const std::unordered_map<std::string, std::string>& args) noexcept
+    inline distance_settings parse_distance_settings(const std::unordered_map<std::string, std::string> &args) noexcept
     {
         distance_settings settings{};
 
@@ -111,7 +114,8 @@ namespace mazes::state_utils
             try
             {
                 settings.start = std::stoi(it->second);
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -120,7 +124,8 @@ namespace mazes::state_utils
             try
             {
                 settings.end = std::stoi(it->second);
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -129,10 +134,10 @@ namespace mazes::state_utils
     }
 
     /// @brief Checks if the "distances" argument is present in the given arguments.
-/// @details This function checks if the "distances" argument is present in the provided
-/// @param args
-/// @return
-    inline bool has_distances(const std::unordered_map<std::string, std::string>& args) noexcept
+    /// @details This function checks if the "distances" argument is present in the provided
+    /// @param args
+    /// @return
+    inline bool has_distances(const std::unordered_map<std::string, std::string> &args) noexcept
     {
         return parse_distance_settings(args).enabled;
     }
@@ -140,15 +145,15 @@ namespace mazes::state_utils
     /// @brief Determines the output state based on the given arguments.
     /// @param args The arguments containing the output information.
     /// @return The corresponding state::ID for the output.
-    inline state::ID output_state_for(const std::unordered_map<std::string, std::string>& args) noexcept
+    inline state::ID output_state_for(const std::unordered_map<std::string, std::string> &args) noexcept
     {
         state::ID output_state = state::ID::WRITE_TO_STRING;
         if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend() && !it->second.empty())
         {
             const auto bare_format = stdout_format_from_sv(it->second);
             const auto output = bare_format != output_format::TOTAL
-                ? std::string{to_sv_from_output_format(bare_format)}
-                : string_utils::f_ext_str(it->second);
+                                    ? std::string{to_sv_from_output_format(bare_format)}
+                                    : string_utils::f_ext_str(it->second);
             output_state = details::to_state_from_output_format(output_format_or_default(output));
             if (output_state == state::ID::EMPTY)
             {
@@ -159,35 +164,37 @@ namespace mazes::state_utils
         return output_state;
     }
 
-    inline std::unordered_map<std::string, std::string> get_args_at_front(const runtime_app::context& ctx) noexcept
+    inline std::unordered_map<std::string, std::string> get_args_at_front(const runtime_app::context &ctx) noexcept
     {
-        if (auto* args_mapper = ctx.get_args_manager())
+        if (auto *args_mapper = ctx.get_args_manager())
         {
             try
             {
-                auto&& parsed_args = args_mapper->get(args_identifier::PARSED).front();
+                auto &&parsed_args = args_mapper->get(args_identifier::PARSED).front();
 
                 if (parsed_args.empty())
                 {
                     parsed_args = args_mapper->get(args_identifier::RAW).front();
                 }
                 return parsed_args;
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
         return {};
     }
 
-    inline bool advance_args(const runtime_app::context& ctx) noexcept
+    inline bool advance_args(const runtime_app::context &ctx) noexcept
     {
-        if (auto* args_mapper = ctx.get_args_manager())
+        if (auto *args_mapper = ctx.get_args_manager())
         {
             try
             {
-                auto& parsed_args = args_mapper->get(args_identifier::PARSED);
+                auto &parsed_args = args_mapper->get(args_identifier::PARSED);
                 return parsed_args.pop_front() && parsed_args.count() > 0;
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -196,14 +203,15 @@ namespace mazes::state_utils
 
     // Reseeds rng from the parsed "seed" arg so repeated apply() calls with the same
     // seed reproduce identical topology; the rng is otherwise shared and keeps advancing.
-    inline void reseed_from_args(const std::unordered_map<std::string, std::string>& args, randomizer& rng) noexcept
+    inline void reseed_from_args(const std::unordered_map<std::string, std::string> &args, randomizer &rng) noexcept
     {
         if (const auto it = args.find(mazes::args::SEED_WORD_STR); it != args.cend())
         {
             try
             {
                 rng.seed(std::stoull(it->second));
-            } catch (...)
+            }
+            catch (...)
             {
             }
         }
@@ -227,7 +235,7 @@ namespace mazes::state_utils
     /// @param rows Desired number of rows.
     /// @param cols Desired number of columns.
     /// @param levels Desired number of levels.
-    inline void check_before_resize(grid_operations* ops, unsigned int rows, unsigned int cols, unsigned int levels) noexcept
+    inline void check_before_resize(grid_operations *ops, unsigned int rows, unsigned int cols, unsigned int levels) noexcept
     {
         if (ops == nullptr)
         {

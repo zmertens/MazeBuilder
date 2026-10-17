@@ -4,6 +4,7 @@
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/bytes.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
@@ -81,7 +82,15 @@ bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delt
         .ensure_levels(levels)
         .ensure_distances(current_grid_id == grid_identifier::DISTANCE);
 
-    auto out{std::string{create(cfg, *rng_ptr)}};
+    // Concrete states mix in create_contract alongside this base
+    auto *creator = dynamic_cast<create_contract *>(this);
+    if (!creator)
+    {
+        request_stack_pop();
+        return false;
+    }
+
+    auto out{std::string{creator->create(cfg, *rng_ptr)}};
 
     if (stdout_format == output_format::B64)
     {

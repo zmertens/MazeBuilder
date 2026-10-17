@@ -1,6 +1,7 @@
 #ifndef WAVEFRONT_OBJECT_CREATE_STATE_H
 #define WAVEFRONT_OBJECT_CREATE_STATE_H
 
+#include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/write_to_output_state.h>
 
 #include <string>
@@ -15,7 +16,7 @@ class runtime_stack;
 namespace mazes
 {
     /// @brief State for creating a maze using the Wavefront Object algorithm
-    class wavefront_object_create_state final : public write_to_output_state
+    class wavefront_object_create_state final : public create_contract, public write_to_output_state
     {
     public:
         explicit wavefront_object_create_state(const runtime_app::context& ctx, runtime_stack* rs);
