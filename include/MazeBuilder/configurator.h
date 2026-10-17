@@ -21,7 +21,7 @@ namespace mazes
     {
     public:
         static constexpr auto MAX_COLUMNS = 100u;
-        static constexpr auto MAX_LEVELS = 10u;
+        static constexpr auto MAX_LEVELS = 100u;
         static constexpr auto MAX_ROWS = 100u;
         static constexpr auto DEFAULT_DISTANCES_START = 0;
         static constexpr auto DEFAULT_DISTANCES_END = -1;
@@ -57,7 +57,7 @@ namespace mazes
         configurator& ensure_levels(const unsigned int levels) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
-            // Levels are more memory-intensive than rows/columns, so lower limit
+            // Levels are more memory-intensive than rows/columns
             m_levels = std::clamp(levels, 1u, MAX_LEVELS);
             return *this;
         }

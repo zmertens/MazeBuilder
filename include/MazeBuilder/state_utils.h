@@ -82,6 +82,11 @@ namespace mazes::state_utils
             {
             }
         }
+
+        // 2D output tiles levels as mazes `cols` per row for at most `rows` rows
+        rows = std::clamp(rows, 1u, configurator::MAX_ROWS);
+        cols = std::clamp(cols, 1u, configurator::MAX_COLUMNS);
+        levels = std::clamp(levels, 1u, std::min(configurator::MAX_LEVELS, rows * cols));
     }
 
     /// @brief Struct to hold distance settings parsed from arguments

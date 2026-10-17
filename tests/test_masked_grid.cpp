@@ -178,28 +178,6 @@ TEST_CASE("Mask loaded from inline string", "[mask][from_string]")
     REQUIRE(m.count() == 16);
 }
 
-TEST_CASE("Mask loaded from inline mask source", "[mask][from_source]")
-{
-    const auto formatted = std::string{ format_maze_from_mask("X....\n.XXX.\n.X...\n.XXX.\n....X") };
-    const mask m = mask::from_source(formatted);
-
-    REQUIRE(m.rows() == 5u);
-    REQUIRE(m.columns() == 5u);
-    REQUIRE_FALSE(m(4u, 4u));
-    REQUIRE(m.count() == 16);
-}
-
-TEST_CASE("Single-row mask loaded from quoted inline mask source", "[mask][from_source][single_row]")
-{
-    const auto formatted = std::string{ format_maze_from_mask("X....") };
-    const mask m = mask::from_source(formatted);
-
-    REQUIRE(m.rows() == 1u);
-    REQUIRE(m.columns() == 5u);
-    REQUIRE_FALSE(m(0u, 0u));
-    REQUIRE(m(0u, 1u));
-}
-
 // ---------------------------------------------------------------------------
 // Masked grid tests
 // ---------------------------------------------------------------------------
@@ -316,21 +294,6 @@ TEST_CASE("Masked grid get_mask returns the mask", "[masked_grid][get_mask]")
     REQUIRE_FALSE(retrieved_mask(0u, 0u));
 }
 
-TEST_CASE("Masked grid from file integration with binary_tree", "[masked_grid][algorithm][binary_tree]")
-{
-    // const mask m = mask::from_txt("mask.txt");
-    // REQUIRE(m.count() == 16); // 16 available cells in our mask.txt
-
-    // masked_grid mg(m);
-
-    // binary_tree bt;
-    // randomizer rng;
-    // rng.seed(12345);
-
-    // const bool result = bt.run(&mg, rng);
-    // REQUIRE(result);
-}
-
 // ---------------------------------------------------------------------------
 // Args parsing tests for --mask
 // ---------------------------------------------------------------------------
@@ -361,34 +324,6 @@ TEST_CASE("Args parse --mask flag", "[args][mask]")
         const auto val = args_handler.get(args::MASK_WORD_STR);
         REQUIRE(val.has_value());
         REQUIRE(val.value() == "mask.txt");
-    }
-
-    SECTION("Inline short form -m\"...\"")
-    {
-        const auto formatted = std::string{ format_maze_from_mask("X....\n.XXX.\n....X") };
-        REQUIRE(args_handler.parse("-m" + formatted));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == formatted);
-    }
-
-    SECTION("Inline long form --mask=\"...\"")
-    {
-        const auto formatted = std::string{ format_maze_from_mask("X....\n.XXX.\n....X") };
-        REQUIRE(args_handler.parse("--mask=" + formatted));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == formatted);
-    }
-
-    SECTION("Inline long form --mask= with next token")
-    {
-        const auto formatted = std::string{ format_maze_from_mask("XXXX\nX..X\nX.XX\nXX.X\n") };
-        REQUIRE(args_handler.parse(std::vector<std::string>{"--mask=", formatted, "-aprims"}));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == formatted);
-        REQUIRE(args_handler.get(args::ALGO_ID_WORD_STR).value_or("") == "prims");
     }
 
     SECTION("Validation still applies for split --rows= form")

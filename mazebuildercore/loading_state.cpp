@@ -56,13 +56,13 @@ void loading_state::load_resources() const noexcept
     args_mapper->load<args>(args_identifier::PARSED);
 
     grid_mapper->load<grid>(grid_identifier::BASIC, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
-        configurator::MAX_LEVELS);
+        1u);
     grid_mapper->load<colored_grid>(grid_identifier::COLORED, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
-        configurator::MAX_LEVELS);
+        1u);
     grid_mapper->load<distance_grid>(grid_identifier::DISTANCE, configurator::MAX_ROWS,
-        configurator::MAX_COLUMNS, configurator::MAX_LEVELS);
+        configurator::MAX_COLUMNS, 1u);
     grid_mapper->load<masked_grid>(grid_identifier::MASKED, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
-        configurator::MAX_LEVELS);
+        1u);
 
     processed_text_mapper->load<processed_text>(processed_text_identifier::FINISHED);
     processed_text_mapper->load<processed_text>(processed_text_identifier::PROCESSING);
