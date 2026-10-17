@@ -2,7 +2,6 @@
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
-#include <MazeBuilder/format_maze_from_mask.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/mask.h>
