@@ -24,14 +24,13 @@
 #include <string_view>
 #include <vector>
 
-#include <fmt/format.h>
-
 namespace
 {
     const std::string APP_NAME = "Amazing - " + std::string{mazes::buildinfo::VERSION};
 
     const std::filesystem::path TEMP_IMAGE_PATH{std::filesystem::temp_directory_path() / "amazing_maze_generated.png"};
 
+    constexpr int MAX_ROWS_ROWS{40};
     constexpr int MAX_ROWS_COLUMNS{40};
     constexpr float FIXED_DELTA{1.0f / 120.0f};
     constexpr int SUB_STEPS{4};
@@ -67,12 +66,18 @@ void main()
     std::string generate_random_args(const mazes::randomizer &rng)
     {
         const auto algo = static_cast<mazes::algo>(rng.get_int(0, static_cast<int>(mazes::algo::TOTAL) - 1));
-        return fmt::format("-r {} -c {} -s {} -a {} --distances=[0:-1] -o {}",
-                           rng.get_int(5, MAX_ROWS_COLUMNS),
-                           rng.get_int(5, MAX_ROWS_COLUMNS),
-                           rng.get_int(1, 100000),
-                           mazes::to_sv_from_algo(algo),
-                           TEMP_IMAGE_PATH.string());
+        auto s1{"-r "};
+        auto s1_val{std::to_string(rng.get_int(5, MAX_ROWS_ROWS)) + " "};
+        auto s2{"-c "};
+        auto s2_val{std::to_string(rng.get_int(5, MAX_ROWS_COLUMNS)) + " "};
+        auto s3{"-s "};
+        auto s3_val{std::to_string(rng.get_int(1, rng.get_int(2, 100'000))) + " "};
+        auto s4{"-a "};
+        auto s4_val{std::string{mazes::to_sv_from_algo(algo)} + " "};
+        auto s5{"--distances=[0:-1] "};
+        auto s6{"-o "};
+        auto s6_val{TEMP_IMAGE_PATH.string()};
+        return s1 + s1_val + s2 + s2_val + s3 + s3_val + s4 + s4_val + s5 + s6 + s6_val;
     }
 } // namespace
 
@@ -454,7 +459,7 @@ bool generate_maze(const mazes::randomizer &rng, sf::Image &image)
     const auto start = std::chrono::steady_clock::now();
     (void)runtime_inst->apply(generate_random_args(rng));
     const std::chrono::duration<double, std::milli> elapsed = std::chrono::steady_clock::now() - start;
-    fmt::println("Apply took {:.3f} ms", elapsed.count());
+    std::printf("Apply took %.3f ms\n", elapsed.count());
 
     return image.loadFromFile(TEMP_IMAGE_PATH);
 }
@@ -499,7 +504,7 @@ int main(int, char *argv[])
         const bool cutout_loaded = parallax_loaded && cutout_shader.loadFromMemory(std::string{WALL_CUTOUT_FRAG}, sf::Shader::Type::Fragment);
         if (!cutout_loaded)
         {
-            fmt::println(stderr, "Parallax shaders unavailable, drawing the maze without them");
+            std::fprintf(stderr, "Parallax shaders unavailable, drawing the maze without them\n");
         }
         const auto update_wall_color = [&]()
         {
@@ -527,7 +532,7 @@ int main(int, char *argv[])
         shape.setOutlineThickness(1.0f);
         shape.setOutlineColor(sf::Color::Black);
 
-        fmt::println("{}", "Press B to generate a new maze");
+        std::printf("%s\n", "Press B to generate a new maze");
 
         sf::Clock clock;
         const sf::Clock total_clock;
@@ -604,7 +609,7 @@ int main(int, char *argv[])
     }
     catch (const std::exception &ex)
     {
-        fmt::println(stderr, "Unhandled exception: {}", ex.what());
+        std::fprintf(stderr, "Unhandled exception: %s\n", ex.what());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;
