@@ -236,7 +236,7 @@ namespace
         {
             try
             {
-                const auto extension = string_utils::file_extension(value);
+                const auto extension = string_utils::f_ext_str(value);
                 (void)to_output_format_from_sv(extension.empty() ? std::string{value} : extension);
                 return true;
             }

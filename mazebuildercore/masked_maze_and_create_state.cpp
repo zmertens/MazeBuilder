@@ -10,7 +10,7 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_stack.h>
-#include <filesystem>
+
 #include <optional>
 #include <stack>
 #include <span>

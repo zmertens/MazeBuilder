@@ -229,7 +229,11 @@ namespace mazes
             return result;
         }
 
-        static std::string file_extension(std::string_view filename) noexcept;
+        /// @brief Extracts the file extension from a filename, excluding the dot.
+        /// @param filename The filename from which to extract the extension.
+        /// @param pos The position of the path substring within the filename.
+        /// @return The file extension string
+        static std::string f_ext_str(std::string_view filename, std::size_t pos = 1) noexcept;
     }; // class
 } // namespace
 

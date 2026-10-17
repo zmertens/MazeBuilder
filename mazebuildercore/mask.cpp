@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <bitset>
+#include <cassert>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -12,6 +13,8 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+
+#include <fmt/format.h>
 
 namespace
 {
@@ -161,7 +164,10 @@ mask::mask(const unsigned int rows, const unsigned int columns)
 
 #if defined(MAZE_DEBUG)
 
-    test_border_exists(std::cref(m_bits));
+    if (!test_border_exists(std::cref(m_bits)))
+    {
+        fmt::println("Mask border test failed");
+    }
 #endif
 }
 

@@ -26,30 +26,13 @@ bool string_utils::ends_with(const std::string& str, const std::string& suffix) 
     return std::string_view{ str }.substr(str.size() - suffix.size()) == suffix;
 }
 
-std::string string_utils::file_extension(std::string_view filename) noexcept
+// pos = 1
+std::string string_utils::f_ext_str(std::string_view filename, std::size_t pos) noexcept
 {
-    if (filename.empty())
+    const auto str{std::filesystem::path(filename).extension().string()};
+    if (pos < str.size())
     {
-        return {};
+        return str.substr(pos);
     }
-
-    const std::string name{ filename };
-    if (auto _stdout{to_sv_from_output_format(output_format::STDOUT)}; name == _stdout)
-    {
-        return std::string{_stdout};
-    }
-
-    const auto ext = std::filesystem::path{ name }.extension().string();
-    if (ext.empty() || ext == ".")
-    {
-        return {};
-    }
-
-    std::string lower{};
-    lower.reserve(ext.size());
-    for (const unsigned char ch : ext)
-    {
-        lower.push_back(static_cast<char>(std::tolower(ch)));
-    }
-    return lower.substr(1);
+    return {};
 }

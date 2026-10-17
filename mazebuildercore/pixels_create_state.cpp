@@ -18,7 +18,6 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -55,70 +54,80 @@ namespace
         {
             r1 = c;
             g1 = x;
-        } else if (h_prime < 2.0f)
+        }
+        else if (h_prime < 2.0f)
         {
             r1 = x;
             g1 = c;
-        } else if (h_prime < 3.0f)
+        }
+        else if (h_prime < 3.0f)
         {
             g1 = c;
             b1 = x;
-        } else if (h_prime < 4.0f)
+        }
+        else if (h_prime < 4.0f)
         {
             g1 = x;
             b1 = c;
-        } else if (h_prime < 5.0f)
+        }
+        else if (h_prime < 5.0f)
         {
             r1 = x;
             b1 = c;
-        } else
+        }
+        else
         {
             r1 = c;
             b1 = x;
         }
 
         const auto to_byte = [](const float channel) -> std::uint8_t
-            {
-                const int value_255 = static_cast<int>((channel * 255.0f) + 0.5f);
-                return static_cast<std::uint8_t>(std::clamp(value_255, 0, 255));
-            };
+        {
+            const int value_255 = static_cast<int>((channel * 255.0f) + 0.5f);
+            return static_cast<std::uint8_t>(std::clamp(value_255, 0, 255));
+        };
 
-        return { to_byte(r1 + m), to_byte(g1 + m), to_byte(b1 + m), 255u };
+        return {to_byte(r1 + m), to_byte(g1 + m), to_byte(b1 + m), 255u};
     }
 }
 
-pixels_create_state::pixels_create_state(const runtime_app::context& ctx, runtime_stack* stack)
+pixels_create_state::pixels_create_state(const runtime_app::context &ctx, runtime_stack *stack)
     : write_to_output_state(ctx, stack)
 {
 }
 
-bool pixels_create_state::write_output(const std::string& output_target, [[maybe_unused]] const std::string& output_content) noexcept
+bool pixels_create_state::write_output(const std::string &output_target, [[maybe_unused]] const std::string &output_content) noexcept
 {
     try
     {
-        auto& grid_ref = grid_mapper->get(current_grid_id);
+        auto &grid_ref = grid_mapper->get(current_grid_id);
         const auto pixels = grid_ref.operations().get_pixels();
 
         if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
         {
-            const auto out = to_output_format_from_sv(string_utils::file_extension(output_target));
+            const auto out = to_output_format_from_sv(string_utils::f_ext_str(output_target));
             switch (out)
             {
-            case output_format::PNG: return io_utils::write_png(output_target, pixels, m_image_width, m_image_height);
-            case output_format::JPG: return io_utils::write_jpg(output_target, pixels, m_image_width, m_image_height);
-            case output_format::BMP: return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
-            default: return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
+            case output_format::PNG:
+                return io_utils::write_png(output_target, pixels, m_image_width, m_image_height);
+            case output_format::JPG:
+                return io_utils::write_jpg(output_target, pixels, m_image_width, m_image_height);
+            case output_format::BMP:
+                return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
+            default:
+                return io_utils::write_bmp(output_target, pixels, m_image_width, m_image_height);
             };
         }
-    } catch (...)
+    }
+    catch (...)
     {
     }
 
     return true;
 }
 
-std::string_view pixels_create_state::create(const configurator& config,
-    randomizer& rng) noexcept
+std::string_view pixels_create_state::create(const configurator &config,
+                                             randomizer &rng) noexcept
 {
     if (!grid_mapper)
     {
@@ -127,36 +136,36 @@ std::string_view pixels_create_state::create(const configurator& config,
 
     try
     {
-        auto& grid_ref = grid_mapper->get(current_grid_id);
-        auto& grid_ops = grid_ref.operations();
+        auto &grid_ref = grid_mapper->get(current_grid_id);
+        auto &grid_ops = grid_ref.operations();
 
         m_image_width = static_cast<int>(config.columns()) * cell_size_px + (static_cast<int>(config.columns()) + 1) * wall_size_px;
         m_image_height = static_cast<int>(config.rows()) * cell_size_px + (static_cast<int>(config.rows()) + 1) * wall_size_px;
 
         std::vector<std::uint8_t> pixels(static_cast<std::size_t>(m_image_width) * static_cast<std::size_t>(m_image_height) * 4u, 0u);
 
-        auto set_pixel = [&](const int x, const int y, const rgba_t& rgba)
-            {
-                const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_image_width) + static_cast<std::size_t>(x)) * 4u;
-                pixels[offset + 0u] = rgba[0];
-                pixels[offset + 1u] = rgba[1];
-                pixels[offset + 2u] = rgba[2];
-                pixels[offset + 3u] = rgba[3];
-            };
+        auto set_pixel = [&](const int x, const int y, const rgba_t &rgba)
+        {
+            const std::size_t offset = (static_cast<std::size_t>(y) * static_cast<std::size_t>(m_image_width) + static_cast<std::size_t>(x)) * 4u;
+            pixels[offset + 0u] = rgba[0];
+            pixels[offset + 1u] = rgba[1];
+            pixels[offset + 2u] = rgba[2];
+            pixels[offset + 3u] = rgba[3];
+        };
 
-        auto fill_rect = [&](const int x0, const int y0, const int width, const int height, const rgba_t& rgba)
+        auto fill_rect = [&](const int x0, const int y0, const int width, const int height, const rgba_t &rgba)
+        {
+            for (int y = y0; y < y0 + height; ++y)
             {
-                for (int y = y0; y < y0 + height; ++y)
+                for (int x = x0; x < x0 + width; ++x)
                 {
-                    for (int x = x0; x < x0 + width; ++x)
-                    {
-                        set_pixel(x, y, rgba);
-                    }
+                    set_pixel(x, y, rgba);
                 }
-            };
+            }
+        };
 
         randomizer deterministic_palette_rng{};
-        randomizer* palette_rng = &rng;
+        randomizer *palette_rng = &rng;
         if (m_palette_seed.has_value())
         {
             deterministic_palette_rng.seed(*m_palette_seed);
@@ -167,9 +176,9 @@ std::string_view pixels_create_state::create(const configurator& config,
         const auto unit = palette_rng->sample_float_n(0.0f, 1.0f, 12);
         std::size_t next = 0;
         const auto pick = [&unit, &next](const float lo, const float hi)
-            {
-                return std::lerp(lo, hi, unit[next++]);
-            };
+        {
+            return std::lerp(lo, hi, unit[next++]);
+        };
 
         const float base_hue = pick(0.0f, 360.0f);
         const rgba_t wall_color = hsv_to_rgba(base_hue, pick(0.58f, 0.92f), pick(0.28f, 0.62f));
@@ -188,7 +197,7 @@ std::string_view pixels_create_state::create(const configurator& config,
             }
         }
 
-        const auto* distance_grid_ref = dynamic_cast<const distance_grid*>(&grid_ref);
+        const auto *distance_grid_ref = dynamic_cast<const distance_grid *>(&grid_ref);
         const auto distance_map = distance_grid_ref ? distance_grid_ref->get_distances() : std::shared_ptr<distances>{};
         const auto max_distance = distance_map ? distance_map->max().second : 0;
 
@@ -211,7 +220,7 @@ std::string_view pixels_create_state::create(const configurator& config,
                         lerp_u8(distance_near_color[0], distance_far_color[0], t),
                         lerp_u8(distance_near_color[1], distance_far_color[1], t),
                         lerp_u8(distance_near_color[2], distance_far_color[2], t),
-                        255u };
+                        255u};
                 }
 
                 const int px = wall_size_px + static_cast<int>(col) * (cell_size_px + wall_size_px);
@@ -236,7 +245,8 @@ std::string_view pixels_create_state::create(const configurator& config,
         // @TODO - convert pixels into a byte string
 
         return "";
-    } catch (...)
+    }
+    catch (...)
     {
         return {};
     }

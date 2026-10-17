@@ -148,7 +148,7 @@ namespace mazes::state_utils
             const auto bare_format = stdout_format_from_sv(it->second);
             const auto output = bare_format != output_format::TOTAL
                 ? std::string{to_sv_from_output_format(bare_format)}
-                : string_utils::file_extension(it->second);
+                : string_utils::f_ext_str(it->second);
             output_state = details::to_state_from_output_format(output_format_or_default(output));
             if (output_state == state::ID::EMPTY)
             {
