@@ -151,6 +151,11 @@ std::string runtime_app::get_finished_text() noexcept
         return processed_text::to_string(txt.get());
     }
 
+#if defined(MAZE_DEBUG)
+
+    async_logger::instance()->log("runtime finished text is not available");
+#endif
+
     return {};
 }
 
