@@ -31,6 +31,7 @@ set(MAZE_BUILDER_CORE_SRCS
     runtime_stack.cpp
     state.cpp
     stringify_create_state.cpp
+    state_utils.cpp
     string_utils.cpp    
     sw_maze_create_state.cpp
     topology.cpp

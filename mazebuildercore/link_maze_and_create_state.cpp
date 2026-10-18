@@ -3,6 +3,7 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/mask.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>

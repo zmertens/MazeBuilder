@@ -5,6 +5,8 @@
 #include <MazeBuilder/bytes.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/create_contract.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
