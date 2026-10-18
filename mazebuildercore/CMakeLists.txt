@@ -34,7 +34,6 @@ set(MAZE_BUILDER_CORE_SRCS
     state_utils.cpp
     string_utils.cpp    
     sw_maze_create_state.cpp
-    topology.cpp
     wavefront_object_create_state.cpp
     write_to_output_state.cpp)
 
