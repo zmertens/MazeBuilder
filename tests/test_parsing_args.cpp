@@ -10,6 +10,7 @@
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/json_helper.h>
 #include <MazeBuilder/output_formats.h>
+#include <MazeBuilder/parsing_state.h>
 #include <MazeBuilder/string_utils.h>
 
 #include <fmt/format.h>
@@ -46,6 +47,44 @@ TEST_CASE("Args static checks", "[args_static_checks]")
     STATIC_REQUIRE(std::is_copy_assignable<mazes::json_helper>::value);
     STATIC_REQUIRE(std::is_move_constructible<mazes::json_helper>::value);
     STATIC_REQUIRE(std::is_move_assignable<mazes::json_helper>::value);
+}
+
+TEST_CASE("parse_args runs the sub-state chain", "[parse_args]")
+{
+    SECTION("Repeated keys: last value wins")
+    {
+        const vector<string> tokens = {"app", "-r", "2", "--rows", "2", "-r", "3"};
+        const auto result = parse_args(tokens, false);
+        REQUIRE(result.ok);
+        REQUIRE(result.maps.size() == 1);
+        REQUIRE(result.maps.front().at(args::ROW_WORD_STR) == "3");
+    }
+
+    SECTION("Failure returns no partial maps and an error")
+    {
+        const vector<string> tokens = {"app", "-r", "5", "--bogus"};
+        const auto result = parse_args(tokens, false);
+        REQUIRE_FALSE(result.ok);
+        REQUIRE(result.maps.empty());
+        REQUIRE_FALSE(result.error.empty());
+    }
+
+    SECTION("Program name is stored when declared")
+    {
+        const vector<string> tokens = {"./maze", "-a", "dfs"};
+        const auto result = parse_args(tokens, true);
+        REQUIRE(result.ok);
+        REQUIRE(result.maps.front().at(args::APP_KEY) == "./maze");
+        REQUIRE(result.maps.front().at(args::ALGO_ID_WORD_STR) == "dfs");
+    }
+
+    SECTION("JSON array yields one map per object")
+    {
+        const vector<string> tokens = {"--json=" + string{ARRAY_DOT_JSON_FILE}};
+        const auto result = parse_args(tokens, false);
+        REQUIRE(result.ok);
+        REQUIRE(result.maps.size() > 1);
+    }
 }
 
 TEST_CASE("Args simple parses", "[simple_parses]")
@@ -306,8 +345,9 @@ TEST_CASE("Args can handle a JSON string input", "[json_string_input]")
         vector<string> args_vec = {args::JSON_FLAG_STR, INVALID_JSON_STR_1};
         REQUIRE_FALSE(args_handler.parse(args_vec));
 
-        const auto &m = args_handler.front();
-        REQUIRE_FALSE(m.empty());
+        // A failed parse leaves no partial results behind
+        REQUIRE(args_handler.front().empty());
+        REQUIRE(args_handler.count() == 0);
     }
 
 #if defined(MAZE_BENCHMARK)
@@ -799,6 +839,13 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]")
         REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "1.json"));
     }
 
+    SECTION("Output short inline with bmp path")
+    {
+        vector<string> args_vec = {"app", "-omaze.bmp"};
+        REQUIRE(args_handler.parse(args_vec, true));
+        REQUIRE(check_optional_equals_value(args_handler.get(args::OUTPUT_ID_WORD_STR), "maze.bmp"));
+    }
+
     SECTION("Output long with json")
     {
         vector<string> args_vec = {"app", "--output=json"};
@@ -819,10 +866,14 @@ TEST_CASE("Args enhanced valid parsing", "[enhanced_valid_parsing]")
         REQUIRE_FALSE(args_handler.parse(args_vec, true));
     }
 
-    SECTION("Valid concatenated options but semantically incorrect")
+    SECTION("Concatenated options are validated like separate values")
     {
         vector<string> args_vec = {"app", "-rx", "-cz", "-salgo"};
-        REQUIRE(args_handler.parse(args_vec));
+        REQUIRE_FALSE(args_handler.parse(args_vec));
+
+        vector<string> valid_vec = {"app", "-r10", "-c20", "-s7"};
+        REQUIRE(args_handler.parse(valid_vec));
+        REQUIRE(args_handler.get(args::ROW_WORD_STR) == "10");
     }
 }
 
@@ -950,7 +1001,7 @@ TEST_CASE("Args validation with distances slices", "[args_validation_with_slices
     SECTION("Valid slice syntax should pass")
     {
         vector<string> args_vec = {"-d", "[1:5]"};
-        REQUIRE(args_handler.parse(args_vec, true));
+        REQUIRE(args_handler.parse(args_vec));
     }
 
     SECTION("Valid option=value slice syntax should pass")

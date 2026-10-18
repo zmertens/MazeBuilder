@@ -2,112 +2,118 @@
 
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
+#include <MazeBuilder/bytes.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/create_contract.h>
+#include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
+#include <MazeBuilder/output_formats.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_stack.h>
 #include <MazeBuilder/state_utils.h>
 
+#include <fmt/format.h>
+
+#include <string>
+#include <type_traits>
+#include <variant>
+
 using namespace mazes;
 
 write_to_output_state::write_to_output_state(const runtime_app::context &ctx, runtime_stack *stack)
     : state(ctx, stack),
+      args_mapper{ctx.get_args_manager()},
       grid_mapper{ctx.get_grid_manager()},
       processed_text_mapper{ctx.get_text_manager()},
       current_grid_id{grid_identifier::BASIC}
 {
-    state_utils::validate_mappers(grid_mapper, processed_text_mapper);
+    state_utils::validate_mappers(args_mapper, grid_mapper, processed_text_mapper);
 }
 
 write_to_output_state::~write_to_output_state() = default;
+
+configurator write_to_output_state::make_config(const args &a) noexcept
+{
+    auto cfg = state_utils::build_configurator(a);
+    current_grid_id = cfg.distances() ? grid_identifier::DISTANCE : grid_identifier::BASIC;
+
+    try
+    {
+        const auto [rows, cols, levels] = grid_mapper->get(current_grid_id).operations().get_dimensions();
+        cfg.ensure_rows(rows).ensure_columns(cols).ensure_levels(levels);
+    }
+    catch (...)
+    {
+    }
+
+    return cfg;
+}
 
 void write_to_output_state::draw() const noexcept
 {
     // Implementation of the draw function
 }
 
-bool write_to_output_state::update([[maybe_unused]] double delta_time) noexcept
+bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
-    m_result.clear();
+    const auto &parsed_args{args_mapper->get(args_identifier::PARSED)};
+    const auto parsed_args_front = parsed_args.front();
 
-    if (!grid_mapper || !processed_text_mapper)
+    // Concrete states mix in create_contract alongside this base
+    auto *creator = dynamic_cast<create_contract *>(this);
+    if (!creator)
     {
         request_stack_pop();
         return false;
     }
 
-    const auto &parsed_args = state_utils::get_args_at_front(get_context());
-
-    unsigned int rows = configurator::MAX_ROWS;
-    unsigned int cols = configurator::MAX_COLUMNS;
-    unsigned int levels = 1u;
-
-    state_utils::parse_dimensions(std::cref(parsed_args), rows, cols, levels);
-
-    current_grid_id = state_utils::has_distances(std::cref(parsed_args)) ? grid_identifier::DISTANCE : grid_identifier::BASIC;
-
-    try
-    {
-        const auto [grid_rows, grid_cols, grid_levels] = grid_mapper->get(current_grid_id).operations().get_dimensions();
-        rows = grid_rows;
-        cols = grid_cols;
-        levels = grid_levels;
-    }
-    catch (...)
-    {
-    }
+    auto out = creator->create_as<std::string>(parsed_args, rng).value_or(std::string{});
 
     std::string output_target;
-    if (const auto it = parsed_args.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args.cend())
+    auto stdout_format = output_format::TOTAL;
+    if (const auto it = parsed_args_front.find(mazes::args::OUTPUT_ID_WORD_STR); it != parsed_args_front.cend())
     {
-        output_target = it->second;
+        // Bare keywords (stdout, obj, b64) print to stdout instead of writing a file.
+        stdout_format = stdout_format_from_sv(it->second);
+        output_target = stdout_format != output_format::TOTAL ? "" : it->second;
+    }
+    if (stdout_format == output_format::B64)
+    {
+        out = bytes::encode(out);
     }
 
-    auto *rng_ptr = state_utils::get_rng_or_default(get_context());
-
-    configurator cfg{};
-    cfg.ensure_rows(rows)
-        .ensure_columns(cols)
-        .ensure_levels(levels)
-        .ensure_distances(current_grid_id == grid_identifier::DISTANCE);
-
-    m_result = std::string{create(cfg, *rng_ptr)};
-
-    // Attempt to write output if result is not empty. If no explicit target was set,
-    // default to emitting the maze text to stdout for the console CLI.
-    if (!m_result.empty())
+    // Image states produce no text content but still write their pixels to the target
+    if (!output_target.empty())
     {
-        const bool default_stdout_output = output_target.empty();
-        if (!default_stdout_output)
+        if (write_output(output_target, out))
         {
-            if (bool write_success = write_output(output_target, m_result); !write_success)
+            async_logger::instance()->log("Successfully wrote maze to " + output_target);
+            if (out.empty())
             {
-                global_async_logger().log_message("Failed to write maze to " + output_target);
+                out = "Successfully wrote maze to " + output_target;
             }
         }
-
-        const auto extension = string_utils::file_extension(output_target);
-        if (default_stdout_output || output_format_or_default(extension) != output_format::STDOUT)
+        else
         {
-            global_async_logger().log(m_result);
+            async_logger::instance()->log("Failed to write maze to " + output_target);
         }
     }
 
-    try
-    {
-        processed_text_mapper->get(processed_text_identifier::FINISHED).set(m_result);
-    }
-    catch (...)
-    {
-        global_async_logger().log_message("Failed to update processed text with the finished result.");
-    }
+    processed_text_mapper->get(processed_text_identifier::FINISHED).set(out);
 
     request_stack_pop();
     if (state_utils::advance_args(get_context()))
     {
         request_stack_push(state::ID::PARSE);
     }
+
+#if defined(MAZE_DEBUG)
+
+    const auto processing_output{processed_text::to_string(processed_text_mapper->get(processed_text_identifier::PROCESSING).get())};
+    async_logger::instance()->log(fmt::format("Processing output:\n{}\n", processing_output));
+#endif
 
     return true;
 }

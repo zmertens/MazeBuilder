@@ -1,9 +1,8 @@
 #ifndef MASK_H
 #define MASK_H
 
-#include <MazeBuilder/randomizer.h>
-
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -11,6 +10,8 @@
 /// @namespace mazes
 namespace mazes
 {
+    class randomizer;
+
     /// @class mask
     /// @brief 2D boolean mask for controlling which cells are available in maze generation
     /// @details Cells marked as blocked (false) are excluded from maze generation.
@@ -25,11 +26,11 @@ namespace mazes
 
         ~mask() = default;
 
-        mask(const mask&) = default;
-        mask& operator=(const mask&) = default;
+        mask(const mask &) = default;
+        mask &operator=(const mask &) = default;
 
-        mask(mask&&) noexcept = default;
-        mask& operator=(mask&&) noexcept = default;
+        mask(mask &&) noexcept = default;
+        mask &operator=(mask &&) noexcept = default;
 
         /// @brief Check if a cell at (row, column) is available
         /// @param row Row index
@@ -51,26 +52,37 @@ namespace mazes
         /// @param rng Randomizer to use
         /// @return A pair (row, col) of a random available cell
         /// @pre count() > 0 — callers must ensure at least one cell is available
-        std::pair<unsigned int, unsigned int> random_location(randomizer& rng) const noexcept;
+        std::pair<unsigned int, unsigned int> random_location(randomizer &rng) const noexcept;
 
         /// @brief Get the number of rows
         /// @return Number of rows
-        [[nodiscard]] unsigned int rows() const noexcept { return m_rows; }
+        [[nodiscard]] unsigned int rows() const noexcept;
 
         /// @brief Get the number of columns
         /// @return Number of columns
-        [[nodiscard]] unsigned int columns() const noexcept { return m_columns; }
+        [[nodiscard]] unsigned int columns() const noexcept;
 
         /// @brief Load a mask from a text file
         /// @param filename Path to the text file ('X' = blocked, other = available)
         /// @return A mask loaded from the file
         /// @throws std::runtime_error if the file cannot be opened or is empty
         /// @note Lines of different lengths are supported; shorter rows default to available
-        static mask from_txt(const std::string& filename);
+        static mask from_txt(const std::string &filename);
+
+        /// @brief Load a mask from an inline string
+        /// @param text Mask text ('X' = blocked, other = available)
+        /// @return A mask loaded from the string
+        /// @throws std::runtime_error if the string is empty or invalid
+        /// @note Supports embedded newlines and escaped newline sequences such as "\n"
+        static mask from_string(std::string_view text);
+
+        /// @brief Load a mask from either a file path or an inline string
+        /// @param source File path or inline mask string
+        /// @return A mask loaded from the given source
+        /// @throws std::runtime_error if the source cannot be resolved
+        static mask from_source(std::string_view source);
 
     private:
-        unsigned int m_rows;
-        unsigned int m_columns;
         std::vector<std::vector<bool>> m_bits;
     };
 } // namespace mazes

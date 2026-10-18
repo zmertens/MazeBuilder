@@ -29,7 +29,7 @@ namespace mazes
         /// @brief Transform a vector of bytes into a string_view
         /// @param bytes The vector of bytes to transform
         /// @return A string_view representing the bytes
-        static std::string_view bytes_to_string(const std::vector<std::uint8_t>& bytes) noexcept;
+        static std::string_view bytes_to_string(const std::vector<std::uint8_t> &bytes) noexcept;
 
         /// @brief Transform a string_view into a vector of bytes
         /// @param sv The string_view to transform

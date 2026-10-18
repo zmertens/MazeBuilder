@@ -4,10 +4,12 @@
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/async_logger.h>
 #include <MazeBuilder/colored_grid.h>
+#include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
 #include <MazeBuilder/grid.h>
-#include <MazeBuilder/configurator.h>
+#include <MazeBuilder/masked_grid.h>
 #include <MazeBuilder/processed_text.h>
+#include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/resource_management.h>
 #include <MazeBuilder/runtime_app.h>
@@ -34,7 +36,7 @@ void loading_state::draw() const noexcept
     // No visual output for now
 }
 
-bool loading_state::update([[maybe_unused]] double delta_time) noexcept
+bool loading_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
     if (!has_finished)
     {
@@ -54,11 +56,13 @@ void loading_state::load_resources() const noexcept
     args_mapper->load<args>(args_identifier::PARSED);
 
     grid_mapper->load<grid>(grid_identifier::BASIC, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
-        configurator::MAX_LEVELS);
+        1u);
     grid_mapper->load<colored_grid>(grid_identifier::COLORED, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
-        configurator::MAX_LEVELS);
+        1u);
     grid_mapper->load<distance_grid>(grid_identifier::DISTANCE, configurator::MAX_ROWS,
-        configurator::MAX_COLUMNS, configurator::MAX_LEVELS);
+        configurator::MAX_COLUMNS, 1u);
+    grid_mapper->load<masked_grid>(grid_identifier::MASKED, configurator::MAX_ROWS, configurator::MAX_COLUMNS,
+        1u);
 
     processed_text_mapper->load<processed_text>(processed_text_identifier::FINISHED);
     processed_text_mapper->load<processed_text>(processed_text_identifier::PROCESSING);
@@ -75,7 +79,7 @@ void loading_state::set_text_to_unknown(const std::string_view txt) noexcept
             unknown_text.set(txt);
         } catch (...)
         {
-            async_logger().log("Failed to set text to UNKNOWN in loading_state.");
+            async_logger::instance()->log("Failed to set text to UNKNOWN in loading_state.");
         }
     }
 }

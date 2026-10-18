@@ -1,5 +1,7 @@
 #include <MazeBuilder/randomizer.h>
 
+#include <MazeBuilder/hash_funcs.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -7,6 +9,7 @@
 #include <functional>
 #include <random>
 #include <ranges>
+#include <type_traits>
 
 using namespace mazes;
 
@@ -17,9 +20,9 @@ class randomizer::randomizer_impl
 public:
     randomizer_impl()
 #if defined(__EMSCRIPTEN__)
-        : rng_device{ 5489u }
+        : rng_device{5489u}
 #else
-        : rng_device{ std::random_device{}() }
+        : rng_device{std::random_device{}()}
 #endif
     {
     }
@@ -29,37 +32,35 @@ public:
     {
         if constexpr (std::is_integral_v<Number>)
         {
-            std::uniform_int_distribution<Number> dist{ low, high };
+            std::uniform_int_distribution<Number> dist{low, high};
             return dist(rng_device);
-        } else
+        }
+        else
         {
-            std::uniform_real_distribution<Number> dist{ low, high };
+            std::uniform_real_distribution<Number> dist{low, high};
             return dist(rng_device);
         }
     }
 
-    // Generate a vector of integers within the specified range
-    [[nodiscard]] std::vector<int> get_vector_ints(int low, int high, const int count) noexcept
+    // Draw n samples from one uniform distribution instance driven by the mt19937 engine
+    template <typename Number>
+    [[nodiscard]] std::vector<Number> sample_n(Number low, Number high, const int n)
     {
-        // Handle invalid ranges
-        if (low > high || count <= 0)
+        if (low > high || n <= 0)
         {
             return {};
         }
 
-        std::vector<int> numbers;
+        using dist_t = std::conditional_t<std::is_integral_v<Number>,
+                                          std::uniform_int_distribution<Number>,
+                                          std::uniform_real_distribution<Number>>;
+        dist_t dist{low, high};
 
-        numbers.reserve(count);
+        std::vector<Number> samples(static_cast<std::size_t>(n));
+        std::ranges::generate(samples, [&]
+                              { return dist(rng_device); });
 
-        for (int i = 0; i < count; ++i)
-        {
-            numbers.emplace_back(get_range<int>(low, high));
-        }
-
-        // Shuffle the vector using the random number generator
-        std::ranges::shuffle(numbers, rng_device);
-
-        return numbers;
+        return samples;
     }
 
     void seed() noexcept
@@ -81,21 +82,28 @@ public:
     {
         rng_device.seed(static_cast<std::mt19937::result_type>(seed));
     }
+
+    void seed(std::string_view sv) noexcept
+    {
+        mazes::uni_hash hasher;
+        const auto seed_value = hasher(sv);
+        rng_device.seed(static_cast<std::mt19937::result_type>(seed_value));
+    }
 };
 
 // Default constructor
-randomizer::randomizer() : m_impl{ std::make_unique<randomizer_impl>() }
+randomizer::randomizer() : m_impl{std::make_unique<randomizer_impl>()}
 {
 }
 
 // Copy constructor
-randomizer::randomizer(const randomizer& other)
-    : m_impl{ std::make_unique<randomizer_impl>(*other.m_impl) }
+randomizer::randomizer(const randomizer &other)
+    : m_impl{std::make_unique<randomizer_impl>(*other.m_impl)}
 {
 }
 
 // Copy assignment operator
-randomizer& randomizer::operator=(const randomizer& other)
+randomizer &randomizer::operator=(const randomizer &other)
 {
     if (this == &other)
     {
@@ -109,13 +117,13 @@ randomizer& randomizer::operator=(const randomizer& other)
 }
 
 // Move constructor
-randomizer::randomizer(randomizer&& other) noexcept
-    : m_impl{ std::move(other.m_impl) }
+randomizer::randomizer(randomizer &&other) noexcept
+    : m_impl{std::move(other.m_impl)}
 {
 }
 
 // Move assignment operator
-randomizer& randomizer::operator=(randomizer&& other) noexcept
+randomizer &randomizer::operator=(randomizer &&other) noexcept
 {
     if (this == &other)
     {
@@ -144,6 +152,11 @@ void randomizer::seed(const unsigned long long seed) const noexcept
     this->m_impl->seed(seed);
 }
 
+void randomizer::seed(std::string_view sv) const noexcept
+{
+    this->m_impl->seed(sv);
+}
+
 /// @brief Generates a random integer within a specified range.
 /// @param low defaults to 0
 /// @param high defaults to 1
@@ -162,12 +175,12 @@ float randomizer::get_float(const float low, const float high) const noexcept
     return this->m_impl->get_range<float>(low, high);
 }
 
-/// @brief Generates a vector of ints
-/// @param low defaults to 0
-/// @param high defaults to 1
-/// @param count defaults to 1
-/// @return A vector of random integers within the specified range.
-std::vector<int> randomizer::get_vector_ints(const int low, const int high, const int count) const noexcept
+std::vector<int> randomizer::sample_int_n(const int low, const int high, const int n) const
 {
-    return this->m_impl->get_vector_ints(low, high, count);
+    return this->m_impl->sample_n<int>(low, high, n);
+}
+
+std::vector<float> randomizer::sample_float_n(const float low, const float high, const int n) const
+{
+    return this->m_impl->sample_n<float>(low, high, n);
 }

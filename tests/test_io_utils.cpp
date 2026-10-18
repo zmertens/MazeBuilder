@@ -2,6 +2,7 @@
 #include <string>
 #include <memory>
 #include <iosfwd>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -23,7 +24,7 @@ TEST_CASE("io_utils can process good text file names", "[good text filenames]")
     test_output_dir output_dir{"test_io_utils_good"};
 
     // Good file names that the io_utils can determine what type to write per the extension
-    vector<string> good_filenames{"1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg"};
+    vector<string> good_filenames{"1.txt", "1.obj", ".object", ".text", ".png", "my.jpg", "other.jpeg", "maze.bmp"};
 
     for (const auto &gf : good_filenames)
     {
@@ -45,7 +46,8 @@ TEST_CASE("io_utils can process bad file names", "[bad filenames]")
 
     for (auto bf : more_filenames)
     {
-        const auto ext{ string_utils::file_extension(bf) };
+        constexpr auto USE_DOT_IN_EXT{0};
+        const auto ext{ string_utils::f_ext_str(bf, USE_DOT_IN_EXT) };
         REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(ext), std::invalid_argument);
     }
 }

@@ -1,6 +1,8 @@
 #include <MazeBuilder/dfs_maze_create_state.h>
 
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/algos.h>
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
@@ -11,6 +13,7 @@
 #include <MazeBuilder/grid_operations.h>
 
 #include <stack>
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -27,15 +30,15 @@ algo dfs_maze_create_state::get_algo_id() const noexcept
     return algo::DFS;
 }
 
-std::string_view dfs_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::any dfs_maze_create_state::create(const args &a, randomizer& rng) noexcept
 {
-    return create_dfs_maze(config.rows(), config.columns(), config.levels(), rng);
+    const auto config = state_utils::build_configurator(a, get_algo_id());
+    return std::string{create_dfs_maze(config.rows(), config.columns(), config.levels(), rng)};
 }
 
-std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-    randomizer& rng) noexcept
+std::string_view dfs_maze_create_state::create_dfs_maze(const unsigned int rows, const unsigned int cols,
+    const unsigned int levels, randomizer& rng) noexcept
 {
-    [[maybe_unused]] auto _levels = levels; // DFS operates on level 0; multi-level support is future work
     if (!grid_mapper)
         return {};
     try
@@ -43,42 +46,47 @@ std::string_view dfs_maze_create_state::create_dfs_maze(unsigned int rows, unsig
         auto& grid_ref = grid_mapper->get(current_grid_id);
         auto& grid_ops = grid_ref.operations();
 
-        // Start in the first cell of level 0
-        const int level0_max = static_cast<int>(rows * cols) - 1;
-        const auto start = grid_ops.search(rng(0, level0_max));
-        if (!start)
+        // Each level is an independent maze
+        const int level_size = static_cast<int>(rows * cols);
+        for (unsigned int lv = 0; lv < levels; ++lv)
         {
-            return {};
-        }
-
-        std::stack<std::shared_ptr<cell>> stk;
-        std::unordered_set<int> visited;
-        stk.push(start);
-        visited.insert(start->get_index());
-
-        while (!stk.empty())
-        {
-            auto current = stk.top();
-            auto all_neighbors = grid_ops.get_neighbors(current);
-
-            std::vector<std::shared_ptr<cell>> unvisited;
-            for (auto& n : all_neighbors)
+            const int offset = static_cast<int>(lv) * level_size;
+            const auto start = grid_ops.search(offset + rng(0, level_size - 1));
+            if (!start)
             {
-                if (n && !visited.contains(n->get_index()))
-                {
-                    unvisited.push_back(n);
-                }
+                return {};
             }
 
-            if (unvisited.empty())
+            std::stack<std::shared_ptr<cell>> stk;
+            std::unordered_set<int> visited;
+            stk.push(start);
+            visited.insert(start->get_index());
+
+            grid_operations::neighbor_buffer neighbor_buf;
+            while (!stk.empty())
             {
-                stk.pop();
-            } else
-            {
-                auto& chosen = unvisited.at(static_cast<size_t>(rng(0, static_cast<int>(unvisited.size()) - 1)));
-                lab::link(current, chosen, true);
-                visited.insert(chosen->get_index());
-                stk.push(chosen);
+                auto current = stk.top();
+                const auto neighbor_count = grid_ops.collect_neighbors(current, neighbor_buf);
+
+                std::vector<std::shared_ptr<cell>> unvisited;
+                for (const auto& n : std::span(neighbor_buf).first(neighbor_count))
+                {
+                    if (n && !visited.contains(n->get_index()))
+                    {
+                        unvisited.push_back(n);
+                    }
+                }
+
+                if (unvisited.empty())
+                {
+                    stk.pop();
+                } else
+                {
+                    auto& chosen = unvisited.at(static_cast<size_t>(rng(0, static_cast<int>(unvisited.size()) - 1)));
+                    lab::link(current, chosen, true);
+                    visited.insert(chosen->get_index());
+                    stk.push(chosen);
+                }
             }
         }
 

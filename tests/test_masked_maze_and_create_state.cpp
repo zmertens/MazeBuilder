@@ -1,4 +1,5 @@
 #include <catch2/catch_test_macros.hpp>
+
 #include <MazeBuilder/runtime_app.h>
 
 #include "test_output_dir.h"

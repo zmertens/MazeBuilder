@@ -25,7 +25,7 @@ namespace mazes
         /// @param args The arguments to pass to the resource constructor
         /// @param ...args The arguments to pass to the resource constructor
         template <typename Concrete, typename... Args>
-        void load(Identifier id, Args&&... args)
+        void load(Identifier id, Args &&...args)
         {
             auto resource = std::make_unique<Concrete>(std::forward<Args>(args)...);
             if (!resource)
@@ -38,12 +38,12 @@ namespace mazes
         /// @brief Retrieves a resource by its identifier
         /// @param id
         /// @return
-        Resource& get(Identifier id);
+        Resource &get(Identifier id);
 
         /// @brief Retrieves a const reference to a resource by its identifier
         /// @param id
         /// @return
-        const Resource& get(Identifier id) const;
+        const Resource &get(Identifier id) const;
 
         /// @brief Clears all resources from the manager
         void clear() noexcept
@@ -69,7 +69,7 @@ namespace mazes
     /// @param id
     /// @return
     template <typename Resource, typename Identifier>
-    Resource& resource_management<Resource, Identifier>::get(Identifier id)
+    Resource &resource_management<Resource, Identifier>::get(Identifier id)
     {
         auto found = m_resources_map.find(id);
         if (found == m_resources_map.cend())
@@ -86,7 +86,7 @@ namespace mazes
     /// @param id
     /// @return
     template <typename Resource, typename Identifier>
-    const Resource& resource_management<Resource, Identifier>::get(Identifier id) const
+    const Resource &resource_management<Resource, Identifier>::get(Identifier id) const
     {
         auto found = m_resources_map.find(id);
         if (found == m_resources_map.cend())

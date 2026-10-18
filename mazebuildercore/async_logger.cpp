@@ -1,11 +1,10 @@
 #include <MazeBuilder/async_logger.h>
-#include <MazeBuilder/singleton_base.h>
 
 #include <condition_variable>
 #include <deque>
 #include <memory>
 #include <mutex>
-#include <stop_token>
+#include <string>
 #include <thread>
 #include <utility>
 
@@ -17,48 +16,21 @@ namespace
 {
     void default_sink(std::string_view message)
     {
-        fmt::print("{}\n", message);
+        fmt::println("{}", message);
     }
 }
 
-std::string mazes::format_placeholders(std::string_view format, std::vector<std::string> args)
-{
-    std::string result;
-    result.reserve(format.size());
-
-    std::size_t arg_index = 0;
-
-    for (std::size_t i = 0; i < format.size(); )
-    {
-        if (format[i] == '{' && i + 1 < format.size() && format[i + 1] == '}')
-        {
-            if (arg_index < args.size())
-            {
-                result += args[arg_index++];
-            }
-
-            i += 2;
-        } else
-        {
-            result += format[i];
-            ++i;
-        }
-    }
-
-    return result;
-}
-
-class async_logger::impl final
+class async_logger::impl
 {
 public:
     explicit impl(sink_type sink)
         : msg_sink(std::move(sink))
     {
 #if !defined(__EMSCRIPTEN__)
-        worker = std::jthread(
-            [this](std::stop_token stop)
+        worker = std::thread(
+            [this]()
             {
-                run(stop);
+                run();
             });
 #endif
     }
@@ -113,15 +85,13 @@ public:
         std::unique_lock lock(mutex);
 
         drained.wait(lock, [this]
-            { return queue.empty() && active == 0; });
+                     { return queue.empty() && active == 0; });
 
 #endif
     }
 
     void stop() noexcept
     {
-#if !defined(__EMSCRIPTEN__)
-
         {
             std::lock_guard lock(mutex);
 
@@ -133,10 +103,11 @@ public:
             stopped = true;
         }
 
-    worker.request_stop();
-    condition.notify_one();
-
-#endif
+        if (worker.joinable())
+        {
+            condition.notify_all();
+            worker.join();
+        }
     }
 
     void set_sink(sink_type sink)
@@ -146,9 +117,7 @@ public:
     }
 
 private:
-#if !defined(__EMSCRIPTEN__)
-
-    void run(std::stop_token stop)
+    void run()
     {
         while (true)
         {
@@ -158,11 +127,11 @@ private:
             {
                 std::unique_lock lock(mutex);
 
-                condition.wait(lock, [this, &stop]
-                    { return stop.stop_requested() || !queue.empty(); });
+                condition.wait(lock, [this]
+                               { return stopped || !queue.empty(); });
 
                 // Finish queued messages before stopping.
-                if (stop.stop_requested() && queue.empty())
+                if (queue.empty())
                 {
                     break;
                 }
@@ -180,7 +149,8 @@ private:
                 {
                     sink(message);
                 }
-            } catch (...)
+            }
+            catch (...)
             {
                 // Logging must never terminate the application.
             }
@@ -203,24 +173,18 @@ private:
         }
     }
 
-#endif
-
     mutable std::mutex mutex;
 
     sink_type msg_sink;
-
-#if !defined(__EMSCRIPTEN__)
 
     std::condition_variable condition;
     std::condition_variable drained;
 
     std::deque<std::string> queue;
-    std::jthread worker;
+    std::thread worker;
 
-    std::size_t active{ 0 };
-    bool stopped{ false };
-
-#endif
+    std::size_t active{0};
+    bool stopped{false};
 };
 
 async_logger::async_logger()
@@ -228,22 +192,12 @@ async_logger::async_logger()
 {
 }
 
-async_logger::async_logger(sink_type sink)
-    : pimpl_(std::make_unique<impl>(std::move(sink)))
-{
-}
-
 // Defined here (not defaulted in the header) since impl must be complete for unique_ptr's deleter.
 async_logger::~async_logger() = default;
 
-void async_logger::log(std::string message)
+void async_logger::log(std::string_view message)
 {
-    pimpl_->log(std::move(message));
-}
-
-void async_logger::log_message(std::string message)
-{
-    log(std::move(message));
+    pimpl_->log(std::string{message});
 }
 
 void async_logger::flush()
@@ -259,31 +213,4 @@ void async_logger::stop() noexcept
 void async_logger::set_sink(sink_type sink)
 {
     pimpl_->set_sink(std::move(sink));
-}
-
-mazes::async_logger& mazes::global_async_logger()
-{
-    return *singleton_base<async_logger>::instance();
-}
-
-void mazes::set_printer_sink(async_logger::sink_type sink)
-{
-    auto& logger = global_async_logger();
-
-    logger.flush();
-    logger.set_sink(std::move(sink));
-}
-
-void mazes::reset_printer_sink()
-{
-    auto& logger = global_async_logger();
-
-    logger.flush();
-
-    logger.set_sink(default_sink);
-}
-
-void mazes::flush_printer()
-{
-    global_async_logger().flush();
 }

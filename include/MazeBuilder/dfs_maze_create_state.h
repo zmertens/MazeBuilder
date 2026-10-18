@@ -4,13 +4,13 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/link_maze_and_create_state.h>
 
-class randomizer;
-class runtime_stack;
-
 /// @namespace mazes
 /// @file dfs_maze_create_state.h
 namespace mazes
 {
+    class args;
+    class randomizer;
+    class runtime_stack;
     /// @brief State for creating a maze using the depth-first search algorithm
     class dfs_maze_create_state final : public link_maze_and_create_state
     {
@@ -18,13 +18,13 @@ namespace mazes
         /// @brief Construct a new depth-first search maze creation state
         /// @param ctx The runtime context
         /// @param stack The runtime stack to allow pushing/popping states
-        explicit dfs_maze_create_state(const runtime_app::context& ctx, runtime_stack* stack);
+        explicit dfs_maze_create_state(const runtime_app::context &ctx, runtime_stack *stack);
 
         /// @brief Create a maze using the depth-first search algorithm
         /// @param config The maze configuration
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        std::string_view create(const configurator& config, randomizer& rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
         /// @brief Get the algorithm ID for the depth-first search algorithm
@@ -37,7 +37,7 @@ namespace mazes
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
         std::string_view create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-            randomizer& rng) noexcept;
+                                         randomizer &rng) noexcept;
     };
 } // namespace mazes
 

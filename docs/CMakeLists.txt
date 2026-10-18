@@ -27,14 +27,14 @@ macro(InitDoxygenAwesomeCss)
         ${doxygen-awesome-css_SOURCE_DIR}/doxygen-awesome-interactive-toc.js
     )
 
-    execute_process(COMMAND ${CMAKE_COMMAND} -E copy 
+    execute_process(COMMAND ${CMAKE_COMMAND} -E copy
         ${doxygen-awesome-css_SOURCE_DIR}/doxygen-custom/header.html
         ${CMAKE_BINARY_DIR}/docs/html/header.html)
 
     execute_process(COMMAND doxygen -w html header.html footer.html style.css
-                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
     execute_process(COMMAND sed -i "/<\\/head>/r ${PROJECT_BINARY_DIR}/cmake/extra_headers.html.txt" header.html
-                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/docs/html)
     set(DOXYGEN_HTML_HEADER ${CMAKE_BINARY_DIR}/docs/html/header.html)
 endmacro()
 
@@ -48,9 +48,9 @@ set(DOXYGEN_MACRO_EXPANSION YES)
 set(DOXYGEN_EXPAND_ONLY_PREDEF YES)
 set(DOXYGEN_WARN_IF_UNDOCUMENTED YES)
 
-set(DOXYGEN_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Voxels/textures")
+set(DOXYGEN_IMAGE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Amazing/resources")
 set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${CMAKE_SOURCE_DIR}/README.md")
-set(DOXYGEN_PROJECT_LOGO "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Voxels/textures/favicon.ico")
+set(DOXYGEN_PROJECT_LOGO "${CMAKE_CURRENT_SOURCE_DIR}/../examples/Amazing/resources/icon.bmp")
 
 set(DOXYGEN_INLINE_SIMPLE_STRUCTS YES)
 set(DOXYGEN_TYPEDEF_HIDES_STRUCT YES)
@@ -61,8 +61,14 @@ set(DOXYGEN_WARN_IF_INCOMPLETE_DOC NO)
 
 InitDoxygenAwesomeCss()
 
+list(APPEND DOXYGEN_HTML_EXTRA_FILES
+    "${CMAKE_SOURCE_DIR}/scripts/mask_output.jpg"
+    "${CMAKE_SOURCE_DIR}/scripts/mask_output_distances.jpg"
+    "${CMAKE_SOURCE_DIR}/scripts/sample_icon.bmp"
+)
+
 doxygen_add_docs(mazebuilderdocs
-                "${CMAKE_SOURCE_DIR}/include/MazeBuilder"
-                "${CMAKE_SOURCE_DIR}/README.md"
-                ALL
-                COMMENT "Generate HTML documentation")
+    "${CMAKE_SOURCE_DIR}/include/MazeBuilder"
+    "${CMAKE_SOURCE_DIR}/README.md"
+    ALL
+    COMMENT "Generate HTML documentation")

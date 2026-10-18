@@ -9,20 +9,18 @@ using namespace mazes;
 /// @brief
 /// @param index 0
 cell::cell(const std::int32_t index)
-    : m_index{ index }
+    : m_index{index}
 {
 }
 
 // Destructor
 cell::~cell()
 {
-    std::unique_lock lock(m_links_mutex);
-
-    m_links.clear();
+    cleanup_links();
 }
 
 // Copy Constructor
-cell::cell(const cell& other)
+cell::cell(const cell &other)
     : m_index(other.m_index)
 {
     // Copy links
@@ -32,7 +30,7 @@ cell::cell(const cell& other)
 }
 
 // Copy Assignment Operator
-cell& cell::operator=(const cell& other)
+cell &cell::operator=(const cell &other)
 {
     if (this == &other)
     {
@@ -53,7 +51,7 @@ cell& cell::operator=(const cell& other)
 }
 
 // Move Constructor
-cell::cell(cell&& other) noexcept
+cell::cell(cell &&other) noexcept
     : m_index(other.m_index)
 {
     // Move links
@@ -63,7 +61,7 @@ cell::cell(cell&& other) noexcept
 }
 
 // Move Assignment Operator
-cell& cell::operator=(cell&& other) noexcept
+cell &cell::operator=(cell &&other) noexcept
 {
     if (this == &other)
     {
@@ -83,18 +81,17 @@ cell& cell::operator=(cell&& other) noexcept
     return *this;
 }
 
-bool cell::has_key(const std::shared_ptr<cell>& c)
+bool cell::has_key(const std::shared_ptr<cell> &c)
 {
     std::lock_guard lock(m_links_mutex);
 
-    return std::ranges::any_of(m_links, [&c](const auto& pair)
-        {
+    return std::ranges::any_of(m_links, [&c](const auto &pair)
+                               {
             if (auto shared_cell = pair.first.lock())
             {
                 return shared_cell == c;
             }
-            return false;
-        });
+            return false; });
 }
 
 void cell::cleanup_links()
@@ -105,7 +102,7 @@ void cell::cleanup_links()
     std::unique_lock lock(m_links_mutex);
 
     // Identify and collect non-expired links
-    for (const auto& pair : m_links)
+    for (const auto &pair : m_links)
     {
         if (!pair.first.expired())
         {
@@ -120,7 +117,7 @@ void cell::cleanup_links()
     }
 }
 
-void cell::add_link(const std::shared_ptr<cell>& other)
+void cell::add_link(const std::shared_ptr<cell> &other)
 {
     if (!other)
     {
@@ -137,14 +134,15 @@ void cell::add_link(const std::shared_ptr<cell>& other)
         if (it->first.expired())
         {
             it = m_links.erase(it);
-        } else
+        }
+        else
         {
             ++it;
         }
     }
 }
 
-void cell::remove_link(const std::shared_ptr<cell>& other)
+void cell::remove_link(const std::shared_ptr<cell> &other)
 {
     if (!other)
     {
@@ -160,32 +158,15 @@ void cell::remove_link(const std::shared_ptr<cell>& other)
         if (it->first.expired())
         {
             it = m_links.erase(it);
-        } else
+        }
+        else
         {
             ++it;
         }
     }
 }
 
-std::vector<std::pair<std::shared_ptr<cell>, bool>> cell::get_links() const
-{
-    std::vector<std::pair<std::shared_ptr<cell>, bool>> shared_links;
-
-    std::shared_lock lock(m_links_mutex);
-    shared_links.reserve(m_links.size());
-
-    for (const auto& [weak_cell, linked] : m_links)
-    {
-        if (auto shared_cell = weak_cell.lock())
-        {
-            shared_links.emplace_back(shared_cell, linked);
-        }
-    }
-
-    return shared_links;
-}
-
-bool cell::is_linked(const std::shared_ptr<cell>& c)
+bool cell::is_linked(const std::shared_ptr<cell> &c)
 {
     return has_key(c);
 }

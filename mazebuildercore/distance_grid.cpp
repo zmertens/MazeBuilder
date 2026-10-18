@@ -11,6 +11,7 @@
 #include <limits>
 #include <numeric>
 #include <stdexcept>
+#include <span>
 #include <vector>
 
 using namespace mazes;
@@ -89,6 +90,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
         }
         m_distances->set(start_index, 0);
 
+        grid_operations::neighbor_buffer neighbor_buf;
         while (!queue.empty())
         {
             const std::int32_t current_index = queue.front();
@@ -109,7 +111,8 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
             }
 
             // Get all neighbors
-            for (auto neighbors = grid_ops.get_neighbors(current_cell); const auto& neighbor : neighbors)
+            const auto neighbor_count = grid_ops.collect_neighbors(current_cell, neighbor_buf);
+            for (const auto& neighbor : std::span(neighbor_buf).first(neighbor_count))
             {
                 if (!neighbor)
                 {

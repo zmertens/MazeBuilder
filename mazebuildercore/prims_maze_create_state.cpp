@@ -1,5 +1,6 @@
 #include <MazeBuilder/prims_maze_create_state.h>
 
+#include <MazeBuilder/state_utils.h>
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
@@ -8,6 +9,7 @@
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/randomizer.h>
 
+#include <span>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -24,9 +26,10 @@ algo prims_maze_create_state::get_algo_id() const noexcept
     return algo::PRIMS;
 }
 
-std::string_view prims_maze_create_state::create(const configurator& config, randomizer& rng) noexcept
+std::any prims_maze_create_state::create(const args &a, randomizer& rng) noexcept
 {
-    return create_prims_maze(config.rows(), config.columns(), config.levels(), rng);
+    const auto config = state_utils::build_configurator(a, get_algo_id());
+    return std::string{create_prims_maze(config.rows(), config.columns(), config.levels(), rng)};
 }
 
 std::string_view prims_maze_create_state::create_prims_maze(const unsigned int rows, const unsigned int cols,
@@ -41,70 +44,78 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
         auto& grid_ref = grid_mapper->get(current_grid_id);
         auto& grid_ops = grid_ref.operations();
 
-        const int total_cells = static_cast<int>(rows * cols * levels);
-        if (total_cells <= 0)
+        const int level_size = static_cast<int>(rows * cols);
+        if (level_size <= 0)
         {
             return {};
         }
 
-        const auto start = grid_ops.search(rng(0, total_cells - 1));
-        if (!start)
+        // Each level is an independent maze
+        for (unsigned int lv = 0; lv < levels; ++lv)
         {
-            return {};
-        }
-
-        std::unordered_set<int> in_maze;
-        std::unordered_set<int> frontier_ids;
-        std::vector<std::shared_ptr<cell>> frontier;
-
-        auto add_frontier_neighbors = [&](const std::shared_ptr<cell>& c)
+            const int offset = static_cast<int>(lv) * level_size;
+            const auto start = grid_ops.search(offset + rng(0, level_size - 1));
+            if (!start)
             {
-                for (const auto& n : grid_ops.get_neighbors(c))
-                {
-                    if (!n)
-                    {
-                        continue;
-                    }
-
-                    const auto idx = n->get_index();
-                    if (!in_maze.contains(idx) && frontier_ids.insert(idx).second)
-                    {
-                        frontier.push_back(n);
-                    }
-                }
-            };
-
-        in_maze.insert(start->get_index());
-        add_frontier_neighbors(start);
-
-        while (!frontier.empty())
-        {
-            const auto frontier_pos = static_cast<std::size_t>(rng(0, static_cast<int>(frontier.size()) - 1));
-            auto current = frontier.at(frontier_pos);
-
-            frontier.at(frontier_pos) = frontier.back();
-            frontier.pop_back();
-            frontier_ids.erase(current->get_index());
-
-            std::vector<std::shared_ptr<cell>> neighbors_in_maze;
-            for (const auto& n : grid_ops.get_neighbors(current))
-            {
-                if (n && in_maze.contains(n->get_index()))
-                {
-                    neighbors_in_maze.push_back(n);
-                }
+                return {};
             }
 
-            if (neighbors_in_maze.empty())
+            std::unordered_set<int> in_maze;
+            std::unordered_set<int> frontier_ids;
+            std::vector<std::shared_ptr<cell>> frontier;
+
+            grid_operations::neighbor_buffer neighbor_buf;
+            auto add_frontier_neighbors = [&](const std::shared_ptr<cell>& c)
+                {
+                    const auto count = grid_ops.collect_neighbors(c, neighbor_buf);
+                    for (const auto& n : std::span(neighbor_buf).first(count))
+                    {
+                        if (!n)
+                        {
+                            continue;
+                        }
+
+                        const auto idx = n->get_index();
+                        if (!in_maze.contains(idx) && frontier_ids.insert(idx).second)
+                        {
+                            frontier.push_back(n);
+                        }
+                    }
+                };
+
+            in_maze.insert(start->get_index());
+            add_frontier_neighbors(start);
+
+            while (!frontier.empty())
             {
-                continue;
+                const auto frontier_pos = static_cast<std::size_t>(rng(0, static_cast<int>(frontier.size()) - 1));
+                auto current = frontier.at(frontier_pos);
+
+                frontier.at(frontier_pos) = frontier.back();
+                frontier.pop_back();
+                frontier_ids.erase(current->get_index());
+
+                std::vector<std::shared_ptr<cell>> neighbors_in_maze;
+                const auto current_count = grid_ops.collect_neighbors(current, neighbor_buf);
+                for (const auto& n : std::span(neighbor_buf).first(current_count))
+                {
+                    if (n && in_maze.contains(n->get_index()))
+                    {
+                        neighbors_in_maze.push_back(n);
+                    }
+                }
+
+                if (neighbors_in_maze.empty())
+                {
+                    continue;
+                }
+
+                const auto chosen_idx = static_cast<std::size_t>(rng(0, static_cast<int>(neighbors_in_maze.size()) - 1));
+                lab::link(current, neighbors_in_maze.at(chosen_idx), true);
+                in_maze.insert(current->get_index());
+
+                add_frontier_neighbors(current);
             }
-
-            const auto chosen_idx = static_cast<std::size_t>(rng(0, static_cast<int>(neighbors_in_maze.size()) - 1));
-            lab::link(current, neighbors_in_maze.at(chosen_idx), true);
-            in_maze.insert(current->get_index());
-
-            add_frontier_neighbors(current);
         }
 
         if (m_use_distances)

@@ -31,9 +31,9 @@ set(MAZE_BUILDER_CORE_SRCS
     runtime_stack.cpp
     state.cpp
     stringify_create_state.cpp
+    state_utils.cpp
     string_utils.cpp    
     sw_maze_create_state.cpp
-    topology.cpp
     wavefront_object_create_state.cpp
     write_to_output_state.cpp)
 
@@ -127,17 +127,26 @@ target_link_libraries(${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
 # Generate the version info for the library
 BuildInfo(${MAZE_BUILDER_LIB_OUT}_obj)
 
-add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_obj)
+add_library(MazeBuilder::MazeBuilder_obj ALIAS ${MAZE_BUILDER_LIB_OUT}_obj)
 
 # Shared build
 if(NOT EMSCRIPTEN)
     add_library(${MAZE_BUILDER_LIB_OUT}_shared SHARED)
-    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
+    target_link_libraries(${MAZE_BUILDER_LIB_OUT}_shared PUBLIC ${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
+    add_library(MazeBuilder::MazeBuilder_shared ALIAS ${MAZE_BUILDER_LIB_OUT}_shared)
 endif()
 
 # Static build
 add_library(${MAZE_BUILDER_LIB_OUT}_static STATIC)
-target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static ${MAZE_BUILDER_LIB_OUT}_obj fmt::fmt)
+target_link_libraries(${MAZE_BUILDER_LIB_OUT}_static PUBLIC ${MAZE_BUILDER_LIB_OUT}_obj PRIVATE fmt::fmt)
+add_library(MazeBuilder::MazeBuilder_static ALIAS ${MAZE_BUILDER_LIB_OUT}_static)
+
+# MazeBuilder::MazeBuilder resolves to a real library, not raw object files
+if(MAZE_BUILDER_BUILD_SHARED AND NOT EMSCRIPTEN)
+    add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_shared)
+else()
+    add_library(MazeBuilder::MazeBuilder ALIAS ${MAZE_BUILDER_LIB_OUT}_static)
+endif()
 
 # Installation
 include(GNUInstallDirs)

@@ -18,6 +18,6 @@ void mazes::state::request_stack_clear() const noexcept
     _runtime_stack->clear_states();
 }
 
-const mazes::runtime_app::context& mazes::state::get_context() const noexcept { return ctx; }
+const mazes::runtime_app::context &mazes::state::get_context() const noexcept { return ctx; }
 
-mazes::runtime_stack& mazes::state::get_stack() const noexcept { return *_runtime_stack; }
+mazes::runtime_stack &mazes::state::get_stack() const noexcept { return *_runtime_stack; }

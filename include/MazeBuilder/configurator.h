@@ -21,7 +21,7 @@ namespace mazes
     {
     public:
         static constexpr auto MAX_COLUMNS = 100u;
-        static constexpr auto MAX_LEVELS = 10u;
+        static constexpr auto MAX_LEVELS = 100u;
         static constexpr auto MAX_ROWS = 100u;
         static constexpr auto DEFAULT_DISTANCES_START = 0;
         static constexpr auto DEFAULT_DISTANCES_END = -1;
@@ -57,7 +57,7 @@ namespace mazes
         configurator& ensure_levels(const unsigned int levels) noexcept
         {
             // Clamp to reasonable limits to prevent infinite loops and memory issues
-            // Levels are more memory-intensive than rows/columns, so lower limit
+            // Levels are more memory-intensive than rows/columns
             m_levels = std::clamp(levels, 1u, MAX_LEVELS);
             return *this;
         }
@@ -68,15 +68,6 @@ namespace mazes
         configurator& ensure_algo_id(const algo algorithm) noexcept
         {
             m_algo_id = algorithm;
-            return *this;
-        }
-
-        /// @brief Set the random seed
-        /// @param seed The random seed
-        /// @return A reference to this configurator
-        configurator& ensure_seed(const unsigned int seed) noexcept
-        {
-            m_seed = seed;
             return *this;
         }
 
@@ -112,7 +103,6 @@ namespace mazes
         configurator& columns(const unsigned int c) noexcept { return ensure_columns(c); }
         configurator& levels(const unsigned int l) noexcept { return ensure_levels(l); }
         configurator& algo_id(const algo a) noexcept { return ensure_algo_id(a); }
-        configurator& seed(const unsigned int s) noexcept { return ensure_seed(s); }
 
         /// @brief Get the number of rows
         /// @return The number of rows (guaranteed to be > 0)
@@ -130,11 +120,6 @@ namespace mazes
         /// @return The algorithm used for maze generation
         [[nodiscard]] algo algo_id() const noexcept { return m_algo_id.value_or(static_cast<algo>(0)); }
 
-
-        /// @brief Get the random seed
-        /// @return The random seed
-        [[nodiscard]] unsigned int seed() const noexcept { return m_seed.value_or(DEFAULT_SEED_VALUE); }
-
         /// @brief Check if distances are calculated
         /// @return True if distances are calculated, false otherwise
         [[nodiscard]] bool distances() const noexcept { return m_distances.value_or(false); }
@@ -150,21 +135,33 @@ namespace mazes
         /// @return The ending cell index for distance calculation
         [[nodiscard]] int distances_end() const noexcept { return m_distances_end.value_or(DEFAULT_DISTANCES_END); }
 
+        /// @brief Set the mask source
+        /// @param mask_source File path or inline mask string
+        /// @return A reference to this configurator
+        configurator& ensure_mask_source(const std::string& mask_source) noexcept
+        {
+            m_mask_source = mask_source;
+            return *this;
+        }
+
         /// @brief Set the mask file path
         /// @param mask_file_path Path to the mask file
         /// @return A reference to this configurator
         configurator& ensure_mask_file(const std::string& mask_file_path) noexcept
         {
-            m_mask_file = mask_file_path;
-            return *this;
+            return ensure_mask_source(mask_file_path);
+        }
+
+        /// @brief Get the mask source
+        /// @return The mask source, or empty string if not set
+        [[nodiscard]] std::string mask_source() const noexcept
+        {
+            return m_mask_source.value_or("");
         }
 
         /// @brief Get the mask file path
-        /// @return The mask file path, or empty string if not set
-        [[nodiscard]] std::string mask_file() const noexcept
-        {
-            return m_mask_file.value_or("");
-        }
+        /// @return The configured mask source, or empty string if not set
+        [[nodiscard]] std::string mask_file() const noexcept { return mask_source(); }
 
         /// @brief Validate all configuration values are within safe limits
         /// @return True if all values are valid, false if any are problematic
@@ -203,15 +200,13 @@ namespace mazes
 
         std::optional<algo> m_algo_id;
 
-        std::optional<unsigned int> m_seed;
-
         std::optional<bool> m_distances;
 
         std::optional<int> m_distances_start;
 
         std::optional<int> m_distances_end;
 
-        std::optional<std::string> m_mask_file;
+        std::optional<std::string> m_mask_source;
     };
 } // namespace
 

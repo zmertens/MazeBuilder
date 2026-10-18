@@ -1,6 +1,7 @@
 #ifndef STRINGIFY_CREATE_STATE_H
 #define STRINGIFY_CREATE_STATE_H
 
+#include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/write_to_output_state.h>
 
 #include <string>
@@ -10,19 +11,23 @@
 /// @namespace mazes
 namespace mazes
 {
-    class configurator;
+    class args;
     class randomizer;
     class runtime_stack;
 
     /// @brief State for creating a maze using the stringify algorithm
-    class stringify_create_state final : public write_to_output_state
+    class stringify_create_state final : public create_contract, public write_to_output_state
     {
     public:
         explicit stringify_create_state(const runtime_app::context &ctx, runtime_stack *rs);
 
-        std::string_view create(const configurator &config, randomizer &rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
+        /// @brief Owns the rendered text that create() returns a view of
+        std::string m_output;
+
+    protected:
         /// @brief Write ASCII maze string to output target or stdout
         [[nodiscard]] bool write_output(const std::string& output_target, const std::string& output_content) noexcept override;
     };

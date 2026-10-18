@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 
+class randomizer;
 class runtime_stack;
 
 /// @file loading_state.h
@@ -26,7 +27,7 @@ namespace mazes
         /// @brief Updates the state of the loading process
         /// @param delta_time Time elapsed since the last update
         /// @return True if the update was successful, false otherwise
-        bool update(double delta_time) noexcept override;
+        bool update(randomizer &rng, double delta_time) noexcept override;
 
         void set_text_to_unknown(const std::string_view txt) noexcept;
     private:

@@ -21,31 +21,34 @@ namespace mazes
     class distance_grid : public grid_interface
     {
     public:
-        explicit distance_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
+        explicit distance_grid(
+            unsigned int width = 1u,
+            unsigned int length = 1u,
+            unsigned int levels = 1u);
 
-        distance_grid(const distance_grid&) = delete;
+        distance_grid(const distance_grid &) = delete;
 
-        distance_grid& operator=(const distance_grid&) = delete;
+        distance_grid &operator=(const distance_grid &) = delete;
 
-        distance_grid(distance_grid&&) noexcept = default;
+        distance_grid(distance_grid &&) noexcept = default;
 
-        distance_grid& operator=(distance_grid&&) noexcept = default;
+        distance_grid &operator=(distance_grid &&) noexcept = default;
 
         /// @brief
         /// @param c
         /// @return
-        [[nodiscard]] std::string contents_of(std::shared_ptr<cell> const& c) const noexcept override;
+        [[nodiscard]] std::string contents_of(std::shared_ptr<cell> const &c) const noexcept override;
 
         /// @brief
         /// @param c
         /// @return
         [[nodiscard]] std::uint32_t
-            background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
+        background_color_for(std::shared_ptr<cell> const &c) const noexcept override;
 
         // Delegate to embedded grid
-        [[nodiscard]] grid_operations& operations() noexcept override;
+        [[nodiscard]] grid_operations &operations() noexcept override;
 
-        [[nodiscard]] const grid_operations& operations() const noexcept override;
+        [[nodiscard]] const grid_operations &operations() const noexcept override;
 
         /// @brief Resize the grid
         /// @param rows

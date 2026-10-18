@@ -6,6 +6,7 @@
 #include <deque>
 #include <ranges>
 #include <unordered_map>
+#include <span>
 #include <unordered_set>
 
 using namespace mazes;
@@ -95,6 +96,7 @@ std::shared_ptr<distances> distances::path_to(grid_interface* g, const std::int3
 
     bool found = false;
 
+    grid_operations::neighbor_buffer neighbor_buf;
     while (!queue.empty())
     {
         const std::int32_t current_index = queue.front();
@@ -112,7 +114,8 @@ std::shared_ptr<distances> distances::path_to(grid_interface* g, const std::int3
             continue;
         }
 
-        for (const auto neighbors = ops.get_neighbors(current_cell); const auto& neighbor : neighbors)
+        const auto neighbor_count = ops.collect_neighbors(current_cell, neighbor_buf);
+        for (const auto& neighbor : std::span(neighbor_buf).first(neighbor_count))
         {
             if (!neighbor || !current_cell->is_linked(neighbor))
             {

@@ -6,6 +6,7 @@
 #include <functional>
 #include <optional>
 
+class randomizer;
 class runtime_stack;
 
 /// @file state.h
@@ -31,7 +32,7 @@ namespace mazes
             TOTAL = 11
         };
 
-        explicit state(const runtime_app::context& c, runtime_stack* rs)
+        explicit state(const runtime_app::context &c, runtime_stack *rs)
             : ctx(c), _runtime_stack(rs)
         {
         }
@@ -43,7 +44,7 @@ namespace mazes
         /// @brief Update the state with the elapsed time
         /// @param delta_time The elapsed time since the last update
         /// @return True if the state should continue updating, false otherwise
-        virtual bool update(double delta_time) noexcept = 0;
+        [[nodiscard]] virtual bool update(randomizer &rng, double delta_time) noexcept = 0;
 
     protected:
         void request_stack_push(ID state_id) const noexcept;
@@ -52,13 +53,13 @@ namespace mazes
 
         void request_stack_clear() const noexcept;
 
-        [[nodiscard]] const runtime_app::context& get_context() const noexcept;
+        [[nodiscard]] const runtime_app::context &get_context() const noexcept;
 
-        [[nodiscard]] runtime_stack& get_stack() const noexcept;
+        [[nodiscard]] runtime_stack &get_stack() const noexcept;
 
     private:
         std::reference_wrapper<const runtime_app::context> ctx;
-        runtime_stack* _runtime_stack;
+        runtime_stack *_runtime_stack;
     };
 } // namespace mazes
 

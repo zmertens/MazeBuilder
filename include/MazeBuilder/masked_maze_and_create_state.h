@@ -6,14 +6,13 @@
 
 #include <string_view>
 
-class configurator;
-class randomizer;
-class runtime_stack;
-
 /// @namespace mazes
 /// @file masked_maze_and_create_state.h
 namespace mazes
 {
+    class args;
+    class randomizer;
+    class runtime_stack;
     /// @brief State for creating a maze with a mask applied
     /// @details This state loads a mask from file and creates a maze using the specified
     ///          algorithm (binary_tree, sidewinder, dfs, or prims) on a masked_grid.
@@ -24,25 +23,25 @@ namespace mazes
         /// @brief Construct a new masked maze creation state
         /// @param ctx The runtime context
         /// @param stack The runtime stack to allow pushing/popping states
-        explicit masked_maze_and_create_state(const runtime_app::context& ctx, runtime_stack* stack);
+        explicit masked_maze_and_create_state(const runtime_app::context &ctx, runtime_stack *stack);
 
         /// @brief Create a masked maze with the given parameters
         /// @param config The maze configuration
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        std::string_view create(const configurator& config, randomizer& rng) noexcept override;
+        std::any create(const args &a, randomizer &rng) noexcept override;
 
     private:
         /// @brief Get the algorithm ID for the masked maze algorithm
         [[nodiscard]] algo get_algo_id() const noexcept override;
 
         /// @brief Implementation of the masked maze creation
-        /// @param mask_file Path to the mask file
+        /// @param mask_source Path to the mask file or inline mask string
         /// @param algorithm The maze generation algorithm to use
         /// @param rng The randomizer for the algorithm
         /// @return A string view with the result message
-        std::string_view create_masked_maze(const std::string& mask_file, algo algorithm,
-            randomizer& rng) noexcept;
+        std::string_view create_masked_maze(const std::string &mask_source, algo algorithm,
+                                            randomizer &rng) noexcept;
     };
 } // namespace mazes
 

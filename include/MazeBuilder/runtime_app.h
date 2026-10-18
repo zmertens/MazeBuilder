@@ -86,6 +86,9 @@ namespace mazes
         /// @brief Returns the last generated grid used by apply(), if available.
         [[nodiscard]] std::string get_finished_text() noexcept;
 
+        // Print out logs to the console or any other configured sink
+        void dump_logs() noexcept;
+
     private:
         /// @brief Registers the states for the runtime stack, associating state IDs with their corresponding factories
         void register_states() const noexcept;

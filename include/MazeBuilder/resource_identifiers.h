@@ -27,7 +27,8 @@ namespace mazes
         BASIC = 0,
         COLORED = 1,
         DISTANCE = 2,
-        TOTAL = 3
+        MASKED = 3,
+        TOTAL = 4
     };
 
     class args;
