@@ -269,5 +269,5 @@ void state_utils::check_before_resize(grid_operations *ops, unsigned int rows, u
         return;
     }
 
-    ops->resize(rows, cols, levels);
+    ops->resize({static_cast<std::uint8_t>(rows), static_cast<std::uint8_t>(cols), static_cast<std::uint8_t>(levels)});
 }

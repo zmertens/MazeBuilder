@@ -75,7 +75,7 @@ namespace mazes
         /// @brief Get the background color for a cell in the grid
         /// @param c A shared pointer to the cell for which to determine the background color.
         /// @return An 8-bit unsigned integer representing the background color of the cell.
-        std::uint8_t background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
+        std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept override;
 
         /// @brief Get neighbor by the cell's respective location
         /// @param c A shared pointer to the cell whose neighbor is to be retrieved.
@@ -117,17 +117,16 @@ namespace mazes
         std::size_t num_cells() const noexcept override;
 
         /// @brief Cleanup cells by cleaning up links within cells
-        void clear_cells() noexcept override;
+        void clear_cells() noexcept;
 
-        using row_col_levels_w = std::tuple<grid_operations::row_col_level, std::uint8_t>;
 
         /// @brief Get the vertices
         /// @return A vector of vertices as tuples (x, y, z, w)
-        std::vector<row_col_levels_w> get_vertices() const noexcept override;
+        std::vector<std::tuple<int, int, int, int>> get_vertices() const noexcept override;
 
         /// @brief Set the vertices
         /// @param vertices A vector of vertices as tuples (row, col, level, w)
-        void set_vertices(const std::vector<row_col_levels_w>& vertices) noexcept override;
+        void set_vertices(const std::vector<std::tuple<int, int, int, int>>& vertices) noexcept override;
 
         /// @brief Get the faces
         /// @return A vector of faces, where each face is a vector of vertex indices
@@ -159,7 +158,7 @@ namespace mazes
         std::unordered_map<std::uint8_t, std::unordered_map<Direction, std::uint8_t>> m_topology;
 
         // 3D data
-        std::vector<row_col_levels_w> m_vertices;
+        std::vector<std::tuple<int, int, int, int>> m_vertices;
         std::vector<std::vector<std::uint32_t>> m_faces;
 
         // Image data

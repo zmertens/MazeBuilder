@@ -60,7 +60,15 @@ runtime_app::runtime_app()
     register_states();
 }
 
-runtime_app::~runtime_app() = default;
+runtime_app::~runtime_app()
+{
+    // The logger singleton outlives this object and its sink captures `this`:
+    // deliver pending logs, then detach the sink before members are destroyed.
+    auto logger = async_logger::instance();
+    logger->flush();
+    logger->set_sink({});
+    logger->flush();
+}
 
 void runtime_app::register_states() const noexcept
 {

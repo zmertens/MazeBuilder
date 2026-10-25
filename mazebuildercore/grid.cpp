@@ -14,13 +14,13 @@ using namespace mazes;
 /// @param rows 2u
 /// @param columns 2u
 /// @param levels 1u
-grid::grid(unsigned int x, unsigned int y, unsigned int z)
-    : grid(std::make_tuple(x, y, z))
+grid::grid(std::uint8_t x, std::uint8_t y, std::uint8_t z)
+    : grid(grid_operations::row_col_level{x, y, z})
 {
 }
 
 /// @param dimens A tuple containing the dimensions of the grid (rows, columns, levels)
-grid::grid(grid_operations::row_col_level &dimens)
+grid::grid(const grid_operations::row_col_level &dimens)
     : m_dimensions(dimens)
 {
     m_pool.acquire(std::get<0>(dimens), std::get<1>(dimens), std::get<2>(dimens));
@@ -70,7 +70,7 @@ void grid::clear_cells() noexcept
     m_topology.clear();
 }
 
-std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
+grid_operations::row_col_level grid::get_dimensions() const noexcept
 {
     return this->m_dimensions;
 }
@@ -276,9 +276,9 @@ void grid::set_pixels(const std::vector<std::uint8_t> &pixels) noexcept
     m_pixels = pixels;
 }
 
-void grid::resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept
+void grid::resize(grid_operations::row_col_level new_size) noexcept
 {
     m_topology.clear();
-    m_dimensions = std::make_tuple(rows, cols, levels);
-    m_pool.acquire(rows, cols, levels);
+    m_dimensions = new_size;
+    m_pool.acquire(std::get<0>(new_size), std::get<1>(new_size), std::get<2>(new_size));
 }

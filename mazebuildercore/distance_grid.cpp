@@ -21,7 +21,7 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{ std::make_unique<grid>(width, length, levels) }
+    : m_grid{ std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels)) }
 {
 }
 
@@ -171,9 +171,4 @@ grid_operations& distance_grid::operations() noexcept
 const grid_operations& distance_grid::operations() const noexcept
 {
     return m_grid->operations();
-}
-
-void distance_grid::resize(grid_operations::row_col_level new_dimensions) const noexcept
-{
-    m_grid->operations().resize(new_dimensions);
 }

@@ -17,7 +17,7 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{ std::make_unique<grid>(width, length, levels) }, m_distances{ std::make_shared<distances>(0) }
+    : m_grid{ std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels)) }, m_distances{ std::make_shared<distances>(0) }
 {
 }
 
@@ -85,9 +85,4 @@ grid_operations& colored_grid::operations() noexcept
 const grid_operations& colored_grid::operations() const noexcept
 {
     return m_grid->operations();
-}
-
-void colored_grid::resize(grid_operations::row_col_level new_dimensions) const noexcept
-{
-    m_grid->operations().resize(new_dimensions);
 }

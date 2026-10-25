@@ -41,7 +41,7 @@ namespace mazes
         /// @brief Retrieves the background color for a given cell, if available.
         /// @param c A shared pointer to the cell for which the background color is to be retrieved.
         /// @return An 32-bit unsigned integer containing the background color
-        [[nodiscard]] std::uint8_t
+        [[nodiscard]] std::uint32_t
         background_color_for(std::shared_ptr<cell> const &c) const noexcept override;
 
         // Delegate to embedded grid
@@ -49,9 +49,6 @@ namespace mazes
 
         [[nodiscard]] const grid_operations &operations() const noexcept override;
 
-        /// @brief Resize the grid
-        /// @param new_size A tuple containing the new row, column, and level counts
-        void resize(grid_operations::row_col_level new_size) noexcept override;
 
         /// @brief Calculates distances for a range of indices.
         /// @param start_index The starting index of the range (inclusive).
