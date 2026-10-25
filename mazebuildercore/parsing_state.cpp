@@ -545,7 +545,7 @@ parsing_state::parsing_state(const runtime_app::context &ctx, runtime_stack *rs)
     state_utils::validate_mappers(args_mapper, processed_text_mapper);
 }
 
-std::optional<args> parsing_state::convert(const std::string_view arguments) const noexcept
+std::optional<args> parsing_state::convert(std::string_view arguments) noexcept
 {
     if (arguments.empty())
     {

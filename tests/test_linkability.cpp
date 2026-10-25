@@ -11,8 +11,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Bidirectional linking works correctly")
     {
-        auto cell1 = std::make_shared<cell>(1);
-        auto cell2 = std::make_shared<cell>(2);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{1, 1});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{2, 2});
 
         // Initially cells should not be linked
         REQUIRE_FALSE(cell1->is_linked(cell2));
@@ -28,8 +28,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Unidirectional linking works correctly")
     {
-        auto cell1 = std::make_shared<cell>(3);
-        auto cell2 = std::make_shared<cell>(4);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{3, 3});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{4, 4});
 
         // Link unidirectionally
         lab::link(cell1, cell2, false);
@@ -41,8 +41,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Unlinking works correctly")
     {
-        auto cell1 = std::make_shared<cell>(5);
-        auto cell2 = std::make_shared<cell>(6);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{5, 5});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{6, 6});
 
         // Link first
         lab::link(cell1, cell2);
@@ -59,8 +59,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Unidirectional unlinking works correctly")
     {
-        auto cell1 = std::make_shared<cell>(7);
-        auto cell2 = std::make_shared<cell>(8);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{7, 7});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{8, 8});
 
         // Link bidirectionally first
         lab::link(cell1, cell2);
@@ -75,7 +75,7 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Null pointer handling in link")
     {
-        auto cell1 = std::make_shared<cell>(9);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{9, 9});
 
         // These should not crash
         lab::link(nullptr, cell1);
@@ -83,12 +83,12 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
         lab::link(nullptr, nullptr);
 
         // Cell should still be in valid state
-        REQUIRE(cell1->get_index() == 9);
+        REQUIRE(cell1->get_area() == cell::cell_area{9, 9});
     }
 
     SECTION("Null pointer handling in unlink")
     {
-        auto cell1 = std::make_shared<cell>(10);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{10, 10});
 
         // These should not crash
         lab::unlink(nullptr, cell1);
@@ -96,14 +96,14 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
         lab::unlink(nullptr, nullptr);
 
         // Cell should still be in valid state
-        REQUIRE(cell1->get_index() == 10);
+        REQUIRE(cell1->get_area() == cell::cell_area{10, 10});
     }
 
     SECTION("Multiple link/unlink operations")
     {
-        auto cell1 = std::make_shared<cell>(11);
-        auto cell2 = std::make_shared<cell>(12);
-        auto cell3 = std::make_shared<cell>(13);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{11, 11});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{12, 12});
+        auto cell3 = std::make_shared<cell>(cell::cell_area{13, 13});
 
         // Link cell1 to both cell2 and cell3
         lab::link(cell1, cell2);
@@ -127,8 +127,8 @@ TEST_CASE("Lab can link/unlink cells", "[links]")
 
     SECTION("Link same cell multiple times")
     {
-        auto cell1 = std::make_shared<cell>(14);
-        auto cell2 = std::make_shared<cell>(15);
+        auto cell1 = std::make_shared<cell>(cell::cell_area{14, 14});
+        auto cell2 = std::make_shared<cell>(cell::cell_area{15, 15});
 
         // Link the same cells multiple times
         lab::link(cell1, cell2);

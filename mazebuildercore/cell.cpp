@@ -1,15 +1,17 @@
 #include <MazeBuilder/cell.h>
 
+#include <MazeBuilder/async_logger.h>
+
 #include <algorithm>
-#include <mutex>
 #include <ranges>
+#include <string>
 
 using namespace mazes;
 
 /// @brief
-/// @param index 0
-cell::cell(const std::int32_t index)
-    : m_index{index}
+/// @param area {1u, u1}
+cell::cell(std::pair<std::uint8_t, std::uint8_t> index)
+    : m_area{index}
 {
 }
 
@@ -21,11 +23,8 @@ cell::~cell()
 
 // Copy Constructor
 cell::cell(const cell &other)
-    : m_index(other.m_index)
+    : m_area(other.m_area)
 {
-    // Copy links
-    std::unique_lock lock(other.m_links_mutex);
-
     m_links = other.m_links;
 }
 
@@ -38,25 +37,17 @@ cell &cell::operator=(const cell &other)
     }
 
     // Copy index
-    m_index = other.m_index;
+    m_area = other.m_area;
 
-    // Copy links
-    {
-        std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
-
-        m_links = other.m_links;
-    }
+    m_links = other.m_links;
 
     return *this;
 }
 
 // Move Constructor
 cell::cell(cell &&other) noexcept
-    : m_index(other.m_index)
+    : m_area(other.m_area)
 {
-    // Move links
-    std::unique_lock lock(other.m_links_mutex);
-
     m_links = std::move(other.m_links);
 }
 
@@ -69,22 +60,15 @@ cell &cell::operator=(cell &&other) noexcept
     }
 
     // Move index
-    m_index = other.m_index;
+    m_area = other.m_area;
 
-    // Move links
-    {
-        std::scoped_lock lock(m_links_mutex, other.m_links_mutex);
-
-        m_links = std::move(other.m_links);
-    }
+    m_links = std::move(other.m_links);
 
     return *this;
 }
 
-bool cell::has_key(const std::shared_ptr<cell> &c)
+bool cell::has_key(const std::shared_ptr<cell> &c) const noexcept
 {
-    std::lock_guard lock(m_links_mutex);
-
     return std::ranges::any_of(m_links, [&c](const auto &pair)
                                {
             if (auto shared_cell = pair.first.lock())
@@ -96,35 +80,21 @@ bool cell::has_key(const std::shared_ptr<cell> &c)
 
 void cell::cleanup_links()
 {
-    // Create a temporary map to hold non-expired links
-    std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> valid_links;
+    [[maybe_unused]] const auto removed = std::erase_if(m_links, [](const auto &pair)
+                                                        { return pair.first.expired(); });
 
-    std::unique_lock lock(m_links_mutex);
-
-    // Identify and collect non-expired links
-    for (const auto &pair : m_links)
-    {
-        if (!pair.first.expired())
-        {
-            valid_links.insert(pair);
-        }
-    }
-
-    // If we have fewer valid links than total links, replace the map
-    if (valid_links.size() < m_links.size())
-    {
-        m_links = std::move(valid_links);
-    }
+#if defined(MAZE_DEBUG)
+    async_logger::instance()->log("Cleaned " + std::to_string(removed) + " expired links");
+#endif
 }
 
-void cell::add_link(const std::shared_ptr<cell> &other)
+void cell::add_link(const std::shared_ptr<cell> &other) noexcept
 {
     if (!other)
     {
         return;
     }
 
-    std::unique_lock lock(m_links_mutex);
     m_links.insert_or_assign(std::weak_ptr(other), true);
 
     // Instead of calling cleanup_links which would require another lock,
@@ -142,14 +112,13 @@ void cell::add_link(const std::shared_ptr<cell> &other)
     }
 }
 
-void cell::remove_link(const std::shared_ptr<cell> &other)
+void cell::remove_link(const std::shared_ptr<cell> &other) noexcept
 {
     if (!other)
     {
         return;
     }
 
-    std::unique_lock lock(m_links_mutex);
     m_links.erase(std::weak_ptr(other));
 
     // Clean up any expired links while we have the lock
@@ -166,17 +135,22 @@ void cell::remove_link(const std::shared_ptr<cell> &other)
     }
 }
 
-bool cell::is_linked(const std::shared_ptr<cell> &c)
+void cell::clear_links() noexcept
 {
-    return has_key(c);
+    m_links.clear();
 }
 
-std::int32_t cell::get_index() const noexcept
+bool cell::is_linked(const std::shared_ptr<cell> &c) const noexcept
 {
-    return this->m_index;
+    return this->has_key(c);
 }
 
-void cell::set_index(const std::int32_t next_index) noexcept
+std::pair<std::uint8_t, std::uint8_t> cell::get_area() const noexcept
 {
-    this->m_index = next_index;
+    return this->m_area;
+}
+
+void cell::set_area(std::pair<std::uint8_t, std::uint8_t> new_area) noexcept
+{
+    this->m_area = new_area;
 }

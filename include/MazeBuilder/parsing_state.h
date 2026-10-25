@@ -45,7 +45,7 @@ namespace mazes
         /// @brief Converts a string of arguments into an args object
         /// @param arguments The string of arguments to convert
         /// @return An optional args object if the conversion was successful, std::nullopt otherwise
-        [[nodiscard]] std::optional<args> convert(std::string_view arguments) const noexcept;
+        [[nodiscard]] static std::optional<args> convert(std::string_view arguments) noexcept;
 
         void draw() const noexcept override;
 

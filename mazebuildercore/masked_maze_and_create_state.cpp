@@ -84,11 +84,11 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                     std::vector<std::shared_ptr<cell>> cands;
 
                     auto n = grid_ops.get_north(c);
-                    if (n && loaded_mask(n->get_index() / cols, n->get_index() % cols))
+                    if (n && loaded_mask(grid_ops.index_of(n) / cols, grid_ops.index_of(n) % cols))
                         cands.push_back(n);
 
                     auto e = grid_ops.get_east(c);
-                    if (e && loaded_mask(e->get_index() / cols, e->get_index() % cols))
+                    if (e && loaded_mask(grid_ops.index_of(e) / cols, grid_ops.index_of(e) % cols))
                         cands.push_back(e);
 
                     if (!cands.empty())
@@ -113,10 +113,10 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                     run.push_back(c);
 
                     auto e = grid_ops.get_east(c);
-                    bool at_east = !e || !loaded_mask(e->get_index() / cols, e->get_index() % cols);
+                    bool at_east = !e || !loaded_mask(grid_ops.index_of(e) / cols, grid_ops.index_of(e) % cols);
 
                     auto n = grid_ops.get_north(c);
-                    bool at_north = !n || !loaded_mask(n->get_index() / cols, n->get_index() % cols);
+                    bool at_north = !n || !loaded_mask(grid_ops.index_of(n) / cols, grid_ops.index_of(n) % cols);
 
                     if (at_east || (!at_north && rng(0, 1) == 0))
                     {
@@ -124,12 +124,12 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                         {
                             auto &member = run[rng(0, static_cast<int>(run.size()) - 1)];
                             auto mn = grid_ops.get_north(member);
-                            if (mn && loaded_mask(mn->get_index() / cols, mn->get_index() % cols))
+                            if (mn && loaded_mask(grid_ops.index_of(mn) / cols, grid_ops.index_of(mn) % cols))
                                 lab::link(member, mn, true);
                         }
                         run.clear();
                     }
-                    else if (e && loaded_mask(e->get_index() / cols, e->get_index() % cols))
+                    else if (e && loaded_mask(grid_ops.index_of(e) / cols, grid_ops.index_of(e) % cols))
                     {
                         lab::link(c, e, true);
                     }
@@ -157,7 +157,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
             std::stack<std::shared_ptr<cell>> stk;
             std::unordered_set<int> visited;
             stk.push(start);
-            visited.insert(start->get_index());
+            visited.insert(grid_ops.index_of(start));
 
             grid_operations::neighbor_buffer neighbor_buf;
             while (!stk.empty())
@@ -168,7 +168,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                 const auto count = grid_ops.collect_neighbors(current, neighbor_buf);
                 for (const auto &n : std::span(neighbor_buf).first(count))
                 {
-                    if (n && loaded_mask(n->get_index() / cols, n->get_index() % cols) && !visited.contains(n->get_index()))
+                    if (n && loaded_mask(grid_ops.index_of(n) / cols, grid_ops.index_of(n) % cols) && !visited.contains(grid_ops.index_of(n)))
                         unvisited.push_back(n);
                 }
 
@@ -180,7 +180,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                 {
                     auto &chosen = unvisited[rng(0, static_cast<int>(unvisited.size()) - 1)];
                     lab::link(current, chosen, true);
-                    visited.insert(chosen->get_index());
+                    visited.insert(grid_ops.index_of(chosen));
                     stk.push(chosen);
                 }
             }
@@ -227,7 +227,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                         continue;
                     }
 
-                    const auto idx = n->get_index();
+                    const auto idx = grid_ops.index_of(n);
                     const auto nr = static_cast<unsigned int>(idx / cols);
                     const auto nc = static_cast<unsigned int>(idx % cols);
                     if (!loaded_mask(nr, nc))
@@ -243,7 +243,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
             };
 
             auto start = open_cells.at(static_cast<std::size_t>(rng(0, static_cast<int>(open_cells.size()) - 1)));
-            in_maze.insert(start->get_index());
+            in_maze.insert(grid_ops.index_of(start));
             add_frontier_neighbors(start);
 
             while (!frontier.empty())
@@ -253,7 +253,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
 
                 frontier.at(frontier_pos) = frontier.back();
                 frontier.pop_back();
-                frontier_ids.erase(current->get_index());
+                frontier_ids.erase(grid_ops.index_of(current));
 
                 std::vector<std::shared_ptr<cell>> neighbors_in_maze;
                 const auto current_count = grid_ops.collect_neighbors(current, neighbor_buf);
@@ -264,7 +264,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
                         continue;
                     }
 
-                    const auto idx = n->get_index();
+                    const auto idx = grid_ops.index_of(n);
                     const auto nr = static_cast<unsigned int>(idx / cols);
                     const auto nc = static_cast<unsigned int>(idx % cols);
                     if (loaded_mask(nr, nc) && in_maze.contains(idx))
@@ -280,7 +280,7 @@ std::string_view masked_maze_and_create_state::create_masked_maze(const std::str
 
                 auto chosen = neighbors_in_maze.at(static_cast<std::size_t>(rng(0, static_cast<int>(neighbors_in_maze.size()) - 1)));
                 lab::link(current, chosen, true);
-                in_maze.insert(current->get_index());
+                in_maze.insert(grid_ops.index_of(current));
 
                 add_frontier_neighbors(current);
             }

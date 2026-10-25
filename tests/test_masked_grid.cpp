@@ -276,7 +276,8 @@ TEST_CASE("Masked grid random_cell returns available cell", "[masked_grid][rando
 
     const auto cell = mg.random_cell(rng);
     REQUIRE(cell != nullptr);
-    REQUIRE(cell->get_index() == 12); // (2,2) in a 5x5 grid = index 12
+    REQUIRE(mg.index_of(cell) == 12); // (2,2) in a 5x5 grid = index 12
+    REQUIRE(cell->get_area() == mazes::cell::cell_area{2, 2});
 }
 
 TEST_CASE("Masked grid get_mask returns the mask", "[masked_grid][get_mask]")

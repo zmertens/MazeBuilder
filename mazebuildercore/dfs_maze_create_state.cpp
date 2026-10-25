@@ -6,6 +6,7 @@
 #include <MazeBuilder/cell.h>
 #include <MazeBuilder/configurator.h>
 #include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/hash_funcs.h>
 #include <MazeBuilder/lab.h>
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/resource_identifiers.h>
@@ -57,10 +58,12 @@ std::string_view dfs_maze_create_state::create_dfs_maze(const unsigned int rows,
                 return {};
             }
 
+            using cell_area = cell::cell_area;
+
             std::stack<std::shared_ptr<cell>> stk;
-            std::unordered_set<int> visited;
+            std::unordered_set<cell_area, pair_hash> visited;
             stk.push(start);
-            visited.insert(start->get_index());
+            visited.insert(start->get_area());
 
             grid_operations::neighbor_buffer neighbor_buf;
             while (!stk.empty())
@@ -71,7 +74,7 @@ std::string_view dfs_maze_create_state::create_dfs_maze(const unsigned int rows,
                 std::vector<std::shared_ptr<cell>> unvisited;
                 for (const auto& n : std::span(neighbor_buf).first(neighbor_count))
                 {
-                    if (n && !visited.contains(n->get_index()))
+                    if (n && !visited.contains(n->get_area()))
                     {
                         unvisited.push_back(n);
                     }
@@ -84,7 +87,7 @@ std::string_view dfs_maze_create_state::create_dfs_maze(const unsigned int rows,
                 {
                     auto& chosen = unvisited.at(static_cast<size_t>(rng(0, static_cast<int>(unvisited.size()) - 1)));
                     lab::link(current, chosen, true);
-                    visited.insert(chosen->get_index());
+                    visited.insert(chosen->get_area());
                     stk.push(chosen);
                 }
             }

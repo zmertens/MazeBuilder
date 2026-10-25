@@ -75,7 +75,7 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
                             continue;
                         }
 
-                        const auto idx = n->get_index();
+                        const auto idx = grid_ops.index_of(n);
                         if (!in_maze.contains(idx) && frontier_ids.insert(idx).second)
                         {
                             frontier.push_back(n);
@@ -83,7 +83,7 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
                     }
                 };
 
-            in_maze.insert(start->get_index());
+            in_maze.insert(grid_ops.index_of(start));
             add_frontier_neighbors(start);
 
             while (!frontier.empty())
@@ -93,13 +93,13 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
 
                 frontier.at(frontier_pos) = frontier.back();
                 frontier.pop_back();
-                frontier_ids.erase(current->get_index());
+                frontier_ids.erase(grid_ops.index_of(current));
 
                 std::vector<std::shared_ptr<cell>> neighbors_in_maze;
                 const auto current_count = grid_ops.collect_neighbors(current, neighbor_buf);
                 for (const auto& n : std::span(neighbor_buf).first(current_count))
                 {
-                    if (n && in_maze.contains(n->get_index()))
+                    if (n && in_maze.contains(grid_ops.index_of(n)))
                     {
                         neighbors_in_maze.push_back(n);
                     }
@@ -112,7 +112,7 @@ std::string_view prims_maze_create_state::create_prims_maze(const unsigned int r
 
                 const auto chosen_idx = static_cast<std::size_t>(rng(0, static_cast<int>(neighbors_in_maze.size()) - 1));
                 lab::link(current, neighbors_in_maze.at(chosen_idx), true);
-                in_maze.insert(current->get_index());
+                in_maze.insert(grid_ops.index_of(current));
 
                 add_frontier_neighbors(current);
             }

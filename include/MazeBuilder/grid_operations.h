@@ -33,9 +33,11 @@ namespace mazes
         /// @brief Destroys the grid_operations object and releases any associated resources.
         virtual ~grid_operations() = default;
 
+        using row_col_level = std::tuple<std::uint8_t, std::uint8_t, std::uint8_t>;
+
         /// @brief Retrieves the dimensions as a tuple of three unsigned integers.
         /// @return A tuple containing three unsigned integers representing the dimensions.
-        [[nodiscard]] virtual std::tuple<std::uint32_t, std::uint32_t, std::uint32_t> get_dimensions() const noexcept = 0;
+        [[nodiscard]] virtual row_col_level get_dimensions() const noexcept = 0;
 
         /// @brief Get neighbor by the cell's respective location
         /// @param c
@@ -44,7 +46,7 @@ namespace mazes
         [[nodiscard]] virtual std::shared_ptr<cell> get_neighbor(std::shared_ptr<cell> const &c,
                                                                  Direction dir) const noexcept = 0;
 
-        /// @brief Maximum number of neighbors a cell can have
+        /// @brief Maximum number of neighbors a cell can have for orthographic maze cells
         static constexpr std::size_t MAX_NEIGHBORS = 4;
 
         /// @brief Reusable neighbor buffer type for collect_neighbors
@@ -55,7 +57,7 @@ namespace mazes
         /// @param out Buffer to fill (reusable across calls)
         /// @return The number of neighbors written to out
         [[nodiscard]] virtual std::size_t collect_neighbors(std::shared_ptr<cell> const &c,
-                                                        std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept = 0;
+                                                            std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept = 0;
 
         /// @brief Get all the neighbors by the cell
         /// @deprecated Allocates on every call; use the buffer overload instead
@@ -90,6 +92,11 @@ namespace mazes
         /// @return
         [[nodiscard]] virtual std::shared_ptr<cell> search(int index) const noexcept = 0;
 
+        /// @brief Linear index of a cell (level-major, then row, then column)
+        /// @param c
+        /// @return The index, or -1 if the cell does not belong to this grid
+        [[nodiscard]] virtual int index_of(const std::shared_ptr<cell> &c) const noexcept = 0;
+
         /// @brief Get the count of cells in the grid
         /// @return The number of cells in the grid
         [[nodiscard]] virtual std::size_t num_cells() const noexcept = 0;
@@ -121,8 +128,8 @@ namespace mazes
         virtual void set_pixels(const std::vector<std::uint8_t> &pixels) noexcept = 0;
 
         /// @brief Resize the grid to new dimensions, clearing all existing cells and topology.
-        /// @param rows New row count  @param cols New column count  @param levels New level count
-        virtual void resize(std::uint32_t rows, std::uint32_t cols, std::uint32_t levels) noexcept = 0;
+        /// @param new_dimensions A tuple containing the new row, column, and level counts
+        virtual void resize(row_col_level new_dimensions) noexcept = 0;
     };
 } // namespace mazes
 
