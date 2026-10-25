@@ -65,6 +65,9 @@ namespace mazes
         static constexpr auto MASK_OPTION_STR = "--mask";
         static constexpr auto MASK_WORD_STR = "mask";
 
+        // Holds the unparsed user input until parsing_state processes it
+        static constexpr auto RAW_WORD_STR = "raw";
+
         // Special values
         static constexpr auto TRUE_VALUE = "true";
 
@@ -78,41 +81,45 @@ namespace mazes
 
         /// @brief Copy constructor
         /// @param other The other args object to copy from
-        args(const args& other);
+        args(const args &other);
 
         /// @brief Copy assignment operator
         /// @param other The other args object to copy from
         /// @return Reference to this object
-        args& operator=(const args& other);
+        args &operator=(const args &other);
 
         /// @brief Move constructor
         /// @param other The other args object to move from
-        args(args&& other) noexcept;
+        args(args &&other) noexcept;
 
         /// @brief Move assignment operator
         /// @param other The other args object to move from
         /// @return Reference to this object
-        args& operator=(args&& other) noexcept;
+        args &operator=(args &&other) noexcept;
 
         /// @brief Parse program arguments from a vector of strings
         /// @param arguments Command-line arguments
         /// @param has_program_name_as_first_arg Whether the first argument is the program name
         /// @return True if parsing was successful
-        bool parse(const std::vector<std::string>& arguments,
-            bool has_program_name_as_first_arg = false) const noexcept;
+        bool parse(const std::vector<std::string> &arguments,
+                   bool has_program_name_as_first_arg = false) const noexcept;
 
         /// @brief Parse program arguments from a string
         /// @param arguments Space-delimited command-line arguments
         /// @param has_program_name_as_first_arg Whether the first argument is the program name
         /// @return True if parsing was successful
-        bool parse(const std::string& arguments, bool has_program_name_as_first_arg = false) const noexcept;
+        bool parse(const std::string &arguments, bool has_program_name_as_first_arg = false) const noexcept;
 
         /// @brief Parse program arguments from argc/argv
         /// @param argc Argument count
         /// @param argv Argument values
         /// @param has_program_name_as_first_arg Whether the first argument is the program name
         /// @return True if parsing was successful
-        bool parse(int argc, char** argv, bool has_program_name_as_first_arg = false) const noexcept;
+        bool parse(int argc, char **argv, bool has_program_name_as_first_arg = false) const noexcept;
+
+        /// @brief Replace all argument maps
+        /// @param maps The new argument maps
+        void set(std::vector<arg_map> maps) const noexcept;
 
         /// @brief Clear the arguments map
         void clear() const noexcept;
@@ -120,7 +127,7 @@ namespace mazes
         /// @brief Get a value
         /// @param key The key to look up
         /// @return The value if found, std::nullopt otherwise
-        [[nodiscard]] std::optional<std::string> get(const std::string& key) const noexcept;
+        [[nodiscard]] std::optional<std::string> get(const std::string &key) const noexcept;
 
         /// @brief Get args from front
         /// @return The internal arguments map or empty map if not valid
@@ -137,6 +144,7 @@ namespace mazes
         /// @brief Get the number of argument maps
         /// @return The number of argument maps
         [[nodiscard]] std::size_t count() const noexcept;
+
     private:
         class impl;
         std::unique_ptr<impl> pimpl;

@@ -99,24 +99,17 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
         visit_states();
     }
 
-    auto &unknown_txt = processed_text_mapper.get(processed_text_identifier::UNKNOWN);
-    if (unknown_txt.is_processed())
-    {
-        return {};
-    }
-
-    args_mapper.get(args_identifier::RAW).clear();
+    auto &raw_args = args_mapper.get(args_identifier::RAW);
     args_mapper.get(args_identifier::PARSED).clear();
 
-    unknown_txt.set(unformatted_args);
+    raw_args.set({args::arg_map{{args::RAW_WORD_STR, std::string{unformatted_args}}}});
     processed_text_mapper.get(processed_text_identifier::PROCESSING).set_processed(std::monostate{});
 
     // PARSE pushes the algorithm/output states itself
     runtime_stack_ptr->push_state(state::ID::PARSE);
     visit_states();
 
-    // Clear so the next apply() call can supply fresh input.
-    unknown_txt.set_processed(std::monostate{});
+    raw_args.clear();
 
     last_result_buffer = get_finished_text();
 

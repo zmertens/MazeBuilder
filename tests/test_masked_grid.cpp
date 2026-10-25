@@ -9,6 +9,7 @@
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 
+#include "parsing_fixture.h"
 #include "test_output_dir.h"
 
 #include <fstream>
@@ -115,7 +116,7 @@ TEST_CASE("Mask random_location returns a valid cell", "[mask][random_location]"
 
     REQUIRE(m.count() == 1);
 
-    randomizer rng;
+    mazes::randomizer rng;
     rng.seed(42);
     const auto [r, c] = m.random_location(rng);
 
@@ -271,7 +272,7 @@ TEST_CASE("Masked grid random_cell returns available cell", "[masked_grid][rando
     }
 
     masked_grid mg(std::move(m));
-    randomizer rng;
+    mazes::randomizer rng;
     rng.seed(42);
 
     const auto cell = mg.random_cell(rng);
@@ -299,51 +300,39 @@ TEST_CASE("Masked grid get_mask returns the mask", "[masked_grid][get_mask]")
 // Args parsing tests for --mask
 // ---------------------------------------------------------------------------
 
-TEST_CASE("Args parse --mask flag", "[args][mask]")
+TEST_CASE("Parsing handles --mask flag", "[args][mask]")
 {
-    args args_handler;
+    test_support::parsing_fixture f;
 
     SECTION("Long form --mask")
     {
-        REQUIRE(args_handler.parse("--mask mask.txt"));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "mask.txt");
+        REQUIRE(f.run("--mask mask.txt"));
+        REQUIRE(f.parsed().get(args::MASK_WORD_STR).value() == "mask.txt");
     }
 
     SECTION("Short form -m")
     {
-        REQUIRE(args_handler.parse("-m mask.txt"));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "mask.txt");
+        REQUIRE(f.run("-m mask.txt"));
+        REQUIRE(f.parsed().get(args::MASK_WORD_STR).value() == "mask.txt");
     }
 
     SECTION("Option form --mask=mask.txt")
     {
-        REQUIRE(args_handler.parse("--mask=mask.txt"));
-        const auto val = args_handler.get(args::MASK_WORD_STR);
-        REQUIRE(val.has_value());
-        REQUIRE(val.value() == "mask.txt");
+        REQUIRE(f.run("--mask=mask.txt"));
+        REQUIRE(f.parsed().get(args::MASK_WORD_STR).value() == "mask.txt");
     }
 
     SECTION("Validation still applies for split --rows= form")
     {
-        REQUIRE_FALSE(args_handler.parse(std::vector<std::string>{"--rows=", "abc"}));
+        REQUIRE_FALSE(f.run("--rows= abc"));
     }
 }
 
-TEST_CASE("Args mask combined with other options", "[args][mask][combined]")
+TEST_CASE("Mask combined with other options", "[args][mask][combined]")
 {
-    args args_handler;
+    test_support::parsing_fixture f;
 
-    REQUIRE(args_handler.parse("-m mask.txt -a dfs -r 10 -c 10"s));
-
-    const auto mask_val = args_handler.get(args::MASK_WORD_STR);
-    REQUIRE(mask_val.has_value());
-    REQUIRE(mask_val.value() == "mask.txt");
-
-    const auto algo_val = args_handler.get(args::ALGO_ID_WORD_STR);
-    REQUIRE(algo_val.has_value());
-    REQUIRE(algo_val.value() == "dfs");
+    REQUIRE(f.run("-m mask.txt -a dfs -r 10 -c 10"));
+    REQUIRE(f.parsed().get(args::MASK_WORD_STR).value() == "mask.txt");
+    REQUIRE(f.parsed().get(args::ALGO_ID_WORD_STR).value() == "dfs");
 }

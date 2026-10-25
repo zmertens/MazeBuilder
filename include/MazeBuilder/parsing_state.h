@@ -1,11 +1,12 @@
 #ifndef PARSING_STATE_H
 #define PARSING_STATE_H
 
-#include <MazeBuilder/args.h>
+#include <MazeBuilder/create_contract.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
 
+#include <any>
 #include <optional>
 #include <span>
 #include <string>
@@ -13,38 +14,25 @@
 #include <unordered_map>
 #include <vector>
 
-class randomizer;
-class runtime_stack;
-struct context;
-
 /// @namespace mazes
 /// @file parsing_state.h
 namespace mazes
 {
-    /// @brief Outcome of parse_args; maps is empty whenever ok is false
-    struct parse_result
-    {
-        bool ok{false};
-        std::vector<args::arg_map> maps;
-        std::string error;
-    };
-
-    /// @brief Parses tokens by running them through the parse_sub_state chain
-    /// @param tokens Already-split command-line tokens
-    /// @param has_program_name Whether tokens[0] is the program name
-    /// @return One map per argument set (a JSON array yields several)
-    [[nodiscard]] parse_result parse_args(std::span<const std::string> tokens, bool has_program_name) noexcept;
+    class args;
+    class randomizer;
+    class runtime_stack;
+    struct context;
 
     /// @brief State for parsing arguments
-    class parsing_state final : public state
+    class parsing_state final : public create_contract, public state
     {
     public:
         explicit parsing_state(const runtime_app::context& ctx, runtime_stack* rs);
 
-        /// @brief Converts a string of arguments into an args object
-        /// @param arguments The string of arguments to convert
-        /// @return An optional args object if the conversion was successful, std::nullopt otherwise
-        [[nodiscard]] static std::optional<args> convert(std::string_view arguments) noexcept;
+        /// @brief Normalizes the raw input into a canonical, space-separated string
+        /// @details Collapses whitespace and splits "--opt=value" into "--opt value"
+        /// @return The canonical string as std::string, or an empty std::any if the input is empty
+        [[nodiscard]] std::any create(const args &a, randomizer &rng) noexcept override;
 
         void draw() const noexcept override;
 
@@ -53,10 +41,8 @@ namespace mazes
         /// @param delta_time Time elapsed since the last update
         /// @return True if the update was successful, false otherwise
         [[nodiscard]] bool update(randomizer &rng, double delta_time) noexcept override;
-
     private:
         args_manager* args_mapper;
-        processed_text_manager* processed_text_mapper;
     };
 } // namespace mazes
 
