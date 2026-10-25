@@ -18,13 +18,12 @@ TEST_CASE("async_logger delivers queued messages", "[async_logger]")
     std::condition_variable cv;
     std::vector<std::string> received;
 
-    auto &logger = async_logger::instance();
+    auto &&logger = async_logger::instance();
     logger->set_sink([&](std::string_view msg)
                      {
                          std::lock_guard<std::mutex> lock(mtx);
                          received.emplace_back(msg);
-                         cv.notify_one();
-                     });
+                         cv.notify_one(); });
 
     logger->log(fmt::format("maze {}", 42));
 
@@ -37,4 +36,5 @@ TEST_CASE("async_logger delivers queued messages", "[async_logger]")
 
     logger->flush();
     logger->set_sink(nullptr);
+    logger->flush();
 }

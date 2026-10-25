@@ -18,7 +18,9 @@ cell::cell(std::pair<std::uint8_t, std::uint8_t> index)
 // Destructor
 cell::~cell()
 {
-    cleanup_links();
+    // No logging here: cells can outlive the logger singleton during static destruction
+    std::erase_if(m_links, [](const auto &pair)
+                  { return pair.first.expired(); });
 }
 
 // Copy Constructor
