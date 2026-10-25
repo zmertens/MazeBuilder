@@ -18,6 +18,8 @@ namespace mazes
     class args final
     {
     public:
+        using arg_map = std::unordered_map<std::string, std::string>;
+
         static constexpr auto APP_KEY = "app";
 
         static constexpr auto ALGO_ID_FLAG_STR = "-a";
@@ -122,7 +124,7 @@ namespace mazes
 
         /// @brief Get args from front
         /// @return The internal arguments map or empty map if not valid
-        [[nodiscard]] std::unordered_map<std::string, std::string> front() const noexcept;
+        [[nodiscard]] arg_map front() const noexcept;
 
         /// @brief Remove the first parsed argument map
         /// @return True if an argument map was removed
@@ -130,7 +132,7 @@ namespace mazes
 
         /// @brief Get entire args map
         /// @return The internal arguments map or empty map if not valid
-        [[nodiscard]] std::vector<std::unordered_map<std::string, std::string>> get() const noexcept;
+        [[nodiscard]] std::vector<arg_map> get() const noexcept;
 
         /// @brief Get the number of argument maps
         /// @return The number of argument maps

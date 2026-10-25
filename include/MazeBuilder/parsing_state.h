@@ -1,6 +1,7 @@
 #ifndef PARSING_STATE_H
 #define PARSING_STATE_H
 
+#include <MazeBuilder/args.h>
 #include <MazeBuilder/resource_identifiers.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
@@ -20,13 +21,11 @@ struct context;
 /// @file parsing_state.h
 namespace mazes
 {
-    using arg_map = std::unordered_map<std::string, std::string>;
-
     /// @brief Outcome of parse_args; maps is empty whenever ok is false
     struct parse_result
     {
         bool ok{false};
-        std::vector<arg_map> maps;
+        std::vector<args::arg_map> maps;
         std::string error;
     };
 

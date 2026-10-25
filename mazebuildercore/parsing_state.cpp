@@ -52,7 +52,7 @@ namespace
     public:
         virtual ~parse_sub_state() = default;
         [[nodiscard]] virtual bool matches(std::string_view token) const noexcept = 0;
-        [[nodiscard]] virtual bool parse(token_cursor &in, arg_map &out) const = 0;
+        [[nodiscard]] virtual bool parse(token_cursor &in, args::arg_map &out) const = 0;
     };
 
     // Program name (or an ignored leading positional when none is declared).
@@ -66,7 +66,7 @@ namespace
             return has_program_name || !looks_like_option(token);
         }
 
-        bool parse(token_cursor &in, arg_map &out) const override
+        bool parse(token_cursor &in, args::arg_map &out) const override
         {
             const auto token = in.take();
             if (has_program_name)
@@ -95,7 +95,7 @@ namespace
                    has_inline_value(token);
         }
 
-        [[nodiscard]] bool parse(token_cursor &in, arg_map &out) const override
+        [[nodiscard]] bool parse(token_cursor &in, args::arg_map &out) const override
         {
             const auto token = in.take();
             std::string_view value;
@@ -133,7 +133,7 @@ namespace
         [[nodiscard]] virtual bool accepts(std::string_view) const noexcept { return true; }
 
         // Later occurrences overwrite earlier ones.
-        void store(arg_map &out, std::string_view value) const
+        void store(args::arg_map &out, std::string_view value) const
         {
             out[std::string{flag_}] = value;
             out[std::string{option_}] = value;
@@ -275,7 +275,7 @@ namespace
         {
         }
 
-        [[nodiscard]] bool parse(token_cursor &in, arg_map &out) const override
+        [[nodiscard]] bool parse(token_cursor &in, args::arg_map &out) const override
         {
             const auto token = in.take();
             std::string_view slice;
@@ -296,7 +296,7 @@ namespace
         }
 
     private:
-        bool store_slice(arg_map &out, std::string_view slice) const
+        bool store_slice(args::arg_map &out, std::string_view slice) const
         {
             static const std::regex slice_pattern(R"(\[(\d*):(-?\d*)\])");
 
@@ -336,7 +336,7 @@ namespace
             return token == flag_ || token == option_;
         }
 
-        [[nodiscard]] bool parse(token_cursor &in, arg_map &out) const override
+        [[nodiscard]] bool parse(token_cursor &in, args::arg_map &out) const override
         {
             in.take();
             store(out, args::TRUE_VALUE);
@@ -406,7 +406,7 @@ namespace
         return raw_path;
     }
 
-    std::vector<arg_map> load_json_objects(const std::string &json_input)
+    std::vector<args::arg_map> load_json_objects(const std::string &json_input)
     {
         const std::string trimmed{string_utils::strip_whitespace(json_input)};
         const std::string text{string_utils::strip_backticks(trimmed)};
@@ -414,8 +414,8 @@ namespace
         const bool is_file = !text.empty() && std::filesystem::exists(path);
 
         json_helper jh{};
-        arg_map single;
-        std::vector<arg_map> array;
+        args::arg_map single;
+        std::vector<args::arg_map> array;
         if (is_file)
         {
             if (jh.load(path.string(), single))
@@ -442,7 +442,7 @@ namespace
     }
 
     // Each JSON object becomes its own map, validated by the same sub-states as the command line.
-    bool expand_json(const sub_state_list &states, const std::string &json_input, std::vector<arg_map> &maps)
+    bool expand_json(const sub_state_list &states, const std::string &json_input, std::vector<args::arg_map> &maps)
     {
         for (const auto &object : load_json_objects(json_input))
         {
@@ -451,7 +451,7 @@ namespace
                 continue;
             }
 
-            arg_map m;
+            args::arg_map m;
             for (const auto &[key, value] : object)
             {
                 const auto owner = std::ranges::find_if(states, [&key](const auto &s)
@@ -485,7 +485,7 @@ parse_result mazes::parse_args(std::span<const std::string> tokens, bool has_pro
     try
     {
         token_cursor cursor{tokens};
-        arg_map flat;
+        args::arg_map flat;
         const auto states = make_sub_states();
 
         if (const parse_app_state app{has_program_name}; !cursor.done() && app.matches(cursor.peek()))

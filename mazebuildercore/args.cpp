@@ -12,12 +12,14 @@
 
 using namespace mazes;
 
+using arg_map = args::arg_map;
+
 class args::impl
 {
 public:
     impl() = default;
 
-    std::vector<std::unordered_map<std::string, std::string>> arguments;
+    std::vector<arg_map> arguments;
 
     bool parse(const std::vector<std::string> &args_vec, const bool has_program_name)
     {
@@ -163,7 +165,7 @@ std::optional<std::string> args::get(const std::string &key) const noexcept
     return std::nullopt;
 }
 
-std::unordered_map<std::string, std::string> args::front() const noexcept
+arg_map args::front() const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {
@@ -184,7 +186,7 @@ bool args::pop_front() const noexcept
     return true;
 }
 
-std::vector<std::unordered_map<std::string, std::string>> args::get() const noexcept
+std::vector<arg_map> args::get() const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {
