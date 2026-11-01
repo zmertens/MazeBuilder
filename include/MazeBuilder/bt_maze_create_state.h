@@ -33,13 +33,6 @@ namespace mazes
     private:
         /// @brief Get the algorithm ID for the binary tree algorithm
         [[nodiscard]] algo get_algo_id() const noexcept override;
-
-        /// @brief Implementation of the binary tree maze creation algorithm
-        /// @param a The maze arguments
-        /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message
-        std::string_view create_bt_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-                                        randomizer &rng) noexcept;
     };
 } // namespace mazes
 

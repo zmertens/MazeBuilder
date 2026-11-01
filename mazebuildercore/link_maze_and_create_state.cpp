@@ -3,6 +3,8 @@
 #include <MazeBuilder/algos.h>
 #include <MazeBuilder/args.h>
 #include <MazeBuilder/configurator.h>
+#include <MazeBuilder/distance_grid.h>
+#include <MazeBuilder/grid_operations.h>
 #include <MazeBuilder/grid_interface.h>
 #include <MazeBuilder/mask.h>
 #include <MazeBuilder/randomizer.h>
@@ -32,6 +34,36 @@ link_maze_and_create_state::~link_maze_and_create_state() = default;
 void link_maze_and_create_state::draw() const noexcept
 {
     // Implementation of the draw function
+}
+
+std::string link_maze_and_create_state::run_link_algorithm(const std::function<bool(grid_operations &)> &link_algorithm) noexcept
+{
+    if (!grid_mapper)
+    {
+        return {};
+    }
+
+    try
+    {
+        auto &grid_ref = grid_mapper->get(current_grid_id);
+        if (!link_algorithm(grid_ref.operations()))
+        {
+            return {};
+        }
+
+        if (m_use_distances)
+        {
+            if (auto *distances = dynamic_cast<distance_grid *>(&grid_ref))
+            {
+                distances->calculate_distances(m_distances_start, m_distances_end);
+            }
+        }
+        return "Maze generated";
+    }
+    catch (...)
+    {
+        return {};
+    }
 }
 
 bool link_maze_and_create_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept

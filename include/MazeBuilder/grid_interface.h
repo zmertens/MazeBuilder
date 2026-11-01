@@ -29,7 +29,7 @@ namespace mazes
 
         /// @brief Returns the background color for the specified cell, if available.
         /// @param c A shared pointer to the cell for which to determine the background color.
-        /// @return An optional 32-bit unsigned integer representing the background color of the cell
+        /// @return A 32-bit unsigned integer representing the background color of the cell
         [[nodiscard]] virtual std::uint32_t background_color_for(std::shared_ptr<cell> const& c) const noexcept = 0;
 
         /// @brief Get access to grid operations interface

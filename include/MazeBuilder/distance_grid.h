@@ -2,8 +2,8 @@
 #define DISTANCE_GRID_H
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 
-#include <future>
 #include <memory>
 #include <string>
 
@@ -14,7 +14,6 @@ namespace mazes
     class cell;
     class distances;
     class grid;
-    class grid_operations;
 
     /// @class distance_grid
     /// @brief A grid that can calculate distances between cells
@@ -34,14 +33,14 @@ namespace mazes
 
         distance_grid &operator=(distance_grid &&) noexcept = default;
 
-        /// @brief
-        /// @param c
-        /// @return
+        /// @brief Retrieves the contents of a given cell, if available.
+        /// @param c A shared pointer to the cell whose contents are to be retrieved.
+        /// @return If the cell has no contents, the contents are considered empty
         [[nodiscard]] std::string contents_of(std::shared_ptr<cell> const &c) const noexcept override;
 
-        /// @brief
-        /// @param c
-        /// @return
+        /// @brief Retrieves the background color for a given cell, if available.
+        /// @param c A shared pointer to the cell for which the background color is to be retrieved.
+        /// @return An 32-bit unsigned integer containing the background color
         [[nodiscard]] std::uint32_t
         background_color_for(std::shared_ptr<cell> const &c) const noexcept override;
 
@@ -50,11 +49,6 @@ namespace mazes
 
         [[nodiscard]] const grid_operations &operations() const noexcept override;
 
-        /// @brief Resize the grid
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        void resize(unsigned int rows, unsigned int cols, unsigned int levels) const noexcept;
 
         /// @brief Calculates distances for a range of indices.
         /// @param start_index The starting index of the range (inclusive).

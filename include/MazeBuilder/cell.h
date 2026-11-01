@@ -3,8 +3,8 @@
 
 #include <cstdint>
 #include <memory>
-#include <shared_mutex>
 #include <unordered_map>
+#include <utility>
 
 #include <MazeBuilder/hash_funcs.h>
 
@@ -16,10 +16,24 @@ namespace mazes
     /// @brief Cell class with links to other cells
     class cell final
     {
+        /// @brief Equals function for weak pointers to cell objects.
+        struct weak_ptr_equal
+        {
+            template <typename T>
+            bool operator()(const std::weak_ptr<T> &lhs, const std::weak_ptr<T> &rhs) const
+            {
+                return !lhs.owner_before(rhs) && !rhs.owner_before(lhs);
+            }
+        };
+
     public:
+        using cell_area = std::pair<std::uint8_t, std::uint8_t>;
+        using cell_map = std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal>;
+
         /// @brief Constructs a cell object with an optional index.
-        /// @param index The index to initialize the cell with. Defaults to 0.
-        explicit cell(std::int32_t index = 0);
+        /// @param index The area (row, column per convention) to initialize the cell with.
+        explicit cell(std::pair<std::uint8_t, std::uint8_t> index 
+            = std::pair<std::uint8_t, std::uint8_t>{1u, 1u});
 
         /// @brief Destroys the cell object and releases any associated resources.
         ~cell();
@@ -33,7 +47,7 @@ namespace mazes
         /// @return A reference to this cell after assignment.
         cell &operator=(const cell &other);
 
-        /// @brief Move constructor for the cell class. Transfers the resources from another cell to this one.
+        /// @brief Move constructor for the cell class.
         /// @param other The cell object to move from.
         cell(cell &&other) noexcept;
 
@@ -44,47 +58,39 @@ namespace mazes
 
         /// @brief Add a link to another cell (passage between cells)
         /// @param other The cell to link to
-        void add_link(const std::shared_ptr<cell> &other);
+        void add_link(const std::shared_ptr<cell> &other) noexcept;
 
         /// @brief Remove a link to another cell
         /// @param other The cell to unlink from
-        void remove_link(const std::shared_ptr<cell> &other);
+        void remove_link(const std::shared_ptr<cell> &other) noexcept;
+
+        /// @brief Remove all links so the cell can be reused
+        void clear_links() noexcept;
 
         /// @brief Checks if a cell is linked.
         /// @param c A shared pointer to the cell to check.
         /// @return True if the cell is linked, false otherwise.
-        bool is_linked(const std::shared_ptr<cell> &c);
+        bool is_linked(const std::shared_ptr<cell> &c) const noexcept;
 
-        /// @brief Retrieves the index of the current cell.
-        /// @return The index of the current cell.
-        int32_t get_index() const noexcept;
+        /// @brief Retrieves the area of the current cell.
+        /// @return The area of the current cell.
+        cell_area get_area() const noexcept;
 
-        /// @brief Sets the index to the specified value.
-        /// @param next_index The new index value to set.
-        void set_index(std::int32_t next_index) noexcept;
+        /// @brief Sets the area to the specified value.
+        /// @param new_area The new area value to set.
+        void set_area(cell_area new_area) noexcept;
+
     private:
-        /// @brief Equals function for weak pointers to cell objects.
-        struct weak_ptr_equal
-        {
-            template <typename T>
-            bool operator()(const std::weak_ptr<T> &lhs, const std::weak_ptr<T> &rhs) const
-            {
-                return !lhs.owner_before(rhs) && !rhs.owner_before(lhs);
-            }
-        };
-        /// @brief Cleans up or removes links, typically as part of a resource management or shutdown process.
+        /// @brief Removes expired links
         void cleanup_links();
 
         /// @brief Checks if the cell has a link to the specified cell.
         /// @param c A shared pointer to the cell to check.
         /// @return True if the cell has a link to the specified cell, false otherwise.
-        bool has_key(const std::shared_ptr<cell> &c);
+        bool has_key(const std::shared_ptr<cell> &c) const noexcept;
 
-        std::unordered_map<std::weak_ptr<cell>, bool, weak_ptr_hash, weak_ptr_equal> m_links;
-
-        mutable std::shared_mutex m_links_mutex;
-
-        std::int32_t m_index;
+        cell_area m_area;
+        cell_map m_links;
     };
 } // namespace mazes
 

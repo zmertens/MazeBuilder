@@ -12,24 +12,31 @@
 
 using namespace mazes;
 
+using arg_map = args::arg_map;
+
 class args::impl
 {
 public:
     impl() = default;
 
-    std::vector<std::unordered_map<std::string, std::string>> arguments;
+    std::vector<arg_map> arguments;
 
+    // Stores the joined tokens as a single raw map; parsing_state turns it into real arguments
     bool parse(const std::vector<std::string> &args_vec, const bool has_program_name)
     {
-        auto result = parse_args(args_vec, has_program_name);
-        if (!result.ok)
+        std::ostringstream joined;
+        for (std::size_t i = has_program_name ? 1 : 0; i < args_vec.size(); ++i)
         {
-            async_logger::instance()->log(fmt::format("Parse error: {}\n", result.error));
+            joined << (joined.tellp() > 0 ? " " : "") << args_vec[i];
+        }
+
+        if (joined.str().empty())
+        {
             arguments.clear();
             return false;
         }
 
-        arguments = std::move(result.maps);
+        arguments = {arg_map{{args::RAW_WORD_STR, joined.str()}}};
         return true;
     }
 
@@ -138,6 +145,14 @@ bool args::parse(int argc, char **argv, const bool has_program_name_as_first_arg
     }
 }
 
+void args::set(std::vector<arg_map> maps) const noexcept
+{
+    if (pimpl)
+    {
+        pimpl->arguments = std::move(maps);
+    }
+}
+
 void args::clear() const noexcept
 {
     if (pimpl)
@@ -163,7 +178,7 @@ std::optional<std::string> args::get(const std::string &key) const noexcept
     return std::nullopt;
 }
 
-std::unordered_map<std::string, std::string> args::front() const noexcept
+arg_map args::front() const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {
@@ -184,7 +199,7 @@ bool args::pop_front() const noexcept
     return true;
 }
 
-std::vector<std::unordered_map<std::string, std::string>> args::get() const noexcept
+std::vector<arg_map> args::get() const noexcept
 {
     if (!pimpl || pimpl->arguments.empty())
     {

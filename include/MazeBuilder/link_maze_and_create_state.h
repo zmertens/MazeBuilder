@@ -8,6 +8,7 @@
 #include <MazeBuilder/state.h>
 
 #include <any>
+#include <functional>
 #include <string>
 
 /// @namespace mazes
@@ -16,6 +17,7 @@ namespace mazes
 {
     class args;
     class configurator;
+    class grid_operations;
     class randomizer;
     class runtime_stack;
 
@@ -51,6 +53,11 @@ namespace mazes
         /// @brief Get the algorithm ID for this maze creation algorithm
         /// @return The algorithm ID to use in the configurator
         [[nodiscard]] virtual algo get_algo_id() const noexcept = 0;
+
+        /// @brief Runs a linking algorithm on the current grid, then calculates distances if requested
+        /// @param link_algorithm Links the grid's cells; returns false if it could not
+        /// @return A result message, or an empty string on failure
+        [[nodiscard]] std::string run_link_algorithm(const std::function<bool(grid_operations &)> &link_algorithm) noexcept;
 
         args_manager *args_mapper;
         grid_manager *grid_mapper;

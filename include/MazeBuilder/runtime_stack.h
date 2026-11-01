@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
-#include <optional>
 #include <ranges>
 #include <string>
 #include <string_view>
@@ -29,7 +28,8 @@ namespace mazes
         {
             PUSH = 0,
             POP = 1,
-            CLEAR = 2
+            ROTATE = 2,
+            CLEAR = 3
         };
 
         explicit runtime_stack(const runtime_app::context &ctx);
@@ -38,6 +38,7 @@ namespace mazes
         void push_state(state::ID state_id) noexcept;
         void pop_state() noexcept;
         void clear_states() noexcept;
+        void rotate() noexcept;
 
         /// @brief Visit each state top-to-bottom, calling update(args, elapsed) until one returns false.
         ///        Applies pending stack changes after the pass.
@@ -111,13 +112,15 @@ namespace mazes
                                      std::to_string(static_cast<unsigned int>(state_id)));
         }
 
-        std::vector<std::unique_ptr<state>> m_states;
-        std::vector<pending_change> m_pending;
         runtime_app::context runtime_context;
+
         std::unordered_map<state::ID,
                            std::function<std::unique_ptr<state>()>,
                            state_id_hash>
             m_factories;
+
+        std::vector<std::unique_ptr<state>> m_states;
+        std::vector<pending_change> m_pending;
     };
 } // namespace mazes
 

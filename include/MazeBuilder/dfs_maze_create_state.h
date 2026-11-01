@@ -29,15 +29,6 @@ namespace mazes
     private:
         /// @brief Get the algorithm ID for the depth-first search algorithm
         [[nodiscard]] algo get_algo_id() const noexcept override;
-
-        /// @brief Implementation of the depth-first search maze creation algorithm
-        /// @param rows The number of rows in the maze
-        /// @param cols The number of columns in the maze
-        /// @param levels The number of levels in the maze
-        /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message
-        std::string_view create_dfs_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-                                         randomizer &rng) noexcept;
     };
 } // namespace mazes
 

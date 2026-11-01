@@ -122,7 +122,7 @@ std::shared_ptr<distances> distances::path_to(grid_interface* g, const std::int3
                 continue;
             }
 
-            const std::int32_t neighbor_index = neighbor->get_index();
+            const std::int32_t neighbor_index = ops.index_of(neighbor);
             if (visited.contains(neighbor_index))
             {
                 continue;

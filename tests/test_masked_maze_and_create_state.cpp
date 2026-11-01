@@ -14,14 +14,7 @@ using namespace std;
 
 namespace {
     std::shared_ptr<runtime_app> app = runtime_app::instance();
-}
 
-// ---------------------------------------------------------------------------
-// Helper functions
-// ---------------------------------------------------------------------------
-
-namespace
-{
     void create_simple_mask_file(const std::string& filename)
     {
         std::ofstream out(filename);
@@ -47,10 +40,6 @@ namespace
         out.close();
     }
 }
-
-// ---------------------------------------------------------------------------
-// Masked maze state tests
-// ---------------------------------------------------------------------------
 
 TEST_CASE("Masked maze with binary_tree algorithm", "[masked_maze][binary_tree]")
 {

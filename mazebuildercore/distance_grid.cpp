@@ -21,7 +21,7 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{ std::make_unique<grid>(width, length, levels) }
+    : m_grid{ std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels)) }
 {
 }
 
@@ -30,9 +30,9 @@ std::string distance_grid::contents_of(std::shared_ptr<cell> const& c) const noe
     if (m_distances && c)
     {
         // Check if the cell exists in our distance map
-        if (m_distances->contains(c->get_index()))
+        if (m_distances->contains(m_grid->operations().index_of(c)))
         {
-            if (const auto d = m_distances->operator[](c->get_index()); d >= 0)
+            if (const auto d = m_distances->operator[](m_grid->operations().index_of(c)); d >= 0)
             {
                 return bytes::to_base36(d);
             }
@@ -64,7 +64,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
         }
 
         // Create distances from start cell to all reachable cells
-        m_distances = std::make_shared<distances>(start_cell->get_index());
+        m_distances = std::make_shared<distances>(grid_ops.index_of(start_cell));
         if (!m_distances)
         {
             throw std::runtime_error("Failed to create distances object.");
@@ -119,7 +119,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
                     continue;
                 }
 
-                const std::int32_t neighbor_index = neighbor->get_index();
+                const std::int32_t neighbor_index = grid_ops.index_of(neighbor);
 
                 // Skip if already visited
                 if (neighbor_index < 0 || neighbor_index >= num_cells)
@@ -171,9 +171,4 @@ grid_operations& distance_grid::operations() noexcept
 const grid_operations& distance_grid::operations() const noexcept
 {
     return m_grid->operations();
-}
-
-void distance_grid::resize(const unsigned int rows, const unsigned int cols, const unsigned int levels) const noexcept
-{
-    m_grid->operations().resize(rows, cols, levels);
 }

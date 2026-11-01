@@ -11,6 +11,7 @@ set(MAZE_BUILDER_CORE_SRCS
     bt_maze_create_state.cpp
     dfs_maze_create_state.cpp
     cell.cpp
+    cell_pool.cpp
     colored_grid.cpp
     distance_grid.cpp
     distances.cpp

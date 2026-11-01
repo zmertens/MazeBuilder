@@ -11,43 +11,34 @@
 
 using namespace mazes;
 
-/// @brief
-/// @param rows
-/// @param columns
-/// @param levels
-grid::grid(unsigned int rows, unsigned int columns, unsigned int levels)
-    : grid(std::make_tuple(rows, columns, levels))
+/// @param rows 2u
+/// @param columns 2u
+/// @param levels 1u
+grid::grid(std::uint8_t x, std::uint8_t y, std::uint8_t z)
+    : grid(grid_operations::row_col_level{x, y, z})
 {
 }
 
-/// @brief
 /// @param dimens A tuple containing the dimensions of the grid (rows, columns, levels)
-grid::grid(const std::tuple<unsigned int, unsigned int, unsigned int> &dimens)
+grid::grid(const grid_operations::row_col_level &dimens)
     : m_dimensions(dimens)
 {
-    const auto total_cells = std::get<0>(dimens) * std::get<1>(dimens) * std::get<2>(dimens);
-    std::ranges::generate_n(std::back_inserter(m_cells), total_cells, [n = 0]() mutable
-                            { return std::make_shared<cell>(static_cast<int32_t>(n++)); });
+    m_pool.acquire(std::get<0>(dimens), std::get<1>(dimens), std::get<2>(dimens));
 }
 
-// Copy constructor
+// Copy constructor: a copy owns its own cells
 grid::grid(const grid &other)
-    : m_cells(other.m_cells), m_dimensions(other.m_dimensions)
+    : grid(other.m_dimensions)
 {
 }
 
 // Copy assignment operator
 grid &grid::operator=(const grid &other)
 {
-    if (this == &other)
+    if (this != &other)
     {
-        return *this;
+        resize(other.m_dimensions);
     }
-
-    m_dimensions = other.m_dimensions;
-
-    m_cells = other.m_cells;
-
     return *this;
 }
 
@@ -60,15 +51,10 @@ grid::grid(grid &&other) noexcept
 // Move assignment operator
 grid &grid::operator=(grid &&other) noexcept
 {
-    if (this == &other)
+    if (this != &other)
     {
-        return *this;
+        resize(other.m_dimensions);
     }
-
-    m_dimensions = other.m_dimensions;
-
-    m_cells = other.m_cells;
-
     return *this;
 }
 
@@ -81,31 +67,27 @@ grid::~grid()
 
 void grid::clear_cells() noexcept
 {
-    // Clear topology first
-    {
-        std::lock_guard lock(m_topology_mutex);
-        m_topology.clear();
-    }
+    m_topology.clear();
 }
 
-std::tuple<unsigned int, unsigned int, unsigned int> grid::get_dimensions() const noexcept
+grid_operations::row_col_level grid::get_dimensions() const noexcept
 {
     return this->m_dimensions;
 }
 
 std::shared_ptr<cell> grid::search(int index) const noexcept
 {
-    if (index >= 0 && static_cast<std::size_t>(index) < m_cells.size())
-    {
-        return m_cells[static_cast<std::size_t>(index)];
-    }
+    return m_pool.at(index);
+}
 
-    return nullptr;
+int grid::index_of(const std::shared_ptr<cell> &c) const noexcept
+{
+    return c ? m_pool.index_of(c.get()) : -1;
 }
 
 std::size_t grid::num_cells() const noexcept
 {
-    return m_cells.size();
+    return m_pool.size();
 }
 
 // Get the contents of a cell for this type of grid
@@ -139,7 +121,11 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, const D
 
     // Calculate neighbor index on-demand instead of pre-computing topology
     auto [rows, columns, levels] = m_dimensions;
-    const int current_index = c->get_index();
+    const int current_index = index_of(c);
+    if (current_index < 0)
+    {
+        return nullptr;
+    }
 
     // Calculate 3D coordinates from index
     const int level = current_index / (rows * columns);
@@ -202,7 +188,7 @@ std::size_t grid::collect_neighbors(std::shared_ptr<cell> const &c,
 
 std::span<const std::shared_ptr<cell>> grid::cells() const noexcept
 {
-    return m_cells;
+    return m_pool.view();
 }
 
 void grid::set_neighbor(const std::shared_ptr<cell> &c, Direction dir, std::shared_ptr<cell> const &neighbor) noexcept
@@ -212,16 +198,14 @@ void grid::set_neighbor(const std::shared_ptr<cell> &c, Direction dir, std::shar
         return;
     }
 
-    std::lock_guard lock(m_topology_mutex);
-
     if (neighbor)
     {
-        m_topology[c->get_index()][dir] = neighbor->get_index();
+        m_topology[index_of(c)][dir] = index_of(neighbor);
     }
     else
     {
         // Remove the neighbor relationship
-        auto cell_it = m_topology.find(c->get_index());
+        auto cell_it = m_topology.find(index_of(c));
         if (cell_it != m_topology.end())
         {
             cell_it->second.erase(dir);
@@ -292,22 +276,9 @@ void grid::set_pixels(const std::vector<std::uint8_t> &pixels) noexcept
     m_pixels = pixels;
 }
 
-void grid::resize(unsigned int rows, unsigned int cols, unsigned int levels) noexcept
+void grid::resize(grid_operations::row_col_level new_size) noexcept
 {
-    // Clear topology
-    {
-        std::lock_guard lock(m_topology_mutex);
-        m_topology.clear();
-    }
-
-    // Replace all cells
-    m_cells.clear();
-    m_dimensions = std::make_tuple(rows, cols, levels);
-
-    const auto total = static_cast<size_t>(rows) * cols * levels;
-    m_cells.reserve(total);
-    for (size_t i = 0; i < total; ++i)
-    {
-        m_cells.push_back(std::make_shared<cell>(static_cast<int32_t>(i)));
-    }
+    m_topology.clear();
+    m_dimensions = new_size;
+    m_pool.acquire(std::get<0>(new_size), std::get<1>(new_size), std::get<2>(new_size));
 }

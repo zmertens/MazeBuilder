@@ -17,7 +17,7 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 colored_grid::colored_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{ std::make_unique<grid>(width, length, levels) }, m_distances{ std::make_shared<distances>(0) }
+    : m_grid{ std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels)) }, m_distances{ std::make_shared<distances>(0) }
 {
 }
 
@@ -25,9 +25,9 @@ std::string colored_grid::contents_of(const std::shared_ptr<cell>& c) const noex
 {
     if (m_distances)
     {
-        if (m_distances->contains(c->get_index()))
+        if (m_distances->contains(m_grid->operations().index_of(c)))
         {
-            return std::to_string(m_distances->operator[](c->get_index()));
+            return std::to_string(m_distances->operator[](m_grid->operations().index_of(c)));
         }
     }
 
@@ -50,7 +50,7 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c)
     }
 
     // Only path cells are colored; all others use the grid default.
-    if (!m_distances || !m_distances->contains(c->get_index()))
+    if (!m_distances || !m_distances->contains(m_grid->operations().index_of(c)))
     {
         return m_grid->background_color_for(cref(c));
     }
@@ -67,7 +67,7 @@ std::uint32_t colored_grid::background_color_for(const std::shared_ptr<cell>& c)
         0xFF1A00u  // red
     };
 
-    const int distance = (*m_distances)[c->get_index()];
+    const int distance = (*m_distances)[m_grid->operations().index_of(c)];
     const int max_dist = m_distances->max().second;
     float normalized = max_dist > 0 ? static_cast<float>(distance) / static_cast<float>(max_dist) : 0.0f;
     normalized = std::clamp(normalized, 0.0f, 1.0f);
@@ -85,9 +85,4 @@ grid_operations& colored_grid::operations() noexcept
 const grid_operations& colored_grid::operations() const noexcept
 {
     return m_grid->operations();
-}
-
-void colored_grid::resize(const unsigned int rows, const unsigned int cols, const unsigned int levels) const noexcept
-{
-    m_grid->operations().resize(rows, cols, levels);
 }

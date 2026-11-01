@@ -2,6 +2,7 @@
 #define COLORED_GRID_H
 
 #include <MazeBuilder/grid_interface.h>
+#include <MazeBuilder/grid_operations.h>
 
 /// @file colored_grid.h
 /// @namespace mazes
@@ -16,9 +17,9 @@ namespace mazes
     {
     public:
         /// @brief Constructs a colored grid with specified dimensions.
-        /// @param width The width of the grid. Defaults to 1.
-        /// @param length The length of the grid. Defaults to 1.
-        /// @param levels The number of levels in the grid. Defaults to 1.
+        /// @param width Number of rows
+        /// @param length Number of columns
+        /// @param levels Number of levels
         explicit colored_grid(unsigned int width = 1u, unsigned int length = 1u, unsigned int levels = 1u);
 
         // Delete copy constructor and copy assignment operator to fix the static assertion failure
@@ -50,11 +51,6 @@ namespace mazes
         // Delegate to the embedded grid
         [[nodiscard]] const grid_operations &operations() const noexcept override;
 
-        /// @brief Resize the grid to the specified dimensions.
-        /// @param rows
-        /// @param cols
-        /// @param levels
-        void resize(unsigned int rows, unsigned int cols, unsigned int levels) const noexcept;
 
     private:
         std::shared_ptr<distances> m_distances;
