@@ -14,6 +14,7 @@
 #include <vector>
 
 #include <MazeBuilder/runtime_app.h>
+#include <MazeBuilder/string_utils.h>
 #include <MazeBuilder/progress.h>
 
 #include "test_output_dir.h"
@@ -22,13 +23,16 @@
 
 #if defined(MAZE_BENCHMARK)
 
-TEST_CASE("E2E benchmarking with runtime", "[benchmark]")
+TEST_CASE("E2E benchmarking with runtime_app->apply", "[apply]")
 {
     // No whitespace inside the JSON literal: apply() tokenizes on whitespace, which would split this into garbage tokens.
-    constexpr std::string_view input = "--json=`["
-                                       "{\"rows\":\"100\",\"columns\":\"101\",\"levels\":\"8\",\"seed\":\"3\",\"algo\":\"dfs\"},"
-                                       "{\"rows\":\"100\",\"columns\":\"101\",\"levels\":\"4\",\"seed\":\"5\",\"algo\":\"binary_tree\"}"
-                                       "]`";
+    static const std::string mask_src = mazes::string_utils::make_mask_source(std::string(200, 'X') + std::string(300, 'o') + std::string(200, 'x') + std::string(300, '.'));
+    const std::string input = "--json=`["
+                              "{\"rows\":\"100\",\"columns\":\"101\",\"levels\":\"8\",\"seed\":\"3\",\"algo\":\"dfs\"},"
+                              "{\"rows\":\"100\",\"columns\":\"101\",\"levels\":\"4\",\"seed\":\"5\",\"algo\":\"binary_tree\"},"
+                              "{\"mask\":\"" +
+                              mask_src + "\",\"distances\":\"[]\",\"seed\":\"8\",\"algo\":\"prims\"}"
+                                         "]`";
 
     auto printer = [input](auto &&time, const auto iterations)
     {
@@ -67,11 +71,11 @@ TEST_CASE("E2E testing starting with apply", "[apply][obj,json,png]")
     const auto first_output_path = (output_dir.path / "first.txt").generic_string();
     const auto second_output_path = (output_dir.path / "second.txt").generic_string();
 
-    constexpr std::string_view input = "-r100 -c100 --levels=1 -s3 -adfs";
+    constexpr std::string_view input = "-r 100 -c 100 --levels=1 -s 3 -a dfs";
     const std::string input2 = "--json=`[{\"rows\":\"2\",\"columns\":\"3\",\"algo\":\"dfs\",\"output\":\"" +
                                first_output_path + "\"},{\"rows\":\"4\",\"columns\":\"5\",\"algo\":\"sidewinder\",\"output\":\"" +
                                second_output_path + "\"}]`";
-    const std::string input3 = "-r10 -c12 --levels=1 -s42 -adfs -d -o " + output_path.string();
+    const std::string input3 = "-r 10 -c 12 --levels=1 -s 42 -a dfs -d -o " + output_path.string();
 
     std::string_view result = inst->apply(input);
     REQUIRE_FALSE(result.empty());

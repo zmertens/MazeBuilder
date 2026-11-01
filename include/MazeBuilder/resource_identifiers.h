@@ -25,10 +25,8 @@ namespace mazes
     enum class grid_identifier : unsigned int
     {
         BASIC = 0,
-        COLORED = 1,
-        DISTANCE = 2,
-        MASKED = 3,
-        TOTAL = 4
+        DISTANCE = 1,
+        TOTAL = 2
     };
 
     class args;

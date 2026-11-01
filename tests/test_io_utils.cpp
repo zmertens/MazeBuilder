@@ -18,6 +18,19 @@
 using namespace std;
 using namespace mazes;
 
+namespace
+{
+    std::string ext_or_empty_str(const std::string &filename, std::size_t pos = 1) noexcept
+    {
+        const auto str{std::filesystem::path(filename).extension().string()};
+        if (pos < str.size())
+        {
+            return str.substr(pos);
+        }
+        return {};
+    }
+}
+
 TEST_CASE("io_utils can process good text file names", "[good text filenames]")
 {
     io_utils my_writer;
@@ -47,7 +60,7 @@ TEST_CASE("io_utils can process bad file names", "[bad filenames]")
     for (auto bf : more_filenames)
     {
         constexpr auto USE_DOT_IN_EXT{0};
-        const auto ext{ string_utils::f_ext_str(bf, USE_DOT_IN_EXT) };
+        const auto ext{ext_or_empty_str(bf, USE_DOT_IN_EXT)};
         REQUIRE_THROWS_AS(mazes::to_output_format_from_sv(ext), std::invalid_argument);
     }
 }

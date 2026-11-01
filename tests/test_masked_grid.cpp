@@ -126,8 +126,8 @@ TEST_CASE("Mask random_location returns a valid cell", "[mask][random_location]"
 
 TEST_CASE("Mask loaded from text file", "[mask][from_txt]")
 {
-    test_output_dir output_dir{ "test_mask_output" };
-    
+    test_output_dir output_dir{"test_mask_output"};
+
     // Create mask.txt in the temporary directory
     // mask.txt contents:
     // X....
@@ -141,7 +141,7 @@ TEST_CASE("Mask loaded from text file", "[mask][from_txt]")
     std::ofstream mask_file(output_dir.path / "mask.txt");
     mask_file << mask_content;
     mask_file.close();
-    
+
     const mask m = mask::from_txt(std::string{(output_dir.path / "mask.txt").string()});
 
     REQUIRE(m.rows() == 5u);

@@ -1,4 +1,4 @@
-// State machine workflow: (load once, lazily on first apply) -> parse -> generate via algo -> output
+// State machine workflow: (load once, in the constructor) -> parse -> generate via algo -> output
 
 #include <MazeBuilder/runtime_app.h>
 
@@ -58,6 +58,10 @@ runtime_app::runtime_app()
         });
 
     register_states();
+
+    // One-time setup: populate the mappers so apply() can use them immediately
+    runtime_stack_ptr->push_state(state::ID::LOAD);
+    visit_states();
 }
 
 runtime_app::~runtime_app()
@@ -90,14 +94,6 @@ std::string_view runtime_app::apply(const std::string_view unformatted_args) noe
 #if defined(MAZE_DEBUG)
     async_logger::instance()->log(fmt::format("runtime received unformatted args: {}\n", unformatted_args));
 #endif
-
-    // LOAD must populate the mappers before any input can be stored, so it
-    // runs first; the stack drains once (it pops itself) and is not re-pushed.
-    if (processed_text_mapper.is_empty())
-    {
-        runtime_stack_ptr->push_state(state::ID::LOAD);
-        visit_states();
-    }
 
     auto &raw_args = args_mapper.get(args_identifier::RAW);
     args_mapper.get(args_identifier::PARSED).clear();

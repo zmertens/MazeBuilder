@@ -34,14 +34,6 @@ namespace mazes
     private:
         /// @brief Get the algorithm ID for the masked maze algorithm
         [[nodiscard]] algo get_algo_id() const noexcept override;
-
-        /// @brief Implementation of the masked maze creation
-        /// @param mask_source Path to the mask file or inline mask string
-        /// @param algorithm The maze generation algorithm to use
-        /// @param rng The randomizer for the algorithm
-        /// @return A string view with the result message
-        std::string_view create_masked_maze(const std::string &mask_source, algo algorithm,
-                                            randomizer &rng) noexcept;
     };
 } // namespace mazes
 

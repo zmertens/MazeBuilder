@@ -19,9 +19,6 @@ namespace mazes
 
     private:
         [[nodiscard]] algo get_algo_id() const noexcept override;
-
-        std::string_view create_prims_maze(unsigned int rows, unsigned int cols, unsigned int levels,
-                                           randomizer &rng) noexcept;
     };
 } // namespace mazes
 

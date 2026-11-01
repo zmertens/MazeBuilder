@@ -89,7 +89,6 @@ bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delt
     {
         if (write_output(output_target, out))
         {
-            async_logger::instance()->log("Successfully wrote maze to " + output_target);
             if (out.empty())
             {
                 out = "Successfully wrote maze to " + output_target;
@@ -108,12 +107,6 @@ bool write_to_output_state::update(randomizer &rng, [[maybe_unused]] double delt
     {
         request_stack_push(state::ID::PARSE);
     }
-
-#if defined(MAZE_DEBUG)
-
-    const auto processing_output{processed_text::to_string(processed_text_mapper->get(processed_text_identifier::PROCESSING).get())};
-    async_logger::instance()->log(fmt::format("Processing output:\n{}\n", processing_output));
-#endif
 
     return true;
 }

@@ -18,6 +18,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -105,7 +106,12 @@ bool pixels_create_state::write_output(const std::string &output_target, [[maybe
 
         if (!pixels.empty() && m_image_width > 0 && m_image_height > 0)
         {
-            const auto out = to_output_format_from_sv(string_utils::f_ext_str(output_target));
+            std::string ext = "";
+            if (const auto e{std::filesystem::path(output_target).extension().string()}; !e.empty())
+            {
+                ext = e.substr(1);
+            }
+            const auto out = to_output_format_from_sv(ext);
             switch (out)
             {
             case output_format::PNG:

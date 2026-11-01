@@ -135,11 +135,18 @@ namespace
         return tokens;
     }
 
+    // Non-throwing: long inline JSON probed as a path would otherwise raise ENAMETOOLONG
+    bool path_exists(const std::filesystem::path &p) noexcept
+    {
+        std::error_code ec;
+        return std::filesystem::exists(p, ec);
+    }
+
     // Test-environment friendly lookup of a JSON file relative to common roots.
     std::filesystem::path resolve_json_file_path(std::string_view candidate)
     {
         const std::filesystem::path raw_path{std::string(candidate)};
-        if (raw_path.empty() || std::filesystem::exists(raw_path))
+        if (raw_path.empty() || path_exists(raw_path))
         {
             return raw_path;
         }
@@ -155,7 +162,7 @@ namespace
 
         for (const auto &root : search_roots)
         {
-            if (const auto candidate_path = root / raw_path; std::filesystem::exists(candidate_path))
+            if (const auto candidate_path = root / raw_path; path_exists(candidate_path))
             {
                 return candidate_path;
             }
@@ -168,7 +175,7 @@ namespace
     {
         const std::string text{string_utils::strip_backticks(std::string{string_utils::strip_whitespace(json_input)})};
         const auto path = resolve_json_file_path(text);
-        const bool is_file = !text.empty() && std::filesystem::exists(path);
+        const bool is_file = !text.empty() && path_exists(path);
 
         json_helper jh{};
         args::arg_map single;

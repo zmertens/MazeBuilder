@@ -16,12 +16,10 @@ namespace mazes
     /// @brief Character representations of walls and barriers in the maze
     enum class Barrier : char
     {
-        HORIZONTAL = '-',
-
-        VERTICAL = '|',
-
+        BLOCKED = 'X',
         CORNER = '+',
-
+        HORIZONTAL = '-',
+        VERTICAL = '|',
         SINGLE_SPACE = ' '
     };
 

@@ -6,6 +6,17 @@
 #include <functional>
 #include <ranges>
 
+namespace 
+{
+    void rotate(std::vector<std::unique_ptr<mazes::state>> &states) noexcept
+    {
+        if (!states.empty())
+        {
+            std::ranges::rotate(states, states.begin() + 1);
+        }
+    }
+}
+
 // Fully qualify runtime_stack to avoid ambiguity
 mazes::runtime_stack::runtime_stack(const mazes::runtime_app::context &ctx)
     : runtime_context(ctx)
@@ -25,6 +36,11 @@ void mazes::runtime_stack::pop_state() noexcept
 void mazes::runtime_stack::clear_states() noexcept
 {
     m_pending.emplace_back(Operation::CLEAR);
+}
+
+void mazes::runtime_stack::rotate() noexcept
+{
+    m_pending.emplace_back(Operation::ROTATE);
 }
 
 void mazes::runtime_stack::apply_pending_changes() noexcept
@@ -52,6 +68,9 @@ void mazes::runtime_stack::apply_pending_changes() noexcept
 
         case Operation::CLEAR:
             m_states.clear();
+            break;
+        case Operation::ROTATE:
+            ::rotate(m_states);
             break;
         }
     }

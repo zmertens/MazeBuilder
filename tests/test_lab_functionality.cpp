@@ -1,10 +1,42 @@
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/benchmark/catch_benchmark.hpp>
+
+#include <functional>
+#include <ranges>
 
 #include <MazeBuilder/cell.h>
+#include <MazeBuilder/grid.h>
 #include <MazeBuilder/lab.h>
+#include <MazeBuilder/mask.h>
+#include <MazeBuilder/masked_grid.h>
+#include <MazeBuilder/randomizer.h>
+#include <MazeBuilder/string_utils.h>
+
+#include <fmt/format.h>
 
 using namespace mazes;
 using namespace std;
+
+#if defined(MAZE_BENCHMARK)
+
+TEST_CASE("E2E benchmarking with lab::dfs", "[lab::dfs]")
+{
+    randomizer rng{};
+    const mask m1{mask::from_source(string_utils::make_mask_source(std::string(200, 'X') + std::string(300, 'o') + std::string(200, 'x') + std::string(300, '.')))};
+    masked_grid g1{m1};
+    const auto cols = static_cast<int>(m1.columns());
+    const auto open = [&m1, cols](const int index)
+    {
+        return m1(static_cast<unsigned int>(index / cols % static_cast<int>(m1.rows())), static_cast<unsigned int>(index % cols));
+    };
+    REQUIRE(lab::dfs(g1.operations(), rng, open));
+
+    BENCHMARK("DFS on masked grid")
+    {
+        return lab::dfs(g1.operations(), rng, open);
+    };
+}
+#endif // MAZE_BENCHMARK
 
 TEST_CASE("Lab can link/unlink cells", "[links]")
 {

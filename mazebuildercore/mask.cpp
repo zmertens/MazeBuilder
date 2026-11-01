@@ -35,8 +35,10 @@ namespace
             return std::nullopt;
         }
 
+        // Non-throwing: long inline masks probed as a path would otherwise raise ENAMETOOLONG
+        std::error_code ec;
         fs::path resolved{filename};
-        if (fs::exists(resolved))
+        if (fs::exists(resolved, ec))
         {
             return resolved;
         }
@@ -45,7 +47,7 @@ namespace
         for (const char *dir : fallback_dirs)
         {
             fs::path candidate = fs::path(dir) / std::string(filename);
-            if (fs::exists(candidate))
+            if (fs::exists(candidate, ec))
             {
                 return candidate;
             }
@@ -111,9 +113,26 @@ namespace
             return false;
         }
 
-        if ((source.front() == '`' && source.back() == '`') ||
-            (source.front() == '"' && source.back() == '"') ||
-            (source.front() == '\'' && source.back() == '\'') ||
+        const auto original_sz{source.size()};
+
+        using mazes::string_utils;
+
+        if (string_utils::strip_whitespace(source).size() != original_sz)
+        {
+            return false;
+        }
+
+        if (string_utils::strip_backticks(source).size() != original_sz)
+        {
+            return false;
+        }
+
+        if (string_utils::strip_quotes(source).size() != original_sz)
+        {
+            return false;
+        }
+
+        if (
             source.find('\n') != std::string_view::npos ||
             source.find('\r') != std::string_view::npos ||
             source.find("\\n") != std::string_view::npos ||

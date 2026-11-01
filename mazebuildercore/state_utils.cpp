@@ -13,7 +13,6 @@ using namespace mazes;
 #include <MazeBuilder/randomizer.h>
 #include <MazeBuilder/runtime_app.h>
 #include <MazeBuilder/state.h>
-#include <MazeBuilder/string_utils.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -206,10 +205,15 @@ state::ID state_utils::output_state_for(const std::unordered_map<std::string, st
     state::ID output_state = state::ID::WRITE_TO_STRING;
     if (const auto it = args.find(mazes::args::OUTPUT_ID_WORD_STR); it != args.cend() && !it->second.empty())
     {
+        std::string e = "";
+        if (const auto ext{std::filesystem::path(it->second).extension().string()}; !ext.empty())
+        {
+            e = ext.substr(1);
+        }
         const auto bare_format = stdout_format_from_sv(it->second);
         const auto output = bare_format != output_format::TOTAL
                                 ? std::string{to_sv_from_output_format(bare_format)}
-                                : string_utils::f_ext_str(it->second);
+                                : e;
         output_state = to_state_from_output_format(output_format_or_default(output));
         if (output_state == state::ID::EMPTY)
         {

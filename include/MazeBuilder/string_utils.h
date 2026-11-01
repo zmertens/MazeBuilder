@@ -62,17 +62,10 @@ namespace mazes
         /// @return A representation of the concatenated string
         static std::string concat(const std::string &a, const std::string &b) noexcept;
 
-        /// @brief Check if a string contains a substring
-        /// @param str The string to search in
-        /// @param substr The substring to search for
-        /// @return True if substr is found in str, false otherwise
-        static bool contains(const std::string &str, const std::string &substr) noexcept;
-
-        /// @brief Check if a string ends with a specific suffix
-        /// @param str The string to check
-        /// @param suffix The suffix to check for
-        /// @return True if str ends with suffix, false otherwise
-        static bool ends_with(const std::string &str, const std::string &suffix) noexcept;
+        /// @brief Generate a mask string based on the given pattern.
+        /// @param pattern The pattern string used to create the mask.
+        /// @return A string representing the generated mask.
+        static std::string make_mask_source(const std::string &pattern) noexcept;
 
         /// @brief Splits a range into slices based on a separator and stores the results in a destination container.
         /// @tparam It Type of the iterator for the input range.
@@ -197,18 +190,30 @@ namespace mazes
         /// @brief Removes consecutive whitespace characters from a string, leaving only single whitespace between non-whitespace characters.
         /// @param s The input string from which to strip consecutive whitespace.
         /// @return A new string with consecutive whitespace characters replaced by a single whitespace.
-        static std::string_view strip_whitespace(const std::string &s)
+        static std::string_view strip_whitespace(std::string_view sv)
         {
-            std::string_view output_str{s};
+            std::string_view output_str{sv};
             output_str.remove_prefix(std::min(output_str.find_first_not_of(" \t\r\n\v\f"), output_str.size()));
             return output_str;
         }
 
-        static std::string_view strip_backticks(const std::string &s)
+        static std::string_view strip_backticks(std::string_view sv)
         {
-            std::string_view output_str{s};
+            std::string_view output_str{sv};
             output_str.remove_prefix(std::min(output_str.find_first_not_of("\\`"), output_str.size()));
             output_str.remove_suffix(std::min(output_str.size() - output_str.find_last_not_of("\\`") - 1, output_str.size()));
+            return output_str;
+        }
+
+        static std::string_view strip_quotes(std::string_view sv)
+        {
+            std::string_view output_str{sv};
+            if (!output_str.empty() && ((output_str.front() == '"' && output_str.back() == '"') ||
+                                        (output_str.front() == '\'' && output_str.back() == '\'')))
+            {
+                output_str.remove_prefix(1);
+                output_str.remove_suffix(1);
+            }
             return output_str;
         }
 
@@ -228,12 +233,6 @@ namespace mazes
             }
             return result;
         }
-
-        /// @brief Extracts the file extension from a filename, excluding the dot.
-        /// @param filename The filename from which to extract the extension.
-        /// @param pos The position of the path substring within the filename.
-        /// @return The file extension string
-        static std::string f_ext_str(std::string_view filename, std::size_t pos = 1) noexcept;
     }; // class
 } // namespace
 

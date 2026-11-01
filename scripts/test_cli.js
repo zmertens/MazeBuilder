@@ -33,6 +33,10 @@ function looksLikeObj(text) {
     return /^# MazeBuilder Wavefront OBJ\n.+/.test(text);
 }
 
+function looksLikeB64(text) {
+  return Buffer.from(text.trim(), 'base64').toString('base64') === text.trim();
+}
+
 function validateOutput(args, output) {
   const text = normalizeText(output);
   if (!text) {
@@ -61,8 +65,8 @@ function validateOutput(args, output) {
     return;
   }
 
-  if (!(looksLikeMaze(text) || looksLikeJson(text) || looksLikeObj(text))) {
-    throw new Error(`Unexpected CLI output, not maze text, JSON, or OBJ: ${text.slice(0, 200)}`);
+  if (!(looksLikeMaze(text) || looksLikeJson(text) || looksLikeObj(text) || looksLikeB64(text))) {
+    throw new Error(`Unexpected CLI output, not maze text, JSON, OBJ, or Base64: ${text.slice(0, 128)}`);
   }
 }
 
