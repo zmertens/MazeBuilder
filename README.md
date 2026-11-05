@@ -1,11 +1,11 @@
 # Maze Builder
 
-Maze Builder is a C++ maze generation library with a CLI and a visual application with SFML Graphics.
+Maze Builder is a C++ maze generation library for making projects with game engines, text processors, and art.
 
 This repository contains:
 
 - **Core library**: reusable maze data structures, generation algorithms, and output pipelines in `include/MazeBuilder`
-- **Examples**: The `examples/CLI` contains a command-line program. It can be built as a desktop executable, or as a WebAssemly module: see `scripts/test_cli.js`. The SFML app is called `examples/Amazing`. Run the app and press *B* to rebuild mazes with cool shader effects.
+- **Examples**: The `examples/CLI` contains a command-line program. It can be built as a desktop executable, or as a WebAssemly module and ran with `scripts/test_cli.js`. The SFML Graphics app is called `examples/Amazing`. Run the app and press *B* to rebuild mazes with cool shader effects.
 
 ## CLI Quick start
 
@@ -78,7 +78,7 @@ The CLI and runtime can emit:
 - JSON (`.json`)
 - Wavefront object (`.obj`)
 - raster images (`.png`, `.jpg`, `.jpeg`, `.bmp`)
-- base64
+- base64 (`b64`)
 
 Output routing is based on `--output`; file extensions select the renderer automatically.
 
