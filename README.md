@@ -201,17 +201,8 @@ This same runtime facade is used by the CLI and example applications.
 
 | Executable | Location | Purpose |
 |---|---|---|
+| `amazing` | `examples/Amazing` | 2D maze visualization |
 | `mazebuildercli` | `examples/CLI` | Command-line maze generation |
-| `mazebuilderhttp` | `examples/Http` | Local HTTP client example |
-| `amazing` | `examples/Amazing` | 2D visualization |
-
-### HTTP example
-
-The HTTP example makes a GET request to `examples/Amazing` for an image rendering of the current background scene.
-
-- `GET /mazes/amazing/current_background_scene`
-
-See `examples/Http/README.md` for quick-start usage.
 
 ## Build and test
 
@@ -264,9 +255,9 @@ Run:
 ctest --test-dir build-tests --verbose -C Debug
 ```
 
-### Configure for the Web
+### WebAssembly Builds
 
-Configure the CLI and HTTP examples for the Web with [Emscripten](https://emscripten.org/):
+Configure the CLI program for WebAssembly with [Emscripten](https://emscripten.org/):
 
 ```sh
 cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${EMSDK_ROOT}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
@@ -280,6 +271,7 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 - **Local web serving**: `secure_http_server.py`
 - **Make an icon**: `make_icon.rb`
 - **Test the CLI**: `test_cli.js`
+- **Test Lua bindings**: `basic_maze_output.lua` , `require_module.lua`
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
@@ -289,4 +281,3 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
 - [codebox maze generator](https://codebox.net/pages/maze-generator/online)
-- [My gallery of mazes](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
