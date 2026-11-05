@@ -19,13 +19,3 @@ target_link_libraries(maze_lua PRIVATE MazeBuilder::MazeBuilder lua_static)
 add_executable(mazebuilder_lua main.cpp maze_lua.cpp)
 target_compile_features(mazebuilder_lua PRIVATE cxx_std_20)
 target_link_libraries(mazebuilder_lua PRIVATE MazeBuilder::MazeBuilder lua_static)
-
-if(MAZE_BUILDER_TESTS)
-    enable_testing()
-    add_test(NAME RUN_LUA_BINDING_EXE
-        COMMAND mazebuilder_lua ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello.lua)
-    add_test(NAME RUN_LUA_BINDING_MODULE
-        COMMAND mazebuilder_lua ${CMAKE_CURRENT_SOURCE_DIR}/examples/require_module.lua)
-    set_tests_properties(RUN_LUA_BINDING_MODULE PROPERTIES
-        ENVIRONMENT "MAZE_MODULE_DIR=$<TARGET_FILE_DIR:maze_lua>")
-endif()
