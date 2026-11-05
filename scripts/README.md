@@ -73,3 +73,7 @@ Provides a secure local HTTP server for testing.
 This script is copied automatically in Web builds to the CLI binary directory.
 
 Run it with: `node test_cli.js <mazebuilder args>`
+
+## `basic_maze_output.lua` and `require_module.lua`
+
+A usage of Maze Builder with Lua scripts
