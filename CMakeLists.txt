@@ -5,7 +5,7 @@ cmake_policy(SET CMP0058 NEW)
 # Prefers to use GLVND (OpenGL Vendor Neutral Dispatch) libraries for OpenGL.
 cmake_policy(SET CMP0072 NEW)
 
-set(MAZE_BUILDER_VERSION 8.10.23)
+set(MAZE_BUILDER_VERSION 8.11.132)
 
 project(MazeBuilder VERSION ${MAZE_BUILDER_VERSION} LANGUAGES C CXX)
 
@@ -23,6 +23,7 @@ option(MAZE_BUILDER_TESTS "Build ${PROJECT_NAME} with tests" OFF)
 option(MAZE_BUILDER_COVERAGE "Build ${PROJECT_NAME} with code coverage" OFF)
 option(MAZE_BUILDER_MEMCHECK "Build ${PROJECT_NAME} with memory analysis" OFF)
 option(MAZE_BUILDER_EXAMPLES "Build ${PROJECT_NAME} examples" OFF)
+option(MAZE_BUILDER_LUA_BINDING "Build ${PROJECT_NAME} Lua binding (executable and loadable module)" OFF)
 option(MAZE_BUILDER_BUILD_SHARED "Make MazeBuilder::MazeBuilder the shared library (default: static)" OFF)
 
 include(NoInSourceBuilds)
@@ -36,4 +37,7 @@ if(MAZE_BUILDER_TESTS)
 endif()
 if(MAZE_BUILDER_EXAMPLES)
     add_subdirectory(examples bin)
+endif()
+if(MAZE_BUILDER_LUA_BINDING)
+    add_subdirectory(examples/LuaBinding bin)
 endif()

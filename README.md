@@ -1,13 +1,13 @@
 # Maze Builder
 
-Maze Builder is a C++ maze generation library with a CLI and several example applications for desktop and web targets.
+Maze Builder is a C++ maze generation library with a CLI and a visual application with SFML Graphics.
 
 This repository contains:
 
 - **Core library**: reusable maze data structures, generation algorithms, and output pipelines in `include/MazeBuilder`
-- **Examples**: There's a CLI example, and an entire game built with SFML in `examples/Amazing`
+- **Examples**: The `examples/CLI` contains a command-line program. It can be built as a desktop executable, or as a WebAssemly module: see `scripts/test_cli.js`. The SFML app is called `examples/Amazing`. Run the app and press *B* to rebuild mazes with cool shader effects.
 
-## Quick start
+## CLI Quick start
 
 Generate a 25x25 maze with depth-first algorithm and print to stdout:
 
@@ -45,11 +45,12 @@ mazebuildercli -m example_mask.txt -a binary_tree -o masked_maze.png
 
 The library is organized around a few core concepts:
 
-- **`cell`**: an indexed maze cell with links to neighboring cells
+- **`cell`**: a 2D represented cell with links to neighboring cells
 - **`lab`**: helper operations for linking and unlinking cells
-- **`grid` / `grid_interface`**: the main maze topology abstraction
+- **`grid` / `grid_interface`**: the main expression point for maze contents and background coloring
+- **`grid_operations`**: getters/setters for properties like dimensions, face, verticies, cells, grids, and strings
 - **`distance_grid` / `distances`**: distance and shortest-path annotation support
-- **`mask` / `masked_grid`**: masked mazes driven by text files
+- **`mask` / `masked_grid`**: masked mazes driven by source strings or text files
 - **`args` / `configurator`**: normalized CLI and JSON configuration handling
 - **`runtime_app`**: the main application facade that parses input and produces output
 
@@ -61,7 +62,7 @@ The library is organized around a few core concepts:
 |---|---|
 | `-r`, `--rows` | Maze rows, clamped to `1..100` |
 | `-c`, `--columns` | Maze columns, clamped to `1..100` |
-| `-l`, `--levels` | Maze levels, clamped to `1..10` |
+| `-l`, `--levels` | Maze levels, clamped to `1..100` |
 | `-s`, `--seed` | Random seed |
 | `-a`, `--algo` | Maze algorithm: `binary_tree`, `sidewinder`, `dfs`, `prims` |
 | `-d`, `--distances` | Show distances, optionally with slice notation like `[0:10]` |
@@ -77,6 +78,7 @@ The CLI and runtime can emit:
 - JSON (`.json`)
 - Wavefront object (`.obj`)
 - raster images (`.png`, `.jpg`, `.jpeg`, `.bmp`)
+- base64
 
 Output routing is based on `--output`; file extensions select the renderer automatically.
 
@@ -177,7 +179,7 @@ Array-style JSON files can be used to store multiple configurations. This is cov
 
 ## C++ API
 
-The simplest integration point is `mazes::runtime_app`, which accepts a command-like string and returns the generated artifact:
+The simplest integration point is `mazes::runtime_app`, which accepts a string and returns a string:
 
 ```cpp
 #include <MazeBuilder/runtime_app.h>
@@ -199,18 +201,8 @@ This same runtime facade is used by the CLI and example applications.
 
 | Executable | Location | Purpose |
 |---|---|---|
+| `amazing` | `examples/Amazing` | 2D maze visualization |
 | `mazebuildercli` | `examples/CLI` | Command-line maze generation |
-| `mazebuilderhttp` | `examples/Http` | Local HTTP server example |
-| `amazing` | `examples/Amazing` | 2D visualization |
-
-### HTTP example
-
-The HTTP example runs a local server with a maze endpoint:
-
-- `GET /mazes`
-- `GET /mazes?rows=12&columns=10&algo=dfs`
-
-See `examples/Http/README.md` for quick-start usage.
 
 ## Build and test
 
@@ -224,7 +216,8 @@ See `examples/Http/README.md` for quick-start usage.
 | `MAZE_BUILDER_COVERAGE` | `OFF` | Enable coverage flags and add the run_cppcheck target |
 | `MAZE_BUILDER_TESTS` | `OFF` | Build tests with Catch2 |
 | `MAZE_BUILDER_DOCS` | `OFF` | Build Doxygen documentation |
-| `MAZE_BUILDER_MEMCHECK` | `OFF` | Enable Valgrind / `Memcheck` support |
+| `MAZE_BUILDER_MEMCHECK` | `OFF` | Enable Valgrind / Memcheck support |
+| `MAZE_BUILDER_LUA_BINDING` | `OFF` | Enable generation of Lua bindings |
 
 ### Build commands
 
@@ -262,9 +255,9 @@ Run:
 ctest --test-dir build-tests --verbose -C Debug
 ```
 
-### Configure for the Web
+### WebAssembly Builds
 
-Configure the CLI and HTTP examples for the Web with [Emscripten](https://emscripten.org/):
+Configure the CLI program for WebAssembly with [Emscripten](https://emscripten.org/):
 
 ```sh
 cmake -S . -B build-web -DCMAKE_TOOLCHAIN_FILE:FILEPATH=${EMSDK_ROOT}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
@@ -278,6 +271,7 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 - **Local web serving**: `secure_http_server.py`
 - **Make an icon**: `make_icon.rb`
 - **Test the CLI**: `test_cli.js`
+- **Test Lua bindings**: `basic_maze_output.lua` , `require_module.lua`
 
 `make_icon.rb` is especially useful as a compact reference implementation: it mirrors concepts such as cells, grids, distances, masked grids, and several maze algorithms.
 
@@ -287,4 +281,3 @@ Scripts are documented in `scripts/README.md`, and mainly fall into these groups
 
 - [Mazes for Programmers Book](https://www.jamisbuck.org/mazes/)
 - [codebox maze generator](https://codebox.net/pages/maze-generator/online)
-- [My gallery of mazes](https://imgur.com/gallery/dumping-bunch-of-mazes-with-stylish-colors-VJoxr43)
