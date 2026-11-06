@@ -8,15 +8,14 @@
 using namespace mazes;
 
 masked_grid::masked_grid(
-    unsigned int width,
-    unsigned int length,
-    unsigned int height
-) : grid(width, length, height), m_mask(width, length)
+    std::uint8_t width,
+    std::uint8_t length,
+    std::uint8_t height) : grid(width, length, height), m_mask(width, length)
 {
 }
 
 masked_grid::masked_grid(mask m)
-    : grid(m.rows(), m.columns()),
+    : grid(static_cast<std::uint8_t>(m.rows()), static_cast<std::uint8_t>(m.columns())),
       m_mask(std::move(m))
 {
 }
@@ -39,12 +38,12 @@ std::size_t masked_grid::num_cells() const noexcept
     return m_mask.count();
 }
 
-const mask& masked_grid::get_mask() const noexcept
+const mask &masked_grid::get_mask() const noexcept
 {
     return m_mask;
 }
 
-std::shared_ptr<cell> masked_grid::random_cell(randomizer& rng) const noexcept
+std::shared_ptr<cell> masked_grid::random_cell(randomizer &rng) const noexcept
 {
     const auto [row, col] = m_mask.random_location(rng);
     const auto [rows, columns, levels] = get_dimensions();

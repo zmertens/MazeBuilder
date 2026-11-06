@@ -17,7 +17,6 @@ namespace mazes
     class grid_operations;
     class randomizer;
     class runtime_app;
-    class context;
 
     class state_utils
     {

@@ -21,11 +21,11 @@ using namespace mazes;
 /// @param length 1
 /// @param levels 1
 distance_grid::distance_grid(unsigned int width, unsigned int length, unsigned int levels)
-    : m_grid{ std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels)) }
+    : m_grid{std::make_unique<grid>(static_cast<std::uint8_t>(width), static_cast<std::uint8_t>(length), static_cast<std::uint8_t>(levels))}
 {
 }
 
-std::string distance_grid::contents_of(std::shared_ptr<cell> const& c) const noexcept
+std::string distance_grid::contents_of(std::shared_ptr<cell> const &c) const noexcept
 {
     if (m_distances && c)
     {
@@ -43,7 +43,7 @@ std::string distance_grid::contents_of(std::shared_ptr<cell> const& c) const noe
     return m_grid->contents_of(c);
 }
 
-std::uint32_t distance_grid::background_color_for(std::shared_ptr<cell> const& c) const noexcept
+std::uint32_t distance_grid::background_color_for(std::shared_ptr<cell> const &c) const noexcept
 {
     return m_grid->background_color_for(cref(c));
 }
@@ -55,7 +55,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
 {
     try
     {
-        const auto& grid_ops = m_grid->operations();
+        const auto &grid_ops = m_grid->operations();
 
         const auto start_cell = grid_ops.search(start_index);
         if (!start_cell)
@@ -72,7 +72,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
 
         // Calculate distances from start cell to reachable cells using BFS.
         // Use contiguous visited storage to avoid hash lookups on the hot path.
-        const int num_cells = grid_ops.num_cells();
+        const int num_cells = static_cast<int>(grid_ops.num_cells());
         if (num_cells <= 0)
         {
             return;
@@ -112,7 +112,7 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
 
             // Get all neighbors
             const auto neighbor_count = grid_ops.collect_neighbors(current_cell, neighbor_buf);
-            for (const auto& neighbor : std::span(neighbor_buf).first(neighbor_count))
+            for (const auto &neighbor : std::span(neighbor_buf).first(neighbor_count))
             {
                 if (!neighbor)
                 {
@@ -152,7 +152,8 @@ void distance_grid::calculate_distances(const int start_index, const int end_ind
                 queue.push_back(neighbor_index);
             }
         }
-    } catch (const std::exception&)
+    }
+    catch (const std::exception &)
     {
     }
 }
@@ -163,12 +164,12 @@ std::shared_ptr<distances> distance_grid::get_distances() const noexcept
 }
 
 // Delegate to embedded grid
-grid_operations& distance_grid::operations() noexcept
+grid_operations &distance_grid::operations() noexcept
 {
     return m_grid->operations();
 }
 
-const grid_operations& distance_grid::operations() const noexcept
+const grid_operations &distance_grid::operations() const noexcept
 {
     return m_grid->operations();
 }

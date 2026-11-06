@@ -225,12 +225,12 @@ int mask::count() const noexcept
 
 unsigned int mask::rows() const noexcept
 {
-    return m_bits.size();
+    return static_cast<std::uint8_t>(m_bits.size());
 }
 
 unsigned int mask::columns() const noexcept
 {
-    return m_bits.empty() ? 0 : m_bits.at(0).size();
+    return m_bits.empty() ? 0 : static_cast<std::uint8_t>(m_bits.at(0).size());
 }
 
 std::pair<unsigned int, unsigned int> mask::random_location(randomizer &rng) const noexcept

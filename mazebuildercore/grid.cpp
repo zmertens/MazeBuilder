@@ -168,7 +168,7 @@ std::shared_ptr<cell> grid::get_neighbor(std::shared_ptr<cell> const &c, const D
 }
 
 std::size_t grid::collect_neighbors(std::shared_ptr<cell> const &c,
-                                std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept
+                                    std::span<std::shared_ptr<cell>, MAX_NEIGHBORS> out) const noexcept
 {
     if (!c)
     {
@@ -200,12 +200,12 @@ void grid::set_neighbor(const std::shared_ptr<cell> &c, Direction dir, std::shar
 
     if (neighbor)
     {
-        m_topology[index_of(c)][dir] = index_of(neighbor);
+        m_topology[static_cast<std::uint8_t>(index_of(c))][dir] = static_cast<std::uint8_t>(index_of(neighbor));
     }
     else
     {
         // Remove the neighbor relationship
-        auto cell_it = m_topology.find(index_of(c));
+        auto cell_it = m_topology.find(static_cast<std::uint8_t>(index_of(c)));
         if (cell_it != m_topology.end())
         {
             cell_it->second.erase(dir);

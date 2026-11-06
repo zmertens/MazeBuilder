@@ -33,7 +33,7 @@ void loading_state::draw() const noexcept
     // No visual output for now
 }
 
-bool loading_state::update(randomizer &rng, [[maybe_unused]] double delta_time) noexcept
+bool loading_state::update([[maybe_unused]] randomizer &rng, [[maybe_unused]] double delta_time) noexcept
 {
     if (!has_finished)
     {

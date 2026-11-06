@@ -26,9 +26,9 @@ namespace mazes
         /// @param length The length of the grid. Defaults to 1.
         /// @param height The number of levels in the grid. Defaults to 1.
         explicit masked_grid(
-            unsigned int width = 1u,
-            unsigned int length = 1u,
-            unsigned int height = 1u
+            std::uint8_t width = 1u,
+            std::uint8_t length = 1u,
+            std::uint8_t height = 1u
         );
 
         /// @brief Constructs a masked grid sized to the given mask

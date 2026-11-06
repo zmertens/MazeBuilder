@@ -43,7 +43,8 @@ runtime_app::runtime_app()
     : runtime_stack_ptr{std::make_unique<runtime_stack>(context{}
                                                             .with_args_manager(args_mapper)
                                                             .with_grid_manager(grid_mapper)
-                                                            .with_text_manager(processed_text_mapper))}
+                                                            .with_text_manager(processed_text_mapper)
+                                                            .with_rng(rng))}
 {
     async_logger::instance()->set_sink(
         [this](std::string_view msg)
@@ -126,11 +127,10 @@ void runtime_app::visit_states() noexcept
     }
 
     double accumulator{0.0};
-    randomizer rng{};
     // Drive the state machine until the stack is empty
     while (!runtime_stack_ptr->is_empty())
     {
-        const auto diff = progress<>::duration([&accumulator, &rng, this]
+        const auto diff = progress<>::duration([&accumulator, this]
                                                { return runtime_stack_ptr->visit_states(std::ref(rng), accumulator); });
         accumulator += progress<>::to_double_from_duration(diff);
     }
